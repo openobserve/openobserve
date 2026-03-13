@@ -248,13 +248,15 @@ describe("DimensionFiltersBar.vue", () => {
 
     it("should compute unstableDimensionTooltipComputed with custom tooltip", () => {
       wrapper = createWrapper({ unstableDimensionTooltip: "Custom Tooltip" });
-      expect(wrapper.vm.unstableDimensionTooltipComputed).toBe("Custom Tooltip");
+      expect(wrapper.vm.unstableDimensionTooltipComputed).toBe(
+        "Custom Tooltip",
+      );
     });
 
     it("should compute unstableDimensionTooltipComputed with default", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.unstableDimensionTooltipComputed).toBe(
-        "This dimension is unstable"
+        "This dimension is unstable",
       );
     });
   });

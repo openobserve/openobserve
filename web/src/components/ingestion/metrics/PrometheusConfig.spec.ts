@@ -12,9 +12,9 @@ vi.mock("../../../aws-exports", () => ({
       scope: ["test-scope"],
       redirectSignIn: "http://localhost:8080/",
       redirectSignOut: "http://localhost:8080/",
-      responseType: "code"
-    }
-  }
+      responseType: "code",
+    },
+  },
 }));
 
 vi.mock("../../../utils/zincutils", () => ({
@@ -23,18 +23,18 @@ vi.mock("../../../utils/zincutils", () => ({
     host: "test.example.com",
     port: "5080",
     protocol: "https",
-    tls: true
+    tls: true,
   })),
   getImageURL: vi.fn(() => "https://test.example.com/image.png"),
-  getIngestionURL: vi.fn(() => "https://test.example.com:5080")
+  getIngestionURL: vi.fn(() => "https://test.example.com:5080"),
 }));
 
 vi.mock("@/components/CopyContent.vue", () => ({
   default: {
     name: "CopyContent",
     template: "<div class='copy-content'><slot /></div>",
-    props: ["content"]
-  }
+    props: ["content"],
+  },
 }));
 
 describe("PrometheusConfig.vue", () => {
@@ -47,16 +47,16 @@ describe("PrometheusConfig.vue", () => {
         selectedOrganization: {
           identifier: "test-org",
           label: "Test Organization",
-          id: 123
+          id: 123,
         },
         API_ENDPOINT: "https://test.example.com:5080",
         theme: "dark",
         userInfo: {
-          email: "test@example.com"
-        }
+          email: "test@example.com",
+        },
       },
       mutations: {},
-      actions: {}
+      actions: {},
     });
   };
 
@@ -68,14 +68,14 @@ describe("PrometheusConfig.vue", () => {
         stubs: {
           CopyContent: {
             template: "<div class='copy-content-stub'>{{ content }}</div>",
-            props: ["content"]
-          }
-        }
+            props: ["content"],
+          },
+        },
       },
       props: {
         currOrgIdentifier: "test-org",
-        currUserEmail: "test@example.com"
-      }
+        currUserEmail: "test@example.com",
+      },
     });
   });
 
@@ -149,7 +149,9 @@ describe("PrometheusConfig.vue", () => {
 
     it("should include correct prometheus endpoint URL", () => {
       const content = wrapper.vm.content;
-      expect(content).toContain("https://test.example.com:5080/api/test-org/prometheus/api/v1/write");
+      expect(content).toContain(
+        "https://test.example.com:5080/api/test-org/prometheus/api/v1/write",
+      );
     });
 
     it("should include queue configuration parameters", () => {
@@ -181,7 +183,6 @@ describe("PrometheusConfig.vue", () => {
       expect(content).toContain("/prometheus/api/v1/write");
     });
   });
-
 
   describe("Template Rendering", () => {
     it("should render main container with correct class", () => {
@@ -219,11 +220,11 @@ describe("PrometheusConfig.vue", () => {
       const wrapperWithoutProp = mount(PrometheusConfig, {
         global: {
           plugins: [store, Quasar],
-          stubs: { CopyContent: true }
+          stubs: { CopyContent: true },
         },
         props: {
-          currUserEmail: "test@example.com"
-        }
+          currUserEmail: "test@example.com",
+        },
       });
       expect(wrapperWithoutProp.props("currOrgIdentifier")).toBeUndefined();
     });
@@ -232,11 +233,11 @@ describe("PrometheusConfig.vue", () => {
       const wrapperWithoutProp = mount(PrometheusConfig, {
         global: {
           plugins: [store, Quasar],
-          stubs: { CopyContent: true }
+          stubs: { CopyContent: true },
         },
         props: {
-          currOrgIdentifier: "test-org"
-        }
+          currOrgIdentifier: "test-org",
+        },
       });
       expect(wrapperWithoutProp.props("currUserEmail")).toBeUndefined();
     });
@@ -259,8 +260,8 @@ describe("PrometheusConfig.vue", () => {
       const newWrapper = mount(PrometheusConfig, {
         global: {
           plugins: [store, Quasar],
-          stubs: { CopyContent: true }
-        }
+          stubs: { CopyContent: true },
+        },
       });
       expect(newWrapper.vm.content).toContain("/api/different-org/");
     });
@@ -285,10 +286,9 @@ describe("PrometheusConfig.vue", () => {
   });
 
   describe("Component Reactivity", () => {
-
     it("should maintain endpoint structure", () => {
       const requiredKeys = ["url", "host", "port", "protocol", "tls"];
-      requiredKeys.forEach(key => {
+      requiredKeys.forEach((key) => {
         expect(wrapper.vm.endpoint).toHaveProperty(key);
       });
     });
@@ -297,9 +297,9 @@ describe("PrometheusConfig.vue", () => {
   describe("Configuration Content Validation", () => {
     it("should generate valid YAML structure", () => {
       const content = wrapper.vm.content;
-      const lines = content.split('\n');
-      
-      expect(lines[0]).toBe('remote_write:');
+      const lines = content.split("\n");
+
+      expect(lines[0]).toBe("remote_write:");
       expect(lines[1]).toMatch(/^\s+- url:/);
       expect(lines[2]).toMatch(/^\s+queue_config:/);
       expect(lines[3]).toMatch(/^\s+max_samples_per_send:/);
@@ -308,7 +308,7 @@ describe("PrometheusConfig.vue", () => {
 
     it("should include all required Prometheus configuration sections", () => {
       const content = wrapper.vm.content;
-      
+
       // Check for all required sections
       expect(content).toContain("remote_write:");
       expect(content).toContain("queue_config:");
@@ -320,8 +320,8 @@ describe("PrometheusConfig.vue", () => {
 
     it("should generate content with proper indentation", () => {
       const content = wrapper.vm.content;
-      const lines = content.split('\n');
-      
+      const lines = content.split("\n");
+
       // Check YAML indentation patterns
       expect(lines[0]).not.toMatch(/^\s/); // Top level shouldn't be indented
       expect(lines[1]).toMatch(/^\s\s-/); // Array item indented 2 spaces
@@ -335,8 +335,8 @@ describe("PrometheusConfig.vue", () => {
       const newWrapper = mount(PrometheusConfig, {
         global: {
           plugins: [store, Quasar],
-          stubs: { CopyContent: true }
-        }
+          stubs: { CopyContent: true },
+        },
       });
       expect(newWrapper.vm.content).toContain("/api//");
     });
@@ -347,22 +347,22 @@ describe("PrometheusConfig.vue", () => {
           selectedOrganization: {
             identifier: "fallback-org",
             label: "Fallback Organization",
-            id: 999
+            id: 999,
           },
           API_ENDPOINT: "https://test.example.com:5080",
           theme: "dark",
           userInfo: {
-            email: "test@example.com"
-          }
+            email: "test@example.com",
+          },
         },
         mutations: {},
-        actions: {}
+        actions: {},
       });
       const newWrapper = mount(PrometheusConfig, {
         global: {
           plugins: [storeWithNullOrg, Quasar],
-          stubs: { CopyContent: true }
-        }
+          stubs: { CopyContent: true },
+        },
       });
       expect(newWrapper.exists()).toBe(true);
       expect(newWrapper.vm.content).toContain("/api/fallback-org/");
@@ -372,8 +372,8 @@ describe("PrometheusConfig.vue", () => {
       const wrapperWithoutProps = mount(PrometheusConfig, {
         global: {
           plugins: [store, Quasar],
-          stubs: { CopyContent: true }
-        }
+          stubs: { CopyContent: true },
+        },
       });
       expect(wrapperWithoutProps.exists()).toBe(true);
     });
@@ -389,21 +389,21 @@ describe("PrometheusConfig.vue", () => {
 
     it("should return all required values from setup", () => {
       const setupFunction = PrometheusConfig.setup!;
-      
+
       // Mock the store for the setup function
       const mockStore = {
         state: {
           selectedOrganization: {
-            identifier: "test-org"
-          }
-        }
+            identifier: "test-org",
+          },
+        },
       };
-      
+
       // Mock useStore to return our mock store
       vi.doMock("vuex", () => ({
-        useStore: () => mockStore
+        useStore: () => mockStore,
       }));
-      
+
       // Since we can't call setup directly due to Vue composition API,
       // we'll verify the component structure instead
       expect(typeof setupFunction).toBe("function");
@@ -412,5 +412,4 @@ describe("PrometheusConfig.vue", () => {
       expect(PrometheusConfig).toHaveProperty("components");
     });
   });
-
 });

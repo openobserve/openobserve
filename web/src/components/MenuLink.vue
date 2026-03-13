@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           aria-live="polite"
           :aria-label="`${badge} notifications`"
         >
-          {{ badge > 99 ? '99+' : badge }}
+          {{ badge > 99 ? "99+" : badge }}
         </div>
       </div>
       <q-item-label>{{ title }}</q-item-label>
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           aria-live="polite"
           :aria-label="`${badge} notifications`"
         >
-          {{ badge > 99 ? '99+' : badge }}
+          {{ badge > 99 ? "99+" : badge }}
         </div>
       </div>
       <q-item-label>{{ title }}</q-item-label>
@@ -135,17 +135,20 @@ export default defineComponent({
 
     // Phase 5: Accessibility - compute active state
     const isActive = computed(() => {
-      return router.currentRoute.value.path.indexOf(props.link) === 0 && props.link !== '/';
+      return (
+        router.currentRoute.value.path.indexOf(props.link) === 0 &&
+        props.link !== "/"
+      );
     });
 
     // Phase 5: Accessibility - compute ARIA label with fallback
     const ariaLabel = computed(() => {
-      let label = props.title || 'Navigation link';
+      let label = props.title || "Navigation link";
       if (props.badge && props.badge > 0) {
         label += ` (${props.badge} notifications)`;
       }
       if (isActive.value) {
-        label += ' - Current page';
+        label += " - Current page";
       }
       return label;
     });
@@ -221,7 +224,11 @@ export default defineComponent({
     //   0 0 8px rgba(168, 85, 247, 0.2),
     //   0 2px 8px rgba(168, 85, 247, 0.25),
     //   inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
-    background: linear-gradient(135deg, var(--o2-menu-gradient-start) 0%, var(--o2-menu-gradient-end) 100%) !important;
+    background: linear-gradient(
+      135deg,
+      var(--o2-menu-gradient-start) 0%,
+      var(--o2-menu-gradient-end) 100%
+    ) !important;
 
     box-shadow: 0 4px 12px rgba(89, 155, 174, 0.09) !important;
     color: var(--o2-menu-color) !important;
@@ -252,7 +259,12 @@ export default defineComponent({
       top: 50%;
       transform: translateY(-50%);
       // Brighter gradient
-      background: linear-gradient(180deg, var(--o2-primary-btn-bg) 0%, var(--o2-primary-btn-bg) 50%, var(--o2-primary-btn-bg) 100%);
+      background: linear-gradient(
+        180deg,
+        var(--o2-primary-btn-bg) 0%,
+        var(--o2-primary-btn-bg) 50%,
+        var(--o2-primary-btn-bg) 100%
+      );
       border-radius: 0 2px 2px 0;
       // Minimal glow
       box-shadow: 0 0 6px var(--o2-menu-color);
@@ -356,10 +368,7 @@ export default defineComponent({
 // Light mode support - using :deep() to pierce scoped styles
 body.body--light {
   .q-item {
-
-
     &.q-router-link--active {
-
       // &::before {
       //   // background: linear-gradient(180deg, var(--o2-body-primary-bg) 0%, var(--o2-body-secondary-bg) 100%) !important;
       //   box-shadow: 4px 0px 0px var(--o2-menu-color) !important;
@@ -367,5 +376,4 @@ body.body--light {
     }
   }
 }
-
 </style>

@@ -19,8 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
       <!-- Header with title and search -->
       <div class="card-container tw:mb-[0.625rem]">
-        <div class="tw:flex tw:justify-between tw:items-center tw:w-full tw:py-3 tw:px-4 tw:h-[68px]">
-          <div class="q-table__title tw:font-[600]" data-test="incidents-list-title">
+        <div
+          class="tw:flex tw:justify-between tw:items-center tw:w-full tw:py-3 tw:px-4 tw:h-[68px]"
+        >
+          <div
+            class="q-table__title tw:font-[600]"
+            data-test="incidents-list-title"
+          >
             {{ t("alerts.incidents.title") }}
           </div>
 
@@ -33,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="incident-refresh-btn"
               class="o2-secondary-button"
             >
-             Refresh
+              Refresh
             </q-btn>
             <q-input
               v-model="searchQuery"
@@ -53,199 +58,237 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- Incidents table -->
       <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-      <div class="card-container tw:h-[calc(100vh-128px)]">
-        <q-table
-          ref="qTableRef"
-          v-model:pagination="pagination"
-          :rows="loading ? [] : incidents"
-          :columns="columns"
-          :loading="loading"
-          row-key="id"
-          :rows-per-page-options="perPageOptions.map((opt: any) => opt.value)"
-          style="width: 100%"
-          :style="!loading && incidents.length > 0
-            ? 'width: 100%; height: calc(100vh - 127px)'
-            : 'width: 100%'"
-          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          data-test="incident-list-table"
-          @request="onRequest"
-        >
-        <!-- Custom body template for clickable rows -->
-        <template v-slot:body="props">
-          <q-tr
-            :props="props"
-            style="cursor: pointer"
-            @click="viewIncident(props.row)"
-            data-test="incident-row"
+        <div class="card-container tw:h-[calc(100vh-128px)]">
+          <q-table
+            ref="qTableRef"
+            v-model:pagination="pagination"
+            :rows="loading ? [] : incidents"
+            :columns="columns"
+            :loading="loading"
+            row-key="id"
+            :rows-per-page-options="perPageOptions.map((opt: any) => opt.value)"
+            style="width: 100%"
+            :style="
+              !loading && incidents.length > 0
+                ? 'width: 100%; height: calc(100vh - 127px)'
+                : 'width: 100%'
+            "
+            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+            data-test="incident-list-table"
+            @request="onRequest"
           >
-            <q-td
-              v-for="col in props.cols"
-              :key="col.name"
-              :props="props"
-            >
-              <template v-if="col.name === 'index'">
-                {{ (pagination.page - 1) * pagination.rowsPerPage + props.pageIndex + 1 }}
-              </template>
-              <template v-else-if="col.name === 'status'">
-                <span
-                  class="status-badge"
-                  :class="getStatusColorClass(props.row.status)"
+            <!-- Custom body template for clickable rows -->
+            <template v-slot:body="props">
+              <q-tr
+                :props="props"
+                style="cursor: pointer"
+                @click="viewIncident(props.row)"
+                data-test="incident-row"
+              >
+                <q-td v-for="col in props.cols" :key="col.name"
+:props="props">
+                  <template v-if="col.name === 'index'">
+                    {{
+                      (pagination.page - 1) * pagination.rowsPerPage +
+                      props.pageIndex +
+                      1
+                    }}
+                  </template>
+                  <template v-else-if="col.name === 'status'">
+                    <span
+                      class="status-badge"
+                      :class="getStatusColorClass(props.row.status)"
+                    >
+                      {{ getStatusLabel(props.row.status) }}
+                    </span>
+                  </template>
+                  <template v-else-if="col.name === 'severity'">
+                    <span
+                      class="severity-badge"
+                      :class="getSeverityColorClass(props.row.severity)"
+                    >
+                      {{ props.row.severity }}
+                    </span>
+                  </template>
+                  <template v-else-if="col.name === 'title'">
+                    <div class="tw:flex tw:items-center tw:gap-1">
+                      <span class="tw:font-medium">
+                        {{
+                          props.row.title ||
+                          formatDimensions(props.row.stable_dimensions)
+                        }}
+                      </span>
+                    </div>
+                  </template>
+                  <template v-else-if="col.name === 'dimensions'">
+                    <div class="tw:flex tw:flex-wrap tw:gap-1">
+                      <!-- Show first 2 dimensions -->
+                      <span
+                        v-for="[key, value] in getSortedDimensions(
+                          props.row.stable_dimensions,
+                        ).slice(0, 2)"
+                        :key="key"
+                        class="dimension-badge"
+                        :class="getDimensionColorClass(key)"
+                      >
+                        <span class="tw:font-medium">{{ key }}</span
+                        >=<span>{{ value }}</span>
+                        <q-tooltip :delay="300" class="tw:text-xs">
+                          {{ key }}={{ value }}
+                        </q-tooltip>
+                      </span>
+                      <!-- Show +X more badge if there are more than 2 dimensions -->
+                      <span
+                        v-if="
+                          getSortedDimensions(props.row.stable_dimensions)
+                            .length > 2
+                        "
+                        class="dimension-badge badge-more"
+                      >
+                        +{{
+                          getSortedDimensions(props.row.stable_dimensions)
+                            .length - 2
+                        }}
+                        more
+                        <q-tooltip :delay="300" class="tw:text-xs tw:max-w-md">
+                          <div class="tw:space-y-1">
+                            <div
+                              v-for="[key, value] in getSortedDimensions(
+                                props.row.stable_dimensions,
+                              ).slice(2)"
+                              :key="key"
+                            >
+                              <span class="tw:font-medium">{{ key }}</span
+                              >=<span>{{ value }}</span>
+                            </div>
+                          </div>
+                        </q-tooltip>
+                      </span>
+                    </div>
+                  </template>
+                  <template v-else-if="col.name === 'alert_count'">
+                    {{ props.row.alert_count }}
+                  </template>
+                  <template v-else-if="col.name === 'last_alert_at'">
+                    {{ formatTimestamp(props.row.last_alert_at) }}
+                  </template>
+                  <template v-else-if="col.name === 'actions'">
+                    <div class="action-buttons">
+                      <q-btn
+                        v-if="props.row.status === 'open'"
+                        flat
+                        dense
+                        size="sm"
+                        icon="visibility"
+                        class="action-btn acknowledge-btn"
+                        @click.stop="acknowledgeIncident(props.row)"
+                        data-test="incident-ack-btn"
+                      >
+                        <q-tooltip>{{
+                          t("alerts.incidents.acknowledge")
+                        }}</q-tooltip>
+                      </q-btn>
+                      <q-btn
+                        v-if="props.row.status !== 'resolved'"
+                        flat
+                        dense
+                        size="sm"
+                        icon="task_alt"
+                        class="action-btn resolve-btn"
+                        @click.stop="resolveIncident(props.row)"
+                        data-test="incident-resolve-btn"
+                      >
+                        <q-tooltip>{{
+                          t("alerts.incidents.resolve")
+                        }}</q-tooltip>
+                      </q-btn>
+                      <q-btn
+                        v-if="props.row.status === 'resolved'"
+                        flat
+                        dense
+                        size="sm"
+                        icon="restart_alt"
+                        class="action-btn reopen-btn"
+                        @click.stop="reopenIncident(props.row)"
+                        data-test="incident-reopen-btn"
+                      >
+                        <q-tooltip>{{
+                          t("alerts.incidents.reopen")
+                        }}</q-tooltip>
+                      </q-btn>
+                    </div>
+                  </template>
+                </q-td>
+              </q-tr>
+            </template>
+
+            <template v-slot:header="props">
+              <q-tr :props="props">
+                <!-- Rendering the of the columns -->
+                <!-- here we can add the classes class so that the head will be sticky -->
+                <q-th
+                  v-for="col in props.cols"
+                  :key="col.name"
+                  :props="props"
+                  :class="col.classes"
+                  :style="col.style"
                 >
-                  {{ getStatusLabel(props.row.status) }}
-                </span>
-              </template>
-              <template v-else-if="col.name === 'severity'">
-                <span
-                  class="severity-badge"
-                  :class="getSeverityColorClass(props.row.severity)"
+                  {{ col.label }}
+                </q-th>
+              </q-tr>
+            </template>
+
+            <!-- Loading state -->
+            <template #loading>
+              <div class="tw:flex tw:items-center tw:justify-center tw:py-20">
+                <q-spinner-hourglass color="primary" size="3rem" />
+              </div>
+            </template>
+
+            <!-- Empty state -->
+            <template #no-data>
+              <div
+                v-if="!loading"
+                class="tw:flex tw:items-center tw:justify-center tw:w-full tw:h-full"
+              >
+                <no-data />
+              </div>
+            </template>
+
+            <!-- Bottom pagination -->
+            <template v-slot:bottom="scope">
+              <div class="bottom-btn tw:h-[48px]">
+                <div
+                  class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md"
                 >
-                  {{ props.row.severity }}
-                </span>
-              </template>
-              <template v-else-if="col.name === 'title'">
-                <div class="tw:flex tw:items-center tw:gap-1">
-                  <span class="tw:font-medium">
-                    {{ props.row.title || formatDimensions(props.row.stable_dimensions) }}
-                  </span>
+                  {{ pagination.rowsNumber }}
+                  {{ pagination.rowsNumber === 1 ? "Incident" : "Incidents" }}
                 </div>
-              </template>
-              <template v-else-if="col.name === 'dimensions'">
-                <div class="tw:flex tw:flex-wrap tw:gap-1">
-                  <!-- Show first 2 dimensions -->
-                  <span
-                    v-for="[key, value] in getSortedDimensions(props.row.stable_dimensions).slice(0, 2)"
-                    :key="key"
-                    class="dimension-badge"
-                    :class="getDimensionColorClass(key)"
-                  >
-                    <span class="tw:font-medium">{{ key }}</span>=<span>{{ value }}</span>
-                    <q-tooltip :delay="300" class="tw:text-xs">
-                      {{ key }}={{ value }}
-                    </q-tooltip>
-                  </span>
-                  <!-- Show +X more badge if there are more than 2 dimensions -->
-                  <span
-                    v-if="getSortedDimensions(props.row.stable_dimensions).length > 2"
-                    class="dimension-badge badge-more"
-                  >
-                    +{{ getSortedDimensions(props.row.stable_dimensions).length - 2 }} more
-                    <q-tooltip :delay="300" class="tw:text-xs tw:max-w-md">
-                      <div class="tw:space-y-1">
-                        <div
-                          v-for="[key, value] in getSortedDimensions(props.row.stable_dimensions).slice(2)"
-                          :key="key"
-                        >
-                          <span class="tw:font-medium">{{ key }}</span>=<span>{{ value }}</span>
-                        </div>
-                      </div>
-                    </q-tooltip>
-                  </span>
-                </div>
-              </template>
-              <template v-else-if="col.name === 'alert_count'">
-                {{ props.row.alert_count }}
-              </template>
-              <template v-else-if="col.name === 'last_alert_at'">
-                {{ formatTimestamp(props.row.last_alert_at) }}
-              </template>
-              <template v-else-if="col.name === 'actions'">
-                <div class="action-buttons">
-                  <q-btn
-                    v-if="props.row.status === 'open'"
-                    flat
-                    dense
-                    size="sm"
-                    icon="visibility"
-                    class="action-btn acknowledge-btn"
-                    @click.stop="acknowledgeIncident(props.row)"
-                    data-test="incident-ack-btn"
-                  >
-                    <q-tooltip>{{ t("alerts.incidents.acknowledge") }}</q-tooltip>
-                  </q-btn>
-                  <q-btn
-                    v-if="props.row.status !== 'resolved'"
-                    flat
-                    dense
-                    size="sm"
-                    icon="task_alt"
-                    class="action-btn resolve-btn"
-                    @click.stop="resolveIncident(props.row)"
-                    data-test="incident-resolve-btn"
-                  >
-                    <q-tooltip>{{ t("alerts.incidents.resolve") }}</q-tooltip>
-                  </q-btn>
-                  <q-btn
-                    v-if="props.row.status === 'resolved'"
-                    flat
-                    dense
-                    size="sm"
-                    icon="restart_alt"
-                    class="action-btn reopen-btn"
-                    @click.stop="reopenIncident(props.row)"
-                    data-test="incident-reopen-btn"
-                  >
-                    <q-tooltip>{{ t("alerts.incidents.reopen") }}</q-tooltip>
-                  </q-btn>
-                </div>
-              </template>
-            </q-td>
-          </q-tr>
-        </template>
-
-        <template v-slot:header="props">
-          <q-tr :props="props">
-            <!-- Rendering the of the columns -->
-            <!-- here we can add the classes class so that the head will be sticky -->
-            <q-th
-              v-for="col in props.cols"
-              :key="col.name"
-              :props="props"
-              :class="col.classes"
-              :style="col.style"
-            >
-              {{ col.label }}
-            </q-th>
-          </q-tr>
-        </template>
-
-        <!-- Loading state -->
-        <template #loading>
-          <div class="tw:flex tw:items-center tw:justify-center tw:py-20">
-            <q-spinner-hourglass color="primary" size="3rem" />
-          </div>
-        </template>
-
-        <!-- Empty state -->
-        <template #no-data>
-          <div v-if="!loading" class="tw:flex tw:items-center tw:justify-center tw:w-full tw:h-full">
-            <no-data />
-          </div>
-        </template>
-
-        <!-- Bottom pagination -->
-        <template v-slot:bottom="scope">
-          <div class="bottom-btn tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
-              {{ pagination.rowsNumber }} {{ pagination.rowsNumber === 1 ? 'Incident' : 'Incidents' }}
-            </div>
-            <QTablePagination
-              :scope="scope"
-              :position="'bottom'"
-              :resultTotal="pagination.rowsNumber"
-              :perPageOptions="perPageOptions"
-              @update:changeRecordPerPage="changePagination"
-            />
-          </div>
-        </template>
-        </q-table>
+                <QTablePagination
+                  :scope="scope"
+                  :position="'bottom'"
+                  :resultTotal="pagination.rowsNumber"
+                  :perPageOptions="perPageOptions"
+                  @update:changeRecordPerPage="changePagination"
+                />
+              </div>
+            </template>
+          </q-table>
+        </div>
       </div>
-    </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted, watch, nextTick } from "vue";
+import {
+  defineComponent,
+  ref,
+  computed,
+  onMounted,
+  watch,
+  nextTick,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -308,14 +351,14 @@ export default defineComponent({
       // Apply status filter
       if (statusFilter.value.length > 0) {
         filtered = filtered.filter((incident) =>
-          statusFilter.value.includes(incident.status)
+          statusFilter.value.includes(incident.status),
         );
       }
 
       // Apply severity filter
       if (severityFilter.value.length > 0) {
         filtered = filtered.filter((incident) =>
-          severityFilter.value.includes(incident.severity)
+          severityFilter.value.includes(incident.severity),
         );
       }
 
@@ -382,12 +425,15 @@ export default defineComponent({
         field: "actions",
         align: "center" as const,
         style: "width: 100px",
-        classes:'actions-column'
+        classes: "actions-column",
       },
     ]);
 
     // Frontend search filter function
-    const applyFrontendSearch = (incidentsList: Incident[], searchQuery: string) => {
+    const applyFrontendSearch = (
+      incidentsList: Incident[],
+      searchQuery: string,
+    ) => {
       if (!searchQuery || searchQuery.trim() === "") {
         return incidentsList;
       }
@@ -396,14 +442,18 @@ export default defineComponent({
 
       return incidentsList.filter((incident) => {
         // Search in title
-        const title = incident.title || formatDimensions(incident.stable_dimensions);
+        const title =
+          incident.title || formatDimensions(incident.stable_dimensions);
         if (title.toLowerCase().includes(query)) {
           return true;
         }
 
         // Search in status
         const statusLabel = getStatusLabel(incident.status).toLowerCase();
-        if (statusLabel.includes(query) || incident.status.toLowerCase().includes(query)) {
+        if (
+          statusLabel.includes(query) ||
+          incident.status.toLowerCase().includes(query)
+        ) {
           return true;
         }
 
@@ -439,23 +489,27 @@ export default defineComponent({
 
         const response = await incidentsService.list(
           org,
-          undefined,  // Status filter to be added when API supports it
+          undefined, // Status filter to be added when API supports it
           limit,
           offset,
-          keyword
+          keyword,
         );
 
         // Store all incidents
         allIncidents.value = response.data.incidents;
 
         // Cache data in store for when navigating back
-        store.dispatch('incidents/setCachedData', response.data.incidents);
+        store.dispatch("incidents/setCachedData", response.data.incidents);
 
         // Apply frontend search filter
-        const filteredIncidents = applyFrontendSearch(allIncidents.value, searchQuery.value);
+        const filteredIncidents = applyFrontendSearch(
+          allIncidents.value,
+          searchQuery.value,
+        );
 
         // Apply pagination on filtered results
-        const startIndex = (pagination.value.page - 1) * pagination.value.rowsPerPage;
+        const startIndex =
+          (pagination.value.page - 1) * pagination.value.rowsPerPage;
         const endIndex = startIndex + pagination.value.rowsPerPage;
         incidents.value = filteredIncidents.slice(startIndex, endIndex);
         pagination.value.rowsNumber = filteredIncidents.length;
@@ -477,32 +531,36 @@ export default defineComponent({
       pagination.value.descending = props.pagination.descending;
 
       // For FE filtering, just reapply filters and pagination without API call
-      const filteredIncidents = applyFrontendSearch(allIncidents.value, searchQuery.value);
-      const startIndex = (pagination.value.page - 1) * pagination.value.rowsPerPage;
+      const filteredIncidents = applyFrontendSearch(
+        allIncidents.value,
+        searchQuery.value,
+      );
+      const startIndex =
+        (pagination.value.page - 1) * pagination.value.rowsPerPage;
       const endIndex = startIndex + pagination.value.rowsPerPage;
       incidents.value = filteredIncidents.slice(startIndex, endIndex);
       pagination.value.rowsNumber = filteredIncidents.length;
 
       // Save to store after pagination update (only search query, page, and rowsPerPage)
-      store.dispatch('incidents/setIncidents', {
+      store.dispatch("incidents/setIncidents", {
         searchQuery: searchQuery.value,
         pagination: {
           page: pagination.value.page,
-          rowsPerPage: pagination.value.rowsPerPage
+          rowsPerPage: pagination.value.rowsPerPage,
         },
-        organizationIdentifier: store.state.selectedOrganization.identifier
+        organizationIdentifier: store.state.selectedOrganization.identifier,
       });
     };
 
     const viewIncident = (incident: Incident) => {
       // Ensure state is saved before navigation (only search query, page, and rowsPerPage)
-      store.dispatch('incidents/setIncidents', {
+      store.dispatch("incidents/setIncidents", {
         searchQuery: searchQuery.value,
         pagination: {
           page: pagination.value.page,
-          rowsPerPage: pagination.value.rowsPerPage
+          rowsPerPage: pagination.value.rowsPerPage,
         },
-        organizationIdentifier: store.state.selectedOrganization.identifier
+        organizationIdentifier: store.state.selectedOrganization.identifier,
       });
 
       // Navigate to incident detail page
@@ -517,7 +575,10 @@ export default defineComponent({
       });
     };
 
-    const updateStatus = async (incident: Incident, newStatus: "open" | "acknowledged" | "resolved") => {
+    const updateStatus = async (
+      incident: Incident,
+      newStatus: "open" | "acknowledged" | "resolved",
+    ) => {
       try {
         const org = store.state.selectedOrganization.identifier;
         await incidentsService.updateStatus(org, incident.id, newStatus);
@@ -528,7 +589,7 @@ export default defineComponent({
         // Reload the incidents list to show updated status
         loadIncidents();
         // Also mark data as stale in store for when navigating back from other pages
-        store.dispatch('incidents/setShouldRefresh', true);
+        store.dispatch("incidents/setShouldRefresh", true);
       } catch (error: any) {
         $q.notify({
           type: "negative",
@@ -549,7 +610,6 @@ export default defineComponent({
     const reopenIncident = (incident: Incident) => {
       updateStatus(incident, "open");
     };
-
 
     const getStatusColorClass = (status: string) => {
       switch (status) {
@@ -614,29 +674,29 @@ export default defineComponent({
       // Sort keys alphabetically for consistency
       return Object.keys(dimensions)
         .sort()
-        .map(key => [key, dimensions[key]] as [string, string]);
+        .map((key) => [key, dimensions[key]] as [string, string]);
     };
 
     const getDimensionColorClass = (key: string) => {
       // Color palette using CSS classes matching schema.scss style
       const colorMap: Record<string, string> = {
-        'k8s-deployment': 'badge-blue',
-        'k8s-namespace': 'badge-orange',
-        'deployment': 'badge-blue',
-        'namespace': 'badge-orange',
-        'env': 'badge-green',
-        'environment': 'badge-green',
-        'host': 'badge-purple',
-        'hostname': 'badge-purple',
-        'service': 'badge-cyan',
-        'service_name': 'badge-cyan',
-        'region': 'badge-pink',
-        'zone': 'badge-pink',
-        'cluster': 'badge-indigo',
-        'pod': 'badge-teal',
-        'container': 'badge-red',
-        'app': 'badge-yellow',
-        'application': 'badge-yellow',
+        "k8s-deployment": "badge-blue",
+        "k8s-namespace": "badge-orange",
+        deployment: "badge-blue",
+        namespace: "badge-orange",
+        env: "badge-green",
+        environment: "badge-green",
+        host: "badge-purple",
+        hostname: "badge-purple",
+        service: "badge-cyan",
+        service_name: "badge-cyan",
+        region: "badge-pink",
+        zone: "badge-pink",
+        cluster: "badge-indigo",
+        pod: "badge-teal",
+        container: "badge-red",
+        app: "badge-yellow",
+        application: "badge-yellow",
       };
 
       // Check for exact match first
@@ -653,10 +713,15 @@ export default defineComponent({
       }
 
       // Hash-based fallback for consistency
-      const classes = ['badge-gray', 'badge-amber', 'badge-violet', 'badge-rose'];
+      const classes = [
+        "badge-gray",
+        "badge-amber",
+        "badge-violet",
+        "badge-rose",
+      ];
       let hash = 0;
       for (let i = 0; i < key.length; i++) {
-        hash = ((hash << 5) - hash) + key.charCodeAt(i);
+        hash = (hash << 5) - hash + key.charCodeAt(i);
         hash = hash & hash;
       }
       return classes[Math.abs(hash) % classes.length];
@@ -673,10 +738,14 @@ export default defineComponent({
       const currentOrg = store.state.selectedOrganization.identifier;
 
       // Check if organization has changed - if so, reset the store
-      if (isInitialized && savedState && savedState.organizationIdentifier &&
-          savedState.organizationIdentifier !== currentOrg) {
+      if (
+        isInitialized &&
+        savedState &&
+        savedState.organizationIdentifier &&
+        savedState.organizationIdentifier !== currentOrg
+      ) {
         // Organization changed - reset store to clear old org's state
-        store.dispatch('incidents/resetIncidents');
+        store.dispatch("incidents/resetIncidents");
 
         // Reset local state to defaults
         searchQuery.value = "";
@@ -691,9 +760,11 @@ export default defineComponent({
         return false;
       }
       // Restore state if available and same organization
-      else if (isInitialized && savedState &&
-               savedState.organizationIdentifier === currentOrg) {
-
+      else if (
+        isInitialized &&
+        savedState &&
+        savedState.organizationIdentifier === currentOrg
+      ) {
         // Prevent watch from interfering during restoration
         isRestoringState.value = true;
 
@@ -705,7 +776,8 @@ export default defineComponent({
         // Restore pagination
         if (savedState.pagination) {
           pagination.value.page = savedState.pagination.page || 1;
-          pagination.value.rowsPerPage = savedState.pagination.rowsPerPage || 20;
+          pagination.value.rowsPerPage =
+            savedState.pagination.rowsPerPage || 20;
         }
 
         // Restore search query
@@ -762,8 +834,12 @@ export default defineComponent({
 
       // Re-apply pagination if any correction was made
       if (wasCorrected) {
-        const filteredIncidents = applyFrontendSearch(allIncidents.value, searchQuery.value);
-        const startIndex = (pagination.value.page - 1) * pagination.value.rowsPerPage;
+        const filteredIncidents = applyFrontendSearch(
+          allIncidents.value,
+          searchQuery.value,
+        );
+        const startIndex =
+          (pagination.value.page - 1) * pagination.value.rowsPerPage;
         const endIndex = startIndex + pagination.value.rowsPerPage;
         incidents.value = filteredIncidents.slice(startIndex, endIndex);
       }
@@ -786,12 +862,16 @@ export default defineComponent({
         await loadIncidents();
         // Clear the shouldRefresh flag after loading
         if (shouldRefresh) {
-          store.dispatch('incidents/setShouldRefresh', false);
+          store.dispatch("incidents/setShouldRefresh", false);
         }
       } else {
         // We have cached data and no refresh needed, just reapply filters and pagination
-        const filteredIncidents = applyFrontendSearch(allIncidents.value, searchQuery.value);
-        const startIndex = (pagination.value.page - 1) * pagination.value.rowsPerPage;
+        const filteredIncidents = applyFrontendSearch(
+          allIncidents.value,
+          searchQuery.value,
+        );
+        const startIndex =
+          (pagination.value.page - 1) * pagination.value.rowsPerPage;
         const endIndex = startIndex + pagination.value.rowsPerPage;
         incidents.value = filteredIncidents.slice(startIndex, endIndex);
         pagination.value.rowsNumber = filteredIncidents.length;
@@ -802,18 +882,18 @@ export default defineComponent({
 
       // Mark as initialized after first load
       if (!store.state.incidents.isInitialized) {
-        store.dispatch('incidents/setIsInitialized', true);
+        store.dispatch("incidents/setIsInitialized", true);
       }
 
       // Save the state to store (either restored or corrected)
       if (hasRestoredState || wasCorrected) {
-        store.dispatch('incidents/setIncidents', {
+        store.dispatch("incidents/setIncidents", {
           searchQuery: searchQuery.value,
           pagination: {
             page: pagination.value.page,
-            rowsPerPage: pagination.value.rowsPerPage
+            rowsPerPage: pagination.value.rowsPerPage,
           },
-          organizationIdentifier: store.state.selectedOrganization.identifier
+          organizationIdentifier: store.state.selectedOrganization.identifier,
         });
       }
 
@@ -825,45 +905,55 @@ export default defineComponent({
     });
 
     // Watch for search query changes and apply FE filter
-    watch(() => searchQuery.value, (newValue, oldValue) => {
-      // Skip page manipulation during state restoration
-      if (!isRestoringState.value) {
-        // If starting a search (going from empty to something)
-        if (!oldValue && newValue) {
-          store.dispatch('incidents/setPageBeforeSearch', pagination.value.page);
-          pagination.value.page = 1;
+    watch(
+      () => searchQuery.value,
+      (newValue, oldValue) => {
+        // Skip page manipulation during state restoration
+        if (!isRestoringState.value) {
+          // If starting a search (going from empty to something)
+          if (!oldValue && newValue) {
+            store.dispatch(
+              "incidents/setPageBeforeSearch",
+              pagination.value.page,
+            );
+            pagination.value.page = 1;
+          }
+          // If clearing the search (going from something to empty)
+          else if (oldValue && !newValue) {
+            const pageBeforeSearch = store.state.incidents.pageBeforeSearch;
+            pagination.value.page = pageBeforeSearch || 1;
+          }
+          // If changing search query (both old and new have values)
+          else if (oldValue && newValue) {
+            pagination.value.page = 1;
+          }
         }
-        // If clearing the search (going from something to empty)
-        else if (oldValue && !newValue) {
-          const pageBeforeSearch = store.state.incidents.pageBeforeSearch;
-          pagination.value.page = pageBeforeSearch || 1;
-        }
-        // If changing search query (both old and new have values)
-        else if (oldValue && newValue) {
-          pagination.value.page = 1;
-        }
-      }
 
-      // Apply FE search filter without API call
-      const filteredIncidents = applyFrontendSearch(allIncidents.value, searchQuery.value);
-      const startIndex = (pagination.value.page - 1) * pagination.value.rowsPerPage;
-      const endIndex = startIndex + pagination.value.rowsPerPage;
-      incidents.value = filteredIncidents.slice(startIndex, endIndex);
-      pagination.value.rowsNumber = filteredIncidents.length;
+        // Apply FE search filter without API call
+        const filteredIncidents = applyFrontendSearch(
+          allIncidents.value,
+          searchQuery.value,
+        );
+        const startIndex =
+          (pagination.value.page - 1) * pagination.value.rowsPerPage;
+        const endIndex = startIndex + pagination.value.rowsPerPage;
+        incidents.value = filteredIncidents.slice(startIndex, endIndex);
+        pagination.value.rowsNumber = filteredIncidents.length;
 
-      // Validate pagination after applying search (handles edge case: pageBeforeSearch is out of bounds)
-      validateAndCorrectPagination();
+        // Validate pagination after applying search (handles edge case: pageBeforeSearch is out of bounds)
+        validateAndCorrectPagination();
 
-      // Save to store (only search query, page, and rowsPerPage - not sort settings)
-      store.dispatch('incidents/setIncidents', {
-        searchQuery: searchQuery.value,
-        pagination: {
-          page: pagination.value.page,
-          rowsPerPage: pagination.value.rowsPerPage
-        },
-        organizationIdentifier: store.state.selectedOrganization.identifier
-      });
-    });
+        // Save to store (only search query, page, and rowsPerPage - not sort settings)
+        store.dispatch("incidents/setIncidents", {
+          searchQuery: searchQuery.value,
+          pagination: {
+            page: pagination.value.page,
+            rowsPerPage: pagination.value.rowsPerPage,
+          },
+          organizationIdentifier: store.state.selectedOrganization.identifier,
+        });
+      },
+    );
 
     // Filter toggle functions
     const toggleStatusFilter = (status: string) => {
@@ -902,17 +992,17 @@ export default defineComponent({
       pagination.value.rowsPerPage = val.value;
       pagination.value.page = 1;
       qTableRef.value?.requestServerInteraction({
-        pagination: pagination.value
+        pagination: pagination.value,
       });
 
       // Save to store (only search query, page, and rowsPerPage)
-      store.dispatch('incidents/setIncidents', {
+      store.dispatch("incidents/setIncidents", {
         searchQuery: searchQuery.value,
         pagination: {
           page: pagination.value.page,
-          rowsPerPage: pagination.value.rowsPerPage
+          rowsPerPage: pagination.value.rowsPerPage,
         },
-        organizationIdentifier: store.state.selectedOrganization.identifier
+        organizationIdentifier: store.state.selectedOrganization.identifier,
       });
     };
 
@@ -925,7 +1015,6 @@ export default defineComponent({
         timeout: 1500,
       });
     };
-
 
     return {
       t,

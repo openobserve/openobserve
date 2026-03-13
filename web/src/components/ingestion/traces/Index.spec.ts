@@ -82,8 +82,7 @@ describe("IngestTraces (Index.vue)", () => {
         stubs: {
           RouterView: { template: "<div data-test='router-view'></div>" },
           QSplitter: {
-            template:
-              "<div><slot name='before'/><slot name='after'/></div>",
+            template: "<div><slot name='before'/><slot name='after'/></div>",
           },
         },
       },

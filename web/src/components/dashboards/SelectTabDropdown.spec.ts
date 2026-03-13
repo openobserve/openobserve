@@ -74,7 +74,9 @@ describe("SelectTabDropdown", () => {
       },
     });
 
-    const dropdown = wrapper.find('[data-test="dashboard-dropdown-tab-selection"]');
+    const dropdown = wrapper.find(
+      '[data-test="dashboard-dropdown-tab-selection"]',
+    );
     expect(dropdown.exists()).toBe(true);
   });
 

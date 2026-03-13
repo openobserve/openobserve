@@ -92,7 +92,7 @@ describe("RawQueryBuilder", () => {
       wrapper = createWrapper();
       const instruction = wrapper.findAll(".query-label")[1];
       expect(instruction.text()).toContain(
-        "Write a SQL query for complex actions"
+        "Write a SQL query for complex actions",
       );
     });
 
@@ -119,7 +119,7 @@ describe("RawQueryBuilder", () => {
       wrapper = createWrapper({ modelValue: customValue });
       const textarea = wrapper.find("textarea");
       expect(textarea.element.value).toBe(
-        "SELECT * FROM logs WHERE level = 'error'"
+        "SELECT * FROM logs WHERE level = 'error'",
       );
     });
 
@@ -130,8 +130,12 @@ describe("RawQueryBuilder", () => {
     });
 
     it("should handle required modelValue", () => {
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleWarnSpy = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => {});
+      const consoleErrorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       // Component requires modelValue, so we provide minimal valid value
       const minimalValue = { rawQuery: "" };
@@ -154,7 +158,7 @@ describe("RawQueryBuilder", () => {
       wrapper = createWrapper();
       const textarea = wrapper.find("textarea");
       expect(textarea.attributes("data-test")).toBe(
-        "dashboard-raw-query-textarea"
+        "dashboard-raw-query-textarea",
       );
     });
 
@@ -216,7 +220,7 @@ WHERE level = 'error'`;
       const textarea = wrapper.find("textarea");
 
       await textarea.setValue(
-        "SELECT * FROM logs WHERE status = 'active' ORDER BY timestamp DESC"
+        "SELECT * FROM logs WHERE status = 'active' ORDER BY timestamp DESC",
       );
       await flushPromises();
 
@@ -229,7 +233,9 @@ WHERE level = 'error'`;
       wrapper = createWrapper();
       const textarea = wrapper.find("textarea");
 
-      await textarea.setValue("SELECT * FROM logs WHERE message LIKE '%error%'");
+      await textarea.setValue(
+        "SELECT * FROM logs WHERE message LIKE '%error%'",
+      );
       await flushPromises();
 
       expect(wrapper.vm.fields.rawQuery).toContain("%error%");
@@ -403,7 +409,7 @@ WHERE level = 'error'`;
       const textarea = wrapper.find("textarea");
 
       await textarea.setValue(
-        "SELECT * FROM logs JOIN metrics ON logs.id = metrics.log_id"
+        "SELECT * FROM logs JOIN metrics ON logs.id = metrics.log_id",
       );
       await flushPromises();
 
@@ -562,8 +568,7 @@ WHERE level = 'error'`;
       wrapper = createWrapper();
       const textarea = wrapper.find("textarea");
 
-      const unionQuery =
-        "SELECT * FROM logs UNION SELECT * FROM archived_logs";
+      const unionQuery = "SELECT * FROM logs UNION SELECT * FROM archived_logs";
       await textarea.setValue(unionQuery);
       await flushPromises();
 
@@ -586,7 +591,9 @@ WHERE level = 'error'`;
       wrapper = createWrapper();
       const textarea = wrapper.find("textarea");
 
-      await textarea.setValue("SELECT COUNT(*), SUM(value), AVG(value) FROM logs");
+      await textarea.setValue(
+        "SELECT COUNT(*), SUM(value), AVG(value) FROM logs",
+      );
       await flushPromises();
 
       expect(wrapper.vm.fields.rawQuery).toContain("COUNT");

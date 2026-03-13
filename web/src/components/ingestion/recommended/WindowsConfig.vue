@@ -24,7 +24,11 @@ import { computed, ref, type Ref } from "vue";
 import type { Endpoint } from "@/ts/interfaces";
 import ContentCopy from "@/components/CopyContent.vue";
 import { useStore } from "vuex";
-import { b64EncodeStandard, getEndPoint, getIngestionURL } from "../../../utils/zincutils";
+import {
+  b64EncodeStandard,
+  getEndPoint,
+  getIngestionURL,
+} from "../../../utils/zincutils";
 
 const store = useStore();
 

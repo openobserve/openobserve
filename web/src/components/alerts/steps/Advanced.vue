@@ -15,14 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="step-advanced" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+  <div
+    class="step-advanced"
+    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
+  >
     <div class="step-content card-container tw:px-3 tw:py-4">
       <!-- Context Variables -->
       <div class="tw:mb-4">
         <div class="tw:pb-2 custom-input-label text-bold">
           <span>{{ t("alerts.additionalVariables") }}</span>
           <q-btn
-            style="color: #A0A0A0;"
+            style="color: #a0a0a0"
             no-caps
             padding="xs"
             class="q-ml-xs"
@@ -31,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon="info_outline"
           >
             <q-tooltip>
-              {{ t('alerts.advanced.variablesTooltip') }}
+              {{ t("alerts.advanced.variablesTooltip") }}
             </q-tooltip>
           </q-btn>
         </div>
@@ -46,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             @click="addVariable"
           >
-            <span>{{ t('alerts.advanced.addVariable') }}</span>
+            <span>{{ t("alerts.advanced.addVariable") }}</span>
           </q-btn>
         </template>
         <template v-else>
@@ -109,7 +112,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Description -->
       <div class="tw:mb-4">
         <div class="flex items-center q-mb-sm">
-          <span class="text-bold custom-input-label">{{ t("alerts.description") }}</span>
+          <span class="text-bold custom-input-label">{{
+            t("alerts.description")
+          }}</span>
         </div>
         <q-input
           v-model="localDescription"
@@ -121,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           borderless
           dense
           tabindex="0"
-          style="width: 100%; resize: none;"
+          style="width: 100%; resize: none"
           type="textarea"
           :placeholder="t('alerts.placeholders.typeSomething')"
           rows="5"
@@ -133,10 +138,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:mb-4">
         <div class="flex items-center justify-between q-mb-sm">
           <div class="flex items-center">
-            <span class="text-bold custom-input-label">{{ t("alerts.row") }}</span>
+            <span class="text-bold custom-input-label">{{
+              t("alerts.row")
+            }}</span>
             <q-btn
               data-test="add-alert-row-input-info-btn"
-              style="color: #A0A0A0;"
+              style="color: #a0a0a0"
               no-caps
               padding="xs"
               class="q-ml-xs"
@@ -145,12 +152,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="info_outline"
             >
               <q-tooltip>
-                {{ t('alerts.advanced.rowTemplateTooltip') }}
+                {{ t("alerts.advanced.rowTemplateTooltip") }}
               </q-tooltip>
             </q-btn>
           </div>
           <div class="flex items-center">
-            <span class="text-caption q-mr-sm">{{ t('alerts.advanced.templateType') }}</span>
+            <span class="text-caption q-mr-sm">{{
+              t("alerts.advanced.templateType")
+            }}</span>
             <q-btn-toggle
               data-test="add-alert-row-template-type-toggle"
               v-model="localRowTemplateType"
@@ -175,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           borderless
           dense
           tabindex="0"
-          style="width: 100%; resize: none;"
+          style="width: 100%; resize: none"
           type="textarea"
           :placeholder="rowTemplatePlaceholder"
           rows="5"
@@ -218,7 +227,12 @@ export default defineComponent({
       default: "String",
     },
   },
-  emits: ["update:contextAttributes", "update:description", "update:rowTemplate", "update:rowTemplateType"],
+  emits: [
+    "update:contextAttributes",
+    "update:description",
+    "update:rowTemplate",
+    "update:rowTemplateType",
+  ],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -240,9 +254,9 @@ export default defineComponent({
     ];
 
     const rowTemplatePlaceholder = computed(() => {
-      return localRowTemplateType.value === 'Json'
+      return localRowTemplateType.value === "Json"
         ? 'e.g - {"user": "{name}", "timestamp": "{timestamp}"}'
-        : 'e.g - Alert was triggered at {timestamp}';
+        : "e.g - Alert was triggered at {timestamp}";
     });
 
     // Watch for prop changes
@@ -251,28 +265,28 @@ export default defineComponent({
       (newVal) => {
         localVariables.value = [...newVal];
       },
-      { deep: true }
+      { deep: true },
     );
 
     watch(
       () => props.description,
       (newVal) => {
         localDescription.value = newVal;
-      }
+      },
     );
 
     watch(
       () => props.rowTemplate,
       (newVal) => {
         localRowTemplate.value = newVal;
-      }
+      },
     );
 
     watch(
       () => props.rowTemplateType,
       (newVal) => {
         localRowTemplateType.value = newVal;
-      }
+      },
     );
 
     const addVariable = () => {
@@ -286,7 +300,7 @@ export default defineComponent({
 
     const removeVariable = (variable: Variable) => {
       localVariables.value = localVariables.value.filter(
-        (v: Variable) => v.id !== variable.id
+        (v: Variable) => v.id !== variable.id,
       );
       emitUpdate();
     };

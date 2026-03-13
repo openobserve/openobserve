@@ -79,7 +79,11 @@ describe("FieldList.vue", () => {
         },
       });
 
-      expect(wrapper.find('[data-test="log-search-index-list-fields-table"]').exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="log-search-index-list-fields-table"]')
+          .exists(),
+      ).toBe(true);
     });
 
     it("should render search input", () => {
@@ -95,7 +99,11 @@ describe("FieldList.vue", () => {
         },
       });
 
-      expect(wrapper.find('[data-test="log-search-index-list-field-search-input"]').exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="log-search-index-list-field-search-input"]')
+          .exists(),
+      ).toBe(true);
     });
 
     it("should render loading state when loadingStream is true", () => {
@@ -136,7 +144,9 @@ describe("FieldList.vue", () => {
         },
       });
 
-      expect(wrapper.find(".field-table").classes()).toContain("loading-fields");
+      expect(wrapper.find(".field-table").classes()).toContain(
+        "loading-fields",
+      );
     });
 
     it("should render no matching fields message", () => {
@@ -222,7 +232,8 @@ describe("FieldList.vue", () => {
         },
       });
 
-      const groupHeader = wrapper.find(".field-group-header").element.parentElement;
+      const groupHeader = wrapper.find(".field-group-header").element
+        .parentElement;
       if (groupHeader) {
         await groupHeader.dispatchEvent(new Event("click"));
       }
@@ -241,7 +252,13 @@ describe("FieldList.vue", () => {
           stubs: {
             FieldRow: {
               template: '<div class="field-row"></div>',
-              props: ["field", "selectedFields", "timestampColumn", "theme", "showQuickMode"],
+              props: [
+                "field",
+                "selectedFields",
+                "timestampColumn",
+                "theme",
+                "showQuickMode",
+              ],
             },
             FieldExpansion: true,
             FieldListPagination: true,
@@ -261,7 +278,13 @@ describe("FieldList.vue", () => {
           stubs: {
             FieldRow: {
               template: '<div class="field-row" />',
-              props: ["field", "selectedFields", "timestampColumn", "theme", "showQuickMode"],
+              props: [
+                "field",
+                "selectedFields",
+                "timestampColumn",
+                "theme",
+                "showQuickMode",
+              ],
             },
             FieldExpansion: true,
             FieldListPagination: true,
@@ -306,7 +329,9 @@ describe("FieldList.vue", () => {
         },
       });
 
-      const searchInput = wrapper.find('[data-test="log-search-index-list-field-search-input"]');
+      const searchInput = wrapper.find(
+        '[data-test="log-search-index-list-field-search-input"]',
+      );
       await searchInput.setValue("test");
 
       expect(wrapper.emitted("update:filter-field")).toBeTruthy();
@@ -366,7 +391,7 @@ describe("FieldList.vue", () => {
         page: 2,
         rowsPerPage: 100,
         sortBy: null,
-        descending: false
+        descending: false,
       };
       await table.vm.$emit("update:pagination", newPagination);
 
@@ -379,8 +404,15 @@ describe("FieldList.vue", () => {
   describe("event forwarding", () => {
     it("should forward add-to-filter event from FieldRow", async () => {
       const FieldRowStub = {
-        template: '<div class="field-row-stub" @click="$emit(\'add-to-filter\', \'test\')"></div>',
-        props: ["field", "selectedFields", "timestampColumn", "theme", "showQuickMode"],
+        template:
+          "<div class=\"field-row-stub\" @click=\"$emit('add-to-filter', 'test')\"></div>",
+        props: [
+          "field",
+          "selectedFields",
+          "timestampColumn",
+          "theme",
+          "showQuickMode",
+        ],
         emits: ["add-to-filter"],
       };
 

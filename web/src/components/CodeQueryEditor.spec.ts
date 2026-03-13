@@ -68,12 +68,30 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
 }));
 
 // Mock dynamic imports
-vi.mock("monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js", () => ({}));
-vi.mock("monaco-editor/esm/vs/language/json/monaco.contribution.js", () => ({}));
-vi.mock("monaco-editor/esm/vs/language/html/monaco.contribution.js", () => ({}));
-vi.mock("monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js", () => ({}));
-vi.mock("monaco-editor/esm/vs/basic-languages/python/python.contribution.js", () => ({}));
-vi.mock("monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js", () => ({}));
+vi.mock(
+  "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js",
+  () => ({}),
+);
+vi.mock(
+  "monaco-editor/esm/vs/language/json/monaco.contribution.js",
+  () => ({}),
+);
+vi.mock(
+  "monaco-editor/esm/vs/language/html/monaco.contribution.js",
+  () => ({}),
+);
+vi.mock(
+  "monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js",
+  () => ({}),
+);
+vi.mock(
+  "monaco-editor/esm/vs/basic-languages/python/python.contribution.js",
+  () => ({}),
+);
+vi.mock(
+  "monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js",
+  () => ({}),
+);
 
 // Fix: component imports default from "@/composables/useLogs/searchState"
 vi.mock("@/composables/useLogs/searchState", () => ({
@@ -201,7 +219,9 @@ describe("CodeQueryEditor", () => {
     });
 
     it("should accept keywords array prop", () => {
-      const keywords = [{ label: "SELECT", kind: "Keyword", insertText: "SELECT" }];
+      const keywords = [
+        { label: "SELECT", kind: "Keyword", insertText: "SELECT" },
+      ];
       const wrapper = createWrapper({ keywords });
       expect(wrapper.props("keywords")).toEqual(keywords);
     });
@@ -434,7 +454,8 @@ describe("CodeQueryEditor", () => {
     });
 
     it("should handle complex SQL query", () => {
-      const query = "SELECT u.name, COUNT(*) as count FROM users u JOIN orders o ON u.id = o.user_id GROUP BY u.name";
+      const query =
+        "SELECT u.name, COUNT(*) as count FROM users u JOIN orders o ON u.id = o.user_id GROUP BY u.name";
       const wrapper = createWrapper({ query });
       expect(wrapper.props("query")).toBe(query);
     });

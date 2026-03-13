@@ -17,19 +17,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
+  <q-page
+    class="q-pa-none"
+    style="min-height: inherit; height: calc(100vh - 44px)"
+  >
     <div>
-    <div class="card-container tw:mb-[0.625rem]">
-      <div class="tw:flex tw:flex-row tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
-    >
-      <div
-          class="q-table__title tw:font-[600]"
-          data-test="user-title-text"
+      <div class="card-container tw:mb-[0.625rem]">
+        <div
+          class="tw:flex tw:flex-row tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
         >
-          {{ t("iam.basicUsers") }}
-        </div>
-        <div class="full-width tw:flex tw:justify-end">
-          <q-input
+          <div class="q-table__title tw:font-[600]" data-test="user-title-text">
+            {{ t("iam.basicUsers") }}
+          </div>
+          <div class="full-width tw:flex tw:justify-end">
+            <q-input
               v-model="filterQuery"
               borderless
               dense
@@ -40,153 +41,171 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon class="o2-search-input-icon" name="search" />
               </template>
             </q-input>
-          <div class="col-6" v-if="config.isCloud == 'true'">
-            <member-invitation
-              :key="currentUserRole"
-              v-model:currentrole="currentUserRole"
-              @invite-sent="handleInviteSent"
-            />
-          </div>
-          <div class="col-6" v-else>
-            <q-btn
-              class="q-ml-sm o2-primary-button tw:h-[36px]"
-              flat
-              no-caps
-              :label="t(`user.add`)"
-              @click="addRoutePush({})"
-              data-test="add-basic-user"
-            />
-          </div>
-        </div>
-        </div>
-    </div>
-    <div class="tw:w-full tw:h-full">
-      <div class="card-container tw:h-[calc(100vh-127px)]">
-        <q-table
-          ref="qTable"
-          :rows="visibleRows"
-          :columns="columns"
-          row-key="email"
-          selection="multiple"
-          v-model:selected="selectedUsers"
-          :pagination="pagination"
-          :filter="filterQuery"
-          :style="hasVisibleRows ? 'height: calc(100vh - 127px); overflow-y: auto;' : ''"
-          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-        >
-          <template #no-data>
-            <NoData></NoData>
-          </template>
-          <template v-slot:body-selection="scope">
-            <q-td auto-width>
-              <q-checkbox
-                v-model="scope.selected"
-                size="sm"
-                class="o2-table-checkbox"
-                :disable="!scope.row.enableDelete"
+            <div class="col-6" v-if="config.isCloud == 'true'">
+              <member-invitation
+                :key="currentUserRole"
+                v-model:currentrole="currentUserRole"
+                @invite-sent="handleInviteSent"
               />
-            </q-td>
-          </template>
-          <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Adding this block to render the select-all checkbox -->
-              <q-th v-if="columns.length > 0" auto-width>
-                <q-checkbox
-                  v-model="props.selected"
-                  size="sm"
-                  :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                  class="o2-table-checkbox"
-                />
-              </q-th>
-
-              <q-th v-for="col in props.cols"
-              :class="col.classes"
-              :style="col.style"
-              :key="col.name" :props="props">
-                <span>{{ col.label }}</span>
-              </q-th>
-            </q-tr>
-          </template>
-          <template #body-cell-actions="props">
-            <q-td :props="props" side>
-              <q-btn
-                v-if="props.row.enableDelete && props.row.status != 'pending'"
-                :title="t('user.delete')"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                :icon="outlinedDelete"
-                @click="confirmDeleteAction(props)"
-                style="cursor: pointer !important"
-                :data-test="`delete-basic-user-${props.row.email}`"
-              >
-              </q-btn>
-              <q-btn
-                v-if="props.row.status == 'pending' && props.row.token"
-                :title="t('user.revoke_invite')"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                icon="cancel"
-                @click="confirmRevokeAction(props)"
-                style="cursor: pointer !important"
-                :data-test="`revoke-invite-${props.row.email}`"
-              >
-              </q-btn>
-              <q-btn
-                v-if="props.row.enableEdit && props.row.status != 'pending' && config.isCloud == 'false'"
-                :title="t('user.update')"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                icon="edit"
-                @click="addRoutePush(props)"
-                style="cursor: pointer !important"
-                :data-test="`edit-basic-user-${props.row.email}`"
-              >
-            </q-btn>
-            </q-td>
-          </template>
-          <template #bottom="scope">
-            <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-              <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[230px] tw:mr-md">
-                {{ resultTotal }} {{ t('user.header') }}
-              </div>
-              <q-btn
-                v-if="selectedUsers.length > 0"
-                data-test="users-list-delete-users-btn"
-                class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-secondary-button-dark'
-                    : 'o2-secondary-button-light'
-                "
-                no-caps
-                dense
-                @click="openBulkDeleteDialog"
-              >
-                <q-icon name="delete" size="16px" />
-                <span class="tw:ml-2">Delete</span>
-              </q-btn>
-              <QTablePagination
-              :scope="scope"
-              :resultTotal="resultTotal"
-              :perPageOptions="perPageOptions"
-              position="bottom"
-              @update:changeRecordPerPage="changePagination"
-            />
             </div>
-
-          </template>
-        </q-table>
+            <div class="col-6" v-else>
+              <q-btn
+                class="q-ml-sm o2-primary-button tw:h-[36px]"
+                flat
+                no-caps
+                :label="t(`user.add`)"
+                @click="addRoutePush({})"
+                data-test="add-basic-user"
+              />
+            </div>
+          </div>
         </div>
-    </div>
+      </div>
+      <div class="tw:w-full tw:h-full">
+        <div class="card-container tw:h-[calc(100vh-127px)]">
+          <q-table
+            ref="qTable"
+            :rows="visibleRows"
+            :columns="columns"
+            row-key="email"
+            selection="multiple"
+            v-model:selected="selectedUsers"
+            :pagination="pagination"
+            :filter="filterQuery"
+            :style="
+              hasVisibleRows
+                ? 'height: calc(100vh - 127px); overflow-y: auto;'
+                : ''
+            "
+            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+          >
+            <template #no-data>
+              <NoData></NoData>
+            </template>
+            <template v-slot:body-selection="scope">
+              <q-td auto-width>
+                <q-checkbox
+                  v-model="scope.selected"
+                  size="sm"
+                  class="o2-table-checkbox"
+                  :disable="!scope.row.enableDelete"
+                />
+              </q-td>
+            </template>
+            <template v-slot:header="props">
+              <q-tr :props="props">
+                <!-- Adding this block to render the select-all checkbox -->
+                <q-th v-if="columns.length > 0" auto-width>
+                  <q-checkbox
+                    v-model="props.selected"
+                    size="sm"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-table-checkbox-dark'
+                        : 'o2-table-checkbox-light'
+                    "
+                    class="o2-table-checkbox"
+                  />
+                </q-th>
+
+                <q-th
+                  v-for="col in props.cols"
+                  :class="col.classes"
+                  :style="col.style"
+                  :key="col.name"
+                  :props="props"
+                >
+                  <span>{{ col.label }}</span>
+                </q-th>
+              </q-tr>
+            </template>
+            <template #body-cell-actions="props">
+              <q-td :props="props" side>
+                <q-btn
+                  v-if="props.row.enableDelete && props.row.status != 'pending'"
+                  :title="t('user.delete')"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  :icon="outlinedDelete"
+                  @click="confirmDeleteAction(props)"
+                  style="cursor: pointer !important"
+                  :data-test="`delete-basic-user-${props.row.email}`"
+                >
+                </q-btn>
+                <q-btn
+                  v-if="props.row.status == 'pending' && props.row.token"
+                  :title="t('user.revoke_invite')"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  icon="cancel"
+                  @click="confirmRevokeAction(props)"
+                  style="cursor: pointer !important"
+                  :data-test="`revoke-invite-${props.row.email}`"
+                >
+                </q-btn>
+                <q-btn
+                  v-if="
+                    props.row.enableEdit &&
+                    props.row.status != 'pending' &&
+                    config.isCloud == 'false'
+                  "
+                  :title="t('user.update')"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  icon="edit"
+                  @click="addRoutePush(props)"
+                  style="cursor: pointer !important"
+                  :data-test="`edit-basic-user-${props.row.email}`"
+                >
+                </q-btn>
+              </q-td>
+            </template>
+            <template #bottom="scope">
+              <div
+                class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+              >
+                <div
+                  class="o2-table-footer-title tw:flex tw:items-center tw:w-[230px] tw:mr-md"
+                >
+                  {{ resultTotal }} {{ t("user.header") }}
+                </div>
+                <q-btn
+                  v-if="selectedUsers.length > 0"
+                  data-test="users-list-delete-users-btn"
+                  class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'o2-secondary-button-dark'
+                      : 'o2-secondary-button-light'
+                  "
+                  no-caps
+                  dense
+                  @click="openBulkDeleteDialog"
+                >
+                  <q-icon name="delete" size="16px" />
+                  <span class="tw:ml-2">Delete</span>
+                </q-btn>
+                <QTablePagination
+                  :scope="scope"
+                  :resultTotal="resultTotal"
+                  :perPageOptions="perPageOptions"
+                  position="bottom"
+                  @update:changeRecordPerPage="changePagination"
+                />
+              </div>
+            </template>
+          </q-table>
+        </div>
+      </div>
     </div>
 
     <q-dialog
@@ -225,8 +244,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated
-            no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true"
+unelevated no-caps
+class="q-mr-sm">
             {{ t("user.cancel") }}
           </q-btn>
           <q-btn
@@ -247,12 +267,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card style="width: 400px">
         <q-card-section class="confirmBody">
           <div class="head">Revoke Invitation</div>
-          <div class="para">Are you sure you want to revoke the invitation for {{ revokeInviteEmail }}?</div>
+          <div class="para">
+            Are you sure you want to revoke the invitation for
+            {{ revokeInviteEmail }}?
+          </div>
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated
-            no-caps class="q-mr-sm o2-secondary-button">
+          <q-btn
+            v-close-popup="true"
+            unelevated
+            no-caps
+            class="q-mr-sm o2-secondary-button"
+          >
             {{ t("user.cancel") }}
           </q-btn>
           <q-btn
@@ -272,12 +299,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card style="width: 280px">
         <q-card-section class="confirmBody">
           <div class="head">Delete Users</div>
-          <div class="para">Are you sure you want to delete {{ selectedUsers.length }} user(s)?</div>
+          <div class="para">
+            Are you sure you want to delete {{ selectedUsers.length }} user(s)?
+          </div>
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated
-            no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true"
+unelevated no-caps
+class="q-mr-sm">
             Cancel
           </q-btn>
           <q-btn
@@ -383,12 +413,12 @@ export default defineComponent({
       await getRoles();
 
       // if (config.isCloud == "true") {
-        // columns.value.push({
-        //   name: "status",
-        //   field: "status",
-        //   label: t("user.status"),
-        //   align: "left",
-        // });
+      // columns.value.push({
+      //   name: "status",
+      //   field: "status",
+      //   label: t("user.status"),
+      //   align: "left",
+      // });
       // }
 
       // if (
@@ -450,8 +480,8 @@ export default defineComponent({
         field: "actions",
         label: t("user.actions"),
         align: "center",
-        classes: 'actions-column',
-        style: "width: 100px"
+        classes: "actions-column",
+        style: "width: 100px",
       },
     ]);
     const userEmail: any = ref("");
@@ -493,7 +523,7 @@ export default defineComponent({
         usersService
           .invitedUsers(store.state.selectedOrganization.identifier)
           .then((res) => {
-            if(res.status == 200) {
+            if (res.status == 200) {
               dismiss();
               resolve(res.data);
             } else {
@@ -506,7 +536,7 @@ export default defineComponent({
             reject([]);
           });
       });
-    }
+    };
 
     const getOrgMembers = () => {
       const dismiss = $q.notify({
@@ -526,7 +556,7 @@ export default defineComponent({
               resultTotal.value += invitedMembers.length;
               users = [...res.data.data, ...invitedMembers];
             }
-            
+
             let counter = 1;
             currentUserRole.value = "";
             usersState.users = users.map((data: any) => {
@@ -544,8 +574,12 @@ export default defineComponent({
                 email: maskText(data.email),
                 first_name: data.first_name,
                 last_name: data.last_name,
-                role: data?.status == "pending" ? toCamelCase(data.role) + " (Invited)": toCamelCase(data.role),
-                enableEdit: store.state.userInfo.email == data.email ? true : false,
+                role:
+                  data?.status == "pending"
+                    ? toCamelCase(data.role) + " (Invited)"
+                    : toCamelCase(data.role),
+                enableEdit:
+                  store.state.userInfo.email == data.email ? true : false,
                 enableChangeRole: false,
                 enableDelete: config.isCloud == "true" ? true : false,
                 status: data?.status,
@@ -645,7 +679,8 @@ export default defineComponent({
         );
       } else {
         return (
-          ((currentUserRole.value == "admin" && user.role?.toLowerCase() !== "root") ||
+          ((currentUserRole.value == "admin" &&
+            user.role?.toLowerCase() !== "root") ||
             currentUserRole.value == "root") &&
           !user.isLoggedinUser
         );
@@ -653,18 +688,16 @@ export default defineComponent({
     };
 
     const shouldAllowDelete = (user: any) => {
-
       if (isEnterprise.value) {
-      //for cloud
-      //should allow delete for all users when it is root and also when the row user is not root
-      //should allow delete for all users when it is admin and also when the row user is not logged in user / not root
-        if(config.isCloud == 'true'){
+        //for cloud
+        //should allow delete for all users when it is root and also when the row user is not root
+        //should allow delete for all users when it is admin and also when the row user is not logged in user / not root
+        if (config.isCloud == "true") {
           return (
             user.role?.toLowerCase() !== "root" &&
             (currentUserRole.value == "root" ||
               currentUserRole.value == "admin") &&
-              store.state.userInfo.email !== user.email
-
+            store.state.userInfo.email !== user.email
           );
         }
         return (
@@ -922,7 +955,10 @@ export default defineComponent({
       });
 
       organizationsService
-        .revoke_invite(store.state.selectedOrganization.identifier, revokeInviteToken)
+        .revoke_invite(
+          store.state.selectedOrganization.identifier,
+          revokeInviteToken,
+        )
         .then(async (res: any) => {
           dismiss();
           $q.notify({
@@ -944,7 +980,9 @@ export default defineComponent({
           dismiss();
           $q.notify({
             color: "negative",
-            message: err?.response?.data?.message || "Error while revoking invitation.",
+            message:
+              err?.response?.data?.message ||
+              "Error while revoking invitation.",
             timeout: 5000,
           });
         });
@@ -965,7 +1003,7 @@ export default defineComponent({
       try {
         const res = await usersService.bulkDelete(
           store.state.selectedOrganization.identifier,
-          { ids: userEmails }
+          { ids: userEmails },
         );
         const { successful, unsuccessful } = res.data;
 
@@ -997,7 +1035,10 @@ export default defineComponent({
         if (err.response?.status != 403 || err?.status != 403) {
           $q.notify({
             color: "negative",
-            message: err.response?.data?.message || err?.message || "Error while deleting users",
+            message:
+              err.response?.data?.message ||
+              err?.message ||
+              "Error while deleting users",
             timeout: 2000,
           });
         }
@@ -1053,36 +1094,42 @@ export default defineComponent({
     };
 
     const filterData = (rows: any, terms: any) => {
-        var filtered = [];
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (
-            rows[i]["first_name"]?.toLowerCase().includes(terms) ||
-            rows[i]["last_name"]?.toLowerCase().includes(terms) ||
-            rows[i]["email"]?.toLowerCase().includes(terms) ||
-            rows[i]["role"].toLowerCase().includes(terms)
-          ) {
-            filtered.push(rows[i]);
-          }
+      var filtered = [];
+      terms = terms.toLowerCase();
+      for (var i = 0; i < rows.length; i++) {
+        if (
+          rows[i]["first_name"]?.toLowerCase().includes(terms) ||
+          rows[i]["last_name"]?.toLowerCase().includes(terms) ||
+          rows[i]["email"]?.toLowerCase().includes(terms) ||
+          rows[i]["role"].toLowerCase().includes(terms)
+        ) {
+          filtered.push(rows[i]);
         }
-        return filtered;
-      };
+      }
+      return filtered;
+    };
 
-      const visibleRows = computed(() => {
-      if (!filterQuery.value) return usersState.users || []
-      return filterData(usersState.users || [], filterQuery.value)
+    const visibleRows = computed(() => {
+      if (!filterQuery.value) return usersState.users || [];
+      return filterData(usersState.users || [], filterQuery.value);
     });
     const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
     // Watch visibleRows to sync resultTotal with search filter
-    watch(visibleRows, (newVisibleRows) => {
-      resultTotal.value = newVisibleRows.length;
-    }, { immediate: true });
+    watch(
+      visibleRows,
+      (newVisibleRows) => {
+        resultTotal.value = newVisibleRows.length;
+      },
+      { immediate: true },
+    );
 
     // Watch selectedUsers to filter out disabled rows
     watch(selectedUsers, (newSelectedUsers) => {
       // Filter out any disabled rows (those with enableDelete = false)
-      const onlyEnabledSelected = newSelectedUsers.filter((user: any) => user.enableDelete);
+      const onlyEnabledSelected = newSelectedUsers.filter(
+        (user: any) => user.enableDelete,
+      );
 
       // If any disabled rows were selected, update to only include enabled ones
       if (onlyEnabledSelected.length !== newSelectedUsers.length) {
@@ -1162,7 +1209,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-
 .iconHoverBtn {
   cursor: pointer !important;
 }

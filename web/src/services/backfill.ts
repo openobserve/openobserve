@@ -43,7 +43,14 @@ export interface BackfillJob {
   end_time: number; // microseconds
   current_position: number; // microseconds
   progress_percent: number; // 0-100
-  status: "running" | "completed" | "failed" | "pending" | "canceled" | "paused" | "waiting";
+  status:
+    | "running"
+    | "completed"
+    | "failed"
+    | "pending"
+    | "canceled"
+    | "paused"
+    | "waiting";
   enabled: boolean;
   deletion_status?: DeletionStatus;
   deletion_job_ids?: string[]; // Multiple deletion job IDs for tracking
@@ -142,7 +149,12 @@ const backfill = {
     pipeline_id: string;
     job_id: string;
   }): Promise<BackfillJobActionResponse> => {
-    return backfill.enableBackfillJob({ org_id, pipeline_id, job_id, enable: false });
+    return backfill.enableBackfillJob({
+      org_id,
+      pipeline_id,
+      job_id,
+      enable: false,
+    });
   },
 
   /**
@@ -158,7 +170,12 @@ const backfill = {
     pipeline_id: string;
     job_id: string;
   }): Promise<BackfillJobActionResponse> => {
-    return backfill.enableBackfillJob({ org_id, pipeline_id, job_id, enable: true });
+    return backfill.enableBackfillJob({
+      org_id,
+      pipeline_id,
+      job_id,
+      enable: true,
+    });
   },
 
   /**
@@ -193,7 +210,12 @@ const backfill = {
     pipeline_id: string;
     job_id: string;
   }): Promise<BackfillJobActionResponse> => {
-    return backfill.enableBackfillJob({ org_id, pipeline_id, job_id, enable: false });
+    return backfill.enableBackfillJob({
+      org_id,
+      pipeline_id,
+      job_id,
+      enable: false,
+    });
   },
 
   /**

@@ -326,9 +326,8 @@ describe("ApiDashboard", () => {
     });
 
     it("should handle dashboard schema conversion", async () => {
-      const convertModule = await import(
-        "@/utils/dashboard/convertDashboardSchemaVersion"
-      );
+      const convertModule =
+        await import("@/utils/dashboard/convertDashboardSchemaVersion");
       const mockConvert = vi.mocked(
         convertModule.convertDashboardSchemaVersion,
       );
@@ -394,9 +393,8 @@ describe("ApiDashboard", () => {
       }
 
       // Mock the convertDashboardSchemaVersion to return data with variables list
-      const convertModule = await import(
-        "@/utils/dashboard/convertDashboardSchemaVersion"
-      );
+      const convertModule =
+        await import("@/utils/dashboard/convertDashboardSchemaVersion");
       const mockConvert = vi.mocked(
         convertModule.convertDashboardSchemaVersion,
       );

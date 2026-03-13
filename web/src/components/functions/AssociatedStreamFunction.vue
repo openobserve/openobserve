@@ -36,7 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-slot:header="props">
         <q-tr :props="props">
           <q-th auto-width />
-          <q-th v-for="col in props.cols" :key="col.name" :props="props">
+          <q-th v-for="col in props.cols" :key="col.name"
+:props="props">
             {{ col.label }}
           </q-th>
         </q-tr>
@@ -60,7 +61,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             />
           </q-td>
-          <q-td v-for="col in props.cols" :key="col.name" :props="props">
+          <q-td v-for="col in props.cols" :key="col.name"
+:props="props">
             {{ col.value }}
           </q-td>
         </q-tr>
@@ -441,7 +443,7 @@ export default defineComponent({
             resultTotal.value = res.list.length;
             logStream.value = res.list
               .filter(
-                (stream: any) => stream.stream_type !== "enrichment_tables"
+                (stream: any) => stream.stream_type !== "enrichment_tables",
               )
               .map((data: any) => {
                 doc_num = "--";
@@ -494,7 +496,7 @@ export default defineComponent({
         filterFunctions.value = allFunctionsList.value
           .filter(
             (item: any) =>
-              !functionsList.value.some((obj: any) => obj.name === item.name)
+              !functionsList.value.some((obj: any) => obj.name === item.name),
           ) // filter existing applied functions
           .filter((v: any) => v.name.toLowerCase().indexOf(needle) > -1); // filter based on search term
       });
@@ -510,7 +512,7 @@ export default defineComponent({
           "name",
           false,
           "",
-          store.state.selectedOrganization.identifier
+          store.state.selectedOrganization.identifier,
         )
         .then((res: any) => {
           res.data.list.forEach((element: any) => {
@@ -549,12 +551,12 @@ export default defineComponent({
             expandedRow.value.name,
             expandedRow.value.stream_type,
             selectedFunction.value.name,
-            apiData
+            apiData,
           )
           .then(() => {
             return getStreamFunctions(
               expandedRow.value.name,
-              expandedRow.value.stream_type
+              expandedRow.value.stream_type,
             );
           })
           .finally(() => {
@@ -580,14 +582,14 @@ export default defineComponent({
 
     const getStreamFunctions = async (
       stream_name: any,
-      stream_type: string
+      stream_type: string,
     ) => {
       loadingFunctions.value = stream_name ? true : false;
       await jsTransformService
         .stream_function(
           store.state.selectedOrganization.identifier,
           stream_name,
-          stream_type
+          stream_type,
         )
         .then((res: any) => {
           functionsList.value = res.data?.list || [];
@@ -616,12 +618,12 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           expandedRow.value.name,
           expandedRow.value.stream_type,
-          functionName
+          functionName,
         )
         .then(() => {
           return getStreamFunctions(
             expandedRow.value.name,
-            expandedRow.value.stream_type
+            expandedRow.value.stream_type,
           );
         })
         .finally(() => {
@@ -671,7 +673,7 @@ export default defineComponent({
         .delete(
           store.state.selectedOrganization.identifier,
           deleteStreamName,
-          deleteStreamType
+          deleteStreamType,
         )
         .then((res: any) => {
           if (res.data.code == 200) {
@@ -710,12 +712,12 @@ export default defineComponent({
           expandedRow.value.name,
           expandedRow.value.stream_type,
           _function.name,
-          _function
+          _function,
         )
         .then((res) => {
           getStreamFunctions(
             expandedRow.value.name,
-            expandedRow.value.stream_type
+            expandedRow.value.stream_type,
           );
         });
     };
@@ -783,7 +785,7 @@ export default defineComponent({
     selectedOrg(newVal: any, oldVal: any) {
       this.verifyOrganizationStatus(
         this.store.state.organizations,
-        this.router
+        this.router,
       );
       this.orgData = newVal;
       if (

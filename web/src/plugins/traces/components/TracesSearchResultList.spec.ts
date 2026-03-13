@@ -31,7 +31,11 @@ vi.mock("@/components/traces/TracesTable.vue", () => ({
 }));
 
 vi.mock("./TraceTimestampCell.vue", () => ({
-  default: { name: "TraceTimestampCell", props: ["item"], template: "<span />" },
+  default: {
+    name: "TraceTimestampCell",
+    props: ["item"],
+    template: "<span />",
+  },
 }));
 vi.mock("./TraceServiceCell.vue", () => ({
   default: { name: "TraceServiceCell", props: ["item"], template: "<span />" },
@@ -86,7 +90,9 @@ describe("TracesSearchResultList", () => {
   describe("loading state", () => {
     it("shows a spinner while loading", () => {
       wrapper = mount_({ hits: [], loading: true });
-      expect(wrapper.findComponent({ name: "QSpinnerHourglass" }).exists()).toBe(true);
+      expect(
+        wrapper.findComponent({ name: "QSpinnerHourglass" }).exists(),
+      ).toBe(true);
     });
 
     // The component uses v-show="hasResults || loading" on the table wrapper, so
@@ -94,7 +100,9 @@ describe("TracesSearchResultList", () => {
     // It is only absent from the DOM when noResults is true (searchPerformed && !loading && empty).
     it.skip("hides the table wrapper while loading", () => {
       wrapper = mount_({ hits: [], loading: true });
-      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(
+        false,
+      );
     });
 
     it("hides the empty state while loading", () => {
@@ -112,12 +120,16 @@ describe("TracesSearchResultList", () => {
 
     it("does not show spinner in empty state", () => {
       wrapper = mount_({ hits: [], loading: false, searchPerformed: true });
-      expect(wrapper.findComponent({ name: "QSpinnerHourglass" }).exists()).toBe(false);
+      expect(
+        wrapper.findComponent({ name: "QSpinnerHourglass" }).exists(),
+      ).toBe(false);
     });
 
     it("does not show the table in empty state", () => {
       wrapper = mount_({ hits: [], loading: false, searchPerformed: true });
-      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(
+        false,
+      );
     });
 
     it("does not show no-results message when searchPerformed is false", () => {
@@ -132,12 +144,16 @@ describe("TracesSearchResultList", () => {
 
     it("shows the table wrapper when hits exist", () => {
       wrapper = mount_({ hits, loading: false, searchPerformed: true });
-      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(
+        true,
+      );
     });
 
     it("does not show spinner when hits exist", () => {
       wrapper = mount_({ hits, loading: false, searchPerformed: true });
-      expect(wrapper.findComponent({ name: "QSpinnerHourglass" }).exists()).toBe(false);
+      expect(
+        wrapper.findComponent({ name: "QSpinnerHourglass" }).exists(),
+      ).toBe(false);
     });
 
     it("does not show the no-results message when hits exist", () => {
@@ -152,17 +168,23 @@ describe("TracesSearchResultList", () => {
 
     it("shows the section header by default", () => {
       wrapper = mount_({ hits, loading: false });
-      expect(wrapper.find('[data-test="traces-section-header"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-section-header"]').exists()).toBe(
+        true,
+      );
     });
 
     it("shows TRACES title in the header", () => {
       wrapper = mount_({ hits, loading: false });
-      expect(wrapper.find('[data-test="traces-section-title"]').text().toUpperCase()).toContain("TRACES");
+      expect(
+        wrapper.find('[data-test="traces-section-title"]').text().toUpperCase(),
+      ).toContain("TRACES");
     });
 
     it("hides the header when showHeader=false", () => {
       wrapper = mount_({ hits, loading: false, showHeader: false });
-      expect(wrapper.find('[data-test="traces-section-header"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-section-header"]').exists()).toBe(
+        false,
+      );
     });
   });
 

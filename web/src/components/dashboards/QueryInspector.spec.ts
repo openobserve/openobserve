@@ -47,7 +47,8 @@ describe("QueryInspector", () => {
       queries: [
         {
           originalQuery: "SELECT * FROM logs WHERE level = 'error'",
-          query: "SELECT * FROM logs WHERE level = 'error' AND timestamp >= 1640995200000",
+          query:
+            "SELECT * FROM logs WHERE level = 'error' AND timestamp >= 1640995200000",
           startTime: 1640995200000,
           endTime: 1641081600000,
           queryType: "SQL",
@@ -72,7 +73,8 @@ describe("QueryInspector", () => {
         },
         {
           originalQuery: "SELECT count(*) FROM metrics",
-          query: "SELECT count(*) FROM metrics WHERE timestamp >= 1640995200000",
+          query:
+            "SELECT count(*) FROM metrics WHERE timestamp >= 1640995200000",
           startTime: 1640995200000,
           endTime: 1641081600000,
           queryType: "SQL",
@@ -118,22 +120,34 @@ describe("QueryInspector", () => {
         },
         stubs: {
           QCard: { template: '<div data-test="q-card"><slot /></div>' },
-          QCardSection: { template: '<div data-test="q-card-section"><slot /></div>' },
+          QCardSection: {
+            template: '<div data-test="q-card-section"><slot /></div>',
+          },
           QBtn: {
-            template: '<button data-test="q-btn" @click="$emit(\'click\')" v-bind="$attrs"><slot /></button>',
-            props: ['icon', 'flat', 'round', 'dense', 'color', 'size', 'noCaps'],
+            template:
+              '<button data-test="q-btn" @click="$emit(\'click\')" v-bind="$attrs"><slot /></button>',
+            props: [
+              "icon",
+              "flat",
+              "round",
+              "dense",
+              "color",
+              "size",
+              "noCaps",
+            ],
           },
           QInput: {
-            template: '<input data-test="q-input" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" v-bind="$attrs"><slot name="prepend" /></input>',
-            props: ['modelValue', 'placeholder', 'dense', 'color', 'dark'],
+            template:
+              '<input data-test="q-input" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" v-bind="$attrs"><slot name="prepend" /></input>',
+            props: ["modelValue", "placeholder", "dense", "color", "dark"],
           },
           QIcon: {
             template: '<span data-test="q-icon" :class="name"><slot /></span>',
-            props: ['name', 'size'],
+            props: ["name", "size"],
           },
         },
         directives: {
-          'close-popup': () => {},
+          "close-popup": () => {},
         },
       },
     });
@@ -374,7 +388,10 @@ describe("QueryInspector", () => {
       const query = defaultProps.metaData.queries[0];
       const standardVars = wrapper.vm.getVariablesByType(query, "variable");
       const fixedVars = wrapper.vm.getVariablesByType(query, "fixed");
-      const dynamicVars = wrapper.vm.getVariablesByType(query, "dynamicVariable");
+      const dynamicVars = wrapper.vm.getVariablesByType(
+        query,
+        "dynamicVariable",
+      );
 
       expect(standardVars).toHaveLength(1);
       expect(standardVars[0].name).toBe("level");
@@ -398,7 +415,10 @@ describe("QueryInspector", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const query = { ...defaultProps.metaData.queries[0], variables: undefined };
+      const query = {
+        ...defaultProps.metaData.queries[0],
+        variables: undefined,
+      };
       const vars = wrapper.vm.getVariablesByType(query, "variable");
 
       expect(vars).toEqual([]);
@@ -581,9 +601,11 @@ describe("QueryInspector", () => {
       wrapper.vm.searchQuery = "test";
 
       // Mock a regex that might throw
-      const spy = vi.spyOn(String.prototype, 'replace').mockImplementationOnce(() => {
-        throw new Error("Regex error");
-      });
+      const spy = vi
+        .spyOn(String.prototype, "replace")
+        .mockImplementationOnce(() => {
+          throw new Error("Regex error");
+        });
 
       const result = wrapper.vm.highlightSearch(html);
 
@@ -635,10 +657,12 @@ describe("QueryInspector", () => {
       await flushPromises();
 
       const copyButtons = wrapper.findAll('[data-test="q-btn"]');
-      const copyButton = copyButtons.find((btn: any) => btn.text().includes("Copy"));
+      const copyButton = copyButtons.find((btn: any) =>
+        btn.text().includes("Copy"),
+      );
 
       if (copyButton) {
-        await copyButton.trigger('click');
+        await copyButton.trigger("click");
         expect(navigator.clipboard.writeText).toHaveBeenCalled();
       }
     });
@@ -654,7 +678,7 @@ describe("QueryInspector", () => {
       // Find the button that would copy the executed query
       for (const btn of copyButtons) {
         if (btn.text().includes("Copy")) {
-          await btn.trigger('click');
+          await btn.trigger("click");
         }
       }
 
@@ -886,7 +910,10 @@ describe("QueryInspector", () => {
     });
 
     it("should handle very long query strings", async () => {
-      const longQuery = "SELECT * FROM logs WHERE " + "condition AND ".repeat(100) + "final_condition";
+      const longQuery =
+        "SELECT * FROM logs WHERE " +
+        "condition AND ".repeat(100) +
+        "final_condition";
 
       wrapper = createWrapper({
         metaData: {
@@ -908,7 +935,8 @@ describe("QueryInspector", () => {
     });
 
     it("should handle special characters in queries", async () => {
-      const specialQuery = "SELECT * FROM logs WHERE field LIKE '%test%' AND other = '$var'";
+      const specialQuery =
+        "SELECT * FROM logs WHERE field LIKE '%test%' AND other = '$var'";
 
       wrapper = createWrapper({
         metaData: {
@@ -1054,7 +1082,9 @@ describe("QueryInspector", () => {
       wrapper.vm.searchQuery = "error";
       await nextTick();
 
-      const highlighted = wrapper.vm.highlightSearch("SELECT * FROM logs WHERE level = 'error'");
+      const highlighted = wrapper.vm.highlightSearch(
+        "SELECT * FROM logs WHERE level = 'error'",
+      );
       expect(highlighted).toContain("<mark");
     });
   });

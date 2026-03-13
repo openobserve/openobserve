@@ -34,12 +34,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Output Section with Destination-specific Error Display -->
     <template #output-content>
-      <div class="tw:w-full" style="min-width: 400px;">
+      <div class="tw:w-full" style="min-width: 400px">
         <div
-          v-if="destinationErrorsToDisplay.length > 0 || destinationCreators.length > 0"
+          v-if="
+            destinationErrorsToDisplay.length > 0 ||
+            destinationCreators.length > 0
+          "
           class="text-center text-h6 tw:py-2"
         >
-          {{ destinationErrorsToDisplay.length > 0 ? 'Error Validations' : 'Output Messages' }}
+          {{
+            destinationErrorsToDisplay.length > 0
+              ? "Error Validations"
+              : "Output Messages"
+          }}
         </div>
         <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
         <q-separator class="q-mx-md q-mt-md" />
@@ -76,10 +83,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-input
                         data-test="destination-import-name-input"
                         :model-value="userSelectedDestinationName[index] || ''"
-                        @update:model-value="(val) => {
-                          userSelectedDestinationName[index] = val;
-                          updateDestinationName(val, index);
-                        }"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedDestinationName[index] = val;
+                            updateDestinationName(val, index);
+                          }
+                        "
                         :label="'Destination Name *'"
                         color="input-border"
                         bg-color="input-bg"
@@ -106,10 +115,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-input
                         data-test="destination-import-url-input"
                         :model-value="userSelectedDestinationUrl[index] || ''"
-                        @update:model-value="(val) => {
-                          userSelectedDestinationUrl[index] = val;
-                          updateDestinationUrl(val, index);
-                        }"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedDestinationUrl[index] = val;
+                            updateDestinationUrl(val, index);
+                          }
+                        "
                         :label="'Destination URL *'"
                         color="input-border"
                         bg-color="input-bg"
@@ -136,10 +147,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-select
                         data-test="destination-import-type-input"
                         :model-value="userSelectedDestinationType[index] || ''"
-                        @update:model-value="(val) => {
-                          userSelectedDestinationType[index] = val;
-                          updateDestinationType(val, index);
-                        }"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedDestinationType[index] = val;
+                            updateDestinationType(val, index);
+                          }
+                        "
                         :options="destinationTypes"
                         :label="'Destination Type *'"
                         :popup-content-style="{
@@ -172,11 +185,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div style="width: 300px">
                       <q-select
                         data-test="destination-import-method-input"
-                        :model-value="userSelectedDestinationMethod[index] || ''"
-                        @update:model-value="(val) => {
-                          userSelectedDestinationMethod[index] = val;
-                          updateDestinationMethod(val, index);
-                        }"
+                        :model-value="
+                          userSelectedDestinationMethod[index] || ''
+                        "
+                        @update:model-value="
+                          (val) => {
+                            userSelectedDestinationMethod[index] = val;
+                            updateDestinationMethod(val, index);
+                          }
+                        "
                         :options="destinationMethods"
                         :label="'Destination Method *'"
                         :popup-content-style="{
@@ -210,10 +227,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-select
                         data-test="destination-import-template-input"
                         :model-value="userSelectedTemplates[index] || ''"
-                        @update:model-value="(val) => {
-                          userSelectedTemplates[index] = val;
-                          updateDestinationTemplate(val, index);
-                        }"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedTemplates[index] = val;
+                            updateDestinationTemplate(val, index);
+                          }
+                        "
                         :options="filteredTemplates"
                         label="Templates *"
                         :popup-content-style="{
@@ -251,10 +270,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-input
                         data-test="destination-import-emails-input"
                         :model-value="userSelectedEmails[index] || ''"
-                        @update:model-value="(val) => {
-                          userSelectedEmails[index] = val;
-                          updateDestinationEmails(val, index);
-                        }"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedEmails[index] = val;
+                            updateDestinationEmails(val, index);
+                          }
+                        "
                         :label="'Emails (comma separated) *'"
                         color="input-border"
                         bg-color="input-bg"
@@ -281,10 +302,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-select
                         data-test="destination-import-action-input"
                         :model-value="userSelectedActionId[index] || ''"
-                        @update:model-value="(val) => {
-                          userSelectedActionId[index] = val;
-                          updateDestinationAction(val, index);
-                        }"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedActionId[index] = val;
+                            updateDestinationAction(val, index);
+                          }
+                        "
                         :options="filteredActions"
                         label="Actions *"
                         :popup-content-style="{
@@ -323,14 +346,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div style="width: 300px">
                       <q-toggle
                         data-test="destination-import-skip-tls-verify-input"
-                        :model-value="
-                          userSelectedSkipTlsVerify[index] ?? false
-                        "
+                        :model-value="userSelectedSkipTlsVerify[index] ?? false"
                         :label="t('alert_destinations.skip_tls_verify')"
                         class="q-mt-sm"
-                        @update:model-value="
-                          updateSkipTlsVerify($event, index)
-                        "
+                        @update:model-value="updateSkipTlsVerify($event, index)"
                       />
                     </div>
                   </span>
@@ -374,12 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  computed,
-  onMounted,
-} from "vue";
+import { defineComponent, ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -448,7 +462,7 @@ export default defineComponent({
         if (baseImportRef.value) {
           baseImportRef.value.jsonArrayOfObj = val;
         }
-      }
+      },
     });
 
     const getFormattedTemplates = computed(() => {
@@ -503,7 +517,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -515,7 +529,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -527,7 +541,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -539,7 +553,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -551,7 +565,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -563,7 +577,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -577,7 +591,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -590,7 +604,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -741,8 +755,8 @@ export default defineComponent({
       if (
         !input.type ||
         (input.type !== "email" &&
-         input.type !== "http" &&
-         input.type !== "action")
+          input.type !== "http" &&
+          input.type !== "action")
       ) {
         destinationErrors.push({
           message: `Destination - ${index}: The "type" field must be either "email", "http", or "action"`,
@@ -775,7 +789,11 @@ export default defineComponent({
 
       // Validate URL for http type
       if (input.type === "http") {
-        if (!input.url || typeof input.url !== "string" || input.url.trim() === "") {
+        if (
+          !input.url ||
+          typeof input.url !== "string" ||
+          input.url.trim() === ""
+        ) {
           destinationErrors.push({
             message: `Destination - ${index}: The "url" field is required for http type destinations.`,
             field: "url",
@@ -812,7 +830,10 @@ export default defineComponent({
 
         // Validate headers should be an object if present
         if (input.headers !== undefined) {
-          if (typeof input.headers !== "object" || Array.isArray(input.headers)) {
+          if (
+            typeof input.headers !== "object" ||
+            Array.isArray(input.headers)
+          ) {
             destinationErrors.push(
               `Destination - ${index}: 'headers' should be an object for http type`,
             );
@@ -840,12 +861,18 @@ export default defineComponent({
         }
 
         // Validate emails array with stricter validation
-        if (!input.emails || !Array.isArray(input.emails) || input.emails.length === 0) {
+        if (
+          !input.emails ||
+          !Array.isArray(input.emails) ||
+          input.emails.length === 0
+        ) {
           destinationErrors.push({
             message: `Destination - ${index}: The "emails" field is required and should be an array for email type destinations.`,
             field: "email_input",
           });
-        } else if (input.emails.some((email: any) => typeof email !== "string")) {
+        } else if (
+          input.emails.some((email: any) => typeof email !== "string")
+        ) {
           destinationErrors.push({
             message: `Destination - ${index}: 'emails' should be an array of strings for email type`,
             field: "email_input",
@@ -864,7 +891,8 @@ export default defineComponent({
       if (input.template) {
         const availableTemplates = props.templates
           .filter((template: any) => {
-            if (input.type === "email" && template.type === "email") return true;
+            if (input.type === "email" && template.type === "email")
+              return true;
             else if (input.type !== "email") return true;
             return false;
           })

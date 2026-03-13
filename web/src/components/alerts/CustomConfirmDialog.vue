@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog data-test="custom-confirm-dialog" v-model="isVisible" persistent>
+  <q-dialog data-test="custom-confirm-dialog" v-model="isVisible"
+persistent>
     <q-card
       data-test="custom-confirm-card"
       class="custom-confirm-dialog"
@@ -32,7 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <!-- Actions -->
-      <q-card-actions data-test="dialog-actions" class="dialog-actions tw:flex tw:justify-end tw:gap-2 tw:px-4 tw:pb-4">
+      <q-card-actions
+        data-test="dialog-actions"
+        class="dialog-actions tw:flex tw:justify-end tw:gap-2 tw:px-4 tw:pb-4"
+      >
         <q-btn
           data-test="custom-cancel-button"
           label="Cancel"
@@ -84,7 +88,7 @@ export default defineComponent({
       () => props.modelValue,
       (newVal) => {
         isVisible.value = newVal;
-      }
+      },
     );
 
     // Watch for internal visibility changes

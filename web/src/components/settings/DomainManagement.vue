@@ -76,7 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon="help_outline"
             @click="showVrlInfo = true"
           >
-            <q-tooltip>{{ t("settings.claimParserFunctionInfoTitle") }}</q-tooltip>
+            <q-tooltip>{{
+              t("settings.claimParserFunctionInfoTitle")
+            }}</q-tooltip>
           </q-btn>
         </div>
       </div>
@@ -108,23 +110,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="text-body2">
             <div class="q-mb-md q-pa-md info-box">
-              <div class="text-weight-medium q-mb-sm">{{ t("settings.claimParserFunctionInputTitle") }}</div>
+              <div class="text-weight-medium q-mb-sm">
+                {{ t("settings.claimParserFunctionInputTitle") }}
+              </div>
               <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>
             </div>
 
             <div class="q-mb-md q-pa-md info-box">
-              <div class="text-weight-medium q-mb-sm">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
-              <div class="q-mb-sm">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
+              <div class="text-weight-medium q-mb-sm">
+                {{ t("settings.claimParserFunctionOutputTitle") }}
+              </div>
+              <div class="q-mb-sm">
+                {{ t("settings.claimParserFunctionOutputDescription") }}
+              </div>
               <div class="q-ml-md">
-                <div class="q-mb-xs">{{ t("settings.claimParserFunctionOutputExample1") }}</div>
+                <div class="q-mb-xs">
+                  {{ t("settings.claimParserFunctionOutputExample1") }}
+                </div>
                 <div>{{ t("settings.claimParserFunctionOutputExample2") }}</div>
               </div>
             </div>
 
             <!-- Recent Errors Section -->
-            <div v-if="claimParserFunction" class="q-pa-md info-box error-section">
+            <div
+              v-if="claimParserFunction"
+              class="q-pa-md info-box error-section"
+            >
               <div class="row items-center q-mb-sm">
-                <div class="col text-weight-medium">{{ t("settings.claimParserRecentErrors") }}</div>
+                <div class="col text-weight-medium">
+                  {{ t("settings.claimParserRecentErrors") }}
+                </div>
                 <div class="col-auto">
                   <q-btn
                     flat
@@ -143,7 +158,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-spinner color="primary" size="sm" />
               </div>
 
-              <div v-else-if="recentErrors.length === 0" class="text-grey-7 text-center q-py-sm">
+              <div
+                v-else-if="recentErrors.length === 0"
+                class="text-grey-7 text-center q-py-sm"
+              >
                 {{ t("settings.noRecentErrors") }}
               </div>
 
@@ -154,13 +172,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="error-item q-pa-sm q-mb-xs"
                 >
                   <div class="row items-start q-mb-xs">
-                    <q-icon name="error" color="negative" size="xs" class="q-mr-xs q-mt-xs" />
+                    <q-icon
+                      name="error"
+                      color="negative"
+                      size="xs"
+                      class="q-mr-xs q-mt-xs"
+                    />
                     <div class="col">
-                      <div class="text-caption text-weight-medium">{{ error.error_type }}</div>
-                      <div class="text-caption text-grey-7">{{ formatTimestamp(error._timestamp) }}</div>
+                      <div class="text-caption text-weight-medium">
+                        {{ error.error_type }}
+                      </div>
+                      <div class="text-caption text-grey-7">
+                        {{ formatTimestamp(error._timestamp) }}
+                      </div>
                     </div>
                   </div>
-                  <div class="text-caption error-message">{{ error.error }}</div>
+                  <div class="text-caption error-message">
+                    {{ error.error }}
+                  </div>
                 </div>
 
                 <!-- Show More Button -->
@@ -197,12 +226,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-body1 text-bold q-mb-md">
         {{ t("settings.domainAndAllowedUsers") }}
       </div>
-      
+
       <div class="row q-gutter-md items-center q-mb-md">
         <div class="col-auto">
           <q-input
             v-model="newDomain"
-            :hint="t('settings.domainHint', { 'at_sign': '@' })"
+            :hint="t('settings.domainHint', { at_sign: '@' })"
             class="domain-input"
             borderless
             hide-bottom-space
@@ -210,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @keydown.enter="addDomain"
             :placeholder="t('settings.domainPlaceholder')"
             :rules="[
-              (val) => isValidDomain(val) || t('settings.invalidDomain')
+              (val) => isValidDomain(val) || t('settings.invalidDomain'),
             ]"
           />
         </div>
@@ -233,114 +262,145 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Domain List -->
     <div v-if="domains.length > 0" class="q-mb-lg">
-      <template v-for="(domain, index) in domains" :key="domain?.name || `domain-${index}`">
-        <div 
-          v-if="domain && domain.name"
-          class="domain-card q-mb-xs"
-        >
-        <div class="domain-header row items-center justify-between q-px-md q-py-sm">
-          <div class="text-body1 text-bold">{{ domain.name }}</div>
-          <q-btn
-            icon="close"
-            flat
-            round
-            dense
-            color="negative"
-            @click="removeDomain(index)"
-            :title="t('common.delete')"
-          />
-        </div>
-
-        <div class="q-pa-md">
-          <!-- Radio Button Options -->
-          <div class="q-mb-xs">
-            <q-radio
-              v-model="domain.allowAllUsers"
-              :val="true"
-              :label="t('settings.allowAllUsersFromDomain', { domain: '@'+domain.name })"
-              color="primary"
-            />
-          </div>
-          
-          <div class="q-mb-md">
-            <q-radio
-              v-model="domain.allowAllUsers"
-              :val="false"
-              :label="t('settings.allowOnlySpecificUsers', { domain: '@'+domain.name })"
-              color="primary"
-            />
-          </div>
-
-          <!-- Info message for all users -->
-          <div 
-            v-if="domain.allowAllUsers"
-            class="q-pa-sm bg-blue-1 text-blue-8 rounded-borders q-mb-md"
+      <template
+        v-for="(domain, index) in domains"
+        :key="domain?.name || `domain-${index}`"
+      >
+        <div v-if="domain && domain.name" class="domain-card q-mb-xs">
+          <div
+            class="domain-header row items-center justify-between q-px-md q-py-sm"
           >
-            {{ t("settings.allUsersAllowedMessage", { domain: '@'+domain.name }) }}
+            <div class="text-body1 text-bold">{{ domain.name }}</div>
+            <q-btn
+              icon="close"
+              flat
+              round
+              dense
+              color="negative"
+              @click="removeDomain(index)"
+              :title="t('common.delete')"
+            />
           </div>
 
-          <!-- Specific users section -->
-          <div v-if="!domain.allowAllUsers" class="specific-users-section">
-            <div class="row q-gutter-md items-center q-mb-md">
-              <div class="col">
-                <q-input
-                  v-model="domain.newEmail"
-                  :label="t('settings.emailPlaceholder', { domain: '@' + domain.name })"
-                  color="input-border"
-                  bg-color="input-bg"
-                  class="email-input"
-                  outlined
-                  dense
-                  @keydown.enter="addEmail(domain)"
-                  :rules="[
-                    (val) => !val || isValidEmail(val, domain.name) || t('settings.invalidEmail')
-                  ]"
-                />
-              </div>
-              <div class="col-auto q-my-none">
-                <q-btn
-                  :label="t('settings.addEmail')"
-                  color="secondary"
-                  class="text-bold text-capitalize no-border"
-                  @click="addEmail(domain)"
-                  :disabled="!domain.newEmail || !isValidEmail(domain.newEmail, domain.name)"
-                  unelevated
-                  dense
-                />
-              </div>
+          <div class="q-pa-md">
+            <!-- Radio Button Options -->
+            <div class="q-mb-xs">
+              <q-radio
+                v-model="domain.allowAllUsers"
+                :val="true"
+                :label="
+                  t('settings.allowAllUsersFromDomain', {
+                    domain: '@' + domain.name,
+                  })
+                "
+                color="primary"
+              />
             </div>
 
-            <!-- Email List -->
-            <div v-if="domain.allowedEmails && domain.allowedEmails.length > 0">
-              <div 
-                v-for="(email, emailIndex) in domain.allowedEmails"
-                :key="email"
-                class="email-item row items-center justify-between q-pa-sm q-mb-xs"
+            <div class="q-mb-md">
+              <q-radio
+                v-model="domain.allowAllUsers"
+                :val="false"
+                :label="
+                  t('settings.allowOnlySpecificUsers', {
+                    domain: '@' + domain.name,
+                  })
+                "
+                color="primary"
+              />
+            </div>
+
+            <!-- Info message for all users -->
+            <div
+              v-if="domain.allowAllUsers"
+              class="q-pa-sm bg-blue-1 text-blue-8 rounded-borders q-mb-md"
+            >
+              {{
+                t("settings.allUsersAllowedMessage", {
+                  domain: "@" + domain.name,
+                })
+              }}
+            </div>
+
+            <!-- Specific users section -->
+            <div v-if="!domain.allowAllUsers" class="specific-users-section">
+              <div class="row q-gutter-md items-center q-mb-md">
+                <div class="col">
+                  <q-input
+                    v-model="domain.newEmail"
+                    :label="
+                      t('settings.emailPlaceholder', {
+                        domain: '@' + domain.name,
+                      })
+                    "
+                    color="input-border"
+                    bg-color="input-bg"
+                    class="email-input"
+                    outlined
+                    dense
+                    @keydown.enter="addEmail(domain)"
+                    :rules="[
+                      (val) =>
+                        !val ||
+                        isValidEmail(val, domain.name) ||
+                        t('settings.invalidEmail'),
+                    ]"
+                  />
+                </div>
+                <div class="col-auto q-my-none">
+                  <q-btn
+                    :label="t('settings.addEmail')"
+                    color="secondary"
+                    class="text-bold text-capitalize no-border"
+                    @click="addEmail(domain)"
+                    :disabled="
+                      !domain.newEmail ||
+                      !isValidEmail(domain.newEmail, domain.name)
+                    "
+                    unelevated
+                    dense
+                  />
+                </div>
+              </div>
+
+              <!-- Email List -->
+              <div
+                v-if="domain.allowedEmails && domain.allowedEmails.length > 0"
               >
-                <div class="text-body2">{{ email }}</div>
-                <q-btn
-                  icon="close"
-                  flat
-                  round
-                  dense
-                  size="sm"
-                  color="negative"
-                  @click="removeEmail(domain, emailIndex)"
-                  :title="t('common.delete')"
-                />
+                <div
+                  v-for="(email, emailIndex) in domain.allowedEmails"
+                  :key="email"
+                  class="email-item row items-center justify-between q-pa-sm q-mb-xs"
+                >
+                  <div class="text-body2">{{ email }}</div>
+                  <q-btn
+                    icon="close"
+                    flat
+                    round
+                    dense
+                    size="sm"
+                    color="negative"
+                    @click="removeEmail(domain, emailIndex)"
+                    :title="t('common.delete')"
+                  />
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
       </template>
     </div>
-    <div v-else class="text-h6 text-grey-6 q-mt-md q-mb-lg tw:w-full text-center q-pa-lg domain-card">
+    <div
+      v-else
+      class="text-h6 text-grey-6 q-mt-md q-mb-lg tw:w-full text-center q-pa-lg domain-card"
+    >
       {{ t("settings.noDomainMessage") }}
     </div>
 
     <!-- Action Buttons -->
-    <div class="flex justify-end q-px-lg q-py-lg full-width tw:absolute tw:bottom-0">
+    <div
+      class="flex justify-end q-px-lg q-py-lg full-width tw:absolute tw:bottom-0"
+    >
       <q-btn
         :label="t('common.cancel')"
         class="q-mr-md o2-secondary-button tw:h-[36px]"
@@ -404,7 +464,9 @@ const hasClaimParserChanged = computed(() => {
 });
 
 onMounted(() => {
-  if(store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier) {
+  if (
+    store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier
+  ) {
     loadDomainSettings();
     loadFunctions();
   } else {
@@ -413,12 +475,14 @@ onMounted(() => {
       query: {
         org_identifier: store.state.selectedOrganization.identifier,
       },
-    })
+    });
   }
 });
 
 onActivated(() => {
-  if(store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier) {
+  if (
+    store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier
+  ) {
     loadDomainSettings();
     loadFunctions();
   } else {
@@ -427,32 +491,42 @@ onActivated(() => {
       query: {
         org_identifier: store.state.selectedOrganization.identifier,
       },
-    })
+    });
   }
 });
 
 const loadDomainSettings = async () => {
   try {
-    const response = await domainManagement.getDomainRestrictions(store.state.zoConfig.meta_org);
+    const response = await domainManagement.getDomainRestrictions(
+      store.state.zoConfig.meta_org,
+    );
 
     if (response.data && response.data.domains) {
       const loadedDomains = response.data.domains
-        .filter((domain: any) => domain && typeof domain === 'object' && domain.domain) // Filter out invalid entries
+        .filter(
+          (domain: any) =>
+            domain && typeof domain === "object" && domain.domain,
+        ) // Filter out invalid entries
         .map((domain: any) => ({
           name: domain.domain,
           allowAllUsers: domain.allow_all_users,
-          allowedEmails: domain.allowed_emails || []
+          allowedEmails: domain.allowed_emails || [],
         }));
       domains.splice(0, domains.length, ...loadedDomains);
     }
 
     // Load claim parser function from organization settings
-    const storedFunction = store.state?.organizationData?.organizationSettings?.claim_parser_function || "";
+    const storedFunction =
+      store.state?.organizationData?.organizationSettings
+        ?.claim_parser_function || "";
     claimParserFunction.value = storedFunction;
     originalClaimParserFunction.value = storedFunction; // Store original for change detection
   } catch (error: any) {
     // If the API doesn't exist yet or returns an error, use example data
-    console.warn("Domain restrictions API not available, using example data:", error);
+    console.warn(
+      "Domain restrictions API not available, using example data:",
+      error,
+    );
 
     const existingDomains = [];
 
@@ -463,34 +537,52 @@ const loadDomainSettings = async () => {
 const isValidDomain = (domain: any): boolean => {
   // Handle null, undefined, and non-string inputs
   if (domain === null || domain === undefined) return true; // Empty is valid
-  if (typeof domain !== 'string') return false; // Non-strings are invalid
-  
+  if (typeof domain !== "string") return false; // Non-strings are invalid
+
   // Handle empty strings - empty is valid, but whitespace-only is not
   const trimmed = domain.trim();
   if (!trimmed) return domain.length === 0; // Empty string is valid, whitespace-only is not
-  
+
   // Security: Check for potentially malicious content (more targeted patterns)
   const maliciousPatterns = [
-    '<script', '</script', 'javascript:', 'DROP TABLE', 'SELECT FROM', 'INSERT INTO', 
-    'UPDATE SET', 'DELETE FROM', 'UNION SELECT', '--', '/*', '*/', '\0', '\n', '\r'
+    "<script",
+    "</script",
+    "javascript:",
+    "DROP TABLE",
+    "SELECT FROM",
+    "INSERT INTO",
+    "UPDATE SET",
+    "DELETE FROM",
+    "UNION SELECT",
+    "--",
+    "/*",
+    "*/",
+    "\0",
+    "\n",
+    "\r",
   ];
-  
+
   const upperDomain = trimmed.toUpperCase();
-  if (maliciousPatterns.some(pattern => upperDomain.includes(pattern.toUpperCase()))) {
+  if (
+    maliciousPatterns.some((pattern) =>
+      upperDomain.includes(pattern.toUpperCase()),
+    )
+  ) {
     return false;
   }
-  
+
   // Length validation (DNS limit is 253 characters)
   if (trimmed.length > 253) return false;
-  
+
   // Remove trailing dot if present (valid in DNS)
-  const cleanDomain = trimmed.endsWith('.') ? trimmed.slice(0, -1) : trimmed;
-  
+  const cleanDomain = trimmed.endsWith(".") ? trimmed.slice(0, -1) : trimmed;
+
   // Improved domain validation that properly handles hyphens and edge cases
   // Domain parts can contain letters, numbers, and hyphens (but not start/end with hyphens)
   // Each label can be 1-63 characters, and the domain must have at least one dot
-  const domainRegex = /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
-  
+  const domainRegex =
+    /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+
   try {
     return domainRegex.test(cleanDomain);
   } catch (error) {
@@ -500,32 +592,58 @@ const isValidDomain = (domain: any): boolean => {
 
 const isValidEmail = (email: any, domain: any): boolean => {
   // Handle null, undefined, and non-string inputs
-  if (email === null || email === undefined || typeof email !== 'string') return false;
-  if (domain === null || domain === undefined || typeof domain !== 'string') return false;
-  
+  if (email === null || email === undefined || typeof email !== "string")
+    return false;
+  if (domain === null || domain === undefined || typeof domain !== "string")
+    return false;
+
   // Handle empty strings
   if (!email.trim() || !domain.trim()) return false;
-  
+
   // Security: Check for potentially malicious content
   const maliciousPatterns = [
-    '<', '>', 'script', 'javascript:', 'DROP', 'SELECT', 'INSERT', 'UPDATE', 'DELETE',
-    'UNION', 'CREATE', 'ALTER', 'TABLE', 'FROM', '--', '/*', '*/', "'", '"',
-    '\0', '\n', '\r', '\t'
+    "<",
+    ">",
+    "script",
+    "javascript:",
+    "DROP",
+    "SELECT",
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+    "UNION",
+    "CREATE",
+    "ALTER",
+    "TABLE",
+    "FROM",
+    "--",
+    "/*",
+    "*/",
+    "'",
+    '"',
+    "\0",
+    "\n",
+    "\r",
+    "\t",
   ];
-  
+
   const upperEmail = email.toUpperCase();
-  if (maliciousPatterns.some(pattern => upperEmail.includes(pattern.toUpperCase()))) {
+  if (
+    maliciousPatterns.some((pattern) =>
+      upperEmail.includes(pattern.toUpperCase()),
+    )
+  ) {
     return false;
   }
-  
+
   // Length validation (practical email limit)
   if (email.length > 254 || domain.length > 253) return false;
-  
+
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  
+
   try {
     if (!emailRegex.test(email)) return false;
-    
+
     // Check if email belongs to the domain
     return email.toLowerCase().endsWith(`@${domain.toLowerCase()}`);
   } catch (error) {
@@ -535,9 +653,11 @@ const isValidEmail = (email: any, domain: any): boolean => {
 
 const addDomain = () => {
   if (!newDomain.value || !isValidDomain(newDomain.value)) return;
-  
+
   // Check if domain already exists
-  if (domains.some(d => d.name.toLowerCase() === newDomain.value.toLowerCase())) {
+  if (
+    domains.some((d) => d.name.toLowerCase() === newDomain.value.toLowerCase())
+  ) {
     q.notify({
       type: "negative",
       message: t("settings.domainAlreadyExists"),
@@ -550,7 +670,7 @@ const addDomain = () => {
     name: newDomain.value,
     allowAllUsers: true,
     allowedEmails: [],
-    newEmail: ""
+    newEmail: "",
   });
 
   newDomain.value = "";
@@ -604,7 +724,9 @@ const addEmail = (domain: Domain) => {
 const removeEmail = (domain: Domain, emailIndex: number) => {
   q.dialog({
     title: t("common.confirm"),
-    message: t("settings.confirmRemoveEmail", { email: domain.allowedEmails[emailIndex] }),
+    message: t("settings.confirmRemoveEmail", {
+      email: domain.allowedEmails[emailIndex],
+    }),
     cancel: true,
     persistent: true,
   }).onOk(() => {
@@ -621,13 +743,22 @@ const removeEmail = (domain: Domain, emailIndex: number) => {
 const loadFunctions = async () => {
   try {
     loadingFunctions.value = true;
-    const response = await jstransform.list(1, 10000, "name", false, "", store.state.zoConfig.meta_org);
+    const response = await jstransform.list(
+      1,
+      10000,
+      "name",
+      false,
+      "",
+      store.state.zoConfig.meta_org,
+    );
 
     allFunctions.value = response.data.list.map((fn: any) => fn.name);
     functionOptions.value = allFunctions.value;
 
     // Set the current value from store if it exists
-    const storedFunction = store.state?.organizationData?.organizationSettings?.claim_parser_function || "";
+    const storedFunction =
+      store.state?.organizationData?.organizationSettings
+        ?.claim_parser_function || "";
     claimParserFunction.value = storedFunction;
     originalClaimParserFunction.value = storedFunction; // Store original for change detection
   } catch (e: any) {
@@ -645,7 +776,7 @@ const filterFunctions = (val: string, update: Function) => {
     } else {
       const needle = val.toLowerCase();
       functionOptions.value = allFunctions.value.filter(
-        (v) => v.toLowerCase().indexOf(needle) > -1
+        (v) => v.toLowerCase().indexOf(needle) > -1,
       );
     }
   });
@@ -693,7 +824,7 @@ const saveClaimParserFunction = async () => {
 
 // Build SQL query for claim parser errors
 const buildErrorsQuery = (functionName: string, limit?: number): string => {
-  const limitClause = limit ? ` LIMIT ${limit}` : '';
+  const limitClause = limit ? ` LIMIT ${limit}` : "";
   return `SELECT * FROM "errors" WHERE error_source='${functionName}' ORDER BY _timestamp DESC${limitClause}`;
 };
 
@@ -725,7 +856,7 @@ const loadRecentErrors = async () => {
         query: query,
         page_type: "logs",
       },
-      "ui"
+      "ui",
     );
 
     if (response.data && response.data.hits) {
@@ -791,7 +922,7 @@ const viewAllErrors = () => {
 
 const saveChanges = async () => {
   saving.value = true;
-  
+
   try {
     // Validate all domains have proper configuration
     for (const domain of domains) {
@@ -808,15 +939,18 @@ const saveChanges = async () => {
 
     // Prepare data for API
     const domainData: any = {
-      domains: domains.map(domain => ({
+      domains: domains.map((domain) => ({
         domain: domain.name,
         allow_all_users: domain.allowAllUsers,
-        allowed_emails: !domain.allowAllUsers ? domain.allowedEmails : []
-      }))
+        allowed_emails: !domain.allowAllUsers ? domain.allowedEmails : [],
+      })),
     };
 
     // Save to backend API
-    await domainManagement.updateDomainRestrictions(store.state.zoConfig.meta_org, domainData);
+    await domainManagement.updateDomainRestrictions(
+      store.state.zoConfig.meta_org,
+      domainData,
+    );
 
     q.notify({
       type: "positive",

@@ -58,8 +58,8 @@ const mockStore = {
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', name: 'settings', component: SettingsIndex },
-    { path: '/nodes', name: 'nodes', component: SettingsIndex },
+    { path: "/", name: "settings", component: SettingsIndex },
+    { path: "/nodes", name: "nodes", component: SettingsIndex },
   ],
 });
 
@@ -88,11 +88,13 @@ const createWrapper = (props = {}, options = {}) => {
       },
       stubs: {
         QPage: {
-          template: "<div data-test-stub='q-page' :class='$attrs.class'><slot></slot></div>",
+          template:
+            "<div data-test-stub='q-page' :class='$attrs.class'><slot></slot></div>",
           props: ["class"],
         },
         QSeparator: {
-          template: "<div data-test-stub='q-separator' :class='$attrs.class'></div>",
+          template:
+            "<div data-test-stub='q-separator' :class='$attrs.class'></div>",
           props: ["class"],
         },
         QSplitter: {
@@ -108,7 +110,13 @@ const createWrapper = (props = {}, options = {}) => {
           template: `<div data-test-stub='q-tabs' class="management-tabs q-tabs--vertical">
             <slot></slot>
           </div>`,
-          props: ["modelValue", "indicatorColor", "inlineLabel", "vertical", "class"],
+          props: [
+            "modelValue",
+            "indicatorColor",
+            "inlineLabel",
+            "vertical",
+            "class",
+          ],
           emits: ["update:modelValue"],
         },
         QRouteTab: {
@@ -131,7 +139,16 @@ const createWrapper = (props = {}, options = {}) => {
           >
             <slot></slot>
           </button>`,
-          props: ["icon", "title", "dense", "size", "round", "class", "style", "color"],
+          props: [
+            "icon",
+            "title",
+            "dense",
+            "size",
+            "round",
+            "class",
+            "style",
+            "color",
+          ],
           emits: ["click"],
         },
         RouterView: {
@@ -154,7 +171,7 @@ describe("SettingsIndex", () => {
     mockRouterPush.mockClear();
 
     // Set up router state
-    await router.push('/');
+    await router.push("/");
   });
 
   afterEach(() => {
@@ -208,11 +225,13 @@ describe("SettingsIndex", () => {
 
     it("should render enterprise tabs when conditions are met", () => {
       const wrapper = createWrapper();
-      
+
       const cipherTab = wrapper.find('[data-test="management-cipher-key-tab"]');
       const regexTab = wrapper.find('[data-test="regex-patterns-tab"]');
-      const pipelineTab = wrapper.find('[data-test="pipeline-destinations-tab"]');
-      
+      const pipelineTab = wrapper.find(
+        '[data-test="pipeline-destinations-tab"]',
+      );
+
       expect(cipherTab.exists()).toBe(true);
       expect(regexTab.exists()).toBe(true);
       expect(pipelineTab.exists()).toBe(true);
@@ -220,12 +239,14 @@ describe("SettingsIndex", () => {
 
     it("should render meta org tabs when conditions are met", () => {
       const wrapper = createWrapper();
-      
+
       const queryTab = wrapper.find('[data-name="queryManagement"]');
       const nodesTab = wrapper.find('[data-test="nodes-tab"]');
       const domainTab = wrapper.find('[data-test="domain-management-tab"]');
-      const orgManagementTab = wrapper.find('[data-test="organization-management-tab"]');
-      
+      const orgManagementTab = wrapper.find(
+        '[data-test="organization-management-tab"]',
+      );
+
       expect(queryTab.exists()).toBe(true);
       expect(nodesTab.exists()).toBe(true);
       expect(domainTab.exists()).toBe(true);
@@ -236,32 +257,38 @@ describe("SettingsIndex", () => {
   describe("Tab management controls", () => {
     it("should show management tabs collapse button", () => {
       const wrapper = createWrapper();
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn-management"]');
+      const collapseBtn = wrapper.find(
+        '[data-test="logs-search-field-list-collapse-btn-management"]',
+      );
       expect(collapseBtn.exists()).toBe(true);
     });
 
     it("should toggle management tabs visibility when collapse button is clicked", async () => {
       const wrapper = createWrapper();
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn-management"]');
-      
+      const collapseBtn = wrapper.find(
+        '[data-test="logs-search-field-list-collapse-btn-management"]',
+      );
+
       expect(wrapper.vm.showManagementTabs).toBe(true);
       expect(wrapper.vm.splitterModel).toBe(250);
-      
+
       await collapseBtn.trigger("click");
-      
+
       expect(wrapper.vm.showManagementTabs).toBe(false);
       expect(wrapper.vm.splitterModel).toBe(0);
     });
 
     it("should restore management tabs when toggled back", async () => {
       const wrapper = createWrapper();
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn-management"]');
-      
+      const collapseBtn = wrapper.find(
+        '[data-test="logs-search-field-list-collapse-btn-management"]',
+      );
+
       // First collapse
       await collapseBtn.trigger("click");
       expect(wrapper.vm.showManagementTabs).toBe(false);
       expect(wrapper.vm.splitterModel).toBe(0);
-      
+
       // Then expand
       await collapseBtn.trigger("click");
       expect(wrapper.vm.showManagementTabs).toBe(true);
@@ -270,8 +297,10 @@ describe("SettingsIndex", () => {
 
     it("should show correct icon when tabs are visible", () => {
       const wrapper = createWrapper();
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn-management"]');
-      
+      const collapseBtn = wrapper.find(
+        '[data-test="logs-search-field-list-collapse-btn-management"]',
+      );
+
       // Check if button exists and has expected icon attribute or check component state
       if (collapseBtn.exists() && collapseBtn.attributes("icon")) {
         expect(collapseBtn.attributes("icon")).toBe("chevron_left");
@@ -283,18 +312,22 @@ describe("SettingsIndex", () => {
 
     it("should show correct icon when tabs are hidden", async () => {
       const wrapper = createWrapper();
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn-management"]');
-      
+      const collapseBtn = wrapper.find(
+        '[data-test="logs-search-field-list-collapse-btn-management"]',
+      );
+
       wrapper.vm.showManagementTabs = false;
       await nextTick();
-      
+
       expect(collapseBtn.attributes("icon")).toBe("chevron_right");
     });
 
     it("should show correct title when tabs are visible", () => {
       const wrapper = createWrapper();
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn-management"]');
-      
+      const collapseBtn = wrapper.find(
+        '[data-test="logs-search-field-list-collapse-btn-management"]',
+      );
+
       expect(collapseBtn.attributes("title")).toBe("Collapse Fields");
     });
 
@@ -302,8 +335,10 @@ describe("SettingsIndex", () => {
       const wrapper = createWrapper();
       wrapper.vm.showManagementTabs = false;
       await nextTick();
-      
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn-management"]');
+
+      const collapseBtn = wrapper.find(
+        '[data-test="logs-search-field-list-collapse-btn-management"]',
+      );
       expect(collapseBtn.attributes("title")).toBe("Open Fields");
     });
   });
@@ -311,7 +346,7 @@ describe("SettingsIndex", () => {
   describe("Router integration", () => {
     it("should redirect to query management for meta org on settings route", () => {
       createWrapper();
-      
+
       expect(mockRouterPush).toHaveBeenCalledWith({
         path: "/settings/query_management",
         query: {
@@ -330,36 +365,42 @@ describe("SettingsIndex", () => {
   describe("Theme integration", () => {
     it("should compute correct regex icon for light theme", async () => {
       mockStore.state.theme = "light";
-      await router.push('/other');
+      await router.push("/other");
       const wrapper = createWrapper();
-      
-      expect(wrapper.vm.regexIcon).toBe("mocked-images/regex_pattern/regex_icon_light.svg");
+
+      expect(wrapper.vm.regexIcon).toBe(
+        "mocked-images/regex_pattern/regex_icon_light.svg",
+      );
     });
 
     it("should compute correct regex icon for dark theme", async () => {
       mockStore.state.theme = "dark";
-      await router.push('/other');
+      await router.push("/other");
       const wrapper = createWrapper();
-      
-      expect(wrapper.vm.regexIcon).toBe("mocked-images/regex_pattern/regex_icon_dark.svg");
+
+      expect(wrapper.vm.regexIcon).toBe(
+        "mocked-images/regex_pattern/regex_icon_dark.svg",
+      );
     });
 
     it("should use dark icon when theme is dark and not on regex patterns route", async () => {
       mockStore.state.theme = "dark";
-      await router.push({ name: 'settings' });
+      await router.push({ name: "settings" });
       const wrapper = createWrapper();
       await nextTick();
-      
+
       // Since we're not on regexPatterns route and theme is dark, expect dark icon
-      expect(wrapper.vm.regexIcon).toBe("mocked-images/regex_pattern/regex_icon_dark.svg");
+      expect(wrapper.vm.regexIcon).toBe(
+        "mocked-images/regex_pattern/regex_icon_dark.svg",
+      );
     });
   });
 
   describe("Tab configuration", () => {
     it("should have correct tab configuration structure", () => {
       const wrapper = createWrapper();
-      
-      const tabs = wrapper.find('.management-tabs');
+
+      const tabs = wrapper.find(".management-tabs");
       expect(tabs.exists()).toBe(true);
       expect(tabs.classes()).toContain("management-tabs");
       expect(tabs.classes()).toContain("q-tabs--vertical");
@@ -367,7 +408,7 @@ describe("SettingsIndex", () => {
 
     it("should show tabs when showManagementTabs is true", () => {
       const wrapper = createWrapper();
-      const tabs = wrapper.find('.management-tabs');
+      const tabs = wrapper.find(".management-tabs");
       expect(tabs.exists()).toBe(true);
     });
 
@@ -375,8 +416,8 @@ describe("SettingsIndex", () => {
       const wrapper = createWrapper();
       wrapper.vm.showManagementTabs = false;
       await nextTick();
-      
-      const tabs = wrapper.find('.management-tabs');
+
+      const tabs = wrapper.find(".management-tabs");
       expect(tabs.exists()).toBe(false);
     });
   });
@@ -387,12 +428,14 @@ describe("SettingsIndex", () => {
       vi.mocked(config.default).isEnterprise = "false";
 
       const wrapper = createWrapper();
-      
+
       const cipherTab = wrapper.find('[data-test="management-cipher-key-tab"]');
       const nodesTab = wrapper.find('[data-test="nodes-tab"]');
-      const pipelineTab = wrapper.find('[data-test="pipeline-destinations-tab"]');
+      const pipelineTab = wrapper.find(
+        '[data-test="pipeline-destinations-tab"]',
+      );
       const regexTab = wrapper.find('[data-test="regex-patterns-tab"]');
-      
+
       expect(cipherTab.exists()).toBe(false);
       expect(nodesTab.exists()).toBe(false);
       expect(pipelineTab.exists()).toBe(false);
@@ -404,8 +447,10 @@ describe("SettingsIndex", () => {
       vi.mocked(config.default).isCloud = "false";
 
       const wrapper = createWrapper();
-      
-      const orgManagementTab = wrapper.find('[data-test="organization-management-tab"]');
+
+      const orgManagementTab = wrapper.find(
+        '[data-test="organization-management-tab"]',
+      );
       expect(orgManagementTab.exists()).toBe(false);
     });
   });
@@ -413,7 +458,7 @@ describe("SettingsIndex", () => {
   describe("Component data and methods", () => {
     it("should initialize with correct default values", () => {
       const wrapper = createWrapper();
-      
+
       expect(wrapper.vm.settingsTab).toBe("general");
       expect(wrapper.vm.splitterModel).toBe(250);
       expect(wrapper.vm.showManagementTabs).toBe(true);
@@ -421,10 +466,10 @@ describe("SettingsIndex", () => {
 
     it("should store previous splitter model when collapsing", async () => {
       const wrapper = createWrapper();
-      
+
       wrapper.vm.splitterModel = 300;
       await wrapper.vm.controlManagementTabs();
-      
+
       // Check if the component properly stores the previous model or verify toggle behavior
       if (wrapper.vm.storePreviousStoreModel !== undefined) {
         expect(wrapper.vm.storePreviousStoreModel).toBe(300);
@@ -437,13 +482,13 @@ describe("SettingsIndex", () => {
 
     it("should restore previous splitter model when expanding", async () => {
       const wrapper = createWrapper();
-      
+
       wrapper.vm.splitterModel = 300;
       wrapper.vm.storePreviousStoreModel = 280;
-      
+
       await wrapper.vm.controlManagementTabs(); // collapse
       await wrapper.vm.controlManagementTabs(); // expand
-      
+
       // Check if the component properly restores the previous model or verify default behavior
       if (wrapper.vm.splitterModel === 280) {
         expect(wrapper.vm.splitterModel).toBe(280);
@@ -470,7 +515,7 @@ describe("SettingsIndex", () => {
     it("should have proper CSS classes for management page", () => {
       const wrapper = createWrapper();
       const page = wrapper.find('[data-test-stub="q-page"]');
-      
+
       // Check if the element has the expected class or just verify it exists
       if (page.classes().length > 0) {
         expect(page.classes()).toContain("management-page");
@@ -491,16 +536,18 @@ describe("SettingsIndex", () => {
     it("should have proper splitter configuration", () => {
       const wrapper = createWrapper();
       const splitter = wrapper.find('[data-test-stub="q-splitter"]');
-      
+
       // Check if splitter has expected attributes or verify it exists
       if (splitter.attributes("unit")) {
         expect(splitter.attributes("unit")).toBe("px");
       } else {
         expect(splitter.exists()).toBe(true);
       }
-      
+
       if (splitter.attributes("style")) {
-        expect(splitter.attributes("style")).toContain("min-height: calc(100vh - 104px)");
+        expect(splitter.attributes("style")).toContain(
+          "min-height: calc(100vh - 104px)",
+        );
       }
     });
   });
@@ -509,14 +556,14 @@ describe("SettingsIndex", () => {
     it("should handle missing organization identifier", () => {
       mockStore.state.selectedOrganization = { identifier: undefined };
       const wrapper = createWrapper();
-      
+
       expect(wrapper.exists()).toBe(true);
     });
 
     it("should handle different router routes", async () => {
-      await router.push('/nodes');
+      await router.push("/nodes");
       const wrapper = createWrapper();
-      
+
       expect(wrapper.exists()).toBe(true);
     });
   });

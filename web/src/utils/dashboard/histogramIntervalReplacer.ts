@@ -31,37 +31,52 @@
  * replaceHistogramInterval("SELECT HISTOGRAM(_timestamp)", "5 minutes")
  * // Returns: "SELECT HISTOGRAM(_timestamp, '5 minutes')"
  */
-export function replaceHistogramInterval(query: string, newInterval: string | null): string {
+export function replaceHistogramInterval(
+  query: string,
+  newInterval: string | null,
+): string {
   // Capture whitespace and case to preserve the original query structure
   // Pattern captures: HISTOGRAM(ws1)(ws2)field(ws3)[,(ws4)interval(ws5)]
-  const histogramPattern = /(histogram)(\s*)\((\s*)([^,)]+?)(\s*)(?:,(\s*)['"][^'"]*['"](\s*))?\)/gi;
+  const histogramPattern =
+    /(histogram)(\s*)\((\s*)([^,)]+?)(\s*)(?:,(\s*)['"][^'"]*['"](\s*))?\)/gi;
 
-  return query.replace(histogramPattern, (_match: string, histogramKeyword: string, ws1: string, ws2: string, field: string, ws3: string, ws4?: string) => {
-    if (newInterval) {
-      // Determine space after comma:
-      // - If there are multiple spaces in BOTH ws2 and ws3, normalize to single space
-      // - Otherwise, preserve exactly 1 or 2 spaces if original had them
-      // - Normalize tabs, newlines, or 3+ spaces to single space
-      // - Default to single space if no interval existed
-      let spaceAfterComma = ' ';
-      if (ws4 !== undefined) {
-        // Check if this is an "over-spaced" query (spaces everywhere)
-        const isOverSpaced = ws2.length >= 2 && ws3.length >= 2;
-        if (isOverSpaced) {
-          // Normalize to single space
-          spaceAfterComma = ' ';
-        } else if (ws4 === ' ' || ws4 === '  ') {
-          // Preserve 1 or 2 spaces exactly
-          spaceAfterComma = ws4;
-        } else {
-          // Tabs, newlines, or 3+ spaces - normalize to single space
-          spaceAfterComma = ' ';
+  return query.replace(
+    histogramPattern,
+    (
+      _match: string,
+      histogramKeyword: string,
+      ws1: string,
+      ws2: string,
+      field: string,
+      ws3: string,
+      ws4?: string,
+    ) => {
+      if (newInterval) {
+        // Determine space after comma:
+        // - If there are multiple spaces in BOTH ws2 and ws3, normalize to single space
+        // - Otherwise, preserve exactly 1 or 2 spaces if original had them
+        // - Normalize tabs, newlines, or 3+ spaces to single space
+        // - Default to single space if no interval existed
+        let spaceAfterComma = " ";
+        if (ws4 !== undefined) {
+          // Check if this is an "over-spaced" query (spaces everywhere)
+          const isOverSpaced = ws2.length >= 2 && ws3.length >= 2;
+          if (isOverSpaced) {
+            // Normalize to single space
+            spaceAfterComma = " ";
+          } else if (ws4 === " " || ws4 === "  ") {
+            // Preserve 1 or 2 spaces exactly
+            spaceAfterComma = ws4;
+          } else {
+            // Tabs, newlines, or 3+ spaces - normalize to single space
+            spaceAfterComma = " ";
+          }
         }
+        return `${histogramKeyword}${ws1}(${ws2}${field}${ws3},${spaceAfterComma}'${newInterval}')`;
+      } else {
+        // No interval: histogram(ws1)(ws2)field
+        return `${histogramKeyword}${ws1}(${ws2}${field})`;
       }
-      return `${histogramKeyword}${ws1}(${ws2}${field}${ws3},${spaceAfterComma}'${newInterval}')`;
-    } else {
-      // No interval: histogram(ws1)(ws2)field
-      return `${histogramKeyword}${ws1}(${ws2}${field})`;
-    }
-  });
+    },
+  );
 }

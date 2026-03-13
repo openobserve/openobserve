@@ -72,7 +72,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 label="Edit Quota"
                 flat
                 class="border title-height o2-secondary-button tw:h-[36px]"
-                :class="store.state.theme == 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                :class="
+                  store.state.theme == 'dark'
+                    ? 'o2-secondary-button-dark'
+                    : 'o2-secondary-button-light'
+                "
                 no-caps
                 :disable="activeTab == 'role-limits' && !expandedRow"
                 @click="editTableWithInput"
@@ -96,17 +100,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 borderless
                 flat
                 class="no-border input-width o2-search-input"
-                :class="store.state.theme == 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
+                :class="
+                  store.state.theme == 'dark'
+                    ? 'o2-search-input-dark'
+                    : 'o2-search-input-light'
+                "
                 :placeholder="
                   {
                     'api-limits': t('quota.api-search'),
                     'role-limits': t('quota.role-search'),
                   }[activeTab]
                 "
-
               >
                 <template #prepend>
-                  <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
+                  <q-icon
+                    name="search"
+                    class="cursor-pointer o2-search-input-icon"
+                    :class="
+                      store.state.theme == 'dark'
+                        ? 'o2-search-input-icon-dark'
+                        : 'o2-search-input-icon-light'
+                    "
+                  />
                 </template>
               </q-input>
               <q-select
@@ -159,112 +174,140 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- this table for api limits -->
-      <div v-if="activeTab == 'api-limits' && activeType == 'table' && !isApiLimitsLoading" class="card-container tw:h-[calc(100vh-218px)]">
-      <q-table
-        :rows="apiLimitsRows"
-        :columns="generateColumns()"
-        row-key="name"
-        :class="store.state.theme == 'dark' ? 'o2-last-row-border-dark' : 'o2-last-row-border-light'"
-        :pagination="pagination"
-        :filter="searchQuery"
-        :filter-method="filteredData"
-        v-if="activeTab == 'api-limits' && activeType == 'table' && !isApiLimitsLoading"
-        style="height: calc(100vh - 220px);"
-        dense
+      <div
+        v-if="
+          activeTab == 'api-limits' &&
+          activeType == 'table' &&
+          !isApiLimitsLoading
+        "
+        class="card-container tw:h-[calc(100vh-218px)]"
       >
-        <template v-slot:header="props">
-          <q-tr :props="props" class="thead-sticky">
-            <q-th
-              v-for="col in props.cols"
-              :key="col.name"
+        <q-table
+          :rows="apiLimitsRows"
+          :columns="generateColumns()"
+          row-key="name"
+          :class="
+            store.state.theme == 'dark'
+              ? 'o2-last-row-border-dark'
+              : 'o2-last-row-border-light'
+          "
+          :pagination="pagination"
+          :filter="searchQuery"
+          :filter-method="filteredData"
+          v-if="
+            activeTab == 'api-limits' &&
+            activeType == 'table' &&
+            !isApiLimitsLoading
+          "
+          style="height: calc(100vh - 220px)"
+          dense
+        >
+          <template v-slot:header="props">
+            <q-tr :props="props" class="thead-sticky">
+              <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                :style="col.style"
+              >
+                {{ col.label }}
+              </q-th>
+            </q-tr>
+          </template>
+          <template #no-data> </template>
+
+          <template #bottom="scope">
+            <q-table-pagination
+              :scope="scope"
+              :resultTotal="resultTotal"
+              position="bottom"
+              :perPageOptions="perPageOptions"
+              @update:changeRecordPerPage="changePagination"
+            />
+          </template>
+
+          <template v-slot:body-cell="props">
+            <q-td
               :props="props"
-              :style="col.style"
-            >
-              {{ col.label }}
-            </q-th>
-          </q-tr>
-        </template>
-        <template #no-data>
-        </template>
-
-        <template #bottom="scope">
-          <q-table-pagination
-            :scope="scope"
-            :resultTotal="resultTotal"
-            position="bottom"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
-
-        <template v-slot:body-cell="props">
-          <q-td
-            :props="props"
-            v-if="editTable"
-            :style="{
-              backgroundColor:
-                editTable && props.col.name !== 'module_name'
-                  ? store.state.theme === 'dark'
-                    ? '#212121'
-                    : '#f1f1ee'
-                  : 'transparent',
-            }"
-          >
-            <div
-              v-if="
-                props.col.name != 'module_name' &&
-                props.row[props.col.name] != '-'
-              "
-              contenteditable="true"
-              debounce="500"
-              :class="{
-                'editable-cell': editTable && props.col.name !== 'module_name',
-                'edited-input': isEdited(props.row.module_name, props.col.name),
+              v-if="editTable"
+              :style="{
+                backgroundColor:
+                  editTable && props.col.name !== 'module_name'
+                    ? store.state.theme === 'dark'
+                      ? '#212121'
+                      : '#f1f1ee'
+                    : 'transparent',
               }"
-              @input="
-                (event: any) =>
-                  handleInputChange(
-                    '',
+            >
+              <div
+                v-if="
+                  props.col.name != 'module_name' &&
+                  props.row[props.col.name] != '-'
+                "
+                contenteditable="true"
+                debounce="500"
+                :class="{
+                  'editable-cell':
+                    editTable && props.col.name !== 'module_name',
+                  'edited-input': isEdited(
                     props.row.module_name,
-                    props.row[props.col.name],
                     props.col.name,
-                    event.target.innerText,
-                  )
-              "
-              @keypress="restrictToNumbers"
-              @paste="preventNonNumericPaste"
-            >
-              {{
-                changedValues[props.row.module_name]?.[props.col.name] ??
-                props.row[props.col.name]
-              }}
-            </div>
-            <div v-else-if="props.col.name == 'module_name'">
-              {{ props.row[props.col.name] }}
-            </div>
-            <div :disabled="true" v-else-if="props.row[props.col.name] == '-'">
-              -
-            </div>
-          </q-td>
-          <q-td :props="props" v-else>
-            <div
-              v-if="
-                props.col.name != 'module_name' &&
-                props.row[props.col.name] != '-'
-              "
-            >
-              {{ props.row[props.col.name] }}
-            </div>
-            <div v-else-if="props.col.name == 'module_name'">
-              {{ props.row[props.col.name] }}
-            </div>
-            <div v-else-if="props.row[props.col.name] == '-'">-</div>
-          </q-td>
-        </template>
-      </q-table>
+                  ),
+                }"
+                @input="
+                  (event: any) =>
+                    handleInputChange(
+                      '',
+                      props.row.module_name,
+                      props.row[props.col.name],
+                      props.col.name,
+                      event.target.innerText,
+                    )
+                "
+                @keypress="restrictToNumbers"
+                @paste="preventNonNumericPaste"
+              >
+                {{
+                  changedValues[props.row.module_name]?.[props.col.name] ??
+                  props.row[props.col.name]
+                }}
+              </div>
+              <div v-else-if="props.col.name == 'module_name'">
+                {{ props.row[props.col.name] }}
+              </div>
+              <div
+                :disabled="true"
+                v-else-if="props.row[props.col.name] == '-'"
+              >
+                -
+              </div>
+            </q-td>
+            <q-td :props="props" v-else>
+              <div
+                v-if="
+                  props.col.name != 'module_name' &&
+                  props.row[props.col.name] != '-'
+                "
+              >
+                {{ props.row[props.col.name] }}
+              </div>
+              <div v-else-if="props.col.name == 'module_name'">
+                {{ props.row[props.col.name] }}
+              </div>
+              <div v-else-if="props.row[props.col.name] == '-'">-</div>
+            </q-td>
+          </template>
+        </q-table>
       </div>
 
-      <div v-if="isApiLimitsLoading && activeTab == 'api-limits' && activeType == 'table'" class="tw:h-[50vh] tw:flex tw:justify-center tw:items-center">
+      <div
+        v-if="
+          isApiLimitsLoading &&
+          activeTab == 'api-limits' &&
+          activeType == 'table'
+        "
+        class="tw:h-[50vh] tw:flex tw:justify-center tw:items-center"
+      >
         <q-spinner-hourglass color="primary" size="lg" />
       </div>
       <div
@@ -285,7 +328,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <!-- this table for role limits -->
-       <div v-if="activeTab == 'role-limits' && activeType == 'table' && !isRolesLoading"  class="card-container tw:h-[calc(100vh-218px)]">
+      <div
+        v-if="
+          activeTab == 'role-limits' && activeType == 'table' && !isRolesLoading
+        "
+        class="card-container tw:h-[calc(100vh-218px)]"
+      >
         <q-table
           :rows="rolesLimitRows"
           :columns="roleLimitsColumns"
@@ -294,147 +342,166 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :filter="searchQuery"
           :filter-method="filteredData"
           dense
-          v-if="activeTab == 'role-limits' && activeType == 'table' && !isRolesLoading"
-          :class="store.state.theme == 'dark' ? 'o2-last-row-border-dark' : 'o2-last-row-border-light'"
-          :style="rolesLimitRows.length > 0 ? 'height: calc(100vh - 218px)' : ''"
+          v-if="
+            activeTab == 'role-limits' &&
+            activeType == 'table' &&
+            !isRolesLoading
+          "
+          :class="
+            store.state.theme == 'dark'
+              ? 'o2-last-row-border-dark'
+              : 'o2-last-row-border-light'
+          "
+          :style="
+            rolesLimitRows.length > 0 ? 'height: calc(100vh - 218px)' : ''
+          "
         >
-        <template v-slot:header="props">
-          <q-tr :props="props" class="thead-sticky">
-            <q-th
-              v-for="col in props.cols"
-              :key="col.name"
+          <template v-slot:header="props">
+            <q-tr :props="props" class="thead-sticky">
+              <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                :style="col.style"
+              >
+                {{ col.label }}
+              </q-th>
+            </q-tr>
+          </template>
+          <template #no-data></template>
+          <template #bottom="scope">
+            <q-table-pagination
+              :scope="scope"
+              :resultTotal="resultTotal"
+              position="bottom"
+              :perPageOptions="perPageOptions"
+              @update:changeRecordPerPage="changePagination"
+            />
+          </template>
+          <template v-slot:body="props">
+            <q-tr
+              :data-test="`quota-role-list-table-${props.row.uuid}-row`"
               :props="props"
-              :style="col.style"
+              style="cursor: pointer"
             >
-              {{ col.label }}
-            </q-th>
-          </q-tr>
-        </template>
-        <template #no-data></template>
-        <template #bottom="scope">
-          <q-table-pagination
-            :scope="scope"
-            :resultTotal="resultTotal"
-            position="bottom"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
-        <template v-slot:body="props">
-          <q-tr
-            :data-test="`quota-role-list-table-${props.row.uuid}-row`"
-            :props="props"
-            style="cursor: pointer"
-          >
-            <q-td
-              v-for="col in roleLimitsColumns"
-              :key="col.name"
+              <q-td
+                v-for="col in roleLimitsColumns"
+                :key="col.name"
+                :props="props"
+                :style="col.style"
+              >
+                <template v-if="col.name == 'role_name'">
+                  <q-btn
+                    dense
+                    flat
+                    size="xs"
+                    :icon="
+                      expandedRow != props.row.uuid
+                        ? 'chevron_right'
+                        : 'expand_more'
+                    "
+                    @click="triggerExpand(props)"
+                  />
+                  {{ props.row[col.name] }}
+                </template>
+                <template v-else> </template>
+              </q-td>
+            </q-tr>
+            <q-tr
+              v-if="!editTable && !isRoleLimitsLoading"
+              v-for="(row, index) in filteredRoleLevelModuleRows"
+              data-test="scheduled-pipeline-row-expand"
+              v-show="expandedRow === props.row.uuid"
               :props="props"
-              :style="col.style"
             >
-              <template v-if="col.name == 'role_name'">
-                <q-btn
-                  dense
-                  flat
-                  size="xs"
-                  :icon="
-                    expandedRow != props.row.uuid
-                      ? 'chevron_right'
-                      : 'expand_more'
-                  "
-                  @click="triggerExpand(props)"
-                />
-                {{ props.row[col.name] }}
-              </template>
-              <template v-else> </template>
-            </q-td>
-          </q-tr>
-          <q-tr
-            v-if="!editTable && !isRoleLimitsLoading"
-            v-for="(row, index) in filteredRoleLevelModuleRows"
-            data-test="scheduled-pipeline-row-expand"
-            v-show="expandedRow === props.row.uuid"
-            :props="props"
-          >
-            <q-td v-for="col in props.cols" :key="col.name" :props="props">
-              <template v-if="col.name == 'role_name'">
-                <div style="padding-left: 20px">
-                  {{ row["module_name"] }}
-                </div>
-              </template>
-              <template v-else-if="col.name == '#'"> {{}} </template>
-              <template v-else-if="row[col.name] == '-'"> - </template>
-              <template v-else>
-                {{ row[col.name] }}
-              </template>
-            </q-td>
-          </q-tr>
-          <q-tr
-            v-if="editTable && !roleLevelLoading && !isRoleLimitsLoading"
-            v-for="(row, index) in filteredRoleLevelModuleRows"
-            data-test="scheduled-pipeline-row-expand"
-            v-show="expandedRow === props.row.uuid"
-            :props="props"
-          >
-            <q-td
-              :style="{
-                backgroundColor:
-                  editTable && col.name !== 'role_name'
-                    ? store.state.theme === 'dark'
-                      ? '#212121'
-                      : '#f1f1ee'
-                    : 'transparent',
-              }"
-              :props="props"
-              v-for="col in props.cols"
-              :key="col.name"
-              v-if="editTable"
-              style="padding-left: 8px"
-            >
-              <template v-if="col.name == 'role_name'">
-                <div style="padding-left: 20px">
-                  {{ row["module_name"] }}
-                </div>
-              </template>
-              <template v-else-if="col.name == '#'"> {{}} </template>
-              <template v-else-if="row[col.name] == '-'"> - </template>
-              <template v-else>
-                <div
-                  contenteditable="true"
-                  debounce="500"
-                  :class="{
-                    'editable-cell': editTable && col.name !== 'module_name',
-                    'edited-input': isEdited(row.module_name, col.name),
-                  }"
-                  @input="
-                    (event: any) =>
-                      handleInputChange(
-                        props.row.role_name,
-                        row.module_name,
-                        row[col.name],
-                        col.name,
-                        event.target.innerText,
-                      )
-                  "
-                  @keypress="restrictToNumbers"
-                  @paste="preventNonNumericPaste"
-                >
+              <q-td v-for="col in props.cols" :key="col.name"
+:props="props">
+                <template v-if="col.name == 'role_name'">
+                  <div style="padding-left: 20px">
+                    {{ row["module_name"] }}
+                  </div>
+                </template>
+                <template v-else-if="col.name == '#'"> {{}} </template>
+                <template v-else-if="row[col.name] == '-'"> - </template>
+                <template v-else>
                   {{ row[col.name] }}
+                </template>
+              </q-td>
+            </q-tr>
+            <q-tr
+              v-if="editTable && !roleLevelLoading && !isRoleLimitsLoading"
+              v-for="(row, index) in filteredRoleLevelModuleRows"
+              data-test="scheduled-pipeline-row-expand"
+              v-show="expandedRow === props.row.uuid"
+              :props="props"
+            >
+              <q-td
+                :style="{
+                  backgroundColor:
+                    editTable && col.name !== 'role_name'
+                      ? store.state.theme === 'dark'
+                        ? '#212121'
+                        : '#f1f1ee'
+                      : 'transparent',
+                }"
+                :props="props"
+                v-for="col in props.cols"
+                :key="col.name"
+                v-if="editTable"
+                style="padding-left: 8px"
+              >
+                <template v-if="col.name == 'role_name'">
+                  <div style="padding-left: 20px">
+                    {{ row["module_name"] }}
+                  </div>
+                </template>
+                <template v-else-if="col.name == '#'"> {{}} </template>
+                <template v-else-if="row[col.name] == '-'"> - </template>
+                <template v-else>
+                  <div
+                    contenteditable="true"
+                    debounce="500"
+                    :class="{
+                      'editable-cell': editTable && col.name !== 'module_name',
+                      'edited-input': isEdited(row.module_name, col.name),
+                    }"
+                    @input="
+                      (event: any) =>
+                        handleInputChange(
+                          props.row.role_name,
+                          row.module_name,
+                          row[col.name],
+                          col.name,
+                          event.target.innerText,
+                        )
+                    "
+                    @keypress="restrictToNumbers"
+                    @paste="preventNonNumericPaste"
+                  >
+                    {{ row[col.name] }}
+                  </div>
+                </template>
+              </q-td>
+            </q-tr>
+            <q-tr v-if="isRoleLimitsLoading && props.row.uuid == expandedRow">
+              <q-td v-for="col in props.cols" :key="col.name">
+                <div
+                  v-if="col.name == 'create'"
+                  class="tw:h-[50vh] tw:w-full tw:flex tw:justify-center tw:items-center"
+                >
+                  <q-spinner-hourglass color="primary" size="lg" />
                 </div>
-              </template>
-            </q-td>
-          </q-tr>
-          <q-tr v-if="isRoleLimitsLoading && props.row.uuid == expandedRow">
-            <q-td v-for="col in props.cols" :key="col.name">
-              <div v-if="col.name == 'create'" class="tw:h-[50vh] tw:w-full tw:flex tw:justify-center tw:items-center">
-              <q-spinner-hourglass color="primary" size="lg" />
-            </div>
-            </q-td>
-          </q-tr>
-        </template>
-      </q-table>
+              </q-td>
+            </q-tr>
+          </template>
+        </q-table>
       </div>
-      <div v-if="isRolesLoading && activeTab == 'role-limits' && activeType == 'table'" class="tw:h-[70vh] tw:flex tw:justify-center tw:items-center">
+      <div
+        v-if="
+          isRolesLoading && activeTab == 'role-limits' && activeType == 'table'
+        "
+        class="tw:h-[70vh] tw:flex tw:justify-center tw:items-center"
+      >
         <q-spinner-hourglass color="primary" size="lg" />
       </div>
       <div
@@ -480,14 +547,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-else-if="
-          activeTab == 'api-limits' && !loading && !apiLimitsRows.length && !isApiLimitsLoading
+          activeTab == 'api-limits' &&
+          !loading &&
+          !apiLimitsRows.length &&
+          !isApiLimitsLoading
         "
       >
         <NoData />
       </div>
       <div
         v-else-if="
-          activeTab == 'role-limits' && !loading && !rolesLimitRows.length && !isRolesLoading
+          activeTab == 'role-limits' &&
+          !loading &&
+          !rolesLimitRows.length &&
+          !isRolesLoading
         "
       >
         <NoData />
@@ -501,7 +574,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-mr-md o2-secondary-button tw:h-[36px]"
           no-caps
           flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-secondary-button-dark'
+              : 'o2-secondary-button-light'
+          "
           @click="cancelChanges"
         />
         <q-btn
@@ -510,7 +587,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disable="Object.keys(changedValues).length === 0"
           no-caps
           flat
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-primary-button-dark'
+              : 'o2-primary-button-light'
+          "
           @click="saveChanges"
         />
       </div>
@@ -523,7 +604,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-mr-md o2-secondary-button tw:h-[36px]"
           no-caps
           flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-secondary-button-dark'
+              : 'o2-secondary-button-light'
+          "
           @click="cancelJsonChanges"
           :disable="isSavingJson"
         />
@@ -532,7 +617,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-primary-button no-border tw:h-[36px]"
           no-caps
           flat
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-primary-button-dark'
+              : 'o2-primary-button-light'
+          "
           @click="saveJsonChanges"
           :disable="isSavingJson"
         />
@@ -1399,7 +1488,7 @@ export default defineComponent({
         openedRole.value = null;
       } else {
         openedRole.value = props.row.role_name;
-        //expand the row at first only because we need to show the loading state for the user 
+        //expand the row at first only because we need to show the loading state for the user
         expandedRow.value = props.row.uuid;
         let roleLimits: any;
         if (
@@ -1615,7 +1704,8 @@ export default defineComponent({
       if (isChanged) {
         $q.notify({
           type: "warning",
-          message: "Please save or cancel your changes before switching time units",
+          message:
+            "Please save or cancel your changes before switching time units",
           timeout: 3000,
         });
         // Revert back to previous time unit
@@ -1641,9 +1731,16 @@ export default defineComponent({
         resultTotal.value = apiLimitsRows.value.length;
       } else if (activeTab.value === "role-limits" && openedRole.value) {
         const storeKey = `${openedRole.value}_${newTimeUnit}`;
-        if (store.state.allRoleLimitsByOrgIdByRole[selectedOrganization.value.value]?.[storeKey]) {
+        if (
+          store.state.allRoleLimitsByOrgIdByRole[
+            selectedOrganization.value.value
+          ]?.[storeKey]
+        ) {
           // Use cached data
-          roleLevelModuleRows.value = store.state.allRoleLimitsByOrgIdByRole[selectedOrganization.value.value][storeKey];
+          roleLevelModuleRows.value =
+            store.state.allRoleLimitsByOrgIdByRole[
+              selectedOrganization.value.value
+            ][storeKey];
         } else {
           // Fetch from API
           roleLevelModuleRows.value = await getRoleLimitsByOrganization(
@@ -1891,11 +1988,11 @@ export default defineComponent({
 }
 
 .app-table-container {
-  .q-table{
-    thead{
-          tr {
-      background: var(--o2-table-header-bg) !important;
-    }
+  .q-table {
+    thead {
+      tr {
+        background: var(--o2-table-header-bg) !important;
+      }
     }
   }
   .thead-sticky,

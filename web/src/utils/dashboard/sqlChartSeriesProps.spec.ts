@@ -32,46 +32,64 @@ describe("sqlChartSeriesProps - getPropsByChartTypeForSeries", () => {
 
   describe("line chart", () => {
     it("returns line type", () => {
-      expect(getPropsByChartTypeForSeries(makeSchema("line")).type).toBe("line");
+      expect(getPropsByChartTypeForSeries(makeSchema("line")).type).toBe(
+        "line",
+      );
     });
 
     it("uses smooth interpolation by default (null)", () => {
-      const result = getPropsByChartTypeForSeries(makeSchema("line", { line_interpolation: null })) as any;
+      const result = getPropsByChartTypeForSeries(
+        makeSchema("line", { line_interpolation: null }),
+      ) as any;
       expect(result.smooth).toBe(true);
     });
 
     it("uses smooth interpolation when config is 'smooth'", () => {
-      const result = getPropsByChartTypeForSeries(makeSchema("line", { line_interpolation: "smooth" })) as any;
+      const result = getPropsByChartTypeForSeries(
+        makeSchema("line", { line_interpolation: "smooth" }),
+      ) as any;
       expect(result.smooth).toBe(true);
     });
 
     it("does not use smooth for step-start", () => {
-      const result = getPropsByChartTypeForSeries(makeSchema("line", { line_interpolation: "step-start" })) as any;
+      const result = getPropsByChartTypeForSeries(
+        makeSchema("line", { line_interpolation: "step-start" }),
+      ) as any;
       expect(result.smooth).toBe(false);
     });
 
     it("returns step for step-start", () => {
-      const result = getPropsByChartTypeForSeries(makeSchema("line", { line_interpolation: "step-start" })) as any;
+      const result = getPropsByChartTypeForSeries(
+        makeSchema("line", { line_interpolation: "step-start" }),
+      ) as any;
       expect(result.step).toBe("start");
     });
 
     it("returns step for step-end", () => {
-      const result = getPropsByChartTypeForSeries(makeSchema("line", { line_interpolation: "step-end" })) as any;
+      const result = getPropsByChartTypeForSeries(
+        makeSchema("line", { line_interpolation: "step-end" }),
+      ) as any;
       expect(result.step).toBe("end");
     });
 
     it("returns step for step-middle", () => {
-      const result = getPropsByChartTypeForSeries(makeSchema("line", { line_interpolation: "step-middle" })) as any;
+      const result = getPropsByChartTypeForSeries(
+        makeSchema("line", { line_interpolation: "step-middle" }),
+      ) as any;
       expect(result.step).toBe("middle");
     });
 
     it("returns false for step when not step interpolation", () => {
-      const result = getPropsByChartTypeForSeries(makeSchema("line", { line_interpolation: "smooth" })) as any;
+      const result = getPropsByChartTypeForSeries(
+        makeSchema("line", { line_interpolation: "smooth" }),
+      ) as any;
       expect(result.step).toBe(false);
     });
 
     it("uses show_symbol from config", () => {
-      const result = getPropsByChartTypeForSeries(makeSchema("line", { show_symbol: true })) as any;
+      const result = getPropsByChartTypeForSeries(
+        makeSchema("line", { show_symbol: true }),
+      ) as any;
       expect(result.showSymbol).toBe(true);
     });
 
@@ -81,7 +99,9 @@ describe("sqlChartSeriesProps - getPropsByChartTypeForSeries", () => {
     });
 
     it("uses line_thickness from config", () => {
-      const result = getPropsByChartTypeForSeries(makeSchema("line", { line_thickness: 3 })) as any;
+      const result = getPropsByChartTypeForSeries(
+        makeSchema("line", { line_thickness: 3 }),
+      ) as any;
       expect(result.lineStyle.width).toBe(3);
     });
 
@@ -98,7 +118,9 @@ describe("sqlChartSeriesProps - getPropsByChartTypeForSeries", () => {
 
   describe("scatter chart", () => {
     it("returns scatter type", () => {
-      expect(getPropsByChartTypeForSeries(makeSchema("scatter")).type).toBe("scatter");
+      expect(getPropsByChartTypeForSeries(makeSchema("scatter")).type).toBe(
+        "scatter",
+      );
     });
 
     it("has symbolSize 5", () => {
@@ -125,7 +147,9 @@ describe("sqlChartSeriesProps - getPropsByChartTypeForSeries", () => {
 
   describe("donut chart", () => {
     it("returns pie type (donut uses pie)", () => {
-      expect(getPropsByChartTypeForSeries(makeSchema("donut")).type).toBe("pie");
+      expect(getPropsByChartTypeForSeries(makeSchema("donut")).type).toBe(
+        "pie",
+      );
     });
 
     it("has two-element radius array", () => {
@@ -142,13 +166,17 @@ describe("sqlChartSeriesProps - getPropsByChartTypeForSeries", () => {
 
   describe("h-bar chart", () => {
     it("returns bar type", () => {
-      expect(getPropsByChartTypeForSeries(makeSchema("h-bar")).type).toBe("bar");
+      expect(getPropsByChartTypeForSeries(makeSchema("h-bar")).type).toBe(
+        "bar",
+      );
     });
   });
 
   describe("area chart", () => {
     it("returns line type", () => {
-      expect(getPropsByChartTypeForSeries(makeSchema("area")).type).toBe("line");
+      expect(getPropsByChartTypeForSeries(makeSchema("area")).type).toBe(
+        "line",
+      );
     });
 
     it("has areaStyle object", () => {
@@ -163,20 +191,26 @@ describe("sqlChartSeriesProps - getPropsByChartTypeForSeries", () => {
     });
 
     it("handles step interpolation", () => {
-      const result = getPropsByChartTypeForSeries(makeSchema("area", { line_interpolation: "step-start" })) as any;
+      const result = getPropsByChartTypeForSeries(
+        makeSchema("area", { line_interpolation: "step-start" }),
+      ) as any;
       expect(result.step).toBe("start");
     });
   });
 
   describe("stacked chart", () => {
     it("returns bar type", () => {
-      expect(getPropsByChartTypeForSeries(makeSchema("stacked")).type).toBe("bar");
+      expect(getPropsByChartTypeForSeries(makeSchema("stacked")).type).toBe(
+        "bar",
+      );
     });
   });
 
   describe("heatmap chart", () => {
     it("returns heatmap type", () => {
-      expect(getPropsByChartTypeForSeries(makeSchema("heatmap")).type).toBe("heatmap");
+      expect(getPropsByChartTypeForSeries(makeSchema("heatmap")).type).toBe(
+        "heatmap",
+      );
     });
 
     it("shows label", () => {
@@ -187,23 +221,31 @@ describe("sqlChartSeriesProps - getPropsByChartTypeForSeries", () => {
 
   describe("area-stacked chart", () => {
     it("returns line type", () => {
-      expect(getPropsByChartTypeForSeries(makeSchema("area-stacked")).type).toBe("line");
+      expect(
+        getPropsByChartTypeForSeries(makeSchema("area-stacked")).type,
+      ).toBe("line");
     });
 
     it("has stack Total", () => {
-      const result = getPropsByChartTypeForSeries(makeSchema("area-stacked")) as any;
+      const result = getPropsByChartTypeForSeries(
+        makeSchema("area-stacked"),
+      ) as any;
       expect(result.stack).toBe("Total");
     });
 
     it("has areaStyle", () => {
-      const result = getPropsByChartTypeForSeries(makeSchema("area-stacked")) as any;
+      const result = getPropsByChartTypeForSeries(
+        makeSchema("area-stacked"),
+      ) as any;
       expect(result.areaStyle).toBeDefined();
     });
   });
 
   describe("metric chart", () => {
     it("returns custom type", () => {
-      expect(getPropsByChartTypeForSeries(makeSchema("metric")).type).toBe("custom");
+      expect(getPropsByChartTypeForSeries(makeSchema("metric")).type).toBe(
+        "custom",
+      );
     });
 
     it("has polar coordinateSystem", () => {
@@ -214,13 +256,17 @@ describe("sqlChartSeriesProps - getPropsByChartTypeForSeries", () => {
 
   describe("h-stacked chart", () => {
     it("returns bar type", () => {
-      expect(getPropsByChartTypeForSeries(makeSchema("h-stacked")).type).toBe("bar");
+      expect(getPropsByChartTypeForSeries(makeSchema("h-stacked")).type).toBe(
+        "bar",
+      );
     });
   });
 
   describe("gauge chart", () => {
     it("returns gauge type", () => {
-      expect(getPropsByChartTypeForSeries(makeSchema("gauge")).type).toBe("gauge");
+      expect(getPropsByChartTypeForSeries(makeSchema("gauge")).type).toBe(
+        "gauge",
+      );
     });
 
     it("has startAngle 205", () => {
@@ -246,7 +292,9 @@ describe("sqlChartSeriesProps - getPropsByChartTypeForSeries", () => {
 
   describe("default / unknown type", () => {
     it("returns bar for unknown type", () => {
-      expect(getPropsByChartTypeForSeries(makeSchema("unknown")).type).toBe("bar");
+      expect(getPropsByChartTypeForSeries(makeSchema("unknown")).type).toBe(
+        "bar",
+      );
     });
 
     it("returns bar for empty string", () => {
@@ -256,8 +304,19 @@ describe("sqlChartSeriesProps - getPropsByChartTypeForSeries", () => {
 
   describe("all chart types return valid objects", () => {
     const types = [
-      "bar", "line", "scatter", "pie", "donut", "h-bar",
-      "area", "stacked", "heatmap", "area-stacked", "metric", "h-stacked", "gauge",
+      "bar",
+      "line",
+      "scatter",
+      "pie",
+      "donut",
+      "h-bar",
+      "area",
+      "stacked",
+      "heatmap",
+      "area-stacked",
+      "metric",
+      "h-stacked",
+      "gauge",
     ];
 
     types.forEach((type) => {

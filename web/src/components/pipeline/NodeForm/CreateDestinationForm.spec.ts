@@ -82,7 +82,9 @@ describe("CreateDestinationForm", () => {
     });
 
     it("should have OpenObserve default url_endpoint", () => {
-      expect(wrapper.vm.formData.url_endpoint).toBe("/api/default/default/_json");
+      expect(wrapper.vm.formData.url_endpoint).toBe(
+        "/api/default/default/_json",
+      );
     });
 
     it("should have POST as default method", () => {
@@ -102,7 +104,7 @@ describe("CreateDestinationForm", () => {
 
     it("should show images for non-custom destination types", async () => {
       const openobserveCard = wrapper.find(
-        '[data-test="destination-type-card-openobserve"]'
+        '[data-test="destination-type-card-openobserve"]',
       );
       const img = openobserveCard.find("img");
       expect(img.exists()).toBe(true);
@@ -112,7 +114,7 @@ describe("CreateDestinationForm", () => {
     it("should show icon for custom destination type", async () => {
       await wrapper.vm.$nextTick();
       const customCard = wrapper.find(
-        '[data-test="destination-type-card-custom"]'
+        '[data-test="destination-type-card-custom"]',
       );
       // Just verify the card exists - icon rendering depends on Quasar setup
       expect(customCard.exists()).toBe(true);
@@ -120,7 +122,7 @@ describe("CreateDestinationForm", () => {
 
     it("should update destination_type when a card is clicked", async () => {
       const splunkCard = wrapper.find(
-        '[data-test="destination-type-card-splunk"]'
+        '[data-test="destination-type-card-splunk"]',
       );
       await splunkCard.trigger("click");
       await flushPromises();
@@ -130,7 +132,7 @@ describe("CreateDestinationForm", () => {
 
     it("should apply selected class to the active destination card", async () => {
       const openobserveCard = wrapper.find(
-        '[data-test="destination-type-card-openobserve"]'
+        '[data-test="destination-type-card-openobserve"]',
       );
       expect(openobserveCard.classes()).toContain("selected");
     });
@@ -192,7 +194,9 @@ describe("CreateDestinationForm", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      const endpointField = wrapper.find('[data-test="add-destination-url-endpoint-input"]');
+      const endpointField = wrapper.find(
+        '[data-test="add-destination-url-endpoint-input"]',
+      );
       expect(endpointField.exists()).toBe(true);
     });
 
@@ -230,7 +234,7 @@ describe("CreateDestinationForm", () => {
       await flushPromises();
 
       const methodField = wrapper.find(
-        '[data-test="add-destination-method-select"]'
+        '[data-test="add-destination-method-select"]',
       );
       expect(methodField.exists()).toBe(false);
     });
@@ -242,7 +246,7 @@ describe("CreateDestinationForm", () => {
       await flushPromises();
 
       const methodField = wrapper.find(
-        '[data-test="add-destination-method-select"]'
+        '[data-test="add-destination-method-select"]',
       );
       expect(methodField.exists()).toBe(true);
     });
@@ -269,7 +273,7 @@ describe("CreateDestinationForm", () => {
       await flushPromises();
 
       const outputField = wrapper.find(
-        '[data-test="add-destination-output-format-select"]'
+        '[data-test="add-destination-output-format-select"]',
       );
       // Just verify field exists on step 2
       expect(outputField.exists()).toBe(true);
@@ -282,7 +286,7 @@ describe("CreateDestinationForm", () => {
       await flushPromises();
 
       const outputField = wrapper.find(
-        '[data-test="add-destination-output-format-select"]'
+        '[data-test="add-destination-output-format-select"]',
       );
       // Just verify field exists on step 2
       expect(outputField.exists()).toBe(true);
@@ -366,7 +370,7 @@ describe("CreateDestinationForm", () => {
       expect(wrapper.vm.apiHeaders[0].value).toBe("Api-Token <token>");
       expect(wrapper.vm.apiHeaders[1].key).toBe("Content-Type");
       expect(wrapper.vm.apiHeaders[1].value).toBe(
-        "application/json; charset=utf-8"
+        "application/json; charset=utf-8",
       );
     });
 
@@ -410,7 +414,7 @@ describe("CreateDestinationForm", () => {
 
       expect(wrapper.vm.apiHeaders.length).toBe(initialLength - 1);
       expect(
-        wrapper.vm.apiHeaders.find((h: any) => h.uuid === headerToDelete.uuid)
+        wrapper.vm.apiHeaders.find((h: any) => h.uuid === headerToDelete.uuid),
       ).toBeUndefined();
     });
 
@@ -509,7 +513,7 @@ describe("CreateDestinationForm", () => {
       wrapper.vm.formData.method = "post";
 
       // URL with trailing slash should fail validation
-      expect(wrapper.vm.formData.url.endsWith('/')).toBe(true);
+      expect(wrapper.vm.formData.url.endsWith("/")).toBe(true);
     });
 
     it("should validate if URL has no trailing slash", () => {
@@ -518,7 +522,7 @@ describe("CreateDestinationForm", () => {
       wrapper.vm.formData.url_endpoint = "/api/test";
       wrapper.vm.formData.method = "post";
 
-      expect(wrapper.vm.formData.url.endsWith('/')).toBe(false);
+      expect(wrapper.vm.formData.url.endsWith("/")).toBe(false);
     });
 
     it("should invalidate if endpoint does not start with slash", () => {
@@ -528,7 +532,7 @@ describe("CreateDestinationForm", () => {
       wrapper.vm.formData.method = "post";
 
       // Endpoint without leading slash should fail validation
-      expect(wrapper.vm.formData.url_endpoint.startsWith('/')).toBe(false);
+      expect(wrapper.vm.formData.url_endpoint.startsWith("/")).toBe(false);
     });
 
     it("should validate if endpoint starts with slash", () => {
@@ -537,7 +541,7 @@ describe("CreateDestinationForm", () => {
       wrapper.vm.formData.url_endpoint = "/api/test";
       wrapper.vm.formData.method = "post";
 
-      expect(wrapper.vm.formData.url_endpoint.startsWith('/')).toBe(true);
+      expect(wrapper.vm.formData.url_endpoint.startsWith("/")).toBe(true);
     });
 
     it("should allow empty endpoint for custom destination type", () => {
@@ -629,7 +633,7 @@ describe("CreateDestinationForm", () => {
           data: expect.objectContaining({
             destination_type_name: "splunk",
           }),
-        })
+        }),
       );
     });
 
@@ -817,7 +821,9 @@ describe("CreateDestinationForm", () => {
 
       wrapper.vm.populateFormForEdit(destination);
 
-      expect(wrapper.vm.formData.url).toBe("https://example.com/api/custom/endpoint");
+      expect(wrapper.vm.formData.url).toBe(
+        "https://example.com/api/custom/endpoint",
+      );
       expect(wrapper.vm.formData.url_endpoint).toBe("");
     });
 
@@ -876,15 +882,23 @@ describe("CreateDestinationForm", () => {
         skip_tls_verify: false,
         headers: {
           "X-Custom-Header": "value1",
-          "Authorization": "Bearer token",
+          Authorization: "Bearer token",
         },
       };
 
       wrapper.vm.populateFormForEdit(destination);
 
       expect(wrapper.vm.apiHeaders).toHaveLength(2);
-      expect(wrapper.vm.apiHeaders.some((h: any) => h.key === "X-Custom-Header" && h.value === "value1")).toBe(true);
-      expect(wrapper.vm.apiHeaders.some((h: any) => h.key === "Authorization" && h.value === "Bearer token")).toBe(true);
+      expect(
+        wrapper.vm.apiHeaders.some(
+          (h: any) => h.key === "X-Custom-Header" && h.value === "value1",
+        ),
+      ).toBe(true);
+      expect(
+        wrapper.vm.apiHeaders.some(
+          (h: any) => h.key === "Authorization" && h.value === "Bearer token",
+        ),
+      ).toBe(true);
     });
   });
 
@@ -944,7 +958,9 @@ describe("CreateDestinationForm", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      const separatorField = wrapper.find('[data-test="add-destination-separator-input"]');
+      const separatorField = wrapper.find(
+        '[data-test="add-destination-separator-input"]',
+      );
       expect(separatorField.exists()).toBe(true);
     });
 
@@ -955,7 +971,9 @@ describe("CreateDestinationForm", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      const separatorField = wrapper.find('[data-test="add-destination-separator-input"]');
+      const separatorField = wrapper.find(
+        '[data-test="add-destination-separator-input"]',
+      );
       expect(separatorField.exists()).toBe(false);
     });
 
@@ -1248,7 +1266,7 @@ describe("CreateDestinationForm", () => {
 
       // Check that stringseparated option exists
       const stringSeparatedOption = outputFormats.find(
-        (opt) => opt.value === "stringseparated"
+        (opt) => opt.value === "stringseparated",
       );
       expect(stringSeparatedOption).toBeDefined();
       expect(stringSeparatedOption?.label).toBe("String Separated");
@@ -1258,7 +1276,10 @@ describe("CreateDestinationForm", () => {
   describe("Destination Metadata", () => {
     it("should have metadata field available", () => {
       // Metadata may be undefined initially until destination type requires it
-      expect(wrapper.vm.formData.metadata === undefined || typeof wrapper.vm.formData.metadata === "object").toBe(true);
+      expect(
+        wrapper.vm.formData.metadata === undefined ||
+          typeof wrapper.vm.formData.metadata === "object",
+      ).toBe(true);
     });
 
     it("should validate that Splunk requires metadata", async () => {

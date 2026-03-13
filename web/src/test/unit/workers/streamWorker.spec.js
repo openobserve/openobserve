@@ -117,7 +117,10 @@ describe("streamWorker", () => {
             global.self.postMessage({
               type: "error",
               traceId,
-              data: { message: "Error processing message", error: e.toString() },
+              data: {
+                message: "Error processing message",
+                error: e.toString(),
+              },
             });
           }
         }
@@ -210,8 +213,7 @@ describe("streamWorker", () => {
     });
 
     it("should handle event with data", () => {
-      const chunk =
-        'event: search_response\ndata: {"hits":[],"total":100}\n\n';
+      const chunk = 'event: search_response\ndata: {"hits":[],"total":100}\n\n';
 
       handleMessage({
         data: {
@@ -266,8 +268,7 @@ describe("streamWorker", () => {
     });
 
     it("should handle multiple messages in one chunk", () => {
-      const chunk =
-        'data: {"id":1}\n\ndata: {"id":2}\n\ndata: {"id":3}\n\n';
+      const chunk = 'data: {"id":1}\n\ndata: {"id":2}\n\ndata: {"id":3}\n\n';
 
       handleMessage({
         data: {
@@ -314,7 +315,7 @@ describe("streamWorker", () => {
     });
 
     it("should handle invalid JSON in event data", () => {
-      const chunk = 'event: test_event\ndata: {invalid json}\n\n';
+      const chunk = "event: test_event\ndata: {invalid json}\n\n";
 
       handleMessage({
         data: {
@@ -468,7 +469,7 @@ describe("streamWorker", () => {
 
     it("should send error message for processing failures", () => {
       // Simulate a chunk that causes JSON parse error in event
-      const chunk = 'event: test\ndata: {invalid}\n\n';
+      const chunk = "event: test\ndata: {invalid}\n\n";
 
       handleMessage({
         data: {

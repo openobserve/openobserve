@@ -215,7 +215,7 @@ describe("Date Utilities", () => {
         },
       };
       const result = getQueryParamsForDuration(obj);
-      
+
       // Check that the result has from and to properties
       expect(result).toHaveProperty("from");
       expect(result).toHaveProperty("to");
@@ -245,25 +245,31 @@ describe("Date Utilities", () => {
     it("should parse relative minutes from params", () => {
       const params = { period: "15m" };
       const result = getDurationObjectFromParams(params);
-      
+
       expect(result.tab).toBe("relative");
-      expect(result.relative.period).toEqual({ label: "Minutes", value: "Minutes" });
+      expect(result.relative.period).toEqual({
+        label: "Minutes",
+        value: "Minutes",
+      });
       expect(result.relative.value).toBe(15);
     });
 
     it("should parse relative hours from params", () => {
       const params = { period: "2h" };
       const result = getDurationObjectFromParams(params);
-      
+
       expect(result.tab).toBe("relative");
-      expect(result.relative.period).toEqual({ label: "Hours", value: "Hours" });
+      expect(result.relative.period).toEqual({
+        label: "Hours",
+        value: "Hours",
+      });
       expect(result.relative.value).toBe(2);
     });
 
     it("should parse relative days from params", () => {
       const params = { period: "7d" };
       const result = getDurationObjectFromParams(params);
-      
+
       expect(result.tab).toBe("relative");
       expect(result.relative.period).toEqual({ label: "Days", value: "Days" });
       expect(result.relative.value).toBe(7);
@@ -272,31 +278,37 @@ describe("Date Utilities", () => {
     it("should parse relative weeks from params", () => {
       const params = { period: "1w" };
       const result = getDurationObjectFromParams(params);
-      
+
       expect(result.tab).toBe("relative");
-      expect(result.relative.period).toEqual({ label: "Weeks", value: "Weeks" });
+      expect(result.relative.period).toEqual({
+        label: "Weeks",
+        value: "Weeks",
+      });
       expect(result.relative.value).toBe(1);
     });
 
     it("should parse relative months from params", () => {
       const params = { period: "3M" };
       const result = getDurationObjectFromParams(params);
-      
+
       expect(result.tab).toBe("relative");
-      expect(result.relative.period).toEqual({ label: "Months", value: "Months" });
+      expect(result.relative.period).toEqual({
+        label: "Months",
+        value: "Months",
+      });
       expect(result.relative.value).toBe(3);
     });
 
     it("should parse absolute time from params", () => {
       const fromTime = new Date("2023-01-01T00:00:00Z").getTime();
       const toTime = new Date("2023-01-02T23:59:00Z").getTime();
-      
-      const params = { 
-        from: fromTime.toString(), 
-        to: toTime.toString() 
+
+      const params = {
+        from: fromTime.toString(),
+        to: toTime.toString(),
       };
       const result = getDurationObjectFromParams(params);
-      
+
       expect(result.tab).toBe("absolute");
       expect(result.absolute.date.from).toBeDefined();
       expect(result.absolute.date.to).toBeDefined();
@@ -306,18 +318,24 @@ describe("Date Utilities", () => {
 
     it("should return default object for empty params", () => {
       const result = getDurationObjectFromParams({});
-      
+
       expect(result.tab).toBe("relative");
-      expect(result.relative.period).toEqual({ label: "Minutes", value: "Minutes" });
+      expect(result.relative.period).toEqual({
+        label: "Minutes",
+        value: "Minutes",
+      });
       expect(result.relative.value).toBe(15);
     });
 
     it("should return default object for invalid params", () => {
       const params = { invalid: "data" };
       const result = getDurationObjectFromParams(params);
-      
+
       expect(result.tab).toBe("relative");
-      expect(result.relative.period).toEqual({ label: "Minutes", value: "Minutes" });
+      expect(result.relative.period).toEqual({
+        label: "Minutes",
+        value: "Minutes",
+      });
       expect(result.relative.value).toBe(15);
     });
   });
@@ -325,7 +343,7 @@ describe("Date Utilities", () => {
   describe("getConsumableRelativeTime", () => {
     it("should calculate relative time for minutes", () => {
       const result = getConsumableRelativeTime("15m");
-      
+
       expect(result).toHaveProperty("startTime");
       expect(result).toHaveProperty("endTime");
       expect(typeof result?.startTime).toBe("number");
@@ -335,7 +353,7 @@ describe("Date Utilities", () => {
 
     it("should calculate relative time for hours", () => {
       const result = getConsumableRelativeTime("2h");
-      
+
       expect(result).toHaveProperty("startTime");
       expect(result).toHaveProperty("endTime");
       expect(typeof result?.startTime).toBe("number");
@@ -344,7 +362,7 @@ describe("Date Utilities", () => {
 
     it("should handle weeks by converting to days", () => {
       const result = getConsumableRelativeTime("1w");
-      
+
       expect(result).toHaveProperty("startTime");
       expect(result).toHaveProperty("endTime");
       expect(typeof result?.startTime).toBe("number");
@@ -405,7 +423,7 @@ describe("Date Utilities", () => {
     it("should convert unix microseconds to quasar format", () => {
       const unixMicros = 1672531200000000; // 2023-01-01 00:00:00 UTC in microseconds
       const result = convertUnixToQuasarFormat(unixMicros);
-      
+
       // Check that the result contains the expected date part
       expect(result).toContain("2023-01-01");
       expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
@@ -424,19 +442,20 @@ describe("Date Utilities", () => {
     it("should handle errors gracefully", () => {
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const result = convertUnixToQuasarFormat("invalid");
-      
+
       expect(result).toBe("");
-      expect(consoleSpy).toHaveBeenCalledWith("Error converting unix to quasar format");
-      
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Error converting unix to quasar format",
+      );
+
       consoleSpy.mockRestore();
     });
   });
 
   describe("convertDateToTimestamp", () => {
-
     it("should convert date and time to timestamp", () => {
       const result = convertDateToTimestamp("01-01-2023", "12:00", "UTC");
-      
+
       expect(result).toHaveProperty("timestamp");
       expect(result).toHaveProperty("offset");
       expect(typeof result.timestamp).toBe("number");
@@ -450,7 +469,7 @@ describe("Date Utilities", () => {
       const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const browserTime = `Browser Time (${browserTimezone})`;
       const result = convertDateToTimestamp("01-01-2023", "12:00", browserTime);
-      
+
       expect(result).toHaveProperty("timestamp");
       expect(result).toHaveProperty("offset");
       expect(typeof result.timestamp).toBe("number");
@@ -459,8 +478,12 @@ describe("Date Utilities", () => {
     });
 
     it("should handle different timezones", () => {
-      const result = convertDateToTimestamp("01-01-2023", "12:00", "America/New_York");
-      
+      const result = convertDateToTimestamp(
+        "01-01-2023",
+        "12:00",
+        "America/New_York",
+      );
+
       expect(result).toHaveProperty("timestamp");
       expect(result).toHaveProperty("offset");
       expect(result.timestamp).toBeGreaterThanOrEqual(0);
@@ -468,11 +491,17 @@ describe("Date Utilities", () => {
 
     it("should handle errors gracefully", () => {
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const result = convertDateToTimestamp("invalid-date", "invalid-time", "UTC");
-      
+      const result = convertDateToTimestamp(
+        "invalid-date",
+        "invalid-time",
+        "UTC",
+      );
+
       expect(result).toEqual({ timestamp: 0, offset: 0 });
-      expect(consoleSpy).toHaveBeenCalledWith("Error converting date to timestamp");
-      
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Error converting date to timestamp",
+      );
+
       consoleSpy.mockRestore();
     });
 
@@ -480,7 +509,7 @@ describe("Date Utilities", () => {
       // Test with different date formats that might cause issues
       const result1 = convertDateToTimestamp("31-12-2023", "23:59", "UTC");
       const result2 = convertDateToTimestamp("01-01-2024", "00:00", "UTC");
-      
+
       expect(result1.timestamp).toBeGreaterThanOrEqual(0);
       expect(result2.timestamp).toBeGreaterThanOrEqual(0);
       // Only compare if both timestamps are valid (not 0)

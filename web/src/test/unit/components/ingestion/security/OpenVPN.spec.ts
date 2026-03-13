@@ -9,7 +9,8 @@ import OpenVPN from "@/components/ingestion/security/OpenVPN.vue";
 vi.mock("@/composables/useIngestion", () => ({
   default: vi.fn(() => ({
     endpoint: "https://api.example.com/ingest",
-    securityContent: "curl -X POST https://api.example.com/ingest -d '{\"stream\": \"[STREAM_NAME]\"}' ",
+    securityContent:
+      'curl -X POST https://api.example.com/ingest -d \'{"stream": "[STREAM_NAME]"}\' ',
     securityDocURLs: { openvpn: "https://docs.example.com/openvpn" },
   })),
 }));
@@ -17,14 +18,21 @@ vi.mock("@/composables/useIngestion", () => ({
 describe("OpenVPN.vue", () => {
   let store: any;
   beforeEach(() => {
-    store = createStore({ state: { selectedOrganization: { identifier: "test-org" } } });
+    store = createStore({
+      state: { selectedOrganization: { identifier: "test-org" } },
+    });
   });
 
   const mountComponent = () => {
     return mount(OpenVPN, {
       global: {
         plugins: [store, Quasar],
-        stubs: { CopyContent: { template: '<div data-test="copy-content-stub">{{ content }}</div>', props: ["content"] } },
+        stubs: {
+          CopyContent: {
+            template: '<div data-test="copy-content-stub">{{ content }}</div>',
+            props: ["content"],
+          },
+        },
       },
     });
   };
@@ -34,12 +42,16 @@ describe("OpenVPN.vue", () => {
   });
 
   it("should render CopyContent component", () => {
-    expect(mountComponent().find('[data-test="copy-content-stub"]').exists()).toBe(true);
+    expect(
+      mountComponent().find('[data-test="copy-content-stub"]').exists(),
+    ).toBe(true);
   });
 
   it("should render documentation link", () => {
     const wrapper = mountComponent();
-    expect(wrapper.find("a").attributes("href")).toBe("https://docs.example.com/openvpn");
+    expect(wrapper.find("a").attributes("href")).toBe(
+      "https://docs.example.com/openvpn",
+    );
   });
 
   it("should replace [STREAM_NAME] with openvpn", () => {

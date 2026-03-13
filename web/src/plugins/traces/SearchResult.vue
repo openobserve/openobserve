@@ -148,9 +148,11 @@ export default defineComponent({
       if (searchObj.meta.searchMode === "spans") {
         // start_time / end_time are nanoseconds in raw span rows — convert to µs
         const spanStart = Math.floor((props.start_time || 0) / 1000);
-        const spanEnd = Math.ceil((props.end_time || props.start_time || 0) / 1000);
-        from = spanStart - 60_000_000;       // -1 min in µs
-        to = spanEnd + 3_600_000_000;        // +1 hr in µs
+        const spanEnd = Math.ceil(
+          (props.end_time || props.start_time || 0) / 1000,
+        );
+        from = spanStart - 60_000_000; // -1 min in µs
+        to = spanEnd + 3_600_000_000; // +1 hr in µs
       } else {
         from = props.trace_start_time - 10000000;
         to = props.trace_end_time + 10000000;

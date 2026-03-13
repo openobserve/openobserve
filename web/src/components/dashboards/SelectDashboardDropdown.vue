@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dashboard-dashboard-add-dialog"
   >
     <AddDashboard
-      :active-folder-id="(folderId as any)"
+      :active-folder-id="folderId as any"
       @updated="updateDashboardList"
       :show-folder-selection="false"
     />

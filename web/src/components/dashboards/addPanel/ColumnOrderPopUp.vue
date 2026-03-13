@@ -51,7 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="!editColumnOrder || editColumnOrder.length === 0"
         class="text-center q-pa-xl text-grey-6"
       >
-        <q-icon name="view_column" size="48px" class="q-mb-md" />
+        <q-icon name="view_column" size="48px"
+class="q-mb-md" />
         <div class="text-body1">{{ t("dashboard.noColumnsOrdered") }}</div>
         <div class="text-caption">
           {{ t("dashboard.columnsDefaultOrder") }}
@@ -72,50 +73,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="column-order-row"
           :data-test="`column-order-row-${index}`"
         >
-            <!-- Drag handle -->
-            <div class="drag-handle">
-              <q-icon
-                name="drag_indicator"
-                color="grey-6"
-                size="20px"
-                :data-test="`column-order-drag-handle-${index}`"
-              />
-            </div>
-
-            <!-- Column number -->
-            <div class="column-number">{{ index + 1 }}.</div>
-
-            <!-- Column name -->
-            <div class="column-name">{{ column }}</div>
-
-            <!-- Actions -->
-            <div class="column-actions">
-              <q-btn
-                flat
-                dense
-                round
-                size="sm"
-                icon="arrow_upward"
-                :disable="index === 0"
-                @click="moveColumnUp(index)"
-                :data-test="`column-order-move-up-${index}`"
-              >
-                <q-tooltip>{{ t("dashboard.moveUp") }}</q-tooltip>
-              </q-btn>
-              <q-btn
-                flat
-                dense
-                round
-                size="sm"
-                icon="arrow_downward"
-                :disable="index === editColumnOrder.length - 1"
-                @click="moveColumnDown(index)"
-                :data-test="`column-order-move-down-${index}`"
-              >
-                <q-tooltip>{{ t("dashboard.moveDown") }}</q-tooltip>
-              </q-btn>
-            </div>
+          <!-- Drag handle -->
+          <div class="drag-handle">
+            <q-icon
+              name="drag_indicator"
+              color="grey-6"
+              size="20px"
+              :data-test="`column-order-drag-handle-${index}`"
+            />
           </div>
+
+          <!-- Column number -->
+          <div class="column-number">{{ index + 1 }}.</div>
+
+          <!-- Column name -->
+          <div class="column-name">{{ column }}</div>
+
+          <!-- Actions -->
+          <div class="column-actions">
+            <q-btn
+              flat
+              dense
+              round
+              size="sm"
+              icon="arrow_upward"
+              :disable="index === 0"
+              @click="moveColumnUp(index)"
+              :data-test="`column-order-move-up-${index}`"
+            >
+              <q-tooltip>{{ t("dashboard.moveUp") }}</q-tooltip>
+            </q-btn>
+            <q-btn
+              flat
+              dense
+              round
+              size="sm"
+              icon="arrow_downward"
+              :disable="index === editColumnOrder.length - 1"
+              @click="moveColumnDown(index)"
+              :data-test="`column-order-move-down-${index}`"
+            >
+              <q-tooltip>{{ t("dashboard.moveDown") }}</q-tooltip>
+            </q-btn>
+          </div>
+        </div>
       </draggable>
     </div>
 
@@ -176,12 +177,12 @@ export default defineComponent({
       if (props.columnOrder && props.columnOrder.length > 0) {
         // Filter the column order to only include columns that are in availableColumns
         const filtered = props.columnOrder.filter((col) =>
-          props.availableColumns.includes(col)
+          props.availableColumns.includes(col),
         );
 
         // Find columns in availableColumns that are not in columnOrder
         const remaining = props.availableColumns.filter(
-          (col) => !filtered.includes(col)
+          (col) => !filtered.includes(col),
         );
 
         // Combine: ordered columns first, then remaining in their natural order
@@ -202,7 +203,7 @@ export default defineComponent({
       () => {
         initializeColumnOrder();
       },
-      { deep: true }
+      { deep: true },
     );
 
     const moveColumnUp = (index: number) => {

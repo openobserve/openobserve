@@ -31,21 +31,18 @@ export default {
 
 <template>
   <div class="nodes">
-    <div
-      v-for="node in node_types"
-      :key="node.io_type"
-      class="o2vf_node"
-    >
+    <div v-for="node in node_types" :key="node.io_type"
+class="o2vf_node">
       <q-btn
         borderless
         :class="`o2vf_node_${node.io_type}`"
         flat
         size="md"
         class="q-pa-none btn-fixed-width node-draggable"
-        style="width: 170px; justify-content: flex-start;"
+        style="width: 170px; justify-content: flex-start"
         :draggable="true"
         @dragstart="onDragStart($event, node)"
-        v-if="node.isSectionHeader==false"
+        v-if="node.isSectionHeader == false"
       >
         <q-tooltip
           anchor="center right"

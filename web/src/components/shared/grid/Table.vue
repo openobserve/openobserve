@@ -46,7 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template v-slot:body-cell-#="props">
-      <q-td :props="props" width="80" @click="editTicket(props)">
+      <q-td :props="props" width="80"
+@click="editTicket(props)">
         {{ props.value }}
       </q-td>
     </template>

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="o2-side-dialog column full-height ">
+  <q-card class="o2-side-dialog column full-height">
     <q-card-section class="q-py-md tw:w-full">
       <div class="row items-center no-wrap q-py-sm">
         <div class="col">
@@ -174,7 +174,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               hide-bottom-space
               class="o2-toggle-button-lg -tw:ml-4"
               size="lg"
-              :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-toggle-button-lg-dark'
+                  : 'o2-toggle-button-lg-light'
+              "
               data-test="user-change-password-field"
             />
 
@@ -264,7 +268,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('user.cancel')"
               no-caps
               flat
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
               @click="$emit('cancel:hideform')"
               data-test="cancel-user-button"
             />
@@ -274,7 +282,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="submit"
               no-caps
               flat
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-primary-button-dark'
+                  : 'o2-primary-button-light'
+              "
               data-test="save-user-button"
             />
           </div>
@@ -285,7 +297,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-dialog v-model="logout_confirm" persistent>
     <q-card>
       <q-card-section class="row items-center">
-        <q-avatar icon="info" color="primary" text-color="white" />
+        <q-avatar icon="info"
+color="primary" text-color="white" />
         <span class="q-ml-sm"
           >As you've chosen to change your password, you'll be automatically
           logged out.</span
@@ -293,7 +306,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions align="right">
-        <q-btn flat label="Ok" color="primary" @click="signout" />
+        <q-btn flat label="Ok"
+color="primary" @click="signout" />
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -438,9 +452,11 @@ export default defineComponent({
           return;
         }
         update(() => {
-          const needle = val.toLowerCase()
-          filterdOption.value = props.customRoles.filter((v:any) => v.toLowerCase().indexOf(needle) > -1)
-        })
+          const needle = val.toLowerCase();
+          filterdOption.value = props.customRoles.filter(
+            (v: any) => v.toLowerCase().indexOf(needle) > -1,
+          );
+        });
       },
       track,
     };
@@ -518,10 +534,10 @@ export default defineComponent({
             dismiss();
             this.formData.email = userEmail;
           });
-          this.track("Button Click", {
-            button: "Update User",
-            page: "Add User"
-          });
+        this.track("Button Click", {
+          button: "Update User",
+          page: "Add User",
+        });
       } else {
         if (this.existingUser) {
           const userEmail = this.formData.email;
@@ -561,10 +577,10 @@ export default defineComponent({
                 this.formData.email = userEmail;
               }
             });
-            this.track("Button Click", {
-              button: "Update User",
-              page: "Add User"
-            });
+          this.track("Button Click", {
+            button: "Update User",
+            page: "Add User",
+          });
         } else {
           userServiece
             .create(this.formData, selectedOrg)
@@ -580,10 +596,10 @@ export default defineComponent({
               });
               dismiss();
             });
-            this.track("Button Click", {
-              button: "Create User",
-              page: "Add User"
-            });
+          this.track("Button Click", {
+            button: "Create User",
+            page: "Add User",
+          });
         }
       }
     },

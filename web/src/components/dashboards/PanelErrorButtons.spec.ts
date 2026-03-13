@@ -77,7 +77,9 @@ describe("PanelErrorButtons", () => {
       },
     });
 
-    const warningButton = wrapper.find('[data-test="panel-max-duration-warning"]');
+    const warningButton = wrapper.find(
+      '[data-test="panel-max-duration-warning"]',
+    );
     expect(warningButton.exists()).toBe(true);
   });
 
@@ -88,7 +90,9 @@ describe("PanelErrorButtons", () => {
       },
     });
 
-    const warningButton = wrapper.find('[data-test="panel-limit-number-of-series-warning"]');
+    const warningButton = wrapper.find(
+      '[data-test="panel-limit-number-of-series-warning"]',
+    );
     expect(warningButton.exists()).toBe(true);
   });
 
@@ -99,7 +103,9 @@ describe("PanelErrorButtons", () => {
       },
     });
 
-    const warningButton = wrapper.find('[data-test="panel-is-cached-data-differ-with-current-time-range-warning"]');
+    const warningButton = wrapper.find(
+      '[data-test="panel-is-cached-data-differ-with-current-time-range-warning"]',
+    );
     expect(warningButton.exists()).toBe(true);
   });
 
@@ -111,7 +117,9 @@ describe("PanelErrorButtons", () => {
       },
     });
 
-    const warningButton = wrapper.find('[data-test="panel-partial-data-warning"]');
+    const warningButton = wrapper.find(
+      '[data-test="panel-partial-data-warning"]',
+    );
     expect(warningButton.exists()).toBe(true);
   });
 
@@ -123,7 +131,9 @@ describe("PanelErrorButtons", () => {
       },
     });
 
-    const warningButton = wrapper.find('[data-test="panel-partial-data-warning"]');
+    const warningButton = wrapper.find(
+      '[data-test="panel-partial-data-warning"]',
+    );
     expect(warningButton.exists()).toBe(false);
   });
 
@@ -135,7 +145,7 @@ describe("PanelErrorButtons", () => {
       },
     });
 
-    const lastRefreshed = wrapper.find('.lastRefreshedAt');
+    const lastRefreshed = wrapper.find(".lastRefreshedAt");
     expect(lastRefreshed.exists()).toBe(true);
   });
 
@@ -147,7 +157,7 @@ describe("PanelErrorButtons", () => {
       },
     });
 
-    const lastRefreshed = wrapper.find('.lastRefreshedAt');
+    const lastRefreshed = wrapper.find(".lastRefreshedAt");
     expect(lastRefreshed.exists()).toBe(false);
   });
 
@@ -159,7 +169,7 @@ describe("PanelErrorButtons", () => {
       },
     });
 
-    const lastRefreshed = wrapper.find('.lastRefreshedAt');
+    const lastRefreshed = wrapper.find(".lastRefreshedAt");
     expect(lastRefreshed.exists()).toBe(false);
   });
 
@@ -167,8 +177,12 @@ describe("PanelErrorButtons", () => {
     const wrapper = mountComponent();
 
     expect(wrapper.find('[data-test="panel-error-data"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="panel-max-duration-warning"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="panel-partial-data-warning"]').exists()).toBe(false);
+    expect(
+      wrapper.find('[data-test="panel-max-duration-warning"]').exists(),
+    ).toBe(false);
+    expect(
+      wrapper.find('[data-test="panel-partial-data-warning"]').exists(),
+    ).toBe(false);
   });
 
   it("should display multiple warnings simultaneously", () => {
@@ -182,8 +196,12 @@ describe("PanelErrorButtons", () => {
     });
 
     expect(wrapper.find('[data-test="panel-error-data"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="panel-max-duration-warning"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="panel-partial-data-warning"]').exists()).toBe(true);
+    expect(
+      wrapper.find('[data-test="panel-max-duration-warning"]').exists(),
+    ).toBe(true);
+    expect(
+      wrapper.find('[data-test="panel-partial-data-warning"]').exists(),
+    ).toBe(true);
   });
 
   it("should accept null lastTriggeredAt", () => {
@@ -193,7 +211,7 @@ describe("PanelErrorButtons", () => {
       },
     });
 
-    const lastRefreshed = wrapper.find('.lastRefreshedAt');
+    const lastRefreshed = wrapper.find(".lastRefreshedAt");
     expect(lastRefreshed.exists()).toBe(false);
   });
 
@@ -205,7 +223,7 @@ describe("PanelErrorButtons", () => {
       },
     });
 
-    const lastRefreshed = wrapper.find('.lastRefreshedAt');
+    const lastRefreshed = wrapper.find(".lastRefreshedAt");
     expect(lastRefreshed.exists()).toBe(true);
   });
 
@@ -217,7 +235,7 @@ describe("PanelErrorButtons", () => {
       },
     });
 
-    const lastRefreshed = wrapper.find('.lastRefreshedAt');
+    const lastRefreshed = wrapper.find(".lastRefreshedAt");
     expect(lastRefreshed.exists()).toBe(true);
   });
 });

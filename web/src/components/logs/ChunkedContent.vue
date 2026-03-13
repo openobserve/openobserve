@@ -58,7 +58,8 @@ Usage:
         class="load-more-btn"
       />
       <span class="tw-text-sm tw-font-medium" style="color: var(--q-primary)">
-        Showing chunk {{ chunkInfo.currentChunk }} of {{ chunkInfo.totalChunks }}
+        Showing chunk {{ chunkInfo.currentChunk }} of
+        {{ chunkInfo.totalChunks }}
       </span>
     </div>
   </div>
@@ -130,7 +131,7 @@ watch(
   () => {
     initializeIfNeeded();
   },
-  { deep: true }
+  { deep: true },
 );
 
 // Get visible content for current chunk state

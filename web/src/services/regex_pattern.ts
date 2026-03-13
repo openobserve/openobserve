@@ -20,39 +20,17 @@ type PatternPayload = {
   description: string;
 };
 const regexPatterns = {
-  list: (
-    org_identifier: string
-  ) => {
-    return http().get(
-      `/api/${org_identifier}/re_patterns`
-    );
+  list: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/re_patterns`);
   },
-  create: (
-    org_identifier: string,
-    payload: PatternPayload
-  ) => {
-    return http().post(
-      `/api/${org_identifier}/re_patterns`,
-      payload
-    );
+  create: (org_identifier: string, payload: PatternPayload) => {
+    return http().post(`/api/${org_identifier}/re_patterns`, payload);
   },
-  update: (
-    org_identifier: string,
-    id: string,
-    payload: any
-  ) => {
-    return http().put(
-      `/api/${org_identifier}/re_patterns/${id}`,
-      payload
-    );
+  update: (org_identifier: string, id: string, payload: any) => {
+    return http().put(`/api/${org_identifier}/re_patterns/${id}`, payload);
   },
-  delete: (
-    org_identifier: string,
-    id: string,
-  ) => {
-    return http().delete(
-      `/api/${org_identifier}/re_patterns/${id}`
-    );
+  delete: (org_identifier: string, id: string) => {
+    return http().delete(`/api/${org_identifier}/re_patterns/${id}`);
   },
   bulkDelete: (org_identifier: string, data: any) => {
     return http().delete(`/api/${org_identifier}/re_patterns/bulk`, { data });
@@ -74,17 +52,18 @@ const regexPatterns = {
     params?: {
       search?: string;
       tags?: string[];
-    }
+    },
   ) => {
     const queryParams = new URLSearchParams();
-    if (params?.search) queryParams.append('search', params.search);
-    if (params?.tags) params.tags.forEach(tag => queryParams.append('tags', tag));
+    if (params?.search) queryParams.append("search", params.search);
+    if (params?.tags)
+      params.tags.forEach((tag) => queryParams.append("tags", tag));
 
     const queryString = queryParams.toString();
-    const url = `/api/${org_identifier}/re_patterns/built-in${queryString ? '?' + queryString : ''}`;
+    const url = `/api/${org_identifier}/re_patterns/built-in${queryString ? "?" + queryString : ""}`;
 
     return http().get(url);
-  }
+  },
 };
 
 export default regexPatterns;

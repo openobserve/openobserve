@@ -66,7 +66,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="showViewPanel = true"
             data-test="dashboard-panel-data-view-query-inspector-btn"
           >
-            <q-tooltip anchor="center left" self="center right"
+            <q-tooltip anchor="center left"
+self="center right"
               >Query Inspector
             </q-tooltip>
           </q-btn>

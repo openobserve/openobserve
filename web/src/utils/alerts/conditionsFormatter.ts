@@ -225,7 +225,7 @@
  * =============================================================================
  */
 
-import type { StreamFieldsMap } from './alertQueryBuilder';
+import type { StreamFieldsMap } from "./alertQueryBuilder";
 
 export interface FormatOptions {
   // Whether to generate SQL format (uppercase AND/OR, SQL operators) or display format (lowercase)
@@ -245,7 +245,7 @@ export interface FormatOptions {
  * @returns true if item is a group, false otherwise
  */
 function isGroup(item: any): boolean {
-  return item && item.filterType === 'group' && Array.isArray(item.conditions);
+  return item && item.filterType === "group" && Array.isArray(item.conditions);
 }
 
 /**
@@ -271,15 +271,15 @@ function formatValue(
 ): string {
   // If no formatting requested, return as-is with quotes
   if (!streamFieldsMap) {
-    return value !== undefined && value !== null && value !== ''
+    return value !== undefined && value !== null && value !== ""
       ? `'${value}'`
       : "''";
   }
 
   // Check if column is Int64 or operator is contains/not_contains - don't add quotes
   const shouldNotQuote =
-    streamFieldsMap[column]?.type === "Int64" ||  // Numeric types don't need quotes in SQL
-    operator === "contains" ||                     // LIKE operator handles quoting
+    streamFieldsMap[column]?.type === "Int64" || // Numeric types don't need quotes in SQL
+    operator === "contains" || // LIKE operator handles quoting
     operator === "not_contains" ||
     operator === "Contains" ||
     operator === "NotContains";
@@ -374,14 +374,15 @@ export function buildConditionsString(
     if (!node) return "";
 
     // Case 1: V2 Group (filterType === 'group')
-    if (node.filterType === 'group') {
-      if (!Array.isArray(node.conditions) || node.conditions.length === 0) return "";
+    if (node.filterType === "group") {
+      if (!Array.isArray(node.conditions) || node.conditions.length === 0)
+        return "";
 
       const parts: string[] = [];
 
       // Iterate through all conditions in this group
       node.conditions.forEach((item: any, index: number) => {
-        let conditionStr = '';
+        let conditionStr = "";
 
         // Case 1a: Nested group - recursively process
         if (isGroup(item)) {
@@ -392,13 +393,25 @@ export function buildConditionsString(
           }
         }
         // Case 1b: Single condition - format and build
-        else if (item.filterType === 'condition' && item.column && item.operator && item.value !== undefined) {
+        else if (
+          item.filterType === "condition" &&
+          item.column &&
+          item.operator &&
+          item.value !== undefined
+        ) {
           // Step 1: Format the value (add quotes if needed, based on type)
           const formattedValue = formatValues
-            ? formatValue(item.column, item.operator, item.value, streamFieldsMap)
-            : (item.value !== undefined && item.value !== null && item.value !== ''
-                ? `'${item.value}'`
-                : "''");
+            ? formatValue(
+                item.column,
+                item.operator,
+                item.value,
+                streamFieldsMap,
+              )
+            : item.value !== undefined &&
+                item.value !== null &&
+                item.value !== ""
+              ? `'${item.value}'`
+              : "''";
 
           // Step 2: Build the condition string (column operator value)
           conditionStr = getFormattedCondition(
@@ -426,16 +439,21 @@ export function buildConditionsString(
       });
 
       // Join all parts with single space (operators are already inline)
-      return parts.join(' ');
+      return parts.join(" ");
     }
 
     // Case 2: V2 Single condition at root level (no group wrapper)
-    if (node.filterType === 'condition' && node.column && node.operator && node.value !== undefined) {
+    if (
+      node.filterType === "condition" &&
+      node.column &&
+      node.operator &&
+      node.value !== undefined
+    ) {
       const formattedValue = formatValues
         ? formatValue(node.column, node.operator, node.value, streamFieldsMap)
-        : (node.value !== undefined && node.value !== null && node.value !== ''
-            ? `'${node.value}'`
-            : "''");
+        : node.value !== undefined && node.value !== null && node.value !== ""
+          ? `'${node.value}'`
+          : "''";
 
       return getFormattedCondition(
         node.column,

@@ -87,9 +87,9 @@ describe("FieldsInput.vue", () => {
   describe("Empty State", () => {
     it("should show add button when no fields exist", () => {
       mountComponent({ fields: [] });
-      expect(wrapper.find('[data-test="alert-conditions-add-btn"]').exists()).toBe(
-        true,
-      );
+      expect(
+        wrapper.find('[data-test="alert-conditions-add-btn"]').exists(),
+      ).toBe(true);
     });
 
     it("should emit add event when add button is clicked", async () => {
@@ -343,13 +343,16 @@ describe("FieldsInput.vue", () => {
       const singleField = [mockFields[0]];
       mountComponent({ fields: singleField });
 
-      expect(wrapper.findAll('[data-test^="alert-conditions-"]').length).toBeGreaterThan(
-        0,
-      );
+      expect(
+        wrapper.findAll('[data-test^="alert-conditions-"]').length,
+      ).toBeGreaterThan(0);
     });
 
     it("should handle multiple fields", () => {
-      const multipleFields = [...mockFields, { ...mockFields[0], uuid: "uuid-3" }];
+      const multipleFields = [
+        ...mockFields,
+        { ...mockFields[0], uuid: "uuid-3" },
+      ];
       mountComponent({ fields: multipleFields });
 
       expect(wrapper.find('[data-test="alert-conditions-3"]').exists()).toBe(

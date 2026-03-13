@@ -48,7 +48,9 @@ function makeMockContext(overrides: Partial<any> = {}): any {
     panelSchema: {
       type: "gauge",
       config: { unit: "default", unit_custom: "", decimals: 2 },
-      queries: [{ config: { min: 0, max: 100 }, fields: { y: [{ label: "Value" }] } }],
+      queries: [
+        { config: { min: 0, max: 100 }, fields: { y: [{ label: "Value" }] } },
+      ],
     },
     store: {
       state: { theme: "light", zoConfig: { timestamp_column: "_timestamp" } },
@@ -160,7 +162,12 @@ describe("applyGaugeChart", () => {
       panelSchema: {
         type: "gauge",
         config: { unit: "default", unit_custom: "", decimals: 2 },
-        queries: [{ config: { min: 10, max: 500 }, fields: { y: [{ label: "Value" }] } }],
+        queries: [
+          {
+            config: { min: 10, max: 500 },
+            fields: { y: [{ label: "Value" }] },
+          },
+        ],
       },
     });
     applyGaugeChart(ctx);

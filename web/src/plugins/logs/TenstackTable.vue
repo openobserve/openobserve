@@ -162,7 +162,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="opacity: 0.7"
           >
             <div class="text-subtitle2 text-weight-bold bg-warning">
-              <q-icon size="xs" name="warning" class="q-mr-xs" />
+              <q-icon size="xs" name="warning"
+class="q-mr-xs" />
               {{ errMsg }}
             </div>
           </td>
@@ -1035,7 +1036,11 @@ const showCorrelation = (row: any) => {
   emits("show-correlation", row);
 };
 
-const sendToAiChat = (value: any, isEntireRow: boolean = false, append: boolean = true) => {
+const sendToAiChat = (
+  value: any,
+  isEntireRow: boolean = false,
+  append: boolean = true,
+) => {
   if (isEntireRow) {
     //here we will get the original value of the row
     //and we need to filter the row if props.columns have any filtered cols that user applied

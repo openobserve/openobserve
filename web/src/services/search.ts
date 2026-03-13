@@ -73,7 +73,8 @@ const search = {
     if (tab_id) url += `&tab_id=${tab_id}`;
     if (tab_name) url += `&tab_name=${encodeURIComponent(tab_name)}`;
     if (is_ui_histogram) url += `&is_ui_histogram=${is_ui_histogram}`;
-    if (is_multi_stream_search) url += `&is_multi_stream_search=${is_multi_stream_search}`;
+    if (is_multi_stream_search)
+      url += `&is_multi_stream_search=${is_multi_stream_search}`;
     if (validate) url += `&validate=${validate}`;
     if (typeof query.query.sql != "string") {
       url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
@@ -230,9 +231,10 @@ const search = {
     tab_id?: string;
     tab_name?: string;
   }) => {
-    const use_cache = (window as any).use_cache !== undefined
-      ? (window as any).use_cache
-      : true;
+    const use_cache =
+      (window as any).use_cache !== undefined
+        ? (window as any).use_cache
+        : true;
     let url = `/api/${org_identifier}/prometheus/api/v1/query_range?use_cache=${use_cache}&start=${start_time}&end=${end_time}&step=${step}&query=${encodeURIComponent(
       query,
     )}`;
@@ -302,7 +304,7 @@ const search = {
     stream_name: string,
     trace_id: string,
     start_time: number,
-    end_time: number
+    end_time: number,
   ) => {
     const url = `/api/${org_identifier}/${stream_name}/traces/${trace_id}/dag?start_time=${start_time}&end_time=${end_time}`;
     return http().get(url);
@@ -324,7 +326,7 @@ const search = {
 
     let url = `/api/${org_identifier}/_search_partition?type=${page_type}&enable_align_histogram=${enable_align_histogram}`;
     if (typeof query.sql != "string") {
-      // this condition will be true for multi-stream search non-sql mode. 
+      // this condition will be true for multi-stream search non-sql mode.
       url = `/api/${org_identifier}/_search_partition_multi?type=${page_type}&enable_align_histogram=true`;
     }
 

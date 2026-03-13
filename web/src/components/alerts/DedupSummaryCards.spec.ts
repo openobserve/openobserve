@@ -72,7 +72,10 @@ function existsByTestId(wrapper: VueWrapper, testId: string): boolean {
 /**
  * Mounts the component with default test setup
  */
-async function mountComponent(summaryData = createMockSummary(), orgId = "test-org") {
+async function mountComponent(
+  summaryData = createMockSummary(),
+  orgId = "test-org",
+) {
   const store = createMockStore(orgId);
 
   // Mock the alertsService
@@ -140,7 +143,9 @@ describe("DedupSummaryCards", () => {
     });
 
     it("should display large numbers correctly", async () => {
-      wrapper = await mountComponent(createMockSummary({ total_alerts: 99999 }));
+      wrapper = await mountComponent(
+        createMockSummary({ total_alerts: 99999 }),
+      );
       const value = findByTestId(wrapper, "total-alerts-value");
       expect(value.text()).toBe("99999");
     });
@@ -148,7 +153,9 @@ describe("DedupSummaryCards", () => {
 
   describe("Card 2: Alerts with Dedup", () => {
     it("should display alerts with dedup value", async () => {
-      wrapper = await mountComponent(createMockSummary({ alerts_with_dedup: 75 }));
+      wrapper = await mountComponent(
+        createMockSummary({ alerts_with_dedup: 75 }),
+      );
       const value = findByTestId(wrapper, "alerts-with-dedup-value");
       expect(value.text()).toBe("75");
     });
@@ -174,30 +181,37 @@ describe("DedupSummaryCards", () => {
       const tooltip = icon.findComponent({ name: "QTooltip" });
       expect(tooltip.exists()).toBe(true);
     });
-
   });
 
   describe("Card 3: Suppression Rate", () => {
     it("should display suppression rate as percentage", async () => {
-      wrapper = await mountComponent(createMockSummary({ suppression_rate: 0.75 }));
+      wrapper = await mountComponent(
+        createMockSummary({ suppression_rate: 0.75 }),
+      );
       const value = findByTestId(wrapper, "suppression-rate-value");
       expect(value.text()).toBe("75.0%");
     });
 
     it("should display 0% when rate is zero", async () => {
-      wrapper = await mountComponent(createMockSummary({ suppression_rate: 0 }));
+      wrapper = await mountComponent(
+        createMockSummary({ suppression_rate: 0 }),
+      );
       const value = findByTestId(wrapper, "suppression-rate-value");
       expect(value.text()).toBe("0%");
     });
 
     it("should format rate with one decimal place", async () => {
-      wrapper = await mountComponent(createMockSummary({ suppression_rate: 0.456 }));
+      wrapper = await mountComponent(
+        createMockSummary({ suppression_rate: 0.456 }),
+      );
       const value = findByTestId(wrapper, "suppression-rate-value");
       expect(value.text()).toBe("45.6%");
     });
 
     it("should apply green styling when rate > 0.5", async () => {
-      wrapper = await mountComponent(createMockSummary({ suppression_rate: 0.8 }));
+      wrapper = await mountComponent(
+        createMockSummary({ suppression_rate: 0.8 }),
+      );
       const card = findByTestId(wrapper, "suppression-rate-card");
       const value = findByTestId(wrapper, "suppression-rate-value");
 
@@ -206,7 +220,9 @@ describe("DedupSummaryCards", () => {
     });
 
     it("should apply yellow styling when rate > 0 and <= 0.5", async () => {
-      wrapper = await mountComponent(createMockSummary({ suppression_rate: 0.3 }));
+      wrapper = await mountComponent(
+        createMockSummary({ suppression_rate: 0.3 }),
+      );
       const card = findByTestId(wrapper, "suppression-rate-card");
       const value = findByTestId(wrapper, "suppression-rate-value");
 
@@ -215,7 +231,9 @@ describe("DedupSummaryCards", () => {
     });
 
     it("should apply no special styling when rate is 0", async () => {
-      wrapper = await mountComponent(createMockSummary({ suppression_rate: 0 }));
+      wrapper = await mountComponent(
+        createMockSummary({ suppression_rate: 0 }),
+      );
       const card = findByTestId(wrapper, "suppression-rate-card");
       const value = findByTestId(wrapper, "suppression-rate-value");
 
@@ -226,7 +244,9 @@ describe("DedupSummaryCards", () => {
     });
 
     it("should handle boundary case at exactly 0.5", async () => {
-      wrapper = await mountComponent(createMockSummary({ suppression_rate: 0.5 }));
+      wrapper = await mountComponent(
+        createMockSummary({ suppression_rate: 0.5 }),
+      );
       const card = findByTestId(wrapper, "suppression-rate-card");
 
       expect(card.classes()).toContain("tw:bg-yellow-50");
@@ -246,12 +266,13 @@ describe("DedupSummaryCards", () => {
       const tooltip = icon.findComponent({ name: "QTooltip" });
       expect(tooltip.exists()).toBe(true);
     });
-
   });
 
   describe("Card 4: Pending Batches", () => {
     it("should display pending batches value", async () => {
-      wrapper = await mountComponent(createMockSummary({ pending_batches: 12 }));
+      wrapper = await mountComponent(
+        createMockSummary({ pending_batches: 12 }),
+      );
       const value = findByTestId(wrapper, "pending-batches-value");
       expect(value.text()).toBe("12");
     });
@@ -319,7 +340,7 @@ describe("DedupSummaryCards", () => {
     it("should handle fetch error gracefully", async () => {
       vi.clearAllMocks();
       vi.spyOn(alertsService, "get_dedup_summary").mockRejectedValue(
-        new Error("Network error")
+        new Error("Network error"),
       );
       vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -364,25 +385,33 @@ describe("DedupSummaryCards", () => {
 
   describe("Percentage Formatting", () => {
     it("should format 0 as '0%'", async () => {
-      wrapper = await mountComponent(createMockSummary({ suppression_rate: 0 }));
+      wrapper = await mountComponent(
+        createMockSummary({ suppression_rate: 0 }),
+      );
       const value = findByTestId(wrapper, "suppression-rate-value");
       expect(value.text()).toBe("0%");
     });
 
     it("should format 1.0 as '100.0%'", async () => {
-      wrapper = await mountComponent(createMockSummary({ suppression_rate: 1.0 }));
+      wrapper = await mountComponent(
+        createMockSummary({ suppression_rate: 1.0 }),
+      );
       const value = findByTestId(wrapper, "suppression-rate-value");
       expect(value.text()).toBe("100.0%");
     });
 
     it("should round to one decimal place", async () => {
-      wrapper = await mountComponent(createMockSummary({ suppression_rate: 0.12345 }));
+      wrapper = await mountComponent(
+        createMockSummary({ suppression_rate: 0.12345 }),
+      );
       const value = findByTestId(wrapper, "suppression-rate-value");
       expect(value.text()).toBe("12.3%");
     });
 
     it("should handle very small rates", async () => {
-      wrapper = await mountComponent(createMockSummary({ suppression_rate: 0.001 }));
+      wrapper = await mountComponent(
+        createMockSummary({ suppression_rate: 0.001 }),
+      );
       const value = findByTestId(wrapper, "suppression-rate-value");
       expect(value.text()).toBe("0.1%");
     });
@@ -398,7 +427,7 @@ describe("DedupSummaryCards", () => {
           passed_total: 0,
           suppression_rate: 0,
           pending_batches: 0,
-        })
+        }),
       );
 
       expect(findByTestId(wrapper, "total-alerts-value").text()).toBe("0");
@@ -413,24 +442,32 @@ describe("DedupSummaryCards", () => {
           total_alerts: 999999,
           alerts_with_dedup: 888888,
           pending_batches: 77777,
-        })
+        }),
       );
 
       expect(findByTestId(wrapper, "total-alerts-value").text()).toBe("999999");
-      expect(findByTestId(wrapper, "alerts-with-dedup-value").text()).toBe("888888");
-      expect(findByTestId(wrapper, "pending-batches-value").text()).toBe("77777");
+      expect(findByTestId(wrapper, "alerts-with-dedup-value").text()).toBe(
+        "888888",
+      );
+      expect(findByTestId(wrapper, "pending-batches-value").text()).toBe(
+        "77777",
+      );
     });
 
     it("should handle suppression rate at exact boundary values", async () => {
       // Test exactly 0.5
-      wrapper = await mountComponent(createMockSummary({ suppression_rate: 0.5 }));
+      wrapper = await mountComponent(
+        createMockSummary({ suppression_rate: 0.5 }),
+      );
       let card = findByTestId(wrapper, "suppression-rate-card");
       expect(card.classes()).toContain("tw:bg-yellow-50");
 
       wrapper.unmount();
 
       // Test just above 0.5
-      wrapper = await mountComponent(createMockSummary({ suppression_rate: 0.501 }));
+      wrapper = await mountComponent(
+        createMockSummary({ suppression_rate: 0.501 }),
+      );
       card = findByTestId(wrapper, "suppression-rate-card");
       expect(card.classes()).toContain("tw:bg-green-50");
     });
@@ -479,8 +516,12 @@ describe("DedupSummaryCards", () => {
       await flushPromises();
 
       expect(findByTestId(wrapper, "total-alerts-value").text()).toBe("100");
-      expect(findByTestId(wrapper, "alerts-with-dedup-value").text()).toBe("75");
-      expect(findByTestId(wrapper, "suppression-rate-value").text()).toBe("80.0%");
+      expect(findByTestId(wrapper, "alerts-with-dedup-value").text()).toBe(
+        "75",
+      );
+      expect(findByTestId(wrapper, "suppression-rate-value").text()).toBe(
+        "80.0%",
+      );
       expect(findByTestId(wrapper, "pending-batches-value").text()).toBe("10");
     });
   });
@@ -503,8 +544,12 @@ describe("DedupSummaryCards", () => {
 
       // Verify all cards display correct data
       expect(findByTestId(wrapper, "total-alerts-value").text()).toBe("250");
-      expect(findByTestId(wrapper, "alerts-with-dedup-value").text()).toBe("180");
-      expect(findByTestId(wrapper, "suppression-rate-value").text()).toBe("66.7%");
+      expect(findByTestId(wrapper, "alerts-with-dedup-value").text()).toBe(
+        "180",
+      );
+      expect(findByTestId(wrapper, "suppression-rate-value").text()).toBe(
+        "66.7%",
+      );
       expect(findByTestId(wrapper, "pending-batches-value").text()).toBe("15");
 
       // Verify styling is applied correctly
@@ -514,7 +559,9 @@ describe("DedupSummaryCards", () => {
 
     it("should handle theme styling transitions", async () => {
       // Start with yellow threshold
-      wrapper = await mountComponent(createMockSummary({ suppression_rate: 0.4 }));
+      wrapper = await mountComponent(
+        createMockSummary({ suppression_rate: 0.4 }),
+      );
       let card = findByTestId(wrapper, "suppression-rate-card");
       expect(card.classes()).toContain("tw:bg-yellow-50");
 
@@ -542,8 +589,12 @@ describe("DedupSummaryCards", () => {
 
       // Check that icons contain tooltip components
       expect(dedupIcon.findComponent({ name: "QTooltip" }).exists()).toBe(true);
-      expect(suppressionIcon.findComponent({ name: "QTooltip" }).exists()).toBe(true);
-      expect(batchesIcon.findComponent({ name: "QTooltip" }).exists()).toBe(true);
+      expect(suppressionIcon.findComponent({ name: "QTooltip" }).exists()).toBe(
+        true,
+      );
+      expect(batchesIcon.findComponent({ name: "QTooltip" }).exists()).toBe(
+        true,
+      );
 
       // Verify tooltip content is present in icon HTML
       expect(dedupIcon.html().length).toBeGreaterThan(0);

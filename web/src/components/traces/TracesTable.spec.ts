@@ -232,7 +232,9 @@ describe("TracesTable", () => {
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.findAll(".oz-table__row")).toHaveLength(0);
       expect(wrapper.find('[data-test="no-traces"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="no-traces"]').text()).toBe("No traces found");
+      expect(wrapper.find('[data-test="no-traces"]').text()).toBe(
+        "No traces found",
+      );
     });
   });
 
@@ -243,7 +245,8 @@ describe("TracesTable", () => {
         props: {
           columns: testColumns,
           rows: testRows,
-          rowClass: (row: any) => (row.name === "alpha" ? "oz-table__row--error" : ""),
+          rowClass: (row: any) =>
+            row.name === "alpha" ? "oz-table__row--error" : "",
         },
       });
       const rows = wrapper.findAll(".oz-table__row");
@@ -279,7 +282,12 @@ describe("TracesTable", () => {
   describe("column alignment", () => {
     it("applies text-center class for center-aligned columns", () => {
       const centeredCols = [
-        { id: "id", header: "ID", size: 100, meta: { align: "center" as const } },
+        {
+          id: "id",
+          header: "ID",
+          size: 100,
+          meta: { align: "center" as const },
+        },
       ];
       wrapper = mount(TracesTable, {
         props: { columns: centeredCols, rows: [{ id: "x" }] },
@@ -291,7 +299,12 @@ describe("TracesTable", () => {
 
     it("applies text-right class for right-aligned columns", () => {
       const rightCols = [
-        { id: "val", header: "VAL", size: 100, meta: { align: "right" as const } },
+        {
+          id: "val",
+          header: "VAL",
+          size: 100,
+          meta: { align: "right" as const },
+        },
       ];
       wrapper = mount(TracesTable, {
         props: { columns: rightCols, rows: [{ val: 42 }] },
@@ -302,7 +315,10 @@ describe("TracesTable", () => {
 
     it("applies no alignment class for default (left) columns", () => {
       wrapper = mount(TracesTable, {
-        props: { columns: [{ id: "name", header: "N", size: 100 }], rows: [{ name: "x" }] },
+        props: {
+          columns: [{ id: "name", header: "N", size: 100 }],
+          rows: [{ name: "x" }],
+        },
       });
       const cell = wrapper.find(".oz-table__row div");
       expect(cell.classes()).not.toContain("text-center");
@@ -326,7 +342,9 @@ describe("TracesTable", () => {
     it("applies flex-grow style for grow columns", () => {
       wrapper = mount(TracesTable, {
         props: {
-          columns: [{ id: "desc", header: "D", meta: { grow: true, width: 200 } }],
+          columns: [
+            { id: "desc", header: "D", meta: { grow: true, width: 200 } },
+          ],
           rows: [{ desc: "y" }],
         },
       });

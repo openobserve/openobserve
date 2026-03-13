@@ -7,104 +7,104 @@
     </div>
 
     <div class="q-mx-md q-mb-md">
-    <div
-      data-test="add-role-rolename-input-btn"
-      class="trace-id-field-name o2-input q-mb-sm"
-    >
-      <q-input
-        v-model.trim="traceIdFieldName"
-        :label="t('settings.traceIdFieldName') + ' *'"
-        color="input-border"
-        bg-color="input-bg"
-        class="q-py-md showLabelOnTop"
-        stack-label
-        borderless
-        dense
-        :rules="[
-          (val: string) =>
-            !!val
-              ? isValidTraceField ||
-                `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
-              : t('common.nameRequired'),
-        ]"
+      <div
+        data-test="add-role-rolename-input-btn"
+        class="trace-id-field-name o2-input q-mb-sm"
       >
-        <template v-slot:hint>
-          Use alphanumeric and '+=,.@-_' characters only, without spaces.
-        </template>
-      </q-input>
-    </div>
+        <q-input
+          v-model.trim="traceIdFieldName"
+          :label="t('settings.traceIdFieldName') + ' *'"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-py-md showLabelOnTop"
+          stack-label
+          borderless
+          dense
+          :rules="[
+            (val: string) =>
+              !!val
+                ? isValidTraceField ||
+                  `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
+                : t('common.nameRequired'),
+          ]"
+        >
+          <template v-slot:hint>
+            Use alphanumeric and '+=,.@-_' characters only, without spaces.
+          </template>
+        </q-input>
+      </div>
 
-    <div
-      data-test="add-role-rolename-input-btn"
-      class="span-id-field-name o2-input"
-    >
-      <q-input
-        v-model.trim="spanIdFieldName"
-        :label="t('settings.spanIdFieldName') + ' *'"
-        color="input-border"
-        bg-color="input-bg"
-        class="q-py-md showLabelOnTop"
-        stack-label
-        borderless
-        dense
-        :rules="[
-          (val: string) =>
-            !!val
-              ? isValidSpanField ||
-                `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
-              : t('common.nameRequired'),
-        ]"
-        @update:model-value="updateFieldName('span')"
+      <div
+        data-test="add-role-rolename-input-btn"
+        class="span-id-field-name o2-input"
       >
-        <template v-slot:hint>
-          Use alphanumeric and '+=,.@-_' characters only, without spaces.
-        </template>
-      </q-input>
-    </div>
+        <q-input
+          v-model.trim="spanIdFieldName"
+          :label="t('settings.spanIdFieldName') + ' *'"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-py-md showLabelOnTop"
+          stack-label
+          borderless
+          dense
+          :rules="[
+            (val: string) =>
+              !!val
+                ? isValidSpanField ||
+                  `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
+                : t('common.nameRequired'),
+          ]"
+          @update:model-value="updateFieldName('span')"
+        >
+          <template v-slot:hint>
+            Use alphanumeric and '+=,.@-_' characters only, without spaces.
+          </template>
+        </q-input>
+      </div>
 
-    <div data-test="add-toggle-ingestion" class="span-id-field-name o2-input">
-      <q-toggle
-        data-test="add-toggle-ingestion-btn"
-        v-model="toggleIngestionLogs"
-        :label="t('settings.toggleIngestionLogsLabel')"
-        stack-label
-        class="q-mt-sm o2-toggle-button-lg tw:mr-3 -tw:ml-4"
-        size="lg"
-      >
-      </q-toggle>
-    </div>
+      <div data-test="add-toggle-ingestion" class="span-id-field-name o2-input">
+        <q-toggle
+          data-test="add-toggle-ingestion-btn"
+          v-model="toggleIngestionLogs"
+          :label="t('settings.toggleIngestionLogsLabel')"
+          stack-label
+          class="q-mt-sm o2-toggle-button-lg tw:mr-3 -tw:ml-4"
+          size="lg"
+        >
+        </q-toggle>
+      </div>
 
-    <!-- Cross-Linking Configuration -->
-    <template v-if="store.state.zoConfig?.enable_cross_linking">
-      <q-separator class="q-mt-lg q-mb-md" />
-      <CrossLinkManager
-        v-model="crossLinks"
-        :title="t('crossLinks.orgConfigTitle')"
-        :subtitle="t('crossLinks.orgConfigSubtitle')"
-        @change="formDirty = true"
-      />
-    </template>
+      <!-- Cross-Linking Configuration -->
+      <template v-if="store.state.zoConfig?.enable_cross_linking">
+        <q-separator class="q-mt-lg q-mb-md" />
+        <CrossLinkManager
+          v-model="crossLinks"
+          :title="t('crossLinks.orgConfigTitle')"
+          :subtitle="t('crossLinks.orgConfigSubtitle')"
+          @change="formDirty = true"
+        />
+      </template>
 
-    <div class="flex justify-start q-mt-md">
-      <q-btn
-        data-test="add-alert-cancel-btn"
-        v-close-popup="true"
-        class="q-mr-md o2-secondary-button tw:h-[36px]"
-        :label="t('alerts.cancel')"
-        no-caps
-        flat
-        @click="$emit('cancel:hideform')"
-      />
-      <q-btn
-        data-test="add-alert-submit-btn"
-        :label="t('alerts.save')"
-        class="o2-primary-button no-border tw:h-[36px]"
-        type="submit"
-        no-caps
-        flat
-        @click="saveOrgSettings"
-      />
-    </div>
+      <div class="flex justify-start q-mt-md">
+        <q-btn
+          data-test="add-alert-cancel-btn"
+          v-close-popup="true"
+          class="q-mr-md o2-secondary-button tw:h-[36px]"
+          :label="t('alerts.cancel')"
+          no-caps
+          flat
+          @click="$emit('cancel:hideform')"
+        />
+        <q-btn
+          data-test="add-alert-submit-btn"
+          :label="t('alerts.save')"
+          class="o2-primary-button no-border tw:h-[36px]"
+          type="submit"
+          no-caps
+          flat
+          @click="saveOrgSettings"
+        />
+      </div>
     </div>
   </div>
 </template>

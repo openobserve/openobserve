@@ -61,7 +61,7 @@ describe("useCorrelatedLogs", () => {
           callbacks.complete(null);
         }
         return Promise.resolve();
-      }
+      },
     );
 
     props = {
@@ -129,18 +129,20 @@ describe("useCorrelatedLogs", () => {
         (_params: any, callbacks: any) => {
           // Simulate metadata event
           callbacks.data(null, {
-            type: 'search_response_metadata',
-            content: { results: { total: 1, took: 10 } }
+            type: "search_response_metadata",
+            content: { results: { total: 1, took: 10 } },
           });
           // Simulate hits event
           callbacks.data(null, {
-            type: 'search_response_hits',
-            content: { results: { hits: [{ _timestamp: 123, field: "value" }] } }
+            type: "search_response_hits",
+            content: {
+              results: { hits: [{ _timestamp: 123, field: "value" }] },
+            },
           });
           // Simulate complete
           callbacks.complete(null);
           return Promise.resolve();
-        }
+        },
       );
 
       const composable = useCorrelatedLogs(props);
@@ -160,12 +162,12 @@ describe("useCorrelatedLogs", () => {
         (_params: any, callbacks: any) => {
           // Simulate metadata and complete
           callbacks.data(null, {
-            type: 'search_response_metadata',
-            content: { results: { total: 0, took: 5 } }
+            type: "search_response_metadata",
+            content: { results: { total: 0, took: 5 } },
           });
           callbacks.complete(null);
           return Promise.resolve();
-        }
+        },
       );
 
       const composable = useCorrelatedLogs(props);
@@ -181,10 +183,10 @@ describe("useCorrelatedLogs", () => {
       mockFetchQueryDataWithHttpStream.mockImplementation(
         (_params: any, callbacks: any) => {
           callbacks.error(null, {
-            content: { message: "Test error" }
+            content: { message: "Test error" },
           });
           return Promise.resolve();
-        }
+        },
       );
 
       const composable = useCorrelatedLogs(props);
@@ -210,12 +212,12 @@ describe("useCorrelatedLogs", () => {
       mockFetchQueryDataWithHttpStream.mockImplementation(
         (_params: any, callbacks: any) => {
           callbacks.data(null, {
-            type: 'search_response_hits',
-            content: { results: { hits: [{ _timestamp: 123 }] } }
+            type: "search_response_hits",
+            content: { results: { hits: [{ _timestamp: 123 }] } },
           });
           callbacks.complete(null);
           return Promise.resolve();
-        }
+        },
       );
 
       const composable = useCorrelatedLogs(props);
@@ -262,7 +264,7 @@ describe("useCorrelatedLogs", () => {
         (_params: any, callbacks: any) => {
           callbacks.complete(null);
           return Promise.resolve();
-        }
+        },
       );
 
       const composable = useCorrelatedLogs(props);
@@ -317,7 +319,7 @@ describe("useCorrelatedLogs", () => {
         (_params: any, callbacks: any) => {
           callbacks.complete(null);
           return Promise.resolve();
-        }
+        },
       );
 
       const composable = useCorrelatedLogs(props);
@@ -347,7 +349,7 @@ describe("useCorrelatedLogs", () => {
         async (_params: any, callbacks: any) => {
           await new Promise((resolve) => setTimeout(resolve, 50));
           callbacks.complete(null);
-        }
+        },
       );
 
       const composable = useCorrelatedLogs(props);
@@ -364,7 +366,7 @@ describe("useCorrelatedLogs", () => {
         (_params: any, callbacks: any) => {
           callbacks.error(null, { content: { message: "Search failed" } });
           return Promise.resolve();
-        }
+        },
       );
 
       const composable = useCorrelatedLogs(props);
@@ -381,7 +383,7 @@ describe("useCorrelatedLogs", () => {
         (_params: any, callbacks: any) => {
           callbacks.error(null, { content: { message: "Previous error" } });
           return Promise.resolve();
-        }
+        },
       );
       const composable = useCorrelatedLogs(props);
       await composable.fetchCorrelatedLogs();
@@ -391,12 +393,12 @@ describe("useCorrelatedLogs", () => {
       mockFetchQueryDataWithHttpStream.mockImplementation(
         (_params: any, callbacks: any) => {
           callbacks.data(null, {
-            type: 'search_response_metadata',
-            content: { results: { total: 0, took: 5 } }
+            type: "search_response_metadata",
+            content: { results: { total: 0, took: 5 } },
           });
           callbacks.complete(null);
           return Promise.resolve();
-        }
+        },
       );
       await composable.fetchCorrelatedLogs();
 
@@ -492,7 +494,7 @@ describe("useCorrelatedLogs", () => {
       await nextTick();
 
       expect(composable.currentFilters.value["special-key"]).toBe(
-        "special@value#123"
+        "special@value#123",
       );
     });
 
@@ -538,7 +540,7 @@ describe("useCorrelatedLogs", () => {
         (_params: any, callbacks: any) => {
           callbacks.error(null, { content: { message: "Network error" } });
           return Promise.resolve();
-        }
+        },
       );
 
       const composable = useCorrelatedLogs(props);
@@ -551,12 +553,12 @@ describe("useCorrelatedLogs", () => {
       mockFetchQueryDataWithHttpStream.mockImplementation(
         (_params: any, callbacks: any) => {
           callbacks.data(null, {
-            type: 'search_response_metadata',
-            content: { results: { total: 0, took: 5 } }
+            type: "search_response_metadata",
+            content: { results: { total: 0, took: 5 } },
           });
           callbacks.complete(null);
           return Promise.resolve();
-        }
+        },
       );
 
       const refreshPromise = composable.refresh();
@@ -573,7 +575,7 @@ describe("useCorrelatedLogs", () => {
         (_params: any, callbacks: any) => {
           callbacks.error(null, { content: { message: "Search error" } });
           return Promise.resolve();
-        }
+        },
       );
 
       const composable = useCorrelatedLogs(props);

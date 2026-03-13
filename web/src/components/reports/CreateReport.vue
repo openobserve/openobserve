@@ -17,7 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:w-full tw:h-full tw:px-[0.625rem] q-mt-xs tw:pb-[0.625rem]">
     <div data-test="add-report-section" class="full-width create-report-page">
-      <div class="row items-center no-wrap card-container tw:py-[0.675rem] tw:h-[64px] tw:px-[0.675rem] tw:mb-[0.675rem] ">
+      <div
+        class="row items-center no-wrap card-container tw:py-[0.675rem] tw:h-[64px] tw:px-[0.675rem] tw:mb-[0.675rem]"
+      >
         <div class="flex items-center">
           <div
             data-test="add-report-back-btn"
@@ -40,13 +42,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("reports.update") }}
           </div>
-          <div v-else class="text-h6" data-test="add-report-title">
+          <div v-else class="text-h6"
+data-test="add-report-title">
             {{ t("reports.add") }}
           </div>
         </div>
       </div>
-      <div class="flex card-container tw:mb-[0.675rem]" style="height: calc(100vh - 192px); overflow: auto">
-        <div ref="addAlertFormRef" class="q-px-lg q-my-md" style="width: 1024px">
+      <div
+        class="flex card-container tw:mb-[0.675rem]"
+        style="height: calc(100vh - 192px); overflow: auto"
+      >
+        <div
+          ref="addAlertFormRef"
+          class="q-px-lg q-my-md"
+          style="width: 1024px"
+        >
           <q-form
             class="create-report-form"
             ref="addReportFormRef"
@@ -122,8 +132,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   self="center left"
                   class="tw:text-[12px]"
                 >
-                  Note: Cached reports are stored for quick access to dashboards;
-                  sharing is disabled for these reports.</q-tooltip
+                  Note: Cached reports are stored for quick access to
+                  dashboards; sharing is disabled for these reports.</q-tooltip
                 >
               </q-icon>
             </div>
@@ -175,7 +185,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         fill-input
                         :input-debounce="400"
                         input-style="text-transform: none;"
-                        @update:model-value="onFolderSelection(dashboard.folder)"
+                        @update:model-value="
+                          onFolderSelection(dashboard.folder)
+                        "
                         @filter="
                           (...args: any) =>
                             onFilterOptions('folders', args[0], args[1])
@@ -277,7 +289,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           Time Range*
                         </div>
                         <div style="font-size: 12px">
-                          Generates report with the data from specified time range
+                          Generates report with the data from specified time
+                          range
                         </div>
                       </div>
                       <DateTime
@@ -310,7 +323,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="add-report-step1-continue-btn"
                     @click="step = 2"
                     class="o2-primary-button tw:h-[36px]"
-                    :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-primary-button-dark'
+                        : 'o2-primary-button-light'
+                    "
                     flat
                     no-caps
                     :label="'Continue'"
@@ -347,10 +364,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       border-radius: 2px;
                     "
                   >
-                    <template v-for="visual in frequencyTabs" :key="visual.value">
+                    <template
+                      v-for="visual in frequencyTabs"
+                      :key="visual.value"
+                    >
                       <q-btn
                         :data-test="`add-report-schedule-frequency-${visual.value}-btn`"
-                        :color="visual.value === frequency.type ? 'primary' : ''"
+                        :color="
+                          visual.value === frequency.type ? 'primary' : ''
+                        "
                         :flat="visual.value === frequency.type ? false : true"
                         dense
                         no-caps
@@ -388,14 +410,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 Pattern: * * * * * * means every second.
                                 <br />
                                 Format: [Second (optional) 0-59] [Minute 0-59]
-                                [Hour 0-23] [Day of Month 1-31, 'L'] [Month 1-12]
-                                [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].
+                                [Hour 0-23] [Day of Month 1-31, 'L'] [Month
+                                1-12] [Day of Week 0-7 or '1L-7L', 0 and 7 for
+                                Sunday].
                                 <br />
                                 Use '*' to represent any value, 'L' for the last
                                 day/weekday. <br />
                                 Example: 0 0 12 * * ? - Triggers at 12:00 PM
                                 daily. It specifies second, minute, hour, day of
-                                month, month, and day of week, respectively.</span
+                                month, month, and day of week,
+                                respectively.</span
                               >
                             </q-tooltip>
                           </q-icon>
@@ -429,7 +453,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @blur="
                             timezone =
                               timezone == ''
-                                ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                                ? Intl.DateTimeFormat().resolvedOptions()
+                                    .timeZone
                                 : timezone
                           "
                           use-input
@@ -452,7 +477,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </template>
                   <template v-else>
-                    <div class="q-mt-md tw:flex tw:justify-start tw:items-center">
+                    <div
+                      class="q-mt-md tw:flex tw:justify-start tw:items-center"
+                    >
                       <div
                         class="tw:flex tw:justify-center tw:align-center"
                         style="
@@ -461,7 +488,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           border-radius: 2px;
                         "
                       >
-                        <template v-for="visual in timeTabs" :key="visual.value">
+                        <template
+                          v-for="visual in timeTabs"
+                          :key="visual.value"
+                        >
                           <q-btn
                             :data-test="`add-report-schedule-${visual.value}-btn`"
                             :color="
@@ -648,7 +678,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @blur="
                             timezone =
                               timezone == ''
-                                ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                                ? Intl.DateTimeFormat().resolvedOptions()
+                                    .timeZone
                                 : timezone
                           "
                           use-input
@@ -678,7 +709,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     flat
                     @click="step = 1"
                     class="o2-secondary-button tw:h-[36px] q-ml-sm"
-                    :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-secondary-button-dark'
+                        : 'o2-secondary-button-light'
+                    "
                     :label="'Back'"
                     no-caps
                   />
@@ -687,7 +722,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="add-report-step2-continue-btn"
                     @click="step = 3"
                     class="o2-primary-button tw:h-[36px] q-ml-md"
-                    :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-primary-button-dark'
+                        : 'o2-primary-button-light'
+                    "
                     flat
                     no-caps
                     :label="'Continue'"
@@ -773,7 +812,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     flat
                     @click="step = 2"
                     class="o2-secondary-button tw:h-[36px] q-ml-sm"
-                    :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-secondary-button-dark'
+                        : 'o2-secondary-button-light'
+                    "
                     :label="'Back'"
                     no-caps
                   />
@@ -783,37 +826,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-form>
         </div>
       </div>
-
     </div>
-      <div
-        class="flex justify-end q-px-md full-width tw:py-3 card-container"
-        style="position: sticky; bottom: 0.375rem; z-index: 2"
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-        :style="{
-          'box-shadow':
-            store.state.theme === 'dark'
-              ? 'rgb(45 45 45) 0px -4px 7px 0px'
-              : 'rgb(240 240 240) 0px -4px 7px 0px',
-        }"
-      >
-        <q-btn
-          data-test="add-report-cancel-btn"
-          class="q-mr-md o2-secondary-button tw:h-[36px]"
-          :label="t('alerts.cancel')"
-          no-caps
-          flat
-          @click="openCancelDialog"
-        />
-        <q-btn
-          data-test="add-report-save-btn"
-          class="o2-primary-button no-border tw:h-[36px]"
-          :label="t('alerts.save')"
-          type="submit"
-          no-caps
-          flat
-          @click="saveReport"
-        />
-      </div>
+    <div
+      class="flex justify-end q-px-md full-width tw:py-3 card-container"
+      style="position: sticky; bottom: 0.375rem; z-index: 2"
+      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+      :style="{
+        'box-shadow':
+          store.state.theme === 'dark'
+            ? 'rgb(45 45 45) 0px -4px 7px 0px'
+            : 'rgb(240 240 240) 0px -4px 7px 0px',
+      }"
+    >
+      <q-btn
+        data-test="add-report-cancel-btn"
+        class="q-mr-md o2-secondary-button tw:h-[36px]"
+        :label="t('alerts.cancel')"
+        no-caps
+        flat
+        @click="openCancelDialog"
+      />
+      <q-btn
+        data-test="add-report-save-btn"
+        class="o2-primary-button no-border tw:h-[36px]"
+        :label="t('alerts.save')"
+        type="submit"
+        no-caps
+        flat
+        @click="saveReport"
+      />
+    </div>
   </div>
   <ConfirmDialog
     v-model="dialog.show"
@@ -1394,10 +1436,10 @@ const saveReport = async () => {
     .finally(() => {
       dismiss();
     });
-    track("Button Click", {
-      button: "Save Report",
-      page: "Add Report"
-    });
+  track("Button Click", {
+    button: "Save Report",
+    page: "Add Report",
+  });
 };
 
 const validateReportData = async () => {
@@ -1672,7 +1714,7 @@ const openCancelDialog = () => {
     goToReports();
     track("Button Click", {
       button: "Cancel Report",
-      page: "Add Report"
+      page: "Add Report",
     });
     return;
   }

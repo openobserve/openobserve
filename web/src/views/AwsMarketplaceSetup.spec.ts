@@ -136,9 +136,9 @@ describe("AwsMarketplaceSetup", () => {
     wrapper.vm.newOrgName = "Test Org";
     await wrapper.vm.$nextTick();
 
-    const createBtn = wrapper.findAll('button').find(btn =>
-      btn.text().includes("Create & Link")
-    );
+    const createBtn = wrapper
+      .findAll("button")
+      .find((btn) => btn.text().includes("Create & Link"));
     expect(createBtn).toBeTruthy();
   });
 
@@ -297,15 +297,13 @@ describe("AwsMarketplaceSetup", () => {
     });
 
     wrapper.vm.state = "select_org";
-    wrapper.vm.eligibleOrganizations = [
-      { identifier: "org1", name: "Org 1" },
-    ];
+    wrapper.vm.eligibleOrganizations = [{ identifier: "org1", name: "Org 1" }];
     wrapper.vm.selectedOrg = { identifier: "org1", name: "Org 1" };
     await wrapper.vm.$nextTick();
 
-    const linkBtn = wrapper.findAll('button').find(btn =>
-      btn.text().includes("Link AWS Billing")
-    );
+    const linkBtn = wrapper
+      .findAll("button")
+      .find((btn) => btn.text().includes("Link AWS Billing"));
     expect(linkBtn).toBeTruthy();
   });
 

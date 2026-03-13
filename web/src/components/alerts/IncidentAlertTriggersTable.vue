@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="alert-triggers-table" class="alert-triggers-table tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
+  <div
+    data-test="alert-triggers-table"
+    class="alert-triggers-table tw:flex tw:flex-col tw:h-full tw:overflow-hidden"
+  >
     <q-table
       data-test="triggers-qtable"
       ref="qTableRef"
@@ -30,7 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #no-data>
         <div data-test="no-triggers-message" class="tw:text-center tw:py-8">
-          <span :class="isDarkMode ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:text-sm">
+          <span
+            :class="isDarkMode ? 'tw:text-gray-500' : 'tw:text-gray-400'"
+            class="tw:text-sm"
+          >
             No triggers loaded
           </span>
         </div>
@@ -38,7 +44,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #body-cell-alert_name="props">
         <q-td :props="props" data-test="alert-name-cell">
-          <span data-test="alert-name-text" :class="isDarkMode ? 'tw:text-gray-200' : 'tw:text-gray-800'" class="tw:text-xs tw:font-medium">
+          <span
+            data-test="alert-name-text"
+            :class="isDarkMode ? 'tw:text-gray-200' : 'tw:text-gray-800'"
+            class="tw:text-xs tw:font-medium"
+          >
             {{ props.row.alert_name }}
           </span>
         </q-td>
@@ -53,14 +63,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #body-cell-correlation_reason="props">
-        <q-td :props="props" class="tw:text-right" data-test="correlation-reason-cell">
+        <q-td
+          :props="props"
+          class="tw:text-right"
+          data-test="correlation-reason-cell"
+        >
           <q-badge
             data-test="correlation-reason-badge"
             :color="getReasonColor(props.row.correlation_reason)"
             :label="getReasonLabel(props.row.correlation_reason)"
             outline
           >
-            <q-tooltip>{{ getReasonTooltip(props.row.correlation_reason) }}</q-tooltip>
+            <q-tooltip>{{
+              getReasonTooltip(props.row.correlation_reason)
+            }}</q-tooltip>
           </q-badge>
         </q-td>
       </template>
@@ -90,7 +106,11 @@ interface IncidentAlert {
   alert_id: string;
   alert_name: string;
   alert_fired_at: number;
-  correlation_reason: "service_discovery" | "scope_match" | "workload_match" | "alert_id";
+  correlation_reason:
+    | "service_discovery"
+    | "scope_match"
+    | "workload_match"
+    | "alert_id";
   created_at: number;
 }
 
@@ -109,7 +129,7 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['row-click'],
+  emits: ["row-click"],
   setup(props, { emit }) {
     const { t } = useI18n();
 
@@ -209,7 +229,7 @@ export default defineComponent({
     };
 
     const onRowClick = (evt: Event, row: IncidentAlert) => {
-      emit('row-click', row.alert_name);
+      emit("row-click", row.alert_name);
     };
 
     return {
@@ -232,5 +252,4 @@ export default defineComponent({
 :deep(.q-table tbody tr) {
   cursor: pointer;
 }
-
 </style>

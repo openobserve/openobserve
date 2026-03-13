@@ -4,7 +4,11 @@
       <q-card-section>
         <div class="tw:flex tw:items-center tw:justify-between">
           <div class="text-h6">
-            {{ isEditing ? t("crossLinks.editCrossLink") : t("crossLinks.addCrossLink") }}
+            {{
+              isEditing
+                ? t("crossLinks.editCrossLink")
+                : t("crossLinks.addCrossLink")
+            }}
           </div>
           <CrossLinkUserGuide />
         </div>
@@ -14,7 +18,11 @@
         <q-form @submit.prevent="onSubmit">
           <!-- Name -->
           <div class="tw:mb-3">
-            <label class="tw:block tw:text-sm tw:font-semibold tw:mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.name") }} *</label>
+            <label
+              class="tw:block tw:text-sm tw:font-semibold tw:mb-1"
+              style="color: var(--o2-text-primary)"
+              >{{ t("crossLinks.name") }} *</label
+            >
             <q-input
               v-model="form.name"
               dense
@@ -28,7 +36,11 @@
 
           <!-- URL Template -->
           <div class="tw:mb-3">
-            <label class="tw:block tw:text-sm tw:font-semibold tw:mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.urlTemplate") }} *</label>
+            <label
+              class="tw:block tw:text-sm tw:font-semibold tw:mb-1"
+              style="color: var(--o2-text-primary)"
+              >{{ t("crossLinks.urlTemplate") }} *</label
+            >
             <q-input
               v-model="form.url"
               dense
@@ -45,11 +57,18 @@
 
           <!-- Fields -->
           <div class="tw:mb-2">
-            <label class="tw:block tw:text-sm tw:font-semibold tw:mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.fields") }} *</label>
+            <label
+              class="tw:block tw:text-sm tw:font-semibold tw:mb-1"
+              style="color: var(--o2-text-primary)"
+              >{{ t("crossLinks.fields") }} *</label
+            >
             <div class="tw:text-xs tw:mb-2" style="color: var(--o2-text-muted)">
               {{ t("crossLinks.fieldsHint") }}
             </div>
-            <div v-if="form.fields.length > 0" class="tw:flex tw:flex-wrap tw:gap-1 tw:mb-2">
+            <div
+              v-if="form.fields.length > 0"
+              class="tw:flex tw:flex-wrap tw:gap-1 tw:mb-2"
+            >
               <q-chip
                 v-for="(field, idx) in form.fields"
                 :key="idx"
@@ -59,7 +78,9 @@
                 @remove="form.fields.splice(idx, 1)"
                 :data-test="`cross-link-field-chip-${idx}`"
               >
-                <span class="tw:truncate tw:text-xs" :title="field.name">{{ field.name }}</span>
+                <span class="tw:truncate tw:text-xs" :title="field.name">{{
+                  field.name
+                }}</span>
               </q-chip>
             </div>
             <div class="tw:flex tw:gap-2 tw:items-center">
@@ -85,7 +106,10 @@
               >
                 <template v-slot:no-option>
                   <q-item>
-                    <q-item-section class="tw:text-xs" style="color: var(--o2-text-muted)">
+                    <q-item-section
+                      class="tw:text-xs"
+                      style="color: var(--o2-text-muted)"
+                    >
                       {{ t("crossLinks.noMatchingFields") }}
                     </q-item-section>
                   </q-item>
@@ -125,7 +149,11 @@
           dense
           :label="t('common.cancel')"
           class="o2-secondary-button tw:h-[36px]"
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-secondary-button-dark'
+              : 'o2-secondary-button-light'
+          "
           @click="onCancel"
           data-test="cross-link-cancel-btn"
         />
@@ -135,7 +163,11 @@
           dense
           :label="isEditing ? t('crossLinks.update') : t('crossLinks.add')"
           class="o2-primary-button tw:h-[36px] q-ml-md"
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-primary-button-dark'
+              : 'o2-primary-button-light'
+          "
           @click="onSubmit"
           :disable="!form.name || !form.url"
           data-test="cross-link-save-btn"
@@ -191,8 +223,8 @@ export default defineComponent({
     function filterFieldOptions(val: string, update: Function) {
       update(() => {
         const needle = val.toLowerCase();
-        filteredFieldOptions.value = props.availableFields.filter(
-          (f) => f.toLowerCase().includes(needle),
+        filteredFieldOptions.value = props.availableFields.filter((f) =>
+          f.toLowerCase().includes(needle),
         );
       });
     }

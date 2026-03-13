@@ -77,22 +77,22 @@ export const useSearchConnection = () => {
   const initializeSearchConnection = (
     payload: any,
   ): string | Promise<void> | null => {
-      payload.searchType = "ui";
-      payload.pageType = searchObj.data.stream.streamType;
-      return fetchQueryDataWithHttpStream(payload, {
-        data: (payload: any, response: any) => {
-          if (payload.onData) payload.onData(payload, response);
-        },
-        error: (payload: any, error: any) => {
-          if (payload.onError) payload.onError(payload, error);
-        },
-        complete: (payload: any, response: any) => {
-          if (payload.onComplete) payload.onComplete(payload, response);
-        },
-        reset: (data: any, traceId?: string) => {
-          if (payload.onReset) payload.onReset(data, traceId);
-        },
-      }) as Promise<void>;
+    payload.searchType = "ui";
+    payload.pageType = searchObj.data.stream.streamType;
+    return fetchQueryDataWithHttpStream(payload, {
+      data: (payload: any, response: any) => {
+        if (payload.onData) payload.onData(payload, response);
+      },
+      error: (payload: any, error: any) => {
+        if (payload.onError) payload.onError(payload, error);
+      },
+      complete: (payload: any, response: any) => {
+        if (payload.onComplete) payload.onComplete(payload, response);
+      },
+      reset: (data: any, traceId?: string) => {
+        if (payload.onReset) payload.onReset(data, traceId);
+      },
+    }) as Promise<void>;
   };
 
   const sendSearchMessage = (queryReq: any) => {
@@ -166,7 +166,13 @@ export const useSearchConnection = () => {
         };
       }
 
-      const payload = buildWebSocketPayload(queryReq, isPagination, "search", {}, searchObj.meta.clearCache);
+      const payload = buildWebSocketPayload(
+        queryReq,
+        isPagination,
+        "search",
+        {},
+        searchObj.meta.clearCache,
+      );
 
       // Add callbacks to payload
       payload.onData = callbacks.onData;
@@ -186,7 +192,7 @@ export const useSearchConnection = () => {
         queryReq.query.from = 0;
         searchObj.meta.refreshHistogram = false;
       }
-      
+
       const requestId = initializeSearchConnection(payload);
 
       if (!requestId) {

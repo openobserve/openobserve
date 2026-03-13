@@ -180,7 +180,7 @@ const useMetricsExplorer = () => {
   };
 
   const promqlMode = computed(
-    () => dashboardPanelData.data.queryType == "promql"
+    () => dashboardPanelData.data.queryType == "promql",
   );
 
   const isAddXAxisNotAllowed = computed((e: any) => {
@@ -287,10 +287,10 @@ const useMetricsExplorer = () => {
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
           ? "x_axis_" +
-          (dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.x.length +
-            1)
+            (dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.x.length +
+              1)
           : row.name,
         column: row.name,
         color: null,
@@ -338,10 +338,10 @@ const useMetricsExplorer = () => {
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
           ? "y_axis_" +
-          (dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.y.length +
-            1)
+            (dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.y.length +
+              1)
           : row.name,
         column: row.name,
         color: getNewColorValue(),
@@ -384,10 +384,10 @@ const useMetricsExplorer = () => {
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
           ? "z_axis_" +
-          (dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.z.length +
-            1)
+            (dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.z.length +
+              1)
           : row.name,
         column: row.name,
         color: getNewColorValue(),
@@ -545,31 +545,31 @@ const useMetricsExplorer = () => {
       dashboardPanelData.layout.currentQueryIndex
     ].fields?.x?.forEach(
       (it: any, index: any) =>
-      (it.alias = !dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].customQuery
-        ? "x_axis_" + (index + 1)
-        : it?.column)
+        (it.alias = !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+          ? "x_axis_" + (index + 1)
+          : it?.column),
     );
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields?.y?.forEach(
       (it: any, index: any) =>
-      (it.alias = !dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].customQuery
-        ? "y_axis_" + (index + 1)
-        : it?.column)
+        (it.alias = !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+          ? "y_axis_" + (index + 1)
+          : it?.column),
     );
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields?.z?.forEach(
       (it: any, index: any) =>
-      (it.alias = !dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].customQuery
-        ? "z_axis_" + (index + 1)
-        : it?.column)
+        (it.alias = !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+          ? "z_axis_" + (index + 1)
+          : it?.column),
     );
   };
 
@@ -668,7 +668,7 @@ const useMetricsExplorer = () => {
 
     // remove any existing data
     const find = dashboardPanelData.meta.filterValue.findIndex(
-      (it: any) => it.column == name
+      (it: any) => it.column == name,
     );
     if (find >= 0) {
       dashboardPanelData.meta.filterValue.splice(find, 1);
@@ -681,10 +681,10 @@ const useMetricsExplorer = () => {
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream,
       start_time: new Date(
-        dashboardPanelData.meta.dateTime["start_time"].toISOString()
+        dashboardPanelData.meta.dateTime["start_time"].toISOString(),
       ).getTime(),
       end_time: new Date(
-        dashboardPanelData.meta.dateTime["end_time"].toISOString()
+        dashboardPanelData.meta.dateTime["end_time"].toISOString(),
       ).getTime(),
       fields: [name],
       size: store.state.zoConfig?.query_values_default_num || 10,
@@ -725,10 +725,10 @@ const useMetricsExplorer = () => {
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream,
       start_time: new Date(
-        dashboardPanelData.meta.dateTime["start_time"].toISOString()
+        dashboardPanelData.meta.dateTime["start_time"].toISOString(),
       ).getTime(),
       end_time: new Date(
-        dashboardPanelData.meta.dateTime["end_time"].toISOString()
+        dashboardPanelData.meta.dateTime["end_time"].toISOString(),
       ).getTime(),
       fields: [name],
       size: store.state.zoConfig?.query_values_default_num || 10,
@@ -738,7 +738,7 @@ const useMetricsExplorer = () => {
     })
       .then((res: any) => {
         const find = dashboardPanelData.meta.filterValue.findIndex(
-          (it: any) => it.column == name
+          (it: any) => it.column == name,
         );
         if (find >= 0) {
           dashboardPanelData.meta.filterValue.splice(find, 1);
@@ -781,7 +781,7 @@ const useMetricsExplorer = () => {
         0,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.x.length
+        ].fields.x.length,
       );
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -789,7 +789,7 @@ const useMetricsExplorer = () => {
         0,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.y.length
+        ].fields.y.length,
       );
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -797,7 +797,7 @@ const useMetricsExplorer = () => {
         0,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.z.length
+        ].fields.z.length,
       );
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -805,7 +805,7 @@ const useMetricsExplorer = () => {
         0,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter.length
+        ].fields.filter.length,
       );
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -867,9 +867,9 @@ const useMetricsExplorer = () => {
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields.x.length +
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields.y.length
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.y.length
             ) {
               currentFieldType = "y";
             } else {
@@ -886,23 +886,23 @@ const useMetricsExplorer = () => {
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields.y[
-                index -
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields.x.length
+                  index -
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.x.length
                 ];
             } else {
               field =
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields.z[
-                index -
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields.x.length -
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields.y.length
+                  index -
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.x.length -
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.y.length
                 ];
             }
 
@@ -916,7 +916,7 @@ const useMetricsExplorer = () => {
           field.alias = name; // Set the alias to the name of the custom query field
           field.column = name; // Set the column to the name of the custom query field
           field.color = null; // Reset the color to null
-        }
+        },
       );
     }
   };
@@ -927,7 +927,7 @@ const useMetricsExplorer = () => {
     const oldArray = oldCustomQueryFields;
     // Create a deep copy of the new custom query fields array
     const newArray = JSON.parse(
-      JSON.stringify(dashboardPanelData.meta.stream.customQueryFields)
+      JSON.stringify(dashboardPanelData.meta.stream.customQueryFields),
     );
 
     // Check if the length of the old and new arrays are the same

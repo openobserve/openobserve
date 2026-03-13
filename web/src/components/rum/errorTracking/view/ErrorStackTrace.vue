@@ -30,8 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 Number(index) === error_stack.length - 1
                   ? '0 0 4px 4px'
                   : Number(index) === 1
-                  ? '4px 4px 0 0'
-                  : '',
+                    ? '4px 4px 0 0'
+                    : '',
             }"
           >
             {{ stack }}

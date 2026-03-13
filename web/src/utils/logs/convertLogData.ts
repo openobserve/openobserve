@@ -110,7 +110,8 @@ export const convertLogData = (
           : {
               color: (() => {
                 // Check if dark mode is active
-                const isDarkMode = document.body.classList.contains('body--dark');
+                const isDarkMode =
+                  document.body.classList.contains("body--dark");
 
                 if (isDarkMode) {
                   // In dark mode, read from body

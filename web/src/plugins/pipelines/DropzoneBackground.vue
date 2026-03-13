@@ -14,15 +14,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-
 <script lang="ts" setup>
 import { Background } from "@vue-flow/background";
 </script>
 
 <template>
   <div class="dropzone-background">
-    <Background :size="2"
-:gap="20" pattern-color="#BDBDBD" />
+    <Background :size="2" :gap="20"
+pattern-color="#BDBDBD" />
 
     <div class="overlay">
       <slot />

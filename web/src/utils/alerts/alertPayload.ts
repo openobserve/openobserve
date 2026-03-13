@@ -81,13 +81,21 @@ export const getAlertPayload = (
       payload.context_attributes[attr.key] = attr.value;
   });
 
-  payload.trigger_condition.threshold = parseInt(formData.trigger_condition.threshold as any);
+  payload.trigger_condition.threshold = parseInt(
+    formData.trigger_condition.threshold as any,
+  );
 
-  payload.trigger_condition.period = parseInt(formData.trigger_condition.period as any);
+  payload.trigger_condition.period = parseInt(
+    formData.trigger_condition.period as any,
+  );
 
-  payload.trigger_condition.frequency = parseInt(formData.trigger_condition.frequency as any);
+  payload.trigger_condition.frequency = parseInt(
+    formData.trigger_condition.frequency as any,
+  );
 
-  payload.trigger_condition.silence = parseInt(formData.trigger_condition.silence as any);
+  payload.trigger_condition.silence = parseInt(
+    formData.trigger_condition.silence as any,
+  );
 
   payload.description = formData.description.trim();
 
@@ -142,20 +150,26 @@ export const prepareAndSaveAlert = async (
   } = context;
 
   const payload = cloneDeep(data);
-  
+
   if (!isAggregationEnabled.value) {
     payload.query_condition.aggregation = null;
   }
-  
-  if (Array.isArray(payload.context_attributes) && payload.context_attributes.length === 0) {
+
+  if (
+    Array.isArray(payload.context_attributes) &&
+    payload.context_attributes.length === 0
+  ) {
     payload.context_attributes = {};
   }
 
   // Transform conditions to backend format
-  payload.query_condition.conditions = transformFEToBE(payload.query_condition.conditions);
+  payload.query_condition.conditions = transformFEToBE(
+    payload.query_condition.conditions,
+  );
 
   // Convert string boolean to actual boolean
-  payload.is_real_time = payload.is_real_time === "true" || payload.is_real_time === true;
+  payload.is_real_time =
+    payload.is_real_time === "true" || payload.is_real_time === true;
 
   // Handle VRL function encoding if present
   if (payload.query_condition.vrl_function) {

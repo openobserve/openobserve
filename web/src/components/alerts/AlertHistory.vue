@@ -15,10 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="alert-history-page"
-    class="q-pa-none flex"
-  >
+  <div data-test="alert-history-page" class="q-pa-none flex">
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pt-[0.325rem]">
       <div class="card-container tw:mb-[0.625rem]">
         <div
@@ -67,7 +64,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               option-value="value"
               @filter="filterAlertOptions"
               @update:model-value="onAlertSelected"
-              :placeholder="t(`alerts.searcHistory`) || 'Select or search alert...'"
+              :placeholder="
+                t(`alerts.searcHistory`) || 'Select or search alert...'
+              "
               data-test="alert-history-search-select"
               class="o2-search-input q-mr-sm"
               style="min-width: 250px"
@@ -194,7 +193,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :color="props.row.is_silenced ? 'grey' : 'positive'"
                 size="20px"
               >
-                <q-tooltip>{{ props.row.is_silenced ? "Silenced" : "Not Silenced" }}</q-tooltip>
+                <q-tooltip>{{
+                  props.row.is_silenced ? "Silenced" : "Not Silenced"
+                }}</q-tooltip>
               </q-icon>
             </q-td>
           </template>
@@ -233,15 +234,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-tooltip class="bg-grey-8">
                   Suppressed by deduplication
                   <div v-if="props.row.dedup_count" class="text-caption">
-                    {{ props.row.dedup_count }} occurrence{{ props.row.dedup_count > 1 ? 's' : '' }}
+                    {{ props.row.dedup_count }} occurrence{{
+                      props.row.dedup_count > 1 ? "s" : ""
+                    }}
                   </div>
                 </q-tooltip>
               </div>
 
               <!-- Grouped notification -->
-              <div v-else-if="props.row.grouped" class="text-primary flex items-center justify-center">
+              <div
+                v-else-if="props.row.grouped"
+                class="text-primary flex items-center justify-center"
+              >
                 <q-icon name="group_work" size="sm" />
-                <span class="text-caption q-ml-xs">×{{ props.row.group_size || 1 }}</span>
+                <span class="text-caption q-ml-xs"
+                  >×{{ props.row.group_size || 1 }}</span
+                >
                 <q-tooltip class="bg-grey-8">
                   Grouped notification
                   <div class="text-caption">
@@ -251,14 +259,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Sent (passed dedup) -->
-              <div v-else class="text-positive flex items-center justify-center">
+              <div
+                v-else
+                class="text-positive flex items-center justify-center"
+              >
                 <q-icon name="check_circle" size="sm" />
-                <span v-if="props.row.dedup_count && props.row.dedup_count > 1" class="text-caption q-ml-xs">
+                <span
+                  v-if="props.row.dedup_count && props.row.dedup_count > 1"
+                  class="text-caption q-ml-xs"
+                >
                   ×{{ props.row.dedup_count }}
                 </span>
                 <q-tooltip class="bg-grey-8">
                   Notification sent
-                  <div v-if="props.row.dedup_count && props.row.dedup_count > 1" class="text-caption">
+                  <div
+                    v-if="props.row.dedup_count && props.row.dedup_count > 1"
+                    class="text-caption"
+                  >
                     {{ props.row.dedup_count }} occurrences deduplicated
                   </div>
                 </q-tooltip>
@@ -293,17 +310,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="showErrorDialog(props.row)"
               >
                 <q-tooltip>
-                  Last error: {{ new Date(props.row.timestamp / 1000).toLocaleString() }}
+                  Last error:
+                  {{ new Date(props.row.timestamp / 1000).toLocaleString() }}
                 </q-tooltip>
               </q-btn>
             </q-td>
           </template>
 
           <template #bottom="scope">
-            <div class="bottom-btn tw:h-[48px] tw:w-full tw:flex tw:items-center">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[120px] tw:mr-md">
-                  {{ pagination.rowsNumber }} {{ t('pipeline.header') }}
-                </div>
+            <div
+              class="bottom-btn tw:h-[48px] tw:w-full tw:flex tw:items-center"
+            >
+              <div
+                class="o2-table-footer-title tw:flex tw:items-center tw:w-[120px] tw:mr-md"
+              >
+                {{ pagination.rowsNumber }} {{ t("pipeline.header") }}
+              </div>
               <QTablePagination
                 :scope="scope"
                 :position="'bottom'"
@@ -311,9 +333,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :perPageOptions="rowsPerPageOptions"
                 @update:changeRecordPerPage="changePagination"
               />
-              </div>
+            </div>
           </template>
-          
         </q-table>
       </div>
     </div>
@@ -327,7 +348,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="row items-center q-pb-xs bg-primary text-white">
           <div class="text-h6">Alert Execution Details</div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
+          <q-btn icon="close"
+flat round
+dense v-close-popup />
         </q-card-section>
 
         <q-separator />
@@ -484,7 +507,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   Error Details
                 </div>
-                <q-card flat bordered class="q-pa-sm bg-negative-1 q-mt-xs">
+                <q-card flat
+bordered class="q-pa-sm bg-negative-1 q-mt-xs">
                   <pre
                     class="text-body2"
                     style="
@@ -513,7 +537,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   Response
                 </div>
-                <q-card flat bordered class="q-pa-sm bg-positive-1 q-mt-xs">
+                <q-card flat
+bordered class="q-pa-sm bg-positive-1 q-mt-xs">
                   <pre
                     class="text-body2"
                     style="
@@ -534,7 +559,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-separator />
 
         <q-card-actions align="right" class="q-pa-md">
-          <q-btn flat label="Close" color="primary" v-close-popup />
+          <q-btn flat label="Close"
+color="primary" v-close-popup />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -542,16 +568,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Error Dialog -->
     <q-dialog v-model="errorDialog">
       <q-card style="min-width: 500px">
-        <q-card-section class="pipeline-error-header row items-center q-pb-none">
+        <q-card-section
+          class="pipeline-error-header row items-center q-pb-none"
+        >
           <div class="tw:flex-1">
             <div class="tw:flex tw:items-center tw:gap-3 tw:mb-1">
-              <q-icon name="error" size="24px" class="error-icon" />
+              <q-icon name="error"
+size="24px" class="error-icon" />
               <span class="pipeline-name">{{ errorMessage.alert_name }}</span>
             </div>
             <div class="error-timestamp">
               <span class="tw:ml-1">Last error:</span>
-              <q-icon name="schedule" size="14px" class="tw:mr-1" />
-              {{ errorMessage.last_error_timestamp && new Date(errorMessage.last_error_timestamp / 1000).toLocaleString() }}
+              <q-icon name="schedule"
+size="14px" class="tw:mr-1" />
+              {{
+                errorMessage.last_error_timestamp &&
+                new Date(
+                  errorMessage.last_error_timestamp / 1000,
+                ).toLocaleString()
+              }}
             </div>
           </div>
           <q-btn
@@ -569,9 +604,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section>
           <div class="tw:mb-4">
             <div class="section-label tw:mb-2">Error Summary</div>
-              <div class="error-summary-box">
-                {{ errorMessage.error }}
-              </div>
+            <div class="error-summary-box">
+              {{ errorMessage.error }}
+            </div>
           </div>
         </q-card-section>
         <q-card-actions class="pipeline-error-actions">
@@ -801,9 +836,9 @@ const filterAlertOptions = (val: string, update: any) => {
 const onAlertSelected = (val: any) => {
   if (val) {
     // Extract the alert_id from the selected object
-    if (typeof val === 'object' && val.value) {
+    if (typeof val === "object" && val.value) {
       searchQuery.value = val.value;
-    } else if (typeof val === 'string') {
+    } else if (typeof val === "string") {
       searchQuery.value = val;
     }
   }
@@ -858,7 +893,10 @@ const fetchAlertHistory = async () => {
       rows.value = (historyData.hits || []).map((hit: any, index: number) => ({
         ...hit,
         id: `${hit.timestamp}_${index}`,
-        "#": (index + 1) + (pagination.value.page - 1) * pagination.value.rowsPerPage,
+        "#":
+          index +
+          1 +
+          (pagination.value.page - 1) * pagination.value.rowsPerPage,
       }));
 
       // Update pagination total
@@ -981,7 +1019,10 @@ const closeErrorDialog = () => {
 };
 
 const goBack = () => {
-  router.push({ name: "alertList", query: { org_identifier: store.state.selectedOrganization.identifier } });
+  router.push({
+    name: "alertList",
+    query: { org_identifier: store.state.selectedOrganization.identifier },
+  });
 };
 
 // Lifecycle
@@ -1114,7 +1155,7 @@ const changePagination = (val: { label: string; value: any }) => {
 .error-summary-box {
   padding: 16px;
   border-radius: 8px;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
   font-size: 13px;
   line-height: 1.6;
   white-space: pre-wrap;

@@ -134,11 +134,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <q-btn
       data-test="logs-search-bar-save-transform-btn"
-      class=" save-transform-btn q-px-sm"
+      class="save-transform-btn q-px-sm"
       icon="save"
       :disable="searchObj.data.transformType !== 'function'"
       @click="fnSavedFunctionDialog"
-
     >
       <q-tooltip class="tw:text-[12px]" :offset="[0, 6]">
         {{
@@ -315,11 +314,12 @@ const fnSavedFunctionDialog = () => {
 const getTransformLabelTooltip = computed(() => {
   if (!isActionsEnabled.value) return t("search.toggleFunctionEditor");
 
-  const editorType = searchObj.data.transformType === "action"
-    ? t("search.actionLabel")
-    : searchObj.data.transformType === "function"
-      ? t("search.functionLabel")
-      : t("search.transformLabel");
+  const editorType =
+    searchObj.data.transformType === "action"
+      ? t("search.actionLabel")
+      : searchObj.data.transformType === "function"
+        ? t("search.functionLabel")
+        : t("search.transformLabel");
 
   return searchObj.meta.showTransformEditor
     ? t("search.hide")
@@ -328,8 +328,8 @@ const getTransformLabelTooltip = computed(() => {
 </script>
 
 <style scoped lang="scss">
-@import '@/styles/logs/transform-selector.scss';
-.save-transform-btn{
+@import "@/styles/logs/transform-selector.scss";
+.save-transform-btn {
   border-left: 1px solid var(--o2-border-color);
 }
 </style>

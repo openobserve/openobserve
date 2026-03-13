@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page>
-    <div class=" tw:pb-[0.625rem]">
+    <div class="tw:pb-[0.625rem]">
       <q-splitter
         v-model="splitterModel"
         unit="px"
@@ -24,8 +24,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:overflow-hidden logs-splitter-smooth"
       >
         <template v-slot:before>
-          <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
-            <div v-if="showSidebar" class="card-container tw:h-[calc(100vh-50px)]">
+          <div
+            class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
+          >
+            <div
+              v-if="showSidebar"
+              class="card-container tw:h-[calc(100vh-50px)]"
+            >
               <q-tabs
                 v-model="activeTab"
                 indicator-color="transparent"
@@ -44,7 +49,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :to="{
                     name: 'pipelines',
                     query: {
-                      org_identifier: store.state.selectedOrganization.identifier,
+                      org_identifier:
+                        store.state.selectedOrganization.identifier,
                     },
                   }"
                   :label="t('function.streamPipeline')"
@@ -57,7 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :to="{
                     name: 'functionList',
                     query: {
-                      org_identifier: store.state.selectedOrganization.identifier,
+                      org_identifier:
+                        store.state.selectedOrganization.identifier,
                     },
                   }"
                   :label="t('function.header')"
@@ -69,10 +76,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :to="{
                     name: 'enrichmentTables',
                     query: {
-                      org_identifier: store.state.selectedOrganization.identifier,
+                      org_identifier:
+                        store.state.selectedOrganization.identifier,
                     },
                   }"
                   :label="t('function.enrichmentTables')"
+                  content-class="tab_content"
+                />
+                <q-route-tab
+                  v-if="config.isEnterprise == 'true'"
+                  data-test="pipeline-eval-templates-tab"
+                  name="evalTemplates"
+                  :to="{
+                    name: 'evalTemplates',
+                    query: {
+                      org_identifier:
+                        store.state.selectedOrganization.identifier,
+                    },
+                  }"
+                  :label="t('pipeline.evalTemplates')"
                   content-class="tab_content"
                 />
               </q-tabs>
@@ -84,7 +106,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-field-list-collapse-btn"
             :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
             :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
-            :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
+            :class="
+              showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'
+            "
             color="primary"
             size="sm"
             dense
@@ -97,11 +121,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :functionAssociatedStreams="functionAssociatedStreams"
             @get:functionAssociatedStreams="getFunctionAssociatedStreams"
             @get:templates="getTemplates" -->
-            <div class=" q-pt-xs">
-              <RouterView v-slot="{ Component }">
-                <component :is="Component" @sendToAiChat="sendToAiChat" />
-              </RouterView>
-            </div>
+          <div class="q-pt-xs">
+            <RouterView v-slot="{ Component }">
+              <component :is="Component" @sendToAiChat="sendToAiChat" />
+            </RouterView>
+          </div>
         </template>
       </q-splitter>
     </div>
@@ -113,6 +137,7 @@ import { defineComponent, ref, onBeforeMount, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "AppFunctions",
@@ -180,6 +205,7 @@ export default defineComponent({
       t,
       store,
       router,
+      config,
       redirectRoute,
       splitterModel,
       functionAssociatedStreams,
@@ -187,7 +213,7 @@ export default defineComponent({
       templates,
       collapseSidebar,
       showSidebar,
-      sendToAiChat
+      sendToAiChat,
     };
   },
 });

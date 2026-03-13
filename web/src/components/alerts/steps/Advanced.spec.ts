@@ -154,9 +154,7 @@ describe("Advanced.vue", () => {
     });
 
     it("should handle contextAttributes prop updates", async () => {
-      const variables: Variable[] = [
-        { id: "1", key: "env", value: "staging" },
-      ];
+      const variables: Variable[] = [{ id: "1", key: "env", value: "staging" }];
       await wrapper.setProps({ contextAttributes: variables });
       await flushPromises();
       expect(wrapper.vm.localVariables).toEqual(variables);
@@ -243,7 +241,9 @@ describe("Advanced.vue", () => {
       });
       await flushPromises();
       const keyInput = wrapper.find('[data-test="alert-variables-key-input"]');
-      const valueInput = wrapper.find('[data-test="alert-variables-value-input"]');
+      const valueInput = wrapper.find(
+        '[data-test="alert-variables-value-input"]',
+      );
       expect(keyInput.exists()).toBe(true);
       expect(valueInput.exists()).toBe(true);
     });
@@ -256,7 +256,9 @@ describe("Advanced.vue", () => {
         ],
       });
       await flushPromises();
-      const deleteBtns = wrapper.findAll('[data-test="alert-variables-delete-variable-btn"]');
+      const deleteBtns = wrapper.findAll(
+        '[data-test="alert-variables-delete-variable-btn"]',
+      );
       expect(deleteBtns.length).toBe(2);
     });
 
@@ -268,7 +270,9 @@ describe("Advanced.vue", () => {
         ],
       });
       await flushPromises();
-      const addBtns = wrapper.findAll('[data-test="alert-variables-add-variable-btn"]');
+      const addBtns = wrapper.findAll(
+        '[data-test="alert-variables-add-variable-btn"]',
+      );
       expect(addBtns.length).toBe(1);
     });
   });
@@ -282,7 +286,7 @@ describe("Advanced.vue", () => {
     });
 
     it("should render description textarea", () => {
-      const textarea = wrapper.find('textarea');
+      const textarea = wrapper.find("textarea");
       expect(textarea.exists()).toBe(true);
     });
   });
@@ -296,12 +300,16 @@ describe("Advanced.vue", () => {
     });
 
     it("should render row template textarea", () => {
-      const textarea = wrapper.find('[data-test="add-alert-row-input-textarea"]');
+      const textarea = wrapper.find(
+        '[data-test="add-alert-row-input-textarea"]',
+      );
       expect(textarea.exists()).toBe(true);
     });
 
     it("should render row template type toggle", () => {
-      const toggle = wrapper.find('[data-test="add-alert-row-template-type-toggle"]');
+      const toggle = wrapper.find(
+        '[data-test="add-alert-row-template-type-toggle"]',
+      );
       expect(toggle.exists()).toBe(true);
     });
 
@@ -321,7 +329,9 @@ describe("Advanced.vue", () => {
 
   describe("Computed - Row Template Placeholder", () => {
     it("should show String placeholder by default", () => {
-      expect(wrapper.vm.rowTemplatePlaceholder).toContain("Alert was triggered");
+      expect(wrapper.vm.rowTemplatePlaceholder).toContain(
+        "Alert was triggered",
+      );
     });
 
     it("should show JSON placeholder when type is Json", async () => {
@@ -332,7 +342,9 @@ describe("Advanced.vue", () => {
     });
 
     it("should update placeholder when type changes", async () => {
-      expect(wrapper.vm.rowTemplatePlaceholder).toContain("Alert was triggered");
+      expect(wrapper.vm.rowTemplatePlaceholder).toContain(
+        "Alert was triggered",
+      );
       wrapper.vm.localRowTemplateType = "Json";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.rowTemplatePlaceholder).toContain("user");
@@ -434,7 +446,9 @@ describe("Advanced.vue", () => {
       await wrapper.setProps({ contextAttributes: variables });
       await flushPromises();
 
-      const updatedVariables: Variable[] = [{ id: "1", key: "env", value: "prod" }];
+      const updatedVariables: Variable[] = [
+        { id: "1", key: "env", value: "prod" },
+      ];
       await wrapper.setProps({ contextAttributes: updatedVariables });
       await flushPromises();
 
@@ -467,7 +481,9 @@ describe("Advanced.vue", () => {
       await wrapper.vm.addVariable();
       wrapper.vm.localVariables[0].key = "special-key_123.test@value";
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.localVariables[0].key).toBe("special-key_123.test@value");
+      expect(wrapper.vm.localVariables[0].key).toBe(
+        "special-key_123.test@value",
+      );
     });
 
     it("should handle special characters in variable values", async () => {
@@ -518,12 +534,16 @@ describe("Advanced.vue", () => {
     });
 
     it("should render info tooltips", () => {
-      const infoBtns = wrapper.findAll('[data-test="add-alert-row-input-info-btn"]');
+      const infoBtns = wrapper.findAll(
+        '[data-test="add-alert-row-input-info-btn"]',
+      );
       expect(infoBtns.length).toBeGreaterThan(0);
     });
 
     it("should render template type toggle", () => {
-      const toggle = wrapper.find('[data-test="add-alert-row-template-type-toggle"]');
+      const toggle = wrapper.find(
+        '[data-test="add-alert-row-template-type-toggle"]',
+      );
       expect(toggle.exists()).toBe(true);
     });
   });

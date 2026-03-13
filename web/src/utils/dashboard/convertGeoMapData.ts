@@ -222,11 +222,11 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
     return;
   }
   //min max for symbol size
-  const seriesData = options.series.flatMap((series: any) => series.data); 
-  
+  const seriesData = options.series.flatMap((series: any) => series.data);
+
   // Calculate min/max values once +
-  const values = seriesData.map((item: any) => item[2]); 
-  const minValue = Math.min(...values); 
+  const values = seriesData.map((item: any) => item[2]);
+  const minValue = Math.min(...values);
   const maxValue = Math.max(...values);
 
   if (seriesData.length > 0) {

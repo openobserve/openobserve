@@ -252,9 +252,9 @@ describe("AzureMarketplaceSetup", () => {
     wrapper.vm.newOrgName = "Test Org";
     await wrapper.vm.$nextTick();
 
-    const createBtn = wrapper.findAll('button').find(btn =>
-      btn.text().includes("Create & Link")
-    );
+    const createBtn = wrapper
+      .findAll("button")
+      .find((btn) => btn.text().includes("Create & Link"));
     expect(createBtn).toBeTruthy();
   });
 
@@ -302,15 +302,13 @@ describe("AzureMarketplaceSetup", () => {
     });
 
     wrapper.vm.state = "select_org";
-    wrapper.vm.eligibleOrganizations = [
-      { identifier: "org1", name: "Org 1" },
-    ];
+    wrapper.vm.eligibleOrganizations = [{ identifier: "org1", name: "Org 1" }];
     wrapper.vm.selectedOrg = { identifier: "org1", name: "Org 1" };
     await wrapper.vm.$nextTick();
 
-    const linkBtn = wrapper.findAll('button').find(btn =>
-      btn.text().includes("Link Azure Billing")
-    );
+    const linkBtn = wrapper
+      .findAll("button")
+      .find((btn) => btn.text().includes("Link Azure Billing"));
     expect(linkBtn).toBeTruthy();
   });
 });

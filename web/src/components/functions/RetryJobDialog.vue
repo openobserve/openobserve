@@ -57,12 +57,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Range Support Warning -->
             <div v-if="!supportsRange" class="warning-banner">
-              <q-icon name="warning" size="20px" class="warning-icon" />
+              <q-icon name="warning" size="20px"
+class="warning-icon" />
               <div class="warning-text">
                 <strong>Range requests not supported</strong>
                 <p>
-                  This URL does not support resuming from the last position.
-                  The job will restart from the beginning.
+                  This URL does not support resuming from the last position. The
+                  job will restart from the beginning.
                 </p>
               </div>
             </div>
@@ -82,11 +83,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div class="option-content">
                     <div class="option-header">
-                      <q-icon name="refresh" size="20px" class="option-icon" />
+                      <q-icon name="refresh" size="20px"
+class="option-icon" />
                       <span class="option-name">Start from Beginning</span>
                     </div>
                     <p class="option-description">
-                      Download the entire file from scratch. All previous progress will be discarded.
+                      Download the entire file from scratch. All previous
+                      progress will be discarded.
                     </p>
                   </div>
                 </label>
@@ -103,7 +106,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div class="option-content">
                     <div class="option-header">
-                      <q-icon name="play_arrow" size="20px" class="option-icon" />
+                      <q-icon
+                        name="play_arrow"
+                        size="20px"
+                        class="option-icon"
+                      />
                       <span class="option-name">Resume from Last Position</span>
                       <span class="recommended-badge">Recommended</span>
                     </div>
@@ -189,7 +196,7 @@ export default defineComponent({
       const k = 1024;
       const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
       const i = Math.floor(Math.log(bytes) / Math.log(k));
-      return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
+      return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
     };
 
     // Handler for ESC key

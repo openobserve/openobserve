@@ -47,7 +47,7 @@ describe("DashboardErrors", () => {
     const defaultProps = {
       errors: { errors: [] },
     };
-    
+
     return mount(DashboardErrors, {
       attachTo: "#app",
       props: { ...defaultProps, ...props },
@@ -58,11 +58,13 @@ describe("DashboardErrors", () => {
             template: "<hr class='q-separator' />",
           },
           "q-bar": {
-            template: "<div class='q-bar q-pa-sm expand-bar' :class='$attrs.class'><slot /></div>",
+            template:
+              "<div class='q-bar q-pa-sm expand-bar' :class='$attrs.class'><slot /></div>",
             inheritAttrs: false,
           },
           "q-icon": {
-            template: "<div class='q-icon q-mr-sm' :name='name' :text-color='textColor' :flat='flat !== false ? \"true\" : \"false\"'></div>",
+            template:
+              "<div class='q-icon q-mr-sm' :name='name' :text-color='textColor' :flat='flat !== false ? \"true\" : \"false\"'></div>",
             props: ["flat", "name", "textColor"],
           },
           "q-space": {
@@ -99,8 +101,8 @@ describe("DashboardErrors", () => {
 
   describe("Component Initialization", () => {
     it("should render when errors exist", () => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Test error"] },
       });
       expect(wrapper.exists()).toBeTruthy();
     });
@@ -112,22 +114,22 @@ describe("DashboardErrors", () => {
     });
 
     it("should initialize with showErrors as false", () => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Test error"] },
       });
       expect(wrapper.vm.showErrors).toBe(false);
     });
 
     it("should have correct component name", () => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Test error"] },
       });
       expect(wrapper.vm.$options.name).toBe("DashboardErrorsComponent");
     });
 
     it("should expose t function from i18n", () => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Test error"] },
       });
       expect(wrapper.vm.t).toBeDefined();
       expect(typeof wrapper.vm.t).toBe("function");
@@ -143,8 +145,8 @@ describe("DashboardErrors", () => {
 
   describe("Conditional Rendering", () => {
     it("should render main container when errors.errors.length > 0", () => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Test error"] },
       });
       const mainContainer = wrapper.find("div[data-test='dashboard-error']");
       expect(mainContainer.exists()).toBeTruthy();
@@ -177,16 +179,16 @@ describe("DashboardErrors", () => {
 
   describe("Error Display", () => {
     it("should display correct error count", () => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Error 1", "Error 2", "Error 3"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Error 1", "Error 2", "Error 3"] },
       });
       const errorText = wrapper.find(".text-subtitle2");
       expect(errorText.text()).toContain("Errors (3)");
     });
 
     it("should display single error count", () => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Single error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Single error"] },
       });
       const errorText = wrapper.find(".text-subtitle2");
       expect(errorText.text()).toContain("Errors (1)");
@@ -195,53 +197,54 @@ describe("DashboardErrors", () => {
     it("should display all error messages in list", () => {
       const errors = ["First error", "Second error", "Third error"];
       wrapper = createWrapper({ errors: { errors } });
-      
+
       const listItems = wrapper.findAll("li");
       expect(listItems.length).toBe(3);
-      
+
       errors.forEach((error, index) => {
         expect(listItems[index].text()).toBe(error);
       });
     });
 
     it("should have correct data-test attributes", () => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Test error"] },
       });
-      
+
       const mainContainer = wrapper.find("[data-test='dashboard-error']");
       expect(mainContainer.exists()).toBeTruthy();
-      
+
       const errorDiv = wrapper.find("div[data-test='dashboard-error']");
       expect(errorDiv.exists()).toBeTruthy();
     });
 
     it("should handle empty string errors", () => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["", "Valid error", "  "] } 
+      wrapper = createWrapper({
+        errors: { errors: ["", "Valid error", "  "] },
       });
-      
+
       const listItems = wrapper.findAll("li");
       expect(listItems.length).toBe(3);
       expect(listItems[1].text()).toBe("Valid error");
     });
 
     it("should handle very long error messages", () => {
-      const longError = "This is a very long error message that might wrap ".repeat(10);
-      wrapper = createWrapper({ 
-        errors: { errors: [longError] } 
+      const longError =
+        "This is a very long error message that might wrap ".repeat(10);
+      wrapper = createWrapper({
+        errors: { errors: [longError] },
       });
-      
+
       const listItem = wrapper.find("li");
       expect(listItem.text().trim()).toBe(longError.trim());
     });
 
     it("should handle special characters in error messages", () => {
       const specialError = "Error with <html> & special chars: @#$%^&*()";
-      wrapper = createWrapper({ 
-        errors: { errors: [specialError] } 
+      wrapper = createWrapper({
+        errors: { errors: [specialError] },
       });
-      
+
       const listItem = wrapper.find("li");
       expect(listItem.text()).toBe(specialError);
     });
@@ -249,8 +252,8 @@ describe("DashboardErrors", () => {
 
   describe("Expand/Collapse Functionality", () => {
     beforeEach(() => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Test error"] },
       });
     });
 
@@ -263,11 +266,11 @@ describe("DashboardErrors", () => {
     it("should expand when dropdown is clicked", async () => {
       const expandBar = wrapper.find(".expand-bar");
       expect(expandBar.exists()).toBe(true);
-      
+
       // Trigger click using the method directly since DOM interaction may be unreliable
       wrapper.vm.onDropDownClick();
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.showErrors).toBe(true);
       const icon = wrapper.find(".q-icon");
       expect(icon.attributes("name")).toBe("arrow_drop_down");
@@ -278,7 +281,7 @@ describe("DashboardErrors", () => {
       wrapper.vm.onDropDownClick();
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.showErrors).toBe(true);
-      
+
       // Second click to collapse
       wrapper.vm.onDropDownClick();
       await wrapper.vm.$nextTick();
@@ -287,10 +290,10 @@ describe("DashboardErrors", () => {
 
     it("should toggle showErrors state via onDropDownClick method", () => {
       expect(wrapper.vm.showErrors).toBe(false);
-      
+
       wrapper.vm.onDropDownClick();
       expect(wrapper.vm.showErrors).toBe(true);
-      
+
       wrapper.vm.onDropDownClick();
       expect(wrapper.vm.showErrors).toBe(false);
     });
@@ -298,7 +301,7 @@ describe("DashboardErrors", () => {
     it("should show correct icon when expanded", async () => {
       wrapper.vm.showErrors = true;
       await wrapper.vm.$nextTick();
-      
+
       const icon = wrapper.find(".q-icon");
       expect(icon.attributes("name")).toBe("arrow_drop_down");
     });
@@ -306,7 +309,7 @@ describe("DashboardErrors", () => {
     it("should show correct icon when collapsed", async () => {
       wrapper.vm.showErrors = false;
       await wrapper.vm.$nextTick();
-      
+
       const icon = wrapper.find(".q-icon");
       expect(icon.attributes("name")).toBe("arrow_right");
     });
@@ -314,8 +317,8 @@ describe("DashboardErrors", () => {
 
   describe("Content Visibility and Styling", () => {
     beforeEach(() => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Test error"] },
       });
     });
 
@@ -328,7 +331,7 @@ describe("DashboardErrors", () => {
     it("should show error list when expanded", async () => {
       wrapper.vm.showErrors = true;
       await wrapper.vm.$nextTick();
-      
+
       const errorContent = wrapper.find(".row[style*='height: auto']");
       expect(errorContent.exists()).toBeTruthy();
     });
@@ -366,7 +369,7 @@ describe("DashboardErrors", () => {
 
     it("should style list items with red color and padding", () => {
       const listItems = wrapper.findAll("li");
-      listItems.forEach(item => {
+      listItems.forEach((item) => {
         expect(item.attributes("style")).toContain("color: red");
         expect(item.classes()).toContain("tw:py-1");
       });
@@ -388,72 +391,72 @@ describe("DashboardErrors", () => {
 
   describe("Watcher Behavior - Combined Watcher", () => {
     it("should dispatch resize event when showErrors changes", async () => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Test error"] },
       });
-      
+
       wrapper.vm.onDropDownClick();
       await flushPromises();
-      
+
       expect(mockDispatchEvent).toHaveBeenCalledWith(new Event("resize"));
     });
 
     it("should dispatch resize event when props.errors changes", async () => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Test error"] },
       });
-      
+
       // Clear initial calls
       mockDispatchEvent.mockClear();
-      
-      await wrapper.setProps({ 
-        errors: { errors: ["Test error", "Another error"] } 
+
+      await wrapper.setProps({
+        errors: { errors: ["Test error", "Another error"] },
       });
       await flushPromises();
-      
+
       // Since watchers may not trigger in test environment, test the behavior indirectly
       // by calling onDropDownClick which should trigger resizeChartEvent
       wrapper.vm.onDropDownClick();
       await wrapper.vm.$nextTick();
-      
+
       expect(mockDispatchEvent).toHaveBeenCalled();
     });
 
     it("should handle multiple rapid changes", async () => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Test error"] },
       });
-      
+
       // Rapid showErrors changes
       for (let i = 0; i < 5; i++) {
         wrapper.vm.onDropDownClick();
         await flushPromises();
       }
-      
+
       expect(mockDispatchEvent).toHaveBeenCalledTimes(5);
     });
 
     it("should watch both showErrors and props.errors in array watcher", async () => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Test error"] },
       });
-      
+
       // Clear initial calls
       mockDispatchEvent.mockClear();
-      
+
       // Change showErrors - this should trigger the watcher
       wrapper.vm.onDropDownClick();
       await flushPromises();
       expect(mockDispatchEvent).toHaveBeenCalled();
-      
+
       mockDispatchEvent.mockClear();
-      
+
       // Change props.errors - this should also trigger the watcher
-      await wrapper.setProps({ 
-        errors: { errors: ["Different error"] } 
+      await wrapper.setProps({
+        errors: { errors: ["Different error"] },
       });
       await flushPromises();
-      
+
       // Since watchers may not fire in test environment, let's trigger manually
       wrapper.vm.onDropDownClick();
       wrapper.vm.onDropDownClick();
@@ -466,16 +469,16 @@ describe("DashboardErrors", () => {
     it("should auto-expand when errors are added to empty list", async () => {
       wrapper = createWrapper({ errors: { errors: [] } });
       expect(wrapper.vm.showErrors).toBe(false);
-      
+
       // Manually simulate the watcher behavior since Vue watchers don't always trigger in tests
       wrapper.vm.showErrors = true;
-      
-      await wrapper.setProps({ 
-        errors: { errors: ["New error"] } 
+
+      await wrapper.setProps({
+        errors: { errors: ["New error"] },
       });
       await wrapper.vm.$nextTick();
       await flushPromises();
-      
+
       // Since watchers may not trigger reliably in tests, we verify the expected end state
       expect(wrapper.vm.showErrors).toBe(true);
     });
@@ -483,48 +486,48 @@ describe("DashboardErrors", () => {
     it("should auto-expand when errors length increases", async () => {
       wrapper = createWrapper({ errors: { errors: ["Existing error"] } });
       wrapper.vm.showErrors = false; // Force collapsed state
-      
-      await wrapper.setProps({ 
-        errors: { errors: ["Error 1", "Error 2"] } 
+
+      await wrapper.setProps({
+        errors: { errors: ["Error 1", "Error 2"] },
       });
       await wrapper.vm.$nextTick();
       await flushPromises();
-      
+
       // Manually trigger the expected behavior since watchers may not fire in tests
       if (wrapper.props().errors.errors.length > 0) {
         wrapper.vm.showErrors = true;
       }
-      
+
       expect(wrapper.vm.showErrors).toBe(true);
     });
 
     it("should not auto-expand when errors array remains empty", async () => {
       wrapper = createWrapper({ errors: { errors: [] } });
       expect(wrapper.vm.showErrors).toBe(false);
-      
-      await wrapper.setProps({ 
-        errors: { errors: [] } 
+
+      await wrapper.setProps({
+        errors: { errors: [] },
       });
       await flushPromises();
-      
+
       expect(wrapper.vm.showErrors).toBe(false);
     });
 
     it("should not change showErrors when already expanded and errors change", async () => {
       wrapper = createWrapper({ errors: { errors: ["Initial error"] } });
       wrapper.vm.showErrors = true;
-      
-      await wrapper.setProps({ 
-        errors: { errors: ["Updated error"] } 
+
+      await wrapper.setProps({
+        errors: { errors: ["Updated error"] },
       });
       await flushPromises();
-      
+
       expect(wrapper.vm.showErrors).toBe(true);
     });
 
     it("should handle null/undefined errors in watcher", async () => {
       wrapper = createWrapper({ errors: { errors: ["Test error"] } });
-      
+
       expect(() => {
         wrapper.setProps({ errors: { errors: [] } });
       }).not.toThrow();
@@ -532,7 +535,7 @@ describe("DashboardErrors", () => {
 
     it("should handle errors object without errors property", async () => {
       wrapper = createWrapper({ errors: { errors: ["Test error"] } });
-      
+
       expect(() => {
         wrapper.setProps({ errors: { errors: [] } });
       }).not.toThrow();
@@ -541,8 +544,8 @@ describe("DashboardErrors", () => {
 
   describe("ResizeChartEvent Method", () => {
     beforeEach(() => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Test error"] },
       });
     });
 
@@ -550,7 +553,7 @@ describe("DashboardErrors", () => {
     it("should dispatch resize events when showErrors changes", async () => {
       // Toggle errors to trigger watcher and resize event
       await wrapper.vm.onDropDownClick();
-      
+
       expect(mockDispatchEvent).toHaveBeenCalled();
       const eventCall = mockDispatchEvent.mock.calls[0][0];
       expect(eventCall).toBeInstanceOf(Event);
@@ -559,18 +562,20 @@ describe("DashboardErrors", () => {
 
     it("should dispatch resize events when errors prop changes", async () => {
       mockDispatchEvent.mockClear(); // Clear previous calls
-      
+
       // Manually trigger state change to simulate watcher behavior
       wrapper.vm.showErrors = false;
       await wrapper.vm.$nextTick();
-      
-      await wrapper.setProps({ errors: { errors: ["New error", "Another error"] } });
+
+      await wrapper.setProps({
+        errors: { errors: ["New error", "Another error"] },
+      });
       await wrapper.vm.$nextTick();
-      
+
       // Manually trigger the showErrors change that would happen via watcher
       wrapper.vm.showErrors = true;
       await wrapper.vm.$nextTick();
-      
+
       expect(mockDispatchEvent).toHaveBeenCalled();
     });
   });
@@ -583,7 +588,7 @@ describe("DashboardErrors", () => {
         { errors: ["Error 1", "Error 2", "Error 3"] },
         { errors: [null, undefined, "", "Valid error"] },
       ];
-      
+
       testCases.forEach((testCase, index) => {
         wrapper = createWrapper({ errors: testCase });
         expect(wrapper.exists()).toBeTruthy();
@@ -593,17 +598,17 @@ describe("DashboardErrors", () => {
 
     it("should be reactive to props changes", async () => {
       wrapper = createWrapper({ errors: { errors: ["Initial error"] } });
-      
+
       const initialCount = wrapper.find(".text-subtitle2").text();
       expect(initialCount).toContain("Errors (1)");
-      
-      await wrapper.setProps({ 
-        errors: { errors: ["Error 1", "Error 2", "Error 3"] } 
+
+      await wrapper.setProps({
+        errors: { errors: ["Error 1", "Error 2", "Error 3"] },
       });
-      
+
       const updatedCount = wrapper.find(".text-subtitle2").text();
       expect(updatedCount).toContain("Errors (3)");
-      
+
       const listItems = wrapper.findAll("li");
       expect(listItems.length).toBe(3);
     });
@@ -611,14 +616,14 @@ describe("DashboardErrors", () => {
     it("should expose props correctly in setup", () => {
       const testErrors = { errors: ["Error 1", "Error 2"] };
       wrapper = createWrapper({ errors: testErrors });
-      
+
       expect(wrapper.vm.props).toBeDefined();
       expect(wrapper.vm.props.errors).toEqual(testErrors);
     });
 
     it("should handle props prop definition correctly", () => {
       wrapper = createWrapper({ errors: { errors: ["Test"] } });
-      
+
       // Check that props are defined as array (line 65 in component)
       expect(wrapper.vm.$options.props).toEqual(["errors"]);
     });
@@ -626,8 +631,8 @@ describe("DashboardErrors", () => {
 
   describe("User Interactions", () => {
     beforeEach(() => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Test error"] },
       });
     });
 
@@ -635,10 +640,10 @@ describe("DashboardErrors", () => {
       // Find the actual clickable element with style="flex: 1"
       const clickArea = wrapper.find('div[style*="flex: 1"]');
       expect(clickArea.exists()).toBeTruthy();
-      
+
       const initialState = wrapper.vm.showErrors;
       await clickArea.trigger("click");
-      
+
       // Should toggle the showErrors state
       expect(wrapper.vm.showErrors).toBe(!initialState);
     });
@@ -646,24 +651,26 @@ describe("DashboardErrors", () => {
     it("should handle rapid click events", async () => {
       const clickArea = wrapper.find('div[style*="flex: 1"]');
       expect(clickArea.exists()).toBeTruthy();
-      
+
       const initialState = wrapper.vm.showErrors;
-      
+
       // Rapid clicks (even number should return to initial state)
       for (let i = 0; i < 10; i++) {
         await clickArea.trigger("click");
       }
-      
+
       expect(wrapper.vm.showErrors).toBe(initialState);
     });
 
     it("should update UI on state change", async () => {
       expect(wrapper.find(".q-icon").attributes("name")).toBe("arrow_right");
-      
+
       wrapper.vm.showErrors = true;
       await wrapper.vm.$nextTick();
-      
-      expect(wrapper.find(".q-icon").attributes("name")).toBe("arrow_drop_down");
+
+      expect(wrapper.find(".q-icon").attributes("name")).toBe(
+        "arrow_drop_down",
+      );
     });
 
     it("should maintain cursor pointer style on expand bar", () => {
@@ -676,10 +683,10 @@ describe("DashboardErrors", () => {
 
   describe("Component Lifecycle", () => {
     it("should initialize correctly with all required properties", () => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Test error"] },
       });
-      
+
       expect(wrapper.vm.showErrors).toBe(false);
       expect(wrapper.vm.onDropDownClick).toBeInstanceOf(Function);
       expect(wrapper.vm.props).toBeDefined();
@@ -687,40 +694,40 @@ describe("DashboardErrors", () => {
     });
 
     it("should cleanup correctly on unmount", () => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Test error"] },
       });
       const vm = wrapper.vm;
-      
+
       wrapper.unmount();
-      
+
       // Should not throw errors after unmount
       expect(() => vm.showErrors).not.toThrow();
     });
 
     it("should maintain state consistency throughout lifecycle", async () => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Test error"] },
       });
-      
+
       // Change state
       wrapper.vm.onDropDownClick();
       expect(wrapper.vm.showErrors).toBe(true);
-      
+
       // Should persist until manually changed
       await flushPromises();
       expect(wrapper.vm.showErrors).toBe(true);
     });
 
     it("should handle component re-mounting", () => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Test error"] },
       });
       wrapper.unmount();
-      
+
       // Re-mount should work without issues
-      wrapper = createWrapper({ 
-        errors: { errors: ["New test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["New test error"] },
       });
       expect(wrapper.exists()).toBeTruthy();
       expect(wrapper.vm.showErrors).toBe(false);
@@ -729,10 +736,10 @@ describe("DashboardErrors", () => {
 
   describe("Edge Cases and Error Handling", () => {
     it("should handle errors with numeric values", () => {
-      wrapper = createWrapper({ 
-        errors: { errors: [123, 456, "string error"] } 
+      wrapper = createWrapper({
+        errors: { errors: [123, 456, "string error"] },
       });
-      
+
       const listItems = wrapper.findAll("li");
       expect(listItems.length).toBe(3);
       expect(listItems[0].text()).toBe("123");
@@ -741,10 +748,10 @@ describe("DashboardErrors", () => {
     });
 
     it("should handle errors with boolean values", () => {
-      wrapper = createWrapper({ 
-        errors: { errors: [true, false, "boolean test"] } 
+      wrapper = createWrapper({
+        errors: { errors: [true, false, "boolean test"] },
       });
-      
+
       const listItems = wrapper.findAll("li");
       expect(listItems.length).toBe(3);
       expect(listItems[0].text()).toBe("true");
@@ -752,14 +759,19 @@ describe("DashboardErrors", () => {
     });
 
     it("should handle extremely large error arrays", () => {
-      const manyErrors = Array.from({ length: 1000 }, (_, i) => `Error ${i + 1}`);
-      
+      const manyErrors = Array.from(
+        { length: 1000 },
+        (_, i) => `Error ${i + 1}`,
+      );
+
       expect(() => {
         wrapper = createWrapper({ errors: { errors: manyErrors } });
       }).not.toThrow();
-      
+
       if (wrapper) {
-        expect(wrapper.find(".text-subtitle2").text()).toContain("Errors (1000)");
+        expect(wrapper.find(".text-subtitle2").text()).toContain(
+          "Errors (1000)",
+        );
       }
     });
 
@@ -768,12 +780,12 @@ describe("DashboardErrors", () => {
       mockDispatchEvent.mockImplementation(() => {
         throw new Error("Dispatch failed");
       });
-      
+
       // Since resizeChartEvent is not exposed, we test indirectly by triggering the watcher
       expect(() => {
         wrapper.vm.onDropDownClick(); // This triggers the watcher which calls resizeChartEvent
       }).not.toThrow(); // Component should handle dispatch failure gracefully
-      
+
       // Restore original mock
       mockDispatchEvent.mockImplementation(originalMock || (() => true));
     });
@@ -782,21 +794,24 @@ describe("DashboardErrors", () => {
   describe("Integration Tests", () => {
     it("should work with different error counts and maintain functionality", () => {
       const testCases = [1, 5, 10, 50];
-      
-      testCases.forEach(count => {
-        const errors = Array.from({ length: count }, (_, i) => `Error ${i + 1}`);
+
+      testCases.forEach((count) => {
+        const errors = Array.from(
+          { length: count },
+          (_, i) => `Error ${i + 1}`,
+        );
         wrapper = createWrapper({ errors: { errors } });
-        
+
         const errorText = wrapper.find(".text-subtitle2");
         expect(errorText.text()).toContain(`Errors (${count})`);
-        
+
         const listItems = wrapper.findAll("li");
         expect(listItems.length).toBe(count);
-        
+
         // Test expand/collapse still works
         wrapper.vm.onDropDownClick();
         expect(wrapper.vm.showErrors).toBe(true);
-        
+
         wrapper.unmount();
       });
     });
@@ -805,20 +820,20 @@ describe("DashboardErrors", () => {
       // Ensure mockDispatchEvent is working properly
       mockDispatchEvent.mockClear();
       mockDispatchEvent.mockImplementation(() => true);
-      
+
       wrapper = createWrapper({ errors: { errors: ["Initial"] } });
-      
+
       expect(wrapper.find(".text-subtitle2").text()).toContain("Errors (1)");
       // Component starts collapsed even with initial errors (watcher only fires on changes)
       expect(wrapper.vm.showErrors).toBe(false);
-      
+
       // Add more errors - should trigger watcher and expand
-      await wrapper.setProps({ 
-        errors: { errors: ["Error 1", "Error 2"] } 
+      await wrapper.setProps({
+        errors: { errors: ["Error 1", "Error 2"] },
       });
       await wrapper.vm.$nextTick();
       await flushPromises();
-      
+
       expect(wrapper.find(".text-subtitle2").text()).toContain("Errors (2)");
       expect(wrapper.findAll("li").length).toBe(2);
       // Since watchers may not trigger in test environment, manually simulate expected behavior
@@ -826,16 +841,16 @@ describe("DashboardErrors", () => {
         wrapper.vm.showErrors = true;
       }
       expect(wrapper.vm.showErrors).toBe(true);
-      
+
       // Collapse manually
       wrapper.vm.onDropDownClick();
       expect(wrapper.vm.showErrors).toBe(false);
-      
+
       // Add more errors - should auto-expand again
-      await wrapper.setProps({ 
-        errors: { errors: ["Error 1", "Error 2", "Error 3"] } 
+      await wrapper.setProps({
+        errors: { errors: ["Error 1", "Error 2", "Error 3"] },
       });
-      
+
       // Since watchers may not trigger in test environment, manually simulate expected behavior
       if (wrapper.props().errors.errors.length > 0) {
         wrapper.vm.showErrors = true;
@@ -847,23 +862,23 @@ describe("DashboardErrors", () => {
       // Ensure mockDispatchEvent is working properly
       mockDispatchEvent.mockClear();
       mockDispatchEvent.mockImplementation(() => true);
-      
+
       wrapper = createWrapper({ errors: { errors: ["Test error"] } });
-      
+
       // Multiple state changes that should trigger watchers
       wrapper.vm.showErrors = false;
       await wrapper.vm.$nextTick();
-      
+
       await wrapper.setProps({ errors: { errors: ["Error 1", "Error 2"] } });
       await wrapper.vm.$nextTick();
-      
+
       wrapper.vm.showErrors = true;
       await wrapper.vm.$nextTick();
-      
+
       // Since watchers may not trigger in test environment, test the onDropDownClick method directly
       wrapper.vm.onDropDownClick();
       await wrapper.vm.$nextTick();
-      
+
       // Should have been called at least once
       expect(mockDispatchEvent.mock.calls.length).toBeGreaterThanOrEqual(1);
     });
@@ -871,25 +886,25 @@ describe("DashboardErrors", () => {
 
   describe("SCSS Styling Coverage", () => {
     it("should have expand-bar styles applied", () => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Test error"] },
       });
-      
+
       const expandBar = wrapper.find(".expand-bar");
       expect(expandBar.exists()).toBeTruthy();
-      
+
       // SCSS styles are applied via CSS classes
       expect(expandBar.classes()).toContain("expand-bar");
     });
 
     it("should apply hover styles to expand bar", () => {
-      wrapper = createWrapper({ 
-        errors: { errors: ["Test error"] } 
+      wrapper = createWrapper({
+        errors: { errors: ["Test error"] },
       });
-      
+
       const expandBar = wrapper.find(".expand-bar");
       expect(expandBar.exists()).toBeTruthy();
-      
+
       // Hover styles are defined in SCSS, class confirms styling exists
       const styles = window.getComputedStyle(expandBar.element);
       expect(expandBar.classes()).toContain("expand-bar");

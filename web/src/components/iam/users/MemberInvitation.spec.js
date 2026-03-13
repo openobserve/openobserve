@@ -17,25 +17,25 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify, Quasar } from "quasar";
-import { nextTick } from 'vue';
+import { nextTick } from "vue";
 
 // Mock services
 vi.mock("@/services/organizations", () => ({
   default: {
-    add_members: vi.fn()
-  }
+    add_members: vi.fn(),
+  },
 }));
 
 vi.mock("@/services/users", () => ({
   default: {
-    getRoles: vi.fn()
-  }
+    getRoles: vi.fn(),
+  },
 }));
 
 vi.mock("@/services/segment_analytics", () => ({
   default: {
-    track: vi.fn()
-  }
+    track: vi.fn(),
+  },
 }));
 
 import MemberInvitation from "@/components/iam/users/MemberInvitation.vue";
@@ -60,8 +60,8 @@ const platform = {
 installQuasar({
   plugins: [Dialog, Notify],
   config: {
-    platform
-  }
+    platform,
+  },
 });
 
 describe("MemberInvitation Component", () => {
@@ -72,39 +72,36 @@ describe("MemberInvitation Component", () => {
     vi.mocked(organizationsService.add_members).mockReset();
     vi.mocked(usersService.getRoles).mockReset();
     vi.mocked(segment.track).mockReset();
-    
 
     // Setup store state
-    store.state.selectedOrganization = { identifier: "test-org", name: "Test Org" };
+    store.state.selectedOrganization = {
+      identifier: "test-org",
+      name: "Test Org",
+    };
     store.state.userInfo = { email: "test@example.com" };
 
     // Mock getRoles response
     vi.mocked(usersService.getRoles).mockResolvedValue({
       data: [
         { label: "Admin", value: "admin" },
-        { label: "Member", value: "member" }
-      ]
+        { label: "Member", value: "member" },
+      ],
     });
 
     wrapper = mount(MemberInvitation, {
       props: {
-        currentrole: "admin"
+        currentrole: "admin",
       },
       global: {
-        plugins: [
-          [Quasar, { platform }],
-          i18n
-        ],
-        provide: { 
+        plugins: [[Quasar, { platform }], i18n],
+        provide: {
           store,
-          platform
+          platform,
         },
-        mocks: {
-        }
+        mocks: {},
       },
-      attachTo: document.body
+      attachTo: document.body,
     });
-
 
     await flushPromises();
 
@@ -115,7 +112,7 @@ describe("MemberInvitation Component", () => {
   });
 
   afterEach(() => {
-    if (wrapper && typeof wrapper.unmount === 'function') {
+    if (wrapper && typeof wrapper.unmount === "function") {
       wrapper.unmount();
     }
     vi.clearAllMocks();
@@ -123,252 +120,78 @@ describe("MemberInvitation Component", () => {
 
   it("renders the component for admin user", () => {
     expect(wrapper.exists()).toBe(true);
-    expect(wrapper.find('.invite-user').exists()).toBe(true);
+    expect(wrapper.find(".invite-user").exists()).toBe(true);
   });
 
   it("does not render for non-admin users", async () => {
     const memberWrapper = mount(MemberInvitation, {
       props: {
-        currentrole: "member"
+        currentrole: "member",
       },
       global: {
-        plugins: [
-          [Quasar, { platform }],
-          i18n
-        ],
-        provide: { 
+        plugins: [[Quasar, { platform }], i18n],
+        provide: {
           store,
-          platform
-        }
-      }
+          platform,
+        },
+      },
     });
     await nextTick();
-    expect(memberWrapper.find('.invite-user').exists()).toBe(false);
+    expect(memberWrapper.find(".invite-user").exists()).toBe(false);
     memberWrapper.unmount();
   });
 
   describe("Email Validation", () => {
     it("validates single email", async () => {
-      const emailInput = wrapper.find('.q-input input');
+      const emailInput = wrapper.find(".q-input input");
       expect(emailInput.exists()).toBe(true);
-      
+
       await emailInput.setValue("invalid-email");
-      await wrapper.find('.q-btn').trigger('click');
+      await wrapper.find(".q-btn").trigger("click");
       await flushPromises();
-      
+
       expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "negative",
-          message: "Please enter correct email id."
-        })
+          message: "Please enter correct email id.",
+        }),
       );
     });
 
     it("validates multiple emails", async () => {
-      const emailInput = wrapper.find('.q-input input');
+      const emailInput = wrapper.find(".q-input input");
       expect(emailInput.exists()).toBe(true);
-      
-      await emailInput.setValue("test1@example.com; invalid-email, test2@example.com");
-      await wrapper.find('.q-btn').trigger('click');
+
+      await emailInput.setValue(
+        "test1@example.com; invalid-email, test2@example.com",
+      );
+      await wrapper.find(".q-btn").trigger("click");
       await flushPromises();
-      
+
       expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "negative",
-          message: "Please enter correct email id."
-        })
+          message: "Please enter correct email id.",
+        }),
       );
     });
 
     it("accepts valid emails", async () => {
-      const validEmails = "test1@example.com; test2@example.com, test3@example.com";
-      const emailInput = wrapper.find('.q-input input');
+      const validEmails =
+        "test1@example.com; test2@example.com, test3@example.com";
+      const emailInput = wrapper.find(".q-input input");
       expect(emailInput.exists()).toBe(true);
-      
+
       await emailInput.setValue(validEmails);
-      
+
       vi.mocked(organizationsService.add_members).mockResolvedValue({
         data: {
           data: {},
-          message: "Invitations sent successfully"
-        }
-      });
-
-      await wrapper.find('.q-btn').trigger('click');
-      await flushPromises();
-      
-      expect(organizationsService.add_members).toHaveBeenCalledWith(
-        {
-          invites: ["test1@example.com", "test2@example.com", "test3@example.com"],
-          role: "admin"
-        },
-        "test-org"
-      );
-    });
-  });
-
-  describe("Invitation Process", () => {
-    it("handles successful invitation", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      expect(emailInput.exists()).toBe(true);
-      
-      await emailInput.setValue("test@example.com");
-      
-      vi.mocked(organizationsService.add_members).mockResolvedValue({
-        data: {
-          data: {},
-          message: "Invitations sent successfully"
-        }
-      });
-
-      await wrapper.find('.q-btn').trigger('click');
-      await flushPromises();
-
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: "positive",
           message: "Invitations sent successfully",
-          timeout: 5000
-        })
-      );
-      expect(wrapper.vm.userEmail).toBe("");
-    });
-
-    it("handles invalid members error", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      expect(emailInput.exists()).toBe(true);
-      
-      await emailInput.setValue("test@example.com");
-      
-      vi.mocked(organizationsService.add_members).mockResolvedValue({
-        data: {
-          data: {
-            invalid_members: ["test@example.com"]
-          }
-        }
+        },
       });
 
-      await wrapper.find('.q-btn').trigger('click');
-      await flushPromises();
-
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: "negative",
-          message: "Error while member invitation: test@example.com",
-          timeout: 15000
-        })
-      );
-    });
-
-    it("tracks invitation in analytics", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      expect(emailInput.exists()).toBe(true);
-      
-      await emailInput.setValue("test@example.com");
-      
-      vi.mocked(organizationsService.add_members).mockResolvedValue({
-        data: {
-          data: {},
-          message: "Success"
-        }
-      });
-
-      await wrapper.find('.q-btn').trigger('click');
-      await flushPromises();
-
-      expect(segment.track).toHaveBeenCalledWith(
-        "Button Click",
-        expect.objectContaining({
-          button: "Invite User",
-          user_org: "test-org",
-          user_id: "test@example.com",
-          page: "Users"
-        })
-      );
-    });
-  });
-
-  describe("UI Interactions", () => {
-    it("disables invite button when email is empty", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      expect(emailInput.exists()).toBe(true);
-      
-      await emailInput.setValue("");
-      await nextTick();
-      
-      const inviteButton = wrapper.find('.q-btn');
-      expect(inviteButton.attributes('disabled')).toBeDefined();
-    });
-
-    it("enables invite button when email is provided", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      expect(emailInput.exists()).toBe(true);
-      
-      await emailInput.setValue("test@example.com");
-      await nextTick();
-      
-      const inviteButton = wrapper.find('.q-btn');
-      expect(inviteButton.attributes('disabled')).toBeUndefined();
-    });
-
-    it("allows role selection", async () => {
-      const select = wrapper.findComponent('.q-select');
-      expect(select.exists()).toBe(true);
-      
-      await select.vm.$emit('update:modelValue', 'member');
-      await nextTick();
-      
-      expect(wrapper.vm.selectedRole).toBe('member');
-    });
-  });
-
-  describe("Error Handling", () => {
-    it("handles API error during invitation", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      await emailInput.setValue("test@example.com");
-      
-      const error = new Error("Network error");
-      vi.mocked(organizationsService.add_members).mockRejectedValue(error);
-
-      await wrapper.find('.q-btn').trigger('click');
-      await flushPromises();
-
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: "negative",
-          message: error.message,
-          timeout: 5000
-        })
-      );
-    });
-
-    it("handles empty response from getRoles", async () => {
-      vi.mocked(usersService.getRoles).mockResolvedValue({ data: [] });
-      
-      const newWrapper = mount(MemberInvitation, {
-        props: { currentrole: "admin" },
-        global: {
-          plugins: [[Quasar, { platform }], i18n],
-          provide: { store, platform }
-        }
-      });
-      
-      await flushPromises();
-      expect(newWrapper.vm.options).toEqual([]);
-      newWrapper.unmount();
-    });
-  });
-
-  describe("Email Input Handling", () => {
-    it("handles mixed separators in email list", async () => {
-      const emailInput = wrapper.find('.q-input input');
-      await emailInput.setValue("test1@example.com, test2@example.com; test3@example.com,test4@example.com");
-      
-      vi.mocked(organizationsService.add_members).mockResolvedValue({
-        data: { data: {}, message: "Success" }
-      });
-
-      await wrapper.find('.q-btn').trigger('click');
+      await wrapper.find(".q-btn").trigger("click");
       await flushPromises();
 
       expect(organizationsService.add_members).toHaveBeenCalledWith(
@@ -377,51 +200,231 @@ describe("MemberInvitation Component", () => {
             "test1@example.com",
             "test2@example.com",
             "test3@example.com",
-            "test4@example.com"
           ],
-          role: "admin"
+          role: "admin",
         },
-        "test-org"
+        "test-org",
+      );
+    });
+  });
+
+  describe("Invitation Process", () => {
+    it("handles successful invitation", async () => {
+      const emailInput = wrapper.find(".q-input input");
+      expect(emailInput.exists()).toBe(true);
+
+      await emailInput.setValue("test@example.com");
+
+      vi.mocked(organizationsService.add_members).mockResolvedValue({
+        data: {
+          data: {},
+          message: "Invitations sent successfully",
+        },
+      });
+
+      await wrapper.find(".q-btn").trigger("click");
+      await flushPromises();
+
+      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "positive",
+          message: "Invitations sent successfully",
+          timeout: 5000,
+        }),
+      );
+      expect(wrapper.vm.userEmail).toBe("");
+    });
+
+    it("handles invalid members error", async () => {
+      const emailInput = wrapper.find(".q-input input");
+      expect(emailInput.exists()).toBe(true);
+
+      await emailInput.setValue("test@example.com");
+
+      vi.mocked(organizationsService.add_members).mockResolvedValue({
+        data: {
+          data: {
+            invalid_members: ["test@example.com"],
+          },
+        },
+      });
+
+      await wrapper.find(".q-btn").trigger("click");
+      await flushPromises();
+
+      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "negative",
+          message: "Error while member invitation: test@example.com",
+          timeout: 15000,
+        }),
+      );
+    });
+
+    it("tracks invitation in analytics", async () => {
+      const emailInput = wrapper.find(".q-input input");
+      expect(emailInput.exists()).toBe(true);
+
+      await emailInput.setValue("test@example.com");
+
+      vi.mocked(organizationsService.add_members).mockResolvedValue({
+        data: {
+          data: {},
+          message: "Success",
+        },
+      });
+
+      await wrapper.find(".q-btn").trigger("click");
+      await flushPromises();
+
+      expect(segment.track).toHaveBeenCalledWith(
+        "Button Click",
+        expect.objectContaining({
+          button: "Invite User",
+          user_org: "test-org",
+          user_id: "test@example.com",
+          page: "Users",
+        }),
+      );
+    });
+  });
+
+  describe("UI Interactions", () => {
+    it("disables invite button when email is empty", async () => {
+      const emailInput = wrapper.find(".q-input input");
+      expect(emailInput.exists()).toBe(true);
+
+      await emailInput.setValue("");
+      await nextTick();
+
+      const inviteButton = wrapper.find(".q-btn");
+      expect(inviteButton.attributes("disabled")).toBeDefined();
+    });
+
+    it("enables invite button when email is provided", async () => {
+      const emailInput = wrapper.find(".q-input input");
+      expect(emailInput.exists()).toBe(true);
+
+      await emailInput.setValue("test@example.com");
+      await nextTick();
+
+      const inviteButton = wrapper.find(".q-btn");
+      expect(inviteButton.attributes("disabled")).toBeUndefined();
+    });
+
+    it("allows role selection", async () => {
+      const select = wrapper.findComponent(".q-select");
+      expect(select.exists()).toBe(true);
+
+      await select.vm.$emit("update:modelValue", "member");
+      await nextTick();
+
+      expect(wrapper.vm.selectedRole).toBe("member");
+    });
+  });
+
+  describe("Error Handling", () => {
+    it("handles API error during invitation", async () => {
+      const emailInput = wrapper.find(".q-input input");
+      await emailInput.setValue("test@example.com");
+
+      const error = new Error("Network error");
+      vi.mocked(organizationsService.add_members).mockRejectedValue(error);
+
+      await wrapper.find(".q-btn").trigger("click");
+      await flushPromises();
+
+      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "negative",
+          message: error.message,
+          timeout: 5000,
+        }),
+      );
+    });
+
+    it("handles empty response from getRoles", async () => {
+      vi.mocked(usersService.getRoles).mockResolvedValue({ data: [] });
+
+      const newWrapper = mount(MemberInvitation, {
+        props: { currentrole: "admin" },
+        global: {
+          plugins: [[Quasar, { platform }], i18n],
+          provide: { store, platform },
+        },
+      });
+
+      await flushPromises();
+      expect(newWrapper.vm.options).toEqual([]);
+      newWrapper.unmount();
+    });
+  });
+
+  describe("Email Input Handling", () => {
+    it("handles mixed separators in email list", async () => {
+      const emailInput = wrapper.find(".q-input input");
+      await emailInput.setValue(
+        "test1@example.com, test2@example.com; test3@example.com,test4@example.com",
+      );
+
+      vi.mocked(organizationsService.add_members).mockResolvedValue({
+        data: { data: {}, message: "Success" },
+      });
+
+      await wrapper.find(".q-btn").trigger("click");
+      await flushPromises();
+
+      expect(organizationsService.add_members).toHaveBeenCalledWith(
+        {
+          invites: [
+            "test1@example.com",
+            "test2@example.com",
+            "test3@example.com",
+            "test4@example.com",
+          ],
+          role: "admin",
+        },
+        "test-org",
       );
     });
 
     it("trims whitespace from emails", async () => {
-      const emailInput = wrapper.find('.q-input input');
+      const emailInput = wrapper.find(".q-input input");
       await emailInput.setValue("  test1@example.com ,  test2@example.com  ");
-      
+
       vi.mocked(organizationsService.add_members).mockResolvedValue({
-        data: { data: {}, message: "Success" }
+        data: { data: {}, message: "Success" },
       });
 
-      await wrapper.find('.q-btn').trigger('click');
+      await wrapper.find(".q-btn").trigger("click");
       await flushPromises();
 
       expect(organizationsService.add_members).toHaveBeenCalledWith(
         {
           invites: ["test1@example.com", "test2@example.com"],
-          role: "admin"
+          role: "admin",
         },
-        "test-org"
+        "test-org",
       );
     });
 
     it("converts emails to lowercase", async () => {
-      const emailInput = wrapper.find('.q-input input');
+      const emailInput = wrapper.find(".q-input input");
       await emailInput.setValue("TEST@EXAMPLE.COM, Test@Example.com");
 
       vi.mocked(organizationsService.add_members).mockResolvedValue({
-        data: { data: {}, message: "Success" }
+        data: { data: {}, message: "Success" },
       });
 
-      await wrapper.find('.q-btn').trigger('click');
+      await wrapper.find(".q-btn").trigger("click");
       await flushPromises();
 
       expect(organizationsService.add_members).toHaveBeenCalledWith(
         {
           invites: ["test@example.com"],
-          role: "admin"
+          role: "admin",
         },
-        "test-org"
+        "test-org",
       );
     });
   });
@@ -446,36 +449,42 @@ describe("MemberInvitation Component", () => {
 
   describe("Notification Behavior", () => {
     it("shows loading notification during invitation process", async () => {
-      const emailInput = wrapper.find('.q-input input');
+      const emailInput = wrapper.find(".q-input input");
       await emailInput.setValue("test@example.com");
-      
-      vi.mocked(organizationsService.add_members).mockImplementation(() => 
-        new Promise(resolve => setTimeout(() => resolve({ data: { data: {}, message: "Success" } }), 100))
+
+      vi.mocked(organizationsService.add_members).mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () => resolve({ data: { data: {}, message: "Success" } }),
+              100,
+            ),
+          ),
       );
 
-      await wrapper.find('.q-btn').trigger('click');
-      
+      await wrapper.find(".q-btn").trigger("click");
+
       expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
         expect.objectContaining({
           spinner: true,
           message: "Please wait...",
-          timeout: 2000
-        })
+          timeout: 2000,
+        }),
       );
     });
 
     it("dismisses loading notification after successful invitation", async () => {
-      const emailInput = wrapper.find('.q-input input');
+      const emailInput = wrapper.find(".q-input input");
       await emailInput.setValue("test@example.com");
-      
+
       const dismissMock = vi.fn();
       wrapper.vm.$q.notify = vi.fn().mockReturnValue(dismissMock);
 
       vi.mocked(organizationsService.add_members).mockResolvedValue({
-        data: { data: {}, message: "Success" }
+        data: { data: {}, message: "Success" },
       });
 
-      await wrapper.find('.q-btn').trigger('click');
+      await wrapper.find(".q-btn").trigger("click");
       await flushPromises();
 
       expect(dismissMock).toHaveBeenCalled();
@@ -484,67 +493,66 @@ describe("MemberInvitation Component", () => {
 
   describe("Role Selection Validation", () => {
     it("updates selected role when valid option is chosen", async () => {
-      const select = wrapper.findComponent('.q-select');
-      await select.vm.$emit('update:modelValue', 'member');
+      const select = wrapper.findComponent(".q-select");
+      await select.vm.$emit("update:modelValue", "member");
       await nextTick();
-      
-      expect(wrapper.vm.selectedRole).toBe('member');
-      expect(select.props('modelValue')).toBe('member');
+
+      expect(wrapper.vm.selectedRole).toBe("member");
+      expect(select.props("modelValue")).toBe("member");
     });
 
     it("maintains default role when options are empty", async () => {
       vi.mocked(usersService.getRoles).mockResolvedValue({ data: [] });
-      
+
       const newWrapper = mount(MemberInvitation, {
         props: { currentrole: "admin" },
         global: {
           plugins: [[Quasar, { platform }], i18n],
-          provide: { store, platform }
-        }
+          provide: { store, platform },
+        },
       });
-      
+
       await flushPromises();
-      expect(newWrapper.vm.selectedRole).toBe('admin');
+      expect(newWrapper.vm.selectedRole).toBe("admin");
       newWrapper.unmount();
     });
 
     it("updates options when getRoles returns new data", async () => {
       const newRoles = [
         { label: "Super Admin", value: "super_admin" },
-        { label: "Basic User", value: "basic" }
+        { label: "Basic User", value: "basic" },
       ];
-      
+
       vi.mocked(usersService.getRoles).mockResolvedValue({ data: newRoles });
-      
+
       const newWrapper = mount(MemberInvitation, {
         props: { currentrole: "admin" },
         global: {
           plugins: [[Quasar, { platform }], i18n],
-          provide: { store, platform }
-        }
+          provide: { store, platform },
+        },
       });
-      
+
       await flushPromises();
       expect(newWrapper.vm.options).toEqual(newRoles);
       newWrapper.unmount();
     });
   });
 
-
   describe("Component Visibility", () => {
     const roles = ["member", "viewer", "custom", "unknown"];
-    
-    roles.forEach(role => {
+
+    roles.forEach((role) => {
       it(`does not show invitation form for ${role} role`, () => {
         const newWrapper = mount(MemberInvitation, {
           props: { currentrole: role },
           global: {
             plugins: [[Quasar, { platform }], i18n],
-            provide: { store, platform }
-          }
+            provide: { store, platform },
+          },
         });
-        
-        expect(newWrapper.find('.invite-user').exists()).toBe(false);
+
+        expect(newWrapper.find(".invite-user").exists()).toBe(false);
         newWrapper.unmount();
       });
     });
@@ -554,30 +562,29 @@ describe("MemberInvitation Component", () => {
         props: { currentrole: "root" },
         global: {
           plugins: [[Quasar, { platform }], i18n],
-          provide: { store, platform }
-        }
+          provide: { store, platform },
+        },
       });
-      
-      expect(newWrapper.find('.invite-user').exists()).toBe(true);
+
+      expect(newWrapper.find(".invite-user").exists()).toBe(true);
       newWrapper.unmount();
     });
   });
 
   describe("Input Reset Behavior", () => {
     it("resets email input after successful invitation", async () => {
-      const emailInput = wrapper.find('.q-input input');
+      const emailInput = wrapper.find(".q-input input");
       await emailInput.setValue("test@example.com");
-      
+
       vi.mocked(organizationsService.add_members).mockResolvedValue({
-        data: { data: {}, message: "Success" }
+        data: { data: {}, message: "Success" },
       });
 
-      await wrapper.find('.q-btn').trigger('click');
+      await wrapper.find(".q-btn").trigger("click");
       await flushPromises();
 
       expect(wrapper.vm.userEmail).toBe("");
       expect(emailInput.element.value).toBe("");
     });
   });
-
 });

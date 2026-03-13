@@ -23,10 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     transition-show="slide-left"
     transition-hide="slide-right"
   >
-    <q-card
-      class="predefined-theme-card"
-      style="width: 400px; max-width: 90vw;"
-    >
+    <q-card class="predefined-theme-card" style="width: 400px; max-width: 90vw">
       <q-card-section class="row items-center q-pb-none">
         <div class="text-h6">Predefined Themes</div>
         <q-space />
@@ -39,7 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="resetToDefaultTheme"
           class="q-mr-sm"
         />
-        <q-btn icon="close" flat round dense v-close-popup />
+        <q-btn icon="close"
+flat round
+dense v-close-popup />
       </q-card-section>
 
       <q-card-section class="q-pt-none">
@@ -60,15 +59,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-tab-panels v-model="activeTab" animated>
           <!-- Light Mode Themes -->
           <q-tab-panel name="light" class="q-pa-none">
-            <div v-for="theme in predefinedThemes" :key="theme.id" class="theme-card-compact q-mb-sm">
+            <div
+              v-for="theme in predefinedThemes"
+              :key="theme.id"
+              class="theme-card-compact q-mb-sm"
+            >
               <div class="row items-center no-wrap">
-                <div class="color-preview-small" :style="{ backgroundColor: theme.light.themeColor }"></div>
-                <div class="q-ml-sm" style="flex: 1; min-width: 0;">
+                <div
+                  class="color-preview-small"
+                  :style="{ backgroundColor: theme.light.themeColor }"
+                ></div>
+                <div class="q-ml-sm" style="flex: 1; min-width: 0">
                   <div class="text-subtitle2">{{ theme.name }}</div>
-                  <div class="text-caption text-grey-7">{{ theme.light.themeColor }}</div>
+                  <div class="text-caption text-grey-7">
+                    {{ theme.light.themeColor }}
+                  </div>
                 </div>
                 <q-space />
-                <q-badge v-if="isThemeApplied(theme, 'light')" color="positive" label="Applied" class="text-caption q-mr-xs" />
+                <q-badge
+                  v-if="isThemeApplied(theme, 'light')"
+                  color="positive"
+                  label="Applied"
+                  class="text-caption q-mr-xs"
+                />
                 <q-btn
                   label="Apply"
                   color="primary"
@@ -82,15 +95,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Custom Color Picker -->
             <div class="theme-card-compact q-mb-sm">
               <div class="row items-center no-wrap">
-                <div class="color-preview-small clickable" :style="{ backgroundColor: customLightColor }" @click="openColorPicker('light')">
-                  <q-icon name="colorize" size="16px" color="white" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);" />
+                <div
+                  class="color-preview-small clickable"
+                  :style="{ backgroundColor: customLightColor }"
+                  @click="openColorPicker('light')"
+                >
+                  <q-icon
+                    name="colorize"
+                    size="16px"
+                    color="white"
+                    style="
+                      position: absolute;
+                      top: 50%;
+                      left: 50%;
+                      transform: translate(-50%, -50%);
+                    "
+                  />
                 </div>
-                <div class="q-ml-sm" style="flex: 1; min-width: 0;">
+                <div class="q-ml-sm" style="flex: 1; min-width: 0">
                   <div class="text-subtitle2">Custom Color</div>
-                  <div class="text-caption text-grey-7">{{ customLightColor }}</div>
+                  <div class="text-caption text-grey-7">
+                    {{ customLightColor }}
+                  </div>
                 </div>
                 <q-space />
-                <q-badge v-if="isCustomThemeApplied('light')" color="positive" label="Applied" class="text-caption q-mr-xs" />
+                <q-badge
+                  v-if="isCustomThemeApplied('light')"
+                  color="positive"
+                  label="Applied"
+                  class="text-caption q-mr-xs"
+                />
                 <q-btn
                   label="Apply"
                   color="primary"
@@ -104,15 +138,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Dark Mode Themes -->
           <q-tab-panel name="dark" class="q-pa-none">
-            <div v-for="theme in predefinedThemes" :key="theme.id" class="theme-card-compact q-mb-sm">
+            <div
+              v-for="theme in predefinedThemes"
+              :key="theme.id"
+              class="theme-card-compact q-mb-sm"
+            >
               <div class="row items-center no-wrap">
-                <div class="color-preview-small" :style="{ backgroundColor: theme.dark.themeColor }"></div>
-                <div class="q-ml-sm" style="flex: 1; min-width: 0;">
+                <div
+                  class="color-preview-small"
+                  :style="{ backgroundColor: theme.dark.themeColor }"
+                ></div>
+                <div class="q-ml-sm" style="flex: 1; min-width: 0">
                   <div class="text-subtitle2">{{ theme.name }}</div>
-                  <div class="text-caption text-grey-7">{{ theme.dark.themeColor }}</div>
+                  <div class="text-caption text-grey-7">
+                    {{ theme.dark.themeColor }}
+                  </div>
                 </div>
                 <q-space />
-                <q-badge v-if="isThemeApplied(theme, 'dark')" color="positive" label="Applied" class="text-caption q-mr-xs" />
+                <q-badge
+                  v-if="isThemeApplied(theme, 'dark')"
+                  color="positive"
+                  label="Applied"
+                  class="text-caption q-mr-xs"
+                />
                 <q-btn
                   label="Apply"
                   color="primary"
@@ -126,15 +174,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Custom Color Picker -->
             <div class="theme-card-compact q-mb-sm">
               <div class="row items-center no-wrap">
-                <div class="color-preview-small clickable" :style="{ backgroundColor: customDarkColor }" @click="openColorPicker('dark')">
-                  <q-icon name="colorize" size="16px" color="white" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);" />
+                <div
+                  class="color-preview-small clickable"
+                  :style="{ backgroundColor: customDarkColor }"
+                  @click="openColorPicker('dark')"
+                >
+                  <q-icon
+                    name="colorize"
+                    size="16px"
+                    color="white"
+                    style="
+                      position: absolute;
+                      top: 50%;
+                      left: 50%;
+                      transform: translate(-50%, -50%);
+                    "
+                  />
                 </div>
-                <div class="q-ml-sm" style="flex: 1; min-width: 0;">
+                <div class="q-ml-sm" style="flex: 1; min-width: 0">
                   <div class="text-subtitle2">Custom Color</div>
-                  <div class="text-caption text-grey-7">{{ customDarkColor }}</div>
+                  <div class="text-caption text-grey-7">
+                    {{ customDarkColor }}
+                  </div>
                 </div>
                 <q-space />
-                <q-badge v-if="isCustomThemeApplied('dark')" color="positive" label="Applied" class="text-caption q-mr-xs" />
+                <q-badge
+                  v-if="isCustomThemeApplied('dark')"
+                  color="positive"
+                  label="Applied"
+                  class="text-caption q-mr-xs"
+                />
                 <q-btn
                   label="Apply"
                   color="primary"
@@ -151,9 +220,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Note at the bottom -->
       <q-card-section class="q-pt-none q-pb-sm">
         <q-separator class="q-mb-sm" />
-        <div class="text-caption text-grey-7 tw:flex tw:items-start q-gutter-xs">
-          <q-icon name="info_outline" size="14px" class="q-mt-xs" />
-          <span>Theme preferences are stored locally on this device and will not sync across different browsers or devices.</span>
+        <div
+          class="text-caption text-grey-7 tw:flex tw:items-start q-gutter-xs"
+        >
+          <q-icon name="info_outline"
+size="14px" class="q-mt-xs" />
+          <span
+            >Theme preferences are stored locally on this device and will not
+            sync across different browsers or devices.</span
+          >
         </div>
       </q-card-section>
     </q-card>
@@ -171,7 +246,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat label="Close" color="primary" v-close-popup />
+          <q-btn flat label="Close"
+color="primary" v-close-popup />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -199,14 +275,14 @@ const DEFAULT_DARK_COLOR = store.state.defaultThemeColors.dark;
 // Track applied themes for each mode
 // Read from localStorage if available, otherwise set to null (no theme applied yet)
 const appliedLightTheme = ref<number | null>(
-  localStorage.getItem('appliedLightTheme')
-    ? parseInt(localStorage.getItem('appliedLightTheme')!)
-    : null
+  localStorage.getItem("appliedLightTheme")
+    ? parseInt(localStorage.getItem("appliedLightTheme")!)
+    : null,
 );
 const appliedDarkTheme = ref<number | null>(
-  localStorage.getItem('appliedDarkTheme')
-    ? parseInt(localStorage.getItem('appliedDarkTheme')!)
-    : null
+  localStorage.getItem("appliedDarkTheme")
+    ? parseInt(localStorage.getItem("appliedDarkTheme")!)
+    : null,
 );
 
 // Custom color state for the color picker in PredefinedThemes dialog
@@ -217,21 +293,23 @@ const appliedDarkTheme = ref<number | null>(
 // 4. Application defaults (#3F7994 for light, #5B9FBE for dark)
 const customLightColor = ref(
   store.state.tempThemeColors?.light ||
-  localStorage.getItem('customLightColor') ||
-  store.state?.organizationData?.organizationSettings?.light_mode_theme_color ||
-  DEFAULT_LIGHT_COLOR
+    localStorage.getItem("customLightColor") ||
+    store.state?.organizationData?.organizationSettings
+      ?.light_mode_theme_color ||
+    DEFAULT_LIGHT_COLOR,
 );
 const customDarkColor = ref(
   store.state.tempThemeColors?.dark ||
-  localStorage.getItem('customDarkColor') ||
-  store.state?.organizationData?.organizationSettings?.dark_mode_theme_color ||
-  DEFAULT_DARK_COLOR
+    localStorage.getItem("customDarkColor") ||
+    store.state?.organizationData?.organizationSettings
+      ?.dark_mode_theme_color ||
+    DEFAULT_DARK_COLOR,
 );
 
 // Color picker dialog state
-const showColorPicker = ref(false);                          // Controls dialog visibility
-const currentPickerMode = ref<"light" | "dark">("light");    // Which mode is being edited
-const tempColor = ref(customLightColor.value);               // Bound to q-color component
+const showColorPicker = ref(false); // Controls dialog visibility
+const currentPickerMode = ref<"light" | "dark">("light"); // Which mode is being edited
+const tempColor = ref(customLightColor.value); // Bound to q-color component
 
 // Watch isOpen from composable
 watch(isOpen, (val) => {
@@ -266,7 +344,7 @@ watch(
     if (activeTab.value !== newTab) {
       activeTab.value = newTab;
     }
-  }
+  },
 );
 
 // Watch for organization settings changes and update custom colors
@@ -278,7 +356,8 @@ watch(
     if (newSettings && newSettings !== oldSettings) {
       // IMPORTANT: Don't override if user is actively previewing a color from General Settings
       // If temp colors exist in Vuex store, skip update to preserve the preview
-      const hasTempColors = store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
+      const hasTempColors =
+        store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
       if (hasTempColors) {
         return;
       }
@@ -287,27 +366,36 @@ watch(
       let shouldApply = false;
 
       // Only update if localStorage doesn't have custom colors
-      if (!localStorage.getItem('customLightColor') && newSettings.light_mode_theme_color) {
+      if (
+        !localStorage.getItem("customLightColor") &&
+        newSettings.light_mode_theme_color
+      ) {
         customLightColor.value = newSettings.light_mode_theme_color;
-        if (currentMode === 'light' && appliedLightTheme.value === -1) {
+        if (currentMode === "light" && appliedLightTheme.value === -1) {
           shouldApply = true;
         }
       }
-      if (!localStorage.getItem('customDarkColor') && newSettings.dark_mode_theme_color) {
+      if (
+        !localStorage.getItem("customDarkColor") &&
+        newSettings.dark_mode_theme_color
+      ) {
         customDarkColor.value = newSettings.dark_mode_theme_color;
-        if (currentMode === 'dark' && appliedDarkTheme.value === -1) {
+        if (currentMode === "dark" && appliedDarkTheme.value === -1) {
           shouldApply = true;
         }
       }
 
       // Apply theme if custom theme is active and we updated the color
       if (shouldApply) {
-        const color = currentMode === "light" ? customLightColor.value : customDarkColor.value;
+        const color =
+          currentMode === "light"
+            ? customLightColor.value
+            : customDarkColor.value;
         applyThemeColors(color, currentMode, false);
       }
     }
   },
-  { deep: true }
+  { deep: true },
 );
 
 // MutationObserver for watching body class changes (theme mode switches)
@@ -323,49 +411,68 @@ onMounted(() => {
 
   // PRIORITY 1: Check if there's a temporary preview color in Vuex store (from General Settings)
   // If user is previewing a color in General Settings, apply it here too
-  const hasTempPreview = currentMode === "light"
-    ? !!store.state.tempThemeColors?.light
-    : !!store.state.tempThemeColors?.dark;
+  const hasTempPreview =
+    currentMode === "light"
+      ? !!store.state.tempThemeColors?.light
+      : !!store.state.tempThemeColors?.dark;
 
   if (hasTempPreview) {
     // Apply temporary preview color from Vuex store (highest priority)
     // RE-READ from store instead of using customLightColor.value to ensure we get the latest
-    const color = currentMode === "light"
-      ? store.state.tempThemeColors!.light!
-      : store.state.tempThemeColors!.dark!;
+    const color =
+      currentMode === "light"
+        ? store.state.tempThemeColors!.light!
+        : store.state.tempThemeColors!.dark!;
 
     applyThemeColors(color, currentMode, false);
   } else {
     // No temporary preview - check if user has saved a theme
-    const appliedTheme = currentMode === "light" ? appliedLightTheme.value : appliedDarkTheme.value;
+    const appliedTheme =
+      currentMode === "light"
+        ? appliedLightTheme.value
+        : appliedDarkTheme.value;
 
     if (appliedTheme === null) {
       // PRIORITY 2: No theme explicitly selected by user yet
       // Apply color from customLightColor/customDarkColor which has its own priority:
       // localStorage > org settings > defaults
       // DON'T save to localStorage automatically - let user explicitly choose
-      const color = currentMode === "light" ? customLightColor.value : customDarkColor.value;
+      const color =
+        currentMode === "light"
+          ? customLightColor.value
+          : customDarkColor.value;
 
       // Determine if this is a default color or from organization settings
-      const isFromOrgSettings = currentMode === "light"
-        ? store.state?.organizationData?.organizationSettings?.light_mode_theme_color
-        : store.state?.organizationData?.organizationSettings?.dark_mode_theme_color;
+      const isFromOrgSettings =
+        currentMode === "light"
+          ? store.state?.organizationData?.organizationSettings
+              ?.light_mode_theme_color
+          : store.state?.organizationData?.organizationSettings
+              ?.dark_mode_theme_color;
 
       // Mark as default only if NOT from org settings and NOT in localStorage
-      const isDefault = !isFromOrgSettings &&
-        !sessionStorage.getItem(`tempCustom${currentMode === 'light' ? 'Light' : 'Dark'}Color`) &&
-        !localStorage.getItem(`custom${currentMode === 'light' ? 'Light' : 'Dark'}Color`);
+      const isDefault =
+        !isFromOrgSettings &&
+        !sessionStorage.getItem(
+          `tempCustom${currentMode === "light" ? "Light" : "Dark"}Color`,
+        ) &&
+        !localStorage.getItem(
+          `custom${currentMode === "light" ? "Light" : "Dark"}Color`,
+        );
 
       applyThemeColors(color, currentMode, isDefault);
     } else {
       // PRIORITY 3: User has explicitly applied a theme - reapply it
       if (appliedTheme === -1) {
         // appliedTheme === -1 means Custom theme (from color picker)
-        const color = currentMode === "light" ? customLightColor.value : customDarkColor.value;
+        const color =
+          currentMode === "light"
+            ? customLightColor.value
+            : customDarkColor.value;
         applyThemeColors(color, currentMode, false);
       } else {
         // appliedTheme is a predefined theme ID
-        const theme = predefinedThemes.find(t => t.id === appliedTheme);
+        const theme = predefinedThemes.find((t) => t.id === appliedTheme);
         if (theme) {
           const modeColors = currentMode === "light" ? theme.light : theme.dark;
           applyThemeColors(modeColors.themeColor, currentMode, false);
@@ -384,46 +491,71 @@ onMounted(() => {
    */
   observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
-      if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+      if (
+        mutation.type === "attributes" &&
+        mutation.attributeName === "class"
+      ) {
         // CRITICAL: Check if user is actively previewing a color from General Settings
         // If temp colors exist in Vuex store, skip applying to preserve the preview
         // This prevents the backend color from overriding the user's preview selection
-        const hasTempColors = store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
+        const hasTempColors =
+          store.state.tempThemeColors?.light ||
+          store.state.tempThemeColors?.dark;
         if (hasTempColors) {
           return;
         }
 
         // Reapply the current theme when mode changes (light <-> dark toggle)
-        const isDarkMode = document.body.classList.contains('body--dark');
-        const currentMode = isDarkMode ? 'dark' : 'light';
+        const isDarkMode = document.body.classList.contains("body--dark");
+        const currentMode = isDarkMode ? "dark" : "light";
 
         // Get the applied theme for the current mode
-        const appliedTheme = currentMode === 'light' ? appliedLightTheme.value : appliedDarkTheme.value;
+        const appliedTheme =
+          currentMode === "light"
+            ? appliedLightTheme.value
+            : appliedDarkTheme.value;
 
         if (appliedTheme !== null) {
           // Theme exists for this mode, apply it
           if (appliedTheme === -1) {
             // Custom theme
-            const color = currentMode === 'light' ? customLightColor.value : customDarkColor.value;
+            const color =
+              currentMode === "light"
+                ? customLightColor.value
+                : customDarkColor.value;
             applyThemeColors(color, currentMode, false);
           } else {
             // Predefined theme
-            const theme = predefinedThemes.find(t => t.id === appliedTheme);
+            const theme = predefinedThemes.find((t) => t.id === appliedTheme);
             if (theme) {
-              const modeColors = currentMode === 'light' ? theme.light : theme.dark;
+              const modeColors =
+                currentMode === "light" ? theme.light : theme.dark;
               applyThemeColors(modeColors.themeColor, currentMode, false);
             }
           }
         } else {
           // No theme explicitly selected, just apply available color
           // DON'T save to localStorage - let user explicitly choose
-          const color = currentMode === 'light' ? customLightColor.value : customDarkColor.value;
+          const color =
+            currentMode === "light"
+              ? customLightColor.value
+              : customDarkColor.value;
 
-          const isFromOrgSettings = currentMode === "light"
-            ? store.state?.organizationData?.organizationSettings?.light_mode_theme_color
-            : store.state?.organizationData?.organizationSettings?.dark_mode_theme_color;
+          const isFromOrgSettings =
+            currentMode === "light"
+              ? store.state?.organizationData?.organizationSettings
+                  ?.light_mode_theme_color
+              : store.state?.organizationData?.organizationSettings
+                  ?.dark_mode_theme_color;
 
-          const isDefault = !isFromOrgSettings && !sessionStorage.getItem(`tempCustom${currentMode === 'light' ? 'Light' : 'Dark'}Color`) && !localStorage.getItem(`custom${currentMode === 'light' ? 'Light' : 'Dark'}Color`);
+          const isDefault =
+            !isFromOrgSettings &&
+            !sessionStorage.getItem(
+              `tempCustom${currentMode === "light" ? "Light" : "Dark"}Color`,
+            ) &&
+            !localStorage.getItem(
+              `custom${currentMode === "light" ? "Light" : "Dark"}Color`,
+            );
 
           applyThemeColors(color, currentMode, isDefault);
         }
@@ -433,7 +565,7 @@ onMounted(() => {
 
   observer.observe(document.body, {
     attributes: true,
-    attributeFilter: ['class']
+    attributeFilter: ["class"],
   });
 });
 
@@ -501,7 +633,7 @@ const predefinedThemes = [
       themeColor: "#29B6F6",
       themeColorOpacity: 10,
     },
-  }
+  },
 ];
 
 const applyTheme = (theme: any, mode: "light" | "dark") => {
@@ -513,19 +645,19 @@ const applyTheme = (theme: any, mode: "light" | "dark") => {
   // Store the hex color value in localStorage (not the theme ID)
   if (mode === "light") {
     appliedLightTheme.value = theme.id;
-    localStorage.setItem('appliedLightTheme', theme.id.toString());
-    localStorage.setItem('customLightColor', modeColors.themeColor);
+    localStorage.setItem("appliedLightTheme", theme.id.toString());
+    localStorage.setItem("customLightColor", modeColors.themeColor);
   } else {
     appliedDarkTheme.value = theme.id;
-    localStorage.setItem('appliedDarkTheme', theme.id.toString());
-    localStorage.setItem('customDarkColor', modeColors.themeColor);
+    localStorage.setItem("appliedDarkTheme", theme.id.toString());
+    localStorage.setItem("customDarkColor", modeColors.themeColor);
   }
 
   // Show success notification
   $q.notify({
-    type: 'positive',
+    type: "positive",
     message: `${theme.name} applied to ${mode} mode successfully!`,
-    position: 'top',
+    position: "top",
     timeout: 2000,
   });
 };
@@ -541,7 +673,8 @@ const isThemeApplied = (theme: any, mode: "light" | "dark"): boolean => {
 // Custom theme functions
 const openColorPicker = (mode: "light" | "dark") => {
   currentPickerMode.value = mode;
-  tempColor.value = mode === "light" ? customLightColor.value : customDarkColor.value;
+  tempColor.value =
+    mode === "light" ? customLightColor.value : customDarkColor.value;
   showColorPicker.value = true;
 };
 
@@ -554,7 +687,8 @@ const openColorPicker = (mode: "light" | "dark") => {
 const isCustomThemeApplied = (mode: "light" | "dark"): boolean => {
   // If there are temp colors being previewed from General Settings, don't show "Applied" badge
   // This prevents confusion - the temp color is being previewed, not permanently applied
-  const hasTempColors = store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
+  const hasTempColors =
+    store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
   if (hasTempColors) {
     return false;
   }
@@ -577,7 +711,8 @@ const updateCustomColor = () => {
 };
 
 const applyCustomTheme = (mode: "light" | "dark") => {
-  const color = mode === "light" ? customLightColor.value : customDarkColor.value;
+  const color =
+    mode === "light" ? customLightColor.value : customDarkColor.value;
 
   // Apply theme colors directly (custom theme is never default)
   applyThemeColors(color, mode, false);
@@ -585,19 +720,19 @@ const applyCustomTheme = (mode: "light" | "dark") => {
   // Mark as custom theme and save to localStorage
   if (mode === "light") {
     appliedLightTheme.value = -1;
-    localStorage.setItem('appliedLightTheme', '-1');
-    localStorage.setItem('customLightColor', color);
+    localStorage.setItem("appliedLightTheme", "-1");
+    localStorage.setItem("customLightColor", color);
   } else {
     appliedDarkTheme.value = -1;
-    localStorage.setItem('appliedDarkTheme', '-1');
-    localStorage.setItem('customDarkColor', color);
+    localStorage.setItem("appliedDarkTheme", "-1");
+    localStorage.setItem("customDarkColor", color);
   }
 
   // Show success notification
   $q.notify({
-    type: 'positive',
+    type: "positive",
     message: `Custom color applied to ${mode} mode successfully!`,
-    position: 'top',
+    position: "top",
     timeout: 2000,
   });
 };
@@ -605,37 +740,41 @@ const applyCustomTheme = (mode: "light" | "dark") => {
 // Reset both light and dark themes to settings or defaults
 const resetToDefaultTheme = () => {
   // Check if we have colors in organizationSettings
-  const orgLightColor = store.state?.organizationData?.organizationSettings?.light_mode_theme_color;
-  const orgDarkColor = store.state?.organizationData?.organizationSettings?.dark_mode_theme_color;
+  const orgLightColor =
+    store.state?.organizationData?.organizationSettings?.light_mode_theme_color;
+  const orgDarkColor =
+    store.state?.organizationData?.organizationSettings?.dark_mode_theme_color;
 
   // Reset light mode
   const lightResetColor = orgLightColor || DEFAULT_LIGHT_COLOR;
   customLightColor.value = lightResetColor;
-  localStorage.removeItem('customLightColor');
-  localStorage.removeItem('appliedLightTheme');
+  localStorage.removeItem("customLightColor");
+  localStorage.removeItem("appliedLightTheme");
   appliedLightTheme.value = -1;
-  localStorage.setItem('appliedLightTheme', '-1');
+  localStorage.setItem("appliedLightTheme", "-1");
 
   // Reset dark mode
   const darkResetColor = orgDarkColor || DEFAULT_DARK_COLOR;
   customDarkColor.value = darkResetColor;
-  localStorage.removeItem('customDarkColor');
-  localStorage.removeItem('appliedDarkTheme');
+  localStorage.removeItem("customDarkColor");
+  localStorage.removeItem("appliedDarkTheme");
   appliedDarkTheme.value = -1;
-  localStorage.setItem('appliedDarkTheme', '-1');
+  localStorage.setItem("appliedDarkTheme", "-1");
 
   // Apply theme for current mode
   const currentMode = store.state.theme === "dark" ? "dark" : "light";
-  const currentColor = currentMode === "light" ? lightResetColor : darkResetColor;
+  const currentColor =
+    currentMode === "light" ? lightResetColor : darkResetColor;
   const isDefault = currentMode === "light" ? !orgLightColor : !orgDarkColor;
   applyThemeColors(currentColor, currentMode, isDefault);
 
   $q.notify({
-    type: 'positive',
-    message: orgLightColor || orgDarkColor
-      ? 'Theme reset to organization settings!'
-      : 'Theme reset to default colors!',
-    position: 'top',
+    type: "positive",
+    message:
+      orgLightColor || orgDarkColor
+        ? "Theme reset to organization settings!"
+        : "Theme reset to default colors!",
+    position: "top",
     timeout: 2000,
   });
 };
@@ -671,7 +810,7 @@ const resetToDefaultTheme = () => {
 .color-preview-small.clickable:hover {
   transform: scale(1.1);
 }
-.predefined-theme-card{
+.predefined-theme-card {
   width: 450px;
   max-width: 90vw;
   height: 100vh;

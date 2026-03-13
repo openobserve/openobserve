@@ -184,23 +184,41 @@ describe("logsUtils", () => {
     });
 
     it("should filter out comment lines starting with --", () => {
-      const mockAst = { columns: [], from: [], orderby: null, limit: null, groupby: null, where: null };
+      const mockAst = {
+        columns: [],
+        from: [],
+        orderby: null,
+        limit: null,
+        groupby: null,
+        where: null,
+      };
       mockParserInstance.astify.mockReturnValue(mockAst);
 
       utils.fnParsedSQL("-- this is a comment\nSELECT * FROM logs");
 
       // The call should have the comment filtered out
-      expect(mockParserInstance.astify).toHaveBeenCalledWith("SELECT * FROM logs");
+      expect(mockParserInstance.astify).toHaveBeenCalledWith(
+        "SELECT * FROM logs",
+      );
     });
 
     it("should use searchObj.data.query when no query provided", () => {
-      const mockAst = { columns: [], from: [], orderby: null, limit: null, groupby: null, where: null };
+      const mockAst = {
+        columns: [],
+        from: [],
+        orderby: null,
+        limit: null,
+        groupby: null,
+        where: null,
+      };
       mockParserInstance.astify.mockReturnValue(mockAst);
       mockSearchObj.data.query = "SELECT * FROM default_stream";
 
       utils.fnParsedSQL("");
 
-      expect(mockParserInstance.astify).toHaveBeenCalledWith("SELECT * FROM default_stream");
+      expect(mockParserInstance.astify).toHaveBeenCalledWith(
+        "SELECT * FROM default_stream",
+      );
     });
   });
 
@@ -243,7 +261,9 @@ describe("logsUtils", () => {
       const result = utils.extractTimestamps("30s");
       expect(result).toBeDefined();
       expect(result!.to).toBe(new Date("2024-06-15T12:00:00.000Z").getTime());
-      expect(result!.from).toBe(new Date("2024-06-15T12:00:00.000Z").getTime() - 30 * 1000);
+      expect(result!.from).toBe(
+        new Date("2024-06-15T12:00:00.000Z").getTime() - 30 * 1000,
+      );
     });
 
     it("should extract timestamps for minutes (m)", () => {
@@ -310,9 +330,7 @@ describe("logsUtils", () => {
 
   describe("hasAggregation", () => {
     it("should return true when column has aggr_func type", () => {
-      const columns = [
-        { expr: { type: "aggr_func", name: "count" } },
-      ];
+      const columns = [{ expr: { type: "aggr_func", name: "count" } }];
       expect(utils.hasAggregation(columns)).toBe(true);
     });
 
@@ -325,7 +343,8 @@ describe("logsUtils", () => {
     });
 
     it("should return true when query contains GROUP BY", () => {
-      mockSearchObj.data.query = "SELECT field1, COUNT(*) FROM logs GROUP BY field1";
+      mockSearchObj.data.query =
+        "SELECT field1, COUNT(*) FROM logs GROUP BY field1";
       const columns = [{ expr: { type: "column" } }];
       expect(utils.hasAggregation(columns)).toBe(true);
     });
@@ -458,7 +477,11 @@ describe("logsUtils", () => {
 
   describe("removeTraceId", () => {
     beforeEach(() => {
-      mockSearchObj.data.searchRequestTraceIds = ["trace-1", "trace-2", "trace-3"];
+      mockSearchObj.data.searchRequestTraceIds = [
+        "trace-1",
+        "trace-2",
+        "trace-3",
+      ];
     });
 
     it("should remove trace ID from the collection", () => {
@@ -496,16 +519,12 @@ describe("logsUtils", () => {
 
   describe("isTimestampASC", () => {
     it("should return true when timestamp is ordered ASC", () => {
-      const orderby = [
-        { expr: { column: "_timestamp" }, type: "ASC" },
-      ];
+      const orderby = [{ expr: { column: "_timestamp" }, type: "ASC" }];
       expect(utils.isTimestampASC(orderby)).toBe(true);
     });
 
     it("should return false when timestamp is ordered DESC", () => {
-      const orderby = [
-        { expr: { column: "_timestamp" }, type: "DESC" },
-      ];
+      const orderby = [{ expr: { column: "_timestamp" }, type: "DESC" }];
       expect(utils.isTimestampASC(orderby)).toBe(false);
     });
 
@@ -515,17 +534,13 @@ describe("logsUtils", () => {
     });
 
     it("should return false when ordering different column", () => {
-      const orderby = [
-        { expr: { column: "other_field" }, type: "ASC" },
-      ];
+      const orderby = [{ expr: { column: "other_field" }, type: "ASC" }];
       expect(utils.isTimestampASC(orderby)).toBe(false);
     });
 
     it("should check timestamp column from store config", () => {
       mockStore.state.zoConfig.timestamp_column = "custom_ts";
-      const orderby = [
-        { expr: { column: "custom_ts" }, type: "ASC" },
-      ];
+      const orderby = [{ expr: { column: "custom_ts" }, type: "ASC" }];
       // Re-get utils to pick up new config
       const newUtils = logsUtils();
       expect(newUtils.isTimestampASC(orderby)).toBe(true);
@@ -541,29 +556,39 @@ describe("logsUtils", () => {
       mockParserInstance.astify.mockReturnValue({
         columns: [{ as: "my_field" }, { as: "other_field" }],
       });
-      expect(utils.checkTimestampAlias("SELECT field1 as my_field FROM logs")).toBe(true);
+      expect(
+        utils.checkTimestampAlias("SELECT field1 as my_field FROM logs"),
+      ).toBe(true);
     });
 
     it("should return false when column is aliased as timestamp", () => {
       mockParserInstance.astify.mockReturnValue({
         columns: [{ as: "_timestamp" }],
       });
-      expect(utils.checkTimestampAlias("SELECT field1 as _timestamp FROM logs")).toBe(false);
+      expect(
+        utils.checkTimestampAlias("SELECT field1 as _timestamp FROM logs"),
+      ).toBe(false);
     });
 
     it("should return false for AS '_timestamp' pattern in query", () => {
       mockParserInstance.astify.mockReturnValue({ columns: [] });
-      expect(utils.checkTimestampAlias("SELECT field1 AS '_timestamp' FROM logs")).toBe(false);
+      expect(
+        utils.checkTimestampAlias("SELECT field1 AS '_timestamp' FROM logs"),
+      ).toBe(false);
     });
 
-    it("should return false for AS \"_timestamp\" pattern in query", () => {
+    it('should return false for AS "_timestamp" pattern in query', () => {
       mockParserInstance.astify.mockReturnValue({ columns: [] });
-      expect(utils.checkTimestampAlias('SELECT field1 AS "_timestamp" FROM logs')).toBe(false);
+      expect(
+        utils.checkTimestampAlias('SELECT field1 AS "_timestamp" FROM logs'),
+      ).toBe(false);
     });
 
     it("should return false for AS _timestamp (unquoted) pattern in query", () => {
       mockParserInstance.astify.mockReturnValue({ columns: [] });
-      expect(utils.checkTimestampAlias("SELECT field1 AS _timestamp FROM logs")).toBe(false);
+      expect(
+        utils.checkTimestampAlias("SELECT field1 AS _timestamp FROM logs"),
+      ).toBe(false);
     });
 
     it("should handle columns not being an array", () => {
@@ -574,39 +599,69 @@ describe("logsUtils", () => {
 
   describe("isNonAggregatedSQLMode", () => {
     it("should return true when not in SQL mode", () => {
-      const searchObjParam = { meta: { sqlMode: false }, data: { queryResults: { is_histogram_eligible: true } } };
+      const searchObjParam = {
+        meta: { sqlMode: false },
+        data: { queryResults: { is_histogram_eligible: true } },
+      };
       const parsedSQL = {};
-      expect(utils.isNonAggregatedSQLMode(searchObjParam, parsedSQL)).toBe(true);
+      expect(utils.isNonAggregatedSQLMode(searchObjParam, parsedSQL)).toBe(
+        true,
+      );
     });
 
     it("should return false when SQL mode with LIMIT query", () => {
-      const searchObjParam = { meta: { sqlMode: true }, data: { queryResults: { is_histogram_eligible: true } } };
+      const searchObjParam = {
+        meta: { sqlMode: true },
+        data: { queryResults: { is_histogram_eligible: true } },
+      };
       const parsedSQL = { limit: { value: [{ value: 10 }] } };
-      expect(utils.isNonAggregatedSQLMode(searchObjParam, parsedSQL)).toBe(false);
+      expect(utils.isNonAggregatedSQLMode(searchObjParam, parsedSQL)).toBe(
+        false,
+      );
     });
 
     it("should return false when SQL mode with DISTINCT query", () => {
-      const searchObjParam = { meta: { sqlMode: true }, data: { queryResults: { is_histogram_eligible: true } } };
+      const searchObjParam = {
+        meta: { sqlMode: true },
+        data: { queryResults: { is_histogram_eligible: true } },
+      };
       const parsedSQL = { distinct: { type: "DISTINCT" } };
-      expect(utils.isNonAggregatedSQLMode(searchObjParam, parsedSQL)).toBe(false);
+      expect(utils.isNonAggregatedSQLMode(searchObjParam, parsedSQL)).toBe(
+        false,
+      );
     });
 
     it("should return false when SQL mode with WITH query", () => {
-      const searchObjParam = { meta: { sqlMode: true }, data: { queryResults: { is_histogram_eligible: true } } };
+      const searchObjParam = {
+        meta: { sqlMode: true },
+        data: { queryResults: { is_histogram_eligible: true } },
+      };
       const parsedSQL = { with: [{ name: "cte" }] };
-      expect(utils.isNonAggregatedSQLMode(searchObjParam, parsedSQL)).toBe(false);
+      expect(utils.isNonAggregatedSQLMode(searchObjParam, parsedSQL)).toBe(
+        false,
+      );
     });
 
     it("should return false when not histogram eligible", () => {
-      const searchObjParam = { meta: { sqlMode: true }, data: { queryResults: { is_histogram_eligible: false } } };
+      const searchObjParam = {
+        meta: { sqlMode: true },
+        data: { queryResults: { is_histogram_eligible: false } },
+      };
       const parsedSQL = {};
-      expect(utils.isNonAggregatedSQLMode(searchObjParam, parsedSQL)).toBe(false);
+      expect(utils.isNonAggregatedSQLMode(searchObjParam, parsedSQL)).toBe(
+        false,
+      );
     });
 
     it("should return true for simple SQL mode query", () => {
-      const searchObjParam = { meta: { sqlMode: true }, data: { queryResults: { is_histogram_eligible: true } } };
+      const searchObjParam = {
+        meta: { sqlMode: true },
+        data: { queryResults: { is_histogram_eligible: true } },
+      };
       const parsedSQL = {};
-      expect(utils.isNonAggregatedSQLMode(searchObjParam, parsedSQL)).toBe(true);
+      expect(utils.isNonAggregatedSQLMode(searchObjParam, parsedSQL)).toBe(
+        true,
+      );
     });
   });
 

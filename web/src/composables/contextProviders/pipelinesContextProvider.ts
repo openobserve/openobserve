@@ -1,16 +1,16 @@
 /**
  * Pipelines Context Provider - Extracts context from the pipeline editor page
- * 
+ *
  * This provider extracts essential pipeline information including:
  * - Pipeline ID and name
  * - Organization context
  * - User intent (create new vs edit existing)
- * 
+ *
  * Example Usage:
  * ```typescript
  * import { createPipelinesContextProvider } from '@/composables/contextProviders/pipelinesContextProvider';
  * import { contextRegistry } from '@/composables/contextProviders';
- * 
+ *
  * // Create and register provider
  * const provider = createPipelinesContextProvider(pipelineObj, store);
  * contextRegistry.register('pipelines', provider);
@@ -18,7 +18,7 @@
  * ```
  */
 
-import type { ContextProvider, PageContext } from './types';
+import type { ContextProvider, PageContext } from "./types";
 
 /**
  * Creates a pipelines context provider that extracts essential context from the pipeline editor state
@@ -39,7 +39,7 @@ export const createPipelinesContextProvider = (
   store: any,
   streamName?: string,
   streamType?: string,
-  queryType?: string
+  queryType?: string,
 ): ContextProvider => {
   return {
     getContext(): PageContext {
@@ -47,24 +47,24 @@ export const createPipelinesContextProvider = (
       const isEditNode = pipelineObj?.isEditNode;
 
       return {
-        currentPage: 'Pipelines',
-        pipelineId: pipeline?.pipeline_id || '',
-        pipelineName: pipeline?.name || '',
-        organization_identifier: store?.state?.selectedOrganization?.identifier || '',
+        currentPage: "Pipelines",
+        pipelineId: pipeline?.pipeline_id || "",
+        pipelineName: pipeline?.name || "",
+        organization_identifier:
+          store?.state?.selectedOrganization?.identifier || "",
         user_intent: isEditNode
-          ? 'edit existing pipeline query node'
+          ? "edit existing pipeline query node"
           : pipelineObj?.isEditPipeline
-            ? 'edit existing pipeline'
-            : 'create new pipeline query node',
+            ? "edit existing pipeline"
+            : "create new pipeline query node",
         // Current timestamp when request is fired (microseconds) for AI agent time calculations
         request_timestamp: Date.now() * 1000,
         // Stream context for query nodes
-        selectedStreams: streamName ? [streamName] : ['default'],
-        streamType: streamType || 'logs',
-        queryType: queryType || 'sql',
-        pipelineNodeType: 'query',
+        selectedStreams: streamName ? [streamName] : ["default"],
+        streamType: streamType || "logs",
+        queryType: queryType || "sql",
+        pipelineNodeType: "query",
       };
-    }
+    },
   };
 };
-

@@ -89,13 +89,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? 'Remove from interesting fields'
             : 'Add to interesting fields'
         "
-        @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
+        @click.stop="
+          $emit('toggle-interesting', field, field.isInterestingField)
+        "
       />
     </div>
   </div>
 
   <!-- Field with expansion for values -->
-  <slot v-else name="expansion" :field="field"></slot>
+  <slot v-else name="expansion"
+:field="field"></slot>
 </template>
 
 <script setup lang="ts">
@@ -106,7 +109,6 @@ import {
   outlinedVisibility,
   outlinedVisibilityOff,
 } from "@quasar/extras/material-icons-outlined";
-
 
 interface Props {
   field: any;

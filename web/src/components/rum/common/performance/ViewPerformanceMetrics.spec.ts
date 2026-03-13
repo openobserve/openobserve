@@ -125,7 +125,9 @@ describe("ViewPerformanceMetrics", () => {
 
   describe("Conditional rendering", () => {
     it("should not display LCP when not available", () => {
-      const metrics = createMockMetrics({ largest_contentful_paint: undefined });
+      const metrics = createMockMetrics({
+        largest_contentful_paint: undefined,
+      });
       const wrapper = mount(ViewPerformanceMetrics, {
         props: { metrics },
       });

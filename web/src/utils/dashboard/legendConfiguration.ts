@@ -443,21 +443,21 @@ export const calculatePieChartRadius = (
   originalWidth?: number,
   originalHeight?: number,
 ): number => {
-    // Calculate the optimal radius in pixels based on available space
-    const maxAvailableRadius = Math.min(availableWidth, availableHeight) / 2;
-    const optimalRadiusPixels = maxAvailableRadius * 0.75; // 75% of available space for padding
+  // Calculate the optimal radius in pixels based on available space
+  const maxAvailableRadius = Math.min(availableWidth, availableHeight) / 2;
+  const optimalRadiusPixels = maxAvailableRadius * 0.75; // 75% of available space for padding
 
-    // If original dimensions are provided, convert to percentage of original container
-    if (originalWidth && originalHeight) {
-      const originalMaxRadius = Math.min(originalWidth, originalHeight) / 2;
-      return Math.min(
-        Math.max((optimalRadiusPixels / originalMaxRadius) * 100, 30),
-        90,
-      );
-    }
+  // If original dimensions are provided, convert to percentage of original container
+  if (originalWidth && originalHeight) {
+    const originalMaxRadius = Math.min(originalWidth, originalHeight) / 2;
+    return Math.min(
+      Math.max((optimalRadiusPixels / originalMaxRadius) * 100, 30),
+      90,
+    );
+  }
 
-    // Fallback: use a conservative percentage
-    return 60;
+  // Fallback: use a conservative percentage
+  return 60;
 };
 
 /**

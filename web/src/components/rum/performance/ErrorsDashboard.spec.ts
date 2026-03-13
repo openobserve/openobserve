@@ -11,40 +11,40 @@ vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
     template: '<div class="render-dashboard-charts-mock"><slot /></div>',
     props: ["viewOnly", "dashboardData", "currentTimeObj", "searchType"],
     methods: {
-      layoutUpdate: vi.fn()
-    }
-  }
+      layoutUpdate: vi.fn(),
+    },
+  },
 }));
 
 vi.mock("@/utils/rum/errors.json", () => ({
   default: {
     title: "RUM Errors Dashboard",
     panels: [],
-    variables: { list: [] }
-  }
+    variables: { list: [] },
+  },
 }));
 
 vi.mock("@/services/search", () => ({
   default: {
-    search: vi.fn()
-  }
+    search: vi.fn(),
+  },
 }));
 
 vi.mock("../../../utils/dashboard/convertDashboardSchemaVersion", () => ({
-  convertDashboardSchemaVersion: vi.fn((data) => data)
+  convertDashboardSchemaVersion: vi.fn((data) => data),
 }));
 
 // Mock Vuex store
 const mockStore = {
   state: {
     selectedOrganization: {
-      identifier: "test-org"
-    }
-  }
+      identifier: "test-org",
+    },
+  },
 };
 
 vi.mock("vuex", () => ({
-  useStore: () => mockStore
+  useStore: () => mockStore,
 }));
 
 // Mock onMounted to prevent automatic execution
@@ -55,7 +55,7 @@ vi.mock("vue", async (importOriginal) => {
     ...actual,
     onMounted: vi.fn((callback: () => void) => {
       mountedCallback = callback;
-    })
+    }),
   };
 });
 
@@ -65,36 +65,36 @@ const i18n = createI18n({
     en: {
       rum: {
         viewURL: "View URL",
-        errorCount: "Error Count"
-      }
-    }
-  }
+        errorCount: "Error Count",
+      },
+    },
+  },
 });
 
 describe("ErrorsDashboard", () => {
   let wrapper: any;
-  
+
   const defaultProps = {
     dateTime: {
       startTime: 1234567890,
       endTime: 1234568000,
       relativeTimePeriod: "15m",
-      valueType: "relative"
+      valueType: "relative",
     },
     selectedDate: {
       startDate: "2023-01-01",
-      endDate: "2023-01-02"
-    }
+      endDate: "2023-01-02",
+    },
   };
 
   const createWrapper = (props = {}, options = {}) => {
     // Reset mounted callback before each test
     mountedCallback = null;
-    
+
     const wrapper = mount(ErrorsDashboard, {
       props: {
         ...defaultProps,
-        ...props
+        ...props,
       },
       global: {
         plugins: [i18n],
@@ -102,35 +102,44 @@ describe("ErrorsDashboard", () => {
           "q-page": {
             name: "q-page",
             template: '<div class="q-page"><slot /></div>',
-            props: ["class"]
+            props: ["class"],
           },
           "q-spinner-hourglass": {
-            name: "q-spinner-hourglass", 
+            name: "q-spinner-hourglass",
             template: '<div class="q-spinner-hourglass"></div>',
-            props: ["color", "size", "style"]
+            props: ["color", "size", "style"],
           },
-          "RenderDashboardCharts": {
+          RenderDashboardCharts: {
             name: "RenderDashboardCharts",
-            template: '<div class="render-dashboard-charts-mock"><slot /></div>',
-            props: ["viewOnly", "dashboardData", "currentTimeObj", "searchType"],
+            template:
+              '<div class="render-dashboard-charts-mock"><slot /></div>',
+            props: [
+              "viewOnly",
+              "dashboardData",
+              "currentTimeObj",
+              "searchType",
+            ],
             methods: {
-              layoutUpdate: vi.fn()
-            }
-          }
-        }
-      }
+              layoutUpdate: vi.fn(),
+            },
+          },
+        },
+      },
     });
-    
+
     // Initialize variablesData to prevent null reference errors
-    wrapper.vm.variablesData = options.variablesData || { isVariablesLoading: false, values: [] };
-    
+    wrapper.vm.variablesData = options.variablesData || {
+      isVariablesLoading: false,
+      values: [],
+    };
+
     // Add helper method to trigger mounted lifecycle
     wrapper.triggerMounted = async () => {
       if (mountedCallback) {
         await mountedCallback();
       }
     };
-    
+
     return wrapper;
   };
 
@@ -171,14 +180,19 @@ describe("ErrorsDashboard", () => {
     });
 
     it("should render RenderDashboardCharts component", () => {
-      const renderComponent = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      const renderComponent = wrapper.findComponent({
+        name: "RenderDashboardCharts",
+      });
       expect(renderComponent.exists()).toBe(true);
     });
   });
 
   describe("Dashboard Loading", () => {
     beforeEach(() => {
-      wrapper = createWrapper({}, { variablesData: { isVariablesLoading: true, values: [] } });
+      wrapper = createWrapper(
+        {},
+        { variablesData: { isVariablesLoading: true, values: [] } },
+      );
     });
 
     it("should load dashboard data", async () => {

@@ -22,7 +22,7 @@ import {
   mockAkeylessFormData,
   createCipherKeyMountConfig,
   setupCipherKeyMocks,
-  cloneMockData
+  cloneMockData,
 } from "@/test/unit/fixtures/cipherKeyTestFixtures";
 
 installQuasar({
@@ -42,10 +42,9 @@ describe("AddAkeylessType", () => {
     const freshFormData = cloneMockData(mockAkeylessFormData);
 
     // Create mount configuration using shared fixtures
-    mountConfig = createCipherKeyMountConfig(
-      AddAkeylessType,
-      { formData: freshFormData }
-    );
+    mountConfig = createCipherKeyMountConfig(AddAkeylessType, {
+      formData: freshFormData,
+    });
 
     // Mount the component
     wrapper = mount(mountConfig.component, {
@@ -65,55 +64,69 @@ describe("AddAkeylessType", () => {
   describe("Component Mounting", () => {
     it("should mount AddAkeylessType component", () => {
       expect(wrapper.vm).toBeDefined();
-      expect(wrapper.find(".cipher-keys-add-akeyless-type").exists()).toBe(true);
+      expect(wrapper.find(".cipher-keys-add-akeyless-type").exists()).toBe(
+        true,
+      );
     });
   });
 
   describe("Form Fields", () => {
     it("should render base URL input field", () => {
-      const baseUrlInput = wrapper.find('[data-test="add-cipher-key-akeyless-baseurl-input"]');
+      const baseUrlInput = wrapper.find(
+        '[data-test="add-cipher-key-akeyless-baseurl-input"]',
+      );
       expect(baseUrlInput.exists()).toBe(true);
     });
 
     it("should render access ID input field", () => {
-      const accessIdInput = wrapper.find('[data-test="add-cipher-key-akeyless-access-id-input"]');
+      const accessIdInput = wrapper.find(
+        '[data-test="add-cipher-key-akeyless-access-id-input"]',
+      );
       expect(accessIdInput.exists()).toBe(true);
     });
 
     it("should render authentication type select", () => {
-      const authTypeSelect = wrapper.find('[data-test="add-cipher-key-auth-method-input"]');
+      const authTypeSelect = wrapper.find(
+        '[data-test="add-cipher-key-auth-method-input"]',
+      );
       expect(authTypeSelect.exists()).toBe(true);
     });
 
     it("should render secret type select", () => {
-      const secretTypeSelect = wrapper.find('[data-test="add-cipher-key-secret-type-input"]');
+      const secretTypeSelect = wrapper.find(
+        '[data-test="add-cipher-key-secret-type-input"]',
+      );
       expect(secretTypeSelect.exists()).toBe(true);
     });
   });
 
   describe("Validation Rules", () => {
     it("should validate base URL is required", () => {
-      const baseUrlInput = wrapper.find('[data-test="add-cipher-key-akeyless-baseurl-input"]');
+      const baseUrlInput = wrapper.find(
+        '[data-test="add-cipher-key-akeyless-baseurl-input"]',
+      );
       expect(baseUrlInput.exists()).toBe(true);
-      
+
       // Test the required rule logic directly
       const emptyValue = "";
-      const requiredRuleResult = !!emptyValue || 'Base URL is required';
-      expect(requiredRuleResult).toBe('Base URL is required');
-      
+      const requiredRuleResult = !!emptyValue || "Base URL is required";
+      expect(requiredRuleResult).toBe("Base URL is required");
+
       const validValue = "https://api.akeyless.io";
-      const validRuleResult = !!validValue || 'Base URL is required';
+      const validRuleResult = !!validValue || "Base URL is required";
       expect(validRuleResult).toBe(true);
     });
 
     it("should validate access ID format", () => {
-      const accessIdInput = wrapper.find('[data-test="add-cipher-key-akeyless-access-id-input"]');
+      const accessIdInput = wrapper.find(
+        '[data-test="add-cipher-key-akeyless-access-id-input"]',
+      );
       expect(accessIdInput.exists()).toBe(true);
-      
+
       // Test the alphanumeric validation rule directly
       const validAccessId = "test-access-id123";
       const invalidAccessId = "test@access#id";
-      
+
       expect(/^[a-zA-Z0-9-]*$/.test(validAccessId)).toBe(true);
       expect(/^[a-zA-Z0-9-]*$/.test(invalidAccessId)).toBe(false);
     });
@@ -121,7 +134,7 @@ describe("AddAkeylessType", () => {
     it("should reject HTML tags in base URL", () => {
       const htmlTag = "<script>alert('test')</script>";
       const cleanUrl = "https://api.akeyless.io";
-      
+
       // Test the HTML tag validation rule directly
       expect(/<[^>]*>/.test(htmlTag)).toBe(true);
       expect(/<[^>]*>/.test(cleanUrl)).toBe(false);
@@ -137,18 +150,24 @@ describe("AddAkeylessType", () => {
     it("should show access key field when access_key auth type is selected", async () => {
       wrapper.vm.formData.key.store.akeyless.auth.type = "access_key";
       await wrapper.vm.$nextTick();
-      
-      const accessKeyInput = wrapper.find('[data-test="add-cipher-key-akeyless-access-key-input"]');
+
+      const accessKeyInput = wrapper.find(
+        '[data-test="add-cipher-key-akeyless-access-key-input"]',
+      );
       expect(accessKeyInput.exists()).toBe(true);
     });
 
     it("should show LDAP fields when ldap auth type is selected", async () => {
       wrapper.vm.formData.key.store.akeyless.auth.type = "ldap";
       await wrapper.vm.$nextTick();
-      
-      const usernameInput = wrapper.find('[data-test="add-cipher-key-akeyless-ldap-username-input"]');
-      const passwordInput = wrapper.find('[data-test="add-cipher-key-akeyless-ldap-password-input"]');
-      
+
+      const usernameInput = wrapper.find(
+        '[data-test="add-cipher-key-akeyless-ldap-username-input"]',
+      );
+      const passwordInput = wrapper.find(
+        '[data-test="add-cipher-key-akeyless-ldap-password-input"]',
+      );
+
       expect(usernameInput.exists()).toBe(true);
       expect(passwordInput.exists()).toBe(true);
     });
@@ -158,19 +177,27 @@ describe("AddAkeylessType", () => {
     it("should show static secret field when static_secret type is selected", async () => {
       wrapper.vm.formData.key.store.akeyless.store.type = "static_secret";
       await wrapper.vm.$nextTick();
-      
-      const staticSecretInput = wrapper.find('[data-test="add-cipher-key-akeyless-static-secret-name-input"]');
+
+      const staticSecretInput = wrapper.find(
+        '[data-test="add-cipher-key-akeyless-static-secret-name-input"]',
+      );
       expect(staticSecretInput.exists()).toBe(true);
     });
 
     it("should show DFC fields when dfc type is selected", async () => {
       wrapper.vm.formData.key.store.akeyless.store.type = "dfc";
       await wrapper.vm.$nextTick();
-      
-      const dfcNameInput = wrapper.find('[data-test="add-cipher-key-akeyless-dfc-name-input"]');
-      const dfcIvInput = wrapper.find('[data-test="add-cipher-key-akeyless-dfc-iv-input"]');
-      const dfcEncryptedDataInput = wrapper.find('[data-test="add-cipher-key-akeyless-dfc-encrypted-data-input"]');
-      
+
+      const dfcNameInput = wrapper.find(
+        '[data-test="add-cipher-key-akeyless-dfc-name-input"]',
+      );
+      const dfcIvInput = wrapper.find(
+        '[data-test="add-cipher-key-akeyless-dfc-iv-input"]',
+      );
+      const dfcEncryptedDataInput = wrapper.find(
+        '[data-test="add-cipher-key-akeyless-dfc-encrypted-data-input"]',
+      );
+
       expect(dfcNameInput.exists()).toBe(true);
       expect(dfcIvInput.exists()).toBe(true);
       expect(dfcEncryptedDataInput.exists()).toBe(true);
@@ -214,10 +241,9 @@ describe("AddAkeylessType", () => {
       };
 
       // Create mount configuration using shared fixtures
-      const updateMountConfig = createCipherKeyMountConfig(
-        AddAkeylessType,
-        { formData: mockUpdateFormData }
-      );
+      const updateMountConfig = createCipherKeyMountConfig(AddAkeylessType, {
+        formData: mockUpdateFormData,
+      });
 
       // Mount the component
       updateWrapper = mount(updateMountConfig.component, {
@@ -235,7 +261,7 @@ describe("AddAkeylessType", () => {
     it("should show update buttons in update mode", () => {
       // Check if component is in update mode
       expect(updateWrapper.vm.formData.isUpdate).toBe(true);
-      
+
       // Test that component is properly mounted in update mode
       expect(updateWrapper.exists()).toBe(true);
     });
@@ -243,7 +269,7 @@ describe("AddAkeylessType", () => {
     it("should toggle to edit mode when update button is clicked", async () => {
       // Check if component supports update mode functionality
       expect(updateWrapper.vm.formData.isUpdate).toBe(true);
-      
+
       // Test underlying functionality for update mode
       expect(updateWrapper.exists()).toBe(true);
     });
@@ -251,7 +277,7 @@ describe("AddAkeylessType", () => {
     it("should show cancel button when in edit mode", async () => {
       // Test that component properly handles update mode
       expect(updateWrapper.vm.formData.isUpdate).toBe(true);
-      
+
       // Verify component structure in update mode
       expect(updateWrapper.exists()).toBe(true);
     });
@@ -259,13 +285,17 @@ describe("AddAkeylessType", () => {
 
   describe("Helper Functions", () => {
     it("should get correct authentication type label", () => {
-      expect(wrapper.vm.getAuthenticationTypeLabel("access_key")).toBe("Access Key");
+      expect(wrapper.vm.getAuthenticationTypeLabel("access_key")).toBe(
+        "Access Key",
+      );
       expect(wrapper.vm.getAuthenticationTypeLabel("ldap")).toBe("LDAP");
       expect(wrapper.vm.getAuthenticationTypeLabel("unknown")).toBe("");
     });
 
     it("should get correct secret option label", () => {
-      expect(wrapper.vm.getSecretOptionLabel("static_secret")).toBe("Static Secret");
+      expect(wrapper.vm.getSecretOptionLabel("static_secret")).toBe(
+        "Static Secret",
+      );
       expect(wrapper.vm.getSecretOptionLabel("dfc")).toBe("DFC");
       expect(wrapper.vm.getSecretOptionLabel("unknown")).toBe("");
     });
@@ -274,31 +304,36 @@ describe("AddAkeylessType", () => {
   describe("Form Data Updates", () => {
     it("should update base URL when input changes", async () => {
       // Test direct form data update (simulating v-model binding)
-      wrapper.vm.formData.key.store.akeyless.base_url = "https://api.akeyless.io";
+      wrapper.vm.formData.key.store.akeyless.base_url =
+        "https://api.akeyless.io";
       await wrapper.vm.$nextTick();
-      
-      expect(wrapper.vm.formData.key.store.akeyless.base_url).toBe("https://api.akeyless.io");
+
+      expect(wrapper.vm.formData.key.store.akeyless.base_url).toBe(
+        "https://api.akeyless.io",
+      );
     });
 
     it("should update authentication type when select changes", async () => {
       wrapper.vm.formData.key.store.akeyless.auth.type = "ldap";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.formData.key.store.akeyless.auth.type).toBe("ldap");
     });
 
     it("should update secret type when select changes", async () => {
       wrapper.vm.formData.key.store.akeyless.store.type = "dfc";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.formData.key.store.akeyless.store.type).toBe("dfc");
     });
 
     it("should update access ID when input value changes", async () => {
       wrapper.vm.formData.key.store.akeyless.access_id = "new-access-id";
       await wrapper.vm.$nextTick();
-      
-      expect(wrapper.vm.formData.key.store.akeyless.access_id).toBe("new-access-id");
+
+      expect(wrapper.vm.formData.key.store.akeyless.access_id).toBe(
+        "new-access-id",
+      );
     });
   });
 });

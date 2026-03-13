@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card style="min-width: 600px; max-width: 800px">
       <!-- Header -->
       <q-card-section class="row items-center q-pb-none">
-        <div class="text-h6">{{ t('correlation.logs.filters.title') }}</div>
+        <div class="text-h6">{{ t("correlation.logs.filters.title") }}</div>
         <q-space />
         <q-btn
           icon="close"
@@ -43,18 +43,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section class="q-pt-md">
         <!-- Description -->
         <div class="tw:mb-4 tw:text-sm tw:text-gray-600">
-          {{ t('correlation.logs.filters.description') }}
+          {{ t("correlation.logs.filters.description") }}
         </div>
 
         <!-- Matched Dimensions (Stable) -->
         <div class="tw:mb-6">
           <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3">
             <h3 class="tw:text-base tw:font-semibold tw:m-0">
-              {{ t('correlation.logs.filters.matchedDimensions') }}
+              {{ t("correlation.logs.filters.matchedDimensions") }}
             </h3>
-            <q-icon name="info" size="sm" color="primary">
+            <q-icon name="info" size="sm"
+color="primary">
               <q-tooltip max-width="300px">
-                {{ t('correlation.logs.filters.matchedDimensionsTooltip') }}
+                {{ t("correlation.logs.filters.matchedDimensionsTooltip") }}
               </q-tooltip>
             </q-icon>
           </div>
@@ -67,7 +68,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`matched-dimension-${key}`"
             >
               <div class="tw:flex-1 tw:flex tw:items-center tw:gap-3">
-                <q-icon name="lock" size="sm" color="primary" />
+                <q-icon name="lock" size="sm"
+color="primary" />
                 <span class="tw:font-semibold tw:text-sm">{{ key }}:</span>
                 <q-input
                   v-model="pendingFilters[key]"
@@ -78,9 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`matched-dimension-input-${key}`"
                 />
               </div>
-              <q-icon name="check_circle" size="sm" color="positive">
+              <q-icon name="check_circle" size="sm"
+color="positive">
                 <q-tooltip>
-                  {{ t('correlation.logs.filters.stableDimension') }}
+                  {{ t("correlation.logs.filters.stableDimension") }}
                 </q-tooltip>
               </q-icon>
             </div>
@@ -88,14 +91,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Additional Dimensions (Unstable) -->
-        <div v-if="Object.keys(additionalDimensions).length > 0" class="tw:mb-4">
+        <div
+          v-if="Object.keys(additionalDimensions).length > 0"
+          class="tw:mb-4"
+        >
           <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3">
             <h3 class="tw:text-base tw:font-semibold tw:m-0">
-              {{ t('correlation.logs.filters.additionalDimensions') }}
+              {{ t("correlation.logs.filters.additionalDimensions") }}
             </h3>
-            <q-icon name="info" size="sm" color="warning">
+            <q-icon name="info" size="sm"
+color="warning">
               <q-tooltip max-width="300px">
-                {{ t('correlation.logs.filters.additionalDimensionsTooltip') }}
+                {{ t("correlation.logs.filters.additionalDimensionsTooltip") }}
               </q-tooltip>
             </q-icon>
           </div>
@@ -109,7 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="tw:flex-1 tw:flex tw:flex-col tw:gap-2">
                 <div class="tw:flex tw:items-center tw:gap-3">
-                  <q-icon name="warning" size="sm" color="warning" />
+                  <q-icon name="warning" size="sm"
+color="warning" />
                   <span class="tw:font-semibold tw:text-sm">{{ key }}:</span>
                   <q-input
                     v-model="pendingFilters[key]"
@@ -131,19 +139,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? t('correlation.logs.filters.showingAll')
                         : t('correlation.logs.filters.setToAll')
                     "
-                    :color="pendingFilters[key] === SELECT_ALL_VALUE ? 'positive' : 'primary'"
+                    :color="
+                      pendingFilters[key] === SELECT_ALL_VALUE
+                        ? 'positive'
+                        : 'primary'
+                    "
                     icon="all_inclusive"
                     @click="toggleWildcard(key)"
                     :data-test="`toggle-wildcard-${key}`"
                   />
                   <span class="tw:ml-2 tw:text-xs tw:text-gray-500">
-                    {{ t('correlation.logs.filters.wildcardHelp') }}
+                    {{ t("correlation.logs.filters.wildcardHelp") }}
                   </span>
                 </div>
               </div>
-              <q-icon name="sync_problem" size="sm" color="warning">
+              <q-icon name="sync_problem" size="sm"
+color="warning">
                 <q-tooltip>
-                  {{ t('correlation.logs.filters.unstableDimension') }}
+                  {{ t("correlation.logs.filters.unstableDimension") }}
                 </q-tooltip>
               </q-icon>
             </div>
@@ -155,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           class="tw:p-3 tw:border tw:border-dashed tw:border-gray-300 tw:rounded tw:text-center tw:text-sm tw:text-gray-500"
         >
-          {{ t('correlation.logs.filters.noAdditionalDimensions') }}
+          {{ t("correlation.logs.filters.noAdditionalDimensions") }}
         </div>
       </q-card-section>
 
@@ -190,9 +203,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { SELECT_ALL_VALUE } from '@/utils/dashboard/constants';
+import { ref, computed, watch } from "vue";
+import { useI18n } from "vue-i18n";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 interface Props {
   modelValue: boolean;
@@ -205,9 +218,9 @@ interface Props {
 // Props & Emits
 const props = defineProps<Props>();
 const emit = defineEmits<{
-  'update:modelValue': [value: boolean];
-  'update:filters': [filters: Record<string, string>];
-  'close': [];
+  "update:modelValue": [value: boolean];
+  "update:filters": [filters: Record<string, string>];
+  close: [];
 }>();
 
 // Composables
@@ -239,7 +252,7 @@ const toggleWildcard = (key: string) => {
   if (pendingFilters.value[key] === SELECT_ALL_VALUE) {
     // Restore original value
     const originalValue =
-      props.additionalDimensions?.[key] || props.matchedDimensions[key] || '';
+      props.additionalDimensions?.[key] || props.matchedDimensions[key] || "";
     pendingFilters.value[key] = String(originalValue);
   } else {
     // Set to wildcard
@@ -251,8 +264,8 @@ const toggleWildcard = (key: string) => {
  * Handle apply button click
  */
 const handleApply = () => {
-  emit('update:filters', { ...pendingFilters.value });
-  emit('update:modelValue', false);
+  emit("update:filters", { ...pendingFilters.value });
+  emit("update:modelValue", false);
 };
 
 /**
@@ -261,8 +274,8 @@ const handleApply = () => {
 const handleCancel = () => {
   // Restore original filters
   pendingFilters.value = { ...props.currentFilters };
-  emit('update:modelValue', false);
-  emit('close');
+  emit("update:modelValue", false);
+  emit("close");
 };
 
 /**
@@ -279,7 +292,7 @@ const handleReset = () => {
 const handleClose = () => {
   // Restore original filters on close
   pendingFilters.value = { ...props.currentFilters };
-  emit('close');
+  emit("close");
 };
 
 // Watch for prop changes
@@ -288,7 +301,7 @@ watch(
   (newFilters) => {
     pendingFilters.value = { ...newFilters };
   },
-  { deep: true }
+  { deep: true },
 );
 
 watch(
@@ -298,7 +311,7 @@ watch(
       // Reset pending filters when dialog opens
       pendingFilters.value = { ...props.currentFilters };
     }
-  }
+  },
 );
 </script>
 

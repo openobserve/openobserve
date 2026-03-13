@@ -26,7 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <span v-if="showLabel" class="q-ml-xs">{{ t("search.shareLink") }}</span>
     <q-tooltip v-if="isWebUrlNotConfigured">
-     <q-icon color="warning" name="warning" class="q-mr-xs" /> {{ t("search.webUrlNotConfigured") }}
+      <q-icon color="warning" name="warning"
+class="q-mr-xs" />
+      {{ t("search.webUrlNotConfigured") }}
     </q-tooltip>
     <q-tooltip v-else-if="tooltip || !showLabel">
       {{ tooltip || t("search.shareLink") }}
@@ -165,7 +167,7 @@ export default defineComponent({
         } else if (attempts >= MAX_ATTEMPTS) {
           // Timeout: Stop polling after max attempts
           console.warn(
-            "Polling timeout: Short URL not received within time limit"
+            "Polling timeout: Short URL not received within time limit",
           );
           if (pollIntervalId) {
             clearInterval(pollIntervalId);

@@ -19,7 +19,7 @@
           size="20px"
         />
         <div
-          @click="showExpandIcon ? expanded = !expanded : null"
+          @click="showExpandIcon ? (expanded = !expanded) : null"
           class="tw:text-[14px] tw:font-bold"
           :class="[
             store.state.theme === 'dark'

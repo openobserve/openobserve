@@ -207,7 +207,8 @@
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn flat label="Close" color="primary" v-close-popup />
+          <q-btn flat label="Close"
+color="primary" v-close-popup />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -328,7 +329,7 @@ const filterOperationLabels = (val: string, update: any) => {
       // Filter labels based on input
       const needle = val.toLowerCase();
       filteredLabels.value = availableLabels.value.filter((label: string) =>
-        label.toLowerCase().includes(needle)
+        label.toLowerCase().includes(needle),
       );
     }
   });
@@ -340,7 +341,7 @@ watch(
   (newLabels) => {
     filteredLabels.value = newLabels;
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 defineExpose({

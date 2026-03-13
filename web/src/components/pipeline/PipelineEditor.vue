@@ -39,23 +39,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="flex justify-end items-center">
           <!-- this is normal secondary button but only icon is there without label -->
-            <q-btn
-              class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode tw:h-[36px] o2-secondary-button tw:min-w-0"
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-              no-caps
-              flat
-              icon="code"
-              data-test="pipeline-json-edit-btn"
-              @click="openJsonEditor"
-            >
-                  <q-tooltip>{{ t('pipeline.editPipelineJson') }}</q-tooltip>
-                </q-btn>
+          <q-btn
+            class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode tw:h-[36px] o2-secondary-button tw:min-w-0"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
+            no-caps
+            flat
+            icon="code"
+            data-test="pipeline-json-edit-btn"
+            @click="openJsonEditor"
+          >
+            <q-tooltip>{{ t("pipeline.editPipelineJson") }}</q-tooltip>
+          </q-btn>
           <q-btn
             data-test="add-pipeline-cancel-btn"
             :label="t('pipeline.cancel')"
             flat
             class="q-ml-md o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
             no-caps
             @click="openCancelDialog"
           />
@@ -64,7 +72,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-pipeline-save-btn"
             :label="t('common.save')"
             class="q-ml-md o2-primary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
             no-caps
             flat
             :loading="isPipelineSaving"
@@ -85,7 +97,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("pipeline.nodes") }}
           </div>
 
-
           <div class="flex q-mt-sm">
             <NodeSidebar
               v-show="
@@ -100,7 +111,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="chartContainerRef"
           class="relative-position pipeline-chart-container o2vf_node"
           :class="store.state.theme === 'dark' ? '' : 'bg-grey-2'"
-          v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'"
+          v-show="
+            !pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'
+          "
         >
           <PipelineFlow />
         </div>
@@ -156,21 +169,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </q-dialog>
   <q-dialog
-        v-model="showJsonEditorDialog"
-        position="right"
-        full-height
-        maximized
-        :persistent="true"
-      >
-        <JsonEditor
-          :data="pipelineObj.currentSelectedPipeline"
-          :title="t('pipeline.editPipelineJSON')"
-          :type="'pipelines'"
-          :validation-errors="validationErrors"
-          @close="showJsonEditorDialog = false"
-          @saveJson="savePipelineJson"
-        />
-      </q-dialog>
+    v-model="showJsonEditorDialog"
+    position="right"
+    full-height
+    maximized
+    :persistent="true"
+  >
+    <JsonEditor
+      :data="pipelineObj.currentSelectedPipeline"
+      :title="t('pipeline.editPipelineJSON')"
+      :type="'pipelines'"
+      :validation-errors="validationErrors"
+      @close="showJsonEditorDialog = false"
+      @saveJson="savePipelineJson"
+    />
+  </q-dialog>
   <confirm-dialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
@@ -217,9 +230,15 @@ import ConditionForm from "@/components/pipeline/NodeForm/Condition.vue";
 import LlmEvaluation from "@/components/pipeline/NodeForm/LlmEvaluation.vue";
 import { MarkerType, useVueFlow } from "@vue-flow/core";
 import ExternalDestination from "./NodeForm/ExternalDestination.vue";
-import { contextRegistry, createPipelinesContextProvider } from "@/composables/contextProviders";
+import {
+  contextRegistry,
+  createPipelinesContextProvider,
+} from "@/composables/contextProviders";
 import JsonEditor from "../common/JsonEditor.vue";
-import { validatePipeline as validatePipelineUtil, type ValidationResult } from '../../utils/validatePipeline';
+import {
+  validatePipeline as validatePipelineUtil,
+  type ValidationResult,
+} from "../../utils/validatePipeline";
 import { useReo } from "@/services/reodotdev_analytics";
 
 const functionImage = getImageURL("images/pipeline/transform_function.png");
@@ -416,7 +435,6 @@ const functionOptions = ref<string[]>([]);
 const pipelineDestinationsList = ref<any[]>([]);
 const usedStreamsListResponse = ref<any[]>([]);
 
-
 const streamRoutes = ref<{ [key: string]: any }>({});
 
 const editingStreamRouteName = ref<string>("");
@@ -466,7 +484,7 @@ watch(
       pipelineNameError.value = false;
       pipelineNameErrorMessage.value = "";
     }
-  }
+  },
 );
 
 // Watch for dialog changes to track node drops
@@ -492,18 +510,20 @@ watch(
           query: "Add Query Node",
           condition: "Add Condition Node",
           function: "Add Function Node",
-          remote_stream: "Add Remote Stream Node"
+          remote_stream: "Add Remote Stream Node",
         };
-        buttonName = nodeTypeMap[pipelineObj.dialog.name] || `Add ${pipelineObj.dialog.name}`;
+        buttonName =
+          nodeTypeMap[pipelineObj.dialog.name] ||
+          `Add ${pipelineObj.dialog.name}`;
       }
 
       track("Button Click", {
         button: buttonName,
-        page: "Pipeline Editor"
+        page: "Pipeline Editor",
       });
     }
   },
-  { immediate: false }
+  { immediate: false },
 );
 
 onBeforeMount(() => {
@@ -545,53 +565,56 @@ onBeforeMount(() => {
 });
 
 // Initialize Vue Flow composables
-const { getSelectedEdges, removeEdges } = useVueFlow()
+const { getSelectedEdges, removeEdges } = useVueFlow();
 
 onMounted(async () => {
   window.addEventListener("beforeunload", beforeUnloadHandler);
-  
+
   // Add keyboard handler for edge deletion
   const handleKeydown = (event) => {
-    if (event.key === 'Delete' || event.key === 'Backspace') {
-      const selectedEdges = getSelectedEdges.value
-      
+    if (event.key === "Delete" || event.key === "Backspace") {
+      const selectedEdges = getSelectedEdges.value;
+
       if (selectedEdges.length > 0) {
-        event.preventDefault()
-        const edgeIds = selectedEdges.map(edge => edge.id)
-        removeEdges(edgeIds)
+        event.preventDefault();
+        const edgeIds = selectedEdges.map((edge) => edge.id);
+        removeEdges(edgeIds);
       }
     }
-  }
-  
+  };
+
   window.addEventListener("keydown", handleKeydown);
-  
+
   // Store handler reference for cleanup
   (window as any).pipelineKeydownHandler = handleKeydown;
-  
+
   pipelineDestinationsList.value = await getPipelineDestinations();
   usedStreamsListResponse.value = await getUsedStreamsList();
-  const { path, query } = router.currentRoute.value; 
-    if (path.includes("edit") && !query.id) {
-      router.push({
-        name:"pipelines",
-        query:{
-          org_identifier: store.state.selectedOrganization.identifier
-        }
-      })
-    }
-    
+  const { path, query } = router.currentRoute.value;
+  if (path.includes("edit") && !query.id) {
+    router.push({
+      name: "pipelines",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    });
+  }
+
   // Setup pipelines context provider
   setupPipelinesContextProvider();
-  });
+});
 
 onUnmounted(() => {
   window.removeEventListener("beforeunload", beforeUnloadHandler);
-  
+
   // Cleanup keyboard handler
   if ((window as any).pipelineKeydownHandler) {
-    window.removeEventListener("keydown", (window as any).pipelineKeydownHandler);
+    window.removeEventListener(
+      "keydown",
+      (window as any).pipelineKeydownHandler,
+    );
   }
-  
+
   // Cleanup pipelines context provider
   cleanupPipelinesContextProvider();
 });
@@ -768,7 +791,7 @@ const savePipeline = async () => {
       position: "bottom",
       timeout: 3000,
     });
-    if(showJsonEditorDialog.value == true){
+    if (showJsonEditorDialog.value == true) {
       validationErrors.value = [t("pipeline.sourceNodeRequired")];
     }
     return;
@@ -779,7 +802,7 @@ const savePipeline = async () => {
       position: "bottom",
       timeout: 3000,
     });
-    if(showJsonEditorDialog.value == true){
+    if (showJsonEditorDialog.value == true) {
       validationErrors.value = [t("pipeline.destinationNodeRequired")];
     }
     return;
@@ -813,7 +836,7 @@ const savePipeline = async () => {
       position: "bottom",
       timeout: 3000,
     });
-    if(showJsonEditorDialog.value == true){
+    if (showJsonEditorDialog.value == true) {
       validationErrors.value = [t("pipeline.connectAllNodes")];
     }
     return;
@@ -866,8 +889,8 @@ const onSubmitPipeline = async () => {
   //   isPipelineSaving.value = false;
   //   return;
   // }
-  if(showJsonEditorDialog.value == false){
-    if(!validatePipeline()){
+  if (showJsonEditorDialog.value == false) {
+    if (!validatePipeline()) {
       isPipelineSaving.value = false;
       return;
     }
@@ -877,6 +900,11 @@ const onSubmitPipeline = async () => {
     position: "bottom",
     spinner: true,
   });
+
+  console.log(
+    "[PipelineEditor] Pipeline to save:",
+    JSON.stringify(pipelineObj.currentSelectedPipeline, null, 2),
+  );
 
   const saveOperation = pipelineObj.isEditPipeline
     ? pipelineService.updatePipeline({
@@ -898,30 +926,34 @@ const onSubmitPipeline = async () => {
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
-      });
-      q.notify({
-        message: t("pipeline.pipelineUpdated"),
-        color: "positive",
-        position: "bottom",
-        timeout: 3000,
-      });
-      }
-      else if (!pipelineObj.isEditPipeline && showJsonEditorDialog.value == false) {
+        });
+        q.notify({
+          message: t("pipeline.pipelineUpdated"),
+          color: "positive",
+          position: "bottom",
+          timeout: 3000,
+        });
+      } else if (
+        !pipelineObj.isEditPipeline &&
+        showJsonEditorDialog.value == false
+      ) {
         showJsonEditorDialog.value = false;
         router.push({
           name: "pipelines",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
-      });
+        });
         q.notify({
           message: t("pipeline.pipelineSaved"),
           color: "positive",
           position: "bottom",
           timeout: 3000,
         });
-      }
-      else if(pipelineObj.isEditPipeline && showJsonEditorDialog.value == true){
+      } else if (
+        pipelineObj.isEditPipeline &&
+        showJsonEditorDialog.value == true
+      ) {
         showJsonEditorDialog.value = false;
         q.notify({
           message: t("pipeline.pipelineUpdated"),
@@ -929,8 +961,7 @@ const onSubmitPipeline = async () => {
           position: "bottom",
           timeout: 3000,
         });
-      }
-      else{
+      } else {
         showJsonEditorDialog.value = false;
         router.push({
           name: "pipelines",
@@ -945,8 +976,6 @@ const onSubmitPipeline = async () => {
           timeout: 3000,
         });
       }
-
-
     })
     .catch((error) => {
       if (pipelineObj.isEditPipeline) {
@@ -962,20 +991,24 @@ const onSubmitPipeline = async () => {
           position: "bottom",
           timeout: 3000,
         });
-        if(showJsonEditorDialog.value == true){
+        if (showJsonEditorDialog.value == true) {
           validationErrors.value = [t("pipeline.connectAllNodes")];
         }
       } else {
         if (error.response.status != 403) {
           q.notify({
             message:
-              error.response?.data?.message || t("pipeline.errorSavingPipeline"),
+              error.response?.data?.message ||
+              t("pipeline.errorSavingPipeline"),
             color: "negative",
             position: "bottom",
             timeout: 3000,
           });
-          if(showJsonEditorDialog.value == true){
-            validationErrors.value = [error.response?.data?.message || t("pipeline.errorSavingPipeline")];
+          if (showJsonEditorDialog.value == true) {
+            validationErrors.value = [
+              error.response?.data?.message ||
+                t("pipeline.errorSavingPipeline"),
+            ];
           }
         }
       }
@@ -984,10 +1017,10 @@ const onSubmitPipeline = async () => {
       isPipelineSaving.value = false;
       dismiss();
     });
-    track("Button Click", {
-      button: "Save Pipeline",
-      page: "Add Pipeline"
-    });
+  track("Button Click", {
+    button: "Save Pipeline",
+    page: "Add Pipeline",
+  });
 };
 
 const openCancelDialog = () => {
@@ -1009,7 +1042,7 @@ const openCancelDialog = () => {
       });
       track("Button Click", {
         button: "Cancel Pipeline",
-        page: "Add Pipeline"
+        page: "Add Pipeline",
       });
     };
   } else {
@@ -1138,39 +1171,53 @@ const savePipelineJson = async (json: string) => {
     const parsedPipeline = JSON.parse(json);
     let streamList: any = [];
     let usedStreamsList: any = [];
-    if(pipelineObj.currentSelectedPipeline.source.source_type === "realtime"){
-      try{
-        //there are couple of scenarios that we need to take care of 
-        //if user gets error that this stream is not there 
-        //2. we dont know if user selects scheduled or realtime right so we need to do this check at the time of saving only 
+    if (pipelineObj.currentSelectedPipeline.source.source_type === "realtime") {
+      try {
+        //there are couple of scenarios that we need to take care of
+        //if user gets error that this stream is not there
+        //2. we dont know if user selects scheduled or realtime right so we need to do this check at the time of saving only
         //3. TODO: store these list in the store so that unnecessary api calls will be avoided.
-        const streamsListResponse: any = await getStreams(parsedPipeline.source.stream_type || "logs", false);
+        const streamsListResponse: any = await getStreams(
+          parsedPipeline.source.stream_type || "logs",
+          false,
+        );
         streamList = streamsListResponse.list.map((stream: any) => stream.name);
-        usedStreamsList = usedStreamsListResponse.value.filter((stream: any) => stream.stream_type == parsedPipeline.source.stream_type).map((stream: any) => stream.stream_name);
-      }
-      catch(error){
-        console.log(error, 'error')
+        usedStreamsList = usedStreamsListResponse.value
+          .filter(
+            (stream: any) =>
+              stream.stream_type == parsedPipeline.source.stream_type,
+          )
+          .map((stream: any) => stream.stream_name);
+      } catch (error) {
+        console.log(error, "error");
       }
     }
 
-    const validationResult = validatePipelineUtil(parsedPipeline, { streamList: streamList, usedStreamsList: usedStreamsList, originalPipeline: pipelineObj.currentSelectedPipeline, pipelineDestinations: pipelineDestinationsList.value, functionsList: functionOptions.value, selectedOrgId: store.state.selectedOrganization.identifier });
-    
+    const validationResult = validatePipelineUtil(parsedPipeline, {
+      streamList: streamList,
+      usedStreamsList: usedStreamsList,
+      originalPipeline: pipelineObj.currentSelectedPipeline,
+      pipelineDestinations: pipelineDestinationsList.value,
+      functionsList: functionOptions.value,
+      selectedOrgId: store.state.selectedOrganization.identifier,
+    });
+
     if (!validationResult.isValid) {
       // Set validation errors to be displayed in the JsonEditor
       validationErrors.value = validationResult.errors;
       return; // Don't save if validation fails
     }
-    
+
     // Clear any previous validation errors
     validationErrors.value = [];
-    
+
     // Only save if validation passes
     pipelineObj.currentSelectedPipeline = parsedPipeline;
     savePipeline();
   } catch (error) {
-    console.log(error, 'error')
+    console.log(error, "error");
     // Handle JSON parsing errors
-    validationErrors.value = ['Invalid JSON format'];
+    validationErrors.value = ["Invalid JSON format"];
   }
 };
 
@@ -1178,28 +1225,28 @@ const savePipelineJson = async (json: string) => {
 
 /**
  * Setup the pipelines context provider for AI chat integration
- * 
+ *
  * Example: When user opens pipeline editor, this registers the context provider
  * that will extract pipeline information for AI context
  */
 const setupPipelinesContextProvider = () => {
   const provider = createPipelinesContextProvider(pipelineObj, store);
-  
-  contextRegistry.register('pipelines', provider);
-  contextRegistry.setActive('pipelines');
+
+  contextRegistry.register("pipelines", provider);
+  contextRegistry.setActive("pipelines");
 };
 
 /**
  * Cleanup pipelines context provider when leaving pipeline editor
- * 
+ *
  * Example: When user navigates away from pipeline editor, this removes the provider
  * but keeps the default provider available for fallback
  */
 const cleanupPipelinesContextProvider = () => {
   // Only unregister the pipelines provider, keep default provider
-  contextRegistry.unregister('pipelines');
+  contextRegistry.unregister("pipelines");
   // Reset to no active provider, so it falls back to default
-  contextRegistry.setActive('');
+  contextRegistry.setActive("");
 };
 
 // [END] Pipelines Context Provider Setup
@@ -1236,7 +1283,7 @@ const cleanupPipelinesContextProvider = () => {
   position: relative;
 
   &::after {
-    content: '';
+    content: "";
     position: absolute;
     bottom: -2px;
     left: 0;
@@ -1270,10 +1317,10 @@ const cleanupPipelinesContextProvider = () => {
   transition: none !important;
   transform: none !important;
   animation: none !important;
-  
+
   * {
     transition: none !important;
-    transform: none !important; 
+    transform: none !important;
     animation: none !important;
   }
 }
@@ -1299,7 +1346,7 @@ const cleanupPipelinesContextProvider = () => {
     align-items: center;
     background: rgba(255, 255, 255, 0.9);
     backdrop-filter: blur(10px);
-    
+
     // Disable ALL transitions when dragging for zero lag
     &:active,
     &.dragging {
@@ -1322,7 +1369,7 @@ const cleanupPipelinesContextProvider = () => {
     cursor: grab;
     min-height: 36px;
     padding: 8px 16px;
-    
+
     // Disable transitions during drag for zero lag
     &:active,
     &.dragging {
@@ -1340,7 +1387,7 @@ const cleanupPipelinesContextProvider = () => {
     padding: 8px 16px;
 
     border: 1px solid rgba(74, 222, 128, 0.4);
-    color: #181a1B;
+    color: #181a1b;
     border-radius: 8px;
     background: rgba(240, 253, 244, 0.9);
     box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
@@ -1362,7 +1409,6 @@ const cleanupPipelinesContextProvider = () => {
     }
   }
 
-
   .o2vf_node_default,
   .vue-flow__node-default {
     border: 1px solid #f59e0b;
@@ -1374,13 +1420,13 @@ const cleanupPipelinesContextProvider = () => {
     cursor: grab;
     min-height: 36px;
     padding: 8px 16px;
-    
+
     &:hover {
       border: 1px solid #f59e0b !important;
       background: rgba(255, 251, 235, 0.95) !important;
       box-shadow: 0 6px 16px rgba(217, 119, 6, 0.2) !important;
     }
-    
+
     // Disable transitions during drag for zero lag
     &:active,
     &.dragging {
@@ -1391,7 +1437,6 @@ const cleanupPipelinesContextProvider = () => {
       }
     }
   }
-
 }
 
 // Dark mode nodes header styling
@@ -1448,5 +1493,4 @@ const cleanupPipelinesContextProvider = () => {
     }
   }
 }
-
 </style>

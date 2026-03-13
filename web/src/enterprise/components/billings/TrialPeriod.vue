@@ -15,26 +15,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="full-width trial-period-container q-pa-md gradient-banner" v-if="showTrialPeriodMsg == true">
+  <div
+    class="full-width trial-period-container q-pa-md gradient-banner"
+    v-if="showTrialPeriodMsg == true"
+  >
     <div class="row">
       <div class="col">
         <span class="o2-trial-message">{{ getTrialPeriodMessage() }}</span>
         <br />
-        <span class="o2-trial-subtitle">Upgrade to a plan to continue enjoying the services by OpenObserve.</span>
+        <span class="o2-trial-subtitle"
+          >Upgrade to a plan to continue enjoying the services by
+          OpenObserve.</span
+        >
       </div>
       <div class="col-2 q-mt-sm" v-if="currentPage != 'billing'">
-        <q-btn 
-          @click="redirectBilling" 
+        <q-btn
+          @click="redirectBilling"
           class="cursor-pointer text-capitalize bg-primary text-white q-px-md q-py-sm rounded-md float-right"
           dense
-        >{{ t("billing.upgradeNow") }}</q-btn>
+          >{{ t("billing.upgradeNow") }}</q-btn
+        >
       </div>
       <div class="col-2 q-mt-sm" v-if="currentPage == 'billing'">
-        <q-btn 
-          @click="redirectContactSupport" 
+        <q-btn
+          @click="redirectContactSupport"
           class="cursor-pointer text-capitalize bg-primary text-white q-px-md q-py-sm rounded-md float-right"
           dense
-        >{{ t("billing.contactSupport") }}</q-btn>
+          >{{ t("billing.contactSupport") }}</q-btn
+        >
       </div>
     </div>
   </div>
@@ -52,16 +60,27 @@ import { siteURL } from "@/constants/config";
 import { getDueDays } from "@/utils/zincutils";
 import BillingService from "@/services/billings";
 
-
 export default defineComponent({
   name: "TrialPeriod",
   props: ["currentPage"],
   methods: {
     getTrialPeriodMessage() {
-      if(Object.hasOwn(this.store.state.organizationData.organizationSettings, "free_trial_expiry") && this.store.state.organizationData.organizationSettings.free_trial_expiry != "" && this.store.state.organizationData.organizationSettings.free_trial_expiry != null) {
-        let dueDays = this.getDueDays(this.store.state.organizationData.organizationSettings.free_trial_expiry);
-        if(dueDays >= 0) {
-          if(dueDays > 1) {
+      if (
+        Object.hasOwn(
+          this.store.state.organizationData.organizationSettings,
+          "free_trial_expiry",
+        ) &&
+        this.store.state.organizationData.organizationSettings
+          .free_trial_expiry != "" &&
+        this.store.state.organizationData.organizationSettings
+          .free_trial_expiry != null
+      ) {
+        let dueDays = this.getDueDays(
+          this.store.state.organizationData.organizationSettings
+            .free_trial_expiry,
+        );
+        if (dueDays >= 0) {
+          if (dueDays > 1) {
             return `${dueDays} Days remaining in your trial account`;
           } else {
             return `${dueDays} Day remaining in your trial account`;
@@ -78,9 +97,15 @@ export default defineComponent({
     const q = useQuasar();
     const router: any = useRouter();
 
-    const hasTrialExpiry = Object.hasOwn(store.state.organizationData.organizationSettings, "free_trial_expiry")
-      && store.state.organizationData.organizationSettings.free_trial_expiry != ""
-      && store.state.organizationData.organizationSettings.free_trial_expiry != null;
+    const hasTrialExpiry =
+      Object.hasOwn(
+        store.state.organizationData.organizationSettings,
+        "free_trial_expiry",
+      ) &&
+      store.state.organizationData.organizationSettings.free_trial_expiry !=
+        "" &&
+      store.state.organizationData.organizationSettings.free_trial_expiry !=
+        null;
 
     const showTrialPeriodMsg = ref(hasTrialExpiry);
 
@@ -89,7 +114,7 @@ export default defineComponent({
       try {
         if (config.isCloud === "true") {
           const res = await BillingService.list_subscription(
-            store.state.selectedOrganization.identifier
+            store.state.selectedOrganization.identifier,
           );
           if (res.data?.provider === "aws") {
             // AWS billing - don't show trial period message
@@ -103,12 +128,12 @@ export default defineComponent({
     });
 
     const redirectBilling = () => {
-      router.push('/billings/plans/')
+      router.push("/billings/plans/");
     };
 
     const redirectContactSupport = () => {
       window.open(siteURL.contactSupport, "_blank");
-    }
+    };
 
     return {
       t,
@@ -130,11 +155,12 @@ export default defineComponent({
     to right,
     transparent 60%,
     #f7f7ff 70%,
-    #cdf7e4 100%  );
+    #cdf7e4 100%
+  );
 }
 
 .trial-period-container {
-  border: 1px solid #D7D7D7;
+  border: 1px solid #d7d7d7;
   border-radius: 6px;
 }
 
@@ -155,12 +181,13 @@ export default defineComponent({
     background: linear-gradient(
       to right,
       transparent 60%,
-      #24262F 70%,
-      #2C3934 100%  );
+      #24262f 70%,
+      #2c3934 100%
+    );
   }
 
   .trial-period-container {
-    border: 1px solid #454F5B;
+    border: 1px solid #454f5b;
   }
 }
 </style>

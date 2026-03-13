@@ -1,20 +1,20 @@
-import { describe, it, expect } from 'vitest';
-import { mount } from '@vue/test-utils';
-import AppMetrics from './AppMetrics.vue';
+import { describe, it, expect } from "vitest";
+import { mount } from "@vue/test-utils";
+import AppMetrics from "./AppMetrics.vue";
 
 // Mock zinc-metrics component
 const ZincMetricsMock = {
-  name: 'ZincMetrics',
+  name: "ZincMetrics",
   template: '<div class="zinc-metrics-mock" data-test="zinc-metrics"></div>',
-  props: ['pageType'],
+  props: ["pageType"],
 };
 
-describe('AppMetrics.vue', () => {
-  it('should render zinc-metrics component', () => {
+describe("AppMetrics.vue", () => {
+  it("should render zinc-metrics component", () => {
     const wrapper = mount(AppMetrics, {
       global: {
         stubs: {
-          'zinc-metrics': ZincMetricsMock,
+          "zinc-metrics": ZincMetricsMock,
         },
       },
     });
@@ -26,32 +26,32 @@ describe('AppMetrics.vue', () => {
     const wrapper = mount(AppMetrics, {
       global: {
         stubs: {
-          'zinc-metrics': ZincMetricsMock,
+          "zinc-metrics": ZincMetricsMock,
         },
       },
     });
 
     const zincMetrics = wrapper.findComponent(ZincMetricsMock);
-    expect(zincMetrics.props('pageType')).toBe('metrics');
+    expect(zincMetrics.props("pageType")).toBe("metrics");
   });
 
-  it('should mount without errors', () => {
+  it("should mount without errors", () => {
     expect(() => {
       mount(AppMetrics, {
         global: {
           stubs: {
-            'zinc-metrics': ZincMetricsMock,
+            "zinc-metrics": ZincMetricsMock,
           },
         },
       });
     }).not.toThrow();
   });
 
-  it('should have correct component structure', () => {
+  it("should have correct component structure", () => {
     const wrapper = mount(AppMetrics, {
       global: {
         stubs: {
-          'zinc-metrics': ZincMetricsMock,
+          "zinc-metrics": ZincMetricsMock,
         },
       },
     });

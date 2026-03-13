@@ -9,23 +9,23 @@ import pipelineService from "@/services/pipelines";
 import { nextTick } from "vue";
 
 // Mock useDnD
-vi.mock('@/plugins/pipelines/useDnD', () => ({
+vi.mock("@/plugins/pipelines/useDnD", () => ({
   default: () => ({
     pipelineObj: {
       currentSelectedPipeline: {},
       pipelineWithoutChange: {},
-    }
-  })
+    },
+  }),
 }));
 
 // Mock Quasar
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
+vi.mock("quasar", async () => {
+  const actual = await vi.importActual("quasar");
   return {
     ...actual,
     useQuasar: () => ({
-      notify: vi.fn(() => vi.fn())
-    })
+      notify: vi.fn(() => vi.fn()),
+    }),
   };
 });
 
@@ -121,16 +121,16 @@ describe("PipelinesList", () => {
           StreamSelection: true,
           ConfirmDialog: true,
           ResumePipelineDialog: true,
-          'q-table': true,
-          'q-tr': true,
-          'q-td': true,
-          'q-checkbox': true,
-          'q-btn': true,
-          'q-tooltip': true,
-          'q-icon': true,
-          'q-input': true,
-          'app-tabs': true,
-          'q-table-pagination': true,
+          "q-table": true,
+          "q-tr": true,
+          "q-td": true,
+          "q-checkbox": true,
+          "q-btn": true,
+          "q-tooltip": true,
+          "q-icon": true,
+          "q-input": true,
+          "app-tabs": true,
+          "q-table-pagination": true,
         },
       },
     });
@@ -214,7 +214,7 @@ describe("PipelinesList", () => {
         "test-org",
         pipeline.pipeline_id,
         false,
-        true
+        true,
       );
     });
 
@@ -242,15 +242,13 @@ describe("PipelinesList", () => {
       const pipeline = mockPipelines.data.list[0];
       const mockLink = { click: vi.fn(), href: "", download: "" };
       global.document.createElement = vi.fn().mockReturnValue(mockLink);
-      
+
       wrapper.vm.exportPipeline(pipeline);
-      
+
       expect(global.URL.createObjectURL).toHaveBeenCalled();
       expect(mockLink.click).toHaveBeenCalled();
       expect(mockLink.download).toBe(`${pipeline.name}.json`);
       expect(global.URL.revokeObjectURL).toHaveBeenCalled();
     });
-
   });
-
 });

@@ -11,9 +11,12 @@
       stroke="currentColor"
       stroke-width="4"
     />
-    <circle cx="66" cy="6" r="6" fill="currentColor" />
-    <circle cx="126" cy="78" r="6" fill="currentColor" />
-    <circle cx="6" cy="78" r="6" fill="currentColor" />
+    <circle cx="66" cy="6"
+r="6" fill="currentColor" />
+    <circle cx="126" cy="78"
+r="6" fill="currentColor" />
+    <circle cx="6" cy="78"
+r="6" fill="currentColor" />
   </svg>
 </template>
 

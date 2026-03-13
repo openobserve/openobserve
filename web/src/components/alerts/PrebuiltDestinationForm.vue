@@ -29,7 +29,9 @@ limitations under the License.
           hide-bottom-space
           :rules="[
             (val: any) => !!val || 'Webhook URL is required',
-            (val: any) => val.startsWith('https://hooks.slack.com/') || 'Invalid Slack webhook URL'
+            (val: any) =>
+              val.startsWith('https://hooks.slack.com/') ||
+              'Invalid Slack webhook URL',
           ]"
           tabindex="0"
         >
@@ -53,9 +55,7 @@ limitations under the License.
           tabindex="0"
         >
           <template v-slot:hint>
-            <span class="text-caption text-grey-7">
-              e.g., #alerts
-            </span>
+            <span class="text-caption text-grey-7"> e.g., #alerts </span>
           </template>
         </q-input>
       </div>
@@ -75,7 +75,9 @@ limitations under the License.
           hide-bottom-space
           :rules="[
             (val: any) => !!val || 'Webhook URL is required',
-            (val: any) => val.includes('discord.com/api/webhooks/') || 'Invalid Discord webhook URL'
+            (val: any) =>
+              val.includes('discord.com/api/webhooks/') ||
+              'Invalid Discord webhook URL',
           ]"
           tabindex="0"
         >
@@ -121,7 +123,10 @@ limitations under the License.
           hide-bottom-space
           :rules="[
             (val: any) => !!val || 'Webhook URL is required',
-            (val: any) => (val.includes('outlook.office.com') || val.includes('webhook.office.com')) || 'Invalid Microsoft Teams webhook URL'
+            (val: any) =>
+              val.includes('outlook.office.com') ||
+              val.includes('webhook.office.com') ||
+              'Invalid Microsoft Teams webhook URL',
           ]"
           tabindex="0"
         >
@@ -149,7 +154,9 @@ limitations under the License.
           hide-bottom-space
           :rules="[
             (val: any) => !!val || 'Integration key is required',
-            (val: any) => val.length === 32 || 'PagerDuty integration key should be 32 characters'
+            (val: any) =>
+              val.length === 32 ||
+              'PagerDuty integration key should be 32 characters',
           ]"
           tabindex="0"
         >
@@ -199,7 +206,10 @@ limitations under the License.
           hide-bottom-space
           :rules="[
             (val: any) => !!val || 'Instance URL is required',
-            (val: any) => (val.includes('.service-now.com') && val.includes('/api/now/table/incident')) || 'URL should be like https://instance.service-now.com/api/now/table/incident'
+            (val: any) =>
+              (val.includes('.service-now.com') &&
+                val.includes('/api/now/table/incident')) ||
+              'URL should be like https://instance.service-now.com/api/now/table/incident',
           ]"
           tabindex="0"
         >
@@ -286,7 +296,8 @@ limitations under the License.
           hide-bottom-space
           :rules="[
             (val: any) => !!val || 'Recipients are required',
-            (val: any) => validateEmailList(val) || 'Please enter valid email addresses'
+            (val: any) =>
+              validateEmailList(val) || 'Please enter valid email addresses',
           ]"
           tabindex="0"
         >
@@ -353,7 +364,9 @@ limitations under the License.
           hide-bottom-space
           :rules="[
             (val: any) => !!val || 'API key is required',
-            (val: any) => val.length > 30 || 'Opsgenie API key should be longer than 30 characters'
+            (val: any) =>
+              val.length > 30 ||
+              'Opsgenie API key should be longer than 30 characters',
           ]"
           tabindex="0"
         >
@@ -429,58 +442,58 @@ limitations under the License.
 </template>
 
 <script lang="ts" setup>
-import { computed } from 'vue';
-import type { PropType } from 'vue';
+import { computed } from "vue";
+import type { PropType } from "vue";
 
 const props = defineProps({
   destinationType: {
     type: String,
-    required: true
+    required: true,
   },
   modelValue: {
     type: Object as PropType<Record<string, any>>,
-    default: () => ({})
+    default: () => ({}),
   },
   isTesting: {
     type: Boolean,
-    default: false
+    default: false,
   },
   hideActions: {
     type: Boolean,
-    default: false
-  }
+    default: false,
+  },
 });
 
-const emit = defineEmits(['update:modelValue', 'preview', 'test']);
+const emit = defineEmits(["update:modelValue", "preview", "test"]);
 
 // Computed credentials that sync with modelValue
 const credentials = computed({
   get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value)
+  set: (value) => emit("update:modelValue", value),
 });
 
 // PagerDuty severity options
 const severityOptions = [
-  { label: 'Critical', value: 'critical' },
-  { label: 'Error', value: 'error' },
-  { label: 'Warning', value: 'warning' },
-  { label: 'Info', value: 'info' }
+  { label: "Critical", value: "critical" },
+  { label: "Error", value: "error" },
+  { label: "Warning", value: "warning" },
+  { label: "Info", value: "info" },
 ];
 
 // Opsgenie priority options
 const priorityOptions = [
-  { label: 'P1 (Critical)', value: 'P1' },
-  { label: 'P2 (High)', value: 'P2' },
-  { label: 'P3 (Moderate)', value: 'P3' },
-  { label: 'P4 (Low)', value: 'P4' },
-  { label: 'P5 (Informational)', value: 'P5' }
+  { label: "P1 (Critical)", value: "P1" },
+  { label: "P2 (High)", value: "P2" },
+  { label: "P3 (Moderate)", value: "P3" },
+  { label: "P4 (Low)", value: "P4" },
+  { label: "P5 (Informational)", value: "P5" },
 ];
 
 // Email validation function
 const validateEmailList = (emails: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const emailList = emails.split(',').map(e => e.trim());
-  return emailList.every(email => emailRegex.test(email));
+  const emailList = emails.split(",").map((e) => e.trim());
+  return emailList.every((email) => emailRegex.test(email));
 };
 </script>
 

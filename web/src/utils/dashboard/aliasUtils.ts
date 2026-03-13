@@ -15,7 +15,7 @@
 
 /**
  * Retrieves a value from an object using a case-insensitive fallback strategy.
- * 
+ *
  * This function is performance-critical and may be called millions of times in nested loops.
  * It handles various edge cases including:
  * - Numeric keys (100, 200, etc.)
@@ -23,22 +23,22 @@
  * - Lowercase string keys (xaxis)
  * - Falsy values (0, false, '', null) which are valid and should be returned
  * - Null/undefined objects and aliases (returns undefined safely without errors)
- * 
+ *
  * Search strategy:
  * 1. First checks for exact key match (case-sensitive)
  * 2. If not found and alias is a string, falls back to lowercase version
  * 3. Returns undefined only if no match is found
- * 
+ *
  * Performance optimizations:
  * - Early return on null/undefined objects or alias
  * - Uses strict inequality (!==) to properly handle falsy values like 0 and false
  * - Minimizes string operations (only converts to lowercase when necessary)
  * - No unnecessary intermediate variables or complex conditionals
- * 
+ *
  * @param obj - The object to search in (can be null/undefined)
  * @param alias - The key to search for (string or number, can be null/undefined)
  * @returns The value if found, undefined otherwise (never throws errors)
- * 
+ *
  * @example
  * getDataValue({ xAxis: 'time' }, 'xAxis') // Returns 'time'
  * getDataValue({ xaxis: 'time' }, 'xAxis') // Returns 'time' (lowercase fallback)
@@ -58,5 +58,5 @@ export const getDataValue = (obj: any, alias: string | number): any => {
 
   // Lowercase fallback only for string keys
   // Numeric keys don't need this fallback
-  return typeof alias === 'string' ? obj[alias.toLowerCase()] : undefined;
+  return typeof alias === "string" ? obj[alias.toLowerCase()] : undefined;
 };

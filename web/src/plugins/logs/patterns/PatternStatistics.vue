@@ -38,8 +38,12 @@ const store = useStore();
 
 const summaryText = computed(() => {
   const patternsFound = props.statistics?.total_patterns_found || 0;
-  const logsAnalyzed = (props.statistics?.total_logs_analyzed || 0).toLocaleString();
-  const totalEvents = props.totalEvents ? props.totalEvents.toLocaleString() : logsAnalyzed;
+  const logsAnalyzed = (
+    props.statistics?.total_logs_analyzed || 0
+  ).toLocaleString();
+  const totalEvents = props.totalEvents
+    ? props.totalEvents.toLocaleString()
+    : logsAnalyzed;
 
   // Combine histogram time + pattern extraction time
   const histogramMs = props.histogramTime || 0;

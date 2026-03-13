@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card style="min-width: 500px; max-width: 600px">
       <!-- Header -->
       <q-card-section class="row items-center q-pb-none">
-        <div class="text-h6">{{ t('correlation.logs.timeRange.title') }}</div>
+        <div class="text-h6">{{ t("correlation.logs.timeRange.title") }}</div>
         <q-space />
         <q-btn
           icon="close"
@@ -44,20 +44,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Source Log Time -->
         <div class="tw:mb-6">
           <div class="tw:text-sm tw:font-semibold tw:mb-2">
-            {{ t('correlation.logs.timeRange.sourceTime') }}
+            {{ t("correlation.logs.timeRange.sourceTime") }}
           </div>
           <div
             class="tw:p-3 tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded tw:bg-gray-50 tw:flex tw:items-center tw:gap-2"
           >
-            <q-icon name="schedule" size="sm" color="primary" />
-            <span class="tw:font-mono tw:text-sm">{{ formatTimestamp(sourceTimestamp) }}</span>
+            <q-icon name="schedule" size="sm"
+color="primary" />
+            <span class="tw:font-mono tw:text-sm">{{
+              formatTimestamp(sourceTimestamp)
+            }}</span>
           </div>
         </div>
 
         <!-- Time Window Presets -->
         <div class="tw:mb-6">
           <div class="tw:text-sm tw:font-semibold tw:mb-3">
-            {{ t('correlation.logs.timeRange.window') }}
+            {{ t("correlation.logs.timeRange.window") }}
           </div>
 
           <div class="tw:space-y-2">
@@ -110,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="selectedWindow === 'custom'" class="tw:mb-4 tw:space-y-3">
           <div>
             <div class="tw:text-sm tw:font-semibold tw:mb-2">
-              {{ t('correlation.logs.timeRange.customStart') }}
+              {{ t("correlation.logs.timeRange.customStart") }}
             </div>
             <q-input
               v-model="customStartTime"
@@ -124,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div>
             <div class="tw:text-sm tw:font-semibold tw:mb-2">
-              {{ t('correlation.logs.timeRange.customEnd') }}
+              {{ t("correlation.logs.timeRange.customEnd") }}
             </div>
             <q-input
               v-model="customEndTime"
@@ -142,20 +145,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:p-3 tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded tw:bg-blue-50"
         >
           <div class="tw:text-xs tw:font-semibold tw:mb-2 tw:opacity-70">
-            {{ t('correlation.logs.timeRange.currentRange') }}
+            {{ t("correlation.logs.timeRange.currentRange") }}
           </div>
           <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm">
             <div class="tw:flex tw:items-center tw:gap-2">
-              <span class="tw:font-semibold">{{ t('correlation.logs.timeRange.start') }}:</span>
-              <span class="tw:font-mono">{{ formatTimestamp(pendingStartTime) }}</span>
+              <span class="tw:font-semibold"
+                >{{ t("correlation.logs.timeRange.start") }}:</span
+              >
+              <span class="tw:font-mono">{{
+                formatTimestamp(pendingStartTime)
+              }}</span>
             </div>
             <div class="tw:flex tw:items-center tw:gap-2">
-              <span class="tw:font-semibold">{{ t('correlation.logs.timeRange.end') }}:</span>
-              <span class="tw:font-mono">{{ formatTimestamp(pendingEndTime) }}</span>
+              <span class="tw:font-semibold"
+                >{{ t("correlation.logs.timeRange.end") }}:</span
+              >
+              <span class="tw:font-mono">{{
+                formatTimestamp(pendingEndTime)
+              }}</span>
             </div>
             <div class="tw:flex tw:items-center tw:gap-2 tw:mt-1">
-              <span class="tw:font-semibold">{{ t('correlation.logs.timeRange.duration') }}:</span>
-              <span>{{ formatDuration(pendingEndTime - pendingStartTime) }}</span>
+              <span class="tw:font-semibold"
+                >{{ t("correlation.logs.timeRange.duration") }}:</span
+              >
+              <span>{{
+                formatDuration(pendingEndTime - pendingStartTime)
+              }}</span>
             </div>
           </div>
         </div>
@@ -192,9 +207,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { date } from 'quasar';
+import { ref, computed, watch } from "vue";
+import { useI18n } from "vue-i18n";
+import { date } from "quasar";
 
 interface Props {
   modelValue: boolean;
@@ -205,24 +220,24 @@ interface Props {
 // Props & Emits
 const props = defineProps<Props>();
 const emit = defineEmits<{
-  'update:modelValue': [value: boolean];
-  'update:range': [startTime: number, endTime: number];
-  'close': [];
+  "update:modelValue": [value: boolean];
+  "update:range": [startTime: number, endTime: number];
+  close: [];
 }>();
 
 // Composables
 const { t } = useI18n();
 
 // State
-const selectedWindow = ref<string>('5min');
+const selectedWindow = ref<string>("5min");
 const pendingStartTime = ref<number>(props.currentRange.startTime);
 const pendingEndTime = ref<number>(props.currentRange.endTime);
-const customStartTime = ref<string>('');
-const customEndTime = ref<string>('');
+const customStartTime = ref<string>("");
+const customEndTime = ref<string>("");
 
 // Computed
 const isValid = computed(() => {
-  if (selectedWindow.value === 'custom') {
+  if (selectedWindow.value === "custom") {
     return (
       customStartTime.value &&
       customEndTime.value &&
@@ -237,7 +252,7 @@ const isValid = computed(() => {
  */
 const formatTimestamp = (timestamp: number): string => {
   const ms = Math.floor(timestamp / 1000);
-  return date.formatDate(ms, 'YYYY-MM-DD HH:mm:ss.SSS');
+  return date.formatDate(ms, "YYYY-MM-DD HH:mm:ss.SSS");
 };
 
 /**
@@ -267,19 +282,19 @@ const applyPreset = () => {
   let windowMicros: number;
 
   switch (selectedWindow.value) {
-    case '1min':
+    case "1min":
       windowMicros = 1 * 60 * 1000 * 1000; // 1 minute in microseconds
       break;
-    case '5min':
+    case "5min":
       windowMicros = 5 * 60 * 1000 * 1000; // 5 minutes
       break;
-    case '15min':
+    case "15min":
       windowMicros = 15 * 60 * 1000 * 1000; // 15 minutes
       break;
-    case '30min':
+    case "30min":
       windowMicros = 30 * 60 * 1000 * 1000; // 30 minutes
       break;
-    case '1hour':
+    case "1hour":
       windowMicros = 60 * 60 * 1000 * 1000; // 1 hour
       break;
     default:
@@ -303,20 +318,20 @@ const datetimeToMicros = (datetime: string): number => {
  */
 const microsToDatetime = (micros: number): string => {
   const ms = Math.floor(micros / 1000);
-  return date.formatDate(ms, 'YYYY-MM-DDTHH:mm');
+  return date.formatDate(ms, "YYYY-MM-DDTHH:mm");
 };
 
 /**
  * Validate start time
  */
 const validateStartTime = (val: string): boolean | string => {
-  if (!val) return t('validation.required');
+  if (!val) return t("validation.required");
 
   const startMicros = datetimeToMicros(val);
   pendingStartTime.value = startMicros;
 
   if (startMicros >= pendingEndTime.value) {
-    return t('correlation.logs.timeRange.startBeforeEnd');
+    return t("correlation.logs.timeRange.startBeforeEnd");
   }
 
   return true;
@@ -326,13 +341,13 @@ const validateStartTime = (val: string): boolean | string => {
  * Validate end time
  */
 const validateEndTime = (val: string): boolean | string => {
-  if (!val) return t('validation.required');
+  if (!val) return t("validation.required");
 
   const endMicros = datetimeToMicros(val);
   pendingEndTime.value = endMicros;
 
   if (endMicros <= pendingStartTime.value) {
-    return t('correlation.logs.timeRange.endAfterStart');
+    return t("correlation.logs.timeRange.endAfterStart");
   }
 
   return true;
@@ -349,7 +364,7 @@ const detectCurrentWindow = () => {
   const isSymmetric = Math.abs(center - props.sourceTimestamp) < 1000000; // 1 second in microseconds
 
   if (!isSymmetric) {
-    selectedWindow.value = 'custom';
+    selectedWindow.value = "custom";
     return;
   }
 
@@ -358,21 +373,21 @@ const detectCurrentWindow = () => {
 
   if (Math.abs(durationMinutes - 2) < 0.1) {
     // ±1 min = 2 min total
-    selectedWindow.value = '1min';
+    selectedWindow.value = "1min";
   } else if (Math.abs(durationMinutes - 10) < 0.1) {
     // ±5 min = 10 min total
-    selectedWindow.value = '5min';
+    selectedWindow.value = "5min";
   } else if (Math.abs(durationMinutes - 30) < 0.1) {
     // ±15 min = 30 min total
-    selectedWindow.value = '15min';
+    selectedWindow.value = "15min";
   } else if (Math.abs(durationMinutes - 60) < 0.1) {
     // ±30 min = 60 min total
-    selectedWindow.value = '30min';
+    selectedWindow.value = "30min";
   } else if (Math.abs(durationMinutes - 120) < 0.1) {
     // ±1 hour = 120 min total
-    selectedWindow.value = '1hour';
+    selectedWindow.value = "1hour";
   } else {
-    selectedWindow.value = 'custom';
+    selectedWindow.value = "custom";
   }
 };
 
@@ -380,19 +395,19 @@ const detectCurrentWindow = () => {
  * Handle apply button click
  */
 const handleApply = () => {
-  if (selectedWindow.value === 'custom') {
+  if (selectedWindow.value === "custom") {
     // Use custom times
     const startMicros = datetimeToMicros(customStartTime.value);
     const endMicros = datetimeToMicros(customEndTime.value);
 
     if (startMicros < endMicros) {
-      emit('update:range', startMicros, endMicros);
-      emit('update:modelValue', false);
+      emit("update:range", startMicros, endMicros);
+      emit("update:modelValue", false);
     }
   } else {
     // Use preset times
-    emit('update:range', pendingStartTime.value, pendingEndTime.value);
-    emit('update:modelValue', false);
+    emit("update:range", pendingStartTime.value, pendingEndTime.value);
+    emit("update:modelValue", false);
   }
 };
 
@@ -404,8 +419,8 @@ const handleCancel = () => {
   pendingStartTime.value = props.currentRange.startTime;
   pendingEndTime.value = props.currentRange.endTime;
   detectCurrentWindow();
-  emit('update:modelValue', false);
-  emit('close');
+  emit("update:modelValue", false);
+  emit("close");
 };
 
 /**
@@ -413,7 +428,7 @@ const handleCancel = () => {
  */
 const handleReset = () => {
   // Reset to ±5 minutes
-  selectedWindow.value = '5min';
+  selectedWindow.value = "5min";
   applyPreset();
 };
 
@@ -425,7 +440,7 @@ const handleClose = () => {
   pendingStartTime.value = props.currentRange.startTime;
   pendingEndTime.value = props.currentRange.endTime;
   detectCurrentWindow();
-  emit('close');
+  emit("close");
 };
 
 // Watch for prop changes
@@ -436,7 +451,7 @@ watch(
     pendingEndTime.value = newRange.endTime;
     detectCurrentWindow();
   },
-  { deep: true }
+  { deep: true },
 );
 
 watch(
@@ -452,7 +467,7 @@ watch(
       customStartTime.value = microsToDatetime(pendingStartTime.value);
       customEndTime.value = microsToDatetime(pendingEndTime.value);
     }
-  }
+  },
 );
 
 // Watch custom inputs and update pending times

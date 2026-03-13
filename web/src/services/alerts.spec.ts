@@ -62,11 +62,11 @@ describe("alerts service", () => {
         params.sort_by,
         params.desc,
         params.name,
-        params.org_identifier
+        params.org_identifier,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/alerts?page_num=${params.page_num}&page_size=${params.page_size}&sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}`
+        `/api/${params.org_identifier}/alerts?page_num=${params.page_num}&page_size=${params.page_size}&sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}`,
       );
     });
   });
@@ -92,11 +92,11 @@ describe("alerts service", () => {
         params.desc,
         params.name,
         params.org_identifier,
-        params.folder_id
+        params.folder_id,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/v2/${params.org_identifier}/alerts?sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}&folder=${params.folder_id}`
+        `/api/v2/${params.org_identifier}/alerts?sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}&folder=${params.folder_id}`,
       );
     });
 
@@ -121,11 +121,11 @@ describe("alerts service", () => {
         params.name,
         params.org_identifier,
         undefined,
-        params.query
+        params.query,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/v2/${params.org_identifier}/alerts?sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}&alert_name_substring=${params.query}`
+        `/api/v2/${params.org_identifier}/alerts?sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}&alert_name_substring=${params.query}`,
       );
     });
 
@@ -151,11 +151,11 @@ describe("alerts service", () => {
         params.name,
         params.org_identifier,
         params.folder_id,
-        params.query
+        params.query,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/v2/${params.org_identifier}/alerts?sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}&folder=${params.folder_id}&alert_name_substring=${params.query}`
+        `/api/v2/${params.org_identifier}/alerts?sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}&folder=${params.folder_id}&alert_name_substring=${params.query}`,
       );
     });
 
@@ -177,11 +177,11 @@ describe("alerts service", () => {
         params.sort_by,
         params.desc,
         params.name,
-        params.org_identifier
+        params.org_identifier,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/v2/${params.org_identifier}/alerts?sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}`
+        `/api/v2/${params.org_identifier}/alerts?sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}`,
       );
     });
   });
@@ -201,12 +201,12 @@ describe("alerts service", () => {
         params.org_identifier,
         params.stream_name,
         params.stream_type,
-        params.data
+        params.data,
       );
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/${params.stream_name}/alerts?type=${params.stream_type}`,
-        params.data
+        params.data,
       );
     });
   });
@@ -226,12 +226,12 @@ describe("alerts service", () => {
         params.org_identifier,
         params.stream_name,
         params.stream_type,
-        params.data
+        params.data,
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/${params.stream_name}/alerts/test%20alert%20with%20spaces?type=${params.stream_type}`,
-        params.data
+        params.data,
       );
     });
   });
@@ -249,11 +249,11 @@ describe("alerts service", () => {
       await alerts.get_with_name(
         params.org_identifier,
         params.stream_name,
-        params.alert_name
+        params.alert_name,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/${params.stream_name}/alerts/test%20alert%20with%20spaces`
+        `/api/${params.org_identifier}/${params.stream_name}/alerts/test%20alert%20with%20spaces`,
       );
     });
   });
@@ -273,11 +273,11 @@ describe("alerts service", () => {
         params.org_identifier,
         params.stream_name,
         params.alert_name,
-        params.type
+        params.type,
       );
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/${params.stream_name}/alerts/test-alert?type=${params.type}`
+        `/api/${params.org_identifier}/${params.stream_name}/alerts/test-alert?type=${params.type}`,
       );
     });
 
@@ -295,11 +295,11 @@ describe("alerts service", () => {
         params.org_identifier,
         params.stream_name,
         params.alert_name,
-        params.type
+        params.type,
       );
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/${params.stream_name}/alerts/test-alert`
+        `/api/${params.org_identifier}/${params.stream_name}/alerts/test-alert`,
       );
     });
   });
@@ -321,11 +321,11 @@ describe("alerts service", () => {
         params.stream_name,
         params.alert_name,
         params.enable,
-        params.stream_type
+        params.stream_type,
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/${params.stream_name}/alerts/test-alert/enable?value=${params.enable}&type=${params.stream_type}`
+        `/api/${params.org_identifier}/${params.stream_name}/alerts/test-alert/enable?value=${params.enable}&type=${params.stream_type}`,
       );
     });
   });
@@ -345,11 +345,11 @@ describe("alerts service", () => {
         params.org_identifier,
         params.stream_name,
         params.alert_name,
-        params.stream_type
+        params.stream_type,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/${params.stream_name}/alerts/test-alert/preview?type=${params.stream_type}`
+        `/api/${params.org_identifier}/${params.stream_name}/alerts/test-alert/preview?type=${params.stream_type}`,
       );
     });
   });
@@ -367,12 +367,12 @@ describe("alerts service", () => {
       await alerts.create_by_alert_id(
         params.org_identifier,
         params.data,
-        params.folder_id
+        params.folder_id,
       );
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/v2/${params.org_identifier}/alerts?folder=${params.folder_id}`,
-        params.data
+        params.data,
       );
     });
 
@@ -388,7 +388,7 @@ describe("alerts service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/v2/${params.org_identifier}/alerts`,
-        params.data
+        params.data,
       );
     });
   });
@@ -406,12 +406,12 @@ describe("alerts service", () => {
       await alerts.update_by_alert_id(
         params.org_identifier,
         params.data,
-        params.folder_id
+        params.folder_id,
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/v2/${params.org_identifier}/alerts/${params.data.id}?folder=${params.folder_id}`,
-        params.data
+        params.data,
       );
     });
 
@@ -427,7 +427,7 @@ describe("alerts service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/v2/${params.org_identifier}/alerts/${params.data.id}`,
-        params.data
+        params.data,
       );
     });
   });
@@ -445,11 +445,11 @@ describe("alerts service", () => {
       await alerts.delete_by_alert_id(
         params.org_identifier,
         params.alert_id,
-        params.folder_id
+        params.folder_id,
       );
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}?folder=${params.folder_id}`
+        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}?folder=${params.folder_id}`,
       );
     });
 
@@ -464,7 +464,7 @@ describe("alerts service", () => {
       await alerts.delete_by_alert_id(params.org_identifier, params.alert_id);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}`
+        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}`,
       );
     });
   });
@@ -484,11 +484,11 @@ describe("alerts service", () => {
         params.org_identifier,
         params.alert_id,
         params.enable,
-        params.folder_id
+        params.folder_id,
       );
 
       expect(mockHttpInstance.patch).toHaveBeenCalledWith(
-        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}/enable?value=${params.enable}&folder=${params.folder_id}`
+        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}/enable?value=${params.enable}&folder=${params.folder_id}`,
       );
     });
 
@@ -504,11 +504,11 @@ describe("alerts service", () => {
       await alerts.toggle_state_by_alert_id(
         params.org_identifier,
         params.alert_id,
-        params.enable
+        params.enable,
       );
 
       expect(mockHttpInstance.patch).toHaveBeenCalledWith(
-        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}/enable?value=${params.enable}`
+        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}/enable?value=${params.enable}`,
       );
     });
   });
@@ -526,11 +526,11 @@ describe("alerts service", () => {
       await alerts.get_by_alert_id(
         params.org_identifier,
         params.alert_id,
-        params.folder_id
+        params.folder_id,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}?folder=${params.folder_id}`
+        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}?folder=${params.folder_id}`,
       );
     });
 
@@ -545,7 +545,7 @@ describe("alerts service", () => {
       await alerts.get_by_alert_id(params.org_identifier, params.alert_id);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}`
+        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}`,
       );
     });
   });
@@ -563,12 +563,12 @@ describe("alerts service", () => {
       await alerts.move_to_another_folder(
         params.org_identifier,
         params.data,
-        params.folder_id
+        params.folder_id,
       );
 
       expect(mockHttpInstance.patch).toHaveBeenCalledWith(
         `/api/v2/${params.org_identifier}/alerts/move?folder=${params.folder_id}`,
-        params.data
+        params.data,
       );
     });
 
@@ -584,7 +584,7 @@ describe("alerts service", () => {
 
       expect(mockHttpInstance.patch).toHaveBeenCalledWith(
         `/api/v2/${params.org_identifier}/alerts/move`,
-        params.data
+        params.data,
       );
     });
   });
@@ -595,7 +595,7 @@ describe("alerts service", () => {
       mockHttpInstance.get.mockRejectedValue(error);
 
       await expect(
-        alerts.list(1, 20, "name", false, "test", "org123")
+        alerts.list(1, 20, "name", false, "test", "org123"),
       ).rejects.toThrow("Network error");
     });
 
@@ -604,7 +604,7 @@ describe("alerts service", () => {
       mockHttpInstance.post.mockRejectedValue(error);
 
       await expect(
-        alerts.create("org123", "logs", "logs", { name: "test" })
+        alerts.create("org123", "logs", "logs", { name: "test" }),
       ).rejects.toThrow("Validation error");
     });
 
@@ -613,7 +613,7 @@ describe("alerts service", () => {
       mockHttpInstance.put.mockRejectedValue(error);
 
       await expect(
-        alerts.update("org123", "logs", "logs", { name: "test" })
+        alerts.update("org123", "logs", "logs", { name: "test" }),
       ).rejects.toThrow("Not found");
     });
 
@@ -622,7 +622,7 @@ describe("alerts service", () => {
       mockHttpInstance.delete.mockRejectedValue(error);
 
       await expect(
-        alerts.delete("org123", "logs", "test", "logs")
+        alerts.delete("org123", "logs", "test", "logs"),
       ).rejects.toThrow("Forbidden");
     });
   });

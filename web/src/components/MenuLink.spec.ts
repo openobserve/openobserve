@@ -27,8 +27,8 @@ const mockRouter = createRouter({
   history: createWebHistory(),
   routes: [
     { path: "/", component: { template: "<div>Home</div>" } },
-    { path: "/logs", component: { template: "<div>Logs</div>" } }
-  ]
+    { path: "/logs", component: { template: "<div>Logs</div>" } },
+  ],
 });
 
 // Set current route for the router
@@ -41,7 +41,7 @@ mockRouter.currentRoute.value = {
   fullPath: "/logs",
   matched: [],
   meta: {},
-  redirectedFrom: undefined
+  redirectedFrom: undefined,
 };
 
 describe("MenuLink", async () => {

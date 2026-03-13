@@ -22,7 +22,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="isUpdating" class="text-h6">
             {{ t("function.updateEnrichmentTable") }}
           </div>
-          <div v-else class="text-h6">{{ t("function.addEnrichmentTable") }}</div>
+          <div v-else class="text-h6">
+            {{ t("function.addEnrichmentTable") }}
+          </div>
         </div>
       </div>
 
@@ -48,7 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Data Source Selection (only for new tables) -->
             <div v-if="!isUpdating" class="col-12 q-py-md">
-              <div class="text-grey-8 text-bold tw:mb-2">{{ t('function.dataSource') }}</div>
+              <div class="text-grey-8 text-bold tw:mb-2">
+                {{ t("function.dataSource") }}
+              </div>
               <q-option-group
                 v-model="formData.source"
                 :options="sourceOptions"
@@ -105,7 +109,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Append/Replace Mode Toggle (only when updating URL-based tables) -->
-            <div v-if="isUpdating && formData.source === 'url'" class="col-12 q-py-md">
+            <div
+              v-if="isUpdating && formData.source === 'url'"
+              class="col-12 q-py-md"
+            >
               <div class="text-grey-8 text-bold tw:mb-2">Update Mode</div>
               <q-option-group
                 v-model="formData.updateMode"
@@ -116,62 +123,136 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Show existing URLs (only when updating URL-based tables) -->
-            <div v-if="isUpdating && formData.source === 'url' && formData.urlJobs && formData.urlJobs.length > 0" class="col-12 q-py-md">
-              <div class="text-grey-8 text-bold q-mb-sm" style="font-size: 13px;">Existing URLs ({{ formData.urlJobs.length }})</div>
-              <q-card flat bordered class="q-pa-sm" style="background-color: #fafafa;">
-                <div v-for="(job, index) in formData.urlJobs" :key="job.id" class="q-mb-xs">
+            <div
+              v-if="
+                isUpdating &&
+                formData.source === 'url' &&
+                formData.urlJobs &&
+                formData.urlJobs.length > 0
+              "
+              class="col-12 q-py-md"
+            >
+              <div
+                class="text-grey-8 text-bold q-mb-sm"
+                style="font-size: 13px"
+              >
+                Existing URLs ({{ formData.urlJobs.length }})
+              </div>
+              <q-card
+                flat
+                bordered
+                class="q-pa-sm"
+                style="background-color: #fafafa"
+              >
+                <div
+                  v-for="(job, index) in formData.urlJobs"
+                  :key="job.id"
+                  class="q-mb-xs"
+                >
                   <div class="row items-center q-gutter-x-xs">
                     <div class="col-auto">
-                      <span class="text-weight-medium text-grey-7" style="font-size: 12px;">{{ Number(index) + 1 }}.</span>
+                      <span
+                        class="text-weight-medium text-grey-7"
+                        style="font-size: 12px"
+                        >{{ Number(index) + 1 }}.</span
+                      >
                     </div>
                     <div class="col-auto">
                       <q-icon
-                        :name="job.status === 'completed' ? 'check_circle' : job.status === 'failed' ? 'warning' : job.status === 'processing' ? 'sync' : 'schedule'"
-                        :color="job.status === 'completed' ? 'positive' : job.status === 'failed' ? 'negative' : job.status === 'processing' ? 'primary' : 'grey'"
+                        :name="
+                          job.status === 'completed'
+                            ? 'check_circle'
+                            : job.status === 'failed'
+                              ? 'warning'
+                              : job.status === 'processing'
+                                ? 'sync'
+                                : 'schedule'
+                        "
+                        :color="
+                          job.status === 'completed'
+                            ? 'positive'
+                            : job.status === 'failed'
+                              ? 'negative'
+                              : job.status === 'processing'
+                                ? 'primary'
+                                : 'grey'
+                        "
                         size="16px"
-                        :class="{'rotate-animation': job.status === 'processing'}"
+                        :class="{
+                          'rotate-animation': job.status === 'processing',
+                        }"
                       />
                     </div>
-                    <div class="col text-grey-8" style="font-size: 13px; word-break: break-all;">
+                    <div
+                      class="col text-grey-8"
+                      style="font-size: 13px; word-break: break-all"
+                    >
                       {{ job.url }}
                     </div>
                   </div>
-                  <q-separator v-if="Number(index) < formData.urlJobs.length - 1" class="q-my-xs" />
+                  <q-separator
+                    v-if="Number(index) < formData.urlJobs.length - 1"
+                    class="q-my-xs"
+                  />
                 </div>
               </q-card>
             </div>
 
             <!-- Mode explanation (always show for URL-based tables in edit mode) -->
             <div v-if="isUpdating && formData.source === 'url'" class="col-12">
-              <div class="tw:text-sm tw:text-gray-600 tw:mb-4 tw:p-3 tw:rounded-lg" :class="{
-                'tw:bg-blue-50': formData.updateMode === 'reload',
-                'tw:bg-green-50': formData.updateMode === 'append',
-                'tw:bg-yellow-50': formData.updateMode === 'replace_failed',
-                'tw:bg-orange-50': formData.updateMode === 'replace'
-              }">
+              <div
+                class="tw:text-sm tw:text-gray-600 tw:mb-4 tw:p-3 tw:rounded-lg"
+                :class="{
+                  'tw:bg-blue-50': formData.updateMode === 'reload',
+                  'tw:bg-green-50': formData.updateMode === 'append',
+                  'tw:bg-yellow-50': formData.updateMode === 'replace_failed',
+                  'tw:bg-orange-50': formData.updateMode === 'replace',
+                }"
+              >
                 <template v-if="formData.updateMode === 'reload'">
-                  <strong>🔄 Reload Mode:</strong> Re-process all existing URLs from scratch. Use this when the CSV file content at the URLs has been updated but the URLs themselves haven't changed.
+                  <strong>🔄 Reload Mode:</strong> Re-process all existing URLs
+                  from scratch. Use this when the CSV file content at the URLs
+                  has been updated but the URLs themselves haven't changed.
                 </template>
                 <template v-else-if="formData.updateMode === 'append'">
-                  <strong>➕ Append Mode:</strong> Add a new URL to existing ones. Data from all URLs will be combined.
+                  <strong>➕ Append Mode:</strong> Add a new URL to existing
+                  ones. Data from all URLs will be combined.
                   <div class="tw:mt-2 tw:text-orange-700">
-                    ⚠️ <strong>Important:</strong> The new CSV file must have the same columns as the existing data. The enrichment table schema cannot be changed.
+                    ⚠️ <strong>Important:</strong> The new CSV file must have
+                    the same columns as the existing data. The enrichment table
+                    schema cannot be changed.
                   </div>
                 </template>
                 <template v-else-if="formData.updateMode === 'replace_failed'">
-                  <strong>🔧 Replace Failed URL:</strong> Replace only the failed URL with a new one. All successful URLs and their data will be kept. Use this to fix typos or broken URLs.
+                  <strong>🔧 Replace Failed URL:</strong> Replace only the
+                  failed URL with a new one. All successful URLs and their data
+                  will be kept. Use this to fix typos or broken URLs.
                 </template>
                 <template v-else-if="formData.updateMode === 'replace'">
-                  <strong>⚠️ Replace Mode:</strong> Delete all existing URLs and data, then use only the new URL you provide below.
+                  <strong>⚠️ Replace Mode:</strong> Delete all existing URLs and
+                  data, then use only the new URL you provide below.
                 </template>
               </div>
             </div>
 
             <!-- URL input field for append, replace_failed, or replace mode (only when updating URL-based tables) -->
-            <div v-if="isUpdating && formData.source === 'url' && (formData.updateMode === 'append' || formData.updateMode === 'replace_failed' || formData.updateMode === 'replace')" class="col-12">
+            <div
+              v-if="
+                isUpdating &&
+                formData.source === 'url' &&
+                (formData.updateMode === 'append' ||
+                  formData.updateMode === 'replace_failed' ||
+                  formData.updateMode === 'replace')
+              "
+              class="col-12"
+            >
               <q-input
                 v-model="formData.url"
-                :label="formData.updateMode === 'append' ? 'New CSV File URL' : 'Replacement CSV File URL'"
+                :label="
+                  formData.updateMode === 'append'
+                    ? 'New CSV File URL'
+                    : 'Replacement CSV File URL'
+                "
                 color="input-border"
                 bg-color="input-bg"
                 class="q-py-md showLabelOnTop text-grey-8 text-bold"
@@ -187,8 +268,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   },
                   (val: any) => {
                     if (formData.updateMode === 'reload' || !val) return true;
-                    return (val.startsWith('http://') || val.startsWith('https://')) || 'URL must start with http:// or https://';
-                  }
+                    return (
+                      val.startsWith('http://') ||
+                      val.startsWith('https://') ||
+                      'URL must start with http:// or https://'
+                    );
+                  },
                 ]"
                 tabindex="0"
               >
@@ -220,7 +305,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 placeholder="https://example.com/data.csv"
                 :rules="[
                   (val: any) => !!val || 'URL is required!',
-                  (val: any) => (val && (val.startsWith('http://') || val.startsWith('https://'))) || 'URL must start with http:// or https://'
+                  (val: any) =>
+                    (val &&
+                      (val.startsWith('http://') ||
+                        val.startsWith('https://'))) ||
+                    'URL must start with http:// or https://',
                 ]"
                 tabindex="0"
               >
@@ -233,9 +322,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <pre v-if="compilationErr" class="q-py-md showLabelOnTop text-bold text-h7">{{
-            compilationErr
-          }}</pre>
+          <pre
+            v-if="compilationErr"
+            class="q-py-md showLabelOnTop text-bold text-h7"
+            >{{ compilationErr }}</pre
+          >
 
           <div class="flex justify-start q-mt-md">
             <q-btn
@@ -244,7 +335,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('function.cancel')"
               no-caps
               flat
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
               @click="$emit('cancel:hideform')"
             />
             <q-btn
@@ -253,7 +348,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="submit"
               no-caps
               flat
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-primary-button-dark'
+                  : 'o2-primary-button-light'
+              "
             />
           </div>
         </q-form>
@@ -311,29 +410,32 @@ export default defineComponent({
     let compilationErr = ref("");
 
     const sourceOptions = [
-      { label: t('function.uploadFile'), value: 'file' },
-      { label: t('function.fromUrl'), value: 'url' }
+      { label: t("function.uploadFile"), value: "file" },
+      { label: t("function.fromUrl"), value: "url" },
     ];
 
     // Computed: Dynamically change options based on failed job status
     const hasFailedJob = computed(() => {
-      return formData.value.urlJobs?.some((job: any) => job.status === 'failed') || false;
+      return (
+        formData.value.urlJobs?.some((job: any) => job.status === "failed") ||
+        false
+      );
     });
 
     const updateModeOptions = computed(() => {
       if (hasFailedJob.value) {
         // When there's a failed job, only allow: reload, replace failed, or replace all
         return [
-          { label: 'Reload existing URLs', value: 'reload' },
-          { label: 'Replace failed URL only', value: 'replace_failed' },
-          { label: 'Replace all URLs', value: 'replace' }
+          { label: "Reload existing URLs", value: "reload" },
+          { label: "Replace failed URL only", value: "replace_failed" },
+          { label: "Replace all URLs", value: "replace" },
         ];
       } else {
         // Normal mode: reload, append, or replace
         return [
-          { label: 'Reload existing URLs', value: 'reload' },
-          { label: 'Add new URL', value: 'append' },
-          { label: 'Replace all URLs', value: 'replace' }
+          { label: "Reload existing URLs", value: "reload" },
+          { label: "Add new URL", value: "append" },
+          { label: "Replace all URLs", value: "replace" },
         ];
       }
     });
@@ -350,7 +452,7 @@ export default defineComponent({
       });
 
       // Handle URL-based enrichment table creation
-      if (formData.value.source === 'url') {
+      if (formData.value.source === "url") {
         // Determine the flags based on update mode
         let appendFlag = false;
         let retryFlag = false;
@@ -359,23 +461,23 @@ export default defineComponent({
 
         if (props.isUpdating) {
           // Update mode logic
-          if (formData.value.updateMode === 'reload') {
+          if (formData.value.updateMode === "reload") {
             // Reload: Trigger retry of all existing jobs (no new URL)
-            urlToSend = '';
+            urlToSend = "";
             appendFlag = false;
             retryFlag = true;
             replaceFailedFlag = false;
-          } else if (formData.value.updateMode === 'append') {
+          } else if (formData.value.updateMode === "append") {
             // Append: Add new URL to existing ones
             appendFlag = true;
             retryFlag = false;
             replaceFailedFlag = false;
-          } else if (formData.value.updateMode === 'replace_failed') {
+          } else if (formData.value.updateMode === "replace_failed") {
             // Replace failed URL only
             appendFlag = false;
             retryFlag = false;
             replaceFailedFlag = true;
-          } else if (formData.value.updateMode === 'replace') {
+          } else if (formData.value.updateMode === "replace") {
             // Replace: Delete all and use new URL
             appendFlag = false;
             retryFlag = false;
@@ -396,7 +498,7 @@ export default defineComponent({
             appendFlag,
             false, // resume
             retryFlag,
-            replaceFailedFlag
+            replaceFailedFlag,
           )
           .then(() => {
             formData.value = { ...defaultValue() };
@@ -405,14 +507,16 @@ export default defineComponent({
             dismiss();
             q.notify({
               type: "positive",
-              message: formData.value.updateMode === 'reload'
-                ? "Enrichment table reload started. Processing in background..."
-                : "Enrichment table job started. Processing in background...",
+              message:
+                formData.value.updateMode === "reload"
+                  ? "Enrichment table reload started. Processing in background..."
+                  : "Enrichment table job started. Processing in background...",
             });
           })
           .catch((err) => {
-            compilationErr.value = err.response?.data?.["message"] || err.message || "Unknown error";
-            if(err.response?.status != 403){
+            compilationErr.value =
+              err.response?.data?.["message"] || err.message || "Unknown error";
+            if (err.response?.status != 403) {
               q.notify({
                 type: "negative",
                 message:
@@ -424,15 +528,19 @@ export default defineComponent({
           });
 
         segment.track("Button Click", {
-          button: props.isUpdating ? `Update Enrichment Table (${formData.value.updateMode})` : "Save Enrichment Table from URL",
+          button: props.isUpdating
+            ? `Update Enrichment Table (${formData.value.updateMode})`
+            : "Save Enrichment Table from URL",
           user_org: store.state.selectedOrganization.identifier,
           user_id: store.state.userInfo.email,
           function_name: formData.value.name,
           page: "Add/Update Enrichment Table",
         });
         track("Button Click", {
-          button: props.isUpdating ? `Update Enrichment Table (${formData.value.updateMode})` : "Save Enrichment Table from URL",
-          page: "Add/Update Enrichment Table"
+          button: props.isUpdating
+            ? `Update Enrichment Table (${formData.value.updateMode})`
+            : "Save Enrichment Table from URL",
+          page: "Add/Update Enrichment Table",
         });
       }
       // Handle file upload enrichment table creation (existing logic)
@@ -445,7 +553,7 @@ export default defineComponent({
             store.state.selectedOrganization.identifier,
             formData.value.name,
             reqformData,
-            formData.value.append
+            formData.value.append,
           )
           .then((res) => {
             formData.value = { ...defaultValue() };
@@ -458,14 +566,15 @@ export default defineComponent({
             });
           })
           .catch((err) => {
-            compilationErr.value = err.response?.data?.["message"] || err.message || "Unknown error";
-            if(err.response?.status != 403){
+            compilationErr.value =
+              err.response?.data?.["message"] || err.message || "Unknown error";
+            if (err.response?.status != 403) {
               q.notify({
-              type: "negative",
-              message:
-                JSON.stringify(err.response?.data?.["error"]) ||
-                "Enrichment Table creation failed",
-            });
+                type: "negative",
+                message:
+                  JSON.stringify(err.response?.data?.["error"]) ||
+                  "Enrichment Table creation failed",
+              });
             }
             dismiss();
           });
@@ -479,7 +588,7 @@ export default defineComponent({
         });
         track("Button Click", {
           button: "Save Enrichment Table",
-          page: "Add Enrichment Table"
+          page: "Add Enrichment Table",
         });
       }
     };
@@ -512,15 +621,15 @@ export default defineComponent({
 
       // Detect if this is a URL-based enrichment table
       if (this.formData.urlJobs && this.formData.urlJobs.length > 0) {
-        this.formData.source = 'url';
+        this.formData.source = "url";
         // Leave URL field empty so user can enter a new URL
-        this.formData.url = '';
+        this.formData.url = "";
         // Default to reload mode (safest - just reprocesses existing URLs)
         if (this.formData.updateMode === undefined) {
-          this.formData.updateMode = 'reload';
+          this.formData.updateMode = "reload";
         }
       } else {
-        this.formData.source = 'file';
+        this.formData.source = "file";
       }
     }
   },

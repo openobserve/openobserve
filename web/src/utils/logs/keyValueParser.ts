@@ -13,9 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
 export const LIGHT_MODE_COLORS = {
-  key: "#B71C1C", // red color for keys 
+  key: "#B71C1C", // red color for keys
   stringValue: "#047857", // Softer green for strings - easy on eyes
   numberValue: "#2563EB", // Royal blue for numbers - distinct from red keys
   booleanValue: "#6D28D9", // Soft purple for booleans - distinct but calm

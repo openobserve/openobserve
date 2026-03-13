@@ -113,7 +113,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div v-else class="text-center q-pa-lg text-grey-7">
-      <q-icon name="info" size="md" class="q-mb-sm" />
+      <q-icon name="info"
+size="md" class="q-mb-sm" />
       <div>
         {{
           t("correlation.noSemanticGroupsInCategory", {
@@ -166,7 +167,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Import Dialog -->
-    <q-dialog v-model="showImportDrawer" maximized position="right" full-height>
+    <q-dialog v-model="showImportDrawer" maximized
+position="right" full-height>
       <q-card class="import-dialog-card">
         <ImportSemanticGroupsDrawer
           :current-groups="localGroups"

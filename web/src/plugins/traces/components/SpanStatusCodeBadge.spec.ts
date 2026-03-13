@@ -53,44 +53,68 @@ describe("SpanStatusCodeBadge", () => {
     it("should show the empty indicator when no props are provided", () => {
       wrapper = mountBadge();
 
-      expect(wrapper.find('[data-test="span-status-code-badge-empty"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="span-status-code-badge"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="span-status-code-badge-empty"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="span-status-code-badge"]').exists(),
+      ).toBe(false);
     });
 
     it("should show the empty indicator when code is null", () => {
       wrapper = mountBadge({ code: null });
 
-      expect(wrapper.find('[data-test="span-status-code-badge-empty"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="span-status-code-badge"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="span-status-code-badge-empty"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="span-status-code-badge"]').exists(),
+      ).toBe(false);
     });
 
     it("should show the empty indicator when grpcCode is null", () => {
       wrapper = mountBadge({ grpcCode: null });
 
-      expect(wrapper.find('[data-test="span-status-code-badge-empty"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="span-status-code-badge"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="span-status-code-badge-empty"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="span-status-code-badge"]').exists(),
+      ).toBe(false);
     });
 
     it("should show the empty indicator when both code and grpcCode are null", () => {
       wrapper = mountBadge({ code: null, grpcCode: null });
 
-      expect(wrapper.find('[data-test="span-status-code-badge-empty"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="span-status-code-badge"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="span-status-code-badge-empty"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="span-status-code-badge"]').exists(),
+      ).toBe(false);
     });
 
     it("should show the empty indicator when code is 0", () => {
       // HTTP code 0 is not a valid positive status code; treated as empty
       wrapper = mountBadge({ code: 0 });
 
-      expect(wrapper.find('[data-test="span-status-code-badge-empty"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="span-status-code-badge"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="span-status-code-badge-empty"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="span-status-code-badge"]').exists(),
+      ).toBe(false);
     });
 
     it("should show the empty indicator when code is a non-numeric string", () => {
       wrapper = mountBadge({ code: "NaN" });
 
-      expect(wrapper.find('[data-test="span-status-code-badge-empty"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="span-status-code-badge"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="span-status-code-badge-empty"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="span-status-code-badge"]').exists(),
+      ).toBe(false);
     });
   });
 
@@ -250,8 +274,12 @@ describe("SpanStatusCodeBadge", () => {
     it("should show the badge and not the empty indicator when grpcCode is 0", () => {
       wrapper = mountBadge({ grpcCode: 0 });
 
-      expect(wrapper.find('[data-test="span-status-code-badge"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="span-status-code-badge-empty"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="span-status-code-badge"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="span-status-code-badge-empty"]').exists(),
+      ).toBe(false);
     });
   });
 
@@ -263,25 +291,33 @@ describe("SpanStatusCodeBadge", () => {
     it("should render the exact HTTP code value as text", () => {
       wrapper = mountBadge({ code: 404 });
 
-      expect(wrapper.find('[data-test="span-status-code-badge"]').text()).toBe("404");
+      expect(wrapper.find('[data-test="span-status-code-badge"]').text()).toBe(
+        "404",
+      );
     });
 
     it("should render the exact gRPC code value as text when no HTTP code is present", () => {
       wrapper = mountBadge({ grpcCode: 0 });
 
-      expect(wrapper.find('[data-test="span-status-code-badge"]').text()).toBe("0");
+      expect(wrapper.find('[data-test="span-status-code-badge"]').text()).toBe(
+        "0",
+      );
     });
 
     it("should render gRPC error code value as text", () => {
       wrapper = mountBadge({ grpcCode: 13 });
 
-      expect(wrapper.find('[data-test="span-status-code-badge"]').text()).toBe("13");
+      expect(wrapper.find('[data-test="span-status-code-badge"]').text()).toBe(
+        "13",
+      );
     });
 
     it("should render the em dash when neither code is present", () => {
       wrapper = mountBadge();
 
-      expect(wrapper.find('[data-test="span-status-code-badge-empty"]').text()).toBe("—");
+      expect(
+        wrapper.find('[data-test="span-status-code-badge-empty"]').text(),
+      ).toBe("—");
     });
   });
 
@@ -301,15 +337,21 @@ describe("SpanStatusCodeBadge", () => {
     it("should render '404' as text when code is the string '404'", () => {
       wrapper = mountBadge({ code: "404" });
 
-      expect(wrapper.find('[data-test="span-status-code-badge"]').text()).toBe("404");
+      expect(wrapper.find('[data-test="span-status-code-badge"]').text()).toBe(
+        "404",
+      );
     });
 
     it("should produce the same tier class for string '404' and number 404", () => {
       const wrapperStr = mountBadge({ code: "404" });
       const wrapperNum = mountBadge({ code: 404 });
 
-      const classesStr = wrapperStr.find('[data-test="span-status-code-badge"]').classes();
-      const classesNum = wrapperNum.find('[data-test="span-status-code-badge"]').classes();
+      const classesStr = wrapperStr
+        .find('[data-test="span-status-code-badge"]')
+        .classes();
+      const classesNum = wrapperNum
+        .find('[data-test="span-status-code-badge"]')
+        .classes();
 
       expect(classesStr).toEqual(classesNum);
 

@@ -33,7 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="correlation-header tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
       >
         <div class="tw:flex tw:items-center tw:gap-3">
-          <q-icon name="link" size="md" color="primary" />
+          <q-icon name="link"
+size="md" color="primary" />
           <div class="tw:flex tw:flex-col tw:gap-0">
             <span class="tw:text-lg tw:font-semibold">
               Correlated Streams - {{ serviceName }}
@@ -188,107 +189,150 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Metrics Tab Panel -->
         <q-tab-panel name="metrics" class="tw:p-0 tw:flex tw:flex-col">
-            <!-- Two-column body: sidebar + charts (q-splitter matching TracesAnalysisDashboard style) -->
+          <!-- Two-column body: sidebar + charts (q-splitter matching TracesAnalysisDashboard style) -->
           <q-splitter
             v-model="splitterModel"
             class="tw:flex-1 full-height full-width"
           >
             <!-- ── Left sidebar ── -->
             <template #before>
-              <div class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col">
-                  <!-- Search -->
-                  <div
-                    class="tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+              <div
+                class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col"
+              >
+                <!-- Search -->
+                <div
+                  class="tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                >
+                  <q-input
+                    v-model="metricSearchText"
+                    dense
+                    borderless
+                    :placeholder="t('search.searchField')"
+                    clearable
                   >
-                    <q-input
-                      v-model="metricSearchText"
-                      dense
-                      borderless
-                      :placeholder="t('search.searchField')"
-                      clearable
-                    >
-                      <template #prepend>
-                        <q-icon name="search" size="xs" />
-                      </template>
-                    </q-input>
-                  </div>
+                    <template #prepend>
+                      <q-icon name="search" size="xs" />
+                    </template>
+                  </q-input>
+                </div>
 
-                  <!-- Grouped metric list -->
-                  <div class="dimension-list-container tw:flex-1 tw:overflow-y-auto tw:px-[0.325rem]">
+                <!-- Grouped metric list -->
+                <div
+                  class="dimension-list-container tw:flex-1 tw:overflow-y-auto tw:px-[0.325rem]"
+                >
+                  <template
+                    v-if="
+                      groupedFilteredMetricStreams.groups.some(
+                        (g) => g.streams.length > 0,
+                      )
+                    "
+                  >
                     <template
-                      v-if="groupedFilteredMetricStreams.groups.some(g => g.streams.length > 0)"
+                      v-for="group in groupedFilteredMetricStreams.groups"
+                      :key="group.id"
                     >
-                      <template
-                        v-for="group in groupedFilteredMetricStreams.groups"
-                        :key="group.id"
-                      >
-                        <template v-if="group.streams.length > 0">
-                          <div class="metric-group-header tw:cursor-pointer" @click="toggleGroupCollapse(group.id)">
-                            <div class="metric-group-label">
-                              <q-icon
-                                :name="collapsedGroups.has(group.id) ? 'chevron_right' : 'expand_more'"
-                                size="0.875rem"
-                                class="tw:mr-0.5"
-                              />
-                              <q-icon :name="group.icon" size="0.875rem" />
-                              <span>{{ group.label }}</span>
-                              <q-badge
-                                color="grey-6"
-                                text-color="white"
-                                :label="group.streams.length"
-                                class="tw:ml-1"
-                              />
-                            </div>
-                            <div class="metric-group-actions">
-                              <q-btn
-                                flat dense no-caps size="xs"
-                                :color="getGroupSelectionState(group.id) === 'none' ? 'primary' : 'grey-7'"
-                                label="All"
-                                @click.stop="selectAllInGroup(group.id)"
-                                :disable="getGroupSelectionState(group.id) === 'all'"
-                              />
-                              <q-btn
-                                flat dense no-caps size="xs" color="grey-7"
-                                label="None"
-                                @click.stop="deselectAllInGroup(group.id)"
-                                :disable="getGroupSelectionState(group.id) === 'none'"
-                              />
-                            </div>
+                      <template v-if="group.streams.length > 0">
+                        <div
+                          class="metric-group-header tw:cursor-pointer"
+                          @click="toggleGroupCollapse(group.id)"
+                        >
+                          <div class="metric-group-label">
+                            <q-icon
+                              :name="
+                                collapsedGroups.has(group.id)
+                                  ? 'chevron_right'
+                                  : 'expand_more'
+                              "
+                              size="0.875rem"
+                              class="tw:mr-0.5"
+                            />
+                            <q-icon :name="group.icon" size="0.875rem" />
+                            <span>{{ group.label }}</span>
+                            <q-badge
+                              color="grey-6"
+                              text-color="white"
+                              :label="group.streams.length"
+                              class="tw:ml-1"
+                            />
                           </div>
-                          <q-item
-                            v-for="stream in group.streams"
-                            v-show="!collapsedGroups.has(group.id)"
-                            :key="stream.stream_name"
-                            dense
-                            clickable
-                            class="dimension-list-item tw:border-none!"
-                            @click="toggleMetricStream(stream)"
-                          >
-                            <q-item-section side>
-                              <q-checkbox
-                                :model-value="selectedMetricStreams.some(s => s.stream_name === stream.stream_name)"
-                                @update:model-value="toggleMetricStream(stream)"
-                                color="primary" size="xs" dense
-                              />
-                            </q-item-section>
-                            <q-item-section>
-                              <q-item-label class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]!">{{ stream.stream_name }}</q-item-label>
-                            </q-item-section>
-                          </q-item>
-                        </template>
+                          <div class="metric-group-actions">
+                            <q-btn
+                              flat
+                              dense
+                              no-caps
+                              size="xs"
+                              :color="
+                                getGroupSelectionState(group.id) === 'none'
+                                  ? 'primary'
+                                  : 'grey-7'
+                              "
+                              label="All"
+                              @click.stop="selectAllInGroup(group.id)"
+                              :disable="
+                                getGroupSelectionState(group.id) === 'all'
+                              "
+                            />
+                            <q-btn
+                              flat
+                              dense
+                              no-caps
+                              size="xs"
+                              color="grey-7"
+                              label="None"
+                              @click.stop="deselectAllInGroup(group.id)"
+                              :disable="
+                                getGroupSelectionState(group.id) === 'none'
+                              "
+                            />
+                          </div>
+                        </div>
+                        <q-item
+                          v-for="stream in group.streams"
+                          v-show="!collapsedGroups.has(group.id)"
+                          :key="stream.stream_name"
+                          dense
+                          clickable
+                          class="dimension-list-item tw:border-none!"
+                          @click="toggleMetricStream(stream)"
+                        >
+                          <q-item-section side>
+                            <q-checkbox
+                              :model-value="
+                                selectedMetricStreams.some(
+                                  (s) => s.stream_name === stream.stream_name,
+                                )
+                              "
+                              @update:model-value="toggleMetricStream(stream)"
+                              color="primary"
+                              size="xs"
+                              dense
+                            />
+                          </q-item-section>
+                          <q-item-section>
+                            <q-item-label
+                              class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]!"
+                              >{{ stream.stream_name }}</q-item-label
+                            >
+                          </q-item-section>
+                        </q-item>
                       </template>
                     </template>
-                    <div v-else class="tw:p-3 tw:text-center tw:text-xs tw:opacity-60">
-                      {{ t("search.noResult") }}
-                    </div>
-                  </div>
-
-                  <!-- Footer: selected count -->
+                  </template>
                   <div
-                    class="tw:p-3 tw:border-t tw:border-solid tw:border-[var(--o2-border-color)] o2-table-footer-title tw:text-[var(--o2-text-4)]!"
+                    v-else
+                    class="tw:p-3 tw:text-center tw:text-xs tw:opacity-60"
                   >
-                    {{ selectedMetricStreams.length }} of {{ uniqueMetricStreams.length }} selected
+                    {{ t("search.noResult") }}
                   </div>
+                </div>
+
+                <!-- Footer: selected count -->
+                <div
+                  class="tw:p-3 tw:border-t tw:border-solid tw:border-[var(--o2-border-color)] o2-table-footer-title tw:text-[var(--o2-text-4)]!"
+                >
+                  {{ selectedMetricStreams.length }} of
+                  {{ uniqueMetricStreams.length }} selected
+                </div>
               </div>
             </template>
 
@@ -304,11 +348,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-tabs
                   v-if="nonEmptyGroupTabs.length > 0"
                   v-model="activeMetricGroupTab"
-                  dense no-caps align="left"
+                  dense
+                  no-caps
+                  align="left"
                   class="metric-group-tabs tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
                 >
                   <q-tab
-                    v-for="group in groupedUniqueMetricStreams.groups.filter(g => nonEmptyGroupTabs.includes(g.id))"
+                    v-for="group in groupedUniqueMetricStreams.groups.filter(
+                      (g) => nonEmptyGroupTabs.includes(g.id),
+                    )"
                     :key="group.id"
                     :name="group.id"
                   >
@@ -317,7 +365,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span>{{ group.label }}</span>
                       <q-badge
                         dense
-                        :color="activeMetricGroupTab === group.id ? 'primary' : 'grey-5'"
+                        :color="
+                          activeMetricGroupTab === group.id
+                            ? 'primary'
+                            : 'grey-5'
+                        "
                         text-color="white"
                         :label="groupedSelectedMetricStreams[group.id].length"
                         class="tw:ml-0.5"
@@ -334,25 +386,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <q-spinner color="primary" size="md" />
                     <div class="tw:text-sm tw:opacity-70">
-                      {{ t("correlation.loadingMetrics", { count: selectedMetricStreams.length }) }}
+                      {{
+                        t("correlation.loadingMetrics", {
+                          count: selectedMetricStreams.length,
+                        })
+                      }}
                     </div>
                   </div>
                   <div
                     v-else-if="error"
                     class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
                   >
-                    <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
+                    <div
+                      class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90"
+                    >
                       {{ t("correlation.metricsError") }}
                     </div>
                     <div class="tw:text-sm tw:opacity-70 tw:mb-4">
                       {{ error || t("correlation.metricsErrorDetails") }}
                     </div>
-                    <q-btn flat color="primary" icon="refresh" :label="t('correlation.retryButton')" @click="loadDashboard" />
+                    <q-btn
+                      flat
+                      color="primary"
+                      icon="refresh"
+                      :label="t('correlation.retryButton')"
+                      @click="loadDashboard"
+                    />
                   </div>
                   <RenderDashboardCharts
                     v-else-if="activeDashboardForGroup"
                     ref="dashboardChartsRef"
-                    :key="activeMetricGroupTab + '_' + groupedDashboardRenderKey"
+                    :key="
+                      activeMetricGroupTab + '_' + groupedDashboardRenderKey
+                    "
                     :dashboardData="activeDashboardForGroup"
                     :currentTimeObj="currentTimeObj"
                     :viewOnly="true"
@@ -363,7 +429,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else
                     class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
                   >
-                    <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
+                    <div
+                      class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90"
+                    >
                       {{ t("correlation.noMetrics") }}
                     </div>
                     <div class="tw:text-sm tw:opacity-70">
@@ -456,7 +524,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
             >
               <div class="tw:flex tw:items-center tw:gap-3">
-                <q-icon name="hub" color="primary" size="1.25rem" />
+                <q-icon name="hub"
+color="primary" size="1.25rem" />
                 <div class="tw:flex tw:flex-col">
                   <span class="tw:text-sm tw:font-semibold">{{
                     t("correlation.dimensionBasedCorrelation")
@@ -481,7 +550,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("correlation.viewInTraces") }}
                     </q-tooltip>
                   </q-btn>
-                  <q-chip dense color="primary" text-color="white">
+                  <q-chip dense
+color="primary" text-color="white">
                     {{ tracesForDimensions.length }} {{ t("menu.traces") }}
                   </q-chip>
                 </div>
@@ -619,100 +689,143 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- ── Left sidebar ── -->
           <template #before>
-            <div class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col">
-                <!-- Search -->
-                <div
-                  class="tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+            <div
+              class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col"
+            >
+              <!-- Search -->
+              <div
+                class="tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+              >
+                <q-input
+                  v-model="metricSearchText"
+                  dense
+                  borderless
+                  :placeholder="t('search.searchField')"
+                  clearable
                 >
-                  <q-input
-                    v-model="metricSearchText"
-                    dense
-                    borderless
-                    :placeholder="t('search.searchField')"
-                    clearable
-                  >
-                    <template #prepend>
-                      <q-icon name="search" size="xs" />
-                    </template>
-                  </q-input>
-                </div>
+                  <template #prepend>
+                    <q-icon name="search" size="xs" />
+                  </template>
+                </q-input>
+              </div>
 
-                <!-- Grouped metric list -->
-                <div class="dimension-list-container tw:flex-1 tw:overflow-y-auto tw:px-[0.325rem]">
+              <!-- Grouped metric list -->
+              <div
+                class="dimension-list-container tw:flex-1 tw:overflow-y-auto tw:px-[0.325rem]"
+              >
+                <template
+                  v-if="
+                    groupedFilteredMetricStreams.groups.some(
+                      (g) => g.streams.length > 0,
+                    )
+                  "
+                >
                   <template
-                    v-if="groupedFilteredMetricStreams.groups.some(g => g.streams.length > 0)"
+                    v-for="group in groupedFilteredMetricStreams.groups"
+                    :key="group.id"
                   >
-                    <template
-                      v-for="group in groupedFilteredMetricStreams.groups"
-                      :key="group.id"
-                    >
-                      <template v-if="group.streams.length > 0">
-                        <div class="metric-group-header tw:cursor-pointer" @click="toggleGroupCollapse(group.id)">
-                          <div class="metric-group-label">
-                            <q-icon
-                              :name="collapsedGroups.has(group.id) ? 'chevron_right' : 'expand_more'"
-                              size="0.875rem"
-                              class="tw:mr-0.5"
-                            />
-                            <q-icon :name="group.icon" size="0.875rem" />
-                            <span>{{ group.label }}</span>
-                            <q-badge
-                              color="grey-6"
-                              text-color="white"
-                              :label="group.streams.length"
-                              class="tw:ml-1"
-                            />
-                          </div>
-                          <div class="metric-group-actions">
-                            <q-btn
-                              flat dense no-caps size="xs"
-                              :color="getGroupSelectionState(group.id) === 'none' ? 'primary' : 'grey-7'"
-                              label="All"
-                              @click.stop="selectAllInGroup(group.id)"
-                              :disable="getGroupSelectionState(group.id) === 'all'"
-                            />
-                            <q-btn
-                              flat dense no-caps size="xs" color="grey-7"
-                              label="None"
-                              @click.stop="deselectAllInGroup(group.id)"
-                              :disable="getGroupSelectionState(group.id) === 'none'"
-                            />
-                          </div>
+                    <template v-if="group.streams.length > 0">
+                      <div
+                        class="metric-group-header tw:cursor-pointer"
+                        @click="toggleGroupCollapse(group.id)"
+                      >
+                        <div class="metric-group-label">
+                          <q-icon
+                            :name="
+                              collapsedGroups.has(group.id)
+                                ? 'chevron_right'
+                                : 'expand_more'
+                            "
+                            size="0.875rem"
+                            class="tw:mr-0.5"
+                          />
+                          <q-icon :name="group.icon" size="0.875rem" />
+                          <span>{{ group.label }}</span>
+                          <q-badge
+                            color="grey-6"
+                            text-color="white"
+                            :label="group.streams.length"
+                            class="tw:ml-1"
+                          />
                         </div>
-                        <q-item
-                          v-for="stream in group.streams"
-                          v-show="!collapsedGroups.has(group.id)"
-                          :key="stream.stream_name"
-                          dense
-                          clickable
-                          class="dimension-list-item tw:border-none!"
-                          @click="toggleMetricStream(stream)"
-                        >
-                          <q-item-section side>
-                            <q-checkbox
-                              :model-value="selectedMetricStreams.some(s => s.stream_name === stream.stream_name)"
-                              @update:model-value="toggleMetricStream(stream)"
-                              color="primary" size="xs" dense
-                            />
-                          </q-item-section>
-                          <q-item-section>
-                            <q-item-label class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]!">{{ stream.stream_name }}</q-item-label>
-                          </q-item-section>
-                        </q-item>
-                      </template>
+                        <div class="metric-group-actions">
+                          <q-btn
+                            flat
+                            dense
+                            no-caps
+                            size="xs"
+                            :color="
+                              getGroupSelectionState(group.id) === 'none'
+                                ? 'primary'
+                                : 'grey-7'
+                            "
+                            label="All"
+                            @click.stop="selectAllInGroup(group.id)"
+                            :disable="
+                              getGroupSelectionState(group.id) === 'all'
+                            "
+                          />
+                          <q-btn
+                            flat
+                            dense
+                            no-caps
+                            size="xs"
+                            color="grey-7"
+                            label="None"
+                            @click.stop="deselectAllInGroup(group.id)"
+                            :disable="
+                              getGroupSelectionState(group.id) === 'none'
+                            "
+                          />
+                        </div>
+                      </div>
+                      <q-item
+                        v-for="stream in group.streams"
+                        v-show="!collapsedGroups.has(group.id)"
+                        :key="stream.stream_name"
+                        dense
+                        clickable
+                        class="dimension-list-item tw:border-none!"
+                        @click="toggleMetricStream(stream)"
+                      >
+                        <q-item-section side>
+                          <q-checkbox
+                            :model-value="
+                              selectedMetricStreams.some(
+                                (s) => s.stream_name === stream.stream_name,
+                              )
+                            "
+                            @update:model-value="toggleMetricStream(stream)"
+                            color="primary"
+                            size="xs"
+                            dense
+                          />
+                        </q-item-section>
+                        <q-item-section>
+                          <q-item-label
+                            class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]!"
+                            >{{ stream.stream_name }}</q-item-label
+                          >
+                        </q-item-section>
+                      </q-item>
                     </template>
                   </template>
-                  <div v-else class="tw:p-3 tw:text-center tw:text-xs tw:opacity-60">
-                    {{ t("search.noResult") }}
-                  </div>
-                </div>
-
-                <!-- Footer: selected count -->
+                </template>
                 <div
-                  class="tw:p-3 tw:border-t tw:border-solid tw:border-[var(--o2-border-color)] o2-table-footer-title tw:text-[var(--o2-text-4)]!"
+                  v-else
+                  class="tw:p-3 tw:text-center tw:text-xs tw:opacity-60"
                 >
-                  {{ selectedMetricStreams.length }} of {{ uniqueMetricStreams.length }} selected
+                  {{ t("search.noResult") }}
                 </div>
+              </div>
+
+              <!-- Footer: selected count -->
+              <div
+                class="tw:p-3 tw:border-t tw:border-solid tw:border-[var(--o2-border-color)] o2-table-footer-title tw:text-[var(--o2-text-4)]!"
+              >
+                {{ selectedMetricStreams.length }} of
+                {{ uniqueMetricStreams.length }} selected
+              </div>
             </div>
           </template>
 
@@ -728,11 +841,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-tabs
                 v-if="nonEmptyGroupTabs.length > 0"
                 v-model="activeMetricGroupTab"
-                dense no-caps align="left"
+                dense
+                no-caps
+                align="left"
                 class="metric-group-tabs tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
               >
                 <q-tab
-                  v-for="group in groupedUniqueMetricStreams.groups.filter(g => nonEmptyGroupTabs.includes(g.id))"
+                  v-for="group in groupedUniqueMetricStreams.groups.filter(
+                    (g) => nonEmptyGroupTabs.includes(g.id),
+                  )"
                   :key="group.id"
                   :name="group.id"
                 >
@@ -741,7 +858,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ group.label }}</span>
                     <q-badge
                       dense
-                      :color="activeMetricGroupTab === group.id ? 'primary' : 'grey-5'"
+                      :color="
+                        activeMetricGroupTab === group.id ? 'primary' : 'grey-5'
+                      "
                       text-color="white"
                       :label="groupedSelectedMetricStreams[group.id].length"
                       class="tw:ml-0.5"
@@ -758,20 +877,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <q-spinner color="primary" size="md" />
                   <div class="tw:text-sm tw:opacity-70">
-                    {{ t("correlation.loadingMetrics", { count: selectedMetricStreams.length }) }}
+                    {{
+                      t("correlation.loadingMetrics", {
+                        count: selectedMetricStreams.length,
+                      })
+                    }}
                   </div>
                 </div>
                 <div
                   v-else-if="error"
                   class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
                 >
-                  <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
+                  <div
+                    class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90"
+                  >
                     {{ t("correlation.metricsError") }}
                   </div>
                   <div class="tw:text-sm tw:opacity-70 tw:mb-4">
                     {{ error || t("correlation.metricsErrorDetails") }}
                   </div>
-                  <q-btn flat color="primary" icon="refresh" :label="t('correlation.retryButton')" @click="loadDashboard" />
+                  <q-btn
+                    flat
+                    color="primary"
+                    icon="refresh"
+                    :label="t('correlation.retryButton')"
+                    @click="loadDashboard"
+                  />
                 </div>
                 <RenderDashboardCharts
                   v-else-if="activeDashboardForGroup"
@@ -786,7 +917,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else
                   class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
                 >
-                  <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
+                  <div
+                    class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90"
+                  >
                     {{ t("correlation.noMetrics") }}
                   </div>
                   <div class="tw:text-sm tw:opacity-70">
@@ -805,7 +938,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="tracesLoading"
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[calc(100vh-272px)] tw:py-20"
         >
-          <q-spinner-hourglass color="primary" size="3.75rem" class="tw:mb-4" />
+          <q-spinner-hourglass color="primary"
+size="3.75rem" class="tw:mb-4" />
           <div class="tw:text-base">{{ t("correlation.loadingTraces") }}</div>
         </div>
 
@@ -876,7 +1010,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
           >
             <div class="tw:flex tw:items-center tw:gap-3">
-              <q-icon name="hub" color="primary" size="1.25rem" />
+              <q-icon name="hub"
+color="primary" size="1.25rem" />
               <div class="tw:flex tw:flex-col">
                 <span class="tw:text-sm tw:font-semibold">{{
                   t("correlation.dimensionBasedCorrelation")
@@ -885,7 +1020,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   t("correlation.tracesFromService", { service: serviceName })
                 }}</span>
               </div>
-              <q-chip dense color="primary" text-color="white">
+              <q-chip dense
+color="primary" text-color="white">
                 {{ tracesForDimensions.length }} {{ t("menu.traces") }}
               </q-chip>
               <div class="tw:ml-auto tw:flex tw:items-center tw:gap-2">
@@ -966,7 +1102,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:text-base tw:font-semibold">
             {{ t("correlation.selectMetrics") }}
           </div>
-          <q-btn flat round dense icon="close" v-close-popup />
+          <q-btn flat
+round dense
+icon="close" v-close-popup />
         </div>
 
         <!-- Search Input -->
@@ -987,7 +1125,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section class="tw:p-0 metric-list-container">
         <template
           v-if="
-            groupedFilteredMetricStreams.groups.some((g) => g.streams.length > 0)
+            groupedFilteredMetricStreams.groups.some(
+              (g) => g.streams.length > 0,
+            )
           "
         >
           <template
@@ -1067,10 +1207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <!-- No results message -->
-        <div
-          v-else
-          class="tw:p-4 tw:text-center tw:text-gray-500"
-        >
+        <div v-else class="tw:p-4 tw:text-center tw:text-gray-500">
           {{ t("search.noResult") }}
         </div>
       </q-card-section>
@@ -1526,7 +1663,9 @@ const getGroupSelectionState = (
   const groupStreams = groupedFilteredMetricStreams.value[groupId];
   if (groupStreams.length === 0) return "none";
   const selectedCount = groupStreams.filter((s) =>
-    selectedMetricStreams.value.some((sel) => sel.stream_name === s.stream_name),
+    selectedMetricStreams.value.some(
+      (sel) => sel.stream_name === s.stream_name,
+    ),
   ).length;
   if (selectedCount === 0) return "none";
   if (selectedCount === groupStreams.length) return "all";

@@ -27,7 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="index"
           class="json-array-item"
         >
-          <span :style="{ color: getValueColor(item) }">{{ formatValue(item) }}</span>
+          <span :style="{ color: getValueColor(item) }">{{
+            formatValue(item)
+          }}</span>
         </div>
       </div>
       <!-- Array of objects: [{"user": "admin"}, ...] -> render each object -->
@@ -41,15 +43,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="json-brace">{</span>
             <template v-for="(val, key) in getDefinedEntries(item)" :key="key">
               <span class="json-key-value">
-                <span class="json-key" :style="{ color: keyColor }">{{ key }}</span>
+                <span class="json-key" :style="{ color: keyColor }">{{
+                  key
+                }}</span>
                 <span class="json-colon">: </span>
-                <span class="json-value" :style="{ color: getValueColor(val) }">{{ formatValue(val) }}</span>
+                <span
+                  class="json-value"
+                  :style="{ color: getValueColor(val) }"
+                  >{{ formatValue(val) }}</span
+                >
               </span>
-              <span v-if="!isLastDefinedEntry(item, key)" class="json-comma">, </span>
+              <span v-if="!isLastDefinedEntry(item, key)" class="json-comma"
+                >,
+              </span>
             </template>
             <span class="json-brace">}</span>
           </span>
-          <span v-else :style="{ color: getValueColor(item) }">{{ formatValue(item) }}</span>
+          <span v-else :style="{ color: getValueColor(item) }">{{
+            formatValue(item)
+          }}</span>
         </div>
       </div>
     </div>
@@ -60,15 +72,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="json-key-value">
           <span class="json-key" :style="{ color: keyColor }">{{ key }}</span>
           <span class="json-colon">: </span>
-          <span class="json-value" :style="{ color: getValueColor(val) }">{{ formatValue(val) }}</span>
+          <span class="json-value" :style="{ color: getValueColor(val) }">{{
+            formatValue(val)
+          }}</span>
         </span>
-        <span v-if="idx < definedObjectKeys.length - 1" class="json-comma">, </span>
+        <span v-if="idx < definedObjectKeys.length - 1" class="json-comma"
+          >,
+        </span>
       </template>
       <span class="json-brace">}</span>
     </div>
     <!-- Primitive value -->
     <div v-else>
-      <span :style="{ color: getValueColor(parsedData) }">{{ formatValue(parsedData) }}</span>
+      <span :style="{ color: getValueColor(parsedData) }">{{
+        formatValue(parsedData)
+      }}</span>
     </div>
   </div>
 </template>
@@ -108,7 +126,7 @@ const isArrayOfPrimitives = computed(() => {
       typeof item === "number" ||
       typeof item === "boolean" ||
       item === null ||
-      item === undefined
+      item === undefined,
   );
 });
 
@@ -120,14 +138,20 @@ const definedItems = computed(() => {
 
 // Memoized defined entries for single objects
 const definedObjectEntries = computed(() => {
-  if (typeof parsedData.value === 'object' && !Array.isArray(parsedData.value) && parsedData.value !== null) {
+  if (
+    typeof parsedData.value === "object" &&
+    !Array.isArray(parsedData.value) &&
+    parsedData.value !== null
+  ) {
     return getDefinedEntries(parsedData.value);
   }
   return {};
 });
 
 // Memoized keys for single objects
-const definedObjectKeys = computed(() => Object.keys(definedObjectEntries.value));
+const definedObjectKeys = computed(() =>
+  Object.keys(definedObjectEntries.value),
+);
 
 // Get color for JSON keys based on theme
 const keyColor = computed(() => {
@@ -163,11 +187,14 @@ const formatValue = (value: any): string => {
 };
 
 // Cache for defined entries to avoid recomputation
-const definedEntriesCache = new WeakMap<object, { entries: Record<string, any>; keys: string[] }>();
+const definedEntriesCache = new WeakMap<
+  object,
+  { entries: Record<string, any>; keys: string[] }
+>();
 
 // Get object entries excluding undefined values - optimized with caching
 const getDefinedEntries = (obj: any): Record<string, any> => {
-  if (!obj || typeof obj !== 'object') return {};
+  if (!obj || typeof obj !== "object") return {};
 
   // Check cache first
   if (definedEntriesCache.has(obj)) {
@@ -191,7 +218,7 @@ const getDefinedEntries = (obj: any): Record<string, any> => {
 
 // Check if current key is the last defined entry - optimized
 const isLastDefinedEntry = (obj: any, currentKey: string): boolean => {
-  if (!obj || typeof obj !== 'object') return true;
+  if (!obj || typeof obj !== "object") return true;
 
   // Use cached keys if available
   const cached = definedEntriesCache.get(obj);

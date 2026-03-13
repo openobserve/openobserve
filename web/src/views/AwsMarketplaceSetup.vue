@@ -31,7 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="setup-container q-pa-xl">
       <!-- No Token Error -->
       <div v-if="state === 'no_token'" class="text-center">
-        <q-icon name="warning" size="80px" color="warning" />
+        <q-icon name="warning" size="80px"
+color="warning" />
         <h5 class="q-mt-md">No Marketplace Token Found</h5>
         <p class="text-grey-7">
           Please start the registration process from AWS Marketplace.
@@ -46,7 +47,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Error State -->
       <div v-else-if="state === 'error'" class="text-center">
-        <q-icon name="error" size="80px" color="negative" />
+        <q-icon name="error" size="80px"
+color="negative" />
         <h5 class="q-mt-md">{{ errorMessage }}</h5>
         <q-btn
           color="primary"
@@ -58,7 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Org Selection/Creation -->
       <div v-else-if="state === 'select_org'" class="text-center">
-        <q-icon name="cloud" size="60px" color="primary" />
+        <q-icon name="cloud" size="60px"
+color="primary" />
         <h4 class="q-mt-md">Complete AWS Marketplace Setup</h4>
         <p class="text-grey-7 q-mb-lg">
           Link your AWS Marketplace subscription to an organization
@@ -66,7 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="options-container">
           <!-- Create New Org -->
-          <q-card flat bordered class="option-card q-mb-md">
+          <q-card flat bordered
+class="option-card q-mb-md">
             <q-card-section>
               <div class="text-h6">Create New Organization</div>
               <p class="text-grey-7">
@@ -140,13 +144,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-spinner-gears size="80px" color="primary" />
         </div>
         <p class="text-grey-7 q-mt-lg">
-          Please wait while we confirm activation with AWS and set up your account.
+          Please wait while we confirm activation with AWS and set up your
+          account.
         </p>
       </div>
 
       <!-- Success State -->
       <div v-else-if="state === 'success'" class="text-center">
-        <q-icon name="check_circle" size="80px" color="positive" />
+        <q-icon name="check_circle" size="80px"
+color="positive" />
         <h4 class="q-mt-md">Subscription Activated!</h4>
         <p class="text-grey-7">
           Your AWS Marketplace subscription is now active.
@@ -162,7 +168,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Payment Failed State -->
       <div v-else-if="state === 'payment_failed'" class="text-center">
-        <q-icon name="error" size="80px" color="negative" />
+        <q-icon name="error" size="80px"
+color="negative" />
         <h5 class="q-mt-md">Payment Failed</h5>
         <p class="text-grey-7">
           There was an issue with your AWS Marketplace payment. Please check
@@ -210,7 +217,7 @@ export default defineComponent({
     const newOrgName = ref("");
     const selectedOrg = ref<{ identifier: string; name: string } | null>(null);
     const eligibleOrganizations = ref<{ identifier: string; name: string }[]>(
-      []
+      [],
     );
     const token = ref("");
     const activatedOrgId = ref("");
@@ -218,13 +225,16 @@ export default defineComponent({
 
     // Helper to get cookie value
     const getCookie = (name: string): string | null => {
-      const match = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]+)'));
+      const match = document.cookie.match(
+        new RegExp("(^|; )" + name + "=([^;]+)"),
+      );
       return match ? decodeURIComponent(match[2]) : null;
     };
 
     // Helper to delete cookie
     const deleteCookie = (name: string) => {
-      document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      document.cookie =
+        name + "=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;";
     };
 
     onMounted(async () => {
@@ -309,7 +319,7 @@ export default defineComponent({
       try {
         const response = await awsMarketplace.linkSubscription(
           orgId,
-          token.value
+          token.value,
         );
 
         if (response.data.success) {
@@ -345,7 +355,7 @@ export default defineComponent({
         try {
           const response = await awsMarketplace.getActivationStatus(
             orgId,
-            customerIdentifier
+            customerIdentifier,
           );
 
           const status = response.data.status;

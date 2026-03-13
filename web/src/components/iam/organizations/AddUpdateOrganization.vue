@@ -26,7 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("organization.updateOrganization") }}
           </div>
-          <div v-else style="font-size: 18px" data-test="create-org">
+          <div v-else style="font-size: 18px"
+data-test="create-org">
             {{ t("organization.createOrganization") }}
           </div>
         </div>
@@ -89,7 +90,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('organization.cancel')"
               no-caps
               flat
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
               @click="router.replace({ name: 'organizations' })"
               data-test="cancel-organizations-modal"
             />
@@ -100,7 +105,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="submit"
               no-caps
               flat
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-primary-button-dark'
+                  : 'o2-primary-button-light'
+              "
               data-test="add-org"
             />
           </div>
@@ -174,7 +183,6 @@ export default defineComponent({
       return orgNameRegex.test(organizationData.value.name);
     });
 
-
     return {
       t,
       router,
@@ -220,12 +228,12 @@ export default defineComponent({
     completeSubscriptionProcess() {
       // this.store.state.dispatch("setSelectedOrganization",)
       this.router.push(
-        `/billings/plans?org_identifier=${this.newOrgIdentifier}`
+        `/billings/plans?org_identifier=${this.newOrgIdentifier}`,
       );
     },
     onSubmit() {
       this.organizationData.name = this.organizationData.name.trim();
-      if(!this.isValidOrgName){
+      if (!this.isValidOrgName) {
         return;
       }
       const dismiss = this.$q.notify({
@@ -244,8 +252,7 @@ export default defineComponent({
         if (!organizationId) {
           delete this.organizationData.id;
           callOrganization = organizationService.create(this.organizationData);
-        }
-        else {
+        } else {
           callOrganization = organizationService.rename_organization(
             organizationId,
             this.organizationData.name,
@@ -294,15 +301,18 @@ export default defineComponent({
             this.$q.notify({
               type: "negative",
               message: JSON.stringify(
-                err?.response?.data["message"] || ( organizationId ? "Organization Update failed." : "Organization creation failed.")
+                err?.response?.data["message"] ||
+                  (organizationId
+                    ? "Organization Update failed."
+                    : "Organization creation failed."),
               ),
             });
             dismiss();
           });
-          this.track("Button Click", {
-            button: "Save Organization",
-            page: "Add Organization"
-          });
+        this.track("Button Click", {
+          button: "Save Organization",
+          page: "Add Organization",
+        });
       });
     },
   },

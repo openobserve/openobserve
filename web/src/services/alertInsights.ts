@@ -128,7 +128,7 @@ const alertInsights = {
    */
   getSummary: (
     org_identifier: string,
-    params: InsightsParams
+    params: InsightsParams,
   ): Promise<{ data: SummaryInsights }> => {
     return http().get(`/api/${org_identifier}/alerts/insights/summary`, {
       params,
@@ -140,7 +140,7 @@ const alertInsights = {
    */
   getTimeseries: (
     org_identifier: string,
-    params: InsightsParams
+    params: InsightsParams,
   ): Promise<{ data: TimeSeriesInsights }> => {
     return http().get(`/api/${org_identifier}/alerts/insights/timeseries`, {
       params,
@@ -152,7 +152,7 @@ const alertInsights = {
    */
   getFrequency: (
     org_identifier: string,
-    params: FrequencyParams
+    params: FrequencyParams,
   ): Promise<{ data: FrequencyInsights }> => {
     return http().get(`/api/${org_identifier}/alerts/insights/frequency`, {
       params,
@@ -164,7 +164,7 @@ const alertInsights = {
    */
   getCorrelation: (
     org_identifier: string,
-    params: CorrelationParams
+    params: CorrelationParams,
   ): Promise<{ data: CorrelationInsights }> => {
     return http().get(`/api/${org_identifier}/alerts/insights/correlation`, {
       params,
@@ -176,7 +176,7 @@ const alertInsights = {
    */
   getQuality: (
     org_identifier: string,
-    params: InsightsParams
+    params: InsightsParams,
   ): Promise<{ data: QualityInsights }> => {
     return http().get(`/api/${org_identifier}/alerts/insights/quality`, {
       params,
@@ -188,7 +188,7 @@ const alertInsights = {
    */
   getAllInsights: async (
     org_identifier: string,
-    params: InsightsParams & FrequencyParams & CorrelationParams
+    params: InsightsParams & FrequencyParams & CorrelationParams,
   ) => {
     const [summary, timeseries, frequency, correlation, quality] =
       await Promise.all([

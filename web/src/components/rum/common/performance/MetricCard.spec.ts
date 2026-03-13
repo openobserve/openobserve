@@ -56,7 +56,7 @@ describe("MetricCard", () => {
         },
       });
 
-      const icons = wrapper.findAll('.q-icon');
+      const icons = wrapper.findAll(".q-icon");
       // Should have no icon since none was provided and no status
       expect(icons.length).toBe(0);
     });
@@ -146,11 +146,11 @@ describe("MetricCard", () => {
       });
 
       // Check for green background class on wrapper
-      const wrapper_div = wrapper.find('.tw\\:bg-green-50');
+      const wrapper_div = wrapper.find(".tw\\:bg-green-50");
       expect(wrapper_div.exists()).toBe(true);
 
       // Check for status icon
-      const statusIcon = wrapper.findAll('.q-icon');
+      const statusIcon = wrapper.findAll(".q-icon");
       expect(statusIcon.length).toBeGreaterThan(0);
     });
 
@@ -165,11 +165,11 @@ describe("MetricCard", () => {
       });
 
       // Check for yellow background class on wrapper
-      const wrapper_div = wrapper.find('.tw\\:bg-yellow-50');
+      const wrapper_div = wrapper.find(".tw\\:bg-yellow-50");
       expect(wrapper_div.exists()).toBe(true);
 
       // Check for status icon
-      const statusIcon = wrapper.findAll('.q-icon');
+      const statusIcon = wrapper.findAll(".q-icon");
       expect(statusIcon.length).toBeGreaterThan(0);
     });
 
@@ -184,11 +184,11 @@ describe("MetricCard", () => {
       });
 
       // Check for red background class on wrapper
-      const wrapper_div = wrapper.find('.tw\\:bg-red-50');
+      const wrapper_div = wrapper.find(".tw\\:bg-red-50");
       expect(wrapper_div.exists()).toBe(true);
 
       // Check for status icon
-      const statusIcon = wrapper.findAll('.q-icon');
+      const statusIcon = wrapper.findAll(".q-icon");
       expect(statusIcon.length).toBeGreaterThan(0);
     });
 
@@ -200,7 +200,9 @@ describe("MetricCard", () => {
         },
       });
 
-      const statusIndicators = wrapper.findAll('[data-test="status-indicator"]');
+      const statusIndicators = wrapper.findAll(
+        '[data-test="status-indicator"]',
+      );
       expect(statusIndicators.length).toBe(0);
     });
   });
@@ -228,10 +230,10 @@ describe("MetricCard", () => {
       });
 
       // Component should still render - it uses a div wrapper
-      expect(wrapper.find('div').exists()).toBe(true);
+      expect(wrapper.find("div").exists()).toBe(true);
       // data-test attribute should be empty string when not provided
-      const dataTest = wrapper.attributes('data-test');
-      expect(dataTest === undefined || dataTest === '').toBe(true);
+      const dataTest = wrapper.attributes("data-test");
+      expect(dataTest === undefined || dataTest === "").toBe(true);
     });
   });
 

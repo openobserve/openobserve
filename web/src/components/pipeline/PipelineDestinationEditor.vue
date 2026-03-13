@@ -15,9 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page
-    class="q-pa-none o2-custom-bg"
-  >
+  <q-page class="q-pa-none o2-custom-bg">
     <div
       class="row items-center no-wrap card-container q-px-md tw:mb-[0.675rem]"
     >
@@ -44,7 +42,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="card-container tw:py-2 q-px-md tw:h-[calc(100vh-120px)] tw:overflow-auto">
+    <div
+      class="card-container tw:py-2 q-px-md tw:h-[calc(100vh-120px)] tw:overflow-auto"
+    >
       <div class="tw:w-[50vw]">
         <CreateDestinationForm
           :destination="destination"

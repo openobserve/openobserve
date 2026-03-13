@@ -143,7 +143,7 @@ describe("OtelConfig", () => {
         stream-name: default
       tls:
         insecure: true`;
-    
+
     expect(wrapper.vm.getOtelGrpcConfig).toBe(expectedConfig);
   });
 
@@ -155,7 +155,7 @@ describe("OtelConfig", () => {
     headers:
       Authorization: Basic ${btoa("test@example.com:test-passcode-123")}
       stream-name: default`;
-    
+
     expect(wrapper.vm.getOtelHttpConfig).toBe(expectedConfig);
   });
 
@@ -164,7 +164,9 @@ describe("OtelConfig", () => {
     await wrapper.setProps({ currOrgIdentifier: "new-org" });
     await nextTick();
 
-    expect(wrapper.vm.getOtelHttpConfig).toContain("http://localhost:5080/api/new-org");
+    expect(wrapper.vm.getOtelHttpConfig).toContain(
+      "http://localhost:5080/api/new-org",
+    );
     expect(wrapper.vm.getOtelGrpcConfig).toContain("organization: new-org");
   });
 
@@ -191,16 +193,20 @@ describe("OtelConfig", () => {
   it("should pass HTTP config to first CopyContent component", () => {
     const copyComponents = wrapper.findAllComponents({ name: "CopyContent" });
     const httpCopyComponent = copyComponents[0];
-    
-    expect(httpCopyComponent.props("content")).toBe(wrapper.vm.getOtelHttpConfig);
+
+    expect(httpCopyComponent.props("content")).toBe(
+      wrapper.vm.getOtelHttpConfig,
+    );
   });
 
   // Test 16: CopyContent props - gRPC config
   it("should pass gRPC config to second CopyContent component", () => {
     const copyComponents = wrapper.findAllComponents({ name: "CopyContent" });
     const grpcCopyComponent = copyComponents[1];
-    
-    expect(grpcCopyComponent.props("content")).toBe(wrapper.vm.getOtelGrpcConfig);
+
+    expect(grpcCopyComponent.props("content")).toBe(
+      wrapper.vm.getOtelGrpcConfig,
+    );
   });
 
   // Test 17: Empty props handling
@@ -208,7 +214,9 @@ describe("OtelConfig", () => {
     await wrapper.setProps({ currOrgIdentifier: "" });
     await nextTick();
 
-    expect(wrapper.vm.getOtelHttpConfig).toContain("http://localhost:5080/api/");
+    expect(wrapper.vm.getOtelHttpConfig).toContain(
+      "http://localhost:5080/api/",
+    );
     expect(wrapper.vm.getOtelGrpcConfig).toContain("organization: ");
   });
 
@@ -225,10 +233,10 @@ describe("OtelConfig", () => {
   it("should be reactive to all computed properties", async () => {
     const initialHttpConfig = wrapper.vm.getOtelHttpConfig;
     const initialGrpcConfig = wrapper.vm.getOtelGrpcConfig;
-    
-    await wrapper.setProps({ 
+
+    await wrapper.setProps({
       currOrgIdentifier: "updated-org",
-      currUserEmail: "updated@example.com"
+      currUserEmail: "updated@example.com",
     });
     await nextTick();
 
@@ -238,9 +246,15 @@ describe("OtelConfig", () => {
 
   // Test 20: Exposed properties accessibility
   it("should expose all required properties", () => {
-    const exposedProps = ['endpoint', 'ingestionURL', 'accessKey', 'getOtelGrpcConfig', 'getOtelHttpConfig'];
-    
-    exposedProps.forEach(prop => {
+    const exposedProps = [
+      "endpoint",
+      "ingestionURL",
+      "accessKey",
+      "getOtelGrpcConfig",
+      "getOtelHttpConfig",
+    ];
+
+    exposedProps.forEach((prop) => {
       expect(wrapper.vm[prop]).toBeDefined();
     });
   });
@@ -248,7 +262,7 @@ describe("OtelConfig", () => {
   // Test 21: gRPC configuration structure validation
   it("should include all required gRPC configuration fields", () => {
     const config = wrapper.vm.getOtelGrpcConfig;
-    
+
     expect(config).toContain("exporters:");
     expect(config).toContain("otlp/openobserve:");
     expect(config).toContain("endpoint:");
@@ -263,7 +277,7 @@ describe("OtelConfig", () => {
   // Test 22: HTTP configuration structure validation
   it("should include all required HTTP configuration fields", () => {
     const config = wrapper.vm.getOtelHttpConfig;
-    
+
     expect(config).toContain("exporters:");
     expect(config).toContain("otlphttp/openobserve:");
     expect(config).toContain("endpoint:");
@@ -287,10 +301,10 @@ describe("OtelConfig", () => {
   it("should use different Authorization formats for HTTP and gRPC", () => {
     const httpConfig = wrapper.vm.getOtelHttpConfig;
     const grpcConfig = wrapper.vm.getOtelGrpcConfig;
-    
+
     // HTTP uses format: Authorization: Basic <token>
     expect(httpConfig).toContain("Authorization: Basic");
-    
+
     // gRPC uses format: Authorization: "Basic <token>"
     expect(grpcConfig).toContain('Authorization: "Basic');
   });
@@ -299,7 +313,7 @@ describe("OtelConfig", () => {
   it("should include TLS configuration only in gRPC config", () => {
     const httpConfig = wrapper.vm.getOtelHttpConfig;
     const grpcConfig = wrapper.vm.getOtelGrpcConfig;
-    
+
     expect(grpcConfig).toContain("tls:");
     expect(grpcConfig).toContain("insecure: true");
     expect(httpConfig).not.toContain("tls:");

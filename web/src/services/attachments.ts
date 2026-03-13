@@ -22,15 +22,15 @@ var attachments = {
     page_size: number,
     sort_by: string,
     desc: boolean,
-    name: string
+    name: string,
   ) => {
     return http().get(
-      `/api/tickets?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
+      `/api/tickets?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`,
     );
   },
   getPresignedUrl: (objectkey: string, fileType: String) => {
     return http().get(
-      `/api/attachements/` + objectkey + "?fileType=" + fileType
+      `/api/attachements/` + objectkey + "?fileType=" + fileType,
     );
   },
   upload: (url: string, data: any) => {

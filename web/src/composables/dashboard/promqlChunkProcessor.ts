@@ -38,7 +38,9 @@ export interface ProcessingStats {
 /**
  * Creates a PromQL chunk processor with optimized metric matching and series limiting
  */
-export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions) {
+export function createPromQLChunkProcessor(
+  options: PromQLChunkProcessorOptions,
+) {
   const { maxSeries, enableLogging = true } = options;
 
   // Fast O(1) metric lookup using hash-based signatures
@@ -72,7 +74,9 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
     stats.totalMetricsReceived += metricsCount;
 
     // Limit the first chunk to maxSeries
-    const limitedResult = newData?.result ? newData.result.slice(0, maxSeries) : [];
+    const limitedResult = newData?.result
+      ? newData.result.slice(0, maxSeries)
+      : [];
 
     // Build metric index map for fast lookups
     if (limitedResult && Array.isArray(limitedResult)) {
@@ -87,11 +91,11 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
     if (enableLogging) {
       if (metricsCount > maxSeries) {
         console.log(
-          `[PromQL Chunk] ⚠️ First chunk limited from ${metricsCount} to ${limitedResult.length} metrics`
+          `[PromQL Chunk] ⚠️ First chunk limited from ${metricsCount} to ${limitedResult.length} metrics`,
         );
       }
       console.log(
-        `[PromQL Chunk] Built index for ${limitedResult.length} metrics in ${(performance.now() - startTime).toFixed(1)}ms`
+        `[PromQL Chunk] Built index for ${limitedResult.length} metrics in ${(performance.now() - startTime).toFixed(1)}ms`,
       );
     }
 
@@ -155,7 +159,7 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
     if (enableLogging) {
       console.log(
         `[PromQL Chunk] Merged in ${(performance.now() - mergeStart).toFixed(1)}ms ` +
-          `(${newMetricsAdded} new metrics, ${valuesAppended} values appended)`
+          `(${newMetricsAdded} new metrics, ${valuesAppended} values appended)`,
       );
     }
 
@@ -176,7 +180,7 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
 
     if (enableLogging) {
       console.log(
-        `[PromQL Chunk] Chunk ${stats.chunkCount} received: ${metricsCount} metrics`
+        `[PromQL Chunk] Chunk ${stats.chunkCount} received: ${metricsCount} metrics`,
       );
     }
 
@@ -186,7 +190,7 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
 
     if (enableLogging) {
       console.log(
-        `[PromQL Chunk] Total chunk processing: ${(performance.now() - chunkStartTime).toFixed(1)}ms`
+        `[PromQL Chunk] Total chunk processing: ${(performance.now() - chunkStartTime).toFixed(1)}ms`,
       );
     }
 
@@ -211,10 +215,10 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
 
     if (enableLogging) {
       console.log(
-        `[PromQL Chunk] ✅ Processing complete! Total time: ${finalStats.totalTime.toFixed(0)}ms (${stats.chunkCount} chunks)`
+        `[PromQL Chunk] ✅ Processing complete! Total time: ${finalStats.totalTime.toFixed(0)}ms (${stats.chunkCount} chunks)`,
       );
       console.log(
-        `[PromQL Chunk] Final metrics: ${stats.metricsStored} stored (${stats.totalMetricsReceived} received, ${stats.valuesAppended} values appended)`
+        `[PromQL Chunk] Final metrics: ${stats.metricsStored} stored (${stats.totalMetricsReceived} received, ${stats.valuesAppended} values appended)`,
       );
     }
   }

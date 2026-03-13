@@ -81,7 +81,9 @@ describe("ColumnOrderPopUp", () => {
       wrapper = createWrapper();
 
       expect(
-        wrapper.find('[data-test="dashboard-column-order-cancel-btn"]').exists(),
+        wrapper
+          .find('[data-test="dashboard-column-order-cancel-btn"]')
+          .exists(),
       ).toBe(true);
       expect(
         wrapper.find('[data-test="dashboard-column-order-save-btn"]').exists(),
@@ -91,7 +93,9 @@ describe("ColumnOrderPopUp", () => {
     it("should render description text", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.text()).toContain("Customize the display order of columns");
+      expect(wrapper.text()).toContain(
+        "Customize the display order of columns",
+      );
     });
   });
 
@@ -214,7 +218,9 @@ describe("ColumnOrderPopUp", () => {
 
       await flushPromises();
 
-      const dragHandles = wrapper.findAll('[data-test^="column-order-drag-handle"]');
+      const dragHandles = wrapper.findAll(
+        '[data-test^="column-order-drag-handle"]',
+      );
       expect(dragHandles.length).toBe(2);
     });
 
@@ -226,8 +232,12 @@ describe("ColumnOrderPopUp", () => {
 
       await flushPromises();
 
-      const moveUpButtons = wrapper.findAll('[data-test^="column-order-move-up"]');
-      const moveDownButtons = wrapper.findAll('[data-test^="column-order-move-down"]');
+      const moveUpButtons = wrapper.findAll(
+        '[data-test^="column-order-move-up"]',
+      );
+      const moveDownButtons = wrapper.findAll(
+        '[data-test^="column-order-move-down"]',
+      );
 
       expect(moveUpButtons.length).toBe(2);
       expect(moveDownButtons.length).toBe(2);
@@ -281,7 +291,9 @@ describe("ColumnOrderPopUp", () => {
 
       await flushPromises();
 
-      const firstMoveUpButton = wrapper.findComponent('[data-test="column-order-move-up-0"]');
+      const firstMoveUpButton = wrapper.findComponent(
+        '[data-test="column-order-move-up-0"]',
+      );
       expect(firstMoveUpButton.props("disable")).toBe(true);
     });
   });
@@ -333,7 +345,9 @@ describe("ColumnOrderPopUp", () => {
 
       await flushPromises();
 
-      const lastMoveDownButton = wrapper.findComponent('[data-test="column-order-move-down-1"]');
+      const lastMoveDownButton = wrapper.findComponent(
+        '[data-test="column-order-move-down-1"]',
+      );
       expect(lastMoveDownButton.props("disable")).toBe(true);
     });
   });
@@ -590,11 +604,15 @@ describe("ColumnOrderPopUp", () => {
       expect(wrapper.vm.editColumnOrder).toEqual(["column1"]);
 
       // Move up button should be disabled
-      const moveUpBtn = wrapper.findComponent('[data-test="column-order-move-up-0"]');
+      const moveUpBtn = wrapper.findComponent(
+        '[data-test="column-order-move-up-0"]',
+      );
       expect(moveUpBtn.props("disable")).toBe(true);
 
       // Move down button should be disabled
-      const moveDownBtn = wrapper.findComponent('[data-test="column-order-move-down-0"]');
+      const moveDownBtn = wrapper.findComponent(
+        '[data-test="column-order-move-down-0"]',
+      );
       expect(moveDownBtn.props("disable")).toBe(true);
     });
 
@@ -660,7 +678,9 @@ describe("ColumnOrderPopUp", () => {
         wrapper.find('[data-test="dashboard-column-order-save-btn"]').exists(),
       ).toBe(true);
       expect(
-        wrapper.find('[data-test="dashboard-column-order-cancel-btn"]').exists(),
+        wrapper
+          .find('[data-test="dashboard-column-order-cancel-btn"]')
+          .exists(),
       ).toBe(true);
     });
 
@@ -670,8 +690,12 @@ describe("ColumnOrderPopUp", () => {
         availableColumns: ["column1"],
       });
 
-      const saveBtn = wrapper.find('[data-test="dashboard-column-order-save-btn"]');
-      const cancelBtn = wrapper.find('[data-test="dashboard-column-order-cancel-btn"]');
+      const saveBtn = wrapper.find(
+        '[data-test="dashboard-column-order-save-btn"]',
+      );
+      const cancelBtn = wrapper.find(
+        '[data-test="dashboard-column-order-cancel-btn"]',
+      );
 
       expect(saveBtn.text()).toContain("Save");
       expect(cancelBtn.text()).toContain("Cancel");

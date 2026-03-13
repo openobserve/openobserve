@@ -21,8 +21,8 @@
  * Format large numbers with K/M notation
  */
 export const formatNumber = (n: number): string => {
-  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
-  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
   return String(n);
 };
 
@@ -30,9 +30,9 @@ export const formatNumber = (n: number): string => {
  * Format latency from nanoseconds to human-readable string
  */
 export const formatLatency = (ns: number): string => {
-  if (!ns) return 'N/A';
+  if (!ns) return "N/A";
   const ms = ns / 1e6;
-  return ms >= 1000 ? (ms / 1000).toFixed(2) + 's' : ms.toFixed(2) + 'ms';
+  return ms >= 1000 ? (ms / 1000).toFixed(2) + "s" : ms.toFixed(2) + "ms";
 };
 
 /**
@@ -50,7 +50,7 @@ export const pointToBezierDistance = (
     cpy2: number;
     x2: number;
     y2: number;
-  }
+  },
 ): number => {
   let min = Infinity;
   const { x1, y1, cpx1, cpy1, cpx2, cpy2, x2, y2 } = shape;
@@ -58,8 +58,16 @@ export const pointToBezierDistance = (
   for (let i = 0; i <= 20; i++) {
     const t = i / 20;
     const u = 1 - t;
-    const bx = u*u*u*x1 + 3*u*u*t*cpx1 + 3*u*t*t*cpx2 + t*t*t*x2;
-    const by = u*u*u*y1 + 3*u*u*t*cpy1 + 3*u*t*t*cpy2 + t*t*t*y2;
+    const bx =
+      u * u * u * x1 +
+      3 * u * u * t * cpx1 +
+      3 * u * t * t * cpx2 +
+      t * t * t * x2;
+    const by =
+      u * u * u * y1 +
+      3 * u * u * t * cpy1 +
+      3 * u * t * t * cpy2 +
+      t * t * t * y2;
     const d = Math.hypot(px - bx, py - by);
     if (d < min) min = d;
   }
@@ -73,7 +81,7 @@ export const generateNodeTooltipContent = (
   nodeName: string,
   requests: number,
   errors: number,
-  errorRate: number
+  errorRate: number,
 ): string => {
   return `
     <strong>${nodeName}</strong><br/>
@@ -92,7 +100,7 @@ export const generateEdgeTooltipContent = (
   errorRate: number,
   p50Ns: number,
   p95Ns: number,
-  p99Ns: number
+  p99Ns: number,
 ): string => {
   return `
     <strong>Requests:</strong> ${formatNumber(total)}<br/>
@@ -109,10 +117,10 @@ export const generateEdgeTooltipContent = (
 export const findIncomingEdgeForNode = (
   nodeName: string,
   parentName: string | undefined,
-  edges: any[]
+  edges: any[],
 ): any | null => {
   // Handle entry-point nodes (no parent or empty parent name)
-  if (!parentName || parentName === '') {
+  if (!parentName || parentName === "") {
     const edge = edges.find((e: any) => e.from === null && e.to === nodeName);
     if (edge) return edge;
     // Fallback to any edge to this node
@@ -120,8 +128,8 @@ export const findIncomingEdgeForNode = (
   }
 
   // Try exact match first
-  const edge = edges.find((e: any) =>
-    e.from === parentName && e.to === nodeName
+  const edge = edges.find(
+    (e: any) => e.from === parentName && e.to === nodeName,
   );
 
   if (edge) return edge;
@@ -135,7 +143,7 @@ export const findIncomingEdgeForNode = (
  */
 export const calculateRootNodeMetrics = (
   nodeName: string,
-  edges: any[]
+  edges: any[],
 ): { requests: number; errors: number; errorRate: number } => {
   const outgoing = edges.filter((e: any) => e.from === nodeName);
 
@@ -143,8 +151,14 @@ export const calculateRootNodeMetrics = (
     return { requests: 0, errors: 0, errorRate: 0 };
   }
 
-  const total = outgoing.reduce((s: number, e: any) => s + (e.total_requests || 0), 0);
-  const failed = outgoing.reduce((s: number, e: any) => s + (e.failed_requests || 0), 0);
+  const total = outgoing.reduce(
+    (s: number, e: any) => s + (e.total_requests || 0),
+    0,
+  );
+  const failed = outgoing.reduce(
+    (s: number, e: any) => s + (e.failed_requests || 0),
+    0,
+  );
   const errorRate = total > 0 ? (failed / total) * 100 : 0;
 
   return { requests: total, errors: failed, errorRate };

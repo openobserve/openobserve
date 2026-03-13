@@ -29,7 +29,12 @@ vi.mock("@/utils/dashboard/legendConfiguration", () => ({
   getChartDimensions: vi.fn(() => ({ chartWidth: 800, chartHeight: 400 })),
   applyPieDonutChartAlignment: vi.fn(),
   applyPieDonutCenterAdjustment: vi.fn(),
-  calculatePieChartContainer: vi.fn(() => ({ left: "15%", right: "15%", top: "15%", bottom: "15%" })),
+  calculatePieChartContainer: vi.fn(() => ({
+    left: "15%",
+    right: "15%",
+    top: "15%",
+    bottom: "15%",
+  })),
 }));
 
 function makeMockContext(overrides: Partial<any> = {}): any {
@@ -43,7 +48,12 @@ function makeMockContext(overrides: Partial<any> = {}): any {
     },
     panelSchema: {
       type: "pie",
-      config: { unit: "default", unit_custom: "", decimals: 2, color: { mode: "fixed" } },
+      config: {
+        unit: "default",
+        unit_custom: "",
+        decimals: 2,
+        color: { mode: "fixed" },
+      },
       queries: [{ fields: { y: [{ label: "Value" }] } }],
     },
     store: {
@@ -118,7 +128,12 @@ describe("applyPieDonutChart - donut type", () => {
     const ctx = makeMockContext({
       panelSchema: {
         type: "donut",
-        config: { unit: "default", unit_custom: "", decimals: 2, color: { mode: "fixed" } },
+        config: {
+          unit: "default",
+          unit_custom: "",
+          decimals: 2,
+          color: { mode: "fixed" },
+        },
         queries: [{ fields: { y: [{ label: "Value" }] } }],
       },
     });
@@ -131,7 +146,12 @@ describe("applyPieDonutChart - donut type", () => {
     const ctx = makeMockContext({
       panelSchema: {
         type: "donut",
-        config: { unit: "default", unit_custom: "", decimals: 2, color: { mode: "fixed" } },
+        config: {
+          unit: "default",
+          unit_custom: "",
+          decimals: 2,
+          color: { mode: "fixed" },
+        },
         queries: [{ fields: { y: [{ label: "Value" }] } }],
       },
     });
@@ -143,7 +163,12 @@ describe("applyPieDonutChart - donut type", () => {
     const ctx = makeMockContext({
       panelSchema: {
         type: "donut",
-        config: { unit: "default", unit_custom: "", decimals: 2, color: { mode: "fixed" } },
+        config: {
+          unit: "default",
+          unit_custom: "",
+          decimals: 2,
+          color: { mode: "fixed" },
+        },
         queries: [{ fields: { y: [{ label: "Value" }] } }],
       },
     });
@@ -155,7 +180,12 @@ describe("applyPieDonutChart - donut type", () => {
     const ctx = makeMockContext({
       panelSchema: {
         type: "donut",
-        config: { unit: "default", unit_custom: "", decimals: 2, color: { mode: "fixed" } },
+        config: {
+          unit: "default",
+          unit_custom: "",
+          decimals: 2,
+          color: { mode: "fixed" },
+        },
         queries: [{ fields: { y: [{ label: "Value" }] } }],
       },
     });

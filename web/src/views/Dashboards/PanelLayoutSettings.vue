@@ -50,7 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             bg-color="input-bg"
             class="showLabelOnTop"
             stack-label
-            borderless hide-bottom-space
+            borderless
+            hide-bottom-space
             dense
             type="number"
             :rules="[
@@ -91,7 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="closeBtn"
           v-close-popup="true"
           class="o2-secondary-button tw:h-[36px]"
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-secondary-button-dark'
+              : 'o2-secondary-button-light'
+          "
           flat
           :label="t('dashboard.cancel')"
           data-test="panel-layout-settings-cancel"
@@ -99,7 +104,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
           :label="t('dashboard.save')"
           class="o2-primary-button tw:h-[36px] q-ml-md"
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-primary-button-dark'
+              : 'o2-primary-button-light'
+          "
           padding="sm xl"
           type="submit"
           no-caps

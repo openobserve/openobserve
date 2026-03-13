@@ -20,7 +20,6 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import DateTime from "@/components/DateTime.vue";
 
-
 installQuasar();
 
 describe("DateTimePickerDashboard", () => {
@@ -31,11 +30,11 @@ describe("DateTimePickerDashboard", () => {
       startTime: 1672531200000,
       endTime: 1672617600000,
       relativeTimePeriod: "15m",
-      valueType: "relative"
+      valueType: "relative",
     },
     initialTimezone: "UTC",
     disable: false,
-    autoApplyDashboard: false
+    autoApplyDashboard: false,
   };
 
   beforeEach(() => {
@@ -52,7 +51,7 @@ describe("DateTimePickerDashboard", () => {
     return shallowMount(DateTimePickerDashboard, {
       props: {
         ...defaultProps,
-        ...props
+        ...props,
       },
       global: {
         stubs: {
@@ -63,22 +62,22 @@ describe("DateTimePickerDashboard", () => {
               "default-type": String,
               "default-absolute-time": Object,
               "default-relative-time": String,
-              "initialTimezone": [String, null],
-              "disable": Boolean,
+              initialTimezone: [String, null],
+              disable: Boolean,
             },
             methods: {
               refresh: vi.fn(),
               setCustomDate: vi.fn(),
               getConsumableDateTime: vi.fn().mockReturnValue({
-                startTime: '2023-01-01T00:00:00Z',
-                endTime: '2023-01-02T00:00:00Z',
-                relativeTimePeriod: '15m',
-                valueType: 'relative'
-              })
-            }
-          }
-        }
-      }
+                startTime: "2023-01-01T00:00:00Z",
+                endTime: "2023-01-02T00:00:00Z",
+                relativeTimePeriod: "15m",
+                valueType: "relative",
+              }),
+            },
+          },
+        },
+      },
     });
   };
 
@@ -92,7 +91,7 @@ describe("DateTimePickerDashboard", () => {
     it("should mount successfully", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      
+
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.vm).toBeDefined();
     });
@@ -112,9 +111,9 @@ describe("DateTimePickerDashboard", () => {
   describe("Props Handling", () => {
     it("should handle default modelValue prop", () => {
       wrapper = createWrapper({
-        modelValue: undefined
+        modelValue: undefined,
       });
-      
+
       // Component should handle undefined modelValue gracefully
       expect(wrapper.exists()).toBe(true);
     });
@@ -124,16 +123,18 @@ describe("DateTimePickerDashboard", () => {
         startTime: 1672531200000,
         endTime: 1672617600000,
         relativeTimePeriod: "30m",
-        valueType: "absolute"
+        valueType: "absolute",
       };
 
       wrapper = createWrapper({
-        modelValue: testModelValue
+        modelValue: testModelValue,
       });
 
-      const dateTimeComponent = wrapper.findComponent('[data-test="datetime-component"]');
+      const dateTimeComponent = wrapper.findComponent(
+        '[data-test="datetime-component"]',
+      );
       expect(dateTimeComponent.exists()).toBe(true);
-      
+
       // Test that the component receives the correct props through template binding
       const html = wrapper.html();
       expect(html).toContain('data-test="datetime-component"');
@@ -141,10 +142,12 @@ describe("DateTimePickerDashboard", () => {
 
     it("should pass initialTimezone prop correctly", () => {
       wrapper = createWrapper({
-        initialTimezone: "America/New_York"
+        initialTimezone: "America/New_York",
       });
 
-      const dateTimeComponent = wrapper.findComponent('[data-test="datetime-component"]');
+      const dateTimeComponent = wrapper.findComponent(
+        '[data-test="datetime-component"]',
+      );
       expect(dateTimeComponent.exists()).toBe(true);
       // Verify the prop is passed correctly through template binding
       expect(wrapper.vm.initialTimezone).toBe("America/New_York");
@@ -152,30 +155,36 @@ describe("DateTimePickerDashboard", () => {
 
     it("should pass disable prop correctly", () => {
       wrapper = createWrapper({
-        disable: true
+        disable: true,
       });
 
-      const dateTimeComponent = wrapper.findComponent('[data-test="datetime-component"]');
+      const dateTimeComponent = wrapper.findComponent(
+        '[data-test="datetime-component"]',
+      );
       expect(dateTimeComponent.exists()).toBe(true);
       expect(wrapper.vm.disable).toBe(true);
     });
 
     it("should pass autoApplyDashboard prop correctly", () => {
       wrapper = createWrapper({
-        autoApplyDashboard: true
+        autoApplyDashboard: true,
       });
 
-      const dateTimeComponent = wrapper.findComponent('[data-test="datetime-component"]');
+      const dateTimeComponent = wrapper.findComponent(
+        '[data-test="datetime-component"]',
+      );
       expect(dateTimeComponent.exists()).toBe(true);
       expect(wrapper.vm.autoApplyDashboard).toBe(true);
     });
 
     it("should handle null initialTimezone", () => {
       wrapper = createWrapper({
-        initialTimezone: null
+        initialTimezone: null,
       });
 
-      const dateTimeComponent = wrapper.findComponent('[data-test="datetime-component"]');
+      const dateTimeComponent = wrapper.findComponent(
+        '[data-test="datetime-component"]',
+      );
       expect(dateTimeComponent.exists()).toBe(true);
       expect(wrapper.vm.initialTimezone).toBeNull();
     });
@@ -189,7 +198,7 @@ describe("DateTimePickerDashboard", () => {
         startTime: 1672531200000,
         endTime: 1672617600000,
         relativeTimePeriod: "1h",
-        valueType: "relative"
+        valueType: "relative",
       };
 
       await wrapper.vm.updateDateTime(mockDate);
@@ -199,7 +208,7 @@ describe("DateTimePickerDashboard", () => {
         startTime: 1672531200000,
         endTime: 1672617600000,
         relativeTimePeriod: "1h",
-        valueType: "relative"
+        valueType: "relative",
       });
     });
 
@@ -210,12 +219,14 @@ describe("DateTimePickerDashboard", () => {
         startTime: 1672531200000,
         endTime: 1672617600000,
         relativeTimePeriod: "custom",
-        valueType: "relative-custom"
+        valueType: "relative-custom",
       };
 
       await wrapper.vm.updateDateTime(mockDate);
 
-      expect(wrapper.emitted("update:modelValue")[0][0].valueType).toBe("relative");
+      expect(wrapper.emitted("update:modelValue")[0][0].valueType).toBe(
+        "relative",
+      );
     });
 
     it("should handle absolute valueType correctly", async () => {
@@ -225,12 +236,14 @@ describe("DateTimePickerDashboard", () => {
         startTime: 1672531200000,
         endTime: 1672617600000,
         relativeTimePeriod: "15m",
-        valueType: "absolute"
+        valueType: "absolute",
       };
 
       await wrapper.vm.updateDateTime(mockDate);
 
-      expect(wrapper.emitted("update:modelValue")[0][0].valueType).toBe("absolute");
+      expect(wrapper.emitted("update:modelValue")[0][0].valueType).toBe(
+        "absolute",
+      );
     });
 
     it("should emit hide event when onHide is called", async () => {
@@ -276,7 +289,7 @@ describe("DateTimePickerDashboard", () => {
         startTime: 1672531200000,
         endTime: 1672617600000,
         relativeTimePeriod: "2h",
-        valueType: "relative"
+        valueType: "relative",
       };
 
       const dateTimeComponent = wrapper.findComponent(DateTime);
@@ -287,7 +300,7 @@ describe("DateTimePickerDashboard", () => {
         startTime: 1672531200000,
         endTime: 1672617600000,
         relativeTimePeriod: "2h",
-        valueType: "relative"
+        valueType: "relative",
       });
     });
   });
@@ -332,17 +345,19 @@ describe("DateTimePickerDashboard", () => {
 
     it("should call dateTimePicker.getConsumableDateTime when getConsumableDateTime is called", async () => {
       const mockGetConsumableDateTime = vi.fn().mockReturnValue({
-        startTime: '2023-01-01T00:00:00Z',
-        endTime: '2023-01-02T00:00:00Z'
+        startTime: "2023-01-01T00:00:00Z",
+        endTime: "2023-01-02T00:00:00Z",
       });
-      wrapper.vm.dateTimePicker = { getConsumableDateTime: mockGetConsumableDateTime };
+      wrapper.vm.dateTimePicker = {
+        getConsumableDateTime: mockGetConsumableDateTime,
+      };
 
       const result = await wrapper.vm.getConsumableDateTime();
 
       expect(mockGetConsumableDateTime).toHaveBeenCalled();
       expect(result).toEqual({
-        startTime: '2023-01-01T00:00:00Z',
-        endTime: '2023-01-02T00:00:00Z'
+        startTime: "2023-01-01T00:00:00Z",
+        endTime: "2023-01-02T00:00:00Z",
       });
     });
 
@@ -365,10 +380,10 @@ describe("DateTimePickerDashboard", () => {
 
     it("should cleanup dateTimePicker on unmount", async () => {
       wrapper = createWrapper();
-      
+
       // Mock dateTimePicker with a truthy value
       wrapper.vm.dateTimePicker = { mockRef: true };
-      
+
       wrapper.unmount();
 
       expect(wrapper.vm.dateTimePicker).toBeNull();
@@ -376,23 +391,23 @@ describe("DateTimePickerDashboard", () => {
 
     it("should cleanup dateTimePicker reference when it has a value during unmount", async () => {
       wrapper = createWrapper();
-      
+
       // Simulate a real Vue ref object that would exist
-      const mockRef = ref({ 
+      const mockRef = ref({
         refresh: vi.fn(),
         setCustomDate: vi.fn(),
-        getConsumableDateTime: vi.fn()
+        getConsumableDateTime: vi.fn(),
       });
-      
+
       // Manually set the ref value to simulate the actual mounted state
       wrapper.vm.dateTimePicker = mockRef.value;
-      
+
       // Verify the ref has a truthy value
       expect(wrapper.vm.dateTimePicker).toBeTruthy();
-      
+
       // Unmount the component which should trigger the cleanup
       wrapper.unmount();
-      
+
       // Verify cleanup occurred
       expect(wrapper.vm.dateTimePicker).toBeNull();
     });
@@ -417,7 +432,7 @@ describe("DateTimePickerDashboard", () => {
           startTime: undefined,
           endTime: undefined,
           relativeTimePeriod: undefined,
-          valueType: undefined
+          valueType: undefined,
         });
       }).not.toThrow();
     });
@@ -427,7 +442,7 @@ describe("DateTimePickerDashboard", () => {
         modelValue: {},
         initialTimezone: "",
         disable: null,
-        autoApplyDashboard: null
+        autoApplyDashboard: null,
       });
 
       expect(wrapper.exists()).toBe(true);
@@ -442,7 +457,7 @@ describe("DateTimePickerDashboard", () => {
         { valueType: "absolute", expected: "absolute" },
         { valueType: "custom", expected: "absolute" },
         { valueType: "", expected: "absolute" },
-        { valueType: null, expected: "absolute" }
+        { valueType: null, expected: "absolute" },
       ];
 
       for (const testCase of testCases) {
@@ -450,14 +465,14 @@ describe("DateTimePickerDashboard", () => {
           startTime: 1672531200000,
           endTime: 1672617600000,
           relativeTimePeriod: "15m",
-          valueType: testCase.valueType
+          valueType: testCase.valueType,
         };
 
         await wrapper.vm.updateDateTime(mockDate);
 
         const emittedEvents = wrapper.emitted("update:modelValue");
         const lastEmittedValue = emittedEvents[emittedEvents.length - 1][0];
-        
+
         expect(lastEmittedValue.valueType).toBe(testCase.expected);
       }
     });
@@ -470,16 +485,18 @@ describe("DateTimePickerDashboard", () => {
           startTime: 1672531200000,
           endTime: 1672617600000,
           relativeTimePeriod: "1d",
-          valueType: "absolute"
+          valueType: "absolute",
         },
         initialTimezone: "Europe/London",
         disable: true,
-        autoApplyDashboard: true
+        autoApplyDashboard: true,
       });
 
-      const dateTimeComponent = wrapper.findComponent('[data-test="datetime-component"]');
+      const dateTimeComponent = wrapper.findComponent(
+        '[data-test="datetime-component"]',
+      );
       expect(dateTimeComponent.exists()).toBe(true);
-      
+
       // Verify that all props are correctly set on the component instance
       expect(wrapper.vm.modelValue.valueType).toBe("absolute");
       expect(wrapper.vm.modelValue.relativeTimePeriod).toBe("1d");
@@ -490,7 +507,7 @@ describe("DateTimePickerDashboard", () => {
 
     it("should have correct ref attribute", () => {
       wrapper = createWrapper();
-      
+
       const dateTimeComponent = wrapper.findComponent(DateTime);
       expect(wrapper.vm.dateTimePicker).toBeDefined();
     });

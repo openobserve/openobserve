@@ -21,7 +21,10 @@ import useIngestion from "@/composables/useIngestion";
 const name = "python";
 const store = useStore();
 const { endpoint, languagesContent, languagesDocURLs } = useIngestion();
-const content = languagesContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
+const content = languagesContent.replace(
+  "[STREAM_NAME]",
+  name.replace(" ", "_").toLowerCase(),
+);
 
 const docURL = languagesDocURLs[name];
 const docURLFastAPI = languagesDocURLs["fastapi"];
@@ -31,13 +34,23 @@ const docURLFastAPI = languagesDocURLs["fastapi"];
   <div class="q-pa-sm">
     <div class="tw:text-[16px]">
       <CopyContent :content="content" />
-      <div class="tw:font-bold tw:pt-6 tw:pb-2">Check further documentation at:</div>
+      <div class="tw:font-bold tw:pt-6 tw:pb-2">
+        Check further documentation at:
+      </div>
       <ol class="tw:list-decimal q-pl-md">
         <li class="tw:py-1">
-          <a :href="docURL" target="_blank" class="text-blue-500 tw:underline">Python</a>
+          <a :href="docURL" target="_blank"
+class="text-blue-500 tw:underline"
+            >Python</a
+          >
         </li>
         <li class="tw:py-1">
-          <a :href="docURLFastAPI" target="_blank" class="text-blue-500 tw:underline">FastAPI</a>
+          <a
+            :href="docURLFastAPI"
+            target="_blank"
+            class="text-blue-500 tw:underline"
+            >FastAPI</a
+          >
         </li>
       </ol>
     </div>

@@ -42,7 +42,10 @@ const mockGroupsState = { groups: [] };
 const mockPermissionsState = { permissions: [], selectedResources: {} };
 const mockRolesState = { roles: [] };
 const mockUsersState = { users: [], getOrgUsers: vi.fn() };
-const mockServiceAccountsState = { service_accounts_users: [], getServiceAccounts: vi.fn() };
+const mockServiceAccountsState = {
+  service_accounts_users: [],
+  getServiceAccounts: vi.fn(),
+};
 
 vi.mock("@/composables/iam/usePermissions", () => ({
   default: () => ({
@@ -114,7 +117,7 @@ describe("AppGroups Component", () => {
     // Mock getGroups to return a resolved promise by default
     const { getGroups } = await import("@/services/iam");
     vi.mocked(getGroups).mockResolvedValue(
-      createMockAxiosResponse(["admin", "developers", "users"]) as any
+      createMockAxiosResponse(["admin", "developers", "users"]) as any,
     );
 
     // Update the mock groups state
@@ -137,16 +140,22 @@ describe("AppGroups Component", () => {
   describe("Component Mounting", () => {
     it("renders the component correctly", () => {
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="iam-groups-section-title"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="iam-groups-section-title"]').exists(),
+      ).toBe(true);
     });
 
     it("displays the correct title", () => {
-      const titleElement = wrapper.find('[data-test="iam-groups-section-title"]');
+      const titleElement = wrapper.find(
+        '[data-test="iam-groups-section-title"]',
+      );
       expect(titleElement.text()).toContain("Groups");
     });
 
     it("renders search input", () => {
-      const searchInput = wrapper.find('[data-test="iam-groups-search-input"] .q-input');
+      const searchInput = wrapper.find(
+        '[data-test="iam-groups-search-input"] .q-input',
+      );
       expect(searchInput.exists()).toBe(true);
     });
 
@@ -166,7 +175,7 @@ describe("AppGroups Component", () => {
     it("has correct table columns structure", () => {
       expect(wrapper.vm.columns).toBeDefined();
       expect(wrapper.vm.columns).toHaveLength(3);
-      
+
       const columnNames = wrapper.vm.columns.map((col: any) => col.name);
       expect(columnNames).toContain("#");
       expect(columnNames).toContain("group_name");
@@ -176,7 +185,7 @@ describe("AppGroups Component", () => {
     it("displays groups data in rows", async () => {
       const { getGroups } = await import("@/services/iam");
       vi.mocked(getGroups).mockResolvedValue(
-        createMockAxiosResponse(["admin", "developers", "users"]) as any
+        createMockAxiosResponse(["admin", "developers", "users"]) as any,
       );
 
       await wrapper.vm.setupGroups();
@@ -191,7 +200,7 @@ describe("AppGroups Component", () => {
     it("formats row numbers correctly", async () => {
       const { getGroups } = await import("@/services/iam");
       vi.mocked(getGroups).mockResolvedValue(
-        createMockAxiosResponse(["group1", "group2", "group3"]) as any
+        createMockAxiosResponse(["group1", "group2", "group3"]) as any,
       );
 
       await wrapper.vm.setupGroups();
@@ -275,15 +284,21 @@ describe("AppGroups Component", () => {
 
   describe("Group Actions", () => {
     it("renders edit and delete icons for each group", () => {
-      const editIcon = wrapper.find('[data-test="iam-groups-edit-test-group-role-icon"]');
-      const deleteIcon = wrapper.find('[data-test="iam-groups-delete-test-group-role-icon"]');
-      
+      const editIcon = wrapper.find(
+        '[data-test="iam-groups-edit-test-group-role-icon"]',
+      );
+      const deleteIcon = wrapper.find(
+        '[data-test="iam-groups-delete-test-group-role-icon"]',
+      );
+
       expect(editIcon.exists()).toBe(true);
       expect(deleteIcon.exists()).toBe(true);
     });
 
     it("navigates to edit page when edit icon is clicked", async () => {
-      const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      const routerPushSpy = vi
+        .spyOn(router, "push")
+        .mockResolvedValue(undefined as any);
       const testGroup = { group_name: "test-group" };
 
       await wrapper.vm.editGroup(testGroup);
@@ -301,9 +316,9 @@ describe("AppGroups Component", () => {
 
     it("shows confirm dialog when delete icon is clicked", async () => {
       const testGroup = { group_name: "test-group" };
-      
+
       wrapper.vm.showConfirmDialog(testGroup);
-      
+
       expect(wrapper.vm.deleteConformDialog.show).toBe(true);
       expect(wrapper.vm.deleteConformDialog.data).toEqual(testGroup);
     });
@@ -317,14 +332,14 @@ describe("AppGroups Component", () => {
     it("deletes group successfully", async () => {
       const { deleteGroup } = await import("@/services/iam");
       vi.mocked(deleteGroup).mockResolvedValue({});
-      
+
       const testGroup = { group_name: "test-group" };
-      
+
       await wrapper.vm.deleteUserGroup(testGroup);
-      
+
       expect(deleteGroup).toHaveBeenCalledWith(
         "test-group",
-        store.state.selectedOrganization.identifier
+        store.state.selectedOrganization.identifier,
       );
       expect(mockNotify).toHaveBeenCalledWith({
         message: "Group deleted successfully!",
@@ -337,18 +352,18 @@ describe("AppGroups Component", () => {
       const { deleteGroup } = await import("@/services/iam");
       const mockError = { response: { status: 500 } };
       vi.mocked(deleteGroup).mockRejectedValue(mockError);
-      
+
       const testGroup = { group_name: "test-group" };
-      
+
       try {
         await wrapper.vm.deleteUserGroup(testGroup);
       } catch (error) {
         // Error should be caught by component
       }
-      
+
       // Give time for async operations
-      await new Promise(resolve => setTimeout(resolve, 0));
-      
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
       expect(mockNotify).toHaveBeenCalledWith({
         message: "Error while deleting group!",
         color: "negative",
@@ -360,25 +375,25 @@ describe("AppGroups Component", () => {
       const { deleteGroup } = await import("@/services/iam");
       const mockError = { response: { status: 403 } };
       vi.mocked(deleteGroup).mockRejectedValue(mockError);
-      
+
       const testGroup = { group_name: "test-group" };
-      
+
       await wrapper.vm.deleteUserGroup(testGroup);
-      
+
       expect(mockNotify).not.toHaveBeenCalled();
     });
 
     it("executes deletion through confirm dialog", async () => {
       const testGroup = { group_name: "test-group" };
-      
+
       wrapper.vm.deleteConformDialog.data = testGroup;
-      
+
       // Test the actual behavior instead of spying on the method
       const initialData = wrapper.vm.deleteConformDialog.data;
       expect(initialData).toEqual(testGroup);
-      
+
       wrapper.vm._deleteGroup();
-      
+
       // Check that data is set to null after deletion attempt
       expect(wrapper.vm.deleteConformDialog.data).toBeNull();
     });
@@ -393,7 +408,7 @@ describe("AppGroups Component", () => {
     it("displays correct delete confirmation message", async () => {
       wrapper.vm.deleteConformDialog.data = { group_name: "test-group" };
       await wrapper.vm.$nextTick();
-      
+
       // Since we're using a mock component, we check the computed message
       const expectedMessage = "Are you sure you want to delete 'test-group'?";
       expect(wrapper.vm.deleteConformDialog.data.group_name).toBe("test-group");
@@ -404,7 +419,7 @@ describe("AppGroups Component", () => {
     it("loads groups on component mount", async () => {
       const { getGroups } = await import("@/services/iam");
       vi.mocked(getGroups).mockResolvedValue(
-        createMockAxiosResponse(["group1", "group2"]) as any
+        createMockAxiosResponse(["group1", "group2"]) as any,
       );
 
       const wrapper = mount(AppGroups, {
@@ -416,7 +431,9 @@ describe("AppGroups Component", () => {
 
       await flushPromises();
 
-      expect(getGroups).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);
+      expect(getGroups).toHaveBeenCalledWith(
+        store.state.selectedOrganization.identifier,
+      );
     });
 
     it("handles error when loading groups", async () => {
@@ -433,7 +450,9 @@ describe("AppGroups Component", () => {
 
   describe("Theme Support", () => {
     it("applies correct theme classes", () => {
-      const header = wrapper.find('.tw\\:flex.tw\\:justify-between.tw\\:items-center.tw\\:px-4.tw\\:py-3');
+      const header = wrapper.find(
+        ".tw\\:flex.tw\\:justify-between.tw\\:items-center.tw\\:px-4.tw\\:py-3",
+      );
       const table = wrapper.find('[data-test="iam-groups-table-section"]');
 
       expect(header.exists()).toBe(true);
@@ -446,7 +465,7 @@ describe("AppGroups Component", () => {
         ...store,
         state: {
           ...store.state,
-          theme: 'dark',
+          theme: "dark",
         },
       };
 
@@ -459,7 +478,9 @@ describe("AppGroups Component", () => {
 
       await flushPromises();
 
-      const header = wrapper.find('.tw\\:flex.tw\\:justify-between.tw\\:items-center.tw\\:px-4.tw\\:py-3');
+      const header = wrapper.find(
+        ".tw\\:flex.tw\\:justify-between.tw\\:items-center.tw\\:px-4.tw\\:py-3",
+      );
       const table = wrapper.find('[data-test="iam-groups-table-section"]');
 
       expect(header.exists()).toBe(true);
@@ -472,7 +493,7 @@ describe("AppGroups Component", () => {
     it("handles empty groups list", async () => {
       const { getGroups } = await import("@/services/iam");
       vi.mocked(getGroups).mockResolvedValue(
-        createMockAxiosResponse([]) as any
+        createMockAxiosResponse([]) as any,
       );
 
       await wrapper.vm.setupGroups();

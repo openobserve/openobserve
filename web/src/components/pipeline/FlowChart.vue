@@ -16,18 +16,18 @@ const nodes = ref([
 ]);
 
 const edges = ref<Edge<any, any, string>[]>([
-  { 
-    id: "e1-2", 
-    source: "1", 
-    target: "2", 
-    animated: true, 
-    markerEnd: { type: MarkerType.ArrowClosed } // Adding arrow marker
+  {
+    id: "e1-2",
+    source: "1",
+    target: "2",
+    animated: true,
+    markerEnd: { type: MarkerType.ArrowClosed }, // Adding arrow marker
   },
-  { 
-    id: "e1-3", 
-    source: "1", 
+  {
+    id: "e1-3",
+    source: "1",
     target: "3",
-    markerEnd: { type: MarkerType.ArrowClosed  } // Adding arrow marker
+    markerEnd: { type: MarkerType.ArrowClosed }, // Adding arrow marker
   },
 ]);
 </script>

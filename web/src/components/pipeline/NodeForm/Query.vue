@@ -260,7 +260,9 @@ const getDefaultStreamRoute: any = () => {
 onMounted(() => {
   if (pipelineObj.isEditNode) {
     // Deep copy to avoid modifying the original node data
-    streamRoute.value = JSON.parse(JSON.stringify(pipelineObj.currentSelectedNodeData?.data)) as StreamRoute;
+    streamRoute.value = JSON.parse(
+      JSON.stringify(pipelineObj.currentSelectedNodeData?.data),
+    ) as StreamRoute;
   }
 
   originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
@@ -271,7 +273,9 @@ onMounted(() => {
 onActivated(() => {
   if (pipelineObj.isEditNode) {
     // Deep copy to avoid modifying the original node data
-    streamRoute.value = JSON.parse(JSON.stringify(pipelineObj.currentSelectedNodeData?.data)) as StreamRoute;
+    streamRoute.value = JSON.parse(
+      JSON.stringify(pipelineObj.currentSelectedNodeData?.data),
+    ) as StreamRoute;
   }
 
   originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
@@ -499,12 +503,12 @@ const validateSqlQuery = async () => {
 
   query.query.start_time = query.query.start_time + 895000000;
 
-  //before assigning the sql , we need to check if the sql does limit is applied or not 
-  //if yes we need to change the limit to 100 because for validating we dont need to send the original limit 
-  //if no we can directly assign the sql to the query 
+  //before assigning the sql , we need to check if the sql does limit is applied or not
+  //if yes we need to change the limit to 100 because for validating we dont need to send the original limit
+  //if no we can directly assign the sql to the query
   //we dont need to change the actual query instead of we need to change the query that we are sending for validation purpose
 
-  query.query.sql = normalizeLimit(streamRoute.value.query_condition.sql,100);
+  query.query.sql = normalizeLimit(streamRoute.value.query_condition.sql, 100);
 
   //removed the encoding as it is not required for the pipeline queries
   if (store.state.zoConfig.sql_base64_enabled && query?.encoding) {
@@ -567,19 +571,19 @@ const updateDelay = (val: any) => {
 //if there is no limit in the sql query then it will return the sql query as is
 const normalizeLimit = (sql: string, maxLimit = 100): string => {
   try {
-    // regex will detect the LIMIT and OFFSET in the sql query 
+    // regex will detect the LIMIT and OFFSET in the sql query
     // it will capture multiple LIMIT and OFFSET in the sql query
     const regex = /\bLIMIT\s+(\d+)(\s+OFFSET\s+\d+)?/gi;
-     //here we will test if the sql query has LIMIT and OFFSET
+    //here we will test if the sql query has LIMIT and OFFSET
     //if it has LIMIT then we will replace the LIMIT with the normalized limit
     //if it has no LIMIT then we will return the sql query as is
     //if it has LIMIT but no OFFSET then we will return the sql query with the normalized
-    //we have moved to match instead of test because sometimes it fails when there are multiple limit with in the same query 
+    //we have moved to match instead of test because sometimes it fails when there are multiple limit with in the same query
     //due to last index effects
     if (sql.match(regex)) {
       return sql.replace(regex, (match, limit, offset) => {
         const num = parseInt(limit, 10);
-        return `LIMIT ${num > maxLimit ? maxLimit : num}${offset || ''}`;
+        return `LIMIT ${num > maxLimit ? maxLimit : num}${offset || ""}`;
       });
     }
 
@@ -590,7 +594,6 @@ const normalizeLimit = (sql: string, maxLimit = 100): string => {
     return sql; // fallback to original SQL
   }
 };
-
 </script>
 
 <style scoped>

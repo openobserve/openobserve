@@ -209,7 +209,7 @@ export const b64DecodeUnicode = (str: string) => {
  * Used to detect double-encoded VRL functions from v0.40 legacy data
  */
 const isBase64Encoded = (str: string): boolean => {
-  if (!str || typeof str !== 'string') return false;
+  if (!str || typeof str !== "string") return false;
 
   // Check if string looks like base64 (url-safe format used by OpenObserve)
   // Base64 pattern: alphanumeric + "-" + "_" + "."
@@ -235,7 +235,9 @@ const isBase64Encoded = (str: string): boolean => {
  * @param vrlFunction - VRL function string (may be single or double encoded)
  * @returns Fully decoded VRL function
  */
-export const smartDecodeVrlFunction = (vrlFunction: string | null | undefined): string => {
+export const smartDecodeVrlFunction = (
+  vrlFunction: string | null | undefined,
+): string => {
   if (!vrlFunction) return "";
 
   try {

@@ -234,7 +234,7 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   update(() => {
     const value = val.toLowerCase();
     filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1
+      (column: any) => column.toLowerCase().indexOf(value) > -1,
     );
   });
   return filteredOptions;
@@ -274,7 +274,7 @@ const addField = () => {
 
 const removeField = (field: any) => {
   streamRoute.value.conditions = streamRoute.value.conditions.filter(
-    (_field: any) => _field.id !== field.id
+    (_field: any) => _field.id !== field.id,
   );
 };
 

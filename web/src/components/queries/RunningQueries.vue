@@ -15,7 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="running-queries-page q-pt-md q-px-md" v-if="isMetaOrg" style="min-height: 95vh;">
+  <div
+    class="running-queries-page q-pt-md q-px-md"
+    v-if="isMetaOrg"
+    style="min-height: 95vh"
+  >
     <div class="flex justify-between items-center full-width">
       <div class="text-h6 q-my-xs" data-test="log-stream-title-text">
         {{ t("queries.runningQueries") }}
@@ -46,54 +50,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
             </template>
           </div>
-          <div class=" o2-select-input o2-input">
-          <q-select
-            v-model="selectedSearchField"
-            dense
-            map-options
-            emit-value
-            filled
-            :options="searchFieldOptions"
-            class="q-pa-none tw:w-[140px] q-mr-sm"
-            data-test="running-queries-search-fields-select"
-            @update:model-value="filterQuery = ''"
-          ></q-select>
+          <div class="o2-select-input o2-input">
+            <q-select
+              v-model="selectedSearchField"
+              dense
+              map-options
+              emit-value
+              filled
+              :options="searchFieldOptions"
+              class="q-pa-none tw:w-[140px] q-mr-sm"
+              data-test="running-queries-search-fields-select"
+              @update:model-value="filterQuery = ''"
+            ></q-select>
           </div>
- 
+
           <q-input
             v-if="selectedSearchField == 'all'"
             v-model="filterQuery"
             dense
             borderless
             class="no-border search-input q-pa-none search-running-query o2-search-input tw:h-[36px]"
-            :class="store.state.theme == 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
+            :class="
+              store.state.theme == 'dark'
+                ? 'o2-search-input-dark'
+                : 'o2-search-input-light'
+            "
             :placeholder="t('queries.search')"
             data-test="running-queries-search-input"
           >
             <template #prepend>
-              <q-icon name="search" class="o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
+              <q-icon
+                name="search"
+                class="o2-search-input-icon"
+                :class="
+                  store.state.theme == 'dark'
+                    ? 'o2-search-input-icon-dark'
+                    : 'o2-search-input-icon-light'
+                "
+              />
             </template>
           </q-input>
-          <div v-else class=" o2-select-input o2-input ">
+          <div v-else class="o2-select-input o2-input">
             <q-select
-            v-model="filterQuery"
-            borderless
-            map-options
-            emit-value
-            filled
-            dense
-
-            :label="filterQuery ? '' : 'Select option'"
-            :options="otherFieldOptions"
-            class="no-border search-input"
-            :placeholder="t('queries.search')"
-            data-test="running-queries-search-input"
-          ></q-select>
+              v-model="filterQuery"
+              borderless
+              map-options
+              emit-value
+              filled
+              dense
+              :label="filterQuery ? '' : 'Select option'"
+              :options="otherFieldOptions"
+              class="no-border search-input"
+              :placeholder="t('queries.search')"
+              data-test="running-queries-search-input"
+            ></q-select>
           </div>
           <q-btn
             data-test="running-queries-refresh-btn"
             class="q-ml-sm text-bold no-border o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme == 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            :class="
+              store.state.theme == 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
             flat
             no-caps
             :label="t(`queries.refreshQuery`)"
@@ -742,10 +761,17 @@ export default defineComponent({
         const search_type = row?.search_type;
         var query_source = "-unknown-";
 
-        if(search_type === "dashboards") {
-          query_source = row?.search_event_context?.folder_name + "/" + row?.search_event_context?.dashboard_name;
-        } else if(search_type == "alerts"){
-          query_source = row?.search_event_context?.alert_name + "(" + row?.search_event_context?.alert_key + ")";
+        if (search_type === "dashboards") {
+          query_source =
+            row?.search_event_context?.folder_name +
+            "/" +
+            row?.search_event_context?.dashboard_name;
+        } else if (search_type == "alerts") {
+          query_source =
+            row?.search_event_context?.alert_name +
+            "(" +
+            row?.search_event_context?.alert_key +
+            ")";
         }
 
         return {
@@ -753,7 +779,8 @@ export default defineComponent({
           user_id: row?.user_id,
           org_id: row?.org_id,
           duration: getDuration(row.created_at).durationInSeconds,
-          queryRange: queryRange(row?.query?.start_time, row?.query?.end_time).queryRangeInSeconds,
+          queryRange: queryRange(row?.query?.start_time, row?.query?.end_time)
+            .queryRangeInSeconds,
           status: row?.status,
           work_group: row?.work_group,
           stream_type: row?.stream_type,
@@ -883,5 +910,4 @@ export default defineComponent({
     position: relative;
   }
 }
-
 </style>

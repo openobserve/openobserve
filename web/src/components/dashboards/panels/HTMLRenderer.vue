@@ -69,10 +69,7 @@ export default defineComponent({
 
         // Sandbox restricts iframe capabilities. Key blocked capability:
         // - top-navigation: prevents iframe from redirecting the parent page
-        node.setAttribute(
-          "sandbox",
-          "allow-scripts allow-same-origin",
-        );
+        node.setAttribute("sandbox", "allow-scripts allow-same-origin");
       }
     });
 
@@ -81,14 +78,18 @@ export default defineComponent({
         tabId: props.tabId,
         panelId: props.panelId,
       };
-      return processVariableContent(props.htmlContent, props.variablesData, context);
+      return processVariableContent(
+        props.htmlContent,
+        props.variablesData,
+        context,
+      );
     });
 
     const sanitizedContent = computed(() =>
       DOMPurify.sanitize(processedContent.value, {
         ADD_TAGS: ["iframe"],
         ADD_ATTR: ["allow", "allowfullscreen", "frameborder", "loading", "csp"],
-      })
+      }),
     );
 
     return {

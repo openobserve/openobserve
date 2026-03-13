@@ -23,21 +23,21 @@ import router from "@/test/unit/helpers/router";
 
 // Mock the zincutils utilities completely
 vi.mock("@/utils/zincutils", async (importOriginal) => {
-  const actual = await importOriginal() as any;
+  const actual = (await importOriginal()) as any;
   return {
     ...actual,
     getImageURL: (path: string) => path,
     useLocalOrganization: vi.fn().mockReturnValue({
       identifier: "test-org",
-      name: "Test Organization"
+      name: "Test Organization",
     }),
     useLocalCurrentUser: vi.fn().mockReturnValue({
       email: "test@example.com",
-      name: "Test User"
+      name: "Test User",
     }),
     useLocalTimezone: vi.fn().mockReturnValue("UTC"),
     b64EncodeUnicode: vi.fn().mockImplementation((str) => btoa(str)),
-    b64DecodeUnicode: vi.fn().mockImplementation((str) => atob(str))
+    b64DecodeUnicode: vi.fn().mockImplementation((str) => atob(str)),
   };
 });
 
@@ -85,12 +85,16 @@ describe("ChartSelection", () => {
   });
 
   it("should render selected chart type", async () => {
-    const lineChartItem = wrapper.find("[data-test='selected-chart-line-item']");
+    const lineChartItem = wrapper.find(
+      "[data-test='selected-chart-line-item']",
+    );
     expect(lineChartItem.exists()).toBe(true);
   });
 
   it("should emit update event when chart is selected", async () => {
-    const chartItems = wrapper.findAll("[data-test='dashboard-addpanel-chart-selection-item']");
+    const chartItems = wrapper.findAll(
+      "[data-test='dashboard-addpanel-chart-selection-item']",
+    );
     await chartItems[0].trigger("click");
 
     expect(wrapper.emitted()["update:selectedChartType"]).toBeTruthy();
@@ -124,7 +128,9 @@ describe("ChartSelection", () => {
   it("should handle chart tooltips", async () => {
     // Just verify the component structure exists
     expect(wrapper.exists()).toBe(true);
-    const chartItems = wrapper.findAll("[data-test='dashboard-addpanel-chart-selection-item']");
+    const chartItems = wrapper.findAll(
+      "[data-test='dashboard-addpanel-chart-selection-item']",
+    );
     expect(chartItems.length).toBeGreaterThan(0);
   });
 
@@ -147,7 +153,7 @@ describe("ChartSelection", () => {
     await flushPromises();
 
     expect(promqlWrapper.exists()).toBe(true);
-    
+
     promqlWrapper.unmount();
   });
 
@@ -169,9 +175,11 @@ describe("ChartSelection", () => {
     await flushPromises();
 
     expect(filteredWrapper.exists()).toBe(true);
-    const chartItems = filteredWrapper.findAll("[data-test='dashboard-addpanel-chart-selection-item']");
+    const chartItems = filteredWrapper.findAll(
+      "[data-test='dashboard-addpanel-chart-selection-item']",
+    );
     expect(chartItems.length).toBeGreaterThan(0);
-    
+
     filteredWrapper.unmount();
   });
 });

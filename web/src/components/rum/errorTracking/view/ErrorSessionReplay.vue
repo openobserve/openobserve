@@ -16,7 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="q-mt-lg">
-    <div class="tags-title text-bold q-mb-sm q-ml-xs">{{ t("rum.sessionReplay") }}</div>
+    <div class="tags-title text-bold q-mb-sm q-ml-xs">
+      {{ t("rum.sessionReplay") }}
+    </div>
     <div class="row">
       <template v-for="(value, tag) in getSessionTags" :key="tag.tag">
         <ErrorTag :tag="{ key: tag, value }" />
@@ -28,7 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('rum.viewSessionReplay')"
       @click="playSessionReplay"
     >
-      <q-icon name="play_circle" size="1.125rem" class="q-mr-xs" /> 
+      <q-icon name="play_circle" size="1.125rem"
+class="q-mr-xs" />
       {{ t("rum.playSessionReplay") }}
     </q-btn>
   </div>

@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator class="q-mb-sm" />
   </div>
 </template>
-  
+
 <script lang="ts">
 import { defineComponent } from "vue";
 
@@ -68,6 +68,5 @@ export default defineComponent({
   },
 });
 </script>
-  
+
 <style scoped lang="scss"></style>
-  

@@ -81,7 +81,9 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    expect(wrapper.text()).toContain("You're currently using OpenObserve Open Source Edition");
+    expect(wrapper.text()).toContain(
+      "You're currently using OpenObserve Open Source Edition",
+    );
   });
 
   it("should display enterprise message when build type is enterprise", () => {
@@ -100,7 +102,9 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    expect(wrapper.text()).toContain("You're using OpenObserve Enterprise Edition");
+    expect(wrapper.text()).toContain(
+      "You're using OpenObserve Enterprise Edition",
+    );
   });
 
   it("should have three columns: opensource, enterprise, cloud", () => {

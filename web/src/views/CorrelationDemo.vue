@@ -13,46 +13,45 @@
           <q-card-section>
             <div class="log-viewer">
               <!-- Sample Log 1 -->
-              <div
-                class="log-line"
-                @click="selectLog(sampleLog1)"
-              >
+              <div class="log-line" @click="selectLog(sampleLog1)">
                 <div class="log-timestamp">2025-12-02 10:23:45</div>
                 <div class="log-content">
                   <div><strong>service.name:</strong> checkout-api</div>
                   <div><strong>k8s.cluster:</strong> prod-us-west</div>
                   <div><strong>k8s.deployment.name:</strong> checkout-v2</div>
-                  <div><strong>message:</strong> Payment processing failed - timeout</div>
+                  <div>
+                    <strong>message:</strong> Payment processing failed -
+                    timeout
+                  </div>
                 </div>
                 <q-icon name="link" class="correlation-hint" />
               </div>
 
               <!-- Sample Log 2 -->
-              <div
-                class="log-line"
-                @click="selectLog(sampleLog2)"
-              >
+              <div class="log-line" @click="selectLog(sampleLog2)">
                 <div class="log-timestamp">2025-12-02 10:24:12</div>
                 <div class="log-content">
                   <div><strong>service.name:</strong> inventory-service</div>
                   <div><strong>k8s.cluster:</strong> prod-us-east</div>
                   <div><strong>environment:</strong> production</div>
-                  <div><strong>message:</strong> Database connection timeout</div>
+                  <div>
+                    <strong>message:</strong> Database connection timeout
+                  </div>
                 </div>
                 <q-icon name="link" class="correlation-hint" />
               </div>
 
               <!-- Sample Log 3 -->
-              <div
-                class="log-line"
-                @click="selectLog(sampleLog3)"
-              >
+              <div class="log-line" @click="selectLog(sampleLog3)">
                 <div class="log-timestamp">2025-12-02 10:25:30</div>
                 <div class="log-content">
                   <div><strong>service.name:</strong> user-auth</div>
                   <div><strong>k8s.cluster:</strong> prod-us-west</div>
                   <div><strong>region:</strong> us-west-2</div>
-                  <div><strong>message:</strong> Authentication successful for user_123</div>
+                  <div>
+                    <strong>message:</strong> Authentication successful for
+                    user_123
+                  </div>
                 </div>
                 <q-icon name="link" class="correlation-hint" />
               </div>
@@ -76,11 +75,20 @@
 
             <div class="text-subtitle2 q-mb-sm">Current Status:</div>
             <div>
-              <q-badge v-if="isServiceStreamsEnabled" color="positive" label="Service Streams: Enabled" />
-              <q-badge v-else color="negative" label="Service Streams: Disabled" />
+              <q-badge
+                v-if="isServiceStreamsEnabled"
+                color="positive"
+                label="Service Streams: Enabled"
+              />
+              <q-badge
+                v-else
+                color="negative"
+                label="Service Streams: Disabled"
+              />
             </div>
             <div class="q-mt-xs text-caption text-grey-7">
-              Note: This is a demo using simulated data. In production, correlation will use real service_streams data.
+              Note: This is a demo using simulated data. In production,
+              correlation will use real service_streams data.
             </div>
           </q-card-section>
         </q-card>
@@ -99,7 +107,8 @@
         <!-- Fallback when panel is closed -->
         <q-card v-if="!showCorrelation">
           <q-card-section class="text-center q-pa-lg">
-            <q-icon name="info" size="lg" color="grey-5" />
+            <q-icon name="info"
+size="lg" color="grey-5" />
             <div class="text-grey-6 q-mt-md">
               Click a log line to see related telemetry
             </div>
@@ -114,20 +123,24 @@
         <q-card-section class="row items-center">
           <div class="text-h6">Generated Query</div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
+          <q-btn icon="close"
+flat round
+dense v-close-popup />
         </q-card-section>
 
         <q-separator />
 
         <q-card-section>
           <div class="text-caption text-grey-7 q-mb-sm">
-            This query would be executed to fetch related {{ queryPreview.type }}:
+            This query would be executed to fetch related
+            {{ queryPreview.type }}:
           </div>
           <pre class="query-preview">{{ queryPreview.sql }}</pre>
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn flat label="Close" color="primary" v-close-popup />
+          <q-btn flat label="Close"
+color="primary" v-close-popup />
         </q-card-actions>
       </q-card>
     </q-dialog>

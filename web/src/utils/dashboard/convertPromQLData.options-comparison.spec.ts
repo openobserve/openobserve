@@ -44,7 +44,10 @@ describe("convertPromQLData - Options Comparison Test", () => {
   });
 
   // Create sample PromQL data
-  const createPromQLData = (seriesCount: number, timestampCount: number = 253) => {
+  const createPromQLData = (
+    seriesCount: number,
+    timestampCount: number = 253,
+  ) => {
     const result: any[] = [];
 
     for (let i = 0; i < seriesCount; i++) {
@@ -141,7 +144,7 @@ describe("convertPromQLData - Options Comparison Test", () => {
       chartPanelRef,
       hoveredSeriesState,
       annotations,
-      metadata
+      metadata,
     );
 
     // Convert with full data (will be limited internally by convertPromQLData)
@@ -152,7 +155,7 @@ describe("convertPromQLData - Options Comparison Test", () => {
       chartPanelRef,
       hoveredSeriesState,
       annotations,
-      metadata
+      metadata,
     );
 
     // Extract comparable data
@@ -253,7 +256,7 @@ describe("convertPromQLData - Options Comparison Test", () => {
       chartPanelRef,
       null,
       [],
-      null
+      null,
     );
 
     expect(result.options).toBeDefined();
@@ -293,7 +296,7 @@ describe("convertPromQLData - Options Comparison Test", () => {
       chartPanelRef,
       null,
       [],
-      null
+      null,
     );
 
     const options = extractComparableOptions(result);
@@ -308,6 +311,8 @@ describe("convertPromQLData - Options Comparison Test", () => {
       expect(options.series[0].dataLength).toBeGreaterThan(0);
     }
 
-    console.log(`✅ Series limiting test passed with ${options.seriesCount} series (limited from 250)`);
+    console.log(
+      `✅ Series limiting test passed with ${options.seriesCount} series (limited from 250)`,
+    );
   });
 });

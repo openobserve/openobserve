@@ -23,7 +23,10 @@ import { getUUID } from "@/utils/zincutils";
 let streamWorker: Worker | null = null;
 const createStreamWorker = () => {
   if (!streamWorker && window.Worker) {
-    streamWorker = new Worker(new URL('../workers/streamWorker.js', import.meta.url), { type: 'module' });
+    streamWorker = new Worker(
+      new URL("../workers/streamWorker.js", import.meta.url),
+      { type: "module" },
+    );
   }
   return streamWorker;
 };
@@ -47,30 +50,46 @@ type TraceRecord = {
 
 const traceMap = ref<Record<string, TraceRecord>>({});
 const activeStreamId = ref<string | null>(null);
-const streamConnections = ref<Record<string, ReadableStreamDefaultReader<Uint8Array>>>({});
+const streamConnections = ref<
+  Record<string, ReadableStreamDefaultReader<Uint8Array>>
+>({});
 const abortControllers = ref<Record<string, AbortController>>({});
 const errorOccurred = ref(false);
 
-type StreamResponseType = 'search_response_metadata' | 'search_response_hits' | 'progress' | 'error' | 'end' | 'pattern_extraction_result' | 'promql_response';
+type StreamResponseType =
+  | "search_response_metadata"
+  | "search_response_hits"
+  | "progress"
+  | "error"
+  | "end"
+  | "pattern_extraction_result"
+  | "promql_response";
 
 const useHttpStreaming = () => {
-  const onData = (traceId: string, type: StreamResponseType | 'end', response: any) => {
+  const onData = (
+    traceId: string,
+    type: StreamResponseType | "end",
+    response: any,
+  ) => {
     if (!traceMap.value[traceId]) return;
 
-    if (response === 'end' || response === '[[DONE]]') {
+    if (response === "end" || response === "[[DONE]]") {
       for (const handler of traceMap.value[traceId].complete) {
         handler(traceId);
       }
       cleanUpListeners(traceId);
-      return
+      return;
     }
 
-    if (typeof response === 'string') {
+    if (typeof response === "string") {
       response = JSON.parse(response);
     }
 
-    const wsResponse = wsMapper[type as StreamResponseType](traceId, response, type);
-
+    const wsResponse = wsMapper[type as StreamResponseType](
+      traceId,
+      response,
+      type,
+    );
 
     for (const handler of traceMap.value[traceId].data) {
       handler(wsResponse, traceId);
@@ -89,7 +108,7 @@ const useHttpStreaming = () => {
     if (!traceMap.value[traceId]) return;
 
     errorOccurred.value = true;
-    
+
     const response = convertToWsError(traceId, error);
 
     for (const handler of traceMap.value[traceId].error) {
@@ -97,7 +116,6 @@ const useHttpStreaming = () => {
     }
 
     cleanUpListeners(traceId);
-
   };
 
   const onReset = (data: any, traceId: string) => {
@@ -111,7 +129,13 @@ const useHttpStreaming = () => {
   const fetchQueryDataWithHttpStream = async (
     data: {
       queryReq: SearchRequestPayload | any;
-      type: "search" | "histogram" | "pageCount" | "values" | "promql" | "traces";
+      type:
+        | "search"
+        | "histogram"
+        | "pageCount"
+        | "values"
+        | "promql"
+        | "traces";
       traceId: string;
       org_id: string;
       pageType?: string;
@@ -124,7 +148,7 @@ const useHttpStreaming = () => {
       error: (data: any, response: any) => void;
       complete: (data: any, response: any) => void;
       reset: (data: any, response: any) => void;
-    }
+    },
   ) => {
     const { traceId, org_id } = data;
 
@@ -137,7 +161,7 @@ const useHttpStreaming = () => {
         isInitiated: false,
         streamId: null,
         abortController: null,
-        requestData: { ...data }
+        requestData: { ...data },
       };
     }
 
@@ -162,7 +186,13 @@ const useHttpStreaming = () => {
   const initiateStreamConnection = async (
     data: {
       queryReq: SearchRequestPayload | any;
-      type: "search" | "histogram" | "pageCount" | "values" | "promql" | "traces";
+      type:
+        | "search"
+        | "histogram"
+        | "pageCount"
+        | "values"
+        | "promql"
+        | "traces";
       traceId: string;
       org_id: string;
       pageType?: string;
@@ -175,9 +205,18 @@ const useHttpStreaming = () => {
       error: (data: any, response: any) => void;
       complete: (data: any, response: any) => void;
       reset: (data: any, response: any) => void;
-    }
+    },
   ) => {
-    const { traceId, org_id, type, queryReq, searchType, pageType, meta, clear_cache } = data;
+    const {
+      traceId,
+      org_id,
+      type,
+      queryReq,
+      searchType,
+      pageType,
+      meta,
+      clear_cache,
+    } = data;
     const abortController = new AbortController();
 
     // Store the abort controller for this trace
@@ -185,18 +224,21 @@ const useHttpStreaming = () => {
     traceMap.value[traceId].abortController = abortController;
 
     // Construct URL based on search type
-    let url = '';
-    const use_cache = (window as any).use_cache !== undefined
-      ? (window as any).use_cache
-      : true;
+    let url = "";
+    const use_cache =
+      (window as any).use_cache !== undefined
+        ? (window as any).use_cache
+        : true;
 
     // Check if this is a multi-stream request (similar to search.ts logic)
     const isMultiStream = typeof queryReq.query?.sql !== "string";
 
     //TODO OK: Create method to get the url based on the type
     if (type === "search" || type === "histogram" || type === "pageCount") {
-      const streamEndpoint = isMultiStream ? "_search_multi_stream" : "_search_stream";
-      
+      const streamEndpoint = isMultiStream
+        ? "_search_multi_stream"
+        : "_search_stream";
+
       url = `/${streamEndpoint}?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
       if (meta?.dashboard_id) url += `&dashboard_id=${meta?.dashboard_id}`;
       if (meta?.dashboard_name)
@@ -213,16 +255,16 @@ const useHttpStreaming = () => {
         url += `&tab_name=${encodeURIComponent(meta?.tab_name)}`;
       if (meta?.fallback_order_by_col)
         url += `&fallback_order_by_col=${meta?.fallback_order_by_col}`;
-      if (clear_cache)
-        url += `&clear_cache=${clear_cache}`;
-      if (meta?.is_ui_histogram) url += `&is_ui_histogram=${meta?.is_ui_histogram}`;
+      if (clear_cache) url += `&clear_cache=${clear_cache}`;
+      if (meta?.is_ui_histogram)
+        url += `&is_ui_histogram=${meta?.is_ui_histogram}`;
 
-      if(type === "histogram") {
+      if (type === "histogram") {
         let is_multi_stream_search = false;
-        if (queryReq.query?.sql.indexOf(' UNION ALL ') !== -1) is_multi_stream_search = true;
+        if (queryReq.query?.sql.indexOf(" UNION ALL ") !== -1)
+          is_multi_stream_search = true;
         url += `&is_multi_stream_search=${is_multi_stream_search}`;
       }
-
     } else if (type === "values") {
       url = `/_values_stream`;
       if (meta?.keyword) url += `?keyword=${encodeURIComponent(meta.keyword)}`;
@@ -230,7 +272,8 @@ const useHttpStreaming = () => {
       // PromQL streaming endpoint
       // For instant queries, set start == end to get a single evaluation point
       const queryType = queryReq.query_type || "range";
-      const startTime = queryType === "instant" ? queryReq.end_time : queryReq.start_time;
+      const startTime =
+        queryType === "instant" ? queryReq.end_time : queryReq.start_time;
       const endTime = queryReq.end_time;
 
       // Always use query_range endpoint (returns matrix format)
@@ -238,17 +281,31 @@ const useHttpStreaming = () => {
 
       // Add common metadata parameters
       if (meta?.dashboard_id) url += `&dashboard_id=${meta?.dashboard_id}`;
-      if (meta?.dashboard_name) url += `&dashboard_name=${encodeURIComponent(meta?.dashboard_name)}`;
+      if (meta?.dashboard_name)
+        url += `&dashboard_name=${encodeURIComponent(meta?.dashboard_name)}`;
       if (meta?.folder_id) url += `&folder_id=${meta?.folder_id}`;
-      if (meta?.folder_name) url += `&folder_name=${encodeURIComponent(meta?.folder_name)}`;
+      if (meta?.folder_name)
+        url += `&folder_name=${encodeURIComponent(meta?.folder_name)}`;
       if (meta?.panel_id) url += `&panel_id=${meta?.panel_id}`;
-      if (meta?.panel_name) url += `&panel_name=${encodeURIComponent(meta?.panel_name)}`;
+      if (meta?.panel_name)
+        url += `&panel_name=${encodeURIComponent(meta?.panel_name)}`;
       if (meta?.run_id) url += `&run_id=${meta?.run_id}`;
       if (meta?.tab_id) url += `&tab_id=${meta?.tab_id}`;
-      if (meta?.tab_name) url += `&tab_name=${encodeURIComponent(meta?.tab_name)}`;
+      if (meta?.tab_name)
+        url += `&tab_name=${encodeURIComponent(meta?.tab_name)}`;
     } else if (type === "traces") {
       // Traces latest_stream endpoint — GET with query params
-      const { stream_name, filter, start_time, end_time, from, size, timeout, sort_by, sort_order } = queryReq;
+      const {
+        stream_name,
+        filter,
+        start_time,
+        end_time,
+        from,
+        size,
+        timeout,
+        sort_by,
+        sort_order,
+      } = queryReq;
       url = `/${stream_name}/traces/latest_stream?filter=${encodeURIComponent(filter || "")}&start_time=${start_time}&end_time=${end_time}&from=${from ?? 0}&size=${size ?? 25}`;
       if (timeout) url += `&timeout=${timeout}`;
       if (sort_by) url += `&sort_by=${encodeURIComponent(sort_by)}`;
@@ -264,18 +321,20 @@ const useHttpStreaming = () => {
       // Make the HTTP/2 streaming request
       const useGetMethod = type === "promql" || type === "traces";
       const fetchOptions: any = {
-        method: useGetMethod ? 'GET' : 'POST',
-        credentials: 'include',
+        method: useGetMethod ? "GET" : "POST",
+        credentials: "include",
         headers: {
-          'traceparent': traceparent,
+          traceparent: traceparent,
         },
         signal: abortController.signal,
       };
 
       // Add Content-Type and body only for POST requests
       if (!useGetMethod) {
-        fetchOptions.headers['Content-Type'] = 'application/json';
-        fetchOptions.body = JSON.stringify((isMultiStream && type != "values") ? queryReq.query : queryReq);
+        fetchOptions.headers["Content-Type"] = "application/json";
+        fetchOptions.body = JSON.stringify(
+          isMultiStream && type != "values" ? queryReq.query : queryReq,
+        );
       }
 
       const response = await fetch(url, fetchOptions);
@@ -294,59 +353,58 @@ const useHttpStreaming = () => {
 
       // Set up worker for stream processing
       const worker = createStreamWorker();
-      
-      if(worker) {
-      // Set up worker message handling
+
+      if (worker) {
+        // Set up worker message handling
         worker.onmessage = (event) => {
           const { type, traceId: eventTraceId, data } = event.data;
           switch (type) {
-            case 'search_response_metadata':
-              onData(eventTraceId, 'search_response_metadata', data);
+            case "search_response_metadata":
+              onData(eventTraceId, "search_response_metadata", data);
               break;
-            case 'search_response_hits':
-              onData(eventTraceId, 'search_response_hits', data);
+            case "search_response_hits":
+              onData(eventTraceId, "search_response_hits", data);
               break;
-            case 'pattern_extraction_result':
-              onData(eventTraceId, 'pattern_extraction_result', data);
+            case "pattern_extraction_result":
+              onData(eventTraceId, "pattern_extraction_result", data);
               break;
-            case 'promql_response':
-              onData(eventTraceId, 'promql_response', data);
+            case "promql_response":
+              onData(eventTraceId, "promql_response", data);
               break;
-            case 'progress':
-              onData(eventTraceId, 'progress', data);
+            case "progress":
+              onData(eventTraceId, "progress", data);
               break;
-            case 'error':
+            case "error":
               onError(eventTraceId, data);
               break;
-            case 'end':
-              onData(eventTraceId, 'end', 'end');
+            case "end":
+              onData(eventTraceId, "end", "end");
               break;
           }
         };
       } else {
-        throw new Error('Worker is not supported');
+        throw new Error("Worker is not supported");
       }
-
 
       // Get the ReadableStream
       const readableStream = response.body;
 
       if (!readableStream) {
-        throw new Error('Response body is null');
+        throw new Error("Response body is null");
       }
-      
+
       // Start the stream in the worker
-      if (worker) {        
+      if (worker) {
         // Initialize the stream in the worker
         worker.postMessage({
-          action: 'startStream',
-          traceId
+          action: "startStream",
+          traceId,
         });
-        
+
         // For Safari compatibility: manually read the stream and send chunks to worker
         const reader = readableStream.getReader();
         const decoder = new TextDecoder();
-        
+
         (async () => {
           try {
             while (true) {
@@ -355,43 +413,43 @@ const useHttpStreaming = () => {
                 // console.log('Trace no longer active, stopping stream reading for traceId:', traceId);
                 break;
               }
-              
+
               const { done, value } = await reader.read();
-              
+
               if (done) {
                 worker.postMessage({
-                  action: 'endStream',
-                  traceId
+                  action: "endStream",
+                  traceId,
                 });
                 break;
               }
-              
+
               // Check again before processing the chunk
               if (!traceMap.value[traceId]) {
                 // console.log('Trace cancelled during processing, skipping chunk for traceId:', traceId);
                 break;
               }
-              
+
               // Decode and send chunks to the worker
               const chunk = decoder.decode(value, { stream: true });
               worker.postMessage({
-                action: 'processChunk',
+                action: "processChunk",
                 traceId,
-                chunk
+                chunk,
               });
             }
           } catch (error) {
             // Handle AbortError gracefully - this is expected when stream is cancelled
-            if ((error as any).name === 'AbortError') {
+            if ((error as any).name === "AbortError") {
               // console.log('Stream reading was cancelled for traceId:', traceId);
               // Don't call onError for expected cancellations
-            } else if((error as any).status === 401) {
+            } else if ((error as any).status === 401) {
               store.dispatch("logout");
               localStorage.clear();
               sessionStorage.clear();
               window.location.reload();
             } else {
-              console.error('Error reading stream:', error);
+              console.error("Error reading stream:", error);
               onError(traceId, error);
             }
           } finally {
@@ -405,16 +463,15 @@ const useHttpStreaming = () => {
           }
         })();
       } else {
-        throw new Error('Worker is not supported');
+        throw new Error("Worker is not supported");
       }
-      
+
       // Store reference to abort controller for cancellation
       activeStreamId.value = traceId;
-      
     } catch (error) {
-      if ((error as any).name === 'AbortError') {
-       // console.error('Stream was canceled');
-      } else if((error as any).status === 401) {
+      if ((error as any).name === "AbortError") {
+        // console.error('Stream was canceled');
+      } else if ((error as any).status === 401) {
         store.dispatch("logout");
         localStorage.clear();
         sessionStorage.clear();
@@ -445,8 +502,8 @@ const useHttpStreaming = () => {
     // Also cancel in worker
     if (streamWorker) {
       streamWorker.postMessage({
-        action: 'cancelStream',
-        traceId: trace_id
+        action: "cancelStream",
+        traceId: trace_id,
       });
     }
 
@@ -468,7 +525,7 @@ const useHttpStreaming = () => {
     // Close all streams in worker
     if (streamWorker) {
       streamWorker.postMessage({
-        action: 'closeAll'
+        action: "closeAll",
       });
     }
 
@@ -488,7 +545,7 @@ const useHttpStreaming = () => {
     // Close all streams in worker
     if (streamWorker) {
       streamWorker.postMessage({
-        action: 'closeAll'
+        action: "closeAll",
       });
     }
 
@@ -503,9 +560,11 @@ const useHttpStreaming = () => {
     await authService.refresh_token();
   };
 
-
-  const convertToWsResponse = (traceId: string, response: any, type: StreamResponseType) => {
-
+  const convertToWsResponse = (
+    traceId: string,
+    response: any,
+    type: StreamResponseType,
+  ) => {
     let resp = {
       content: {
         results: response.results || response,
@@ -516,7 +575,7 @@ const useHttpStreaming = () => {
       type: type,
     };
     return resp;
-  }
+  };
 
   const convertToWsError = (traceId: string, response: any) => {
     return {
@@ -525,35 +584,47 @@ const useHttpStreaming = () => {
         trace_id: traceId,
       },
       type: "error",
-    }
-  }
+    };
+  };
 
-  const convertToWsEventProgress = (traceId: string, response: any, type: StreamResponseType) => {
+  const convertToWsEventProgress = (
+    traceId: string,
+    response: any,
+    type: StreamResponseType,
+  ) => {
     return {
       content: {
         percent: response?.percent,
       },
       type: "event_progress",
-    }
-  }
+    };
+  };
 
-  const convertToWsEnd = (traceId: string, response: any, type: StreamResponseType) => {
+  const convertToWsEnd = (
+    traceId: string,
+    response: any,
+    type: StreamResponseType,
+  ) => {
     return {
       content: {
         end: true,
       },
       type: "end",
-    }
-  }
+    };
+  };
 
   const convertToPatternResult = (type: string, data: any) => {
     return {
       type: "pattern_extraction_result",
       content: data,
-    }
-  }
+    };
+  };
 
-  const convertToPromQLResponse = (traceId: string, response: any, type: StreamResponseType) => {
+  const convertToPromQLResponse = (
+    traceId: string,
+    response: any,
+    type: StreamResponseType,
+  ) => {
     // Backend sends: PromqlResponse { data: QueryResult { result_type, result } }
     // We need to extract the QueryResult and return it in a format compatible with the old API
     return {
@@ -562,18 +633,18 @@ const useHttpStreaming = () => {
         trace_id: traceId,
       },
       type: "promql_response",
-    }
-  }
+    };
+  };
 
   const wsMapper = {
-    'search_response_metadata': convertToWsResponse,
-    'search_response_hits': convertToWsResponse,
-    'pattern_extraction_result': convertToPatternResult,
-    'promql_response': convertToPromQLResponse,
-    'progress': convertToWsEventProgress,
-    'error': convertToWsError,
-    'end': convertToWsEnd,
-  }
+    search_response_metadata: convertToWsResponse,
+    search_response_hits: convertToWsResponse,
+    pattern_extraction_result: convertToPatternResult,
+    promql_response: convertToPromQLResponse,
+    progress: convertToWsEventProgress,
+    error: convertToWsError,
+    end: convertToWsEnd,
+  };
 
   return {
     fetchQueryDataWithHttpStream,
@@ -596,4 +667,4 @@ const useHttpStreaming = () => {
   };
 };
 
-export default useHttpStreaming; 
+export default useHttpStreaming;

@@ -120,7 +120,7 @@ describe("Config Service", () => {
               backup: true,
             },
             {
-              region: "eu-west-1", 
+              region: "eu-west-1",
               endpoint: "https://eu-west.api.example.com",
               backup: false,
             },
@@ -304,7 +304,9 @@ describe("Config Service", () => {
       const configError = new Error("Configuration not found");
       mockHttp.get.mockRejectedValue(configError);
 
-      await expect(zo_config.get_config()).rejects.toThrow("Configuration not found");
+      await expect(zo_config.get_config()).rejects.toThrow(
+        "Configuration not found",
+      );
       expect(mockHttp.get).toHaveBeenCalledWith("/config");
     });
 

@@ -855,7 +855,7 @@ export default defineComponent({
       handleNativeContextMenu,
       get chart() {
         return chart;
-      }
+      },
     };
   },
 });

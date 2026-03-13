@@ -83,7 +83,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="logs-search-no-field-found-text"
         class="text-center col-10 q-mx-none q-pt-md"
       >
-        <q-icon name="info" color="primary" size="xs" />
+        <q-icon name="info" color="primary"
+size="xs" />
         {{ t("search.noFieldFoundInStream") }}
       </div>
     </div>
@@ -116,7 +117,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :active-exclude-field-values="activeExcludeFilterValues"
         :expanded-fields="expandedFields"
         :selected-streams-count="searchObj.data.stream.selectedStream.length"
-        :default-values-count="store.state.zoConfig?.query_values_default_num || 10"
+        :default-values-count="
+          store.state.zoConfig?.query_values_default_num || 10
+        "
         :show-user-defined-schema-toggle="showUserDefinedSchemaToggle"
         :use-user-defined-schemas="searchObj.meta.useUserDefinedSchemas"
         :user-defined-schema-btn-group-option="userDefinedSchemaBtnGroupOption"
@@ -331,10 +334,17 @@ export default defineComponent({
     const lastFieldFetchPayloads = ref<Record<string, any[]>>({});
     // Caches the original (no-keyword) values so clearing the search box
     // restores them instantly without a new API call.
-    const cachedFieldValues = ref<Record<string, { key: string; count: number }[]>>({});
+    const cachedFieldValues = ref<
+      Record<string, { key: string; count: number }[]>
+    >({});
     // Caches the per-stream values alongside cachedFieldValues so "load more"
     // appends correctly after a search is cleared.
-    const cachedStreamFieldValues = ref<Record<string, Record<string, { values: { key: string; count: number }[] }>>>({});
+    const cachedStreamFieldValues = ref<
+      Record<
+        string,
+        Record<string, { values: { key: string; count: number }[] }>
+      >
+    >({});
     // Tracks the current `from` offset for each field's "load more" pagination.
     const fieldValuesPage = ref<Record<string, number>>({});
     // Tracks the active keyword search term per field so "load more" re-applies it.
@@ -917,7 +927,10 @@ export default defineComponent({
 
             // Build SQL with the expanded field's own filter condition removed so
             // field value counts are not constrained by that filter.
-            const rawSQL = query_context.replace("[INDEX_NAME]", selectedStream);
+            const rawSQL = query_context.replace(
+              "[INDEX_NAME]",
+              selectedStream,
+            );
             let sqlForValues = rawSQL;
             try {
               const parsedForValues = fnParsedSQL(rawSQL);
@@ -1401,7 +1414,12 @@ export default defineComponent({
 
       // Pre-allocate the stream slot on fresh loads. In append mode we keep the
       // existing accumulated values so handleSearchResponse can concat to them.
-      if (!isAppend && fieldName && streamName && streamFieldValues.value[fieldName])
+      if (
+        !isAppend &&
+        fieldName &&
+        streamName &&
+        streamFieldValues.value[fieldName]
+      )
         streamFieldValues.value[fieldName][streamName] = { values: [] };
 
       const wsPayload = {
@@ -1550,7 +1568,8 @@ export default defineComponent({
               ...streamValues,
             ];
           } else {
-            streamFieldValues.value[fieldName][streamName].values = streamValues;
+            streamFieldValues.value[fieldName][streamName].values =
+              streamValues;
           }
 
           // Aggregate values across all streams

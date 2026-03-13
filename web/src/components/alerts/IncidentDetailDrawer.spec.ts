@@ -36,7 +36,11 @@ import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
 import IncidentDetailDrawer from "./IncidentDetailDrawer.vue";
-import incidentsService, { Incident, IncidentWithAlerts, IncidentAlert } from "@/services/incidents";
+import incidentsService, {
+  Incident,
+  IncidentWithAlerts,
+  IncidentAlert,
+} from "@/services/incidents";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -63,13 +67,17 @@ const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
   topology_context: overrides.topology_context,
 });
 
-const createIncidentWithAlerts = (overrides: Partial<IncidentWithAlerts> = {}): IncidentWithAlerts => ({
+const createIncidentWithAlerts = (
+  overrides: Partial<IncidentWithAlerts> = {},
+): IncidentWithAlerts => ({
   ...createIncident(overrides),
   alerts: overrides.alerts || [],
   triggers: overrides.triggers || [],
 });
 
-const createAlert = (overrides: Partial<IncidentAlert> = {}): IncidentAlert => ({
+const createAlert = (
+  overrides: Partial<IncidentAlert> = {},
+): IncidentAlert => ({
   incident_id: overrides.incident_id || "incident-1",
   alert_id: overrides.alert_id || "alert-1",
   alert_name: overrides.alert_name || "Test Alert",
@@ -81,7 +89,11 @@ const createAlert = (overrides: Partial<IncidentAlert> = {}): IncidentAlert => (
 describe("IncidentDetailDrawer.vue", () => {
   let wrapper: VueWrapper<any>;
 
-  const createWrapper = async (props = {}, storeOverrides = {}, incidentId?: string | null) => {
+  const createWrapper = async (
+    props = {},
+    storeOverrides = {},
+    incidentId?: string | null,
+  ) => {
     // Update store state with overrides
     if (storeOverrides && Object.keys(storeOverrides).length > 0) {
       Object.assign(store.state, storeOverrides);
@@ -109,15 +121,39 @@ describe("IncidentDetailDrawer.vue", () => {
           SREChat: true,
           // Use custom stubs that accept props so we can test them
           TelemetryCorrelationDashboard: {
-            name: 'TelemetryCorrelationDashboard',
+            name: "TelemetryCorrelationDashboard",
             template: '<div class="telemetry-stub"></div>',
-            props: ['mode', 'externalActiveTab', 'serviceName', 'matchedDimensions', 'additionalDimensions', 'logStreams', 'metricStreams', 'traceStreams', 'timeRange', 'hideDimensionFilters']
+            props: [
+              "mode",
+              "externalActiveTab",
+              "serviceName",
+              "matchedDimensions",
+              "additionalDimensions",
+              "logStreams",
+              "metricStreams",
+              "traceStreams",
+              "timeRange",
+              "hideDimensionFilters",
+            ],
           },
           CorrelatedLogsTable: {
-            name: 'CorrelatedLogsTable',
+            name: "CorrelatedLogsTable",
             template: '<div class="logs-stub"></div>',
-            props: ['serviceName', 'sourceStream', 'sourceType', 'hideViewRelatedButton', 'hideDimensionFilters', 'matchedDimensions', 'availableDimensions', 'additionalDimensions', 'logStreams', 'ftsFields', 'timeRange', 'hideSearchTermActions'],
-            emits: ['sendToAiChat']
+            props: [
+              "serviceName",
+              "sourceStream",
+              "sourceType",
+              "hideViewRelatedButton",
+              "hideDimensionFilters",
+              "matchedDimensions",
+              "availableDimensions",
+              "additionalDimensions",
+              "logStreams",
+              "ftsFields",
+              "timeRange",
+              "hideSearchTermActions",
+            ],
+            emits: ["sendToAiChat"],
           },
         },
       },
@@ -155,7 +191,10 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     (incidentsService.triggerRca as any).mockResolvedValue({
-      data: { rca_content: "## Root Cause Analysis\n\nThe issue is related to high CPU usage." },
+      data: {
+        rca_content:
+          "## Root Cause Analysis\n\nThe issue is related to high CPU usage.",
+      },
     });
   });
 
@@ -195,13 +234,16 @@ describe("IncidentDetailDrawer.vue", () => {
   describe("URL-based Incident Loading", () => {
     it("should emit close when drawer closes", async () => {
       wrapper = await createWrapper();
-      const pushSpy = vi.spyOn(router, 'push');
+      const pushSpy = vi.spyOn(router, "push");
 
       wrapper.vm.close();
       await nextTick();
 
       // Should navigate back to incident list instead of emitting
-      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList", query: { org_identifier: "default" } });
+      expect(pushSpy).toHaveBeenCalledWith({
+        name: "incidentList",
+        query: { org_identifier: "default" },
+      });
     });
 
     it("should load details when incident_id is in URL", async () => {
@@ -305,7 +347,7 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(incidentsService.updateStatus).toHaveBeenCalledWith(
         "default",
         "1",
-        "acknowledged"
+        "acknowledged",
       );
     });
 
@@ -315,7 +357,7 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(incidentsService.updateStatus).toHaveBeenCalledWith(
         "default",
         "1",
-        "resolved"
+        "resolved",
       );
     });
 
@@ -328,7 +370,7 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(incidentsService.updateStatus).toHaveBeenCalledWith(
         "default",
         "1",
-        "open"
+        "open",
       );
     });
 
@@ -363,7 +405,9 @@ describe("IncidentDetailDrawer.vue", () => {
 
     it("should handle status update error", async () => {
       const mockNotify = vi.fn();
-      (incidentsService.updateStatus as any).mockRejectedValue(new Error("Update failed"));
+      (incidentsService.updateStatus as any).mockRejectedValue(
+        new Error("Update failed"),
+      );
 
       wrapper.vm.$q.notify = mockNotify;
 
@@ -465,7 +509,9 @@ describe("IncidentDetailDrawer.vue", () => {
 
     it("should handle RCA error", async () => {
       const mockNotify = vi.fn();
-      (incidentsService.triggerRca as any).mockRejectedValue(new Error("RCA failed"));
+      (incidentsService.triggerRca as any).mockRejectedValue(
+        new Error("RCA failed"),
+      );
 
       wrapper.vm.$q.notify = mockNotify;
 
@@ -476,7 +522,9 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should clear RCA content on error", async () => {
-      (incidentsService.triggerRca as any).mockRejectedValue(new Error("RCA failed"));
+      (incidentsService.triggerRca as any).mockRejectedValue(
+        new Error("RCA failed"),
+      );
 
       wrapper.vm.rcaStreamContent = "Some content";
       await wrapper.vm.triggerRca();
@@ -655,7 +703,9 @@ describe("IncidentDetailDrawer.vue", () => {
       const content = "This is **bold** text";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain('<strong class="tw:font-semibold">bold</strong>');
+      expect(formatted).toContain(
+        '<strong class="tw:font-semibold">bold</strong>',
+      );
     });
 
     it("should format h2 headers", () => {
@@ -692,10 +742,13 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should format complex markdown", () => {
-      const content = "## Root Cause\n\n**Issue**: High CPU\n\n- Check process\n- Review logs";
+      const content =
+        "## Root Cause\n\n**Issue**: High CPU\n\n- Check process\n- Review logs";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain('<strong class="tw:font-semibold">Issue</strong>');
+      expect(formatted).toContain(
+        '<strong class="tw:font-semibold">Issue</strong>',
+      );
       expect(formatted).toContain("tw:font-bold");
       expect(formatted).toContain("rca-ul");
     });
@@ -764,12 +817,16 @@ describe("IncidentDetailDrawer.vue", () => {
 
     it("should display topology nodes", () => {
       expect(wrapper.vm.incidentDetails.topology_context.nodes).toHaveLength(2);
-      expect(wrapper.vm.incidentDetails.topology_context.nodes[0].alert_name).toBe("High CPU");
+      expect(
+        wrapper.vm.incidentDetails.topology_context.nodes[0].alert_name,
+      ).toBe("High CPU");
     });
 
     it("should display topology edges", () => {
       expect(wrapper.vm.incidentDetails.topology_context.edges).toHaveLength(1);
-      expect(wrapper.vm.incidentDetails.topology_context.edges[0].edge_type).toBe("service_dependency");
+      expect(
+        wrapper.vm.incidentDetails.topology_context.edges[0].edge_type,
+      ).toBe("service_dependency");
     });
   });
 
@@ -802,7 +859,10 @@ describe("IncidentDetailDrawer.vue", () => {
 
     it("should handle missing topology context", async () => {
       (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", topology_context: undefined }),
+        data: createIncidentWithAlerts({
+          id: "test-123",
+          topology_context: undefined,
+        }),
       });
 
       wrapper = await createWrapper({}, {}, "test-123");
@@ -816,7 +876,10 @@ describe("IncidentDetailDrawer.vue", () => {
 
     it("should handle empty dimensions", async () => {
       (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", stable_dimensions: {} }),
+        data: createIncidentWithAlerts({
+          id: "test-123",
+          stable_dimensions: {},
+        }),
       });
 
       wrapper = await createWrapper({}, {}, "test-123");
@@ -848,24 +911,30 @@ describe("IncidentDetailDrawer.vue", () => {
   describe("Close Functionality", () => {
     it("should close drawer", async () => {
       wrapper = await createWrapper();
-      const pushSpy = vi.spyOn(router, 'push');
+      const pushSpy = vi.spyOn(router, "push");
 
       wrapper.vm.close();
       await nextTick();
 
       // Should navigate back to incident list
-      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList", query: { org_identifier: "default" } });
+      expect(pushSpy).toHaveBeenCalledWith({
+        name: "incidentList",
+        query: { org_identifier: "default" },
+      });
     });
 
     it("should navigate back to incident list on close", async () => {
       wrapper = await createWrapper();
-      const pushSpy = vi.spyOn(router, 'push');
+      const pushSpy = vi.spyOn(router, "push");
 
       wrapper.vm.close();
       await nextTick();
 
       // Verify navigation to incident list
-      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList", query: { org_identifier: "default" } });
+      expect(pushSpy).toHaveBeenCalledWith({
+        name: "incidentList",
+        query: { org_identifier: "default" },
+      });
     });
   });
 
@@ -874,13 +943,16 @@ describe("IncidentDetailDrawer.vue", () => {
       wrapper = await createWrapper(
         {},
         { selectedOrganization: { identifier: "custom-org" } },
-        "test-123"
+        "test-123",
       );
 
       await nextTick();
       await flushPromises();
 
-      expect(incidentsService.get).toHaveBeenCalledWith("custom-org", "test-123");
+      expect(incidentsService.get).toHaveBeenCalledWith(
+        "custom-org",
+        "test-123",
+      );
     });
 
     it("should use organization in status updates", async () => {
@@ -889,7 +961,7 @@ describe("IncidentDetailDrawer.vue", () => {
       wrapper = await createWrapper(
         {},
         { selectedOrganization: { identifier: "org-123" } },
-        "1"
+        "1",
       );
 
       await nextTick();
@@ -900,7 +972,7 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(incidentsService.updateStatus).toHaveBeenCalledWith(
         "org-123",
         expect.any(String),
-        "acknowledged"
+        "acknowledged",
       );
     });
 
@@ -908,7 +980,7 @@ describe("IncidentDetailDrawer.vue", () => {
       wrapper = await createWrapper(
         {},
         { selectedOrganization: { identifier: "org-456" } },
-        "1"
+        "1",
       );
 
       await nextTick();
@@ -918,7 +990,7 @@ describe("IncidentDetailDrawer.vue", () => {
 
       expect(incidentsService.triggerRca).toHaveBeenCalledWith(
         "org-456",
-        expect.any(String)
+        expect.any(String),
       );
     });
   });
@@ -1020,9 +1092,9 @@ describe("IncidentDetailDrawer.vue", () => {
       // This test verifies the fix: uniqueness should be by alert_id, not alert_name
       const triggers = [
         createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
-        createAlert({ alert_id: "alert-2", alert_name: "High CPU" }),  // Same name, different ID
+        createAlert({ alert_id: "alert-2", alert_name: "High CPU" }), // Same name, different ID
         createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
-        createAlert({ alert_id: "alert-3", alert_name: "High CPU" }),  // Same name, different ID
+        createAlert({ alert_id: "alert-3", alert_name: "High CPU" }), // Same name, different ID
       ];
 
       (incidentsService.get as any).mockResolvedValue({
@@ -1113,7 +1185,10 @@ describe("IncidentDetailDrawer.vue", () => {
 
     it("should derive alerts from triggers instead of API alerts array", async () => {
       const triggers = [
-        createAlert({ alert_id: "trigger-alert-1", alert_name: "From Triggers" }),
+        createAlert({
+          alert_id: "trigger-alert-1",
+          alert_name: "From Triggers",
+        }),
       ];
 
       (incidentsService.get as any).mockResolvedValue({
@@ -1168,17 +1243,23 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should have translation for fired times with parameter", () => {
-      const translation = wrapper.vm.t("alerts.incidents.firedTimes", { count: 5 });
+      const translation = wrapper.vm.t("alerts.incidents.firedTimes", {
+        count: 5,
+      });
       expect(translation).toBe("Fired 5 time(s)");
     });
 
     it("should have translation for refresh correlated data", () => {
-      const translation = wrapper.vm.t("alerts.incidents.refreshCorrelatedData");
+      const translation = wrapper.vm.t(
+        "alerts.incidents.refreshCorrelatedData",
+      );
       expect(translation).toBe("Refresh correlated data");
     });
 
     it("should have translation for incident title updated success", () => {
-      const translation = wrapper.vm.t("alerts.incidents.incidentTitleUpdatedSuccess");
+      const translation = wrapper.vm.t(
+        "alerts.incidents.incidentTitleUpdatedSuccess",
+      );
       expect(translation).toBe("Incident title updated successfully");
     });
   });
@@ -1203,4 +1284,3 @@ describe("IncidentDetailDrawer.vue", () => {
   // Testing loading state UI presentation is better handled through visual regression tests
   // Component logic tests should focus on loading state management, not CSS/layout
 });
-

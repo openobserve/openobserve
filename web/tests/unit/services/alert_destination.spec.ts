@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import destination from '@/services/alert_destination';
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import destination from "@/services/alert_destination";
 
 // Mock http module
 const mockPost = vi.fn();
@@ -21,303 +21,303 @@ const mockPut = vi.fn();
 const mockGet = vi.fn();
 const mockDelete = vi.fn();
 
-vi.mock('@/services/http', () => ({
+vi.mock("@/services/http", () => ({
   default: () => ({
     post: mockPost,
     put: mockPut,
     get: mockGet,
-    delete: mockDelete
-  })
+    delete: mockDelete,
+  }),
 }));
 
-describe('alert_destination service', () => {
+describe("alert_destination service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('create', () => {
-    it('calls POST with correct URL and data', () => {
+  describe("create", () => {
+    it("calls POST with correct URL and data", () => {
       const params = {
-        org_identifier: 'test-org',
-        destination_name: 'test-dest',
-        data: { name: 'Test Destination', type: 'http' }
+        org_identifier: "test-org",
+        destination_name: "test-dest",
+        data: { name: "Test Destination", type: "http" },
       };
 
       destination.create(params);
 
       expect(mockPost).toHaveBeenCalledWith(
-        '/api/test-org/alerts/destinations',
-        params.data
+        "/api/test-org/alerts/destinations",
+        params.data,
       );
     });
 
-    it('includes module parameter in URL when provided', () => {
+    it("includes module parameter in URL when provided", () => {
       const params = {
-        org_identifier: 'test-org',
-        destination_name: 'test-dest',
-        data: { name: 'Test Destination' },
-        module: 'alerts'
+        org_identifier: "test-org",
+        destination_name: "test-dest",
+        data: { name: "Test Destination" },
+        module: "alerts",
       };
 
       destination.create(params);
 
       expect(mockPost).toHaveBeenCalledWith(
-        '/api/test-org/alerts/destinations?module=alerts',
-        params.data
+        "/api/test-org/alerts/destinations?module=alerts",
+        params.data,
       );
     });
 
-    it('does not include module parameter when not provided', () => {
+    it("does not include module parameter when not provided", () => {
       const params = {
-        org_identifier: 'test-org',
-        destination_name: 'test-dest',
-        data: { name: 'Test Destination' }
+        org_identifier: "test-org",
+        destination_name: "test-dest",
+        data: { name: "Test Destination" },
       };
 
       destination.create(params);
 
       expect(mockPost).toHaveBeenCalledWith(
-        '/api/test-org/alerts/destinations',
-        params.data
+        "/api/test-org/alerts/destinations",
+        params.data,
       );
     });
   });
 
-  describe('update', () => {
-    it('calls PUT with correct URL and data', () => {
+  describe("update", () => {
+    it("calls PUT with correct URL and data", () => {
       const params = {
-        org_identifier: 'test-org',
-        destination_name: 'test-dest',
-        data: { name: 'Updated Destination' }
+        org_identifier: "test-org",
+        destination_name: "test-dest",
+        data: { name: "Updated Destination" },
       };
 
       destination.update(params);
 
       expect(mockPut).toHaveBeenCalledWith(
-        '/api/test-org/alerts/destinations/test-dest',
-        params.data
+        "/api/test-org/alerts/destinations/test-dest",
+        params.data,
       );
     });
 
-    it('URL encodes destination name', () => {
+    it("URL encodes destination name", () => {
       const params = {
-        org_identifier: 'test-org',
-        destination_name: 'test dest with spaces',
-        data: { name: 'Updated' }
+        org_identifier: "test-org",
+        destination_name: "test dest with spaces",
+        data: { name: "Updated" },
       };
 
       destination.update(params);
 
       expect(mockPut).toHaveBeenCalledWith(
-        '/api/test-org/alerts/destinations/test%20dest%20with%20spaces',
-        params.data
+        "/api/test-org/alerts/destinations/test%20dest%20with%20spaces",
+        params.data,
       );
     });
 
-    it('includes module parameter in URL when provided', () => {
+    it("includes module parameter in URL when provided", () => {
       const params = {
-        org_identifier: 'test-org',
-        destination_name: 'test-dest',
-        data: { name: 'Updated' },
-        module: 'alerts'
+        org_identifier: "test-org",
+        destination_name: "test-dest",
+        data: { name: "Updated" },
+        module: "alerts",
       };
 
       destination.update(params);
 
       expect(mockPut).toHaveBeenCalledWith(
-        '/api/test-org/alerts/destinations/test-dest?module=alerts',
-        params.data
+        "/api/test-org/alerts/destinations/test-dest?module=alerts",
+        params.data,
       );
     });
   });
 
-  describe('list', () => {
-    it('calls GET with correct URL and query parameters', () => {
+  describe("list", () => {
+    it("calls GET with correct URL and query parameters", () => {
       const params = {
-        org_identifier: 'test-org',
+        org_identifier: "test-org",
         page_num: 1,
         page_size: 10,
         desc: true,
-        sort_by: 'name'
+        sort_by: "name",
       };
 
       destination.list(params);
 
       expect(mockGet).toHaveBeenCalledWith(
-        '/api/test-org/alerts/destinations?page_num=1&page_size=10&sort_by=name&desc=true'
+        "/api/test-org/alerts/destinations?page_num=1&page_size=10&sort_by=name&desc=true",
       );
     });
 
-    it('includes module parameter when provided', () => {
+    it("includes module parameter when provided", () => {
       const params = {
-        org_identifier: 'test-org',
+        org_identifier: "test-org",
         page_num: 1,
         page_size: 10,
         desc: false,
-        sort_by: 'created_at',
-        module: 'alerts'
+        sort_by: "created_at",
+        module: "alerts",
       };
 
       destination.list(params);
 
       expect(mockGet).toHaveBeenCalledWith(
-        '/api/test-org/alerts/destinations?page_num=1&page_size=10&sort_by=created_at&desc=false&module=alerts'
+        "/api/test-org/alerts/destinations?page_num=1&page_size=10&sort_by=created_at&desc=false&module=alerts",
       );
     });
 
-    it('does not include module parameter when not provided', () => {
+    it("does not include module parameter when not provided", () => {
       const params = {
-        org_identifier: 'test-org',
+        org_identifier: "test-org",
         page_num: 0,
         page_size: 25,
         desc: true,
-        sort_by: 'updated_at'
+        sort_by: "updated_at",
       };
 
       destination.list(params);
 
       expect(mockGet).toHaveBeenCalledWith(
-        '/api/test-org/alerts/destinations?page_num=0&page_size=25&sort_by=updated_at&desc=true'
+        "/api/test-org/alerts/destinations?page_num=0&page_size=25&sort_by=updated_at&desc=true",
       );
     });
   });
 
-  describe('get_by_name', () => {
-    it('calls GET with correct URL', () => {
+  describe("get_by_name", () => {
+    it("calls GET with correct URL", () => {
       const params = {
-        org_identifier: 'test-org',
-        destination_name: 'test-dest'
+        org_identifier: "test-org",
+        destination_name: "test-dest",
       };
 
       destination.get_by_name(params);
 
       expect(mockGet).toHaveBeenCalledWith(
-        '/api/test-org/alerts/destinations/test-dest'
+        "/api/test-org/alerts/destinations/test-dest",
       );
     });
 
-    it('URL encodes destination name', () => {
+    it("URL encodes destination name", () => {
       const params = {
-        org_identifier: 'test-org',
-        destination_name: 'dest/with/slashes'
+        org_identifier: "test-org",
+        destination_name: "dest/with/slashes",
       };
 
       destination.get_by_name(params);
 
       expect(mockGet).toHaveBeenCalledWith(
-        '/api/test-org/alerts/destinations/dest%2Fwith%2Fslashes'
+        "/api/test-org/alerts/destinations/dest%2Fwith%2Fslashes",
       );
     });
 
-    it('handles special characters in destination name', () => {
+    it("handles special characters in destination name", () => {
       const params = {
-        org_identifier: 'test-org',
-        destination_name: 'dest@#$%'
+        org_identifier: "test-org",
+        destination_name: "dest@#$%",
       };
 
       destination.get_by_name(params);
 
       expect(mockGet).toHaveBeenCalledWith(
-        '/api/test-org/alerts/destinations/dest%40%23%24%25'
+        "/api/test-org/alerts/destinations/dest%40%23%24%25",
       );
     });
   });
 
-  describe('delete', () => {
-    it('calls DELETE with correct URL', () => {
+  describe("delete", () => {
+    it("calls DELETE with correct URL", () => {
       const params = {
-        org_identifier: 'test-org',
-        destination_name: 'test-dest'
+        org_identifier: "test-org",
+        destination_name: "test-dest",
       };
 
       destination.delete(params);
 
       expect(mockDelete).toHaveBeenCalledWith(
-        '/api/test-org/alerts/destinations/test-dest'
+        "/api/test-org/alerts/destinations/test-dest",
       );
     });
 
-    it('URL encodes destination name', () => {
+    it("URL encodes destination name", () => {
       const params = {
-        org_identifier: 'test-org',
-        destination_name: 'dest with spaces'
+        org_identifier: "test-org",
+        destination_name: "dest with spaces",
       };
 
       destination.delete(params);
 
       expect(mockDelete).toHaveBeenCalledWith(
-        '/api/test-org/alerts/destinations/dest%20with%20spaces'
+        "/api/test-org/alerts/destinations/dest%20with%20spaces",
       );
     });
   });
 
-  describe('bulkDelete', () => {
-    it('calls DELETE with correct URL and data', () => {
-      const orgId = 'test-org';
+  describe("bulkDelete", () => {
+    it("calls DELETE with correct URL and data", () => {
+      const orgId = "test-org";
       const data = {
-        names: ['dest1', 'dest2', 'dest3']
+        names: ["dest1", "dest2", "dest3"],
       };
 
       destination.bulkDelete(orgId, data);
 
       expect(mockDelete).toHaveBeenCalledWith(
-        '/api/test-org/alerts/destinations/bulk',
-        { data }
+        "/api/test-org/alerts/destinations/bulk",
+        { data },
       );
     });
 
-    it('handles empty array of destinations', () => {
-      const orgId = 'test-org';
+    it("handles empty array of destinations", () => {
+      const orgId = "test-org";
       const data = { names: [] };
 
       destination.bulkDelete(orgId, data);
 
       expect(mockDelete).toHaveBeenCalledWith(
-        '/api/test-org/alerts/destinations/bulk',
-        { data }
+        "/api/test-org/alerts/destinations/bulk",
+        { data },
       );
     });
   });
 
-  describe('test', () => {
-    it('calls POST with correct URL and data', () => {
+  describe("test", () => {
+    it("calls POST with correct URL and data", () => {
       const params = {
-        org_identifier: 'test-org',
+        org_identifier: "test-org",
         data: {
-          name: 'test-dest',
-          type: 'http',
-          url: 'https://example.com/webhook'
-        }
+          name: "test-dest",
+          type: "http",
+          url: "https://example.com/webhook",
+        },
       };
 
       destination.test(params);
 
       expect(mockPost).toHaveBeenCalledWith(
-        '/api/test-org/alerts/destinations/test',
-        params.data
+        "/api/test-org/alerts/destinations/test",
+        params.data,
       );
     });
 
-    it('handles complex destination configuration', () => {
+    it("handles complex destination configuration", () => {
       const params = {
-        org_identifier: 'test-org',
+        org_identifier: "test-org",
         data: {
-          name: 'slack-dest',
-          type: 'http',
-          url: 'https://hooks.slack.com/services/xxx',
-          method: 'post',
+          name: "slack-dest",
+          type: "http",
+          url: "https://hooks.slack.com/services/xxx",
+          method: "post",
           headers: {
-            'Content-Type': 'application/json'
+            "Content-Type": "application/json",
           },
-          template: '{"text": "Alert fired"}'
-        }
+          template: '{"text": "Alert fired"}',
+        },
       };
 
       destination.test(params);
 
       expect(mockPost).toHaveBeenCalledWith(
-        '/api/test-org/alerts/destinations/test',
-        params.data
+        "/api/test-org/alerts/destinations/test",
+        params.data,
       );
     });
   });

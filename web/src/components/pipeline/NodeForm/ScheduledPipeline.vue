@@ -1179,7 +1179,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <q-icon name="info" color="primary" size="md" />
+                      <q-icon name="info" color="primary"
+size="md" />
                       {{ t("search.noStreamSelectedMessage") }}
                     </h6>
                     <h6
@@ -1194,7 +1195,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <q-icon name="info" color="primary" size="md" />
+                      <q-icon name="info" color="primary"
+size="md" />
                       {{ t("search.applySearch") }}
                     </h6>
                   </div>

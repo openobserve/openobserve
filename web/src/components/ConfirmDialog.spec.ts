@@ -44,22 +44,23 @@ describe("ConfirmDialog", async () => {
       global: {
         plugins: [i18n],
         stubs: {
-          'q-dialog': {
-            template: '<div class="q-dialog"><slot /></div>'
+          "q-dialog": {
+            template: '<div class="q-dialog"><slot /></div>',
           },
-          'q-card': {
-            template: '<div class="q-card"><slot /></div>'
+          "q-card": {
+            template: '<div class="q-card"><slot /></div>',
           },
-          'q-card-section': {
-            template: '<div class="q-card-section"><slot /></div>'
+          "q-card-section": {
+            template: '<div class="q-card-section"><slot /></div>',
           },
-          'q-card-actions': {
-            template: '<div class="q-card-actions"><slot /></div>'
+          "q-card-actions": {
+            template: '<div class="q-card-actions"><slot /></div>',
           },
-          'q-btn': {
-            template: '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']"><slot /></button>'
-          }
-        }
+          "q-btn": {
+            template:
+              "<button @click=\"$emit('click')\" :data-test=\"$attrs['data-test']\"><slot /></button>",
+          },
+        },
       },
     });
   });
@@ -110,14 +111,14 @@ describe("ConfirmDialog", async () => {
   });
 
   it("should call onCancel method", () => {
-    const onCancelSpy = vi.spyOn(wrapper.vm, 'onCancel');
+    const onCancelSpy = vi.spyOn(wrapper.vm, "onCancel");
     wrapper.vm.onCancel();
     expect(onCancelSpy).toHaveBeenCalledTimes(1);
     expect(wrapper.emitted("update:cancel")).toBeTruthy();
   });
 
   it("should call onConfirm method", () => {
-    const onConfirmSpy = vi.spyOn(wrapper.vm, 'onConfirm');
+    const onConfirmSpy = vi.spyOn(wrapper.vm, "onConfirm");
     wrapper.vm.onConfirm();
     expect(onConfirmSpy).toHaveBeenCalledTimes(1);
     expect(wrapper.emitted("update:ok")).toBeTruthy();

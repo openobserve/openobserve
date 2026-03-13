@@ -22,11 +22,11 @@ describe("validateTemplateBody", () => {
 
     it("should validate mixed placeholders from issue #8658", () => {
       const result = validateTemplateBody(
-        '[{"__name__": "xxx", "__type__": "counter", "label": "{aaa}", "value": {bbb}}]'
+        '[{"__name__": "xxx", "__type__": "counter", "label": "{aaa}", "value": {bbb}}]',
       );
       expect(result.valid).toBe(true);
       expect(result.transformed).toBe(
-        '[{"__name__": "xxx", "__type__": "counter", "label": "test", "value": 0}]'
+        '[{"__name__": "xxx", "__type__": "counter", "label": "test", "value": 0}]',
       );
     });
   });
@@ -52,12 +52,10 @@ describe("validateTemplateBody", () => {
 
     it("should validate complex nested array", () => {
       const result = validateTemplateBody(
-        '{"data": [{"id": {id}, "name": "{name}"}]}'
+        '{"data": [{"id": {id}, "name": "{name}"}]}',
       );
       expect(result.valid).toBe(true);
-      expect(result.transformed).toBe(
-        '{"data": [{"id": 0, "name": "test"}]}'
-      );
+      expect(result.transformed).toBe('{"data": [{"id": 0, "name": "test"}]}');
     });
   });
 
@@ -76,10 +74,12 @@ describe("validateTemplateBody", () => {
 
     it("should validate multiple nested placeholders", () => {
       const result = validateTemplateBody(
-        '{"level1": {"level2": {val1}, "level2b": {val2}}}'
+        '{"level1": {"level2": {val1}, "level2b": {val2}}}',
       );
       expect(result.valid).toBe(true);
-      expect(result.transformed).toBe('{"level1": {"level2": 0, "level2b": 0}}');
+      expect(result.transformed).toBe(
+        '{"level1": {"level2": 0, "level2b": 0}}',
+      );
     });
   });
 
@@ -249,7 +249,7 @@ describe("TEMPLATE_EXAMPLES", () => {
 
   it("should have simple alert example", () => {
     const simpleAlert = TEMPLATE_EXAMPLES.find(
-      (e) => e.name === "Simple Alert"
+      (e) => e.name === "Simple Alert",
     );
     expect(simpleAlert).toBeDefined();
     expect(simpleAlert?.template).toContain("{alert_name}");
@@ -257,7 +257,7 @@ describe("TEMPLATE_EXAMPLES", () => {
 
   it("should have metrics array example", () => {
     const metricsArray = TEMPLATE_EXAMPLES.find(
-      (e) => e.name === "Metrics Array"
+      (e) => e.name === "Metrics Array",
     );
     expect(metricsArray).toBeDefined();
     expect(metricsArray?.template).toContain("__name__");
@@ -265,7 +265,7 @@ describe("TEMPLATE_EXAMPLES", () => {
 
   it("should have complex nested example", () => {
     const complexNested = TEMPLATE_EXAMPLES.find(
-      (e) => e.name === "Complex Nested"
+      (e) => e.name === "Complex Nested",
     );
     expect(complexNested).toBeDefined();
     expect(complexNested?.template).toContain("metrics");

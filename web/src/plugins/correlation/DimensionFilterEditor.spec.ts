@@ -176,7 +176,9 @@ describe("DimensionFilterEditor.vue", () => {
 
     it("should accept currentFilters prop", () => {
       wrapper = createWrapper();
-      expect(wrapper.props().currentFilters).toEqual(defaultProps.currentFilters);
+      expect(wrapper.props().currentFilters).toEqual(
+        defaultProps.currentFilters,
+      );
     });
   });
 
@@ -218,8 +220,12 @@ describe("DimensionFilterEditor.vue", () => {
 
     it("should initialize with matched dimensions", () => {
       wrapper = createWrapper();
-      expect(Object.keys(wrapper.props().matchedDimensions)).toContain("service");
-      expect(Object.keys(wrapper.props().matchedDimensions)).toContain("environment");
+      expect(Object.keys(wrapper.props().matchedDimensions)).toContain(
+        "service",
+      );
+      expect(Object.keys(wrapper.props().matchedDimensions)).toContain(
+        "environment",
+      );
     });
 
     it("should have dialog component for matched dimensions", () => {
@@ -252,8 +258,12 @@ describe("DimensionFilterEditor.vue", () => {
 
     it("should initialize with additional dimensions", () => {
       wrapper = createWrapper();
-      expect(Object.keys(wrapper.props().additionalDimensions)).toContain("region");
-      expect(Object.keys(wrapper.props().additionalDimensions)).toContain("cluster");
+      expect(Object.keys(wrapper.props().additionalDimensions)).toContain(
+        "region",
+      );
+      expect(Object.keys(wrapper.props().additionalDimensions)).toContain(
+        "cluster",
+      );
     });
 
     it("should track additional dimension keys", () => {

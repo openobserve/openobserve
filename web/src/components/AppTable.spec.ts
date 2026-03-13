@@ -175,7 +175,9 @@ describe("AppTable", () => {
 
     it("should show pagination components", () => {
       const wrapper = createWrapper();
-      const paginationComponents = wrapper.findAllComponents({ name: "QTablePagination" });
+      const paginationComponents = wrapper.findAllComponents({
+        name: "QTablePagination",
+      });
       expect(paginationComponents.length).toBeGreaterThan(0);
     });
 
@@ -188,7 +190,7 @@ describe("AppTable", () => {
     it("should show bottom pagination with title when enabled", () => {
       const wrapper = createWrapper({
         showBottomPaginationWithTitle: true,
-        title: "Items"
+        title: "Items",
       });
       expect(wrapper.text()).toContain("3 Items");
     });
@@ -209,7 +211,7 @@ describe("AppTable", () => {
         { label: "50", value: 50 },
         { label: "100", value: 100 },
         { label: "250", value: 250 },
-        { label: "500", value: 500 }
+        { label: "500", value: 500 },
       ]);
     });
   });
@@ -230,7 +232,7 @@ describe("AppTable", () => {
     it("should emit update:selected when selection changes", async () => {
       const wrapper = createWrapper({
         selection: "multiple",
-        selected: []
+        selected: [],
       });
 
       wrapper.vm.selectedRows = [mockRows[0]];
@@ -244,7 +246,7 @@ describe("AppTable", () => {
       const selected = [mockRows[0]];
       const wrapper = createWrapper({
         selection: "multiple",
-        selected
+        selected,
       });
 
       expect(wrapper.vm.selectedRows).toEqual(selected);
@@ -260,7 +262,7 @@ describe("AppTable", () => {
       expect(wrapper.emitted("event-emitted")).toBeTruthy();
       expect(wrapper.emitted("event-emitted")?.[0]).toEqual([
         "cell-click",
-        { columnName: "name", row: mockRows[0] }
+        { columnName: "name", row: mockRows[0] },
       ]);
     });
 
@@ -271,14 +273,22 @@ describe("AppTable", () => {
       await wrapper.vm.onScroll(scrollEvent);
 
       expect(wrapper.emitted("event-emitted")).toBeTruthy();
-      expect(wrapper.emitted("event-emitted")?.[0]).toEqual(["scroll", scrollEvent]);
+      expect(wrapper.emitted("event-emitted")?.[0]).toEqual([
+        "scroll",
+        scrollEvent,
+      ]);
     });
   });
 
   describe("Column Features", () => {
     it("should render slot columns when col.slot is true", () => {
       const columnsWithSlot = [
-        { name: "custom", label: "Custom", slot: true, slotName: "custom-slot" },
+        {
+          name: "custom",
+          label: "Custom",
+          slot: true,
+          slotName: "custom-slot",
+        },
       ];
       const wrapper = mount(AppTable, {
         props: {
@@ -287,7 +297,8 @@ describe("AppTable", () => {
           virtualScroll: false, // Disable virtual scroll for DOM rendering
         },
         slots: {
-          "custom-slot": '<div class="custom-slot-content">Custom Content</div>',
+          "custom-slot":
+            '<div class="custom-slot-content">Custom Content</div>',
         },
         global: {
           stubs: {
@@ -309,7 +320,10 @@ describe("AppTable", () => {
         ...mockColumns,
         { name: "actions", label: "Actions", type: "action", icon: "delete" },
       ];
-      const wrapper = createWrapper({ columns: columnsWithAction, virtualScroll: false });
+      const wrapper = createWrapper({
+        columns: columnsWithAction,
+        virtualScroll: false,
+      });
 
       const icons = wrapper.findAllComponents({ name: "QIcon" });
       expect(icons.length).toBeGreaterThan(0);
@@ -337,9 +351,18 @@ describe("AppTable", () => {
   describe("Row Expansion", () => {
     it("should render expandable row structure", () => {
       const rowsWithExpand = [
-        { id: 1, name: "Item 1", status: "active", expand: true, slotName: "expand-slot" },
+        {
+          id: 1,
+          name: "Item 1",
+          status: "active",
+          expand: true,
+          slotName: "expand-slot",
+        },
       ];
-      const wrapper = createWrapper({ rows: rowsWithExpand, virtualScroll: false });
+      const wrapper = createWrapper({
+        rows: rowsWithExpand,
+        virtualScroll: false,
+      });
 
       // Verify rows are passed to QTable
       const qTable = wrapper.findComponent({ name: "QTable" });
@@ -362,8 +385,8 @@ describe("AppTable", () => {
       const filter = {
         value: "Item 1",
         method: (rows: any[], terms: string) => {
-          return rows.filter(row => row.name.includes(terms));
-        }
+          return rows.filter((row) => row.name.includes(terms));
+        },
       };
       const wrapper = createWrapper({ filter });
       const qTable = wrapper.findComponent({ name: "QTable" });
@@ -386,7 +409,9 @@ describe("AppTable", () => {
 
       expect(wrapper.vm.resultTotal).toBe(3);
 
-      await wrapper.setProps({ rows: [...mockRows, { id: 4, name: "Item 4", status: "active" }] });
+      await wrapper.setProps({
+        rows: [...mockRows, { id: 4, name: "Item 4", status: "active" }],
+      });
 
       expect(wrapper.vm.resultTotal).toBe(4);
     });
@@ -410,7 +435,8 @@ describe("AppTable", () => {
           rows: mockRows,
         },
         slots: {
-          "bottom-actions": '<button class="action-button">Custom Action</button>',
+          "bottom-actions":
+            '<button class="action-button">Custom Action</button>',
         },
         global: {
           stubs: {

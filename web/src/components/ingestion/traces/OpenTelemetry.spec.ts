@@ -25,8 +25,8 @@ import i18n from "@/locales";
 vi.mock("@/aws-exports", () => ({
   default: {
     isCloud: "false",
-    enableAnalytics: "true"
-  }
+    enableAnalytics: "true",
+  },
 }));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
@@ -37,11 +37,11 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
     getIngestionURL: vi.fn(() => "http://localhost:5080"),
     getEndPoint: vi.fn((url: string) => ({
       url: "http://localhost:5080",
-      host: "localhost:5080", 
+      host: "localhost:5080",
       port: "5080",
       protocol: "http",
-      tls: false
-    }))
+      tls: false,
+    })),
   };
 });
 
@@ -52,7 +52,7 @@ describe("OpenTelemetry Component", () => {
 
   const mockProps = {
     currOrgIdentifier: "test-org",
-    currUserEmail: "test@example.com"
+    currUserEmail: "test@example.com",
   };
 
   beforeEach(() => {
@@ -61,9 +61,9 @@ describe("OpenTelemetry Component", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          "CopyContent": true
-        }
-      }
+          CopyContent: true,
+        },
+      },
     });
 
     // Reset mocks
@@ -87,8 +87,8 @@ describe("OpenTelemetry Component", () => {
     });
 
     it("should initialize with correct props", () => {
-      expect(wrapper.props('currOrgIdentifier')).toBe("test-org");
-      expect(wrapper.props('currUserEmail')).toBe("test@example.com");
+      expect(wrapper.props("currOrgIdentifier")).toBe("test-org");
+      expect(wrapper.props("currUserEmail")).toBe("test@example.com");
     });
 
     it("should initialize store instance", () => {
@@ -98,12 +98,12 @@ describe("OpenTelemetry Component", () => {
 
     it("should initialize config object", () => {
       expect(wrapper.vm.config).toBeTruthy();
-      expect(typeof wrapper.vm.config).toBe('object');
+      expect(typeof wrapper.vm.config).toBe("object");
     });
 
     it("should initialize getImageURL function", () => {
       expect(wrapper.vm.getImageURL).toBeTruthy();
-      expect(typeof wrapper.vm.getImageURL).toBe('function');
+      expect(typeof wrapper.vm.getImageURL).toBe("function");
     });
 
     it("should have CopyContent component registered", () => {
@@ -115,11 +115,11 @@ describe("OpenTelemetry Component", () => {
   describe("Endpoint Configuration", () => {
     it("should initialize endpoint object with correct structure", () => {
       expect(wrapper.vm.endpoint).toBeTruthy();
-      expect(wrapper.vm.endpoint).toHaveProperty('url');
-      expect(wrapper.vm.endpoint).toHaveProperty('host');
-      expect(wrapper.vm.endpoint).toHaveProperty('port');
-      expect(wrapper.vm.endpoint).toHaveProperty('protocol');
-      expect(wrapper.vm.endpoint).toHaveProperty('tls');
+      expect(wrapper.vm.endpoint).toHaveProperty("url");
+      expect(wrapper.vm.endpoint).toHaveProperty("host");
+      expect(wrapper.vm.endpoint).toHaveProperty("port");
+      expect(wrapper.vm.endpoint).toHaveProperty("protocol");
+      expect(wrapper.vm.endpoint).toHaveProperty("tls");
     });
 
     it("should set correct endpoint URL", () => {
@@ -148,7 +148,7 @@ describe("OpenTelemetry Component", () => {
     });
 
     it("should call getEndPoint utility function", () => {
-      // Test that the endpoint is properly configured 
+      // Test that the endpoint is properly configured
       expect(wrapper.vm.endpoint.url).toBe("http://localhost:5080");
       expect(wrapper.vm.endpoint.host).toBe("localhost:5080");
     });
@@ -181,11 +181,11 @@ describe("OpenTelemetry Component", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "CopyContent": true
-          }
-        }
+            CopyContent: true,
+          },
+        },
       });
-      
+
       // The URL should contain the organization identifier from the store
       expect(testWrapper.vm.copyHTTPTracesContentURL).toMatch(/\/api\/[^\/]+$/);
       testWrapper.unmount();
@@ -197,7 +197,9 @@ describe("OpenTelemetry Component", () => {
     });
 
     it("should use Basic authentication format", () => {
-      expect(wrapper.vm.copyHTTPTracesContentPasscode).toMatch(/^Basic \[BASIC_PASSCODE\]$/);
+      expect(wrapper.vm.copyHTTPTracesContentPasscode).toMatch(
+        /^Basic \[BASIC_PASSCODE\]$/,
+      );
     });
   });
 
@@ -215,19 +217,27 @@ describe("OpenTelemetry Component", () => {
     });
 
     it("should include correct endpoint host in gRPC content", () => {
-      expect(wrapper.vm.copyGRPCTracesContent).toContain("endpoint: localhost:5080");
+      expect(wrapper.vm.copyGRPCTracesContent).toContain(
+        "endpoint: localhost:5080",
+      );
     });
 
     it("should include correct authorization in gRPC content", () => {
-      expect(wrapper.vm.copyGRPCTracesContent).toContain('Authorization: "Basic [BASIC_PASSCODE]"');
+      expect(wrapper.vm.copyGRPCTracesContent).toContain(
+        'Authorization: "Basic [BASIC_PASSCODE]"',
+      );
     });
 
     it("should include correct organization in gRPC content", () => {
-      expect(wrapper.vm.copyGRPCTracesContent).toContain("organization: default");
+      expect(wrapper.vm.copyGRPCTracesContent).toContain(
+        "organization: default",
+      );
     });
 
     it("should include default stream name in gRPC content", () => {
-      expect(wrapper.vm.copyGRPCTracesContent).toContain("stream-name: default");
+      expect(wrapper.vm.copyGRPCTracesContent).toContain(
+        "stream-name: default",
+      );
     });
 
     it("should set insecure to true when protocol is http", () => {
@@ -241,14 +251,14 @@ describe("OpenTelemetry Component", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "CopyContent": true
-          }
-        }
+            CopyContent: true,
+          },
+        },
       });
-      
+
       // Mock the endpoint to be HTTPS
       httpsWrapper.vm.endpoint.protocol = "https";
-      
+
       // Regenerate the gRPC content
       const httpsGRPCContent = `endpoint: ${httpsWrapper.vm.endpoint.host}
 headers: 
@@ -257,18 +267,20 @@ headers:
   stream-name: default
 tls:
   insecure: ${httpsWrapper.vm.endpoint.protocol == "https" ? false : true}`;
-      
+
       expect(httpsGRPCContent).toContain("insecure: false");
       httpsWrapper.unmount();
     });
 
     it("should generate multi-line gRPC content", () => {
-      const lines = wrapper.vm.copyGRPCTracesContent.split('\n');
+      const lines = wrapper.vm.copyGRPCTracesContent.split("\n");
       expect(lines.length).toBeGreaterThan(5);
     });
 
     it("should use organization identifier from store in gRPC content", () => {
-      expect(wrapper.vm.copyGRPCTracesContent).toContain("organization: default");
+      expect(wrapper.vm.copyGRPCTracesContent).toContain(
+        "organization: default",
+      );
     });
   });
 
@@ -289,10 +301,12 @@ tls:
     });
 
     it("should pass correct HTTP URL to first CopyContent", () => {
-      const copyComponents = wrapper.findAll('CopyContent-stub');
+      const copyComponents = wrapper.findAll("CopyContent-stub");
       if (copyComponents.length > 0) {
         const firstCopy = copyComponents[0];
-        expect(firstCopy.attributes('content')).toBe(wrapper.vm.copyHTTPTracesContentURL);
+        expect(firstCopy.attributes("content")).toBe(
+          wrapper.vm.copyHTTPTracesContentURL,
+        );
       } else {
         // Test that content is generated correctly even if component is stubbed
         expect(wrapper.vm.copyHTTPTracesContentURL).toBeTruthy();
@@ -300,10 +314,12 @@ tls:
     });
 
     it("should pass correct HTTP passcode to second CopyContent", () => {
-      const copyComponents = wrapper.findAll('CopyContent-stub');
+      const copyComponents = wrapper.findAll("CopyContent-stub");
       if (copyComponents.length > 1) {
         const secondCopy = copyComponents[1];
-        expect(secondCopy.attributes('content')).toBe(wrapper.vm.copyHTTPTracesContentPasscode);
+        expect(secondCopy.attributes("content")).toBe(
+          wrapper.vm.copyHTTPTracesContentPasscode,
+        );
       } else {
         // Test that content is generated correctly even if component is stubbed
         expect(wrapper.vm.copyHTTPTracesContentPasscode).toBeTruthy();
@@ -317,10 +333,12 @@ tls:
     });
 
     it("should pass gRPC content to third CopyContent", () => {
-      const copyComponents = wrapper.findAll('CopyContent-stub');
+      const copyComponents = wrapper.findAll("CopyContent-stub");
       if (copyComponents.length > 2) {
         const thirdCopy = copyComponents[2];
-        expect(thirdCopy.attributes('content')).toBe(wrapper.vm.copyGRPCTracesContent);
+        expect(thirdCopy.attributes("content")).toBe(
+          wrapper.vm.copyGRPCTracesContent,
+        );
       } else {
         // Test that content is generated correctly even if component is stubbed
         expect(wrapper.vm.copyGRPCTracesContent).toBeTruthy();
@@ -328,26 +346,34 @@ tls:
     });
 
     it("should render proper display content for HTTP endpoint", () => {
-      const copyComponents = wrapper.findAll('CopyContent-stub');
+      const copyComponents = wrapper.findAll("CopyContent-stub");
       if (copyComponents.length > 0) {
         const firstCopy = copyComponents[0];
-        expect(firstCopy.attributes('displaycontent')).toContain('HTTP Endpoint:');
-        expect(firstCopy.attributes('displaycontent')).toContain(wrapper.vm.copyHTTPTracesContentURL);
+        expect(firstCopy.attributes("displaycontent")).toContain(
+          "HTTP Endpoint:",
+        );
+        expect(firstCopy.attributes("displaycontent")).toContain(
+          wrapper.vm.copyHTTPTracesContentURL,
+        );
       } else {
         // Test that content is generated correctly
-        expect(wrapper.vm.copyHTTPTracesContentURL).toContain('http');
+        expect(wrapper.vm.copyHTTPTracesContentURL).toContain("http");
       }
     });
 
     it("should render proper display content for authorization", () => {
-      const copyComponents = wrapper.findAll('CopyContent-stub');
+      const copyComponents = wrapper.findAll("CopyContent-stub");
       if (copyComponents.length > 1) {
         const secondCopy = copyComponents[1];
-        expect(secondCopy.attributes('displaycontent')).toContain('Authorization:');
-        expect(secondCopy.attributes('displaycontent')).toContain(wrapper.vm.copyHTTPTracesContentPasscode);
+        expect(secondCopy.attributes("displaycontent")).toContain(
+          "Authorization:",
+        );
+        expect(secondCopy.attributes("displaycontent")).toContain(
+          wrapper.vm.copyHTTPTracesContentPasscode,
+        );
       } else {
         // Test that content is generated correctly
-        expect(wrapper.vm.copyHTTPTracesContentPasscode).toContain('Basic');
+        expect(wrapper.vm.copyHTTPTracesContentPasscode).toContain("Basic");
       }
     });
   });
@@ -367,11 +393,11 @@ tls:
         global: {
           plugins: [store, i18n],
           stubs: {
-            "CopyContent": true
-          }
-        }
+            CopyContent: true,
+          },
+        },
       });
-      
+
       expect(noPropsWrapper.props().currOrgIdentifier).toBeUndefined();
       noPropsWrapper.unmount();
     });
@@ -381,11 +407,11 @@ tls:
         global: {
           plugins: [store, i18n],
           stubs: {
-            "CopyContent": true
-          }
-        }
+            CopyContent: true,
+          },
+        },
       });
-      
+
       expect(noPropsWrapper.props().currUserEmail).toBeUndefined();
       noPropsWrapper.unmount();
     });
@@ -396,11 +422,11 @@ tls:
         global: {
           plugins: [store, i18n],
           stubs: {
-            "CopyContent": true
-          }
-        }
+            CopyContent: true,
+          },
+        },
       });
-      
+
       expect(testWrapper.props().currOrgIdentifier).toBe("different-org");
       testWrapper.unmount();
     });
@@ -411,11 +437,11 @@ tls:
         global: {
           plugins: [store, i18n],
           stubs: {
-            "CopyContent": true
-          }
-        }
+            CopyContent: true,
+          },
+        },
       });
-      
+
       expect(testWrapper.props().currUserEmail).toBe("different@email.com");
       testWrapper.unmount();
     });
@@ -435,15 +461,15 @@ tls:
     it("should integrate with getIngestionURL", () => {
       // Test that the function produces the expected result
       expect(wrapper.vm.ingestionURL).toBeTruthy();
-      expect(typeof wrapper.vm.ingestionURL).toBe('string');
+      expect(typeof wrapper.vm.ingestionURL).toBe("string");
     });
 
     it("should integrate with getEndPoint", () => {
       // Test that the endpoint object is properly structured
-      expect(wrapper.vm.endpoint).toHaveProperty('url');
-      expect(wrapper.vm.endpoint).toHaveProperty('host');
-      expect(wrapper.vm.endpoint).toHaveProperty('port');
-      expect(wrapper.vm.endpoint).toHaveProperty('protocol');
+      expect(wrapper.vm.endpoint).toHaveProperty("url");
+      expect(wrapper.vm.endpoint).toHaveProperty("host");
+      expect(wrapper.vm.endpoint).toHaveProperty("port");
+      expect(wrapper.vm.endpoint).toHaveProperty("protocol");
     });
   });
 
@@ -456,11 +482,11 @@ tls:
         global: {
           plugins: [store, i18n],
           stubs: {
-            "CopyContent": true
-          }
-        }
+            CopyContent: true,
+          },
+        },
       });
-      
+
       expect(emptyOrgWrapper.vm.copyHTTPTracesContentURL).toBeTruthy();
       expect(emptyOrgWrapper.vm.copyGRPCTracesContent).toBeTruthy();
       emptyOrgWrapper.unmount();
@@ -479,9 +505,9 @@ tls:
         host: null,
         port: null,
         protocol: null,
-        tls: null
+        tls: null,
       };
-      
+
       // Component should still render without crashing
       expect(wrapper.vm.endpoint).toBeTruthy();
     });
@@ -490,13 +516,14 @@ tls:
       // The component should handle organization identifiers with special characters
       const url = wrapper.vm.copyHTTPTracesContentURL;
       expect(url).toBeTruthy();
-      expect(typeof url).toBe('string');
+      expect(typeof url).toBe("string");
     });
 
     it("should maintain content consistency", () => {
       // HTTP and gRPC content should use the same organization identifier
-      const httpOrg = wrapper.vm.copyHTTPTracesContentURL.split('/').pop();
-      const gRPCOrg = wrapper.vm.copyGRPCTracesContent.match(/organization: (.*)/)[1];
+      const httpOrg = wrapper.vm.copyHTTPTracesContentURL.split("/").pop();
+      const gRPCOrg =
+        wrapper.vm.copyGRPCTracesContent.match(/organization: (.*)/)[1];
       expect(httpOrg).toBe(gRPCOrg);
     });
 
@@ -508,20 +535,20 @@ tls:
           global: {
             plugins: [store, i18n],
             stubs: {
-              "CopyContent": true
-            }
-          }
+              CopyContent: true,
+            },
+          },
         });
       }).not.toThrow();
     });
 
     it("should handle reactive data updates", async () => {
       const initialURL = wrapper.vm.copyHTTPTracesContentURL;
-      
+
       // Simulate endpoint change
       wrapper.vm.endpoint.url = "https://new-host:443";
       await nextTick();
-      
+
       // The URL should still be accessible
       expect(wrapper.vm.copyHTTPTracesContentURL).toBeTruthy();
     });
@@ -531,12 +558,14 @@ tls:
   describe("Component Integration", () => {
     it("should integrate properly with Vuex store", () => {
       expect(wrapper.vm.store.state.selectedOrganization).toBeTruthy();
-      expect(wrapper.vm.store.state.selectedOrganization.identifier).toBe("default");
+      expect(wrapper.vm.store.state.selectedOrganization.identifier).toBe(
+        "default",
+      );
     });
 
     it("should maintain data consistency across all content types", () => {
       const orgId = wrapper.vm.store.state.selectedOrganization.identifier;
-      
+
       expect(wrapper.vm.copyHTTPTracesContentURL).toContain(orgId);
       expect(wrapper.vm.copyGRPCTracesContent).toContain(orgId);
     });
@@ -545,7 +574,7 @@ tls:
       // Verify initial state
       expect(wrapper.vm.copyHTTPTracesContentURL).toBeTruthy();
       expect(wrapper.vm.copyGRPCTracesContent).toBeTruthy();
-      
+
       // Content should remain valid
       expect(wrapper.vm.copyHTTPTracesContentURL.length).toBeGreaterThan(0);
       expect(wrapper.vm.copyGRPCTracesContent.length).toBeGreaterThan(0);

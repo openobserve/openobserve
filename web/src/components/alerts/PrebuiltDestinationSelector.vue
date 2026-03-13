@@ -35,11 +35,8 @@ limitations under the License. -->
               :alt="type.name"
               class="destination-logo"
             />
-            <q-icon
-              v-else
-              :name="getIconName(type.icon)"
-              size="1.5rem"
-            />
+            <q-icon v-else :name="getIconName(type.icon)"
+size="1.5rem" />
           </div>
 
           <!-- Name -->
@@ -53,11 +50,9 @@ limitations under the License. -->
           </p>
 
           <!-- Selection Indicator -->
-          <div
-            v-if="selectedType === type.id"
-            class="check-icon"
-          >
-            <q-icon name="check_circle" size="1.25rem" color="positive" />
+          <div v-if="selectedType === type.id" class="check-icon">
+            <q-icon name="check_circle"
+size="1.25rem" color="positive" />
           </div>
         </div>
       </div>
@@ -75,16 +70,14 @@ limitations under the License. -->
             <q-icon name="settings" size="1.5rem" />
           </div>
           <h3 data-test="destination-type-name" class="card-title">
-            {{ t('alerts.customDestination') }}
+            {{ t("alerts.customDestination") }}
           </h3>
           <p data-test="destination-type-description" class="card-description">
-            {{ t('alerts.customDestinationDescription') }}
+            {{ t("alerts.customDestinationDescription") }}
           </p>
-          <div
-            v-if="selectedType === 'custom'"
-            class="check-icon"
-          >
-            <q-icon name="check_circle" size="1.25rem" color="positive" />
+          <div v-if="selectedType === 'custom'" class="check-icon">
+            <q-icon name="check_circle"
+size="1.25rem" color="positive" />
           </div>
         </div>
       </div>
@@ -93,24 +86,24 @@ limitations under the License. -->
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { PREBUILT_DESTINATION_TYPES } from '@/utils/prebuilt-templates';
-import type { PrebuiltTypeId } from '@/utils/prebuilt-templates/types';
+import { computed } from "vue";
+import { useI18n } from "vue-i18n";
+import { PREBUILT_DESTINATION_TYPES } from "@/utils/prebuilt-templates";
+import type { PrebuiltTypeId } from "@/utils/prebuilt-templates/types";
 
 // Define component props
 interface Props {
-  modelValue?: PrebuiltTypeId | 'custom' | null;
+  modelValue?: PrebuiltTypeId | "custom" | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  modelValue: null
+  modelValue: null,
 });
 
 // Define component emits
 interface Emits {
-  (e: 'update:modelValue', value: PrebuiltTypeId | 'custom' | null): void;
-  (e: 'select', value: PrebuiltTypeId | 'custom'): void;
+  (e: "update:modelValue", value: PrebuiltTypeId | "custom" | null): void;
+  (e: "select", value: PrebuiltTypeId | "custom"): void;
 }
 
 const emit = defineEmits<Emits>();
@@ -121,29 +114,29 @@ const { t } = useI18n();
 // Reactive state
 const selectedType = computed({
   get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value)
+  set: (value) => emit("update:modelValue", value),
 });
 
 // Computed properties
 const filteredDestinationTypes = computed(() => PREBUILT_DESTINATION_TYPES);
 
 // Methods
-function selectType(typeId: PrebuiltTypeId | 'custom') {
+function selectType(typeId: PrebuiltTypeId | "custom") {
   selectedType.value = typeId;
-  emit('select', typeId);
+  emit("select", typeId);
 }
 
 function getIconName(icon: string): string {
   // Map destination type icons to Quasar icon names
   const iconMap: Record<string, string> = {
-    slack: 'chat',
-    discord: 'forum',
-    msteams: 'groups',
-    email: 'email',
-    pagerduty: 'warning',
-    opsgenie: 'notifications_active',
-    servicenow: 'support_agent',
-    custom: 'settings'
+    slack: "chat",
+    discord: "forum",
+    msteams: "groups",
+    email: "email",
+    pagerduty: "warning",
+    opsgenie: "notifications_active",
+    servicenow: "support_agent",
+    custom: "settings",
   };
 
   return iconMap[icon] || icon;
@@ -241,5 +234,4 @@ function getIconName(icon: string): string {
     }
   }
 }
-
 </style>

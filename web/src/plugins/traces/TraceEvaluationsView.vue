@@ -15,6 +15,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
 <template>
   <div class="eval-container">
+    <!-- Template Selector -->
+    <div class="eval-template-selector">
+      <div class="eval-template-label">Evaluation Template:</div>
+      <q-select
+        v-model="selectedTemplate"
+        :options="availableTemplates"
+        option-value="agent_type"
+        option-label="name"
+        emit-value
+        map-options
+        dense
+        outlined
+        class="eval-template-dropdown"
+        @update:model-value="onTemplateChange"
+      >
+        <template v-slot:prepend>
+          <q-icon name="assignment" />
+        </template>
+        <template v-slot:no-option>
+          <q-item>
+            <q-item-section class="text-grey">
+              No templates available
+            </q-item-section>
+          </q-item>
+        </template>
+      </q-select>
+    </div>
+
     <!-- Loading state -->
     <div v-if="isLoading" class="eval-loading">
       <q-spinner color="primary" size="60px" />
@@ -27,17 +55,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
         <q-icon name="assessment" />
       </div>
       <div class="eval-empty-title">No Evaluation Data</div>
-      <div class="eval-empty-subtitle">This trace hasn't been evaluated yet. Configure LLM evaluation for this stream to see quality scores and analysis.</div>
+      <div class="eval-empty-subtitle">
+        This trace hasn't been evaluated yet. Configure LLM evaluation for this
+        stream to see quality scores and analysis.
+      </div>
     </div>
 
     <!-- Evaluation records -->
     <template v-else>
-      <div v-for="(record, idx) in evalData" :key="idx" class="eval-record">
+      <div v-for="(record, idx) in evalData"
+:key="idx" class="eval-record">
         <!-- Compact Header with Score -->
         <div class="eval-header-compact">
-          <div class="eval-score-badge" :class="getScoreClass(record.llm_evaluation_quality_score)">
+          <div
+            class="eval-score-badge"
+            :class="getScoreClass(record.llm_evaluation_quality_score)"
+          >
             <div class="eval-score-number">
-              {{ formatScore(record.llm_evaluation_quality_score).replace('%', '') }}
+              {{
+                formatScore(record.llm_evaluation_quality_score).replace(
+                  "%",
+                  "",
+                )
+              }}
             </div>
             <div class="eval-score-label">Quality</div>
           </div>
@@ -46,21 +86,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             <div class="eval-header-row">
               <q-badge
                 v-if="record.llm_evaluation_judge_verdict"
-                :color="record.llm_evaluation_judge_verdict === 'PASS' ? 'positive' : 'negative'"
+                :color="
+                  record.llm_evaluation_judge_verdict === 'PASS'
+                    ? 'positive'
+                    : 'negative'
+                "
                 :label="record.llm_evaluation_judge_verdict"
                 class="eval-verdict-badge"
               />
-              <span v-if="record.llm_evaluation_judge_confidence" class="eval-confidence-text">
-                {{ formatScore(record.llm_evaluation_judge_confidence) }} confidence
+              <span
+                v-if="record.llm_evaluation_judge_confidence"
+                class="eval-confidence-text"
+              >
+                {{ formatScore(record.llm_evaluation_judge_confidence) }}
+                confidence
               </span>
             </div>
             <div class="eval-header-row eval-judge-row">
-              <span class="eval-judge-label">Evaluated by {{ record.llm_evaluation_judge_model || 'LLM Judge' }}</span>
-              <span class="eval-time-text">{{ formatTimestampDisplay(record._timestamp) }}</span>
+              <span class="eval-judge-label"
+                >Evaluated by
+                {{ record.llm_evaluation_judge_model || "LLM Judge" }}</span
+              >
+              <span class="eval-time-text">{{
+                formatTimestampDisplay(record._timestamp)
+              }}</span>
             </div>
           </div>
 
-          <div class="eval-aggregate-mini" v-if="record.llm_evaluation_judge_aggregate_score != null">
+          <div
+            class="eval-aggregate-mini"
+            v-if="record.llm_evaluation_judge_aggregate_score != null"
+          >
             <div class="eval-aggregate-mini-label">Aggregate</div>
             <div class="eval-aggregate-mini-value">
               {{ formatScore(record.llm_evaluation_judge_aggregate_score) }}
@@ -68,7 +124,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             <div class="eval-aggregate-mini-bar">
               <div
                 class="eval-aggregate-mini-fill"
-                :style="{ width: (parseFloat(record.llm_evaluation_judge_aggregate_score) * 100) + '%' }"
+                :style="{
+                  width:
+                    parseFloat(record.llm_evaluation_judge_aggregate_score) *
+                      100 +
+                    '%',
+                }"
               ></div>
             </div>
           </div>
@@ -83,13 +144,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               class="eval-dimension-compact"
             >
               <div class="eval-dimension-header-compact">
-                <q-icon name="done_all" color="primary" size="xs" />
+                <q-icon name="done_all"
+color="primary" size="xs" />
                 <span class="eval-dimension-name">Relevance</span>
               </div>
-              <div class="eval-dimension-bar-compact" :style="{ '--bar-color': '#2196F3' }">
+              <div
+                class="eval-dimension-bar-compact"
+                :style="{ '--bar-color': '#2196F3' }"
+              >
                 <div
                   class="eval-dimension-bar-fill"
-                  :style="{ width: getBarWidth(record.llm_evaluation_judge_relevance) }"
+                  :style="{
+                    width: getBarWidth(record.llm_evaluation_judge_relevance),
+                  }"
                 ></div>
               </div>
               <div class="eval-dimension-score-compact">
@@ -102,13 +169,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               class="eval-dimension-compact"
             >
               <div class="eval-dimension-header-compact">
-                <q-icon name="verified" color="positive" size="xs" />
+                <q-icon name="verified"
+color="positive" size="xs" />
                 <span class="eval-dimension-name">Groundedness</span>
               </div>
-              <div class="eval-dimension-bar-compact" :style="{ '--bar-color': '#4CAF50' }">
+              <div
+                class="eval-dimension-bar-compact"
+                :style="{ '--bar-color': '#4CAF50' }"
+              >
                 <div
                   class="eval-dimension-bar-fill"
-                  :style="{ width: getBarWidth(record.llm_evaluation_judge_groundedness) }"
+                  :style="{
+                    width: getBarWidth(
+                      record.llm_evaluation_judge_groundedness,
+                    ),
+                  }"
                 ></div>
               </div>
               <div class="eval-dimension-score-compact">
@@ -121,13 +196,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               class="eval-dimension-compact"
             >
               <div class="eval-dimension-header-compact">
-                <q-icon name="summarize" color="deep-purple" size="xs" />
+                <q-icon name="summarize"
+color="deep-purple" size="xs" />
                 <span class="eval-dimension-name">Conciseness</span>
               </div>
-              <div class="eval-dimension-bar-compact" :style="{ '--bar-color': '#9C27B0' }">
+              <div
+                class="eval-dimension-bar-compact"
+                :style="{ '--bar-color': '#9C27B0' }"
+              >
                 <div
                   class="eval-dimension-bar-fill"
-                  :style="{ width: getBarWidth(record.llm_evaluation_judge_conciseness) }"
+                  :style="{
+                    width: getBarWidth(record.llm_evaluation_judge_conciseness),
+                  }"
                 ></div>
               </div>
               <div class="eval-dimension-score-compact">
@@ -140,17 +221,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               class="eval-dimension-compact"
             >
               <div class="eval-dimension-header-compact">
-                <q-icon name="rule" color="orange" size="xs" />
+                <q-icon name="rule"
+color="orange" size="xs" />
                 <span class="eval-dimension-name">Instructions</span>
               </div>
-              <div class="eval-dimension-bar-compact" :style="{ '--bar-color': '#FF9800' }">
+              <div
+                class="eval-dimension-bar-compact"
+                :style="{ '--bar-color': '#FF9800' }"
+              >
                 <div
                   class="eval-dimension-bar-fill"
-                  :style="{ width: getBarWidth(record.llm_evaluation_judge_instruction_following) }"
+                  :style="{
+                    width: getBarWidth(
+                      record.llm_evaluation_judge_instruction_following,
+                    ),
+                  }"
                 ></div>
               </div>
               <div class="eval-dimension-score-compact">
-                {{ formatScore(record.llm_evaluation_judge_instruction_following) }}
+                {{
+                  formatScore(record.llm_evaluation_judge_instruction_following)
+                }}
               </div>
             </div>
 
@@ -159,13 +250,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               class="eval-dimension-compact"
             >
               <div class="eval-dimension-header-compact">
-                <q-icon name="check_circle" color="negative" size="xs" />
+                <q-icon name="check_circle"
+color="negative" size="xs" />
                 <span class="eval-dimension-name">Accuracy</span>
               </div>
-              <div class="eval-dimension-bar-compact" :style="{ '--bar-color': '#F44336' }">
+              <div
+                class="eval-dimension-bar-compact"
+                :style="{ '--bar-color': '#F44336' }"
+              >
                 <div
                   class="eval-dimension-bar-fill"
-                  :style="{ width: getBarWidth(record.llm_evaluation_judge_accuracy) }"
+                  :style="{
+                    width: getBarWidth(record.llm_evaluation_judge_accuracy),
+                  }"
                 ></div>
               </div>
               <div class="eval-dimension-score-compact">
@@ -178,17 +275,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               class="eval-dimension-compact"
             >
               <div class="eval-dimension-header-compact">
-                <q-icon name="flash_on" color="info" size="xs" />
+                <q-icon name="flash_on"
+color="info" size="xs" />
                 <span class="eval-dimension-name">Efficiency</span>
               </div>
-              <div class="eval-dimension-bar-compact" :style="{ '--bar-color': '#00BCD4' }">
+              <div
+                class="eval-dimension-bar-compact"
+                :style="{ '--bar-color': '#00BCD4' }"
+              >
                 <div
                   class="eval-dimension-bar-fill"
-                  :style="{ width: getBarWidth(record.llm_evaluation_judge_trajectory_efficiency) }"
+                  :style="{
+                    width: getBarWidth(
+                      record.llm_evaluation_judge_trajectory_efficiency,
+                    ),
+                  }"
                 ></div>
               </div>
               <div class="eval-dimension-score-compact">
-                {{ formatScore(record.llm_evaluation_judge_trajectory_efficiency) }}
+                {{
+                  formatScore(record.llm_evaluation_judge_trajectory_efficiency)
+                }}
               </div>
             </div>
           </div>
@@ -201,42 +308,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             <div class="eval-column-title">Metadata</div>
             <div class="eval-info-grid">
               <div v-if="record.is_multi_step" class="eval-info-item">
-                <q-icon name="account_tree" color="primary" size="sm" class="eval-info-icon" />
+                <q-icon
+                  name="account_tree"
+                  color="primary"
+                  size="sm"
+                  class="eval-info-icon"
+                />
                 <div class="eval-info-content">
                   <span class="eval-info-label">Multi-step</span>
-                  <q-badge label="Yes" color="info" size="sm" />
+                  <q-badge label="Yes"
+color="info" size="sm" />
                 </div>
               </div>
               <div v-if="record.total_steps" class="eval-info-item">
-                <q-icon name="layers" color="primary" size="sm" class="eval-info-icon" />
+                <q-icon
+                  name="layers"
+                  color="primary"
+                  size="sm"
+                  class="eval-info-icon"
+                />
                 <div class="eval-info-content">
                   <span class="eval-info-label">Steps</span>
                   <span class="eval-info-value">{{ record.total_steps }}</span>
                 </div>
               </div>
               <div v-if="record.total_tool_calls" class="eval-info-item">
-                <q-icon name="build" color="primary" size="sm" class="eval-info-icon" />
+                <q-icon
+                  name="build"
+                  color="primary"
+                  size="sm"
+                  class="eval-info-icon"
+                />
                 <div class="eval-info-content">
                   <span class="eval-info-label">Tools</span>
-                  <span class="eval-info-value">{{ record.total_tool_calls }}</span>
+                  <span class="eval-info-value">{{
+                    record.total_tool_calls
+                  }}</span>
                 </div>
               </div>
               <div v-if="record.exit_status" class="eval-info-item">
-                <q-icon :name="record.exit_status === 'ok' ? 'check_circle' : 'error'" :color="record.exit_status === 'ok' ? 'positive' : 'negative'" size="sm" class="eval-info-icon" />
+                <q-icon
+                  :name="record.exit_status === 'ok' ? 'check_circle' : 'error'"
+                  :color="record.exit_status === 'ok' ? 'positive' : 'negative'"
+                  size="sm"
+                  class="eval-info-icon"
+                />
                 <div class="eval-info-content">
                   <span class="eval-info-label">Status</span>
                   <q-badge
-                    :color="record.exit_status === 'ok' ? 'positive' : 'negative'"
+                    :color="
+                      record.exit_status === 'ok' ? 'positive' : 'negative'
+                    "
                     :label="record.exit_status.toUpperCase()"
                     size="sm"
                   />
                 </div>
               </div>
               <div v-if="record.completion_signal" class="eval-info-item">
-                <q-icon name="done" color="primary" size="sm" class="eval-info-icon" />
+                <q-icon
+                  name="done"
+                  color="primary"
+                  size="sm"
+                  class="eval-info-icon"
+                />
                 <div class="eval-info-content">
                   <span class="eval-info-label">Completed</span>
-                  <span class="eval-info-value">{{ record.completion_signal }}</span>
+                  <span class="eval-info-value">{{
+                    record.completion_signal
+                  }}</span>
                 </div>
               </div>
             </div>
@@ -246,8 +385,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
           <div class="eval-column">
             <div class="eval-column-title">Issues & Analysis</div>
 
-            <div v-if="record.llm_evaluation_judge_failure_category" class="eval-analysis-item">
-              <q-icon name="category" color="warning" size="sm" />
+            <div
+              v-if="record.llm_evaluation_judge_failure_category"
+              class="eval-analysis-item"
+            >
+              <q-icon name="category"
+color="warning" size="sm" />
               <span class="eval-analysis-label">Category</span>
               <q-badge
                 color="warning"
@@ -256,17 +399,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               />
             </div>
 
-            <div v-if="record.llm_evaluation_judge_component_at_fault" class="eval-analysis-item">
-              <q-icon name="build" color="info" size="sm" />
+            <div
+              v-if="record.llm_evaluation_judge_component_at_fault"
+              class="eval-analysis-item"
+            >
+              <q-icon name="build"
+color="info" size="sm" />
               <span class="eval-analysis-label">Component</span>
-              <q-badge :label="record.llm_evaluation_judge_component_at_fault" color="info" />
+              <q-badge
+                :label="record.llm_evaluation_judge_component_at_fault"
+                color="info"
+              />
             </div>
 
-            <div v-if="record.llm_evaluation_judge_critical_issues" class="eval-analysis-item eval-issues-item">
+            <div
+              v-if="record.llm_evaluation_judge_critical_issues"
+              class="eval-analysis-item eval-issues-item"
+            >
               <div class="eval-analysis-label">Issues</div>
               <div class="eval-issues-compact">
                 <div
-                  v-for="(issue, i) in parseCriticalIssues(record.llm_evaluation_judge_critical_issues).slice(0, 3)"
+                  v-for="(issue, i) in parseCriticalIssues(
+                    record.llm_evaluation_judge_critical_issues,
+                  ).slice(0, 3)"
                   :key="i"
                   class="eval-issue-tag"
                 >
@@ -281,17 +436,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
           <div class="eval-column">
             <div class="eval-column-title">Recommendations</div>
 
-            <div v-if="record.llm_evaluation_judge_failure_rationale" class="eval-text-box eval-rationale-box">
+            <div
+              v-if="record.llm_evaluation_judge_failure_rationale"
+              class="eval-text-box eval-rationale-box"
+            >
               <div class="eval-text-label">Rationale</div>
               <div class="eval-text-value">
-                {{ truncateContent(record.llm_evaluation_judge_failure_rationale, 150) }}
+                {{
+                  truncateContent(
+                    record.llm_evaluation_judge_failure_rationale,
+                    150,
+                  )
+                }}
               </div>
             </div>
 
-            <div v-if="record.llm_evaluation_judge_suggested_fix" class="eval-text-box eval-fix-box">
+            <div
+              v-if="record.llm_evaluation_judge_suggested_fix"
+              class="eval-text-box eval-fix-box"
+            >
               <div class="eval-text-label">Suggested Fix</div>
               <div class="eval-text-value">
-                {{ truncateContent(record.llm_evaluation_judge_suggested_fix, 150) }}
+                {{
+                  truncateContent(
+                    record.llm_evaluation_judge_suggested_fix,
+                    150,
+                  )
+                }}
               </div>
             </div>
           </div>
@@ -303,14 +474,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
           <div class="eval-io-row">
             <div v-if="record.llm_input" class="eval-io-sections">
               <!-- System Prompt Section -->
-              <div v-if="parseMessages(record.llm_input).system" class="eval-io-section">
+              <div
+                v-if="parseMessages(record.llm_input).system"
+                class="eval-io-section"
+              >
                 <div class="eval-io-header">
-                  <q-icon name="settings" color="warning" size="sm" />
+                  <q-icon name="settings"
+color="warning" size="sm" />
                   <span>System Prompt</span>
                 </div>
                 <div class="eval-io-content-wrapper">
                   <LLMContentRenderer
-                    :content="JSON.stringify([{ role: 'system', content: parseMessages(record.llm_input).system }])"
+                    :content="
+                      JSON.stringify([
+                        {
+                          role: 'system',
+                          content: parseMessages(record.llm_input).system,
+                        },
+                      ])
+                    "
                     :contentType="'input'"
                     :viewMode="'formatted'"
                   />
@@ -318,14 +500,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               </div>
 
               <!-- User Messages Section -->
-              <div v-if="parseMessages(record.llm_input).user.length > 0" class="eval-io-section">
+              <div
+                v-if="parseMessages(record.llm_input).user.length > 0"
+                class="eval-io-section"
+              >
                 <div class="eval-io-header">
-                  <q-icon name="person" color="info" size="sm" />
+                  <q-icon name="person"
+color="info" size="sm" />
                   <span>User Messages</span>
                 </div>
                 <div class="eval-io-content-wrapper">
                   <LLMContentRenderer
-                    :content="JSON.stringify(parseMessages(record.llm_input).user)"
+                    :content="
+                      JSON.stringify(parseMessages(record.llm_input).user)
+                    "
                     :contentType="'input'"
                     :viewMode="'formatted'"
                   />
@@ -354,7 +542,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 </template>
 
 <script lang="ts">
-import { defineComponent, PropType } from "vue";
+import { defineComponent, PropType, ref } from "vue";
 import { getQualityScoreColor } from "@/utils/llmUtils";
 import LLMContentRenderer from "./LLMContentRenderer.vue";
 
@@ -402,7 +590,8 @@ export default defineComponent({
     const formatTimestampDisplay = (timestamp: number | string): string => {
       if (!timestamp) return "N/A";
       try {
-        const ts = typeof timestamp === "string" ? parseInt(timestamp) : timestamp;
+        const ts =
+          typeof timestamp === "string" ? parseInt(timestamp) : timestamp;
         const date = new Date(ts / 1000);
         return date.toLocaleString();
       } catch {
@@ -464,7 +653,11 @@ export default defineComponent({
             return parsed;
           }
           // If parsed is an object with a "messages" field, use that
-          if (parsed && typeof parsed === "object" && Array.isArray(parsed.messages)) {
+          if (
+            parsed &&
+            typeof parsed === "object" &&
+            Array.isArray(parsed.messages)
+          ) {
             return parsed.messages;
           }
         }
@@ -484,7 +677,9 @@ export default defineComponent({
       return colors[role] || "rgba(158, 158, 158, 0.1)";
     };
 
-    const parseMessages = (input: any): { system: string | null; user: any[] } => {
+    const parseMessages = (
+      input: any,
+    ): { system: string | null; user: any[] } => {
       try {
         let messages = [];
         let system = null;
@@ -500,7 +695,13 @@ export default defineComponent({
             messages = parsed.messages;
           } else {
             // If it's just a JSON object (not array), treat the whole thing as content
-            return { system: typeof input === "string" ? input : JSON.stringify(parsed, null, 2), user: [] };
+            return {
+              system:
+                typeof input === "string"
+                  ? input
+                  : JSON.stringify(parsed, null, 2),
+              user: [],
+            };
           }
         } else {
           // If input is not a string or array, stringify it
@@ -509,11 +710,19 @@ export default defineComponent({
 
         // If no messages found, treat entire input as system/content
         if (messages.length === 0) {
-          return { system: typeof input === "string" ? input : JSON.stringify(input, null, 2), user: [] };
+          return {
+            system:
+              typeof input === "string"
+                ? input
+                : JSON.stringify(input, null, 2),
+            user: [],
+          };
         }
 
         // Separate system and user messages
-        const userMessages = messages.filter((msg: any) => msg.role !== "system" && msg.role !== undefined);
+        const userMessages = messages.filter(
+          (msg: any) => msg.role !== "system" && msg.role !== undefined,
+        );
         const systemMsg = messages.find((msg: any) => msg.role === "system");
         system = systemMsg?.content || null;
 
@@ -538,7 +747,11 @@ export default defineComponent({
               return JSON.stringify(parsed);
             }
             // If it's an object with a messages field, use that
-            if (parsed && typeof parsed === "object" && Array.isArray(parsed.messages)) {
+            if (
+              parsed &&
+              typeof parsed === "object" &&
+              Array.isArray(parsed.messages)
+            ) {
               return JSON.stringify(parsed.messages);
             }
             // Otherwise return the original string
@@ -555,6 +768,42 @@ export default defineComponent({
       }
     };
 
+    // Template selector reactive data
+    const selectedTemplate = ref<string | null>(null);
+    const availableTemplates = ref<any[]>([]);
+    const isLoadingTemplates = ref(false);
+
+    // Load available templates for the org
+    const loadTemplates = async (orgId: string) => {
+      try {
+        isLoadingTemplates.value = true;
+        // Import at runtime to avoid circular deps
+        const { evalTemplateService } =
+          await import("@/services/eval-template.service");
+        const templates = await evalTemplateService.listTemplates(orgId);
+        availableTemplates.value = templates;
+
+        // Set first template as default if available
+        if (templates.length > 0 && !selectedTemplate.value) {
+          selectedTemplate.value = templates[0].agent_type;
+        }
+      } catch (error) {
+        console.error("Failed to load evaluation templates:", error);
+        availableTemplates.value = [];
+      } finally {
+        isLoadingTemplates.value = false;
+      }
+    };
+
+    // Handle template selection change
+    const onTemplateChange = (newTemplate: string | null) => {
+      if (newTemplate) {
+        console.log("Selected evaluation template:", newTemplate);
+        // Template is now selected - UI can use this for filtering or re-evaluation
+        // The actual re-evaluation would be handled by parent component or API
+      }
+    };
+
     return {
       formatScore,
       getBarWidth,
@@ -567,6 +816,11 @@ export default defineComponent({
       transformInputForRenderer,
       parseMessages,
       getQualityScoreColor,
+      selectedTemplate,
+      availableTemplates,
+      isLoadingTemplates,
+      loadTemplates,
+      onTemplateChange,
     };
   },
 });
@@ -597,6 +851,35 @@ export default defineComponent({
 
     &:hover {
       background: var(--o2-border-color-hover);
+    }
+  }
+}
+
+// Template Selector
+.eval-template-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--o2-card-bg);
+  border: 1px solid var(--o2-border-color);
+  border-radius: 8px;
+  margin-bottom: 8px;
+
+  .eval-template-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--o2-text-secondary);
+    white-space: nowrap;
+  }
+
+  .eval-template-dropdown {
+    flex: 1;
+    max-width: 300px;
+
+    :deep(.q-field__control) {
+      height: 32px;
+      font-size: 13px;
     }
   }
 }
@@ -672,15 +955,15 @@ export default defineComponent({
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 
   &.score-excellent {
-    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
   }
 
   &.score-good {
-    background: linear-gradient(135deg, #FFC107 0%, #ffb300 100%);
+    background: linear-gradient(135deg, #ffc107 0%, #ffb300 100%);
   }
 
   &.score-poor {
-    background: linear-gradient(135deg, #F44336 0%, #da190b 100%);
+    background: linear-gradient(135deg, #f44336 0%, #da190b 100%);
   }
 }
 
@@ -774,7 +1057,7 @@ export default defineComponent({
 
 .eval-aggregate-mini-fill {
   height: 100%;
-  background: linear-gradient(90deg, #2196F3, #1976D2);
+  background: linear-gradient(90deg, #2196f3, #1976d2);
   border-radius: 3px;
 }
 
@@ -961,11 +1244,11 @@ export default defineComponent({
 }
 
 .eval-rationale-box {
-  border-left-color: #2196F3;
+  border-left-color: #2196f3;
 }
 
 .eval-fix-box {
-  border-left-color: #4CAF50;
+  border-left-color: #4caf50;
 }
 
 .eval-text-label {
@@ -1014,11 +1297,11 @@ export default defineComponent({
 }
 
 .eval-io-input {
-  border-left-color: #2196F3;
+  border-left-color: #2196f3;
 }
 
 .eval-io-output {
-  border-left-color: #4CAF50;
+  border-left-color: #4caf50;
 }
 
 .eval-io-sections {
@@ -1026,7 +1309,7 @@ export default defineComponent({
   flex-direction: column;
   gap: 12px;
   border-radius: 6px;
-  border-left: 4px solid #2196F3;
+  border-left: 4px solid #2196f3;
   overflow: hidden;
 }
 

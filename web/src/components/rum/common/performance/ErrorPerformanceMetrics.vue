@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 lg:tw:grid-cols-3 tw:gap-3" data-test="error-performance-metrics">
+  <div
+    class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 lg:tw:grid-cols-3 tw:gap-3"
+    data-test="error-performance-metrics"
+  >
     <MetricCard
       v-if="metrics?.error?.handling_duration"
       label="Handling Duration"
@@ -68,7 +71,9 @@ interface Props {
 
 defineProps<Props>();
 
-const getStatusCodeStatus = (statusCode: number): "good" | "needs-improvement" | "poor" => {
+const getStatusCodeStatus = (
+  statusCode: number,
+): "good" | "needs-improvement" | "poor" => {
   if (statusCode >= 200 && statusCode < 300) return "good";
   if (statusCode >= 300 && statusCode < 400) return "needs-improvement";
   return "poor";

@@ -23,9 +23,7 @@ import {
  * Helper to get display name for operation
  */
 function getOperationDisplayName(id: string): string {
-  return id
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (l) => l.toUpperCase());
+  return id.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
 }
 
 /**
@@ -205,7 +203,7 @@ export function getOperationDefinitions(): QueryBuilderOperationDef[] {
           name: "Quantile",
           type: "number",
           placeholder: "0.95",
-          options: [0.99, 0.95, 0.90, 0.75, 0.50],
+          options: [0.99, 0.95, 0.9, 0.75, 0.5],
         },
         {
           name: "Range",
@@ -215,8 +213,7 @@ export function getOperationDefinitions(): QueryBuilderOperationDef[] {
       ],
       defaultParams: [0.95, "$__interval"],
       category: PromVisualQueryOperationCategory.RangeFunctions,
-      documentation:
-        "Quantile of all points in the specified interval (0-1)",
+      documentation: "Quantile of all points in the specified interval (0-1)",
     },
     {
       id: PromOperationId.LastOverTime,
@@ -382,7 +379,7 @@ export function getOperationDefinitions(): QueryBuilderOperationDef[] {
           name: "Quantile",
           type: "number",
           placeholder: "0.95",
-          options: [0.99, 0.95, 0.90, 0.75, 0.50],
+          options: [0.99, 0.95, 0.9, 0.75, 0.5],
         },
         {
           name: "By Labels",
@@ -406,7 +403,7 @@ export function getOperationDefinitions(): QueryBuilderOperationDef[] {
           name: "Quantile",
           type: "number",
           placeholder: "0.95",
-          options: [0.99, 0.95, 0.90, 0.75, 0.50],
+          options: [0.99, 0.95, 0.9, 0.75, 0.5],
         },
       ],
       defaultParams: [0.95],

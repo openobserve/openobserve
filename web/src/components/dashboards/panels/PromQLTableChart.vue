@@ -56,7 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <q-space />
             <TablePaginationControls
-              :show-pagination="config.table_pagination && !store.state.printMode"
+              :show-pagination="
+                config.table_pagination && !store.state.printMode
+              "
               :pagination="scope.pagination"
               :pagination-options="scope.paginationOptions"
               :total-rows="scope.totalRows"
@@ -162,9 +164,7 @@ export default defineComponent({
     const showLegendFooter = computed(() => {
       const tableMode = props.config?.promql_table_mode || "single";
       // Show legend footer in both "single" and "expanded_timeseries" modes
-      return (
-        (tableMode === "single" || tableMode === "expanded_timeseries")
-      );
+      return tableMode === "single" || tableMode === "expanded_timeseries";
     });
 
     // Filter rows based on selected legend

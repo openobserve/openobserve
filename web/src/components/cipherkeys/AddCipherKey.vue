@@ -14,15 +14,15 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit;">
+  <q-page class="q-pa-none" style="min-height: inherit">
     <div class="row items-center no-wrap q-mx-md q-pt-sm">
       <div class="flex items-center tw:py-2">
         <div
           no-caps
-            padding="xs"
-            outline
-            icon="arrow_back_ios_new"
-            class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
+          padding="xs"
+          outline
+          icon="arrow_back_ios_new"
+          class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
           title="Go Back"
           @click="$emit('cancel:hideform')"
         >
@@ -44,144 +44,145 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="addCipherKeyFormRef"
       @submit="onSubmit"
     >
-    <div style="height: calc(100vh - 180px); overflow: auto">
-      <div class="row">
-        <div class="col-4 o2-input flex q-mx-md q-mt-md">
-          <q-input
-            data-test="add-cipher-key-name-input"
-            v-model="formData.name"
-            :label="t('cipherKey.name') + ' *'"
-            class="showLabelOnTop full-width"
-            stack-label
-            borderless
-            dense
-            v-bind:readonly="isUpdatingCipherKey"
-            v-bind:disable="isUpdatingCipherKey"
-            :rules="[
-              (val: any) =>
-                !!val
-                  ? isValidResourceName(val) ||
-                    `Characters like :, ?, /, #, and spaces are not allowed.`
-                  : 'Name is required',
-              (val: any) => maxLengthCharValidation(val, 50),
-              (val: any) =>
-                /^[a-zA-Z0-9_-]+$/.test(val) ||
-                'Only alphanumeric characters, underscores, and hyphens are allowed',
-            ]"
-            tabindex="0"
+      <div style="height: calc(100vh - 180px); overflow: auto">
+        <div class="row">
+          <div class="col-4 o2-input flex q-mx-md q-mt-md">
+            <q-input
+              data-test="add-cipher-key-name-input"
+              v-model="formData.name"
+              :label="t('cipherKey.name') + ' *'"
+              class="showLabelOnTop full-width"
+              stack-label
+              borderless
+              dense
+              v-bind:readonly="isUpdatingCipherKey"
+              v-bind:disable="isUpdatingCipherKey"
+              :rules="[
+                (val: any) =>
+                  !!val
+                    ? isValidResourceName(val) ||
+                      `Characters like :, ?, /, #, and spaces are not allowed.`
+                    : 'Name is required',
+                (val: any) => maxLengthCharValidation(val, 50),
+                (val: any) =>
+                  /^[a-zA-Z0-9_-]+$/.test(val) ||
+                  'Only alphanumeric characters, underscores, and hyphens are allowed',
+              ]"
+              tabindex="0"
+            />
+          </div>
+        </div>
+
+        <q-stepper
+          v-model="step"
+          vertical
+          color="primary"
+          animated
+          class="q-mx-md q-pa-none"
+          header-nav
+        >
+          <q-step
+            data-test="cipher-key-key-store-detils-step"
+            :name="1"
+            :title="
+              t('cipherKey.step1') +
+              ' (Type: ' +
+              getTypeLabel(formData.key.store.type) +
+              ')'
+            "
+            icon="addition"
+            :done="step > 1"
+          >
+            <div>
+              <div class="q-w-lg">
+                <q-select
+                  data-test="add-cipher-key-type-input"
+                  v-model="formData.key.store.type"
+                  :label="t('cipherKey.type') + ' *'"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="showLabelOnTop full-width"
+                  stack-label
+                  dense
+                  borderless
+                  hide-bottom-space
+                  :options="cipherKeyTypes"
+                  option-value="value"
+                  option-label="label"
+                  map-options
+                  emit-value
+                  :rules="[(val: any) => !!val || 'Type is required']"
+                  tabindex="0"
+                />
+              </div>
+              <add-openobserve-type
+                v-if="formData.key.store.type == 'local'"
+                v-model:formData="formData"
+              />
+              <add-akeyless-type
+                v-else-if="formData.key.store.type == 'akeyless'"
+                v-model:formData="formData"
+              />
+            </div>
+            <q-stepper-navigation>
+              <q-btn
+                data-test="add-report-step1-continue-btn"
+                @click="validateForm(2)"
+                class="o2-primary-button tw:h-[36px]"
+                flat
+                no-caps
+                :label="'Continue'"
+              />
+            </q-stepper-navigation>
+          </q-step>
+
+          <q-step
+            data-test="cipher-key-encryption-mechanism-step"
+            :name="2"
+            :title="t('cipherKey.step2')"
+            icon="addition"
+            :done="step > 2"
+          >
+            <add-encryption-mechanism v-model:formData="formData" />
+            <q-stepper-navigation class="q-pa-none">
+              <q-btn
+                data-test="add-cipher-key-step2-back-btn"
+                flat
+                @click="step = 1"
+                class="o2-secondary-button tw:h-[36px] q-mb-sm"
+                :label="t('common.back')"
+                no-caps
+              />
+            </q-stepper-navigation>
+          </q-step>
+        </q-stepper>
+      </div>
+      <div class="tw:mx-2">
+        <div
+          class="flex justify-end q-px-sm q-py-lg full-width"
+          style="position: sticky; bottom: 0px; z-index: 2"
+        >
+          <q-btn
+            data-test="add-cipher-key-cancel-btn"
+            class="q-mr-md o2-secondary-button tw:h-[36px]"
+            :label="t('common.cancel')"
+            no-caps
+            flat
+            @click="openCancelDialog"
+          />
+          <q-btn
+            :disable="
+              (step === 1 && isUpdatingCipherKey == false) || isSubmitting
+            "
+            data-test="add-cipher-key-save-btn"
+            class="o2-primary-button no-border tw:h-[36px]"
+            :label="t('common.save')"
+            type="submit"
+            no-caps
+            flat
           />
         </div>
       </div>
-
-      <q-stepper
-        v-model="step"
-        vertical
-        color="primary"
-        animated
-        class="q-mx-md q-pa-none"
-        header-nav
-      >
-        <q-step
-          data-test="cipher-key-key-store-detils-step"
-          :name="1"
-          :title="
-            t('cipherKey.step1') +
-            ' (Type: ' +
-            getTypeLabel(formData.key.store.type) +
-            ')'
-          "
-          icon="addition"
-          :done="step > 1"
-        >
-          <div>
-            <div class="q-w-lg">
-              <q-select
-                data-test="add-cipher-key-type-input"
-                v-model="formData.key.store.type"
-                :label="t('cipherKey.type') + ' *'"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop full-width"
-                stack-label
-                dense
-                borderless
-                hide-bottom-space
-                :options="cipherKeyTypes"
-                option-value="value"
-                option-label="label"
-                map-options
-                emit-value
-                :rules="[(val: any) => !!val || 'Type is required']"
-                tabindex="0"
-              />
-            </div>
-            <add-openobserve-type
-              v-if="formData.key.store.type == 'local'"
-              v-model:formData="formData"
-            />
-            <add-akeyless-type
-              v-else-if="formData.key.store.type == 'akeyless'"
-              v-model:formData="formData"
-            />
-          </div>
-          <q-stepper-navigation>
-            <q-btn
-              data-test="add-report-step1-continue-btn"
-              @click="validateForm(2)"
-              class="o2-primary-button tw:h-[36px]"
-              flat
-              no-caps
-              :label="'Continue'"
-            />
-          </q-stepper-navigation>
-        </q-step>
-
-        <q-step
-          data-test="cipher-key-encryption-mechanism-step"
-          :name="2"
-          :title="t('cipherKey.step2')"
-          icon="addition"
-          :done="step > 2"
-        >
-          <add-encryption-mechanism v-model:formData="formData" />
-          <q-stepper-navigation class="q-pa-none">
-            <q-btn
-              data-test="add-cipher-key-step2-back-btn"
-              flat
-              @click="step = 1"
-              class="o2-secondary-button tw:h-[36px] q-mb-sm"
-              :label="t('common.back')"
-              no-caps
-            />
-          </q-stepper-navigation>
-        </q-step>
-      </q-stepper>
-    </div>
-    <div class="tw:mx-2">
-            <div class="flex justify-end q-px-sm q-py-lg full-width"
-      style="position: sticky; bottom: 0px; z-index: 2"
-      >
-        <q-btn
-          data-test="add-cipher-key-cancel-btn"
-          class="q-mr-md o2-secondary-button tw:h-[36px]"
-          :label="t('common.cancel')"
-          no-caps
-          flat
-          @click="openCancelDialog"
-        />
-        <q-btn
-          :disable="
-            (step === 1 && isUpdatingCipherKey == false) || isSubmitting
-          "
-          data-test="add-cipher-key-save-btn"
-          class="o2-primary-button no-border tw:h-[36px]"
-          :label="t('common.save')"
-          type="submit"
-          no-caps
-          flat
-        />
-      </div>
-    </div>
     </q-form>
     <ConfirmDialog
       v-model="dialog.show"

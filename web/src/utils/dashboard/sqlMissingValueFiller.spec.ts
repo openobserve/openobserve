@@ -33,8 +33,9 @@ vi.mock("@/utils/dashboard/datetimeStartPoint", () => ({
 
 // Mock dateTimeUtils: isTimeSeries returns true when the value is an ISO string
 vi.mock("@/utils/dashboard/dateTimeUtils", () => ({
-  isTimeSeries: vi.fn((arr: any[]) =>
-    typeof arr[0] === "string" && /\d{4}-\d{2}-\d{2}T/.test(arr[0]),
+  isTimeSeries: vi.fn(
+    (arr: any[]) =>
+      typeof arr[0] === "string" && /\d{4}-\d{2}-\d{2}T/.test(arr[0]),
   ),
 }));
 

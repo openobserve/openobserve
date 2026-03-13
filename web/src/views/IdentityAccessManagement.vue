@@ -1,5 +1,6 @@
 <template>
-  <q-page data-test="iam-page" class="q-pa-none" style="min-height: inherit">
+  <q-page data-test="iam-page" class="q-pa-none"
+style="min-height: inherit">
     <q-splitter
       v-model="splitterModel"
       unit="px"
@@ -7,33 +8,43 @@
       class="tw:overflow-hidden logs-splitter-smooth"
     >
       <template v-slot:before>
-        <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
-        <div v-if="showSidebar" class="iam-tabs spitter-container card-container o2-container-navbarheight" style="height: calc(100vh - 50px);">
-          <route-tabs
-            ref="iamRouteTabsRef"
-            dataTest="iam-tabs"
-            :tabs="tabs"
-            :activeTab="activeTab"
-            @update:activeTab="updateActiveTab"
-          />
+        <div
+          class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
+        >
+          <div
+            v-if="showSidebar"
+            class="iam-tabs spitter-container card-container o2-container-navbarheight"
+            style="height: calc(100vh - 50px)"
+          >
+            <route-tabs
+              ref="iamRouteTabsRef"
+              dataTest="iam-tabs"
+              :tabs="tabs"
+              :activeTab="activeTab"
+              @update:activeTab="updateActiveTab"
+            />
           </div>
         </div>
       </template>
       <template #separator>
-          <q-btn
-            data-test="logs-search-field-list-collapse-btn"
-            :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
-            :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
-            :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
-            color="primary"
-            size="sm"
-            dense
-            round
-            @click="collapseSidebar"
-          />
+        <q-btn
+          data-test="logs-search-field-list-collapse-btn"
+          :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
+          :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
+          :class="
+            showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'
+          "
+          color="primary"
+          size="sm"
+          dense
+          round
+          @click="collapseSidebar"
+        />
       </template>
       <template v-slot:after>
-        <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
+        <div
+          class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
+        >
           <div class="o2-container-navbarheight">
             <RouterView />
           </div>
@@ -212,7 +223,8 @@ function setTabs() {
     config.isEnterprise == "true" || config.isCloud == "true";
 
   // Filter service accounts based on config
-  const serviceAccountEnabled = store.state.zoConfig.service_account_enabled ?? true;
+  const serviceAccountEnabled =
+    store.state.zoConfig.service_account_enabled ?? true;
 
   if (isEnterprise) {
     //for cloud version we dont want service accounts and for enterprise version we need service accounts
@@ -273,6 +285,6 @@ const updateActiveTab = (tab: string) => {
 }
 
 .splitter-icon-collapse {
-    left: 4px !important;
+  left: 4px !important;
 }
 </style>

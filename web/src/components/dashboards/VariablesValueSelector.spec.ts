@@ -261,7 +261,7 @@ describe("VariablesValueSelector", () => {
       // Poll until loading completes or timeout
       let attempts = 0;
       while (vm.variablesData.isVariablesLoading && attempts < 20) {
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         attempts++;
       }
 
@@ -307,9 +307,8 @@ describe("VariablesValueSelector", () => {
       wrapper = createWrapper();
       await nextTick();
 
-      const { buildVariablesDependencyGraph } = await import(
-        "@/utils/dashboard/variables/variablesDependencyUtils"
-      );
+      const { buildVariablesDependencyGraph } =
+        await import("@/utils/dashboard/variables/variablesDependencyUtils");
       expect(buildVariablesDependencyGraph).toHaveBeenCalled();
     });
   });
@@ -323,7 +322,7 @@ describe("VariablesValueSelector", () => {
       const vm = wrapper.vm as any;
       let attempts = 0;
       while (vm.variablesData.isVariablesLoading && attempts < 20) {
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         attempts++;
       }
 
@@ -337,34 +336,44 @@ describe("VariablesValueSelector", () => {
       const vm = wrapper.vm as any;
 
       // Verify variable exists
-      const queryVariable = vm.variablesData.values.find((v: any) => v.type === 'query_values');
+      const queryVariable = vm.variablesData.values.find(
+        (v: any) => v.type === "query_values",
+      );
       expect(queryVariable).toBeDefined();
-      expect(queryVariable.type).toBe('query_values');
+      expect(queryVariable.type).toBe("query_values");
 
       // The component renders, just check that it's in the internal state
       // The mocked child component might not render the exact data-test attribute
-      expect(vm.variablesData.values.some((v: any) => v.type === 'query_values')).toBe(true);
+      expect(
+        vm.variablesData.values.some((v: any) => v.type === "query_values"),
+      ).toBe(true);
     });
 
     it("should render constant variable correctly", () => {
       const vm = wrapper.vm as any;
-      const constantVariable = vm.variablesData.values.find((v: any) => v.type === 'constant');
+      const constantVariable = vm.variablesData.values.find(
+        (v: any) => v.type === "constant",
+      );
       expect(constantVariable).toBeDefined();
-      expect(constantVariable.type).toBe('constant');
+      expect(constantVariable.type).toBe("constant");
     });
 
     it("should render textbox variable correctly", () => {
       const vm = wrapper.vm as any;
-      const textboxVariable = vm.variablesData.values.find((v: any) => v.type === 'textbox');
+      const textboxVariable = vm.variablesData.values.find(
+        (v: any) => v.type === "textbox",
+      );
       expect(textboxVariable).toBeDefined();
-      expect(textboxVariable.type).toBe('textbox');
+      expect(textboxVariable.type).toBe("textbox");
     });
 
     it("should render custom variable correctly", () => {
       const vm = wrapper.vm as any;
-      const customVariable = vm.variablesData.values.find((v: any) => v.type === 'custom');
+      const customVariable = vm.variablesData.values.find(
+        (v: any) => v.type === "custom",
+      );
       expect(customVariable).toBeDefined();
-      expect(customVariable.type).toBe('custom');
+      expect(customVariable.type).toBe("custom");
     });
 
     it("should handle multiSelect variables", async () => {
@@ -467,7 +476,7 @@ describe("VariablesValueSelector", () => {
       // Wait for initialization
       let attempts = 0;
       while (vm.variablesData.isVariablesLoading && attempts < 20) {
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         attempts++;
       }
       if (vm.variablesData.isVariablesLoading) {
@@ -506,7 +515,7 @@ describe("VariablesValueSelector", () => {
       const vm = wrapper.vm as any;
       let attempts = 0;
       while (vm.variablesData.isVariablesLoading && attempts < 20) {
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         attempts++;
       }
 
@@ -870,9 +879,8 @@ describe("VariablesValueSelector", () => {
       wrapper = createWrapper({ variablesConfig: dependentVariablesConfig });
       await nextTick();
 
-      const { buildVariablesDependencyGraph } = await import(
-        "@/utils/dashboard/variables/variablesDependencyUtils"
-      );
+      const { buildVariablesDependencyGraph } =
+        await import("@/utils/dashboard/variables/variablesDependencyUtils");
       expect(buildVariablesDependencyGraph).toHaveBeenCalled();
     });
 
@@ -922,7 +930,7 @@ describe("VariablesValueSelector", () => {
       // Wait for initialization
       let attempts = 0;
       while (vm.variablesData.isVariablesLoading && attempts < 20) {
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         attempts++;
       }
       if (vm.variablesData.isVariablesLoading) {
@@ -1011,7 +1019,7 @@ describe("VariablesValueSelector", () => {
       const vm = wrapper.vm as any;
       let attempts = 0;
       while (vm.variablesData.isVariablesLoading && attempts < 20) {
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         attempts++;
       }
 
@@ -1292,9 +1300,8 @@ describe("VariablesValueSelector", () => {
     });
 
     it("should generate trace IDs for WebSocket requests", async () => {
-      const { isWebSocketEnabled, generateTraceContext } = await import(
-        "@/utils/zincutils"
-      );
+      const { isWebSocketEnabled, generateTraceContext } =
+        await import("@/utils/zincutils");
       vi.mocked(isWebSocketEnabled).mockReturnValue(true);
       vi.mocked(generateTraceContext).mockReturnValue({
         traceId: "test-trace-123",
@@ -1570,7 +1577,9 @@ describe("VariablesValueSelector", () => {
       await nextTick();
 
       // Check if the button exists in the DOM
-      const addButton = wrapper.find('[data-test="dashboard-add-variable-btn"]');
+      const addButton = wrapper.find(
+        '[data-test="dashboard-add-variable-btn"]',
+      );
       expect(addButton.exists()).toBe(true);
     });
 
@@ -1580,7 +1589,9 @@ describe("VariablesValueSelector", () => {
       });
       await nextTick();
 
-      const addButton = wrapper.find('[data-test="dashboard-add-variable-btn"]');
+      const addButton = wrapper.find(
+        '[data-test="dashboard-add-variable-btn"]',
+      );
       expect(addButton.exists()).toBe(false);
     });
 
@@ -2172,7 +2183,7 @@ describe("VariablesValueSelector", () => {
       // Wait for initialization
       let attempts = 0;
       while (vm.variablesData.isVariablesLoading && attempts < 20) {
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         attempts++;
       }
       if (vm.variablesData.isVariablesLoading) {
@@ -2345,7 +2356,7 @@ describe("VariablesValueSelector", () => {
       // Wait for initialization
       let attempts = 0;
       while (vm.variablesData.isVariablesLoading && attempts < 20) {
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         attempts++;
       }
       if (vm.variablesData.isVariablesLoading) {
@@ -2443,7 +2454,7 @@ describe("VariablesValueSelector", () => {
       // Wait for initialization
       let attempts = 0;
       while (vm.variablesData.isVariablesLoading && attempts < 20) {
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         attempts++;
       }
       if (vm.variablesData.isVariablesLoading) {
@@ -2509,7 +2520,10 @@ describe("VariablesValueSelector", () => {
       mockBuildGraph.mockReturnValue({
         streamVar: { parentVariables: [], childVariables: ["dynamicQuery"] },
         fieldVar: { parentVariables: [], childVariables: ["dynamicQuery"] },
-        dynamicQuery: { parentVariables: ["streamVar", "fieldVar"], childVariables: [] },
+        dynamicQuery: {
+          parentVariables: ["streamVar", "fieldVar"],
+          childVariables: [],
+        },
       });
 
       wrapper = createWrapper({
@@ -2524,9 +2538,8 @@ describe("VariablesValueSelector", () => {
       });
       await nextTick();
 
-      const { buildVariablesDependencyGraph } = await import(
-        "@/utils/dashboard/variables/variablesDependencyUtils"
-      );
+      const { buildVariablesDependencyGraph } =
+        await import("@/utils/dashboard/variables/variablesDependencyUtils");
       expect(buildVariablesDependencyGraph).toHaveBeenCalled();
 
       const vm = wrapper.vm as any;

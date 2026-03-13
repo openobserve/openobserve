@@ -26,15 +26,15 @@ import i18n from "@/locales";
 // Mock services and utilities
 vi.mock("@/services/segment_analytics", () => ({
   default: {
-    track: vi.fn()
-  }
+    track: vi.fn(),
+  },
 }));
 
 vi.mock("@/aws-exports", () => ({
   default: {
     isCloud: "false",
-    enableAnalytics: "true"
-  }
+    enableAnalytics: "true",
+  },
 }));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
@@ -43,7 +43,10 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
     ...actual,
     getImageURL: vi.fn((path: string) => `/mocked/path/${path}`),
     verifyOrganizationStatus: vi.fn(),
-    mergeRoutes: vi.fn((route1: any, route2: any) => [...(route1 || []), ...(route2 || [])])
+    mergeRoutes: vi.fn((route1: any, route2: any) => [
+      ...(route1 || []),
+      ...(route2 || []),
+    ]),
   };
 });
 
@@ -51,28 +54,28 @@ vi.mock("quasar", async () => {
   const actual: any = await vi.importActual("quasar");
   return {
     ...actual,
-    copyToClipboard: vi.fn()
+    copyToClipboard: vi.fn(),
   };
 });
 
 installQuasar({
-  plugins: [Notify]
+  plugins: [Notify],
 });
 
 describe("IngestLogs Index Component", () => {
   let wrapper: any = null;
 
   const mockProps = {
-    currOrgIdentifier: "test-org"
+    currOrgIdentifier: "test-org",
   };
 
   const mockRouter = {
     currentRoute: {
       value: {
-        name: "curl"
-      }
+        name: "curl",
+      },
     },
-    push: vi.fn()
+    push: vi.fn(),
   };
 
   beforeEach(() => {
@@ -84,9 +87,9 @@ describe("IngestLogs Index Component", () => {
           "q-splitter": true,
           "q-tabs": true,
           "q-route-tab": true,
-          "router-view": true
-        }
-      }
+          "router-view": true,
+        },
+      },
     });
 
     // Reset mocks
@@ -151,7 +154,7 @@ describe("IngestLogs Index Component", () => {
       // Test by directly checking computed property logic
       const isCloudTrue = "true";
       const showCloudResult = isCloudTrue === "true"; // This will be true
-      
+
       expect(showCloudResult).toBe(true);
     });
 
@@ -195,7 +198,7 @@ describe("IngestLogs Index Component", () => {
     it("should track segment analytics on copy", async () => {
       const mockContent = { innerText: "test content" };
       (copyToClipboard as any).mockResolvedValue(true);
-      
+
       // Get the mocked segment analytics module
       const segmentModule = await import("@/services/segment_analytics");
       const mockSegmentAnalytics = segmentModule.default;
@@ -259,7 +262,9 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test &amp; content &lt; &gt;");
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "test &amp; content &lt; &gt;",
+      );
     });
 
     it("should track analytics with correct current route name", async () => {
@@ -273,10 +278,11 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(mockSegmentAnalytics.track).toHaveBeenCalledWith("Button Click", 
+      expect(mockSegmentAnalytics.track).toHaveBeenCalledWith(
+        "Button Click",
         expect.objectContaining({
-          ingestion: "fluentbit"
-        })
+          ingestion: "fluentbit",
+        }),
       );
     });
   });
@@ -285,18 +291,18 @@ describe("IngestLogs Index Component", () => {
   describe("showUpdateDialogFn function", () => {
     it("should set confirmUpdate to true", () => {
       expect(wrapper.vm.confirmUpdate).toBe(false);
-      
+
       wrapper.vm.showUpdateDialogFn();
-      
+
       expect(wrapper.vm.confirmUpdate).toBe(true);
     });
 
     it("should toggle confirmUpdate correctly multiple times", () => {
       expect(wrapper.vm.confirmUpdate).toBe(false);
-      
+
       wrapper.vm.showUpdateDialogFn();
       expect(wrapper.vm.confirmUpdate).toBe(true);
-      
+
       wrapper.vm.confirmUpdate = false;
       wrapper.vm.showUpdateDialogFn();
       expect(wrapper.vm.confirmUpdate).toBe(true);
@@ -308,12 +314,12 @@ describe("IngestLogs Index Component", () => {
     it("should include all expected ingest routes", () => {
       const expectedRoutes = [
         "curl",
-        "fluentbit", 
+        "fluentbit",
         "fluentd",
         "vector",
-        "syslogNg"
+        "syslogNg",
       ];
-      
+
       expect(wrapper.vm.ingestRoutes).toEqual(expectedRoutes);
     });
 
@@ -324,7 +330,7 @@ describe("IngestLogs Index Component", () => {
     it("should handle route checking logic", () => {
       const testRoutes = ["curl", "fluentbit", "vector"];
       const routeInList = testRoutes.includes("curl");
-      
+
       expect(routeInList).toBe(true);
     });
   });
@@ -332,7 +338,7 @@ describe("IngestLogs Index Component", () => {
   // Template and UI Tests
   describe("Template and UI", () => {
     it("should render splitter component", () => {
-      expect(wrapper.find('q-splitter-stub').exists()).toBe(true);
+      expect(wrapper.find("q-splitter-stub").exists()).toBe(true);
     });
 
     it("should have template structure", () => {
@@ -358,7 +364,7 @@ describe("IngestLogs Index Component", () => {
   // Props and Data Tests
   describe("Props and Data", () => {
     it("should receive currOrgIdentifier prop correctly", () => {
-      expect(wrapper.props('currOrgIdentifier')).toBe("test-org");
+      expect(wrapper.props("currOrgIdentifier")).toBe("test-org");
     });
 
     it("should handle empty currOrgIdentifier prop", () => {
@@ -370,12 +376,12 @@ describe("IngestLogs Index Component", () => {
             "q-splitter": true,
             "q-tabs": true,
             "q-route-tab": true,
-            "router-view": true
-          }
-        }
+            "router-view": true,
+          },
+        },
       });
-      
-      expect(emptyPropWrapper.props('currOrgIdentifier')).toBe("");
+
+      expect(emptyPropWrapper.props("currOrgIdentifier")).toBe("");
       emptyPropWrapper.unmount();
     });
 
@@ -388,12 +394,12 @@ describe("IngestLogs Index Component", () => {
             "q-splitter": true,
             "q-tabs": true,
             "q-route-tab": true,
-            "router-view": true
-          }
-        }
+            "router-view": true,
+          },
+        },
       });
-      
-      expect(defaultPropWrapper.props('currOrgIdentifier')).toBe("");
+
+      expect(defaultPropWrapper.props("currOrgIdentifier")).toBe("");
       defaultPropWrapper.unmount();
     });
 
@@ -401,7 +407,7 @@ describe("IngestLogs Index Component", () => {
       const initialTabs = wrapper.vm.ingestiontabs;
       wrapper.vm.ingestiontabs = "curl";
       await nextTick();
-      
+
       expect(wrapper.vm.ingestiontabs).toBe("curl");
       expect(wrapper.vm.ingestiontabs).not.toBe(initialTabs);
     });
@@ -410,7 +416,7 @@ describe("IngestLogs Index Component", () => {
       const testData = { key: "value" };
       wrapper.vm.rowData = testData;
       await nextTick();
-      
+
       expect(wrapper.vm.rowData).toEqual(testData);
     });
   });
@@ -425,7 +431,7 @@ describe("IngestLogs Index Component", () => {
     it("should call getImageURL with correct parameters", () => {
       const mockGetImageURL = wrapper.vm.getImageURL;
       const testPath = "images/test.png";
-      
+
       mockGetImageURL(testPath);
       expect(mockGetImageURL).toBeTruthy();
     });
@@ -491,7 +497,7 @@ describe("IngestLogs Index Component", () => {
       wrapper.vm.showUpdateDialogFn();
       wrapper.vm.showUpdateDialogFn();
       wrapper.vm.showUpdateDialogFn();
-      
+
       expect(wrapper.vm.confirmUpdate).toBe(true);
     });
   });
@@ -511,7 +517,7 @@ describe("IngestLogs Index Component", () => {
       const initialValue = wrapper.vm.ingestiontabs;
       wrapper.vm.ingestiontabs = "fluentbit";
       await nextTick();
-      
+
       expect(wrapper.vm.ingestiontabs).toBe("fluentbit");
       expect(wrapper.vm.ingestiontabs).not.toBe(initialValue);
     });
@@ -535,9 +541,9 @@ describe("IngestLogs Index Component", () => {
             "q-splitter": true,
             "q-tabs": true,
             "q-route-tab": true,
-            "router-view": true
-          }
-        }
+            "router-view": true,
+          },
+        },
       });
 
       expect(() => {

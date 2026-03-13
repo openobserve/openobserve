@@ -80,7 +80,7 @@ const loadMetrics = async () => {
       -1, // limit (get all)
       "", // keyword
       "", // sort
-      false // asc
+      false, // asc
     );
 
     if (response.data && response.data.list) {
@@ -113,12 +113,14 @@ const filterMetrics = async (val: string, update: any) => {
         -1,
         val, // Use search keyword
         "",
-        false
+        false,
       );
 
       update(() => {
         if (response.data && response.data.list) {
-          filteredMetrics.value = response.data.list.map((stream: any) => stream.name);
+          filteredMetrics.value = response.data.list.map(
+            (stream: any) => stream.name,
+          );
         } else {
           filteredMetrics.value = [];
         }

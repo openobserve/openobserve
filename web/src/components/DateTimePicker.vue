@@ -66,7 +66,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ period.value }}
               </div>
               <div
-                v-for="(item, item_index) in (relativeDates as any)[period.value]"
+                v-for="(item, item_index) in (relativeDates as any)[
+                  period.value
+                ]"
                 :key="item"
               >
                 <q-btn
@@ -253,7 +255,7 @@ export default defineComponent({
     watch(selectedDateEmitValue, () => {
       Object.assign(
         data.selectedDate,
-        JSON.parse(JSON.stringify(props.modelValue))
+        JSON.parse(JSON.stringify(props.modelValue)),
       );
     });
 
@@ -366,12 +368,12 @@ export default defineComponent({
           updateEmitValue();
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     const updateEmitValue = () => {
       selectedDateEmitValue.value = JSON.parse(
-        JSON.stringify(data.selectedDate)
+        JSON.stringify(data.selectedDate),
       );
     };
 

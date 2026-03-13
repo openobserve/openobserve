@@ -87,13 +87,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-table>
     </div>
     <q-dialog v-model="extendTrialPrompt">
-      <q-card class="q-pa-sm" style="min-width: 450px;">
+      <q-card class="q-pa-sm" style="min-width: 450px">
         <q-toolbar>
           <q-toolbar-title>
-            <span class="text-weight-bold" :title="extendTrialDataRow.name">Extend Trial for {{ extendTrialDataRow.name }}</span>
-            <span class="text-subtitle2 flex">Set the new trial extension period.</span>
+            <span class="text-weight-bold"
+:title="extendTrialDataRow.name"
+              >Extend Trial for {{ extendTrialDataRow.name }}</span
+            >
+            <span class="text-subtitle2 flex"
+              >Set the new trial extension period.</span
+            >
           </q-toolbar-title>
-          <q-btn flat round dense icon="close" v-close-popup />
+          <q-btn flat
+round dense
+icon="close" v-close-popup />
         </q-toolbar>
 
         <q-card-section>
@@ -108,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   'cursor-pointer q-px-sm q-py-xs page-border',
                   extendedTrial === page
                     ? 'bg-primary text-white'
-                    : 'bg-white text-gray-700 border-gray-3'
+                    : 'bg-white text-gray-700 border-gray-3',
                 ]"
               >
                 {{ page }}
@@ -123,15 +130,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('common.cancel')"
             no-caps
             flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
           />
           <q-btn
             class="o2-primary-button no-border tw:h-[36px]"
             :label="`Extend trial by ${extendedTrial} week(s)`"
             no-caps
             flat
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            @click.stop="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
+            @click.stop="
+              updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)
+            "
           />
         </q-card-actions>
       </q-card>
@@ -181,7 +198,10 @@ export default defineComponent({
     });
 
     onMounted(() => {
-      if(store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier) {
+      if (
+        store.state.zoConfig.meta_org ==
+        store.state.selectedOrganization.identifier
+      ) {
         getData();
       } else {
         router.replace({
@@ -189,7 +209,7 @@ export default defineComponent({
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
-        })
+        });
       }
     });
 
@@ -207,7 +227,7 @@ export default defineComponent({
         label: t("settings.org_name"),
         align: "left",
         sortable: true,
-        classes: 'w-[150px]'
+        classes: "w-[150px]",
       },
       {
         name: "identifier",
@@ -215,7 +235,7 @@ export default defineComponent({
         label: t("settings.org_identifier"),
         align: "left",
         sortable: false,
-        style: "col-3"
+        style: "col-3",
       },
       {
         name: "subscription_status",
@@ -223,7 +243,7 @@ export default defineComponent({
         label: t("settings.subscription_status"),
         align: "left",
         sortable: true,
-        style: "col-1"
+        style: "col-1",
       },
       {
         name: "created_on",
@@ -259,15 +279,15 @@ export default defineComponent({
     const subscriptionPlans: any = {
       "0": "Free",
       "1": "Pay as you go",
-      "2": "Enterprise"
-    }
-    
+      "2": "Enterprise",
+    };
+
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
       qTable.value.setPagination(pagination.value);
     };
-    
+
     const getData = () => {
       loading.value = true;
       const dismiss = $q.notify({
@@ -275,7 +295,9 @@ export default defineComponent({
         message: "Please wait while loading data...",
       });
 
-      OrganizationServices.get_admin_org(store.state.selectedOrganization.identifier)
+      OrganizationServices.get_admin_org(
+        store.state.selectedOrganization.identifier,
+      )
         .then((response) => {
           const data = [];
           const responseData = response.data.data;
@@ -286,8 +308,16 @@ export default defineComponent({
               name: responseData[i].name,
               identifier: responseData[i].identifier,
               plan: subscriptionPlans[responseData[i].plan],
-              created_at: timestampToTimezoneDate(responseData[i].created_at, "UTC", "yyyy-MM-dd"),
-              trial_expires_at: timestampToTimezoneDate(responseData[i].trial_expires_at, "UTC", "yyyy-MM-dd"),
+              created_at: timestampToTimezoneDate(
+                responseData[i].created_at,
+                "UTC",
+                "yyyy-MM-dd",
+              ),
+              trial_expires_at: timestampToTimezoneDate(
+                responseData[i].trial_expires_at,
+                "UTC",
+                "yyyy-MM-dd",
+              ),
             });
           }
 
@@ -314,25 +344,29 @@ export default defineComponent({
     const toggleExtendTrialDialog = (row: any) => {
       extendTrialPrompt.value = true;
       extendTrialDataRow.value = row;
-    }
+    };
 
-    const getTimestampInMicroseconds = (weeks: number) => (Date.now() + weeks * 7 * 24 * 60 * 60 * 1000) * 1000;
-
+    const getTimestampInMicroseconds = (weeks: number) =>
+      (Date.now() + weeks * 7 * 24 * 60 * 60 * 1000) * 1000;
 
     const updateTrialPeriod = (org_id: string, extended_week: number) => {
       const payload = {
         new_end_date: getTimestampInMicroseconds(extended_week),
-        org_id
+        org_id,
       };
 
       loading.value = true;
       const dismiss = $q.notify({
         spinner: true,
-        message: "Please wait while processing trial period extension request...",
+        message:
+          "Please wait while processing trial period extension request...",
       });
-      OrganizationServices.extend_trial_period(store.state.selectedOrganization.identifier, payload)
+      OrganizationServices.extend_trial_period(
+        store.state.selectedOrganization.identifier,
+        payload,
+      )
         .then((response) => {
-          if(response.data) {
+          if (response.data) {
             $q.notify({
               type: "positive",
               message: "Trial period extended successfully.",
@@ -358,7 +392,7 @@ export default defineComponent({
             });
           }
         });
-    }
+    };
 
     return {
       t,
@@ -384,7 +418,11 @@ export default defineComponent({
         var filtered = [];
         terms = terms.toLowerCase();
         for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms) || rows[i]["identifier"].toLowerCase().includes(terms) || rows[i]["plan"].toLowerCase().includes(terms)) {
+          if (
+            rows[i]["name"].toLowerCase().includes(terms) ||
+            rows[i]["identifier"].toLowerCase().includes(terms) ||
+            rows[i]["plan"].toLowerCase().includes(terms)
+          ) {
             filtered.push(rows[i]);
           }
         }

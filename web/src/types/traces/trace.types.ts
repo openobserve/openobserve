@@ -3,7 +3,7 @@
  * Types for distributed traces and trace metadata
  */
 
-import { type Span, type EnrichedSpan, type SpanStatus } from './span.types';
+import { type Span, type EnrichedSpan, type SpanStatus } from "./span.types";
 
 /**
  * Trace - Collection of spans representing a single request
@@ -11,12 +11,12 @@ import { type Span, type EnrichedSpan, type SpanStatus } from './span.types';
 export interface Trace {
   trace_id: string;
   spans: Span[];
-  startTime: number;     // Earliest span start time
-  endTime: number;       // Latest span end time
-  duration: number;      // Total trace duration in microseconds
-  spanCount: number;     // Total number of spans
-  serviceCount: number;  // Number of unique services
-  errorCount: number;    // Number of error spans
+  startTime: number; // Earliest span start time
+  endTime: number; // Latest span end time
+  duration: number; // Total trace duration in microseconds
+  spanCount: number; // Total number of spans
+  serviceCount: number; // Number of unique services
+  errorCount: number; // Number of error spans
 }
 
 /**
@@ -25,9 +25,9 @@ export interface Trace {
 export interface TraceTree {
   trace_id: string;
   rootSpan: EnrichedSpan;
-  flatSpans: EnrichedSpan[];    // All spans in flat array
+  flatSpans: EnrichedSpan[]; // All spans in flat array
   spanMap: Map<string, EnrichedSpan>; // Quick lookup by span_id
-  criticalPath: string[];        // Span IDs on critical path
+  criticalPath: string[]; // Span IDs on critical path
   metadata: TraceMetadata;
 }
 
@@ -67,13 +67,13 @@ export interface TraceMetadata {
 
   // Performance
   critical_path_duration: number; // Duration of longest path
-  critical_path_percent: number;  // % of total duration
-  slowest_spans: EnrichedSpan[];  // Top 5 slowest spans
+  critical_path_percent: number; // % of total duration
+  slowest_spans: EnrichedSpan[]; // Top 5 slowest spans
 
   // Error information
   has_errors: boolean;
-  error_services: string[];       // Services with errors
-  error_messages: string[];       // Unique error messages
+  error_services: string[]; // Services with errors
+  error_messages: string[]; // Unique error messages
 }
 
 /**
@@ -152,9 +152,9 @@ export interface TraceViewState {
 
   // Timeline
   timeline: {
-    zoom_level: number;      // 1 = fit all, >1 = zoomed in
-    pan_offset: number;      // Horizontal offset in px
-    viewport_width: number;  // Width of timeline area
+    zoom_level: number; // 1 = fit all, >1 = zoomed in
+    pan_offset: number; // Horizontal offset in px
+    viewport_width: number; // Width of timeline area
   };
 
   // Panel visibility
@@ -169,7 +169,7 @@ export interface TraceViewState {
   sort_ascending: boolean;
 
   // View mode
-  view_mode: 'tree' | 'list' | 'timeline';
+  view_mode: "tree" | "list" | "timeline";
 }
 
 /**

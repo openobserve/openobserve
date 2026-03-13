@@ -434,7 +434,15 @@ describe("LogsHighLighting Component", () => {
     });
 
     it("should detect HTTP methods", async () => {
-      const methods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
+      const methods = [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE",
+        "PATCH",
+        "HEAD",
+        "OPTIONS",
+      ];
 
       for (const method of methods) {
         await wrapper.setProps({ data: method });
@@ -655,13 +663,13 @@ describe("LogsHighLighting Component", () => {
 
       // Verify the text is displayed, not executed
       const textContent = span.text();
-      expect(textContent).toContain('<img');
-      expect(textContent).toContain('onerror');
-      expect(textContent).toContain('alert(1)');
+      expect(textContent).toContain("<img");
+      expect(textContent).toContain("onerror");
+      expect(textContent).toContain("alert(1)");
     });
 
     it("should handle quotes safely", async () => {
-      const quoteData = 'Test "double" and \'single\' quotes';
+      const quoteData = "Test \"double\" and 'single' quotes";
       await wrapper.setProps({ data: quoteData });
       await wrapper.vm.$nextTick();
 
@@ -794,7 +802,7 @@ describe("LogsHighLighting Component", () => {
             props: {
               data: `message ${i}`,
             },
-          })
+          }),
         );
       }
 
@@ -950,7 +958,8 @@ describe("LogsHighLighting Component", () => {
 
   describe("Real-world Scenarios", () => {
     it("should handle typical log message", async () => {
-      const logMessage = '[2023-01-01 12:00:00] ERROR: Connection failed to 192.168.1.1:8080';
+      const logMessage =
+        "[2023-01-01 12:00:00] ERROR: Connection failed to 192.168.1.1:8080";
       await wrapper.setProps({ data: logMessage });
       await wrapper.vm.$nextTick();
 
@@ -979,7 +988,7 @@ describe("LogsHighLighting Component", () => {
     });
 
     it("should handle HTTP access log", async () => {
-      const accessLog = 'GET /api/v1/users HTTP/1.1 200 192.168.1.1';
+      const accessLog = "GET /api/v1/users HTTP/1.1 200 192.168.1.1";
       await wrapper.setProps({ data: accessLog });
       await wrapper.vm.$nextTick();
 

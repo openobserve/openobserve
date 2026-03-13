@@ -122,9 +122,13 @@ const removeHandler = (
 
 const closeSocket = (socketId: string) => {
   const socket = sockets[socketId];
-  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
-      // sendMessage(socketId, JSON.stringify({ type: "close" }));
-      socket.close(1000, "search cancelled");
+  if (
+    socket &&
+    (socket.readyState === WebSocket.OPEN ||
+      socket.readyState === WebSocket.CONNECTING)
+  ) {
+    // sendMessage(socketId, JSON.stringify({ type: "close" }));
+    socket.close(1000, "search cancelled");
   }
 };
 
@@ -139,7 +143,7 @@ const useWebSocket = () => {
   const cleanupSocket = (socketId: string) => {
     const socket = sockets[socketId];
 
-    if(!socket) {
+    if (!socket) {
       console.error("Cleanup socket failed, socket not found", socketId);
       return;
     }

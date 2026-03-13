@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="horizontal-stepper" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+  <div
+    class="horizontal-stepper"
+    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
+  >
     <div class="stepper-container">
       <div
         v-for="(step, index) in steps"
@@ -25,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           'step-active': currentStep === step.id,
           'step-completed': completedSteps.includes(step.id),
           'step-disabled': !canNavigateToStep(step.id),
-          'step-error': step.hasError
+          'step-error': step.hasError,
         }"
         @click="handleStepClick(step.id)"
       >
@@ -51,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="index < steps.length - 1"
             class="step-connector"
             :class="{
-              'connector-active': completedSteps.includes(step.id)
+              'connector-active': completedSteps.includes(step.id),
             }"
           ></div>
         </div>
@@ -101,11 +104,17 @@ export default defineComponent({
 
     const canNavigateToStep = (stepId: number): boolean => {
       // Can always navigate to completed steps or current step
-      if (props.completedSteps.includes(stepId) || stepId === props.currentStep) {
+      if (
+        props.completedSteps.includes(stepId) ||
+        stepId === props.currentStep
+      ) {
         return true;
       }
       // Can navigate to next step if current step is completed
-      if (stepId === props.currentStep + 1 && props.completedSteps.includes(props.currentStep)) {
+      if (
+        stepId === props.currentStep + 1 &&
+        props.completedSteps.includes(props.currentStep)
+      ) {
         return true;
       }
       return false;

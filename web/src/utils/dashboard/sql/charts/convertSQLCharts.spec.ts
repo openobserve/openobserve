@@ -45,7 +45,12 @@ vi.mock("@/utils/dashboard/legendConfiguration", () => ({
   getChartDimensions: vi.fn(() => ({ width: 800, height: 400 })),
   applyPieDonutChartAlignment: vi.fn(),
   applyPieDonutCenterAdjustment: vi.fn(),
-  calculatePieChartContainer: vi.fn(() => ({ left: "15%", right: "15%", top: "15%", bottom: "15%" })),
+  calculatePieChartContainer: vi.fn(() => ({
+    left: "15%",
+    right: "15%",
+    top: "15%",
+    bottom: "15%",
+  })),
 }));
 
 vi.mock("@/utils/dashboard/sql/shared/contextBuilder", () => ({
@@ -66,15 +71,19 @@ function makeMockContext(overrides: Partial<any> = {}): any {
     return map[key] ?? [];
   });
 
-  const getSeries = vi.fn(() => [
-    { name: "series1", data: [1, 2, 3] },
-  ]);
+  const getSeries = vi.fn(() => [{ name: "series1", data: [1, 2, 3] }]);
 
   const updateTrellisConfig = vi.fn();
 
   return {
     options: {
-      xAxis: [{ data: ["Jan", "Feb", "Mar"], axisLabel: { rotate: 0, width: 120 }, name: "" }],
+      xAxis: [
+        {
+          data: ["Jan", "Feb", "Mar"],
+          axisLabel: { rotate: 0, width: 120 },
+          name: "",
+        },
+      ],
       yAxis: [{ data: [], axisLabel: { width: 80 }, name: "" }],
       series: [],
       tooltip: {
@@ -151,7 +160,9 @@ describe("SQL Chart Converters", () => {
             decimals: 2,
             background: { value: { color: "#FFFFFF" } },
           },
-          queries: [{ fields: { y: [{ label: "Value" }] }, customQuery: false }],
+          queries: [
+            { fields: { y: [{ label: "Value" }] }, customQuery: false },
+          ],
         },
       });
       applyMetricChart(ctx);
@@ -192,7 +203,15 @@ describe("SQL Chart Converters", () => {
 
   describe("applyStackedChart", () => {
     it("sets series using getSeries", () => {
-      const ctx = makeMockContext({ panelSchema: { type: "stacked", config: { decimals: 2, trellis: { layout: null } }, queries: [{ fields: { y: [{ label: "Value" }] }, customQuery: false }] } });
+      const ctx = makeMockContext({
+        panelSchema: {
+          type: "stacked",
+          config: { decimals: 2, trellis: { layout: null } },
+          queries: [
+            { fields: { y: [{ label: "Value" }] }, customQuery: false },
+          ],
+        },
+      });
       applyStackedChart(ctx);
       expect(ctx.getSeries).toHaveBeenCalled();
       expect(Array.isArray(ctx.options.series)).toBe(true);
@@ -202,13 +221,27 @@ describe("SQL Chart Converters", () => {
       const ctx = makeMockContext();
       // Give it two xAxis elements
       ctx.options.xAxis = [
-        { data: ["Jan", "Feb"], axisLabel: { rotate: 0, margin: 5 }, axisTick: {}, nameGap: 25 },
-        { data: ["A", "B"], axisLabel: { rotate: 0, margin: 5 }, axisTick: {}, nameGap: 25 },
+        {
+          data: ["Jan", "Feb"],
+          axisLabel: { rotate: 0, margin: 5 },
+          axisTick: {},
+          nameGap: 25,
+        },
+        {
+          data: ["A", "B"],
+          axisLabel: { rotate: 0, margin: 5 },
+          axisTick: {},
+          nameGap: 25,
+        },
       ];
       ctx.panelSchema = {
         ...ctx.panelSchema,
         type: "stacked",
-        config: { ...ctx.panelSchema.config, axis_label_truncate_width: 120, decimals: 2 },
+        config: {
+          ...ctx.panelSchema.config,
+          axis_label_truncate_width: 120,
+          decimals: 2,
+        },
       };
       applyStackedChart(ctx);
       expect(ctx.options.xAxis).toHaveLength(1);
@@ -216,7 +249,11 @@ describe("SQL Chart Converters", () => {
 
     it("sets tooltip axisPointer label", () => {
       const ctx = makeMockContext();
-      ctx.panelSchema = { ...ctx.panelSchema, type: "stacked", config: { ...ctx.panelSchema.config, decimals: 2 } };
+      ctx.panelSchema = {
+        ...ctx.panelSchema,
+        type: "stacked",
+        config: { ...ctx.panelSchema.config, decimals: 2 },
+      };
       applyStackedChart(ctx);
       expect(ctx.options.tooltip.axisPointer.label).toBeDefined();
     });
@@ -225,8 +262,12 @@ describe("SQL Chart Converters", () => {
   describe("applyHStackedChart", () => {
     it("swaps xAxis and yAxis", () => {
       const ctx = makeMockContext();
-      ctx.options.xAxis = [{ data: ["A", "B"], axisLabel: { width: 80 }, name: "X" }];
-      ctx.options.yAxis = [{ data: ["1", "2"], axisLabel: { width: 60 }, name: "Y" }];
+      ctx.options.xAxis = [
+        { data: ["A", "B"], axisLabel: { width: 80 }, name: "X" },
+      ];
+      ctx.options.yAxis = [
+        { data: ["1", "2"], axisLabel: { width: 60 }, name: "Y" },
+      ];
       applyHStackedChart(ctx);
       // The function overwrites xAxis[0].data with getAxisDataFromKey(xAxisKeys[0]) before swapping
       // xAxisKeys[0] = "x1", getAxisDataFromKey("x1") = ["Jan", "Feb", "Mar"]
@@ -245,8 +286,12 @@ describe("SQL Chart Converters", () => {
 
     it("sets nameGap on yAxis elements", () => {
       const ctx = makeMockContext();
-      ctx.options.xAxis = [{ data: ["A", "B"], axisLabel: { width: 100 }, name: "" }];
-      ctx.options.yAxis = [{ data: ["Jan", "Feb"], axisLabel: { width: 100 }, name: "" }];
+      ctx.options.xAxis = [
+        { data: ["A", "B"], axisLabel: { width: 100 }, name: "" },
+      ];
+      ctx.options.yAxis = [
+        { data: ["Jan", "Feb"], axisLabel: { width: 100 }, name: "" },
+      ];
       applyHStackedChart(ctx);
       // After swap, yAxis is original xAxis which should have nameGap set
       ctx.options.yAxis.forEach((axis: any) => {
@@ -258,8 +303,12 @@ describe("SQL Chart Converters", () => {
   describe("applyHBarChart", () => {
     it("swaps xAxis and yAxis", () => {
       const ctx = makeMockContext();
-      ctx.options.xAxis = [{ data: ["A", "B"], axisLabel: { width: 80 }, name: "" }];
-      ctx.options.yAxis = [{ data: ["1", "2"], axisLabel: { width: 60 }, name: "" }];
+      ctx.options.xAxis = [
+        { data: ["A", "B"], axisLabel: { width: 80 }, name: "" },
+      ];
+      ctx.options.yAxis = [
+        { data: ["1", "2"], axisLabel: { width: 60 }, name: "" },
+      ];
       ctx.panelSchema = {
         ...ctx.panelSchema,
         type: "h-bar",
@@ -272,13 +321,22 @@ describe("SQL Chart Converters", () => {
 
     it("sets xAxis name from query fields", () => {
       const ctx = makeMockContext();
-      ctx.options.xAxis = [{ data: ["A"], axisLabel: { width: 80, overflow: "" }, nameGap: 0, name: "" }];
+      ctx.options.xAxis = [
+        {
+          data: ["A"],
+          axisLabel: { width: 80, overflow: "" },
+          nameGap: 0,
+          name: "",
+        },
+      ];
       ctx.options.yAxis = [{ data: [], axisLabel: { width: 60 }, name: "" }];
       ctx.panelSchema = {
         ...ctx.panelSchema,
         type: "h-bar",
         config: { ...ctx.panelSchema.config, trellis: { layout: null } },
-        queries: [{ fields: { y: [{ label: "Metrics" }] }, customQuery: false }],
+        queries: [
+          { fields: { y: [{ label: "Metrics" }] }, customQuery: false },
+        ],
       };
       applyHBarChart(ctx);
       // After swap, original yAxis (now xAxis) should have name set
@@ -293,7 +351,16 @@ describe("SQL Chart Converters", () => {
         ...ctx.panelSchema,
         type: "area-stacked",
         config: { ...ctx.panelSchema.config, decimals: 2 },
-        queries: [{ fields: { x: [], y: [{ label: "Value" }], breakdown: [{ alias: "cat" }] }, customQuery: false }],
+        queries: [
+          {
+            fields: {
+              x: [],
+              y: [{ label: "Value" }],
+              breakdown: [{ alias: "cat" }],
+            },
+            customQuery: false,
+          },
+        ],
       };
       applyLineAreaScatterBarChart(ctx);
       expect(ctx.getSeries).toHaveBeenCalled();
@@ -304,7 +371,12 @@ describe("SQL Chart Converters", () => {
       ctx.panelSchema = {
         ...ctx.panelSchema,
         type: "line",
-        queries: [{ fields: { x: [], y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+        queries: [
+          {
+            fields: { x: [], y: [{ label: "Value" }], breakdown: [] },
+            customQuery: false,
+          },
+        ],
       };
       expect(() => applyLineAreaScatterBarChart(ctx)).not.toThrow();
     });

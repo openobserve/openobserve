@@ -469,7 +469,7 @@ describe("FlameGraphView", () => {
 
       // Simulate click event handler
       const clickHandler = mockChart.on.mock.calls.find(
-        (call: any) => call[0] === "click"
+        (call: any) => call[0] === "click",
       )?.[1];
 
       expect(clickHandler).toBeDefined();
@@ -501,7 +501,7 @@ describe("FlameGraphView", () => {
 
       const mockChart = (echarts.init as any).mock.results[0].value;
       const clickHandler = mockChart.on.mock.calls.find(
-        (call: any) => call[0] === "click"
+        (call: any) => call[0] === "click",
       )?.[1];
 
       // Click without span data
@@ -686,7 +686,7 @@ describe("FlameGraphView", () => {
           depth: i,
           durationMs: 10,
           startOffsetMs: i * 10,
-        })
+        }),
       );
 
       wrapper = mount(FlameGraphView, {

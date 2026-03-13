@@ -20,14 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:pb-4">
         <div class="tw:flex tw:items-start tw:gap-4">
           <div class="tw:flex-shrink-0">
-            <q-icon name="cloud" size="2.5rem" color="primary" />
+            <q-icon name="cloud" size="2.5rem"
+color="primary" />
           </div>
           <div class="tw:flex-1">
             <h5 class="tw:text-lg tw:font-bold tw:m-0 tw:mb-2 title">
               Azure Function Integration
             </h5>
             <p class="tw:text-sm tw:m-0 tw:mb-4 description">
-              Deploy the OpenObserve Azure Function to collect logs from any Azure service through diagnostic settings and Event Hub.
+              Deploy the OpenObserve Azure Function to collect logs from any
+              Azure service through diagnostic settings and Event Hub.
             </p>
 
             <div class="tw:flex tw:gap-2 tw:mt-4">
@@ -37,7 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="handleDeployFunction"
                 data-test="azure-quick-setup-deploy-btn"
               >
-                <q-icon name="open_in_new" left size="sm" />
+                <q-icon name="open_in_new" left
+size="sm" />
                 View Setup Guide
               </q-btn>
               <q-btn
@@ -47,7 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="addingDashboard"
                 data-test="azure-quick-setup-add-dashboard-btn"
               >
-                <q-icon name="dashboard" left size="sm" />
+                <q-icon name="dashboard" left
+size="sm" />
                 Add Dashboard
               </q-btn>
               <q-btn
@@ -56,8 +60,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="showDetails = !showDetails"
                 data-test="azure-quick-setup-details-btn"
               >
-                <q-icon :name="showDetails ? 'expand_less' : 'expand_more'" left size="sm" />
-                {{ showDetails ? 'Hide' : 'View' }} Details
+                <q-icon
+                  :name="showDetails ? 'expand_less' : 'expand_more'"
+                  left
+                  size="sm"
+                />
+                {{ showDetails ? "Hide" : "View" }} Details
               </q-btn>
             </div>
           </div>
@@ -69,7 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-separator />
           <q-card-section class="tw:pt-4">
             <div class="tw:text-sm details-section">
-              <h6 class="tw:text-base tw:font-semibold tw:m-0 tw:mb-3 details-title">
+              <h6
+                class="tw:text-base tw:font-semibold tw:m-0 tw:mb-3 details-title"
+              >
                 Supported Azure Services ({{ includedServices.length }})
               </h6>
 
@@ -105,17 +115,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <h6 class="tw:text-base tw:font-semibold tw:m-0 tw:mb-3 details-title">How It Works</h6>
+              <h6
+                class="tw:text-base tw:font-semibold tw:m-0 tw:mb-3 details-title"
+              >
+                How It Works
+              </h6>
 
               <div class="tw:mb-3">
-                <div class="tw:font-semibold tw:mb-1 detail-label">Architecture:</div>
+                <div class="tw:font-semibold tw:mb-1 detail-label">
+                  Architecture:
+                </div>
                 <div class="detail-value">
-                  Azure Service → Diagnostic Settings → Event Hub → Azure Function → OpenObserve
+                  Azure Service → Diagnostic Settings → Event Hub → Azure
+                  Function → OpenObserve
                 </div>
               </div>
 
               <div class="tw:mb-3">
-                <div class="tw:font-semibold tw:mb-1 detail-label">What You Need:</div>
+                <div class="tw:font-semibold tw:mb-1 detail-label">
+                  What You Need:
+                </div>
                 <ul class="tw:list-disc tw:ml-5 tw:space-y-1 detail-value">
                   <li>Azure subscription with appropriate permissions</li>
                   <li>Event Hub namespace and hub</li>
@@ -125,20 +144,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div class="tw:mb-3">
-                <div class="tw:font-semibold tw:mb-1 detail-label">Setup Steps:</div>
+                <div class="tw:font-semibold tw:mb-1 detail-label">
+                  Setup Steps:
+                </div>
                 <ol class="tw:list-decimal tw:ml-5 tw:space-y-1 detail-value">
                   <li>Create an Event Hub namespace and hub</li>
                   <li>Deploy the Azure Function from GitHub</li>
                   <li>Configure function with OpenObserve credentials</li>
-                  <li>Enable diagnostic settings on Azure services to send logs to Event Hub</li>
+                  <li>
+                    Enable diagnostic settings on Azure services to send logs to
+                    Event Hub
+                  </li>
                 </ol>
               </div>
 
               <div>
-                <div class="tw:font-semibold tw:mb-1 detail-label">Cost Considerations:</div>
+                <div class="tw:font-semibold tw:mb-1 detail-label">
+                  Cost Considerations:
+                </div>
                 <div class="detail-value">
-                  Charges apply for Event Hub throughput, Azure Function execution, and OpenObserve storage.
-                  Refer to Azure and OpenObserve pricing for details.
+                  Charges apply for Event Hub throughput, Azure Function
+                  execution, and OpenObserve storage. Refer to Azure and
+                  OpenObserve pricing for details.
                 </div>
               </div>
             </div>
@@ -168,7 +195,7 @@ export default defineComponent({
     // Get all Azure services
     const includedServices = computed(() => {
       return azureIntegrations
-        .map(integration => ({
+        .map((integration) => ({
           name: integration.displayName,
           description: integration.description,
           category: integration.category,
@@ -178,15 +205,15 @@ export default defineComponent({
 
     const getCategoryIcon = (category: string) => {
       const iconMap: Record<string, string> = {
-        'logs': 'description',
-        'metrics': 'speed',
-        'security': 'security',
-        'networking': 'network_check',
-        'compute': 'computer',
-        'storage': 'storage',
-        'other': 'settings',
+        logs: "description",
+        metrics: "speed",
+        security: "security",
+        networking: "network_check",
+        compute: "computer",
+        storage: "storage",
+        other: "settings",
       };
-      return iconMap[category] || 'cloud';
+      return iconMap[category] || "cloud";
     };
 
     const formatCategory = (category: string) => {
@@ -201,14 +228,19 @@ export default defineComponent({
       });
 
       // Open GitHub repository in new tab
-      window.open('https://github.com/openobserve/azure-function-openobserve', '_blank', 'noopener,noreferrer');
+      window.open(
+        "https://github.com/openobserve/azure-function-openobserve",
+        "_blank",
+        "noopener,noreferrer",
+      );
     };
 
     const handleAddDashboard = async () => {
       try {
         addingDashboard.value = true;
 
-        const dashboardUrl = 'https://raw.githubusercontent.com/openobserve/dashboards/main/Microsoft_O365/Microsoft.dashboard.json';
+        const dashboardUrl =
+          "https://raw.githubusercontent.com/openobserve/dashboards/main/Microsoft_O365/Microsoft.dashboard.json";
         const orgId = store.state.selectedOrganization.identifier;
 
         // Fetch the dashboard JSON
@@ -225,13 +257,13 @@ export default defineComponent({
         const folders = foldersResponse.data?.list || [];
 
         // Check if Microsoft folder exists
-        let microsoftFolder = folders.find((f: any) => f.name === 'Microsoft');
+        let microsoftFolder = folders.find((f: any) => f.name === "Microsoft");
 
         if (!microsoftFolder) {
           // Create Microsoft folder
           const folderResponse = await dashboardsService.new_Folder(orgId, {
-            name: 'Microsoft',
-            description: 'Microsoft Azure and O365 dashboards',
+            name: "Microsoft",
+            description: "Microsoft Azure and O365 dashboards",
           });
           microsoftFolder = folderResponse.data;
         }
@@ -242,17 +274,17 @@ export default defineComponent({
         const dashboardsResponse = await dashboardsService.list(
           0,
           1000,
-          'name',
+          "name",
           false,
-          '',
+          "",
           orgId,
           folderId,
-          dashboardTitle
+          dashboardTitle,
         );
 
         const existingDashboards = dashboardsResponse.data?.dashboards || [];
         const existingDashboard = existingDashboards.find(
-          (d: any) => d.title === dashboardTitle
+          (d: any) => d.title === dashboardTitle,
         );
 
         let shouldReplace = false;
@@ -260,11 +292,12 @@ export default defineComponent({
           // Ask user if they want to replace
           shouldReplace = await new Promise<boolean>((resolve) => {
             q.dialog({
-              title: 'Dashboard Already Exists',
+              title: "Dashboard Already Exists",
               message: `A dashboard named "${dashboardTitle}" already exists in the Microsoft folder. Do you want to replace it?`,
               cancel: true,
               persistent: true,
-            }).onOk(() => resolve(true))
+            })
+              .onOk(() => resolve(true))
               .onCancel(() => resolve(false));
           });
 
@@ -274,21 +307,27 @@ export default defineComponent({
           }
 
           // Delete existing dashboard
-          await dashboardsService.delete(orgId, existingDashboard.dashboardId, folderId);
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await dashboardsService.delete(
+            orgId,
+            existingDashboard.dashboardId,
+            folderId,
+          );
+          await new Promise((resolve) => setTimeout(resolve, 500));
         }
 
-        console.log('Creating dashboard:', { orgId, folderId, title: dashboardTitle });
+        console.log("Creating dashboard:", {
+          orgId,
+          folderId,
+          title: dashboardTitle,
+        });
 
         // Add the dashboard to the Microsoft folder
-        await dashboardsService.create(
-          orgId,
-          dashboardData,
-          folderId
-        );
+        await dashboardsService.create(orgId, dashboardData, folderId);
 
         // Refresh folders in store
-        await store.dispatch('organizationData/getFolders', { org_identifier: orgId });
+        await store.dispatch("organizationData/getFolders", {
+          org_identifier: orgId,
+        });
 
         // Track analytics
         segment.track("Azure Dashboard Added", {
@@ -299,17 +338,17 @@ export default defineComponent({
         });
 
         q.notify({
-          type: 'positive',
+          type: "positive",
           message: shouldReplace
-            ? 'Microsoft O365 dashboard replaced successfully'
-            : 'Microsoft O365 dashboard added successfully to Microsoft folder',
+            ? "Microsoft O365 dashboard replaced successfully"
+            : "Microsoft O365 dashboard added successfully to Microsoft folder",
           timeout: 3000,
         });
       } catch (error) {
-        console.error('Error adding dashboard:', error);
+        console.error("Error adding dashboard:", error);
         q.notify({
-          type: 'negative',
-          message: `Failed to add dashboard: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          type: "negative",
+          message: `Failed to add dashboard: ${error instanceof Error ? error.message : "Unknown error"}`,
           timeout: 5000,
         });
       } finally {

@@ -4,11 +4,15 @@
     <!-- Quick Install Section -->
     <div class="tw:mb-6 tw:p-4 tw:rounded-lg" :class="quickInstallBgClass">
       <div class="tw:flex tw:items-start tw:gap-3">
-        <q-icon name="rocket_launch" size="md" color="primary" />
+        <q-icon name="rocket_launch" size="md"
+color="primary" />
         <div class="tw:flex-1">
-          <h6 class="tw:text-base tw:font-bold tw:m-0 tw:mb-2">Quick Install (Recommended)</h6>
+          <h6 class="tw:text-base tw:font-bold tw:m-0 tw:mb-2">
+            Quick Install (Recommended)
+          </h6>
           <p class="tw:text-sm tw:m-0 tw:mb-3" :class="descriptionClass">
-            Install OpenObserve collector with a single command. Just set your cluster name and run.
+            Install OpenObserve collector with a single command. Just set your
+            cluster name and run.
           </p>
 
           <div class="tw:mb-3">
@@ -28,19 +32,28 @@
           </div>
 
           <div v-if="config.isCloud != 'true'" class="tw:mb-3">
-            <q-tabs v-model="installType" dense no-caps>
+            <q-tabs v-model="installType" dense
+no-caps>
               <q-tab name="external" label="External Endpoint" />
               <q-tab name="internal" label="Internal Endpoint">
-                <q-tooltip>Use this if OpenObserve is in the same cluster</q-tooltip>
+                <q-tooltip
+                  >Use this if OpenObserve is in the same cluster</q-tooltip
+                >
               </q-tab>
             </q-tabs>
           </div>
 
-          <ContentCopy class="tw:mt-3" :content="quickInstallCmd" :key="`${clusterName}-${installType}`" />
+          <ContentCopy
+            class="tw:mt-3"
+            :content="quickInstallCmd"
+            :key="`${clusterName}-${installType}`"
+          />
 
           <div class="tw:mt-2 tw:text-xs" :class="hintClass">
-            <q-icon name="info" size="xs" class="tw:mr-1" />
-            This installs cert-manager, OpenTelemetry operator, and OpenObserve collector automatically
+            <q-icon name="info" size="xs"
+class="tw:mr-1" />
+            This installs cert-manager, OpenTelemetry operator, and OpenObserve
+            collector automatically
           </div>
         </div>
       </div>
@@ -97,7 +110,8 @@
           <ContentCopy class="q-mt-sm" :content="collectorCmd" />
         </div>
         <div v-else>
-          <q-tabs v-model="tab" horizontalalign="left" no-caps>
+          <q-tabs v-model="tab" horizontalalign="left"
+no-caps>
             <q-tab
               data-test="kubernetes-default-tab"
               name="external"
@@ -130,7 +144,10 @@ Make changes accordingly to the above URL.
               </pre>
             </q-tab-panel>
 
-            <q-tab-panel name="external" data-test="kubernetes-tab-panels-default">
+            <q-tab-panel
+              name="external"
+              data-test="kubernetes-tab-panels-default"
+            >
               <ContentCopy class="q-mt-sm" :content="collectorCmd" />
             </q-tab-panel>
           </q-tab-panels>
@@ -206,7 +223,11 @@ import { computed, ref, type Ref } from "vue";
 import type { Endpoint } from "@/ts/interfaces";
 import ContentCopy from "@/components/CopyContent.vue";
 import { useStore } from "vuex";
-import { b64EncodeStandard, getEndPoint, getIngestionURL } from "../../../utils/zincutils";
+import {
+  b64EncodeStandard,
+  getEndPoint,
+  getIngestionURL,
+} from "../../../utils/zincutils";
 import config from "@/aws-exports";
 import { useI18n } from "vue-i18n";
 
@@ -246,24 +267,25 @@ const accessKey = computed(() => {
 
 // Computed class for styling based on theme
 const quickInstallBgClass = computed(() => {
-  return store.state.theme === 'dark'
-    ? 'tw:bg-gray-800 tw:border tw:border-gray-700'
-    : 'tw:bg-blue-50 tw:border tw:border-blue-200';
+  return store.state.theme === "dark"
+    ? "tw:bg-gray-800 tw:border tw:border-gray-700"
+    : "tw:bg-blue-50 tw:border tw:border-blue-200";
 });
 
 const descriptionClass = computed(() => {
-  return store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700';
+  return store.state.theme === "dark" ? "tw:text-gray-300" : "tw:text-gray-700";
 });
 
 const hintClass = computed(() => {
-  return store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600';
+  return store.state.theme === "dark" ? "tw:text-gray-400" : "tw:text-gray-600";
 });
 
 // Quick install command
 const quickInstallCmd = computed(() => {
-  const baseCmd = 'curl -sSL https://raw.githubusercontent.com/openobserve/o2-datasource/main/k8s/install.sh | bash -s --';
+  const baseCmd =
+    "curl -sSL https://raw.githubusercontent.com/openobserve/o2-datasource/main/k8s/install.sh | bash -s --";
 
-  if (config.isCloud === 'true') {
+  if (config.isCloud === "true") {
     // Cloud version - external endpoint only
     return `${baseCmd} \\
   --cluster-name=${clusterName.value} \\
@@ -272,7 +294,7 @@ const quickInstallCmd = computed(() => {
   --access-key=${accessKey.value}`;
   } else {
     // Self-hosted version - support both internal and external
-    if (installType.value === 'internal') {
+    if (installType.value === "internal") {
       return `${baseCmd} \\
   --cluster-name=${clusterName.value} \\
   --org-id=${props.currOrgIdentifier} \\

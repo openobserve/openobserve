@@ -15,9 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="preview-alert-container" :class="{'preview-alert-container-light': store.state.theme !== 'dark'}" ref="chartPanelRef" style="height: 100%; position: relative; display: flex; flex-direction: column;">
+  <div
+    class="preview-alert-container"
+    :class="{ 'preview-alert-container-light': store.state.theme !== 'dark' }"
+    ref="chartPanelRef"
+    style="
+      height: 100%;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    "
+  >
     <!-- Chart -->
-    <div data-test="alert-preview-chart" class="preview-alert-chart" style="flex: 1; min-height: 0; padding: 1rem;">
+    <div
+      data-test="alert-preview-chart"
+      class="preview-alert-chart"
+      style="flex: 1; min-height: 0; padding: 1rem"
+    >
       <PanelSchemaRenderer
         ref="panelRendererRef"
         v-if="chartData"
@@ -28,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :variablesData="{}"
         searchType="UI"
         :is_ui_histogram="shouldUseHistogram"
-        style="height: 100%; width: 100%;"
+        style="height: 100%; width: 100%"
         @result-metadata-update="handleChartDataUpdate"
         @series-data-update="handleSeriesDataUpdate"
       />
@@ -45,7 +59,11 @@ import { cloneDeep } from "lodash-es";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
-import { b64EncodeUnicode, b64DecodeUnicode, smartDecodeVrlFunction } from "@/utils/zincutils";
+import {
+  b64EncodeUnicode,
+  b64DecodeUnicode,
+  smartDecodeVrlFunction,
+} from "@/utils/zincutils";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 
 const getDefaultDashboardPanelData: any = () => ({
@@ -180,7 +198,7 @@ const props = defineProps({
   },
 });
 
-  const { hasAggregation, fnParsedSQL } = logsUtils();
+const { hasAggregation, fnParsedSQL } = logsUtils();
 
 // Helper function to get decoded VRL function
 const getDecodedVrlFunction = (): string | null => {
@@ -198,12 +216,13 @@ onBeforeMount(() => {
     props.selectedTab === "promql" ? "promql" : "sql";
   dashboardPanelData.data.queries[0].query = props.query;
   // VRL function is only supported in SQL mode
-  dashboardPanelData.data.queries[0].vrlFunctionQuery = props.selectedTab === "sql"
-    ? getDecodedVrlFunction()
-    : null;
+  dashboardPanelData.data.queries[0].vrlFunctionQuery =
+    props.selectedTab === "sql" ? getDecodedVrlFunction() : null;
   // Enable dynamic columns when VRL function is present
   dashboardPanelData.data.config.table_dynamic_columns =
-    props.selectedTab === "sql" && props.formData.query_condition?.vrl_function ? true : false;
+    props.selectedTab === "sql" && props.formData.query_condition?.vrl_function
+      ? true
+      : false;
   dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
   dashboardPanelData.data.queries[0].fields.stream_type =
     props.formData.stream_type;
@@ -226,7 +245,6 @@ const store = useStore();
 // For SQL/custom with aggregations (GROUP BY), we should use histogram
 // because histogram is needed for aggregated queries
 const shouldUseHistogram = computed(() => {
-
   // Custom mode with aggregations: never use histogram
   if (props.selectedTab === "custom" && props.isAggregationEnabled) {
     return false;
@@ -243,18 +261,18 @@ const determineChartType = (extractedFields: {
   timeseries_field: string | null;
 }): string => {
   // Check if we have histogram or timestamp in group_by (common patterns)
-  const hasTimeSeriesGrouping = extractedFields.group_by.some(field =>
-    field && (
-      field.toLowerCase().includes('histogram') ||
-      field.toLowerCase().includes('_timestamp') ||
-      field.toLowerCase().includes('timestamp')
-    )
+  const hasTimeSeriesGrouping = extractedFields.group_by.some(
+    (field) =>
+      field &&
+      (field.toLowerCase().includes("histogram") ||
+        field.toLowerCase().includes("_timestamp") ||
+        field.toLowerCase().includes("timestamp")),
   );
 
   // For raw log data (no group_by)
   // we will show table by default becuase no group by means no aggregation so for no aggregation queries we dont show any line chart
   if (extractedFields.group_by.length === 0) {
-    return 'table';
+    return "table";
   }
 
   // If we have a time series field with time-based grouping, use line chart
@@ -267,7 +285,10 @@ const determineChartType = (extractedFields: {
   }
 
   // If we have group by without time series, could be bar chart
-  if (extractedFields.group_by.length > 0 && extractedFields.group_by.length <= 2) {
+  if (
+    extractedFields.group_by.length > 0 &&
+    extractedFields.group_by.length <= 2
+  ) {
     return "bar";
   }
 
@@ -291,7 +312,7 @@ const convertSchemaToFields = (
   // For table charts, add all projections to x-axis since tables display all fields as columns
   if (chartType === "table") {
     return {
-      x: extractedFields.projections.map(field => ({
+      x: extractedFields.projections.map((field) => ({
         alias: field,
         column: field,
         color: null,
@@ -315,7 +336,7 @@ const convertSchemaToFields = (
 
   const fields = {
     x: [] as any[],
-    y: yAxisFields.map(field => ({
+    y: yAxisFields.map((field) => ({
       alias: field,
       column: field,
       color: "#5960b2",
@@ -397,18 +418,23 @@ const fetchQuerySchema = async () => {
     const chartType = determineChartType(extractedFields);
     dashboardPanelData.data.type = chartType;
 
-
     // Convert schema to fields
     const fields = convertSchemaToFields(extractedFields, chartType);
 
     // Set up the query
     dashboardPanelData.data.queries[0].customQuery = true;
     dashboardPanelData.data.queries[0].query = props.query;
-    dashboardPanelData.data.queries[0].vrlFunctionQuery = getDecodedVrlFunction();
+    dashboardPanelData.data.queries[0].vrlFunctionQuery =
+      getDecodedVrlFunction();
     // Enable dynamic columns when VRL function is present
-    dashboardPanelData.data.config.table_dynamic_columns = props.formData.query_condition?.vrl_function ? true : false;
-    dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
-    dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
+    dashboardPanelData.data.config.table_dynamic_columns = props.formData
+      .query_condition?.vrl_function
+      ? true
+      : false;
+    dashboardPanelData.data.queries[0].fields.stream =
+      props.formData.stream_name;
+    dashboardPanelData.data.queries[0].fields.stream_type =
+      props.formData.stream_type;
     dashboardPanelData.data.queryType = "sql";
 
     // Set the fields from schema
@@ -427,7 +453,10 @@ const fetchQuerySchema = async () => {
     // }
 
     // Ensure filter is always an object
-    if (!dashboardPanelData.data.queries[0].fields.filter || Array.isArray(dashboardPanelData.data.queries[0].fields.filter)) {
+    if (
+      !dashboardPanelData.data.queries[0].fields.filter ||
+      Array.isArray(dashboardPanelData.data.queries[0].fields.filter)
+    ) {
       dashboardPanelData.data.queries[0].fields.filter = {
         filterType: "group",
         logicalOperator: "AND",
@@ -445,18 +474,27 @@ const fetchQuerySchema = async () => {
     dashboardPanelData.data.type = "table";
     dashboardPanelData.data.queries[0].customQuery = true;
     dashboardPanelData.data.queries[0].query = props.query;
-    dashboardPanelData.data.queries[0].vrlFunctionQuery = getDecodedVrlFunction();
+    dashboardPanelData.data.queries[0].vrlFunctionQuery =
+      getDecodedVrlFunction();
     // Enable dynamic columns when VRL function is present
-    dashboardPanelData.data.config.table_dynamic_columns = props.formData.query_condition?.vrl_function ? true : false;
-    dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
-    dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
+    dashboardPanelData.data.config.table_dynamic_columns = props.formData
+      .query_condition?.vrl_function
+      ? true
+      : false;
+    dashboardPanelData.data.queries[0].fields.stream =
+      props.formData.stream_name;
+    dashboardPanelData.data.queries[0].fields.stream_type =
+      props.formData.stream_type;
     dashboardPanelData.data.queryType = "sql";
     dashboardPanelData.data.queries[0].fields.x = [];
     dashboardPanelData.data.queries[0].fields.y = [];
     dashboardPanelData.data.queries[0].fields.z = [];
     dashboardPanelData.data.queries[0].fields.breakdown = [];
 
-    if (!dashboardPanelData.data.queries[0].fields.filter || Array.isArray(dashboardPanelData.data.queries[0].fields.filter)) {
+    if (
+      !dashboardPanelData.data.queries[0].fields.filter ||
+      Array.isArray(dashboardPanelData.data.queries[0].fields.filter)
+    ) {
       dashboardPanelData.data.queries[0].fields.filter = {
         filterType: "group",
         logicalOperator: "AND",
@@ -474,7 +512,9 @@ const fetchQuerySchema = async () => {
 const handleChartDataUpdate = (resultMetaData: any) => {
   // Safety check: ensure trigger_condition exists
   if (!props.formData.trigger_condition) {
-    console.warn("[PreviewAlert] No trigger_condition found, skipping evaluation");
+    console.warn(
+      "[PreviewAlert] No trigger_condition found, skipping evaluation",
+    );
     return;
   }
 
@@ -492,17 +532,28 @@ const handleChartDataUpdate = (resultMetaData: any) => {
 
       if (Array.isArray(firstQueryMetadata) && firstQueryMetadata.length > 0) {
         // Get the latest partition metadata (last element in array)
-        const latestPartition = firstQueryMetadata[firstQueryMetadata.length - 1];
+        const latestPartition =
+          firstQueryMetadata[firstQueryMetadata.length - 1];
 
         // Determine result count based on query mode
         // SQL mode and custom with aggregations: use 'total' field (count of aggregated groups)
-        if (props.selectedTab === "sql" || (props.selectedTab === "custom" && props.isAggregationEnabled)) {
+        if (
+          props.selectedTab === "sql" ||
+          (props.selectedTab === "custom" && props.isAggregationEnabled)
+        ) {
           // Sum up total from all partitions instead of just taking the last one
           // This handles streaming responses where data comes in multiple partitions
-          if (firstQueryMetadata.some((partition: any) => partition?.total !== undefined)) {
-            resultCount = firstQueryMetadata.reduce((sum: number, partition: any) => {
-              return sum + (partition?.total || 0);
-            }, 0);
+          if (
+            firstQueryMetadata.some(
+              (partition: any) => partition?.total !== undefined,
+            )
+          ) {
+            resultCount = firstQueryMetadata.reduce(
+              (sum: number, partition: any) => {
+                return sum + (partition?.total || 0);
+              },
+              0,
+            );
           } else if (Array.isArray(latestPartition?.hits)) {
             resultCount = latestPartition.hits.length;
           }
@@ -515,20 +566,33 @@ const handleChartDataUpdate = (resultMetaData: any) => {
           // 2. OR count data points above/below threshold - for "value" alerts
 
           // Check if we have PromQL result structure
-          if (latestPartition?.result && Array.isArray(latestPartition.result)) {
+          if (
+            latestPartition?.result &&
+            Array.isArray(latestPartition.result)
+          ) {
             // Count the number of time series
             resultCount = latestPartition.result.length;
           } else if (Array.isArray(latestPartition?.hits)) {
             resultCount = latestPartition.hits.length;
-          } else if (firstQueryMetadata.some((partition: any) => partition?.total !== undefined)) {
+          } else if (
+            firstQueryMetadata.some(
+              (partition: any) => partition?.total !== undefined,
+            )
+          ) {
             // Sum up total from all partitions for PromQL fallback
-            resultCount = firstQueryMetadata.reduce((sum: number, partition: any) => {
-              return sum + (partition?.total || 0);
-            }, 0);
+            resultCount = firstQueryMetadata.reduce(
+              (sum: number, partition: any) => {
+                return sum + (partition?.total || 0);
+              },
+              0,
+            );
           }
         }
         // Custom mode without aggregations: sum zo_sql_num from all partitions
-        else if (props.selectedTab === "custom" && !props.isAggregationEnabled) {
+        else if (
+          props.selectedTab === "custom" &&
+          !props.isAggregationEnabled
+        ) {
           // Iterate through ALL partitions to sum zo_sql_num values
           for (const partition of firstQueryMetadata) {
             if (Array.isArray(partition?.hits)) {
@@ -543,14 +607,24 @@ const handleChartDataUpdate = (resultMetaData: any) => {
         // Fallback for any other modes (traces, logs without aggregation, etc.)
         else {
           // Sum up total from all partitions instead of just taking the last one
-          if (firstQueryMetadata.some((partition: any) => partition?.total !== undefined)) {
-            resultCount = firstQueryMetadata.reduce((sum: number, partition: any) => {
-              return sum + (partition?.total || 0);
-            }, 0);
+          if (
+            firstQueryMetadata.some(
+              (partition: any) => partition?.total !== undefined,
+            )
+          ) {
+            resultCount = firstQueryMetadata.reduce(
+              (sum: number, partition: any) => {
+                return sum + (partition?.total || 0);
+              },
+              0,
+            );
           } else if (Array.isArray(latestPartition?.hits)) {
             resultCount = latestPartition.hits.length;
           } else {
-            console.warn("[PreviewAlert] Could not determine result count from metadata:", latestPartition);
+            console.warn(
+              "[PreviewAlert] Could not determine result count from metadata:",
+              latestPartition,
+            );
           }
         }
       }
@@ -582,13 +656,16 @@ const handleSeriesDataUpdate = (seriesData: any) => {
 
     if (Array.isArray(seriesData)) {
       resultCount = seriesData.length;
-    } else if (seriesData && typeof seriesData === 'object') {
+    } else if (seriesData && typeof seriesData === "object") {
       // Check if there's a nested array
       if (Array.isArray(seriesData.series)) {
         resultCount = seriesData.series.length;
       } else if (Array.isArray(seriesData.data)) {
         resultCount = seriesData.data.length;
-      } else if (seriesData.options && Array.isArray(seriesData.options.series)) {
+      } else if (
+        seriesData.options &&
+        Array.isArray(seriesData.options.series)
+      ) {
         // ECharts series are in options.series
         // Filter to only count actual data series with meaningful data
         // Exclude helper/placeholder series (unnamed series with only 1 data point)
@@ -621,7 +698,9 @@ const handleSeriesDataUpdate = (seriesData: any) => {
 
 // Separate function to evaluate and set status based on result count
 const evaluateAndSetStatus = (resultCount: number) => {
-  const isRealTime = props.formData.is_real_time === "true" || props.formData.is_real_time === true;
+  const isRealTime =
+    props.formData.is_real_time === "true" ||
+    props.formData.is_real_time === true;
 
   // Use the configured trigger condition threshold values
   const threshold = props.formData.trigger_condition?.threshold || 0;
@@ -635,7 +714,7 @@ const evaluateAndSetStatus = (resultCount: number) => {
     // Always show as "would trigger" with informational message for real-time alerts
     evaluationStatus.value = {
       wouldTrigger: true,
-      reason: 'When conditions match',
+      reason: "When conditions match",
     };
     return;
   }
@@ -671,8 +750,9 @@ const evaluateAndSetStatus = (resultCount: number) => {
 
   // Determine appropriate label based on chart data
   const chartType = dashboardPanelData.data.type;
-  const hasGroupBy = dashboardPanelData.data.queries[0]?.fields?.breakdown?.length > 0 ||
-                     dashboardPanelData.data.queries[0]?.fields?.x?.length > 0;
+  const hasGroupBy =
+    dashboardPanelData.data.queries[0]?.fields?.breakdown?.length > 0 ||
+    dashboardPanelData.data.queries[0]?.fields?.x?.length > 0;
 
   let resultLabel = "result";
   if (chartType === "bar" && hasGroupBy) {
@@ -696,7 +776,9 @@ const evaluateAndSetStatus = (resultCount: number) => {
 const refreshData = () => {
   // Safety check: ensure trigger_condition exists
   if (!props.formData.trigger_condition) {
-    console.warn("[PreviewAlert] No trigger_condition found, skipping refreshData");
+    console.warn(
+      "[PreviewAlert] No trigger_condition found, skipping refreshData",
+    );
     return;
   }
 
@@ -707,7 +789,8 @@ const refreshData = () => {
   // Priority order for time range:
   // 1. Use env variable ZO_ALERT_PREVIEW_TIMERANGE_MINUTES if set and > 0
   // 2. Fall back to alert period
-  const previewTimerangeMinutes = store.state.zoConfig.alert_preview_timerange_minutes || 0;
+  const previewTimerangeMinutes =
+    store.state.zoConfig.alert_preview_timerange_minutes || 0;
   let new_relative_time;
 
   if (previewTimerangeMinutes > 0) {
@@ -737,7 +820,10 @@ const refreshData = () => {
   let yAxis = [];
 
   // Handle SQL mode and custom mode with aggregations - use result_schema API to intelligently determine chart type
-  if (props.selectedTab === "sql" || (props.selectedTab === "custom" && props.isAggregationEnabled)) {
+  if (
+    props.selectedTab === "sql" ||
+    (props.selectedTab === "custom" && props.isAggregationEnabled)
+  ) {
     // Use result_schema API to get query structure
     fetchQuerySchema();
     return;
@@ -754,8 +840,10 @@ const refreshData = () => {
     dashboardPanelData.data.queries[0].fields.y = [];
     dashboardPanelData.data.queries[0].fields.z = [];
     dashboardPanelData.data.queries[0].fields.breakdown = [];
-    dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
-    dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
+    dashboardPanelData.data.queries[0].fields.stream =
+      props.formData.stream_name;
+    dashboardPanelData.data.queries[0].fields.stream_type =
+      props.formData.stream_type;
     dashboardPanelData.data.queries[0].config.promql_mode = true;
     dashboardPanelData.data.queryType = "promql";
     dashboardPanelData.data.type = "line"; // Default chart type for PromQL time-series
@@ -773,7 +861,6 @@ const refreshData = () => {
   // Handle custom mode without aggregations - configure for histogram visualization
   // The backend automatically converts the query to histogram (zo_sql_key, zo_sql_num)
   if (props.selectedTab === "custom" && !props.isAggregationEnabled) {
-
     // Configure x-axis for zo_sql_key (timestamp buckets)
     xAxis = [
       {
@@ -781,7 +868,7 @@ const refreshData = () => {
         alias: "zo_sql_key",
         column: "zo_sql_key",
         color: null,
-      }
+      },
     ];
 
     // Configure y-axis for zo_sql_num (counts)
@@ -791,7 +878,7 @@ const refreshData = () => {
         alias: "zo_sql_num",
         column: "zo_sql_num",
         color: "#5960b2",
-      }
+      },
     ];
 
     dashboardPanelData.data.queries[0].fields.x = xAxis;
@@ -802,8 +889,10 @@ const refreshData = () => {
     dashboardPanelData.data.queries[0].query = props.query;
     dashboardPanelData.data.queries[0].vrlFunctionQuery = null; // VRL not supported in custom mode
     dashboardPanelData.data.config.table_dynamic_columns = false; // VRL not supported in custom mode
-    dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
-    dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
+    dashboardPanelData.data.queries[0].fields.stream =
+      props.formData.stream_name;
+    dashboardPanelData.data.queries[0].fields.stream_type =
+      props.formData.stream_type;
     dashboardPanelData.data.queryType = "sql";
     dashboardPanelData.data.type = "bar"; // Bar chart for histogram
 
@@ -822,15 +911,17 @@ const refreshData = () => {
   dashboardPanelData.data.queries[0].fields.y = yAxis;
   dashboardPanelData.data.queries[0].fields.breakdown = [];
 
-  dashboardPanelData.data.queries[0].customQuery = props.selectedTab === "custom";
+  dashboardPanelData.data.queries[0].customQuery =
+    props.selectedTab === "custom";
   dashboardPanelData.data.queries[0].query = props.query;
   // VRL function is only supported in SQL mode
-  dashboardPanelData.data.queries[0].vrlFunctionQuery = props.selectedTab === "sql"
-    ? getDecodedVrlFunction()
-    : null;
+  dashboardPanelData.data.queries[0].vrlFunctionQuery =
+    props.selectedTab === "sql" ? getDecodedVrlFunction() : null;
   // Enable dynamic columns when VRL function is present
   dashboardPanelData.data.config.table_dynamic_columns =
-    props.selectedTab === "sql" && props.formData.query_condition?.vrl_function ? true : false;
+    props.selectedTab === "sql" && props.formData.query_condition?.vrl_function
+      ? true
+      : false;
   dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
   dashboardPanelData.data.queries[0].fields.stream_type =
     props.formData.stream_type;
@@ -892,12 +983,18 @@ watch(
     }
 
     // Check if aggregation is enabled but required fields are missing
-    if (props.isAggregationEnabled && props.formData.query_condition?.aggregation) {
-      const hasColumn = props.formData.query_condition.aggregation.having?.column &&
-                        props.formData.query_condition.aggregation.having.column.trim() !== '';
-      const hasValue = props.formData.query_condition.aggregation.having?.value !== undefined &&
-                       props.formData.query_condition.aggregation.having.value !== null &&
-                       props.formData.query_condition.aggregation.having.value !== '';
+    if (
+      props.isAggregationEnabled &&
+      props.formData.query_condition?.aggregation
+    ) {
+      const hasColumn =
+        props.formData.query_condition.aggregation.having?.column &&
+        props.formData.query_condition.aggregation.having.column.trim() !== "";
+      const hasValue =
+        props.formData.query_condition.aggregation.having?.value !==
+          undefined &&
+        props.formData.query_condition.aggregation.having.value !== null &&
+        props.formData.query_condition.aggregation.having.value !== "";
 
       if (!hasColumn || !hasValue) {
         return;
@@ -909,7 +1006,7 @@ watch(
       refreshDataOnce();
     }
   },
-  { deep: true }
+  { deep: true },
 );
 
 // Refresh data on mount if we already have a query
@@ -945,10 +1042,10 @@ defineExpose({ refreshData: refreshDataOnce, resizeChart, evaluationStatus });
   align-items: center;
   margin-top: 5vh;
 }
-.preview-alert-container{
+.preview-alert-container {
   border: 1px solid rgb(39, 39, 39) !important;
 }
-.preview-alert-container-light{
+.preview-alert-container-light {
   border: 1px solid #e6e6e6 !important;
 }
 

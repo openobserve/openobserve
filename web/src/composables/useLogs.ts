@@ -262,7 +262,8 @@ const useLogs = () => {
       // in-progress and user select stream from dropdown in that case it loads data but it should wait for
       // additional details from the user like filter conditions and time range selection before load data
       // it should work in case of page refresh, navigate user from streams page or short url
-      let initialStreamSelected: boolean = searchObj.data.stream.selectedStream.length > 0;
+      let initialStreamSelected: boolean =
+        searchObj.data.stream.selectedStream.length > 0;
 
       await getStreamList();
       await getFunctions();
@@ -331,7 +332,7 @@ const useLogs = () => {
       if (
         Object.hasOwn(router.currentRoute.value.query, "type") &&
         (router.currentRoute.value.query.type == "search_history_re_apply" ||
-        router.currentRoute.value.query.type == "ai_chat_query")
+          router.currentRoute.value.query.type == "ai_chat_query")
       ) {
         delete router.currentRoute.value.query.type;
       }
@@ -489,7 +490,10 @@ const useLogs = () => {
     }
   };
 
-  const reorderArrayByReference = (arr1: string[], arr2: string[]): string[] => {
+  const reorderArrayByReference = (
+    arr1: string[],
+    arr2: string[],
+  ): string[] => {
     return [...arr1].sort((a, b) => {
       const indexA = arr2.indexOf(a);
       const indexB = arr2.indexOf(b);

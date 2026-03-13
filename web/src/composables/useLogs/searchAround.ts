@@ -34,7 +34,8 @@ export const useSearchAround = () => {
   const { searchObj, notificationMsg } = searchState();
   const { showErrorNotification } = useNotifications();
 
-  const { extractFields, updateGridColumns, filterHitsColumns } = useStreamFields();
+  const { extractFields, updateGridColumns, filterHitsColumns } =
+    useStreamFields();
   const { generateHistogramData, generateHistogramSkeleton } = useHistogram();
   const {
     fnParsedSQL,

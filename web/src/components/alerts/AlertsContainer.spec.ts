@@ -279,33 +279,27 @@ describe("AlertsContainer", () => {
 
   describe("Slot Content", () => {
     it("should render slot content when expanded", () => {
-      wrapper = mountComponent(
-        { isExpanded: true },
-        "light",
-        { default: '<div class="test-content">Slot Content</div>' }
-      );
+      wrapper = mountComponent({ isExpanded: true }, "light", {
+        default: '<div class="test-content">Slot Content</div>',
+      });
 
       expect(existsByTestId(wrapper, "container-content")).toBe(true);
       expect(wrapper.html()).toContain("Slot Content");
     });
 
     it("should not render slot content when collapsed", () => {
-      wrapper = mountComponent(
-        { isExpanded: false },
-        "light",
-        { default: '<div class="test-content">Slot Content</div>' }
-      );
+      wrapper = mountComponent({ isExpanded: false }, "light", {
+        default: '<div class="test-content">Slot Content</div>',
+      });
 
       expect(existsByTestId(wrapper, "container-content")).toBe(false);
       expect(wrapper.html()).not.toContain("Slot Content");
     });
 
     it("should show/hide slot content on toggle", async () => {
-      wrapper = mountComponent(
-        { isExpanded: false },
-        "light",
-        { default: '<div class="test-content">Dynamic Content</div>' }
-      );
+      wrapper = mountComponent({ isExpanded: false }, "light", {
+        default: '<div class="test-content">Dynamic Content</div>',
+      });
 
       expect(wrapper.html()).not.toContain("Dynamic Content");
 
@@ -392,11 +386,13 @@ describe("AlertsContainer", () => {
           isExpanded: false,
         },
         "light",
-        { default: '<div>Hidden Content</div>' }
+        { default: "<div>Hidden Content</div>" },
       );
 
       // Verify initial state
-      expect(findByTestId(wrapper, "container-label").text()).toBe("My Section");
+      expect(findByTestId(wrapper, "container-label").text()).toBe(
+        "My Section",
+      );
       expect(existsByTestId(wrapper, "container-content")).toBe(false);
 
       // User clicks to expand

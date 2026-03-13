@@ -17,7 +17,7 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify, Quasar } from "quasar";
-import { nextTick } from 'vue';
+import { nextTick } from "vue";
 
 // Mock service_accounts service
 vi.mock("@/services/service_accounts", () => ({
@@ -25,27 +25,27 @@ vi.mock("@/services/service_accounts", () => ({
     list: vi.fn(),
     delete: vi.fn(),
     get_service_token: vi.fn(),
-    refresh_token: vi.fn()
-  }
+    refresh_token: vi.fn(),
+  },
 }));
 
 // Mock usePermissions composable
 const mockServiceAccountsState = {
-  service_accounts_users: []
+  service_accounts_users: [],
 };
 
 vi.mock("@/composables/iam/usePermissions", () => ({
   default: () => ({
-    serviceAccountsState: mockServiceAccountsState
-  })
+    serviceAccountsState: mockServiceAccountsState,
+  }),
 }));
 
 // Mock aws-exports
 vi.mock("@/aws-exports", () => ({
   default: {
     isEnterprise: "true",
-    isCloud: false
-  }
+    isCloud: false,
+  },
 }));
 
 import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccountsList.vue";
@@ -73,8 +73,8 @@ const platform = {
 installQuasar({
   plugins: [Dialog, Notify],
   config: {
-    platform
-  }
+    platform,
+  },
 });
 
 describe("ServiceAccountsList Component", () => {
@@ -96,15 +96,18 @@ describe("ServiceAccountsList Component", () => {
       data: {
         data: [
           { email: "service1@example.com", first_name: "Service 1" },
-          { email: "service2@example.com", first_name: "Service 2" }
-        ]
-      }
+          { email: "service2@example.com", first_name: "Service 2" },
+        ],
+      },
     });
 
     // Setup store state
-    store.state.selectedOrganization = { identifier: "test-org", name: "Test Org" };
+    store.state.selectedOrganization = {
+      identifier: "test-org",
+      name: "Test Org",
+    };
     store.state.userInfo = { email: "test@example.com" };
-    store.state.theme = 'light';
+    store.state.theme = "light";
 
     // Setup router mock with currentRoute
     mockRouter = {
@@ -113,9 +116,9 @@ describe("ServiceAccountsList Component", () => {
       currentRoute: {
         value: {
           query: {},
-          params: {}
-        }
-      }
+          params: {},
+        },
+      },
     };
 
     // Setup notify and dialog mocks
@@ -126,23 +129,20 @@ describe("ServiceAccountsList Component", () => {
     // Mock navigator.clipboard
     Object.assign(navigator, {
       clipboard: {
-        writeText: vi.fn().mockResolvedValue(undefined)
-      }
+        writeText: vi.fn().mockResolvedValue(undefined),
+      },
     });
 
     // Mock URL methods
-    global.URL.createObjectURL = vi.fn(() => 'blob:test-url');
+    global.URL.createObjectURL = vi.fn(() => "blob:test-url");
     global.URL.revokeObjectURL = vi.fn();
 
     wrapper = mount(ServiceAccountsList, {
       global: {
-        plugins: [
-          [Quasar, { platform }],
-          [i18n]
-        ],
-        provide: { 
+        plugins: [[Quasar, { platform }], [i18n]],
+        provide: {
           store,
-          platform
+          platform,
         },
         mocks: {
           $router: mockRouter,
@@ -150,25 +150,25 @@ describe("ServiceAccountsList Component", () => {
           $q: {
             platform,
             notify: notifyMock,
-            dialog: dialogMock
-          }
+            dialog: dialogMock,
+          },
         },
         stubs: {
-          'router-link': true,
-          'router-view': true,
-          'AddServiceAccount': true,
-          'QTablePagination': true,
-          'NoData': true
-        }
+          "router-link": true,
+          "router-view": true,
+          AddServiceAccount: true,
+          QTablePagination: true,
+          NoData: true,
+        },
       },
-      attachTo: document.body
+      attachTo: document.body,
     });
 
     // Set up wrapper's $q.notify and dialog after mount
     wrapper.vm.$q = {
       ...wrapper.vm.$q,
       notify: notifyMock,
-      dialog: dialogMock
+      dialog: dialogMock,
     };
 
     // Mock the router in wrapper.vm if needed
@@ -198,7 +198,7 @@ describe("ServiceAccountsList Component", () => {
     it("formats service account data correctly", async () => {
       const result = await wrapper.vm.getServiceAccountsUsers();
       await flushPromises();
-      
+
       expect(result).toBeDefined();
     });
   });
@@ -215,7 +215,7 @@ describe("ServiceAccountsList Component", () => {
       // Test the direct state change functionality
       wrapper.vm.showAddUserDialog = true;
       expect(wrapper.vm.showAddUserDialog).toBe(true);
-      
+
       wrapper.vm.showAddUserDialog = false;
       expect(wrapper.vm.showAddUserDialog).toBe(false);
     });
@@ -223,12 +223,12 @@ describe("ServiceAccountsList Component", () => {
     it("handles successful service account creation", async () => {
       const newAccount = {
         email: "new-service@example.com",
-        first_name: "New Service"
+        first_name: "New Service",
       };
 
       wrapper.vm.isUpdated = false;
       wrapper.vm.addUser(newAccount, true);
-      
+
       expect(wrapper.vm.isUpdated).toBe(true);
       expect(wrapper.vm.showAddUserDialog).toBe(false);
     });
@@ -236,22 +236,25 @@ describe("ServiceAccountsList Component", () => {
     it("confirms delete action", () => {
       const props = { row: { email: "test@example.com" } };
       wrapper.vm.confirmDeleteAction(props);
-      
+
       expect(wrapper.vm.confirmDelete).toBe(true);
     });
 
     it("deletes service account successfully", async () => {
       vi.mocked(service_accounts.delete).mockResolvedValue({
-        data: { code: 200 }
+        data: { code: 200 },
       });
-      
+
       // Set the deleteUserEmail through confirmDeleteAction
       const props = { row: { email: "test@example.com" } };
       wrapper.vm.confirmDeleteAction(props);
 
       await wrapper.vm.deleteUser();
-      
-      expect(service_accounts.delete).toHaveBeenCalledWith("test-org", "test@example.com");
+
+      expect(service_accounts.delete).toHaveBeenCalledWith(
+        "test-org",
+        "test@example.com",
+      );
       // Just verify the function was called successfully
       expect(wrapper.vm.confirmDelete).toBe(true); // Still true as it's managed by dialog
     });
@@ -261,18 +264,21 @@ describe("ServiceAccountsList Component", () => {
     it("gets service token successfully", async () => {
       const mockToken = "test-token-123";
       vi.mocked(service_accounts.get_service_token).mockResolvedValue({
-        data: { token: mockToken }
+        data: { token: mockToken },
       });
 
       const row = {
         email: "service1@example.com",
         isLoading: false,
-        isTokenVisible: false
+        isTokenVisible: false,
       };
 
       await wrapper.vm.getServiceToken(row);
-      
-      expect(service_accounts.get_service_token).toHaveBeenCalledWith("test-org", "service1@example.com");
+
+      expect(service_accounts.get_service_token).toHaveBeenCalledWith(
+        "test-org",
+        "service1@example.com",
+      );
       expect(row.token).toBe(mockToken);
       expect(row.isTokenVisible).toBe(true);
     });
@@ -280,29 +286,29 @@ describe("ServiceAccountsList Component", () => {
     it("toggles token visibility when token exists", () => {
       const row = {
         token: "existing-token",
-        isTokenVisible: false
+        isTokenVisible: false,
       };
 
       wrapper.vm.getServiceToken(row);
-      
+
       expect(row.isTokenVisible).toBe(true);
     });
 
     it("hides token when already visible", () => {
       const row = {
         token: "existing-token",
-        isTokenVisible: true
+        isTokenVisible: true,
       };
 
       wrapper.vm.getServiceToken(row);
-      
+
       expect(row.isTokenVisible).toBe(false);
     });
 
     it("gets service token for service token variable", async () => {
       const mockToken = "service-token-456";
       vi.mocked(service_accounts.get_service_token).mockResolvedValue({
-        data: { token: mockToken }
+        data: { token: mockToken },
       });
 
       const row = { email: "service@example.com" };
@@ -316,16 +322,18 @@ describe("ServiceAccountsList Component", () => {
       const mockError = {
         response: {
           status: 500,
-          data: { message: "Token fetch failed" }
-        }
+          data: { message: "Token fetch failed" },
+        },
       };
-      
-      vi.mocked(service_accounts.get_service_token).mockRejectedValue(mockError);
+
+      vi.mocked(service_accounts.get_service_token).mockRejectedValue(
+        mockError,
+      );
 
       const row = {
         email: "service1@example.com",
         isLoading: true,
-        isTokenVisible: false
+        isTokenVisible: false,
       };
 
       await wrapper.vm.getServiceToken(row, true);
@@ -338,16 +346,18 @@ describe("ServiceAccountsList Component", () => {
       const mockError = {
         response: {
           status: 403,
-          data: { message: "Forbidden" }
-        }
+          data: { message: "Forbidden" },
+        },
       };
-      
-      vi.mocked(service_accounts.get_service_token).mockRejectedValue(mockError);
+
+      vi.mocked(service_accounts.get_service_token).mockRejectedValue(
+        mockError,
+      );
 
       const row = {
         email: "service1@example.com",
         isLoading: false,
-        isTokenVisible: false
+        isTokenVisible: false,
       };
 
       await wrapper.vm.getServiceToken(row, true);
@@ -358,24 +368,27 @@ describe("ServiceAccountsList Component", () => {
     it("refreshes service token successfully", async () => {
       const mockToken = "refreshed-token-789";
       vi.mocked(service_accounts.refresh_token).mockResolvedValue({
-        data: { token: mockToken }
+        data: { token: mockToken },
       });
 
       const row = {
         email: "service1@example.com",
-        isLoading: false
+        isLoading: false,
       };
 
       await wrapper.vm.refreshServiceToken(row, true);
 
-      expect(service_accounts.refresh_token).toHaveBeenCalledWith("test-org", "service1@example.com");
+      expect(service_accounts.refresh_token).toHaveBeenCalledWith(
+        "test-org",
+        "service1@example.com",
+      );
       expect(row.token).toBe(mockToken);
     });
 
     it("confirms refresh action", () => {
       const row = { email: "test@example.com" };
       wrapper.vm.confirmRefreshAction(row);
-      
+
       expect(wrapper.vm.confirmRefresh).toBe(true);
       expect(wrapper.vm.toBeRefreshed).toEqual(row);
     });
@@ -384,10 +397,10 @@ describe("ServiceAccountsList Component", () => {
   describe("Clipboard Operations", () => {
     it("copies token to clipboard successfully", async () => {
       const token = "test-token-123";
-      
+
       try {
         await wrapper.vm.copyToClipboard(token);
-        
+
         expect(navigator.clipboard.writeText).toHaveBeenCalledWith(token);
         expect(notifyMock).toHaveBeenCalledWith({
           type: "positive",
@@ -403,10 +416,10 @@ describe("ServiceAccountsList Component", () => {
     it("handles clipboard copy error", async () => {
       const token = "test-token-123";
       navigator.clipboard.writeText.mockRejectedValue(new Error("Copy failed"));
-      
+
       try {
         await wrapper.vm.copyToClipboard(token);
-        
+
         expect(notifyMock).toHaveBeenCalledWith({
           type: "negative",
           message: "Error while copy content.",
@@ -422,7 +435,7 @@ describe("ServiceAccountsList Component", () => {
   describe("Data Fetching", () => {
     it("fetches service accounts successfully", async () => {
       const result = await wrapper.vm.getServiceAccountsUsers();
-      
+
       expect(service_accounts.list).toHaveBeenCalledWith("test-org");
       expect(result).toBeDefined();
     });
@@ -431,10 +444,10 @@ describe("ServiceAccountsList Component", () => {
       const mockError = {
         response: {
           status: 500,
-          data: { message: "Fetch failed" }
-        }
+          data: { message: "Fetch failed" },
+        },
       };
-      
+
       vi.mocked(service_accounts.list).mockRejectedValue(mockError);
 
       try {
@@ -450,15 +463,17 @@ describe("ServiceAccountsList Component", () => {
           data: [
             { email: "service1@example.com", first_name: "Service 1" },
             { email: "service2@example.com", first_name: "Service 2" },
-            { email: "service3@example.com", first_name: "Service 3" }
-          ]
-        }
+            { email: "service3@example.com", first_name: "Service 3" },
+          ],
+        },
       });
 
       await wrapper.vm.getServiceAccountsUsers();
-      
+
       expect(mockServiceAccountsState.service_accounts_users).toHaveLength(3);
-      expect(mockServiceAccountsState.service_accounts_users[2]["#"]).toBe("03");
+      expect(mockServiceAccountsState.service_accounts_users[2]["#"]).toBe(
+        "03",
+      );
     });
   });
 
@@ -467,14 +482,14 @@ describe("ServiceAccountsList Component", () => {
       mockServiceAccountsState.service_accounts_users = [
         { email: "user1@example.com", first_name: "John", last_name: "Doe" },
         { email: "user2@example.com", first_name: "Jane", last_name: "Smith" },
-        { email: "admin@example.com", first_name: "Admin", last_name: "User" }
+        { email: "admin@example.com", first_name: "Admin", last_name: "User" },
       ];
     });
 
     it("filters by email", () => {
       const filtered = wrapper.vm.filterData(
         mockServiceAccountsState.service_accounts_users,
-        "admin"
+        "admin",
       );
       expect(filtered).toHaveLength(1);
       expect(filtered[0].email).toContain("admin");
@@ -483,7 +498,7 @@ describe("ServiceAccountsList Component", () => {
     it("filters by first name", () => {
       const filtered = wrapper.vm.filterData(
         mockServiceAccountsState.service_accounts_users,
-        "John"
+        "John",
       );
       expect(filtered).toHaveLength(1);
       expect(filtered[0].first_name).toBe("John");
@@ -492,7 +507,7 @@ describe("ServiceAccountsList Component", () => {
     it("filters by last name", () => {
       const filtered = wrapper.vm.filterData(
         mockServiceAccountsState.service_accounts_users,
-        "Smith"
+        "Smith",
       );
       expect(filtered).toHaveLength(1);
       expect(filtered[0].last_name).toBe("Smith");
@@ -501,7 +516,7 @@ describe("ServiceAccountsList Component", () => {
     it("is case insensitive", () => {
       const filtered = wrapper.vm.filterData(
         mockServiceAccountsState.service_accounts_users,
-        "JANE"
+        "JANE",
       );
       expect(filtered).toHaveLength(1);
       expect(filtered[0].first_name).toBe("Jane");
@@ -510,7 +525,7 @@ describe("ServiceAccountsList Component", () => {
     it("returns empty array for no matches", () => {
       const filtered = wrapper.vm.filterData(
         mockServiceAccountsState.service_accounts_users,
-        "nonexistent"
+        "nonexistent",
       );
       expect(filtered).toHaveLength(0);
     });
@@ -518,7 +533,7 @@ describe("ServiceAccountsList Component", () => {
     it("handles empty search term", () => {
       const filtered = wrapper.vm.filterData(
         mockServiceAccountsState.service_accounts_users,
-        ""
+        "",
       );
       expect(filtered).toHaveLength(3);
     });
@@ -526,9 +541,9 @@ describe("ServiceAccountsList Component", () => {
     it("handles null/undefined fields", () => {
       const dataWithNulls = [
         { email: null, first_name: "Test", last_name: undefined },
-        { email: "test@example.com", first_name: null, last_name: "User" }
+        { email: "test@example.com", first_name: null, last_name: "User" },
       ];
-      
+
       const filtered = wrapper.vm.filterData(dataWithNulls, "test");
       expect(filtered).toHaveLength(2);
     });
@@ -538,7 +553,7 @@ describe("ServiceAccountsList Component", () => {
     it("changes pagination settings", () => {
       const newValue = { label: "50", value: 50 };
       wrapper.vm.changePagination(newValue);
-      
+
       expect(wrapper.vm.selectedPerPage).toBe(50);
       expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
     });
@@ -546,7 +561,7 @@ describe("ServiceAccountsList Component", () => {
     it("updates max records to return", () => {
       const newValue = 100;
       wrapper.vm.changeMaxRecordToReturn(newValue);
-      
+
       expect(wrapper.vm.maxRecordToReturn).toBe(100);
     });
   });
@@ -567,9 +582,9 @@ describe("ServiceAccountsList Component", () => {
     it("displays token correctly when visible", () => {
       const row = {
         token: "test-token-123",
-        isTokenVisible: true
+        isTokenVisible: true,
       };
-      
+
       const displayToken = wrapper.vm.getDisplayToken(row);
       expect(displayToken).toBe("test **** -123");
     });
@@ -577,18 +592,18 @@ describe("ServiceAccountsList Component", () => {
     it("displays stars when token not visible", () => {
       const row = {
         token: "test-token-123",
-        isTokenVisible: false
+        isTokenVisible: false,
       };
-      
+
       const displayToken = wrapper.vm.getDisplayToken(row);
       expect(displayToken).toBe("* * * * * * * * * * * * * * * *");
     });
 
     it("displays stars when no token", () => {
       const row = {
-        isTokenVisible: true
+        isTokenVisible: true,
       };
-      
+
       const displayToken = wrapper.vm.getDisplayToken(row);
       expect(displayToken).toBe("* * * * * * * * * * * * * * * *");
     });
@@ -601,7 +616,7 @@ describe("ServiceAccountsList Component", () => {
       const mockLink = {
         href: "",
         download: "",
-        click: mockClick
+        click: mockClick,
       };
 
       const originalCreateElement = document.createElement;
@@ -641,7 +656,7 @@ describe("ServiceAccountsList Component", () => {
         { label: "50", value: 50 },
         { label: "100", value: 100 },
         { label: "250", value: 250 },
-        { label: "500", value: 500 }
+        { label: "500", value: 500 },
       ]);
     });
   });

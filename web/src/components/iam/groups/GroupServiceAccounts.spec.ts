@@ -53,14 +53,18 @@ describe("GroupServiceAccounts Component", () => {
   beforeEach(async () => {
     mockServiceAccountsState = {
       service_accounts_users: [],
-      getServiceAccounts: vi.fn().mockResolvedValue([
-        { email: "service1@example.com" },
-        { email: "service2@example.com" },
-        { email: "service3@example.com" },
-      ]),
+      getServiceAccounts: vi
+        .fn()
+        .mockResolvedValue([
+          { email: "service1@example.com" },
+          { email: "service2@example.com" },
+          { email: "service3@example.com" },
+        ]),
     };
 
-    vi.mocked(await import("@/composables/iam/usePermissions")).default.mockReturnValue({
+    vi.mocked(
+      await import("@/composables/iam/usePermissions"),
+    ).default.mockReturnValue({
       serviceAccountsState: mockServiceAccountsState,
     });
 
@@ -83,24 +87,32 @@ describe("GroupServiceAccounts Component", () => {
   describe("Component Mounting", () => {
     it("renders the component correctly", () => {
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('.col').exists()).toBe(true);
+      expect(wrapper.find(".col").exists()).toBe(true);
     });
 
     it("renders filter options", () => {
-      const showToggle = wrapper.find('[data-test="iam-service-accounts-selection-show-toggle"]');
-      const showText = wrapper.find('[data-test="iam-service-accounts-selection-show-text"]');
-      
+      const showToggle = wrapper.find(
+        '[data-test="iam-service-accounts-selection-show-toggle"]',
+      );
+      const showText = wrapper.find(
+        '[data-test="iam-service-accounts-selection-show-text"]',
+      );
+
       expect(showToggle.exists()).toBe(true);
       expect(showText.text()).toBe("Show");
     });
 
     it("renders search input", () => {
-      const searchInput = wrapper.find('[data-test="iam-service-accounts-selection-search-input"]');
+      const searchInput = wrapper.find(
+        '[data-test="iam-service-accounts-selection-search-input"]',
+      );
       expect(searchInput.exists()).toBe(true);
     });
 
     it("renders table section", () => {
-      const table = wrapper.find('[data-test="iam-service-accounts-selection-table"]');
+      const table = wrapper.find(
+        '[data-test="iam-service-accounts-selection-table"]',
+      );
       expect(table.exists()).toBe(true);
     });
   });
@@ -118,17 +130,23 @@ describe("GroupServiceAccounts Component", () => {
     });
 
     it("renders filter buttons for each option", () => {
-      const allButton = wrapper.find('[data-test="iam-service-accounts-selection-show-all-btn"]');
-      const selectedButton = wrapper.find('[data-test="iam-service-accounts-selection-show-selected-btn"]');
-      
+      const allButton = wrapper.find(
+        '[data-test="iam-service-accounts-selection-show-all-btn"]',
+      );
+      const selectedButton = wrapper.find(
+        '[data-test="iam-service-accounts-selection-show-selected-btn"]',
+      );
+
       expect(allButton.exists()).toBe(true);
       expect(selectedButton.exists()).toBe(true);
     });
 
     it("switches display option when button is clicked", async () => {
-      const allButton = wrapper.find('[data-test="iam-service-accounts-selection-show-all-btn"]');
+      const allButton = wrapper.find(
+        '[data-test="iam-service-accounts-selection-show-all-btn"]',
+      );
       await allButton.trigger("click");
-      
+
       expect(wrapper.vm.usersDisplay).toBe("all");
     });
   });
@@ -137,12 +155,14 @@ describe("GroupServiceAccounts Component", () => {
     it("updates search key when typing", async () => {
       const searchInput = wrapper.find('input[type="text"]');
       await searchInput.setValue("service1");
-      
+
       expect(wrapper.vm.userSearchKey).toBe("service1");
     });
 
     it("has correct search placeholder", () => {
-      const searchInput = wrapper.find('input[placeholder="Search Service Accounts"]');
+      const searchInput = wrapper.find(
+        'input[placeholder="Search Service Accounts"]',
+      );
       expect(searchInput.exists()).toBe(true);
     });
 
@@ -153,7 +173,10 @@ describe("GroupServiceAccounts Component", () => {
         { email: "service2@example.com" },
       ];
 
-      const filteredResults = wrapper.vm.filterUsers(testServiceAccounts, "service");
+      const filteredResults = wrapper.vm.filterUsers(
+        testServiceAccounts,
+        "service",
+      );
       expect(filteredResults).toHaveLength(2);
       expect(filteredResults[0].email).toBe("service1@example.com");
       expect(filteredResults[1].email).toBe("service2@example.com");
@@ -165,7 +188,10 @@ describe("GroupServiceAccounts Component", () => {
         { email: "admin@example.com" },
       ];
 
-      const filteredResults = wrapper.vm.filterUsers(testServiceAccounts, "SERVICE");
+      const filteredResults = wrapper.vm.filterUsers(
+        testServiceAccounts,
+        "SERVICE",
+      );
       expect(filteredResults).toHaveLength(1);
       expect(filteredResults[0].email).toBe("Service1@example.com");
     });
@@ -184,7 +210,7 @@ describe("GroupServiceAccounts Component", () => {
   describe("Data Loading", () => {
     it("fetches service accounts on component mount", async () => {
       expect(mockServiceAccountsState.getServiceAccounts).toHaveBeenCalledWith(
-        store.state.selectedOrganization.identifier
+        store.state.selectedOrganization.identifier,
       );
     });
 
@@ -212,9 +238,15 @@ describe("GroupServiceAccounts Component", () => {
     it("marks service accounts as selected based on groupUsers prop", async () => {
       await wrapper.vm.fetchOrgServiceAccounts();
 
-      const service1 = wrapper.vm.users.find((user: any) => user.email === "service1@example.com");
-      const service2 = wrapper.vm.users.find((user: any) => user.email === "service2@example.com");
-      const service3 = wrapper.vm.users.find((user: any) => user.email === "service3@example.com");
+      const service1 = wrapper.vm.users.find(
+        (user: any) => user.email === "service1@example.com",
+      );
+      const service2 = wrapper.vm.users.find(
+        (user: any) => user.email === "service2@example.com",
+      );
+      const service3 = wrapper.vm.users.find(
+        (user: any) => user.email === "service3@example.com",
+      );
 
       expect(service1.isInGroup).toBe(true);
       expect(service2.isInGroup).toBe(true);
@@ -236,7 +268,7 @@ describe("GroupServiceAccounts Component", () => {
   describe("Table Structure", () => {
     it("has correct column structure", () => {
       expect(wrapper.vm.columns).toHaveLength(2);
-      
+
       const selectColumn = wrapper.vm.columns[0];
       expect(selectColumn.name).toBe("select");
       expect(selectColumn.slot).toBe(true);
@@ -261,7 +293,9 @@ describe("GroupServiceAccounts Component", () => {
       wrapper.vm.rows = [];
       await wrapper.vm.$nextTick();
 
-      const noUsersText = wrapper.find('[data-test="iam-service-accounts-selection-table-no-users-text"]');
+      const noUsersText = wrapper.find(
+        '[data-test="iam-service-accounts-selection-table-no-users-text"]',
+      );
       expect(noUsersText.exists()).toBe(true);
       expect(noUsersText.text()).toBe("No Service Accounts added");
     });
@@ -269,14 +303,16 @@ describe("GroupServiceAccounts Component", () => {
 
   describe("Service Account Selection", () => {
     it("renders checkboxes for service account selection", () => {
-      const checkbox = wrapper.find('[data-test="iam-service-accounts-selection-table-body-row-test@example.com-checkbox"]');
+      const checkbox = wrapper.find(
+        '[data-test="iam-service-accounts-selection-table-body-row-test@example.com-checkbox"]',
+      );
       expect(checkbox.exists()).toBe(true);
     });
 
     it("handles service account selection toggle", () => {
       const addedUsers = new Set();
       const removedUsers = new Set();
-      
+
       wrapper = mount(GroupServiceAccounts, {
         global: {
           provide: { store },
@@ -290,19 +326,22 @@ describe("GroupServiceAccounts Component", () => {
         },
       });
 
-      const testServiceAccount = { email: "service2@example.com", isInGroup: false };
-      
+      const testServiceAccount = {
+        email: "service2@example.com",
+        isInGroup: false,
+      };
+
       // Simulate checking the checkbox (selecting the service account)
       testServiceAccount.isInGroup = true;
       wrapper.vm.toggleUserSelection(testServiceAccount);
-      
+
       expect(addedUsers.has("service2@example.com")).toBe(true);
     });
 
     it("adds service account to addedUsers when selecting unassigned account", () => {
       const addedUsers = new Set();
       const removedUsers = new Set();
-      
+
       wrapper = mount(GroupServiceAccounts, {
         global: {
           provide: { store },
@@ -317,17 +356,20 @@ describe("GroupServiceAccounts Component", () => {
       });
 
       wrapper.vm.groupUsersMap = new Set([]);
-      const testServiceAccount = { email: "service1@example.com", isInGroup: true };
-      
+      const testServiceAccount = {
+        email: "service1@example.com",
+        isInGroup: true,
+      };
+
       wrapper.vm.toggleUserSelection(testServiceAccount);
-      
+
       expect(addedUsers.has("service1@example.com")).toBe(true);
     });
 
     it("adds service account to removedUsers when deselecting assigned account", () => {
       const addedUsers = new Set();
       const removedUsers = new Set();
-      
+
       wrapper = mount(GroupServiceAccounts, {
         global: {
           provide: { store },
@@ -342,17 +384,20 @@ describe("GroupServiceAccounts Component", () => {
       });
 
       wrapper.vm.groupUsersMap = new Set(["service1@example.com"]);
-      const testServiceAccount = { email: "service1@example.com", isInGroup: false };
-      
+      const testServiceAccount = {
+        email: "service1@example.com",
+        isInGroup: false,
+      };
+
       wrapper.vm.toggleUserSelection(testServiceAccount);
-      
+
       expect(removedUsers.has("service1@example.com")).toBe(true);
     });
 
     it("removes service account from addedUsers when deselecting newly added account", () => {
       const addedUsers = new Set(["service2@example.com"]);
       const removedUsers = new Set();
-      
+
       wrapper = mount(GroupServiceAccounts, {
         global: {
           provide: { store },
@@ -367,17 +412,20 @@ describe("GroupServiceAccounts Component", () => {
       });
 
       wrapper.vm.groupUsersMap = new Set([]);
-      const testServiceAccount = { email: "service2@example.com", isInGroup: false };
-      
+      const testServiceAccount = {
+        email: "service2@example.com",
+        isInGroup: false,
+      };
+
       wrapper.vm.toggleUserSelection(testServiceAccount);
-      
+
       expect(addedUsers.has("service2@example.com")).toBe(false);
     });
 
     it.skip("removes service account from removedUsers when reselecting removed account", async () => {
       const addedUsers = new Set();
       const removedUsers = new Set(["service1@example.com"]);
-      
+
       await wrapper.setProps({
         groupUsers: ["service1@example.com"],
         activeTab: "serviceAccounts",
@@ -386,10 +434,13 @@ describe("GroupServiceAccounts Component", () => {
       });
 
       wrapper.vm.groupUsersMap = new Set(["service1@example.com"]);
-      const testServiceAccount = { email: "service1@example.com", isInGroup: true };
-      
+      const testServiceAccount = {
+        email: "service1@example.com",
+        isInGroup: true,
+      };
+
       wrapper.vm.toggleUserSelection(testServiceAccount);
-      
+
       expect(removedUsers.has("service1@example.com")).toBe(false);
     });
   });
@@ -406,16 +457,18 @@ describe("GroupServiceAccounts Component", () => {
 
     it("shows only selected service accounts when display is 'selected'", async () => {
       await wrapper.vm.updateUserTable("selected");
-      
-      const selectedAccounts = wrapper.vm.rows.filter((account: any) => account.isInGroup);
+
+      const selectedAccounts = wrapper.vm.rows.filter(
+        (account: any) => account.isInGroup,
+      );
       expect(wrapper.vm.rows).toEqual(selectedAccounts);
     });
 
     it("fetches data when switching to 'all' for first time", async () => {
       wrapper.vm.hasFetchedOrgServiceAccounts = false;
-      
+
       await wrapper.vm.updateUserTable("all");
-      
+
       // Test behavior: hasFetchedOrgServiceAccounts should be set to true after fetch
       expect(wrapper.vm.hasFetchedOrgServiceAccounts).toBe(true);
     });
@@ -423,9 +476,9 @@ describe("GroupServiceAccounts Component", () => {
     it("does not refetch data when switching to 'all' after first fetch", async () => {
       const fetchSpy = vi.spyOn(wrapper.vm, "fetchOrgServiceAccounts");
       wrapper.vm.hasFetchedOrgServiceAccounts = true;
-      
+
       await wrapper.vm.updateUserTable("all");
-      
+
       expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
@@ -433,10 +486,12 @@ describe("GroupServiceAccounts Component", () => {
   describe("Props Watching", () => {
     it("updates when groupUsers prop changes", async () => {
       const initialGroupUsersMapSize = wrapper.vm.groupUsersMap.size;
-      
-      await wrapper.setProps({ groupUsers: ["service1@example.com", "service3@example.com"] });
+
+      await wrapper.setProps({
+        groupUsers: ["service1@example.com", "service3@example.com"],
+      });
       await flushPromises();
-      
+
       // Test behavior: groupUsersMap should be updated with new prop values
       expect(wrapper.vm.groupUsersMap.size).toBe(2);
       expect(wrapper.vm.groupUsersMap.has("service1@example.com")).toBe(true);
@@ -445,10 +500,10 @@ describe("GroupServiceAccounts Component", () => {
 
     it("resets hasFetchedOrgServiceAccounts when groupUsers changes", async () => {
       wrapper.vm.hasFetchedOrgServiceAccounts = true;
-      
+
       await wrapper.setProps({ groupUsers: ["newservice@example.com"] });
       await flushPromises();
-      
+
       expect(wrapper.vm.hasFetchedOrgServiceAccounts).toBe(true); // Gets set back to true after fetch
     });
   });
@@ -498,7 +553,9 @@ describe("GroupServiceAccounts Component", () => {
 
   describe("Theme Support", () => {
     it("applies correct theme classes", () => {
-      const filters = wrapper.find('[data-test="iam-service-accounts-selection-filters"]');
+      const filters = wrapper.find(
+        '[data-test="iam-service-accounts-selection-filters"]',
+      );
       expect(filters.exists()).toBe(true);
       // Theme classes may vary based on actual implementation
     });
@@ -508,7 +565,7 @@ describe("GroupServiceAccounts Component", () => {
         ...store,
         state: {
           ...store.state,
-          theme: 'dark',
+          theme: "dark",
         },
       };
 
@@ -525,7 +582,9 @@ describe("GroupServiceAccounts Component", () => {
         },
       });
 
-      const filters = wrapper.find('[data-test="iam-service-accounts-selection-filters"]');
+      const filters = wrapper.find(
+        '[data-test="iam-service-accounts-selection-filters"]',
+      );
       expect(filters.exists()).toBe(true);
       // Theme classes have been removed from the component
     });
@@ -540,18 +599,20 @@ describe("GroupServiceAccounts Component", () => {
         "iam-service-accounts-selection-table",
       ];
 
-      sections.forEach(selector => {
+      sections.forEach((selector) => {
         expect(wrapper.find(`[data-test="${selector}"]`).exists()).toBe(true);
       });
     });
 
     it("has proper form labels and placeholders", () => {
-      const searchInput = wrapper.find('input[placeholder="Search Service Accounts"]');
+      const searchInput = wrapper.find(
+        'input[placeholder="Search Service Accounts"]',
+      );
       expect(searchInput.exists()).toBe(true);
     });
 
     it("has proper button styling", () => {
-      const filterButtons = wrapper.findAll('.visual-selection-btn');
+      const filterButtons = wrapper.findAll(".visual-selection-btn");
       expect(filterButtons.length).toBeGreaterThan(0);
     });
 

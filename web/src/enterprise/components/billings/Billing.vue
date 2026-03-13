@@ -16,13 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="q-pa-none q-pt-xs" style="min-height: inherit;" >
-    <div class="tw:flex tw:justify-between tw:items-center q-pb-md card-container tw:h-[62px] tw:mb-2 tw:ml-2 tw:mr-3 tw:px-3 tw:py-4">
-    <div class="head q-table__title ">
-      {{ headerBasedOnRoute() }}
-    </div>
-    <div v-if="isUsageRoute" class="tw:flex tw:gap-2 tw:items-center ">
-      <div class="custom-usage-date-select">
+  <q-page class="q-pa-none q-pt-xs" style="min-height: inherit">
+    <div
+      class="tw:flex tw:justify-between tw:items-center q-pb-md card-container tw:h-[62px] tw:mb-2 tw:ml-2 tw:mr-3 tw:px-3 tw:py-4"
+    >
+      <div class="head q-table__title">
+        {{ headerBasedOnRoute() }}
+      </div>
+      <div v-if="isUsageRoute" class="tw:flex tw:gap-2 tw:items-center">
+        <div class="custom-usage-date-select">
           <q-select
             dense
             borderless
@@ -34,26 +36,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="(value: any) => selectUsageDate()"
             class="q-pa-none q-mx-none tw:h-[40px] q-mt-xs"
           >
-          <template v-slot:prepend>
-            <q-icon name="schedule" size="xs" class="tw:mr-2 tw:mt-1" @click.stop.prevent />
-          </template>
+            <template v-slot:prepend>
+              <q-icon
+                name="schedule"
+                size="xs"
+                class="tw:mr-2 tw:mt-1"
+                @click.stop.prevent
+              />
+            </template>
           </q-select>
         </div>
-        <div class="tw:flex tw:items-center ">
-          <div class="app-tabs-container tw:h-[36px] ">
-              <AppTabs class=" tabs-selection-container"  :tabs="tabs" :activeTab="usageDataType" @update:activeTab="(value: any) => updateActiveTab(value)" />
-
+        <div class="tw:flex tw:items-center">
+          <div class="app-tabs-container tw:h-[36px]">
+            <AppTabs
+              class="tabs-selection-container"
+              :tabs="tabs"
+              :activeTab="usageDataType"
+              @update:activeTab="(value: any) => updateActiveTab(value)"
+            />
           </div>
         </div>
-    </div>
       </div>
-    <q-splitter
-      v-model="splitterModel"
-      unit="px"
-      class="logs-splitter-smooth"
-    >
+    </div>
+    <q-splitter v-model="splitterModel" unit="px"
+class="logs-splitter-smooth">
       <template v-slot:before>
-        <div class="tw:w-full tw:pl-[0.625rem] tw:pb-[0.625rem] ">
+        <div class="tw:w-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
           <div class="card-container" style="min-height: calc(100vh - 125px)">
             <q-tabs
               v-model="billingtab"
@@ -61,48 +69,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               inline-label
               vertical
             >
-
-          <q-route-tab
-            exact
-            name="plans"
-            :to="
-              '/billings/plans?org_identifier=' +
-              store.state.selectedOrganization.identifier
-            "
-            :icon="'img:' + getImageURL('images/common/plan_icon.svg')"
-            :label="t('billing.plansLabel')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            exact
-            default
-            name="usage"
-            :to="
-              '/billings/usage?org_identifier=' +
-              store.state.selectedOrganization.identifier +
-              '&usage_date=' +
-              usageDate + 
-              '&data_type=' +
-              usageDataType
-            "
-            :icon="'img:' + getImageURL('images/common/usage_icon.svg')"
-            :label="t('billing.usageLabel')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            v-if="showInvoiceTab"
-            exact
-            name="invoice_history"
-            :to="
-              '/billings/invoice_history?org_identifier=' +
-              store.state.selectedOrganization.identifier
-            "
-            :icon="'img:' + getImageURL('images/common/invoice_icon.svg')"
-            :label="t('billing.invoiceHistoryLabel')"
-            content-class="tab_content"
-          />
-        </q-tabs>
-        <!-- <q-btn
+              <q-route-tab
+                exact
+                name="plans"
+                :to="
+                  '/billings/plans?org_identifier=' +
+                  store.state.selectedOrganization.identifier
+                "
+                :icon="'img:' + getImageURL('images/common/plan_icon.svg')"
+                :label="t('billing.plansLabel')"
+                content-class="tab_content"
+              />
+              <q-route-tab
+                exact
+                default
+                name="usage"
+                :to="
+                  '/billings/usage?org_identifier=' +
+                  store.state.selectedOrganization.identifier +
+                  '&usage_date=' +
+                  usageDate +
+                  '&data_type=' +
+                  usageDataType
+                "
+                :icon="'img:' + getImageURL('images/common/usage_icon.svg')"
+                :label="t('billing.usageLabel')"
+                content-class="tab_content"
+              />
+              <q-route-tab
+                v-if="showInvoiceTab"
+                exact
+                name="invoice_history"
+                :to="
+                  '/billings/invoice_history?org_identifier=' +
+                  store.state.selectedOrganization.identifier
+                "
+                :icon="'img:' + getImageURL('images/common/invoice_icon.svg')"
+                :label="t('billing.invoiceHistoryLabel')"
+                content-class="tab_content"
+              />
+            </q-tabs>
+            <!-- <q-btn
               data-test="logs-search-field-list-collapse-btn"
               :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
               :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
@@ -115,7 +122,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             /> -->
           </div>
         </div>
-
       </template>
 
       <template v-slot:after>
@@ -152,7 +158,9 @@ export default defineComponent({
     const q = useQuasar();
     const router: any = useRouter();
     const billingtab = ref("usage");
-    const usageDataType = ref(router.currentRoute.value.query.data_type || "gb");
+    const usageDataType = ref(
+      router.currentRoute.value.query.data_type || "gb",
+    );
     const showSidebar = ref(true);
     const lastSplitterPosition = ref(200);
     const splitterModel = ref(220);
@@ -163,7 +171,7 @@ export default defineComponent({
     const fetchBillingInfo = async () => {
       try {
         const res = await BillingService.list_subscription(
-          store.state.selectedOrganization.identifier
+          store.state.selectedOrganization.identifier,
         );
         billingProvider.value = res.data?.provider || "";
       } catch (e) {
@@ -191,9 +199,17 @@ export default defineComponent({
     onMounted(async () => {
       // Fetch billing info to determine provider type
       await fetchBillingInfo();
-      if (router.currentRoute.value.name == "billings" || router.currentRoute.value.name == "plans") {
+      if (
+        router.currentRoute.value.name == "billings" ||
+        router.currentRoute.value.name == "plans"
+      ) {
         billingtab.value = "plans";
-        router.push({ path: "/billings/plans", query: { org_identifier: store.state.selectedOrganization.identifier } });
+        router.push({
+          path: "/billings/plans",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
       }
       // else {
       //   billingtab.value = router.currentRoute.value.name;
@@ -211,36 +227,37 @@ export default defineComponent({
       }
       return "";
     };
-    const usageDate = ref(router.currentRoute.value.query.usage_date || "30days");
+    const usageDate = ref(
+      router.currentRoute.value.query.usage_date || "30days",
+    );
 
     const isUsageRoute = computed(() => {
       return router.currentRoute.value.name == "usage";
-    })
+    });
     const selectUsageDate = () => {
       router.push({
-        path: '/billings/usage',
+        path: "/billings/usage",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           usage_date: usageDate.value,
-          data_type: usageDataType.value
-        }
-      })
-      
-    }
+          data_type: usageDataType.value,
+        },
+      });
+    };
     const updateActiveTab = (value: any) => {
       usageDataType.value = value;
       selectUsageDate();
-    }
+    };
     const tabs = [
-    {
-        label: 'Gb',
+      {
+        label: "Gb",
         value: "gb",
       },
       {
-        label: 'Mb',
+        label: "Mb",
         value: "mb",
-      }
-    ]
+      },
+    ];
 
     return {
       t,
@@ -252,10 +269,11 @@ export default defineComponent({
       splitterModel,
       headerBasedOnRoute,
       options: [
-        {label: "30 Days", value: "30days"},
-        {label: "60 Days", value: "60days"},
-        {label: "3 Months", value: "3months"},
-        {label: "6 Months", value: "6months"}],
+        { label: "30 Days", value: "30days" },
+        { label: "60 Days", value: "60days" },
+        { label: "3 Months", value: "3months" },
+        { label: "6 Months", value: "6months" },
+      ],
       usageDate,
       selectUsageDate,
       isUsageRoute,
@@ -273,24 +291,23 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-
 .card-container {
   overflow-y: auto;
   max-height: calc(100vh - 125px);
 }
 
-.custom-usage-date-select{
+.custom-usage-date-select {
   ::v-deep(.q-field--auto-height.q-field--dense .q-field__control) {
-  min-height: 32px !important;
-  height: 40px !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  align-items: center !important;
-}
+    min-height: 32px !important;
+    height: 40px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    align-items: center !important;
+  }
 
-::v-deep(.q-field--auto-height.q-field--dense .q-field__native) {
-  min-height: 42px !important;
-  height: 42px !important;
-}
+  ::v-deep(.q-field--auto-height.q-field--dense .q-field__native) {
+    min-height: 42px !important;
+    height: 42px !important;
+  }
 }
 </style>

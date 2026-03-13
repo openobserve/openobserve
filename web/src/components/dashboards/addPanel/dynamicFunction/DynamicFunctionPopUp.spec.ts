@@ -217,13 +217,17 @@ describe("DynamicFunctionPopUp", () => {
   describe("Tabs", () => {
     it("should have Build tab", () => {
       wrapper = createWrapper();
-      const buildTab = wrapper.find('[data-test="dynamic-function-popup-tab-build"]');
+      const buildTab = wrapper.find(
+        '[data-test="dynamic-function-popup-tab-build"]',
+      );
       expect(buildTab.exists()).toBe(true);
     });
 
     it("should have Raw tab", () => {
       wrapper = createWrapper();
-      const rawTab = wrapper.find('[data-test="dynamic-function-popup-tab-raw"]');
+      const rawTab = wrapper.find(
+        '[data-test="dynamic-function-popup-tab-raw"]',
+      );
       expect(rawTab.exists()).toBe(true);
     });
 
@@ -631,7 +635,7 @@ describe("DynamicFunctionPopUp", () => {
   describe("Layout and Styling", () => {
     it("should have flex layout", () => {
       wrapper = createWrapper();
-      const container = wrapper.find('div.tw\\:flex');
+      const container = wrapper.find("div.tw\\:flex");
       expect(container.exists()).toBe(true);
     });
 

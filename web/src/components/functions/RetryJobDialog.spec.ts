@@ -153,7 +153,7 @@ describe("RetryJobDialog", () => {
     await wrapper.vm.$nextTick();
 
     const buttons = wrapper.findAllComponents({ name: "QBtn" });
-    const cancelButton = buttons.find(btn => btn.text() === "Cancel");
+    const cancelButton = buttons.find((btn) => btn.text() === "Cancel");
     await cancelButton?.trigger("click");
 
     expect(wrapper.emitted("cancel")).toBeTruthy();
@@ -178,7 +178,7 @@ describe("RetryJobDialog", () => {
     await wrapper.vm.$nextTick();
 
     const buttons = wrapper.findAllComponents({ name: "QBtn" });
-    const retryButton = buttons.find(btn => btn.text() === "Retry");
+    const retryButton = buttons.find((btn) => btn.text() === "Retry");
     await retryButton?.trigger("click");
 
     expect(wrapper.emitted("confirm")).toBeTruthy();

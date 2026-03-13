@@ -42,7 +42,7 @@ vi.mock("@/services/short_url", () => ({
       Promise.resolve({
         status: 200,
         data: { short_url: "https://short.url/abc123" },
-      })
+      }),
     ),
   },
 }));
@@ -79,7 +79,8 @@ describe("ShareButton", () => {
             linkCopiedSuccessfully: "Link copied successfully",
             errorCopyingLink: "Error copying link",
             errorShorteningLink: "Error shortening link",
-            webUrlNotConfigured: "Share URL is disabled until ZO_WEB_URL is configured by your administrator.",
+            webUrlNotConfigured:
+              "Share URL is disabled until ZO_WEB_URL is configured by your administrator.",
           },
         },
       },
@@ -102,9 +103,9 @@ describe("ShareButton", () => {
         stubs: {
           QBtn: {
             template: '<button :data-test="dataTest"><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          QTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
@@ -122,9 +123,9 @@ describe("ShareButton", () => {
         stubs: {
           QBtn: {
             template: '<button :disable="disable"><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          QTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
@@ -136,7 +137,8 @@ describe("ShareButton", () => {
   it("should copy URL to clipboard on click (Chrome)", async () => {
     // Mock non-Safari browser
     Object.defineProperty(window.navigator, "userAgent", {
-      value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      value:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
       configurable: true,
     });
 
@@ -157,11 +159,11 @@ describe("ShareButton", () => {
         plugins: [store, i18n],
         stubs: {
           QBtn: {
-            template: '<button @click="$emit(\'click\')"><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
-            emits: ['click'],
+            template: "<button @click=\"$emit('click')\"><slot /></button>",
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
+            emits: ["click"],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          QTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
@@ -169,14 +171,20 @@ describe("ShareButton", () => {
     await wrapper.find("button").trigger("click");
     await flushPromises();
 
-    expect(mockCreate).toHaveBeenCalledWith("test-org", "https://example.com/logs?query=test");
-    expect(mockCopyToClipboard).toHaveBeenCalledWith("https://short.url/abc123");
+    expect(mockCreate).toHaveBeenCalledWith(
+      "test-org",
+      "https://example.com/logs?query=test",
+    );
+    expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      "https://short.url/abc123",
+    );
   });
 
   it("should emit copy:success event when copy succeeds (Chrome)", async () => {
     // Mock non-Safari browser
     Object.defineProperty(window.navigator, "userAgent", {
-      value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      value:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
       configurable: true,
     });
 
@@ -197,11 +205,11 @@ describe("ShareButton", () => {
         plugins: [store, i18n],
         stubs: {
           QBtn: {
-            template: '<button @click="$emit(\'click\')"><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
-            emits: ['click'],
+            template: "<button @click=\"$emit('click')\"><slot /></button>",
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
+            emits: ["click"],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          QTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
@@ -227,11 +235,12 @@ describe("ShareButton", () => {
         plugins: [store, i18n],
         stubs: {
           QBtn: {
-            template: '<button><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
+            template: "<button><slot /></button>",
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
           },
           QTooltip: {
-            template: '<div class="tooltip">{{ $slots.default?.()[0]?.children }}</div>',
+            template:
+              '<div class="tooltip">{{ $slots.default?.()[0]?.children }}</div>',
           },
         },
       },
@@ -251,10 +260,18 @@ describe("ShareButton", () => {
         plugins: [store, i18n],
         stubs: {
           QBtn: {
-            template: '<button :class="buttonClass" :size="buttonSize"><slot /></button>',
-            props: ['dataTest', 'buttonClass', 'buttonSize', 'loading', 'disable', 'icon'],
+            template:
+              '<button :class="buttonClass" :size="buttonSize"><slot /></button>',
+            props: [
+              "dataTest",
+              "buttonClass",
+              "buttonSize",
+              "loading",
+              "disable",
+              "icon",
+            ],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          QTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
@@ -274,10 +291,10 @@ describe("ShareButton", () => {
         plugins: [store, i18n],
         stubs: {
           QBtn: {
-            template: '<button><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
+            template: "<button><slot /></button>",
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          QTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
@@ -296,9 +313,9 @@ describe("ShareButton", () => {
         stubs: {
           QBtn: {
             template: '<button :disable="disable"><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          QTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
@@ -335,9 +352,9 @@ describe("ShareButton", () => {
         stubs: {
           QBtn: {
             template: '<button :disable="disable"><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          QTooltip: { template: "<div><slot /></div>" },
         },
       },
     });

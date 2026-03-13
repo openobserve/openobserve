@@ -1,7 +1,5 @@
 <template>
-  <div
-    class="tw:w-full tw:flex tw:justify-between tw:items-center"
-  >
+  <div class="tw:w-full tw:flex tw:justify-between tw:items-center">
     <div class="tw:flex tw:items-center">
       <div class="add-function-back-btn">
         <div
@@ -18,9 +16,12 @@
         </div>
       </div>
       <div class="tw:text-lg tw:w-full add-function-title q-mr-sm">
-        {{ t('function.addFunction') }}
+        {{ t("function.addFunction") }}
       </div>
-      <q-form ref="addFunctionForm" class="o2-input tw:flex tw:items-center tw:gap-6">
+      <q-form
+        ref="addFunctionForm"
+        class="o2-input tw:flex tw:items-center tw:gap-6"
+      >
         <div class="tw:flex tw:items-center">
           <q-input
             data-test="add-function-name-input"
@@ -62,34 +63,55 @@
         </div>
         <!-- Transform Type Radio Buttons -->
         <div class="tw:flex tw:items-center tw:gap-4">
-          <div class="tw:flex tw:items-center tw:gap-1" data-test="function-transform-type-vrl-radio">
+          <div
+            class="tw:flex tw:items-center tw:gap-1"
+            data-test="function-transform-type-vrl-radio"
+          >
             <q-radio
               v-model="selectedTransType"
               val="0"
               size="xs"
               class="tw:mb-0"
             />
-            <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[0]?.label }}</span>
+            <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{
+              transformTypeOptions[0]?.label
+            }}</span>
           </div>
           <!-- JavaScript option only shown in _meta organization -->
-          <div v-if="transformTypeOptions[1]" class="tw:flex tw:items-center tw:gap-1" data-test="function-transform-type-js-radio">
+          <div
+            v-if="transformTypeOptions[1]"
+            class="tw:flex tw:items-center tw:gap-1"
+            data-test="function-transform-type-js-radio"
+          >
             <q-radio
               v-model="selectedTransType"
               val="1"
               size="xs"
               class="tw:mb-0"
             />
-            <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[1]?.label }}</span>
+            <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{
+              transformTypeOptions[1]?.label
+            }}</span>
           </div>
           <!-- Info icon with tooltip -->
-          <q-icon
-            name="info_outline"
-            size="xs"
-            class="tw:cursor-pointer"
-          >
+          <q-icon name="info_outline" size="xs"
+class="tw:cursor-pointer">
             <q-tooltip class="bg-grey-8">
-              <div class="tw:font-semibold tw:mb-1">{{ selectedTransType === '1' ? t('function.javascript') : t('function.vrl') }} Tip:</div>
-              <div>{{ selectedTransType === '1' ? t('function.jsFunctionHint') : t('function.vrlFunctionHint') }}</div>
+              <div class="tw:font-semibold tw:mb-1">
+                {{
+                  selectedTransType === "1"
+                    ? t("function.javascript")
+                    : t("function.vrl")
+                }}
+                Tip:
+              </div>
+              <div>
+                {{
+                  selectedTransType === "1"
+                    ? t("function.jsFunctionHint")
+                    : t("function.vrlFunctionHint")
+                }}
+              </div>
             </q-tooltip>
           </q-icon>
         </div>
@@ -97,25 +119,28 @@
     </div>
     <div class="add-function-actions flex justify-center tw:gap-2">
       <q-btn
-            v-if="config.isEnterprise == 'true' && !isAddFunctionComponent && store.state.zoConfig.ai_enabled"
-            :ripple="false"
-            @click="emit('open:chat',!store.state.isAiChatEnabled)"
-            data-test="menu-link-ai-item"
-            no-caps
-            :borderless="true"
-            flat
-            dense
-            class="o2-button ai-hover-btn q-px-sm q-py-sm"
-            :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-            style="border-radius: 100%;"
-            @mouseenter="isHovered = true"
-            @mouseleave="isHovered = false"
-
-          >
-            <div class="row items-center no-wrap tw:gap-2  ">
-              <img  :src="getBtnLogo" class="header-icon ai-icon" />
-            </div>
-          </q-btn>
+        v-if="
+          config.isEnterprise == 'true' &&
+          !isAddFunctionComponent &&
+          store.state.zoConfig.ai_enabled
+        "
+        :ripple="false"
+        @click="emit('open:chat', !store.state.isAiChatEnabled)"
+        data-test="menu-link-ai-item"
+        no-caps
+        :borderless="true"
+        flat
+        dense
+        class="o2-button ai-hover-btn q-px-sm q-py-sm"
+        :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+        style="border-radius: 100%"
+        @mouseenter="isHovered = true"
+        @mouseleave="isHovered = false"
+      >
+        <div class="row items-center no-wrap tw:gap-2">
+          <img :src="getBtnLogo" class="header-icon ai-icon" />
+        </div>
+      </q-btn>
       <q-btn
         data-test="add-function-fullscreen-btn"
         v-close-popup="true"
@@ -155,10 +180,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import {
-  ref,
-  computed,
-} from "vue";
+import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
@@ -197,7 +219,15 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["test", "save", "update:name", "back", "cancel", "open:chat", "update:transType"]);
+const emit = defineEmits([
+  "test",
+  "save",
+  "update:name",
+  "back",
+  "cancel",
+  "open:chat",
+  "update:transType",
+]);
 
 const addFunctionForm = ref(null);
 
@@ -230,7 +260,9 @@ const selectedTransType = computed({
   set: (value) => emit("update:transType", value),
 });
 
-const isAddFunctionComponent = computed(() => router.currentRoute.value.path.includes('functions'))
+const isAddFunctionComponent = computed(() =>
+  router.currentRoute.value.path.includes("functions"),
+);
 const handleFullScreen = () => {
   q.fullscreen.toggle();
 };
@@ -245,14 +277,14 @@ const onSave = () => {
 };
 
 const getBtnLogo = computed(() => {
-      if (isHovered.value || store.state.isAiChatEnabled) {
-        return getImageURL('images/common/ai_icon_dark.svg')
-      }
+  if (isHovered.value || store.state.isAiChatEnabled) {
+    return getImageURL("images/common/ai_icon_dark.svg");
+  }
 
-      return store.state.theme === 'dark'
-        ? getImageURL('images/common/ai_icon_dark.svg')
-        : getImageURL('images/common/ai_icon.svg')
-    })
+  return store.state.theme === "dark"
+    ? getImageURL("images/common/ai_icon_dark.svg")
+    : getImageURL("images/common/ai_icon.svg");
+});
 
 defineExpose({ addFunctionForm });
 </script>

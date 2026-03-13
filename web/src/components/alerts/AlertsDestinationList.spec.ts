@@ -135,17 +135,17 @@ vi.mock("@/components/alerts/ImportDestination.vue", () => ({
 }));
 
 // Mock DOM methods
-Object.defineProperty(window, 'URL', {
+Object.defineProperty(window, "URL", {
   value: {
-    createObjectURL: vi.fn(() => 'mock-url'),
+    createObjectURL: vi.fn(() => "mock-url"),
     revokeObjectURL: vi.fn(),
   },
 });
 
 // Mock document.createElement for export functionality
 const mockCreateElement = vi.fn(() => ({
-  href: '',
-  download: '',
+  href: "",
+  download: "",
   click: vi.fn(),
 }));
 
@@ -163,7 +163,7 @@ describe("AlertsDestinationList", () => {
       type: "http",
     },
     {
-      id: "2", 
+      id: "2",
       name: "destination2",
       url: "https://example.com/webhook2",
       method: "GET",
@@ -171,7 +171,7 @@ describe("AlertsDestinationList", () => {
     },
     {
       id: "3",
-      name: "destination3", 
+      name: "destination3",
       url: "https://example.com/webhook3",
       method: "POST",
       type: "action",
@@ -185,7 +185,7 @@ describe("AlertsDestinationList", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    
+
     // Import the actual services to mock them
     const destinationService = await import("@/services/alert_destination");
     const templateService = await import("@/services/alert_templates");
@@ -207,7 +207,7 @@ describe("AlertsDestinationList", () => {
     mockDestinationService.delete.mockResolvedValue({});
 
     mockRouter.currentRoute.value.query = {};
-    
+
     wrapper = mount(AlertsDestinationList, {
       global: {
         plugins: [i18n],
@@ -389,7 +389,7 @@ describe("AlertsDestinationList", () => {
 
       it("should handle destinations loading error", async () => {
         mockDestinationService.list.mockRejectedValue({
-          response: { status: 500 }
+          response: { status: 500 },
         });
         await wrapper.vm.getDestinations();
         expect(mockDestinationService.list).toHaveBeenCalled();
@@ -397,7 +397,7 @@ describe("AlertsDestinationList", () => {
 
       it("should handle 403 error gracefully", async () => {
         mockDestinationService.list.mockRejectedValue({
-          response: { status: 403 }
+          response: { status: 403 },
         });
         await wrapper.vm.getDestinations();
         expect(mockDestinationService.list).toHaveBeenCalled();
@@ -411,7 +411,7 @@ describe("AlertsDestinationList", () => {
         mockDestinationService.list.mockResolvedValue({
           data: mixedDestinations,
         });
-        
+
         await wrapper.vm.getDestinations();
         expect(wrapper.vm.destinations).toHaveLength(3); // Only http, email, action
       });
@@ -434,7 +434,7 @@ describe("AlertsDestinationList", () => {
 
     describe("updateRoute", () => {
       it("should exist and be callable", () => {
-        expect(typeof wrapper.vm.updateRoute).toBe('function');
+        expect(typeof wrapper.vm.updateRoute).toBe("function");
         expect(() => wrapper.vm.updateRoute()).not.toThrow();
       });
     });
@@ -463,7 +463,7 @@ describe("AlertsDestinationList", () => {
     describe("editDestination", () => {
       it("should handle creating new destination", () => {
         wrapper.vm.editDestination(null);
-        
+
         expect(mockRouter.push).toHaveBeenCalledWith({
           name: "alertDestinations",
           query: {
@@ -477,7 +477,7 @@ describe("AlertsDestinationList", () => {
       it("should handle editing existing destination", () => {
         const destination = { name: "test-dest", id: "1" };
         wrapper.vm.editDestination(destination);
-        
+
         expect(mockRouter.push).toHaveBeenCalledWith({
           name: "alertDestinations",
           query: {
@@ -509,7 +509,7 @@ describe("AlertsDestinationList", () => {
       it("should delete destination successfully", async () => {
         wrapper.vm.confirmDelete.data = { name: "test-dest" };
         await wrapper.vm.deleteDestination();
-        
+
         expect(mockDestinationService.delete).toHaveBeenCalledWith({
           org_identifier: "test-org",
           destination_name: "test-dest",
@@ -521,10 +521,10 @@ describe("AlertsDestinationList", () => {
         mockDestinationService.delete.mockRejectedValue({
           response: {
             status: 409,
-            data: { code: 409, message: "Destination in use" }
-          }
+            data: { code: 409, message: "Destination in use" },
+          },
         });
-        
+
         await wrapper.vm.deleteDestination();
         expect(mockDestinationService.delete).toHaveBeenCalled();
       });
@@ -532,16 +532,16 @@ describe("AlertsDestinationList", () => {
       it("should handle missing destination data", async () => {
         wrapper.vm.confirmDelete.data = null;
         await wrapper.vm.deleteDestination();
-        
+
         expect(mockDestinationService.delete).not.toHaveBeenCalled();
       });
 
       it("should refresh destinations after successful delete", async () => {
         wrapper.vm.confirmDelete.data = { name: "test-dest" };
         const originalListCall = mockDestinationService.list;
-        
+
         await wrapper.vm.deleteDestination();
-        
+
         // After successful delete, getDestinations should be called which calls the service
         expect(mockDestinationService.delete).toHaveBeenCalled();
       });
@@ -551,14 +551,14 @@ describe("AlertsDestinationList", () => {
       it("should set confirm delete data", () => {
         const destination = { name: "test-dest", id: "1" };
         wrapper.vm.conformDeleteDestination(destination);
-        
+
         expect(wrapper.vm.confirmDelete.visible).toBe(true);
         expect(wrapper.vm.confirmDelete.data).toEqual(destination);
       });
 
       it("should handle null destination", () => {
         wrapper.vm.conformDeleteDestination(null);
-        
+
         expect(wrapper.vm.confirmDelete.visible).toBe(true);
         expect(wrapper.vm.confirmDelete.data).toBeNull();
       });
@@ -568,9 +568,9 @@ describe("AlertsDestinationList", () => {
       it("should reset confirm delete state", () => {
         wrapper.vm.confirmDelete.visible = true;
         wrapper.vm.confirmDelete.data = { name: "test" };
-        
+
         wrapper.vm.cancelDeleteDestination();
-        
+
         expect(wrapper.vm.confirmDelete.visible).toBe(false);
         expect(wrapper.vm.confirmDelete.data).toBeNull();
       });
@@ -586,7 +586,7 @@ describe("AlertsDestinationList", () => {
       it("should navigate when closing editor", () => {
         wrapper.vm.showDestinationEditor = true;
         wrapper.vm.toggleDestinationEditor();
-        
+
         expect(mockRouter.push).toHaveBeenCalledWith({
           name: "alertDestinations",
           query: {
@@ -600,10 +600,10 @@ describe("AlertsDestinationList", () => {
       it("should update pagination settings", () => {
         const mockSetPagination = vi.fn();
         wrapper.vm.qTable = { setPagination: mockSetPagination };
-        
+
         const newValue = { label: "50", value: 50 };
         wrapper.vm.changePagination(newValue);
-        
+
         // The method should exist and be callable
         expect(mockSetPagination).toHaveBeenCalled();
         expect(wrapper.vm.pagination).toBeDefined();
@@ -612,10 +612,10 @@ describe("AlertsDestinationList", () => {
       it("should handle pagination change with value 0", () => {
         const mockSetPagination = vi.fn();
         wrapper.vm.qTable = { setPagination: mockSetPagination };
-        
+
         const newValue = { label: "All", value: 0 };
         wrapper.vm.changePagination(newValue);
-        
+
         expect(mockSetPagination).toHaveBeenCalled();
       });
     });
@@ -659,7 +659,7 @@ describe("AlertsDestinationList", () => {
     describe("routeTo", () => {
       it("should navigate to specified route", () => {
         wrapper.vm.routeTo("alertTemplates");
-        
+
         expect(mockRouter.push).toHaveBeenCalledWith({
           name: "alertTemplates",
           query: {
@@ -671,7 +671,7 @@ describe("AlertsDestinationList", () => {
 
       it("should handle different route names", () => {
         wrapper.vm.routeTo("customRoute");
-        
+
         expect(mockRouter.push).toHaveBeenCalledWith({
           name: "customRoute",
           query: {
@@ -686,21 +686,19 @@ describe("AlertsDestinationList", () => {
       it("should export destination as JSON", () => {
         const row = { name: "destination1" };
         const mockLink = {
-          href: '',
-          download: '',
+          href: "",
+          download: "",
           click: vi.fn(),
         };
         document.createElement = vi.fn(() => mockLink);
-        
+
         wrapper.vm.exportDestination(row);
-        
-        expect(document.createElement).toHaveBeenCalledWith('a');
-        expect(mockLink.download).toBe('destination1.json');
+
+        expect(document.createElement).toHaveBeenCalledWith("a");
+        expect(mockLink.download).toBe("destination1.json");
         expect(mockLink.click).toHaveBeenCalled();
         expect(window.URL.createObjectURL).toHaveBeenCalled();
       });
     });
-
   });
-
 });

@@ -43,8 +43,8 @@ vi.mock("echarts/charts", () => ({
 vi.mock("@/assets/dashboard/maps/map.json", () => ({
   default: {
     type: "FeatureCollection",
-    features: []
-  }
+    features: [],
+  },
 }));
 
 // Mock Vuex
@@ -61,19 +61,19 @@ vi.mock("vuex", () => ({
 // Mock window event listeners with callback tracking
 let windowResizeCallback: Function | null = null;
 
-Object.defineProperty(window, 'addEventListener', {
+Object.defineProperty(window, "addEventListener", {
   writable: true,
   value: vi.fn((event: string, callback: Function) => {
-    if (event === 'resize') {
+    if (event === "resize") {
       windowResizeCallback = callback;
     }
   }),
 });
 
-Object.defineProperty(window, 'removeEventListener', {
+Object.defineProperty(window, "removeEventListener", {
   writable: true,
   value: vi.fn((event: string, callback: Function) => {
-    if (event === 'resize' && callback === windowResizeCallback) {
+    if (event === "resize" && callback === windowResizeCallback) {
       windowResizeCallback = null;
     }
   }),
@@ -85,7 +85,7 @@ describe("MapsRenderer", () => {
   const mockMapData = {
     options: {
       tooltip: {
-        formatter: "{b}: {c}"
+        formatter: "{b}: {c}",
       },
       series: [
         {
@@ -93,25 +93,25 @@ describe("MapsRenderer", () => {
           map: "world",
           data: [
             { name: "United States", value: 100 },
-            { name: "Canada", value: 50 }
-          ]
-        }
-      ]
-    }
+            { name: "Canada", value: 50 },
+          ],
+        },
+      ],
+    },
   };
 
   const createWrapper = (props = {}) => {
     return mount(MapsRenderer, {
       props: {
         data: mockMapData,
-        ...props
+        ...props,
       },
       global: {
         plugins: [Quasar],
       },
     });
   };
-  
+
   const waitForChartInit = async (wrapper: any) => {
     // Wait for the component's multiple nextTick calls like the component does
     await wrapper.vm.$nextTick();
@@ -137,64 +137,67 @@ describe("MapsRenderer", () => {
     it("should render correctly", async () => {
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
-      
+
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('#chart-map').exists()).toBe(true);
+      expect(wrapper.find("#chart-map").exists()).toBe(true);
     });
 
     it("should have correct component name", async () => {
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
-      
+
       expect(wrapper.vm.$options.name).toBe("MapsRenderer");
     });
 
     it("should accept data prop", async () => {
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
-      
-      expect(wrapper.props('data')).toEqual(mockMapData);
+
+      expect(wrapper.props("data")).toEqual(mockMapData);
     });
 
     it("should handle default data prop", async () => {
       wrapper = mount(MapsRenderer, {
         props: {
-          data: { options: {} }
+          data: { options: {} },
         },
         global: {
           plugins: [Quasar],
         },
       });
       await wrapper.vm.$nextTick();
-      
-      expect(wrapper.props('data')).toEqual({ options: {} });
+
+      expect(wrapper.props("data")).toEqual({ options: {} });
     });
   });
 
   describe("ECharts Integration", () => {
     it("should initialize ECharts on mount", async () => {
       const echarts = await import("echarts/core");
-      
+
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
-      
+
       expect(echarts.init).toHaveBeenCalled();
-      expect(echarts.registerMap).toHaveBeenCalledWith("world", expect.any(Object));
+      expect(echarts.registerMap).toHaveBeenCalledWith(
+        "world",
+        expect.any(Object),
+      );
     });
 
     it("should set chart options", async () => {
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
-      
+
       expect(mockChart.setOption).toHaveBeenCalled();
     });
 
     it("should dispose chart on unmount", async () => {
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
-      
+
       wrapper.unmount();
-      
+
       expect(mockChart.dispose).toHaveBeenCalled();
     });
   });
@@ -202,35 +205,37 @@ describe("MapsRenderer", () => {
   describe("Data Handling", () => {
     it("should handle empty options", async () => {
       wrapper = createWrapper({
-        data: { options: {} }
+        data: { options: {} },
       });
       await waitForChartInit(wrapper);
-      
+
       expect(wrapper.exists()).toBe(true);
     });
 
     it("should handle null options", async () => {
       wrapper = createWrapper({
-        data: { options: null }
+        data: { options: null },
       });
       await waitForChartInit(wrapper);
-      
+
       expect(wrapper.exists()).toBe(true);
     });
 
     it("should update when data changes", async () => {
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
-      
+
       const newData = {
         options: {
-          series: [{ type: "map", map: "world", data: [{ name: "Test", value: 1 }] }]
-        }
+          series: [
+            { type: "map", map: "world", data: [{ name: "Test", value: 1 }] },
+          ],
+        },
       };
-      
+
       await wrapper.setProps({ data: newData });
-      
-      expect(wrapper.props('data')).toEqual(newData);
+
+      expect(wrapper.props("data")).toEqual(newData);
     });
   });
 
@@ -238,28 +243,34 @@ describe("MapsRenderer", () => {
     it("should add resize event listener", async () => {
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
-      
-      expect(window.addEventListener).toHaveBeenCalledWith("resize", expect.any(Function));
+
+      expect(window.addEventListener).toHaveBeenCalledWith(
+        "resize",
+        expect.any(Function),
+      );
     });
 
     it("should remove resize event listener on unmount", async () => {
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
-      
+
       expect(windowResizeCallback).not.toBeNull();
       const callbackBeforeUnmount = windowResizeCallback;
-      
+
       wrapper.unmount();
-      
-      expect(window.removeEventListener).toHaveBeenCalledWith("resize", callbackBeforeUnmount);
+
+      expect(window.removeEventListener).toHaveBeenCalledWith(
+        "resize",
+        callbackBeforeUnmount,
+      );
     });
 
     it("should handle resize callback", async () => {
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
-      
+
       expect(windowResizeCallback).not.toBeNull();
-      
+
       if (windowResizeCallback) {
         await windowResizeCallback();
         expect(mockChart.resize).toHaveBeenCalled();
@@ -271,17 +282,17 @@ describe("MapsRenderer", () => {
     it("should have chart ref element", async () => {
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
-      
+
       expect(wrapper.vm.chartRef).toBeDefined();
     });
 
     it("should have correct chart container styling", async () => {
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
-      
-      const chartContainer = wrapper.find('#chart-map');
-      expect(chartContainer.attributes('style')).toContain('height: 100%');
-      expect(chartContainer.attributes('style')).toContain('width: 100%');
+
+      const chartContainer = wrapper.find("#chart-map");
+      expect(chartContainer.attributes("style")).toContain("height: 100%");
+      expect(chartContainer.attributes("style")).toContain("width: 100%");
     });
   });
 
@@ -296,18 +307,18 @@ describe("MapsRenderer", () => {
     it("should have correct prop types", async () => {
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
-      
-      expect(typeof wrapper.props('data')).toBe('object');
+
+      expect(typeof wrapper.props("data")).toBe("object");
     });
 
     it("should handle prop updates", async () => {
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
-      
+
       const newData = { options: { series: [] } };
       await wrapper.setProps({ data: newData });
-      
-      expect(wrapper.props('data')).toEqual(newData);
+
+      expect(wrapper.props("data")).toEqual(newData);
     });
   });
 
@@ -315,17 +326,17 @@ describe("MapsRenderer", () => {
     it("should handle multiple nextTick calls", async () => {
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
-      
+
       await wrapper.vm.$nextTick();
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.exists()).toBe(true);
     });
 
     it("should cleanup on unmount", async () => {
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
-      
+
       expect(() => wrapper.unmount()).not.toThrow();
     });
 
@@ -335,7 +346,7 @@ describe("MapsRenderer", () => {
         await waitForChartInit(testWrapper);
         testWrapper.unmount();
       }
-      
+
       // Should not throw errors
       expect(true).toBe(true);
     });
@@ -345,7 +356,7 @@ describe("MapsRenderer", () => {
     it("should handle invalid data gracefully", async () => {
       expect(() => {
         wrapper = createWrapper({
-          data: { options: { invalid: "data" } }
+          data: { options: { invalid: "data" } },
         });
       }).not.toThrow();
       await waitForChartInit(wrapper);
@@ -355,14 +366,14 @@ describe("MapsRenderer", () => {
       expect(() => {
         wrapper = mount(MapsRenderer, {
           props: {
-            data: { options: {} } // Use valid default instead of null
+            data: { options: {} }, // Use valid default instead of null
           },
           global: {
             plugins: [Quasar],
           },
         });
       }).not.toThrow();
-      
+
       if (wrapper) {
         await wrapper.vm.$nextTick();
         expect(wrapper.exists()).toBe(true);
@@ -372,12 +383,12 @@ describe("MapsRenderer", () => {
     it("should handle missing chart reference", async () => {
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
-      
+
       // Simulate missing chart ref
       wrapper.vm.chartRef = null;
-      
+
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.exists()).toBe(true);
     });
   });
@@ -385,10 +396,10 @@ describe("MapsRenderer", () => {
   describe("Map Configuration", () => {
     it("should use default map options", async () => {
       wrapper = createWrapper({
-        data: { options: {} }
+        data: { options: {} },
       });
       await waitForChartInit(wrapper);
-      
+
       // Component should render without errors
       expect(wrapper.exists()).toBe(true);
     });
@@ -398,18 +409,20 @@ describe("MapsRenderer", () => {
         options: {
           tooltip: { formatter: "{b}: {c}" },
           visualMap: { min: 0, max: 1000 },
-          series: [{
-            type: "map",
-            map: "world",
-            roam: true,
-            data: [
-              { name: "China", value: 1000 },
-              { name: "India", value: 800 }
-            ]
-          }]
-        }
+          series: [
+            {
+              type: "map",
+              map: "world",
+              roam: true,
+              data: [
+                { name: "China", value: 1000 },
+                { name: "India", value: 800 },
+              ],
+            },
+          ],
+        },
       };
-      
+
       expect(() => {
         wrapper = createWrapper({ data: complexData });
       }).not.toThrow();
@@ -419,10 +432,10 @@ describe("MapsRenderer", () => {
     it("should handle empty series", async () => {
       const emptySeriesData = {
         options: {
-          series: []
-        }
+          series: [],
+        },
       };
-      
+
       expect(() => {
         wrapper = createWrapper({ data: emptySeriesData });
       }).not.toThrow();
@@ -434,18 +447,21 @@ describe("MapsRenderer", () => {
     it("should load world map data", async () => {
       wrapper = createWrapper();
       const mapData = await import("@/assets/dashboard/maps/map.json");
-      
+
       expect(mapData.default).toBeDefined();
       expect(mapData.default.type).toBe("FeatureCollection");
     });
 
     it("should register map with ECharts", async () => {
       const echarts = await import("echarts/core");
-      
+
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
-      
-      expect(echarts.registerMap).toHaveBeenCalledWith("world", expect.any(Object));
+
+      expect(echarts.registerMap).toHaveBeenCalledWith(
+        "world",
+        expect.any(Object),
+      );
     });
   });
 
@@ -453,17 +469,19 @@ describe("MapsRenderer", () => {
     it("should handle large datasets", async () => {
       const largeData = {
         options: {
-          series: [{
-            type: "map",
-            map: "world",
-            data: Array.from({ length: 100 }, (_, i) => ({
-              name: `Country${i}`,
-              value: Math.random() * 1000
-            }))
-          }]
-        }
+          series: [
+            {
+              type: "map",
+              map: "world",
+              data: Array.from({ length: 100 }, (_, i) => ({
+                name: `Country${i}`,
+                value: Math.random() * 1000,
+              })),
+            },
+          ],
+        },
       };
-      
+
       expect(() => {
         wrapper = createWrapper({ data: largeData });
       }).not.toThrow();
@@ -473,17 +491,23 @@ describe("MapsRenderer", () => {
     it("should handle rapid data updates", async () => {
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
-      
+
       for (let i = 0; i < 5; i++) {
         await wrapper.setProps({
           data: {
             options: {
-              series: [{ type: "map", map: "world", data: [{ name: `Test${i}`, value: i }] }]
-            }
-          }
+              series: [
+                {
+                  type: "map",
+                  map: "world",
+                  data: [{ name: `Test${i}`, value: i }],
+                },
+              ],
+            },
+          },
         });
       }
-      
+
       expect(wrapper.exists()).toBe(true);
     });
   });

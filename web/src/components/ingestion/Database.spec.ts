@@ -10,13 +10,13 @@ installQuasar();
 // Mock services
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path) => `mock-${path}`),
-  verifyOrganizationStatus: vi.fn()
+  verifyOrganizationStatus: vi.fn(),
 }));
 
 vi.mock("@/aws-exports", () => ({
   default: {
-    API_ENDPOINT: "http://localhost:5080"
-  }
+    API_ENDPOINT: "http://localhost:5080",
+  },
 }));
 
 // Mock router
@@ -24,26 +24,26 @@ const mockRouter = {
   currentRoute: {
     value: {
       name: "databases",
-      query: {}
-    }
+      query: {},
+    },
   },
-  push: vi.fn()
+  push: vi.fn(),
 };
 
 vi.mock("vue-router", () => ({
-  useRouter: () => mockRouter
+  useRouter: () => mockRouter,
 }));
 
 // Mock Quasar
 const mockQuasar = {
-  notify: vi.fn()
+  notify: vi.fn(),
 };
 
 vi.mock("quasar", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
-    useQuasar: () => mockQuasar
+    useQuasar: () => mockQuasar,
   };
 });
 
@@ -53,14 +53,14 @@ describe("Database Component", () => {
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
-    
+
     // Reset router state
     mockRouter.currentRoute.value.name = "databases";
     mockRouter.currentRoute.value.query = {};
 
     wrapper = mount(Database, {
       props: {
-        currOrgIdentifier: "test-org"
+        currOrgIdentifier: "test-org",
       },
       global: {
         plugins: [i18n],
@@ -68,15 +68,16 @@ describe("Database Component", () => {
           store,
         },
         stubs: {
-          'q-splitter': {
-            template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+          "q-splitter": {
+            template:
+              '<div><slot name="before"></slot><slot name="after"></slot></div>',
           },
-          'q-input': true,
-          'q-icon': true,
-          'q-tabs': true,
-          'q-route-tab': true,
-          'router-view': true
-        }
+          "q-input": true,
+          "q-icon": true,
+          "q-tabs": true,
+          "q-route-tab": true,
+          "router-view": true,
+        },
       },
     });
   });
@@ -93,7 +94,7 @@ describe("Database Component", () => {
     });
 
     it("should have correct props", () => {
-      expect(wrapper.props('currOrgIdentifier')).toBe("test-org");
+      expect(wrapper.props("currOrgIdentifier")).toBe("test-org");
     });
 
     it("should initialize with correct data", () => {
@@ -106,7 +107,9 @@ describe("Database Component", () => {
 
     it("should have correct computed values", () => {
       expect(wrapper.vm.currentUserEmail).toBe(store.state.userInfo.email);
-      expect(wrapper.vm.currentOrgIdentifier).toBe(store.state.selectedOrganization.identifier);
+      expect(wrapper.vm.currentOrgIdentifier).toBe(
+        store.state.selectedOrganization.identifier,
+      );
     });
   });
 
@@ -122,25 +125,26 @@ describe("Database Component", () => {
 
     it("should not redirect when not on databases route", () => {
       mockRouter.currentRoute.value.name = "sqlserver";
-      
+
       const testWrapper = mount(Database, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            "q-splitter": {
+              template:
+                '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'q-input': true,
-            'q-icon': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true
-          }
+            "q-input": true,
+            "q-icon": true,
+            "q-tabs": true,
+            "q-route-tab": true,
+            "router-view": true,
+          },
         },
       });
-      
+
       // Only the initial call from the previous test should exist
       expect(mockRouter.push).toHaveBeenCalledTimes(1);
       testWrapper.unmount();
@@ -150,10 +154,10 @@ describe("Database Component", () => {
   describe("Database Tabs Configuration", () => {
     it("should have correct database tabs structure", () => {
       const filteredList = wrapper.vm.filteredList;
-      
+
       expect(Array.isArray(filteredList)).toBe(true);
       expect(filteredList.length).toBeGreaterThan(0);
-      
+
       // Check if key database types are present
       const tabNames = filteredList.map((tab: any) => tab.name);
       expect(tabNames).toContain("sqlserver");
@@ -172,31 +176,38 @@ describe("Database Component", () => {
     it("should have correct tab structure for each database", () => {
       const filteredList = wrapper.vm.filteredList;
       const firstTab = filteredList[0];
-      
+
       expect(firstTab).toHaveProperty("name");
       expect(firstTab).toHaveProperty("to");
       expect(firstTab).toHaveProperty("icon");
       expect(firstTab).toHaveProperty("label");
       expect(firstTab).toHaveProperty("contentClass", "tab_content");
-      
+
       // Check icon URL structure
       expect(firstTab.icon).toMatch(/^img:mock-images\/ingestion\//);
-      
+
       // Check to object structure
       expect(firstTab.to).toHaveProperty("name");
       expect(firstTab.to).toHaveProperty("query");
-      expect(firstTab.to.query).toHaveProperty("org_identifier", store.state.selectedOrganization.identifier);
+      expect(firstTab.to.query).toHaveProperty(
+        "org_identifier",
+        store.state.selectedOrganization.identifier,
+      );
     });
 
     it("should generate correct icons for each database", () => {
       const filteredList = wrapper.vm.filteredList;
-      
-      const sqlServerTab = filteredList.find((tab: any) => tab.name === "sqlserver");
+
+      const sqlServerTab = filteredList.find(
+        (tab: any) => tab.name === "sqlserver",
+      );
       expect(sqlServerTab.icon).toBe("img:mock-images/ingestion/sqlserver.png");
-      
-      const postgresTab = filteredList.find((tab: any) => tab.name === "postgres");
+
+      const postgresTab = filteredList.find(
+        (tab: any) => tab.name === "postgres",
+      );
       expect(postgresTab.icon).toBe("img:mock-images/ingestion/postgres.png");
-      
+
       const mongoTab = filteredList.find((tab: any) => tab.name === "mongodb");
       expect(mongoTab.icon).toBe("img:mock-images/ingestion/mongodb.svg");
     });
@@ -206,11 +217,11 @@ describe("Database Component", () => {
     it("should filter database tabs based on search input", async () => {
       // Initially should show all tabs
       expect(wrapper.vm.filteredList.length).toBeGreaterThan(5);
-      
+
       // Filter by "sql"
       wrapper.vm.tabsFilter = "sql";
       await wrapper.vm.$nextTick();
-      
+
       const filteredList = wrapper.vm.filteredList;
       filteredList.forEach((tab: any) => {
         expect(tab.label.toLowerCase()).toContain("sql");
@@ -221,10 +232,10 @@ describe("Database Component", () => {
       // Set filter then clear it
       wrapper.vm.tabsFilter = "postgres";
       await wrapper.vm.$nextTick();
-      
+
       wrapper.vm.tabsFilter = "";
       await wrapper.vm.$nextTick();
-      
+
       // Should show all tabs again
       expect(wrapper.vm.filteredList.length).toBe(12); // Total number of database tabs
     });
@@ -232,25 +243,29 @@ describe("Database Component", () => {
     it("should be case insensitive", async () => {
       wrapper.vm.tabsFilter = "POSTGRES";
       await wrapper.vm.$nextTick();
-      
+
       const filteredList = wrapper.vm.filteredList;
-      const hasPostgres = filteredList.some((tab: any) => tab.name === "postgres");
+      const hasPostgres = filteredList.some(
+        (tab: any) => tab.name === "postgres",
+      );
       expect(hasPostgres).toBe(true);
     });
 
     it("should handle no matches", async () => {
       wrapper.vm.tabsFilter = "nonexistentdb";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.filteredList.length).toBe(0);
     });
 
     it("should filter by partial matches", async () => {
       wrapper.vm.tabsFilter = "mongo";
       await wrapper.vm.$nextTick();
-      
+
       const filteredList = wrapper.vm.filteredList;
-      const hasMongoDb = filteredList.some((tab: any) => tab.name === "mongodb");
+      const hasMongoDb = filteredList.some(
+        (tab: any) => tab.name === "mongodb",
+      );
       expect(hasMongoDb).toBe(true);
       expect(filteredList.length).toBe(1);
     });
@@ -280,8 +295,8 @@ describe("Database Component", () => {
     it("should include SQL databases", () => {
       const filteredList = wrapper.vm.filteredList;
       const sqlDatabases = ["sqlserver", "postgres", "mysql"];
-      
-      sqlDatabases.forEach(dbName => {
+
+      sqlDatabases.forEach((dbName) => {
         const hasDb = filteredList.some((tab: any) => tab.name === dbName);
         expect(hasDb).toBe(true);
       });
@@ -289,9 +304,15 @@ describe("Database Component", () => {
 
     it("should include NoSQL databases", () => {
       const filteredList = wrapper.vm.filteredList;
-      const nosqlDatabases = ["mongodb", "redis", "cassandra", "aerospike", "dynamodb"];
-      
-      nosqlDatabases.forEach(dbName => {
+      const nosqlDatabases = [
+        "mongodb",
+        "redis",
+        "cassandra",
+        "aerospike",
+        "dynamodb",
+      ];
+
+      nosqlDatabases.forEach((dbName) => {
         const hasDb = filteredList.some((tab: any) => tab.name === dbName);
         expect(hasDb).toBe(true);
       });
@@ -300,8 +321,8 @@ describe("Database Component", () => {
     it("should include data warehouse solutions", () => {
       const filteredList = wrapper.vm.filteredList;
       const dataWarehouses = ["snowflake", "databricks"];
-      
-      dataWarehouses.forEach(dbName => {
+
+      dataWarehouses.forEach((dbName) => {
         const hasDb = filteredList.some((tab: any) => tab.name === dbName);
         expect(hasDb).toBe(true);
       });
@@ -310,8 +331,8 @@ describe("Database Component", () => {
     it("should include coordination services", () => {
       const filteredList = wrapper.vm.filteredList;
       const coordinationServices = ["zookeeper"];
-      
-      coordinationServices.forEach(dbName => {
+
+      coordinationServices.forEach((dbName) => {
         const hasDb = filteredList.some((tab: any) => tab.name === dbName);
         expect(hasDb).toBe(true);
       });
@@ -321,7 +342,7 @@ describe("Database Component", () => {
   describe("Localization", () => {
     it("should use translation keys for database labels", () => {
       const filteredList = wrapper.vm.filteredList;
-      
+
       // The labels should be translated strings
       filteredList.forEach((tab: any) => {
         expect(typeof tab.label).toBe("string");
@@ -335,7 +356,7 @@ describe("Database Component", () => {
       // Reset mock call count
       mockRouter.push.mockClear();
       mockRouter.currentRoute.value.name = "databases";
-      
+
       // Create new component to trigger onBeforeMount
       const testWrapper = mount(Database, {
         props: { currOrgIdentifier: "test-org" },
@@ -343,15 +364,16 @@ describe("Database Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            "q-splitter": {
+              template:
+                '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'q-input': true,
-            'q-icon': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true
-          }
+            "q-input": true,
+            "q-icon": true,
+            "q-tabs": true,
+            "q-route-tab": true,
+            "router-view": true,
+          },
         },
       });
 
@@ -361,29 +383,30 @@ describe("Database Component", () => {
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
-      
+
       testWrapper.unmount();
     });
 
     it("should not redirect when not on databases route during onBeforeMount", () => {
       mockRouter.push.mockClear();
       mockRouter.currentRoute.value.name = "postgres";
-      
+
       const testWrapper = mount(Database, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            "q-splitter": {
+              template:
+                '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'q-input': true,
-            'q-icon': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true
-          }
+            "q-input": true,
+            "q-icon": true,
+            "q-tabs": true,
+            "q-route-tab": true,
+            "router-view": true,
+          },
         },
       });
 
@@ -396,10 +419,10 @@ describe("Database Component", () => {
     it("should redirect to sqlserver on databases route during onUpdated", async () => {
       mockRouter.push.mockClear();
       mockRouter.currentRoute.value.name = "databases";
-      
+
       // Trigger component update
       await wrapper.setProps({ currOrgIdentifier: "updated-org" });
-      
+
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "sqlserver",
         query: {
@@ -411,9 +434,9 @@ describe("Database Component", () => {
     it("should not redirect when not on databases route during onUpdated", async () => {
       mockRouter.push.mockClear();
       mockRouter.currentRoute.value.name = "postgres";
-      
+
       await wrapper.setProps({ currOrgIdentifier: "updated-org" });
-      
+
       expect(mockRouter.push).not.toHaveBeenCalled();
     });
   });
@@ -421,20 +444,26 @@ describe("Database Component", () => {
   describe("Database Tabs - Detailed Structure", () => {
     it("should have correct configuration for SQL Server tab", () => {
       const filteredList = wrapper.vm.filteredList;
-      const sqlServerTab = filteredList.find((tab: any) => tab.name === "sqlserver");
-      
+      const sqlServerTab = filteredList.find(
+        (tab: any) => tab.name === "sqlserver",
+      );
+
       expect(sqlServerTab).toBeDefined();
       expect(sqlServerTab.name).toBe("sqlserver");
       expect(sqlServerTab.icon).toBe("img:mock-images/ingestion/sqlserver.png");
       expect(sqlServerTab.contentClass).toBe("tab_content");
       expect(sqlServerTab.to.name).toBe("sqlserver");
-      expect(sqlServerTab.to.query.org_identifier).toBe(store.state.selectedOrganization.identifier);
+      expect(sqlServerTab.to.query.org_identifier).toBe(
+        store.state.selectedOrganization.identifier,
+      );
     });
 
     it("should have correct configuration for PostgreSQL tab", () => {
       const filteredList = wrapper.vm.filteredList;
-      const postgresTab = filteredList.find((tab: any) => tab.name === "postgres");
-      
+      const postgresTab = filteredList.find(
+        (tab: any) => tab.name === "postgres",
+      );
+
       expect(postgresTab).toBeDefined();
       expect(postgresTab.name).toBe("postgres");
       expect(postgresTab.icon).toBe("img:mock-images/ingestion/postgres.png");
@@ -445,7 +474,7 @@ describe("Database Component", () => {
     it("should have correct configuration for MongoDB tab", () => {
       const filteredList = wrapper.vm.filteredList;
       const mongoTab = filteredList.find((tab: any) => tab.name === "mongodb");
-      
+
       expect(mongoTab).toBeDefined();
       expect(mongoTab.name).toBe("mongodb");
       expect(mongoTab.icon).toBe("img:mock-images/ingestion/mongodb.svg");
@@ -455,7 +484,7 @@ describe("Database Component", () => {
     it("should have correct configuration for Redis tab", () => {
       const filteredList = wrapper.vm.filteredList;
       const redisTab = filteredList.find((tab: any) => tab.name === "redis");
-      
+
       expect(redisTab).toBeDefined();
       expect(redisTab.name).toBe("redis");
       expect(redisTab.icon).toBe("img:mock-images/ingestion/redis.svg");
@@ -465,7 +494,7 @@ describe("Database Component", () => {
     it("should have correct configuration for MySQL tab", () => {
       const filteredList = wrapper.vm.filteredList;
       const mysqlTab = filteredList.find((tab: any) => tab.name === "mysql");
-      
+
       expect(mysqlTab).toBeDefined();
       expect(mysqlTab.name).toBe("mysql");
       expect(mysqlTab.icon).toBe("img:mock-images/ingestion/mysql.svg");
@@ -474,8 +503,10 @@ describe("Database Component", () => {
 
     it("should have correct configuration for Snowflake tab", () => {
       const filteredList = wrapper.vm.filteredList;
-      const snowflakeTab = filteredList.find((tab: any) => tab.name === "snowflake");
-      
+      const snowflakeTab = filteredList.find(
+        (tab: any) => tab.name === "snowflake",
+      );
+
       expect(snowflakeTab).toBeDefined();
       expect(snowflakeTab.name).toBe("snowflake");
       expect(snowflakeTab.icon).toBe("img:mock-images/ingestion/snowflake.svg");
@@ -484,8 +515,10 @@ describe("Database Component", () => {
 
     it("should have correct configuration for Zookeeper tab", () => {
       const filteredList = wrapper.vm.filteredList;
-      const zookeeperTab = filteredList.find((tab: any) => tab.name === "zookeeper");
-      
+      const zookeeperTab = filteredList.find(
+        (tab: any) => tab.name === "zookeeper",
+      );
+
       expect(zookeeperTab).toBeDefined();
       expect(zookeeperTab.name).toBe("zookeeper");
       expect(zookeeperTab.icon).toBe("img:mock-images/ingestion/zookeeper.png");
@@ -494,8 +527,10 @@ describe("Database Component", () => {
 
     it("should have correct configuration for Cassandra tab", () => {
       const filteredList = wrapper.vm.filteredList;
-      const cassandraTab = filteredList.find((tab: any) => tab.name === "cassandra");
-      
+      const cassandraTab = filteredList.find(
+        (tab: any) => tab.name === "cassandra",
+      );
+
       expect(cassandraTab).toBeDefined();
       expect(cassandraTab.name).toBe("cassandra");
       expect(cassandraTab.icon).toBe("img:mock-images/ingestion/cassandra.png");
@@ -504,8 +539,10 @@ describe("Database Component", () => {
 
     it("should have correct configuration for Aerospike tab", () => {
       const filteredList = wrapper.vm.filteredList;
-      const aerospikeTab = filteredList.find((tab: any) => tab.name === "aerospike");
-      
+      const aerospikeTab = filteredList.find(
+        (tab: any) => tab.name === "aerospike",
+      );
+
       expect(aerospikeTab).toBeDefined();
       expect(aerospikeTab.name).toBe("aerospike");
       expect(aerospikeTab.icon).toBe("img:mock-images/ingestion/aerospike.svg");
@@ -514,8 +551,10 @@ describe("Database Component", () => {
 
     it("should have correct configuration for DynamoDB tab", () => {
       const filteredList = wrapper.vm.filteredList;
-      const dynamodbTab = filteredList.find((tab: any) => tab.name === "dynamodb");
-      
+      const dynamodbTab = filteredList.find(
+        (tab: any) => tab.name === "dynamodb",
+      );
+
       expect(dynamodbTab).toBeDefined();
       expect(dynamodbTab.name).toBe("dynamodb");
       expect(dynamodbTab.icon).toBe("img:mock-images/ingestion/dynamodb.png");
@@ -524,11 +563,15 @@ describe("Database Component", () => {
 
     it("should have correct configuration for Databricks tab", () => {
       const filteredList = wrapper.vm.filteredList;
-      const databricksTab = filteredList.find((tab: any) => tab.name === "databricks");
-      
+      const databricksTab = filteredList.find(
+        (tab: any) => tab.name === "databricks",
+      );
+
       expect(databricksTab).toBeDefined();
       expect(databricksTab.name).toBe("databricks");
-      expect(databricksTab.icon).toBe("img:mock-images/ingestion/databricks.svg");
+      expect(databricksTab.icon).toBe(
+        "img:mock-images/ingestion/databricks.svg",
+      );
       expect(databricksTab.contentClass).toBe("tab_content");
     });
   });
@@ -540,7 +583,7 @@ describe("Database Component", () => {
 
       wrapper.vm.tabsFilter = "postgres";
       await wrapper.vm.$nextTick();
-      
+
       const filteredLength = wrapper.vm.filteredList.length;
       expect(filteredLength).toBeLessThan(initialLength);
     });
@@ -548,7 +591,7 @@ describe("Database Component", () => {
     it("should maintain original array when filter matches all", async () => {
       wrapper.vm.tabsFilter = "";
       await wrapper.vm.$nextTick();
-      
+
       const allTabs = wrapper.vm.filteredList;
       expect(allTabs.length).toBe(12);
     });
@@ -556,7 +599,7 @@ describe("Database Component", () => {
     it("should filter based on label content", async () => {
       wrapper.vm.tabsFilter = "databricks";
       await wrapper.vm.$nextTick();
-      
+
       const filtered = wrapper.vm.filteredList;
       expect(filtered.length).toBe(1);
       expect(filtered[0].name).toBe("databricks");
@@ -565,9 +608,11 @@ describe("Database Component", () => {
     it("should handle special characters in filter", async () => {
       wrapper.vm.tabsFilter = "SQL";
       await wrapper.vm.$nextTick();
-      
+
       const filtered = wrapper.vm.filteredList;
-      const hasSqlServer = filtered.some((tab: any) => tab.name === "sqlserver");
+      const hasSqlServer = filtered.some(
+        (tab: any) => tab.name === "sqlserver",
+      );
       const hasMysql = filtered.some((tab: any) => tab.name === "mysql");
       expect(hasSqlServer || hasMysql).toBe(true);
     });
@@ -625,24 +670,28 @@ describe("Database Component", () => {
   describe("Integration Tests", () => {
     it("should maintain consistency between router and tab state", () => {
       expect(wrapper.vm.ingestTabType).toBe("sqlserver");
-      const sqlServerTab = wrapper.vm.filteredList.find((tab: any) => tab.name === "sqlserver");
+      const sqlServerTab = wrapper.vm.filteredList.find(
+        (tab: any) => tab.name === "sqlserver",
+      );
       expect(sqlServerTab).toBeDefined();
     });
 
     it("should properly integrate with store state", () => {
-      expect(wrapper.vm.currentOrgIdentifier).toBe(store.state.selectedOrganization.identifier);
+      expect(wrapper.vm.currentOrgIdentifier).toBe(
+        store.state.selectedOrganization.identifier,
+      );
       expect(wrapper.vm.currentUserEmail).toBe(store.state.userInfo.email);
     });
 
     it("should maintain filter and display consistency", async () => {
       const originalCount = wrapper.vm.filteredList.length;
-      
+
       wrapper.vm.tabsFilter = "sql";
       await wrapper.vm.$nextTick();
-      
+
       const filteredCount = wrapper.vm.filteredList.length;
       expect(filteredCount).toBeLessThan(originalCount);
-      
+
       // Check each filtered item contains the search term
       wrapper.vm.filteredList.forEach((tab: any) => {
         expect(tab.label.toLowerCase()).toContain("sql");
@@ -658,19 +707,20 @@ describe("Database Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            "q-splitter": {
+              template:
+                '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'q-input': true,
-            'q-icon': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true
-          }
+            "q-input": true,
+            "q-icon": true,
+            "q-tabs": true,
+            "q-route-tab": true,
+            "router-view": true,
+          },
         },
       });
-      
-      expect(testWrapper.props('currOrgIdentifier')).toBe("");
+
+      expect(testWrapper.props("currOrgIdentifier")).toBe("");
       expect(testWrapper.vm.filteredList).toBeDefined();
       testWrapper.unmount();
     });
@@ -679,7 +729,7 @@ describe("Database Component", () => {
       const longFilter = "a".repeat(1000);
       wrapper.vm.tabsFilter = longFilter;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.filteredList).toBeDefined();
       expect(Array.isArray(wrapper.vm.filteredList)).toBe(true);
     });
@@ -735,21 +785,43 @@ describe("Database Component", () => {
   describe("Database Tabs Raw Data", () => {
     it("should contain all expected database types in databaseTabs", () => {
       const expectedDbs = [
-        "sqlserver", "postgres", "mongodb", "redis", "mysql",
-        "snowflake", "zookeeper", "cassandra", "aerospike", "dynamodb", "databricks"
+        "sqlserver",
+        "postgres",
+        "mongodb",
+        "redis",
+        "mysql",
+        "snowflake",
+        "zookeeper",
+        "cassandra",
+        "aerospike",
+        "dynamodb",
+        "databricks",
       ];
-      
+
       const actualDbNames = wrapper.vm.databaseTabs.map((tab: any) => tab.name);
-      
-      expectedDbs.forEach(dbName => {
+
+      expectedDbs.forEach((dbName) => {
         expect(actualDbNames).toContain(dbName);
       });
     });
 
     it("should have correct icon extensions for different databases", () => {
-      const svgDbs = ["mongodb", "redis", "mysql", "snowflake", "aerospike", "databricks"];
-      const pngDbs = ["sqlserver", "postgres", "zookeeper", "cassandra", "dynamodb"];
-      
+      const svgDbs = [
+        "mongodb",
+        "redis",
+        "mysql",
+        "snowflake",
+        "aerospike",
+        "databricks",
+      ];
+      const pngDbs = [
+        "sqlserver",
+        "postgres",
+        "zookeeper",
+        "cassandra",
+        "dynamodb",
+      ];
+
       wrapper.vm.databaseTabs.forEach((tab: any) => {
         if (svgDbs.includes(tab.name)) {
           expect(tab.icon).toMatch(/\.svg$/);
@@ -763,9 +835,9 @@ describe("Database Component", () => {
       wrapper.vm.tabsFilter = "";
       const filteredTabs = wrapper.vm.filteredList;
       const rawTabs = wrapper.vm.databaseTabs;
-      
+
       expect(filteredTabs.length).toBe(rawTabs.length);
-      
+
       rawTabs.forEach((rawTab: any, index: number) => {
         expect(filteredTabs[index].name).toBe(rawTab.name);
         expect(filteredTabs[index].label).toBe(rawTab.label);

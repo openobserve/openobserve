@@ -41,14 +41,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-space />
         <q-icon
           v-if="
-            !viewOnly && !simplifiedPanelView && isCurrentlyHoveredPanel && props.data.description != ''
+            !viewOnly &&
+            !simplifiedPanelView &&
+            isCurrentlyHoveredPanel &&
+            props.data.description != ''
           "
           name="info_outline"
           style="cursor: pointer"
           data-test="dashboard-panel-description-info"
         >
-          <q-tooltip anchor="bottom right"
-self="top right" max-width="220px">
+          <q-tooltip anchor="bottom right" self="top right"
+max-width="220px">
             <div style="white-space: pre-wrap">
               {{ props.data.description }}
             </div>
@@ -73,8 +76,8 @@ self="top right" max-width="220px">
           @click="showViewPanel = true"
           data-test="dashboard-panel-dependent-adhoc-variable-btn"
         >
-          <q-tooltip anchor="bottom right"
-self="top right" max-width="220px">
+          <q-tooltip anchor="bottom right" self="top right"
+max-width="220px">
             Some dynamic variables are not applied because the field is not
             present in the query's stream. Open Query Inspector to see all the
             details of the variables and queries executed to render this panel
@@ -85,7 +88,9 @@ self="top right" max-width="220px">
           :error="errorData"
           :maxQueryRangeWarning="maxQueryRangeWarning"
           :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
-          :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
+          :isCachedDataDifferWithCurrentTimeRange="
+            isCachedDataDifferWithCurrentTimeRange
+          "
           :isPartialData="isPartialData"
           :isPanelLoading="isPanelLoading"
           :lastTriggeredAt="lastTriggeredAt"
@@ -203,7 +208,9 @@ self="top right" max-width="220px">
             </q-item>
             <q-item
               clickable
-              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              v-if="
+                !simplifiedPanelView && metaData && metaData.queries?.length > 0
+              "
               v-close-popup="true"
               @click="showViewPanel = true"
             >
@@ -220,7 +227,9 @@ self="top right" max-width="220px">
             </q-item>
             <q-item
               clickable
-              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              v-if="
+                !simplifiedPanelView && metaData && metaData.queries?.length > 0
+              "
               v-close-popup="true"
               @click="
                 PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)
@@ -239,7 +248,9 @@ self="top right" max-width="220px">
             </q-item>
             <q-item
               clickable
-              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              v-if="
+                !simplifiedPanelView && metaData && metaData.queries?.length > 0
+              "
               v-close-popup="true"
               @click="
                 PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)
@@ -258,7 +269,9 @@ self="top right" max-width="220px">
             </q-item>
             <q-item
               clickable
-              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              v-if="
+                !simplifiedPanelView && metaData && metaData.queries?.length > 0
+              "
               :disable="props.data.queryType != 'sql'"
               v-close-popup="true"
               @click="onLogPanel"
@@ -310,7 +323,9 @@ self="top right" max-width="220px">
             </q-item>
             <q-item
               clickable
-              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              v-if="
+                !simplifiedPanelView && metaData && metaData.queries?.length > 0
+              "
               v-close-popup="true"
               @click="onPanelModifyClick('CreateAlert')"
             >
@@ -329,7 +344,7 @@ self="top right" max-width="220px">
         </q-btn-dropdown>
       </q-bar>
     </div>
-    
+
     <!-- Panel-Level Variables (shown below drag-allow section) -->
     <div class="panel-variables-wrapper">
       <slot name="panel-variables"></slot>
@@ -341,45 +356,45 @@ self="top right" max-width="220px">
         :selectedTimeObj="props.selectedTimeDate"
         :width="props.width"
         :height="props.height"
-      :variablesData="props.variablesData"
-      :currentVariablesData="props.currentVariablesData"
-      :forceLoad="props.forceLoad"
-      :searchType="searchType"
-      :dashboard-id="props.dashboardId"
-      :folder-id="props.folderId"
-      :report-id="props.reportId"
-      :runId="runId"
-      :tabId="props.tabId"
-      :tabName="props.tabName"
-      :dashboardName="props.dashboardName"
-      :folderName="props.folderName"
-      :viewOnly="viewOnly"
-      :shouldRefreshWithoutCache="props.shouldRefreshWithoutCache"
-      @loading-state-change="handleLoadingStateChange"
-      @metadata-update="metaDataValue"
-      @limit-number-of-series-warning-message-update="
-        handleLimitNumberOfSeriesWarningMessageUpdate
-      "
-      @result-metadata-update="handleResultMetadataUpdate"
-      @last-triggered-at-update="handleLastTriggeredAtUpdate"
-      @is-cached-data-differ-with-current-time-range-update="
-        handleIsCachedDataDifferWithCurrentTimeRangeUpdate
-      "
-      @updated:data-zoom="$emit('updated:data-zoom', $event)"
-      @update:initial-variable-values="
-        (...args) => $emit('update:initial-variable-values', ...args)
-      "
-      @error="onError"
-      @is-partial-data-update="handleIsPartialDataUpdate"
-      @contextmenu="$emit('contextmenu', $event)"
-      ref="PanleSchemaRendererRef"
-      :allowAnnotationsAdd="true"
-      :allowAlertCreation="allowAlertCreation"
-      @show-legends="showLegendsDialog = true"
-      :showLegendsButton="props.showLegendsButton"
-    ></PanelSchemaRenderer>
+        :variablesData="props.variablesData"
+        :currentVariablesData="props.currentVariablesData"
+        :forceLoad="props.forceLoad"
+        :searchType="searchType"
+        :dashboard-id="props.dashboardId"
+        :folder-id="props.folderId"
+        :report-id="props.reportId"
+        :runId="runId"
+        :tabId="props.tabId"
+        :tabName="props.tabName"
+        :dashboardName="props.dashboardName"
+        :folderName="props.folderName"
+        :viewOnly="viewOnly"
+        :shouldRefreshWithoutCache="props.shouldRefreshWithoutCache"
+        @loading-state-change="handleLoadingStateChange"
+        @metadata-update="metaDataValue"
+        @limit-number-of-series-warning-message-update="
+          handleLimitNumberOfSeriesWarningMessageUpdate
+        "
+        @result-metadata-update="handleResultMetadataUpdate"
+        @last-triggered-at-update="handleLastTriggeredAtUpdate"
+        @is-cached-data-differ-with-current-time-range-update="
+          handleIsCachedDataDifferWithCurrentTimeRangeUpdate
+        "
+        @updated:data-zoom="$emit('updated:data-zoom', $event)"
+        @update:initial-variable-values="
+          (...args) => $emit('update:initial-variable-values', ...args)
+        "
+        @error="onError"
+        @is-partial-data-update="handleIsPartialDataUpdate"
+        @contextmenu="$emit('contextmenu', $event)"
+        ref="PanleSchemaRendererRef"
+        :allowAnnotationsAdd="true"
+        :allowAlertCreation="allowAlertCreation"
+        @show-legends="showLegendsDialog = true"
+        :showLegendsButton="props.showLegendsButton"
+      ></PanelSchemaRenderer>
     </div>
-    
+
     <q-dialog v-model="showViewPanel">
       <QueryInspector :metaData="metaData" :data="props.data"></QueryInspector>
     </q-dialog>
@@ -441,7 +456,11 @@ import {
 } from "@quasar/extras/material-symbols-outlined";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
-import { getFunctionErrorMessage, getUUID, processQueryMetadataErrors } from "@/utils/zincutils";
+import {
+  getFunctionErrorMessage,
+  getUUID,
+  processQueryMetadataErrors,
+} from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import { isEqual } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
@@ -811,7 +830,7 @@ export default defineComponent({
       return newRunId;
     };
 
-    const onRefreshPanel = async (shouldRefreshWithoutCache=false) => {
+    const onRefreshPanel = async (shouldRefreshWithoutCache = false) => {
       // Need to generate a new run id when refreshing the panel
       generateNewDashboardRunId();
 
@@ -819,7 +838,11 @@ export default defineComponent({
 
       isPanelLoading.value = true;
       try {
-        await emit("refreshPanelRequest", props.data.id, shouldRefreshWithoutCache);
+        await emit(
+          "refreshPanelRequest",
+          props.data.id,
+          shouldRefreshWithoutCache,
+        );
       } finally {
         isPanelLoading.value = false;
       }

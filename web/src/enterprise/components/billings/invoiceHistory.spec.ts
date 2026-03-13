@@ -24,8 +24,8 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 vi.mock("@/enterprise/components/billings/invoiceTable.vue", () => ({
   default: {
     name: "InvoiceTable",
-    template: '<div data-testid="mock-invoice-table">Mock Invoice Table</div>'
-  }
+    template: '<div data-testid="mock-invoice-table">Mock Invoice Table</div>',
+  },
 }));
 
 import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
@@ -40,9 +40,9 @@ describe("InvoiceHistory", () => {
       global: {
         plugins: [i18n],
         provide: {
-          store: store
+          store: store,
         },
-      }
+      },
     });
   });
 
@@ -127,8 +127,8 @@ describe("InvoiceHistory", () => {
         props: propsData,
         global: {
           plugins: [i18n],
-          provide: { store }
-        }
+          provide: { store },
+        },
       });
       expect(wrapperWithProps.exists()).toBe(true);
     });
@@ -138,8 +138,8 @@ describe("InvoiceHistory", () => {
         props: { unknownProp: "test" },
         global: {
           plugins: [i18n],
-          provide: { store }
-        }
+          provide: { store },
+        },
       });
       expect(wrapperWithUnknownProps.exists()).toBe(true);
     });
@@ -168,7 +168,9 @@ describe("InvoiceHistory", () => {
     });
 
     it("should contain exactly one InvoiceTable component", () => {
-      const invoiceTables = wrapper.findAll('[data-testid="mock-invoice-table"]');
+      const invoiceTables = wrapper.findAll(
+        '[data-testid="mock-invoice-table"]',
+      );
       expect(invoiceTables).toHaveLength(1);
     });
 
@@ -183,7 +185,6 @@ describe("InvoiceHistory", () => {
     });
   });
 
-
   describe("Internationalization (i18n)", () => {
     it("should use i18n for title text", () => {
       const titleDiv = wrapper.find(".row.q-px-sm.q-table__title");
@@ -193,7 +194,7 @@ describe("InvoiceHistory", () => {
     it("should handle missing translation keys gracefully", () => {
       // Test that translation function exists and works
       expect(typeof wrapper.vm.t).toBe("function");
-      
+
       // Test with a known translation key
       const result = wrapper.vm.t("billing.invoiceHistory");
       expect(typeof result).toBe("string");
@@ -263,9 +264,9 @@ describe("InvoiceHistory", () => {
             plugins: [i18n],
             provide: { store },
             stubs: {
-              'q-page': true
-            }
-          }
+              "q-page": true,
+            },
+          },
         });
       }).not.toThrow();
     });
@@ -276,9 +277,9 @@ describe("InvoiceHistory", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            InvoiceTable: true
-          }
-        }
+            InvoiceTable: true,
+          },
+        },
       });
       expect(minimalWrapper.exists()).toBe(true);
     });
@@ -289,7 +290,7 @@ describe("InvoiceHistory", () => {
           global: {
             plugins: [i18n],
             // Completely omit store from provide to test actual missing store scenario
-          }
+          },
         });
       }).not.toThrow();
     });
@@ -299,8 +300,8 @@ describe("InvoiceHistory", () => {
         props: null,
         global: {
           plugins: [i18n],
-          provide: { store }
-        }
+          provide: { store },
+        },
       });
       expect(wrapperWithNullProps.exists()).toBe(true);
     });
@@ -311,7 +312,7 @@ describe("InvoiceHistory", () => {
       // Test that component maintains its structure after updates
       const initialHtml = wrapper.html();
       wrapper.vm.$forceUpdate();
-      
+
       // Verify component still exists and has expected elements
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.html()).toContain("Invoice History");

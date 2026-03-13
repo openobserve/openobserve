@@ -247,28 +247,46 @@ describe("ServiceGraphSidePanel.vue", () => {
 
     it("should render panel when visible is true", () => {
       wrapper = createWrapper({ visible: true });
-      expect(wrapper.find('[data-test="service-graph-side-panel"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="service-graph-side-panel"]').exists(),
+      ).toBe(true);
     });
 
     it("should not render panel when visible is false", () => {
       wrapper = createWrapper({ visible: false });
-      expect(wrapper.find('[data-test="service-graph-side-panel"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="service-graph-side-panel"]').exists(),
+      ).toBe(false);
     });
 
     it("should display panel header", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="service-graph-side-panel-header"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="service-graph-side-panel-header"]').exists(),
+      ).toBe(true);
     });
 
     it("should display service name", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="service-graph-side-panel-service-name"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="service-graph-side-panel-service-name"]').text()).toContain("Service A");
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-service-name"]')
+          .exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-service-name"]')
+          .text(),
+      ).toContain("Service A");
     });
 
     it("should display close button", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="service-graph-side-panel-close-btn"]').exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-close-btn"]')
+          .exists(),
+      ).toBe(true);
     });
   });
 
@@ -585,7 +603,9 @@ describe("ServiceGraphSidePanel.vue", () => {
   describe("Event Handlers - handleClose", () => {
     it("should emit close event when close button is clicked", async () => {
       wrapper = createWrapper();
-      const closeBtn = wrapper.find('[data-test="service-graph-side-panel-close-btn"]');
+      const closeBtn = wrapper.find(
+        '[data-test="service-graph-side-panel-close-btn"]',
+      );
 
       await closeBtn.trigger("click");
 
@@ -597,7 +617,9 @@ describe("ServiceGraphSidePanel.vue", () => {
   describe("Event Handlers - handleShowTelemetry", () => {
     it("should have Show telemetry button", () => {
       wrapper = createWrapper();
-      const showTelemetryBtn = wrapper.find('[data-test="service-graph-side-panel-show-telemetry-btn"]');
+      const showTelemetryBtn = wrapper.find(
+        '[data-test="service-graph-side-panel-show-telemetry-btn"]',
+      );
 
       expect(showTelemetryBtn.exists()).toBe(true);
       expect(showTelemetryBtn.text()).toContain("Show telemetry");
@@ -664,7 +686,7 @@ describe("ServiceGraphSidePanel.vue", () => {
     it("should include time range parameters in navigation", () => {
       const customTimeRange = {
         startTime: 1609459200000, // 2021-01-01 00:00:00
-        endTime: 1609545600000,   // 2021-01-02 00:00:00
+        endTime: 1609545600000, // 2021-01-02 00:00:00
       };
 
       wrapper = createWrapper({
@@ -683,7 +705,7 @@ describe("ServiceGraphSidePanel.vue", () => {
             from: customTimeRange.startTime,
             to: customTimeRange.endTime,
           }),
-        })
+        }),
       );
     });
 
@@ -703,7 +725,7 @@ describe("ServiceGraphSidePanel.vue", () => {
           query: expect.objectContaining({
             stream: "custom-stream",
           }),
-        })
+        }),
       );
     });
 
@@ -723,7 +745,7 @@ describe("ServiceGraphSidePanel.vue", () => {
           query: expect.objectContaining({
             stream: "default",
           }),
-        })
+        }),
       );
     });
 
@@ -741,16 +763,19 @@ describe("ServiceGraphSidePanel.vue", () => {
           query: expect.objectContaining({
             org_identifier: "test-org",
           }),
-        })
+        }),
       );
     });
 
     it("should handle different org identifiers", () => {
-      wrapper = createWrapper({}, {
-        selectedOrganization: {
-          identifier: "different-org",
+      wrapper = createWrapper(
+        {},
+        {
+          selectedOrganization: {
+            identifier: "different-org",
+          },
         },
-      });
+      );
 
       const mockTrace = {
         traceId: "trace-different",
@@ -763,7 +788,7 @@ describe("ServiceGraphSidePanel.vue", () => {
           query: expect.objectContaining({
             org_identifier: "different-org",
           }),
-        })
+        }),
       );
     });
 
@@ -774,7 +799,9 @@ describe("ServiceGraphSidePanel.vue", () => {
       await flushPromises();
       await nextTick();
 
-      const traceItems = wrapper.findAll('[data-test="service-graph-side-panel-trace-item"]');
+      const traceItems = wrapper.findAll(
+        '[data-test="service-graph-side-panel-trace-item"]',
+      );
       expect(traceItems.length).toBeGreaterThan(0);
 
       // Click on the trace ID
@@ -791,7 +818,9 @@ describe("ServiceGraphSidePanel.vue", () => {
 
       await wrapper.vm.copyTraceId("test-trace-id");
 
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("test-trace-id");
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        "test-trace-id",
+      );
     });
 
     it("should set copiedTraceId state after copying", async () => {
@@ -816,8 +845,12 @@ describe("ServiceGraphSidePanel.vue", () => {
     });
 
     it("should handle clipboard copy failure", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-      navigator.clipboard.writeText = vi.fn().mockRejectedValue(new Error("Copy failed"));
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      navigator.clipboard.writeText = vi
+        .fn()
+        .mockRejectedValue(new Error("Copy failed"));
 
       wrapper = createWrapper();
 
@@ -867,7 +900,7 @@ describe("ServiceGraphSidePanel.vue", () => {
         () =>
           new Promise((resolve) => {
             resolvePromise = () => resolve(mockTraces);
-          })
+          }),
       );
 
       wrapper = createWrapper({ visible: true, streamFilter: "default" });
@@ -910,8 +943,12 @@ describe("ServiceGraphSidePanel.vue", () => {
     });
 
     it("should handle fetch error gracefully", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-      vi.mocked(searchService.get_traces).mockRejectedValue(new Error("API Error"));
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      vi.mocked(searchService.get_traces).mockRejectedValue(
+        new Error("API Error"),
+      );
 
       wrapper = createWrapper({ visible: true, streamFilter: "default" });
       await flushPromises();
@@ -924,7 +961,9 @@ describe("ServiceGraphSidePanel.vue", () => {
     });
 
     it("should handle empty trace response", async () => {
-      vi.mocked(searchService.get_traces).mockResolvedValue({ data: { hits: [] } });
+      vi.mocked(searchService.get_traces).mockResolvedValue({
+        data: { hits: [] },
+      });
 
       wrapper = createWrapper({ visible: true, streamFilter: "default" });
       await flushPromises();
@@ -959,7 +998,9 @@ describe("ServiceGraphSidePanel.vue", () => {
       await wrapper.setProps({ selectedNode: mockNodes[1] });
       await flushPromises();
 
-      expect(vi.mocked(searchService.get_traces).mock.calls.length).toBeGreaterThan(callCount);
+      expect(
+        vi.mocked(searchService.get_traces).mock.calls.length,
+      ).toBeGreaterThan(callCount);
     });
 
     it("should fetch traces when streamFilter changes", async () => {
@@ -973,7 +1014,9 @@ describe("ServiceGraphSidePanel.vue", () => {
       await wrapper.setProps({ streamFilter: "another-stream" });
       await flushPromises();
 
-      expect(vi.mocked(searchService.get_traces).mock.calls.length).toBeGreaterThan(callCount);
+      expect(
+        vi.mocked(searchService.get_traces).mock.calls.length,
+      ).toBeGreaterThan(callCount);
     });
 
     it("should not fetch traces when changing to 'all' stream", async () => {
@@ -994,57 +1037,87 @@ describe("ServiceGraphSidePanel.vue", () => {
   describe("UI Rendering - Metrics Section", () => {
     it("should display metrics section", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="service-graph-side-panel-metrics"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="service-graph-side-panel-metrics"]').exists(),
+      ).toBe(true);
     });
 
     it("should display request rate metric", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="service-graph-side-panel-request-rate"]').exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-request-rate"]')
+          .exists(),
+      ).toBe(true);
     });
 
     it("should display error rate metric", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="service-graph-side-panel-error-rate"]').exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-error-rate"]')
+          .exists(),
+      ).toBe(true);
     });
 
     it("should display P95 latency metric", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="service-graph-side-panel-p95-latency"]').exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-p95-latency"]')
+          .exists(),
+      ).toBe(true);
     });
   });
 
   describe("UI Rendering - Services Lists", () => {
     it("should display upstream services section", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="service-graph-side-panel-upstream-services"]').exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-upstream-services"]')
+          .exists(),
+      ).toBe(true);
     });
 
     it("should display downstream services section", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="service-graph-side-panel-downstream-services"]').exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-downstream-services"]')
+          .exists(),
+      ).toBe(true);
     });
 
     it("should display correct upstream service count", () => {
       wrapper = createWrapper();
-      const upstreamSection = wrapper.find('[data-test="service-graph-side-panel-upstream-services"]');
+      const upstreamSection = wrapper.find(
+        '[data-test="service-graph-side-panel-upstream-services"]',
+      );
       expect(upstreamSection.text()).toContain("(3)");
     });
 
     it("should display correct downstream service count", () => {
       wrapper = createWrapper();
-      const downstreamSection = wrapper.find('[data-test="service-graph-side-panel-downstream-services"]');
+      const downstreamSection = wrapper.find(
+        '[data-test="service-graph-side-panel-downstream-services"]',
+      );
       expect(downstreamSection.text()).toContain("(2)");
     });
 
     it("should render upstream service items", () => {
       wrapper = createWrapper();
-      const upstreamItems = wrapper.findAll('[data-test="service-graph-side-panel-upstream-service-item"]');
+      const upstreamItems = wrapper.findAll(
+        '[data-test="service-graph-side-panel-upstream-service-item"]',
+      );
       expect(upstreamItems.length).toBeGreaterThan(0);
     });
 
     it("should render downstream service items", () => {
       wrapper = createWrapper();
-      const downstreamItems = wrapper.findAll('[data-test="service-graph-side-panel-downstream-service-item"]');
+      const downstreamItems = wrapper.findAll(
+        '[data-test="service-graph-side-panel-downstream-service-item"]',
+      );
       expect(downstreamItems.length).toBe(2);
     });
   });
@@ -1056,12 +1129,20 @@ describe("ServiceGraphSidePanel.vue", () => {
       wrapper = createWrapper({ visible: true, streamFilter: "default" });
       await flushPromises();
 
-      expect(wrapper.find('[data-test="service-graph-side-panel-recent-traces"]').exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-recent-traces"]')
+          .exists(),
+      ).toBe(true);
     });
 
     it("should not display recent traces section when stream is 'all'", () => {
       wrapper = createWrapper({ streamFilter: "all" });
-      expect(wrapper.find('[data-test="service-graph-side-panel-recent-traces"]').exists()).toBe(false);
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-recent-traces"]')
+          .exists(),
+      ).toBe(false);
     });
 
     it("should show loading spinner while fetching traces", async () => {
@@ -1069,7 +1150,7 @@ describe("ServiceGraphSidePanel.vue", () => {
         () =>
           new Promise((resolve) => {
             setTimeout(() => resolve(mockTraces), 100);
-          })
+          }),
       );
 
       wrapper = createWrapper({ visible: true, streamFilter: "default" });
@@ -1085,7 +1166,9 @@ describe("ServiceGraphSidePanel.vue", () => {
       await flushPromises();
       await nextTick();
 
-      const traceItems = wrapper.findAll('[data-test="service-graph-side-panel-trace-item"]');
+      const traceItems = wrapper.findAll(
+        '[data-test="service-graph-side-panel-trace-item"]',
+      );
       expect(traceItems.length).toBe(2);
     });
 
@@ -1096,7 +1179,9 @@ describe("ServiceGraphSidePanel.vue", () => {
       await flushPromises();
       await nextTick();
 
-      const copyButtons = wrapper.findAll('[data-test="service-graph-side-panel-copy-trace-btn"]');
+      const copyButtons = wrapper.findAll(
+        '[data-test="service-graph-side-panel-copy-trace-btn"]',
+      );
       expect(copyButtons.length).toBe(2);
     });
   });
@@ -1122,7 +1207,9 @@ describe("ServiceGraphSidePanel.vue", () => {
         selectedNode: { id: "test-service" },
       });
 
-      const serviceName = wrapper.find('[data-test="service-graph-side-panel-service-name"]');
+      const serviceName = wrapper.find(
+        '[data-test="service-graph-side-panel-service-name"]',
+      );
       expect(serviceName.text()).toContain("test-service");
     });
 
@@ -1160,7 +1247,10 @@ describe("ServiceGraphSidePanel.vue", () => {
       wrapper = createWrapper();
 
       expect(wrapper.props("selectedNode")).toEqual(mockNodes[0]);
-      expect(wrapper.props("graphData")).toEqual({ nodes: mockNodes, edges: mockEdges });
+      expect(wrapper.props("graphData")).toEqual({
+        nodes: mockNodes,
+        edges: mockEdges,
+      });
       expect(wrapper.props("timeRange")).toEqual(mockTimeRange);
       expect(wrapper.props("visible")).toBe(true);
       expect(wrapper.props("streamFilter")).toBe("default");
@@ -1168,10 +1258,14 @@ describe("ServiceGraphSidePanel.vue", () => {
 
     it("should handle visible prop change", async () => {
       wrapper = createWrapper({ visible: true });
-      expect(wrapper.find('[data-test="service-graph-side-panel"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="service-graph-side-panel"]').exists(),
+      ).toBe(true);
 
       await wrapper.setProps({ visible: false });
-      expect(wrapper.find('[data-test="service-graph-side-panel"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="service-graph-side-panel"]').exists(),
+      ).toBe(false);
     });
   });
 
@@ -1179,11 +1273,27 @@ describe("ServiceGraphSidePanel.vue", () => {
     it("should have proper data-test attributes", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('[data-test="service-graph-side-panel"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="service-graph-side-panel-header"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="service-graph-side-panel-service-name"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="service-graph-side-panel-close-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="service-graph-side-panel-show-telemetry-btn"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="service-graph-side-panel"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="service-graph-side-panel-header"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-service-name"]')
+          .exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-close-btn"]')
+          .exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-show-telemetry-btn"]')
+          .exists(),
+      ).toBe(true);
     });
   });
 });

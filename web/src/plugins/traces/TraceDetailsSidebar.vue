@@ -69,7 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="span.service_name"
             data-test="trace-details-sidebar-header-toolbar-service"
           >
-            <q-icon name="cloud_queue" size="12px" class="q-mr-xs" />
+            <q-icon name="cloud_queue" size="12px"
+class="q-mr-xs" />
             <span class="chip-label">Service</span>
             <span
               class="chip-value"
@@ -87,7 +88,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="getDuration"
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
-            <q-icon name="schedule" size="12px" class="q-mr-xs" />
+            <q-icon name="schedule" size="12px"
+class="q-mr-xs" />
             <span class="chip-label">Duration</span>
             <span class="chip-value">{{ getDuration }}</span>
           </q-chip>
@@ -101,7 +103,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="getTTFT"
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
-            <q-icon name="speed" size="12px" class="q-mr-xs" />
+            <q-icon name="speed" size="12px"
+class="q-mr-xs" />
             <span class="chip-label">TTFT</span>
             <span class="chip-value">{{ getTTFT }}</span>
           </q-chip>
@@ -114,7 +117,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="getStartTime"
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
-            <q-icon name="access_time" size="12px" class="q-mr-xs" />
+            <q-icon name="access_time" size="12px"
+class="q-mr-xs" />
             <span class="chip-label">Start</span>
             <span class="chip-value">{{ getStartTime }}</span>
           </q-chip>
@@ -131,7 +135,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="copySpanId"
             data-test="trace-details-sidebar-header-toolbar-span-id"
           >
-            <q-icon name="tag" size="12px" class="q-mr-xs" />
+            <q-icon name="tag" size="12px"
+class="q-mr-xs" />
             <span class="chip-value">{{ span.span_id }}</span>
             <q-icon
               name="content_copy"
@@ -189,7 +194,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="llm-chip token-chip input-token-chip"
               title="Input Tokens"
             >
-              <q-icon name="arrow_upward" size="10px" class="q-mr-xs" />
+              <q-icon name="arrow_upward" size="10px"
+class="q-mr-xs" />
               <span class="chip-label">In</span>
               <span class="chip-value">{{ llmMetrics.usage.input }}</span>
             </q-chip>
@@ -201,7 +207,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="llm-chip token-chip output-token-chip"
               title="Output Tokens"
             >
-              <q-icon name="arrow_downward" size="10px" class="q-mr-xs" />
+              <q-icon name="arrow_downward" size="10px"
+class="q-mr-xs" />
               <span class="chip-label">Out</span>
               <span class="chip-value">{{ llmMetrics.usage.output }}</span>
             </q-chip>
@@ -733,7 +740,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ></pre>
                     </div>
                     <div v-else class="stacktrace-empty">
-                      <q-icon name="info" size="16px" class="q-mr-xs" />
+                      <q-icon name="info" size="16px"
+class="q-mr-xs" />
                       <span>No stacktrace available</span>
                     </div>
                   </div>

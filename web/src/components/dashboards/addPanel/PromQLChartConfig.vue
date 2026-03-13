@@ -33,7 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-slot:label>
         <div class="row items-center all-pointer-events">
           {{ t("dashboard.aggregationFunction") }}
-          <q-icon class="q-ml-xs" size="20px" name="info" />
+          <q-icon class="q-ml-xs" size="20px"
+name="info" />
           <q-tooltip class="bg-grey-8" max-width="300px">
             <b>Aggregation Function - </b>
             Determines how time-series data is converted to a single value.
@@ -73,7 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:label>
           <div class="row items-center all-pointer-events tw:mb-[-5px]">
             {{ t("dashboard.geoLatLabel") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
+            <q-icon class="q-ml-xs" size="20px"
+name="info" />
             <q-tooltip class="bg-grey-8" max-width="250px">
               Name of the metric label containing latitude values. Default:
               "latitude" or "lat"
@@ -95,7 +97,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:label>
           <div class="row items-center all-pointer-events tw:mb-[-5px]">
             {{ t("dashboard.geoLonLabel") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
+            <q-icon class="q-ml-xs" size="20px"
+name="info" />
             <q-tooltip class="bg-grey-8" max-width="250px">
               Name of the metric label containing longitude values. Default:
               "longitude" or "lon"
@@ -117,7 +120,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:label>
           <div class="row items-center all-pointer-events tw:mb-[-5px]">
             {{ t("dashboard.geoWeightLabel") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
+            <q-icon class="q-ml-xs" size="20px"
+name="info" />
             <q-tooltip class="bg-grey-8" max-width="250px">
               Name of the metric label containing weight values. Default:
               "weight"
@@ -142,7 +146,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:label>
           <div class="row items-center all-pointer-events tw:mb-[-5px]">
             {{ t("dashboard.mapsNameLabel") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
+            <q-icon class="q-ml-xs" size="20px"
+name="info" />
             <q-tooltip class="bg-grey-8" max-width="300px">
               Name of the metric label containing location names (e.g., country,
               region). Default: "name"
@@ -164,7 +169,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:label>
           <div class="row items-center all-pointer-events tw:mb-[-5px]">
             {{ t("dashboard.mapsMapType") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
+            <q-icon class="q-ml-xs" size="20px"
+name="info" />
             <q-tooltip class="bg-grey-8" max-width="250px">
               Map type to display. Default: "world"
             </q-tooltip>
@@ -191,7 +197,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:label>
           <div class="row items-center all-pointer-events">
             {{ t("dashboard.promqlTableMode") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
+            <q-icon class="q-ml-xs" size="20px"
+name="info" />
             <q-tooltip class="bg-grey-8" max-width="400px">
               <b>PromQL Table Mode - </b>
               Controls how time-series data is displayed in the table.
@@ -227,7 +234,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:label>
             <div class="row items-center all-pointer-events">
               {{ t("dashboard.tableAggregations") }}
-              <q-icon class="q-ml-xs" size="20px" name="info" />
+              <q-icon class="q-ml-xs" size="20px"
+name="info" />
               <q-tooltip class="bg-grey-8" max-width="350px">
                 <b>Table Aggregations - </b>
                 Select multiple aggregation functions to display as columns.
@@ -242,7 +250,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-            <q-item v-bind="itemProps" dense style="padding: 0px 4px">
+            <q-item v-bind="itemProps" dense
+style="padding: 0px 4px">
               <q-item-section side class="q-pa-none">
                 <q-checkbox
                   :model-value="selected"
@@ -285,7 +294,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:label>
             <div class="row items-center all-pointer-events tw:mb-[-5px]">
               {{ t("dashboard.visibleColumns") }}
-              <q-icon class="q-ml-xs" size="18px" name="info">
+              <q-icon class="q-ml-xs" size="18px"
+name="info">
                 <q-tooltip class="bg-grey-8" max-width="400px">
                   <b>Visible Columns</b>
                   <br /><br />
@@ -341,7 +351,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:label>
             <div class="row items-center all-pointer-events tw:mb-[-5px]">
               {{ t("dashboard.hiddenColumns") }}
-              <q-icon class="q-ml-xs" size="18px" name="info">
+              <q-icon class="q-ml-xs" size="18px"
+name="info">
                 <q-tooltip class="bg-grey-8" max-width="400px">
                   <b>Hidden Columns</b>
                   <br /><br />
@@ -397,7 +408,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="row items-center all-pointer-events tw:mb-[-5px] tw:ml-2"
             >
               {{ t("dashboard.stickyFirstColumn") }}
-              <q-icon class="q-ml-xs" size="20px" name="info" />
+              <q-icon class="q-ml-xs" size="20px"
+name="info" />
               <q-tooltip class="bg-grey-8" max-width="300px">
                 <b>Sticky First Column - </b>
                 Makes the first column stay fixed when scrolling horizontally.
@@ -430,7 +442,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:label>
             <div class="row items-center all-pointer-events">
               {{ t("dashboard.stickyColumns") }}
-              <q-icon class="q-ml-xs" size="18px" name="info">
+              <q-icon class="q-ml-xs" size="18px"
+name="info">
                 <q-tooltip class="bg-grey-8" max-width="400px">
                   <b>Sticky Columns</b>
                   <br /><br />

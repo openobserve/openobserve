@@ -17,7 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="feature-card q-mb-md"
-    :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
+    :class="
+      store.state.theme === 'dark'
+        ? 'dark-stream-container'
+        : 'light-stream-container'
+    "
     v-if="showDeprecationWarning"
     role="region"
     aria-label="MySQL deprecation warning"
@@ -75,7 +79,8 @@ export default defineComponent({
           const dismissedDate = new Date(timestamp);
           const currentDate = new Date();
           const daysSinceDismissal = Math.floor(
-            (currentDate.getTime() - dismissedDate.getTime()) / (1000 * 60 * 60 * 24)
+            (currentDate.getTime() - dismissedDate.getTime()) /
+              (1000 * 60 * 60 * 24),
           );
 
           // Show again if more than DISMISS_DURATION_DAYS have passed

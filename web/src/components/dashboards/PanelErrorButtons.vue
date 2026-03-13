@@ -1,6 +1,13 @@
 <template>
   <div
-    v-if="error || maxQueryRangeWarning || limitNumberOfSeriesWarningMessage || isCachedDataDifferWithCurrentTimeRange || (isPartialData && !isPanelLoading) || (lastTriggeredAt && !viewOnly && !simplifiedPanelView)"
+    v-if="
+      error ||
+      maxQueryRangeWarning ||
+      limitNumberOfSeriesWarningMessage ||
+      isCachedDataDifferWithCurrentTimeRange ||
+      (isPartialData && !isPanelLoading) ||
+      (lastTriggeredAt && !viewOnly && !simplifiedPanelView)
+    "
     class="row items-center no-wrap"
   >
     <q-btn
@@ -13,7 +20,8 @@
       data-test="panel-error-data"
       class="warning"
     >
-      <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+      <q-tooltip anchor="bottom right" self="top right"
+max-width="220px">
         <div style="white-space: pre-wrap">
           {{ error }}
         </div>
@@ -28,7 +36,8 @@
       data-test="panel-max-duration-warning"
       class="warning"
     >
-      <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+      <q-tooltip anchor="bottom right" self="top right"
+max-width="220px">
         <div style="white-space: pre-wrap">
           {{ maxQueryRangeWarning }}
         </div>
@@ -82,7 +91,10 @@
     </q-btn>
 
     <!-- Universal Last Refreshed Clock Icon and Time -->
-    <span v-if="lastTriggeredAt && !viewOnly && !simplifiedPanelView" class="lastRefreshedAt">
+    <span
+      v-if="lastTriggeredAt && !viewOnly && !simplifiedPanelView"
+      class="lastRefreshedAt"
+    >
       <span class="lastRefreshedAtIcon">
         🕑
         <q-tooltip anchor="bottom right" self="top right">

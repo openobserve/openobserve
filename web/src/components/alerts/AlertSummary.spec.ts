@@ -181,7 +181,8 @@ describe("AlertSummary", () => {
 
     // Mock the scrollTo method
     const mockScrollTo = vi.fn();
-    const summaryContainer = wrapper.find(".summary-content").element as HTMLElement;
+    const summaryContainer = wrapper.find(".summary-content")
+      .element as HTMLElement;
     summaryContainer.scrollTo = mockScrollTo;
 
     wrapper.vm.showScrollToBottom = true;

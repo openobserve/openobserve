@@ -465,7 +465,9 @@ describe("Login.vue", () => {
 
       wrapper.vm.redirectUser();
 
-      expect(mockSessionStorage.getItem).toHaveBeenCalledWith("azure_marketplace_token");
+      expect(mockSessionStorage.getItem).toHaveBeenCalledWith(
+        "azure_marketplace_token",
+      );
       expect(mockSessionStorage.getItem).toHaveBeenCalledWith("redirectURI");
       expect(mockSessionStorage.removeItem).toHaveBeenCalledWith("redirectURI");
       expect(pushSpy).toHaveBeenCalledWith({ path: "/dashboard" });
@@ -481,7 +483,9 @@ describe("Login.vue", () => {
 
       wrapper.vm.redirectUser();
 
-      expect(mockSessionStorage.getItem).toHaveBeenCalledWith("azure_marketplace_token");
+      expect(mockSessionStorage.getItem).toHaveBeenCalledWith(
+        "azure_marketplace_token",
+      );
       expect(mockSessionStorage.getItem).toHaveBeenCalledWith("redirectURI");
       expect(mockSessionStorage.removeItem).toHaveBeenCalledWith("redirectURI");
       expect(window.location.href).toBe("https://external.com");

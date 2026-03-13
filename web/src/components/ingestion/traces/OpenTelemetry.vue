@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="q-pa-sm">
     <div class="title" data-test="vector-title-text">
       <b>OTLP HTTP</b>
-    
+
       <CopyContent
         :content="copyHTTPTracesContentURL"
         :displayContent="'HTTP Endpoint: ' + copyHTTPTracesContentURL"
@@ -40,7 +40,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, type Ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
-import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
+import {
+  getEndPoint,
+  getImageURL,
+  getIngestionURL,
+} from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
 
 export default defineComponent({

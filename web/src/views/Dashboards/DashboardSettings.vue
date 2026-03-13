@@ -82,11 +82,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             transition-prev="fade"
             transition-next="fade"
           >
-            <q-tab-panel name="generalSettings" data-test="general-tab-panels-default">
+            <q-tab-panel
+              name="generalSettings"
+              data-test="general-tab-panels-default"
+            >
               <GeneralSettings @save="refreshRequired" />
             </q-tab-panel>
 
-            <q-tab-panel name="variableSettings" data-test="variable-tab-panels-default">
+            <q-tab-panel
+              name="variableSettings"
+              data-test="variable-tab-panels-default"
+            >
               <VariableSettings @save="refreshRequired" />
             </q-tab-panel>
 

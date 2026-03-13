@@ -78,7 +78,7 @@ describe("Deduplication.vue", () => {
 
     it("should render with correct theme class (light mode)", () => {
       expect(wrapper.find(".step-deduplication.light-mode").exists()).toBe(
-        true
+        true,
       );
     });
 
@@ -101,7 +101,7 @@ describe("Deduplication.vue", () => {
       });
 
       expect(darkWrapper.find(".step-deduplication.dark-mode").exists()).toBe(
-        true
+        true,
       );
       darkWrapper.unmount();
     });
@@ -136,11 +136,11 @@ describe("Deduplication.vue", () => {
       });
 
       expect(
-        wrapperWithFields.vm.localDeduplication.fingerprint_fields
+        wrapperWithFields.vm.localDeduplication.fingerprint_fields,
       ).toEqual(["field1", "field2"]);
-      expect(
-        wrapperWithFields.vm.localDeduplication.time_window_minutes
-      ).toBe(10);
+      expect(wrapperWithFields.vm.localDeduplication.time_window_minutes).toBe(
+        10,
+      );
       wrapperWithFields.unmount();
     });
   });
@@ -169,7 +169,7 @@ describe("Deduplication.vue", () => {
       expect(defaultWrapper.props().deduplication).toBeDefined();
       expect(defaultWrapper.props().deduplication.enabled).toBe(true);
       expect(defaultWrapper.props().deduplication.fingerprint_fields).toEqual(
-        []
+        [],
       );
       defaultWrapper.unmount();
     });
@@ -237,7 +237,7 @@ describe("Deduplication.vue", () => {
       await wrapper.vm.emitUpdate();
 
       expect(
-        wrapper.emitted("update:deduplication")![0][0].fingerprint_fields
+        wrapper.emitted("update:deduplication")![0][0].fingerprint_fields,
       ).toEqual(["field1"]);
     });
 
@@ -250,7 +250,7 @@ describe("Deduplication.vue", () => {
       await wrapper.vm.emitUpdate();
 
       expect(
-        wrapper.emitted("update:deduplication")![0][0].fingerprint_fields
+        wrapper.emitted("update:deduplication")![0][0].fingerprint_fields,
       ).toEqual(["field1", "field2", "field3"]);
     });
 
@@ -259,7 +259,7 @@ describe("Deduplication.vue", () => {
       await wrapper.vm.emitUpdate();
 
       expect(
-        wrapper.emitted("update:deduplication")![0][0].fingerprint_fields
+        wrapper.emitted("update:deduplication")![0][0].fingerprint_fields,
       ).toEqual([]);
     });
 
@@ -268,7 +268,7 @@ describe("Deduplication.vue", () => {
       await wrapper.vm.emitUpdate();
 
       expect(
-        wrapper.emitted("update:deduplication")![0][0].fingerprint_fields
+        wrapper.emitted("update:deduplication")![0][0].fingerprint_fields,
       ).toEqual(["customField"]);
     });
   });
@@ -280,7 +280,7 @@ describe("Deduplication.vue", () => {
 
       expect(wrapper.emitted("update:deduplication")).toBeTruthy();
       expect(
-        wrapper.emitted("update:deduplication")![0][0].time_window_minutes
+        wrapper.emitted("update:deduplication")![0][0].time_window_minutes,
       ).toBe(15);
     });
 
@@ -289,7 +289,7 @@ describe("Deduplication.vue", () => {
       await wrapper.vm.emitUpdate();
 
       expect(
-        wrapper.emitted("update:deduplication")![0][0].time_window_minutes
+        wrapper.emitted("update:deduplication")![0][0].time_window_minutes,
       ).toBe(0);
     });
 
@@ -298,7 +298,7 @@ describe("Deduplication.vue", () => {
       await wrapper.vm.emitUpdate();
 
       expect(
-        wrapper.emitted("update:deduplication")![0][0].time_window_minutes
+        wrapper.emitted("update:deduplication")![0][0].time_window_minutes,
       ).toBeUndefined();
     });
 
@@ -307,7 +307,7 @@ describe("Deduplication.vue", () => {
       await wrapper.vm.emitUpdate();
 
       expect(
-        wrapper.emitted("update:deduplication")![0][0].time_window_minutes
+        wrapper.emitted("update:deduplication")![0][0].time_window_minutes,
       ).toBe(99999);
     });
 
@@ -316,7 +316,7 @@ describe("Deduplication.vue", () => {
       await wrapper.vm.emitUpdate();
 
       expect(
-        wrapper.emitted("update:deduplication")![0][0].time_window_minutes
+        wrapper.emitted("update:deduplication")![0][0].time_window_minutes,
       ).toBe(1);
     });
   });
@@ -445,7 +445,7 @@ describe("Deduplication.vue", () => {
       await wrapper.vm.emitUpdate();
 
       expect(
-        wrapper.emitted("update:deduplication")![0][0].time_window_minutes
+        wrapper.emitted("update:deduplication")![0][0].time_window_minutes,
       ).toBe(123);
     });
 
@@ -458,7 +458,7 @@ describe("Deduplication.vue", () => {
       await wrapper.vm.emitUpdate();
 
       expect(
-        wrapper.emitted("update:deduplication")![0][0].fingerprint_fields
+        wrapper.emitted("update:deduplication")![0][0].fingerprint_fields,
       ).toEqual(["field1", "field1", "field2"]);
     });
   });
@@ -513,7 +513,7 @@ describe("Deduplication.vue", () => {
       await wrapper.vm.emitUpdate();
 
       expect(
-        wrapper.emitted("update:deduplication")![0][0].time_window_minutes
+        wrapper.emitted("update:deduplication")![0][0].time_window_minutes,
       ).toBe(1);
     });
 
@@ -522,7 +522,7 @@ describe("Deduplication.vue", () => {
       await wrapper.vm.emitUpdate();
 
       expect(
-        wrapper.emitted("update:deduplication")![0][0].time_window_minutes
+        wrapper.emitted("update:deduplication")![0][0].time_window_minutes,
       ).toBe(525600);
     });
 
@@ -563,7 +563,7 @@ describe("Deduplication.vue", () => {
       await wrapper.vm.emitUpdate();
 
       expect(
-        wrapper.emitted("update:deduplication")![0][0].time_window_minutes
+        wrapper.emitted("update:deduplication")![0][0].time_window_minutes,
       ).toBe(-5);
     });
   });

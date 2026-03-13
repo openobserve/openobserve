@@ -111,7 +111,9 @@ describe("TraceDAG", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset mock implementation to default response
-    vi.mocked(searchService.getTraceDAG).mockResolvedValue({ data: defaultMockResponse } as any);
+    vi.mocked(searchService.getTraceDAG).mockResolvedValue({
+      data: defaultMockResponse,
+    } as any);
   });
 
   afterEach(() => {
@@ -179,7 +181,7 @@ describe("TraceDAG", () => {
         "default",
         "test-trace-123",
         1000000,
-        1100000
+        1100000,
       );
     });
 
@@ -205,7 +207,9 @@ describe("TraceDAG", () => {
 
   describe("Error Handling", () => {
     it("should display error message when fetch fails", async () => {
-      vi.mocked(searchService.getTraceDAG).mockRejectedValueOnce(new Error("Network error"));
+      vi.mocked(searchService.getTraceDAG).mockRejectedValueOnce(
+        new Error("Network error"),
+      );
 
       wrapper = mount(TraceDAG, {
         props: {
@@ -728,7 +732,7 @@ describe("TraceDAG", () => {
         "default",
         "trace-2",
         1000000,
-        1100000
+        1100000,
       );
     });
 
@@ -759,7 +763,7 @@ describe("TraceDAG", () => {
         "stream-2",
         "test",
         1000000,
-        1100000
+        1100000,
       );
     });
   });
@@ -843,14 +847,14 @@ describe("TraceDAG", () => {
         data: {
           trace_id: "test",
           nodes: [
-              { span_id: "a", parent_span_id: null, operation_name: "a" },
-              { span_id: "b", parent_span_id: "a", operation_name: "b" },
-            ],
-            edges: [
-              { from: "a", to: "b" },
-              { from: "b", to: "a" }, // Circular!
-            ],
-          },
+            { span_id: "a", parent_span_id: null, operation_name: "a" },
+            { span_id: "b", parent_span_id: "a", operation_name: "b" },
+          ],
+          edges: [
+            { from: "a", to: "b" },
+            { from: "b", to: "a" }, // Circular!
+          ],
+        },
       });
 
       wrapper = mount(TraceDAG, {

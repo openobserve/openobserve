@@ -3,7 +3,7 @@ import { toZonedTime, format } from "date-fns-tz";
 export const getChartData = (
   x: any,
   y: any,
-  params: { title: any; unparsed_x_data: any; timezone: string }
+  params: { title: any; unparsed_x_data: any; timezone: string },
 ) => {
   const options: any = {
     title: {

@@ -54,7 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="filteredIntegrations.length === 0"
       class="tw:text-center tw:py-12 empty-state"
     >
-      <q-icon name="search_off" size="3rem" class="tw:mb-2" />
+      <q-icon name="search_off" size="3rem"
+class="tw:mb-2" />
       <div class="tw:text-base">No integrations found matching your search</div>
     </div>
 
@@ -94,14 +95,14 @@ export default defineComponent({
           (integration) =>
             integration.displayName.toLowerCase().includes(query) ||
             integration.description.toLowerCase().includes(query) ||
-            integration.name.toLowerCase().includes(query)
+            integration.name.toLowerCase().includes(query),
         );
       }
 
       // Filter by category
       if (activeCategory.value !== "all") {
         filtered = filtered.filter(
-          (integration) => integration.category === activeCategory.value
+          (integration) => integration.category === activeCategory.value,
         );
       }
 

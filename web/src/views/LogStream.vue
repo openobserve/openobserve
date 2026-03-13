@@ -17,63 +17,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div
-    data-test="alert-list-page"
-    class="q-pa-none flex flex-col"
-  >
+  <div data-test="alert-list-page" class="q-pa-none flex flex-col">
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
-        <div class="card-container tw:mb-[0.625rem]">
-          <div class="flex items-center justify-between full-width tw:py-3 tw:px-4 tw:h-[68px]">
-            <div class="q-table__title tw:font-[600]" data-test="log-stream-title-text">
-              {{ t("logStream.header") }}
+      <div class="card-container tw:mb-[0.625rem]">
+        <div
+          class="flex items-center justify-between full-width tw:py-3 tw:px-4 tw:h-[68px]"
+        >
+          <div
+            class="q-table__title tw:font-[600]"
+            data-test="log-stream-title-text"
+          >
+            {{ t("logStream.header") }}
+          </div>
+          <div class="flex items-start">
+            <div class="flex justify-between items-end">
+              <div class="app-tabs-container tw:h-[36px] q-mr-sm">
+                <app-tabs
+                  class="tabs-selection-container"
+                  :tabs="streamTabs"
+                  v-model:active-tab="streamActiveTab"
+                  @update:active-tab="filterLogStreamByTab"
+                />
+              </div>
             </div>
-            <div class="flex items-start">
-              <div class="flex justify-between items-end">
-
-                  <div class="app-tabs-container tw:h-[36px] q-mr-sm">
-                      <app-tabs
-                      class="tabs-selection-container"
-                      :tabs="streamTabs"
-                      v-model:active-tab="streamActiveTab"
-                      @update:active-tab="filterLogStreamByTab"
-                    />
-                </div>
-              </div>
-              <div data-test="streams-search-stream-input">
-                <q-input
-                  v-model="filterQuery"
-                  borderless
-                  dense
-                  class="q-ml-auto no-border o2-search-input tw:h-[36px]"
-                  :placeholder="t('logStream.search')"
-                  debounce="300"
-                >
-                  <template #prepend>
-                    <q-icon class="o2-search-input-icon" name="search" />
-                  </template>
-                </q-input>
-              </div>
-              <q-btn
-                data-test="log-stream-refresh-stats-btn"
-                class="q-ml-sm o2-secondary-button tw:h-[36px]"
-                flat
-                no-caps
-                @click="getLogStream(true)"
+            <div data-test="streams-search-stream-input">
+              <q-input
+                v-model="filterQuery"
+                borderless
+                dense
+                class="q-ml-auto no-border o2-search-input tw:h-[36px]"
+                :placeholder="t('logStream.search')"
+                debounce="300"
               >
-                <span>{{ t(`logStream.refreshStats`) }}</span>
-              </q-btn>
-              <q-btn
-                v-if="isSchemaUDSEnabled"
-                data-test="log-stream-add-stream-btn"
-                class="q-ml-sm o2-primary-button tw:h-[36px]"
-                flat
-                no-caps
-                :label="t(`logStream.add`)"
-                @click="addStream"
-              />
+                <template #prepend>
+                  <q-icon class="o2-search-input-icon" name="search" />
+                </template>
+              </q-input>
             </div>
+            <q-btn
+              data-test="log-stream-refresh-stats-btn"
+              class="q-ml-sm o2-secondary-button tw:h-[36px]"
+              flat
+              no-caps
+              @click="getLogStream(true)"
+            >
+              <span>{{ t(`logStream.refreshStats`) }}</span>
+            </q-btn>
+            <q-btn
+              v-if="isSchemaUDSEnabled"
+              data-test="log-stream-add-stream-btn"
+              class="q-ml-sm o2-primary-button tw:h-[36px]"
+              flat
+              no-caps
+              :label="t(`logStream.add`)"
+              @click="addStream"
+            />
           </div>
         </div>
+      </div>
       <div class="tw:w-full tw:h-full">
         <div class="card-container tw:h-[calc(100vh-126px)]">
           <q-table
@@ -89,14 +90,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model:pagination="pagination"
             :filter="filterQuery"
             :filter-method="filterData"
-            :style="logStream?.length
-                  ? 'width: 100%; height: calc(100vh - 126px)' 
-                  : 'width: 100%'"
+            :style="
+              logStream?.length
+                ? 'width: 100%; height: calc(100vh - 126px)'
+                : 'width: 100%'
+            "
             :rows-per-page-options="perPageOptions"
             @request="onRequest"
           >
             <template #no-data>
-              <div v-if="!loadingState" class="text-center full-width full-height">
+              <div
+                v-if="!loadingState"
+                class="text-center full-width full-height"
+              >
                 <NoData />
               </div>
               <div
@@ -107,7 +113,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template #body-selection="scope">
-              <q-checkbox v-model="scope.selected" size="sm" :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'" class="o2-table-checkbox" />
+              <q-checkbox
+                v-model="scope.selected"
+                size="sm"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-table-checkbox-dark'
+                    : 'o2-table-checkbox-light'
+                "
+                class="o2-table-checkbox"
+              />
             </template>
             <template #body-cell-actions="props">
               <q-td :props="props">
@@ -121,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="exploreStream(props)"
                   icon="search"
                 >
-              </q-btn>
+                </q-btn>
                 <q-btn
                   :title="t('logStream.schemaHeader')"
                   padding="sm"
@@ -132,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="listSchema(props)"
                   icon="list_alt"
                 >
-              </q-btn>
+                </q-btn>
                 <q-btn
                   :title="t('logStream.delete')"
                   padding="sm"
@@ -143,86 +158,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="confirmDeleteAction(props)"
                   :icon="outlinedDelete"
                 >
-              </q-btn>
+                </q-btn>
               </q-td>
             </template>
             <template v-slot:pagination="scope">
-              <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4">
-
-
-              <div class="q-btn-group row no-wrap inline q-ml-md">
-                <q-btn
-                  icon="chevron_left"
-                  color="grey-8"
-                  round
-                  dense
-                  flat
-                  size="sm"
-                  class="q-px-sm"
-                  :disable="scope.isFirstPage"
-                  @click="scope.prevPage"
-                />
-                <hr
-                  class="q-separator q-separator--vertical"
-                  aria-orientation="vertical"
-                />
-                <q-btn
-                  icon="chevron_right"
-                  color="grey-8"
-                  round
-                  dense
-                  flat
-                  size="sm"
-                  class="q-px-sm"
-                  :disable="scope.isLastPage"
-                  @click="scope.nextPage"
-                />
+              <div
+                class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4"
+              >
+                <div class="q-btn-group row no-wrap inline q-ml-md">
+                  <q-btn
+                    icon="chevron_left"
+                    color="grey-8"
+                    round
+                    dense
+                    flat
+                    size="sm"
+                    class="q-px-sm"
+                    :disable="scope.isFirstPage"
+                    @click="scope.prevPage"
+                  />
+                  <hr
+                    class="q-separator q-separator--vertical"
+                    aria-orientation="vertical"
+                  />
+                  <q-btn
+                    icon="chevron_right"
+                    color="grey-8"
+                    round
+                    dense
+                    flat
+                    size="sm"
+                    class="q-px-sm"
+                    :disable="scope.isLastPage"
+                    @click="scope.nextPage"
+                  />
+                </div>
               </div>
-              </div>
-
             </template>
             <template v-slot:header="props">
-                  <q-tr :props="props">
-                    <!-- Adding this block to render the select-all checkbox -->
-                    <q-th auto-width>
-                      <q-checkbox
-                        v-model="props.selected"
-                        size="sm"
-                        :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                        class="o2-table-checkbox"
-                        @update:model-value="props.select"
-                      />
-                    </q-th>
+              <q-tr :props="props">
+                <!-- Adding this block to render the select-all checkbox -->
+                <q-th auto-width>
+                  <q-checkbox
+                    v-model="props.selected"
+                    size="sm"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-table-checkbox-dark'
+                        : 'o2-table-checkbox-light'
+                    "
+                    class="o2-table-checkbox"
+                    @update:model-value="props.select"
+                  />
+                </q-th>
 
-                    <!-- Rendering the rest of the columns -->
-                    <q-th
-                      v-for="col in props.cols"
-                      :key="col.name"
-                      :props="props"
-                      :class="col.classes"
-                      :style="col.style"
-                    >
-                      {{ col.label }}
-                    </q-th>
-                  </q-tr>
-                </template>
+                <!-- Rendering the rest of the columns -->
+                <q-th
+                  v-for="col in props.cols"
+                  :key="col.name"
+                  :props="props"
+                  :class="col.classes"
+                  :style="col.style"
+                >
+                  {{ col.label }}
+                </q-th>
+              </q-tr>
+            </template>
 
             <template v-slot:bottom="scope">
-              <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-                <div class="q-table__separator tw:flex tw:items-center tw:w-full text-bold tw:text-[14px]">
-                  {{scope.pagination.rowsNumber}} Stream(s)
-                  <q-btn
-                  v-if="selected.length > 0"
-                  class="o2-secondary-button tw:h-[36px] tw:ml-4"
-                  no-caps
-                  flat
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  :disable="isDeleting"
-                  @click="confirmBatchDeleteAction"
+              <div
+                class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+              >
+                <div
+                  class="q-table__separator tw:flex tw:items-center tw:w-full text-bold tw:text-[14px]"
                 >
-                  <q-icon name="delete" size="16px" />
-                  <span class="tw:ml-2">{{ isDeleting ? 'Deleting...' : 'Delete' }}</span>
-              </q-btn>
+                  {{ scope.pagination.rowsNumber }} Stream(s)
+                  <q-btn
+                    v-if="selected.length > 0"
+                    class="o2-secondary-button tw:h-[36px] tw:ml-4"
+                    no-caps
+                    flat
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-secondary-button-dark'
+                        : 'o2-secondary-button-light'
+                    "
+                    :disable="isDeleting"
+                    @click="confirmBatchDeleteAction"
+                  >
+                    <q-icon name="delete" size="16px" />
+                    <span class="tw:ml-2">{{
+                      isDeleting ? "Deleting..." : "Delete"
+                    }}</span>
+                  </q-btn>
                 </div>
                 <QTablePagination
                   :scope="scope"
@@ -232,14 +260,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:changeRecordPerPage="changePagination"
                 />
               </div>
-
             </template>
-
-          </q-table> 
+          </q-table>
         </div>
       </div>
-    </div> 
-  
+    </div>
+
     <q-dialog
       v-model="showIndexSchemaDialog"
       position="right"
@@ -268,14 +294,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="head">{{ t("logStream.confirmDeleteHead") }}</div>
           <div class="para">{{ t("logStream.confirmDeleteMsg") }}</div>
         </q-card-section>
-        <div class="tw:w-full tw:flex tw:justify-center tw:items-center tw:text-sm tw:text-gray-500">
-            <q-checkbox class="checkbox-delete-associated-alerts-pipelines" v-model="deleteAssociatedAlertsPipelines" />
+        <div
+          class="tw:w-full tw:flex tw:justify-center tw:items-center tw:text-sm tw:text-gray-500"
+        >
+          <q-checkbox
+            class="checkbox-delete-associated-alerts-pipelines"
+            v-model="deleteAssociatedAlertsPipelines"
+          />
           <span class="delete-associated-alerts-pipelines-text">
             Delete all pipelines and alerts associated with the stream
           </span>
-          </div>
+        </div>
         <q-card-actions class="confirmActionsLogStream">
-          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated
+no-caps class="q-mr-sm">
             {{ t("logStream.cancel") }}
           </q-btn>
           <q-btn
@@ -297,14 +329,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="head">{{ t("logStream.confirmBatchDeleteHead") }}</div>
           <div class="para">{{ t("logStream.confirmBatchDeleteMsg") }}</div>
         </q-card-section>
-        <div class="tw:w-full tw:flex tw:justify-center tw:items-center tw:text-sm tw:text-gray-500">
-            <q-checkbox class="checkbox-delete-associated-alerts-pipelines" v-model="deleteAssociatedAlertsPipelines" />
+        <div
+          class="tw:w-full tw:flex tw:justify-center tw:items-center tw:text-sm tw:text-gray-500"
+        >
+          <q-checkbox
+            class="checkbox-delete-associated-alerts-pipelines"
+            v-model="deleteAssociatedAlertsPipelines"
+          />
           <span class="delete-associated-alerts-pipelines-text">
             Delete all pipelines and alerts associated with the selected streams
           </span>
-          </div>
+        </div>
         <q-card-actions class="confirmActionsLogStream">
-          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated
+no-caps class="q-mr-sm">
             {{ t("logStream.cancel") }}
           </q-btn>
           <q-btn
@@ -357,7 +395,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 export default defineComponent({
   name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData, AddStream, AppTabs, },
+  components: { QTablePagination, SchemaIndex, NoData, AddStream, AppTabs },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {
     const store = useStore();
@@ -676,7 +714,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           deleteStreamName,
           deleteStreamType,
-          deleteAssociatedAlertsPipelines.value
+          deleteAssociatedAlertsPipelines.value,
         )
         .then((res: any) => {
           if (res.data.code == 200) {
@@ -712,7 +750,7 @@ export default defineComponent({
             store.state.selectedOrganization.identifier,
             stream.name,
             stream.stream_type,
-            deleteAssociatedAlertsPipelines.value
+            deleteAssociatedAlertsPipelines.value,
           ),
         );
       });
@@ -850,7 +888,9 @@ export default defineComponent({
           refresh: "0",
           query: "",
           type: "stream_explorer",
-          quick_mode: store.state.zoConfig.quick_mode_enabled ? "true" : "false",
+          quick_mode: store.state.zoConfig.quick_mode_enabled
+            ? "true"
+            : "false",
           org_identifier: store.state.selectedOrganization.identifier,
           ...dateTime,
         },
@@ -944,10 +984,12 @@ export default defineComponent({
     };
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.hasOwnProperty("value") ? val.value : val;
-      pagination.value.rowsPerPage = val.hasOwnProperty("value") ? val.value : val;
+      pagination.value.rowsPerPage = val.hasOwnProperty("value")
+        ? val.value
+        : val;
       pagination.value.page = 1; // Reset to first page when changing records per page
       qTable.value?.requestServerInteraction({
-        pagination: pagination.value
+        pagination: pagination.value,
       });
     };
 
@@ -1003,11 +1045,9 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-</style>
+<style lang="scss" scoped></style>
 
 <style lang="scss">
-
 .bottom-bar {
   display: flex;
   width: 100%;
@@ -1034,7 +1074,7 @@ export default defineComponent({
   }
 }
 
-.delete-associated-alerts-pipelines-text{
+.delete-associated-alerts-pipelines-text {
   color: $light-text;
   font-size: 12px;
   font-weight: 500;
@@ -1050,14 +1090,14 @@ export default defineComponent({
     font-weight: 700;
   }
 }
-.checkbox-delete-associated-alerts-pipelines{
-  .q-checkbox__inner{
+.checkbox-delete-associated-alerts-pipelines {
+  .q-checkbox__inner {
     height: 28px !important;
     min-height: 28px !important;
     width: 28px !important;
     min-width: 28px !important;
   }
-  .q-checkbox__bg{
+  .q-checkbox__bg {
     height: 16px !important;
     width: 16px !important;
   }

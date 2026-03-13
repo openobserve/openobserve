@@ -1,9 +1,9 @@
 <template>
-  <div
-   class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
-  >
+  <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
     <div v-if="!showSearchResults" class="tw:h-full">
-       <div class="flex tw:justify-between tw:items-center tw:h-[68px] card-container tw:mb-[0.625rem]">
+      <div
+        class="flex tw:justify-between tw:items-center tw:h-[68px] card-container tw:mb-[0.625rem]"
+      >
         <div class="flex items-center q-py-sm q-pl-md">
           <div
             data-test="search-scheduler-back-btn"
@@ -20,7 +20,7 @@
             <q-icon name="arrow_back_ios_new" size="14px" />
           </div>
           <div class="text-h6 tw:font-[600]" data-test="search-scheduler-title">
-            {{ t('search_scheduler_job.title') }}
+            {{ t("search_scheduler_job.title") }}
           </div>
         </div>
         <div class="flex items-center q-py-sm q-pr-md">
@@ -29,7 +29,11 @@
               :label="t('search_scheduler_job.get_jobs')"
               @click="fetchSearchHistory"
               class="q-ml-md o2-primary-button tw:h-[36px] tw:rounded-md"
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-primary-button-dark'
+                  : 'o2-primary-button-light'
+              "
               no-caps
               flat
               dense
@@ -39,8 +43,8 @@
         </div>
       </div>
 
-   <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-      <div class=" tw:h-[calc(100vh-128px)] card-container">
+      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
+        <div class="tw:h-[calc(100vh-128px)] card-container">
           <q-table
             data-test="search-scheduler-table"
             ref="qTableSchedule"
@@ -51,7 +55,11 @@
             row-key="trace_id"
             :rows-per-page-options="[]"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-            :style="dataToBeLoaded.length > 0 ? 'height: calc(100vh - 128px); overflow-y: auto;' : 'height: 0px'"
+            :style="
+              dataToBeLoaded.length > 0
+                ? 'height: calc(100vh - 128px); overflow-y: auto;'
+                : 'height: 0px'
+            "
             :sort-method="sortMethod"
           >
             <template v-slot:body="props">
@@ -183,7 +191,7 @@
                     <div class="text-left tw:px-2 q-mb-sm expanded-content">
                       <div class="tw:flex tw:items-center q-py-sm">
                         <strong
-                          >{{ t('search_scheduler_job.sql_query') }} :
+                          >{{ t("search_scheduler_job.sql_query") }} :
                           <span>
                             <q-btn
                               @click.stop="
@@ -230,7 +238,7 @@
                     >
                       <div class="tw:flex tw:items-center q-py-sm">
                         <strong
-                          >{{ t('search_scheduler_job.function_definition') }} :
+                          >{{ t("search_scheduler_job.function_definition") }} :
                           <span>
                             <q-btn
                               @click.stop="
@@ -277,29 +285,35 @@
               </q-tr>
             </template>
             <template #bottom="scope">
-            <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
-              {{ resultTotal }} {{ t('search_scheduler_job.results') }}
-            </div>
-            <div class="tw:ml-auto tw:mr-2">{{ t('search_scheduler_job.max_limit') }} : <b>1000</b></div>
-            <q-separator
-              style="height: 1.5rem; margin: auto 0"
-              vertical
-              inset
-              class="q-mr-md"
-            />
+              <div
+                class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+              >
+                <div
+                  class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md"
+                >
+                  {{ resultTotal }} {{ t("search_scheduler_job.results") }}
+                </div>
+                <div class="tw:ml-auto tw:mr-2">
+                  {{ t("search_scheduler_job.max_limit") }} : <b>1000</b>
+                </div>
+                <q-separator
+                  style="height: 1.5rem; margin: auto 0"
+                  vertical
+                  inset
+                  class="q-mr-md"
+                />
 
-            <div class="q-pl-md">
-              <QTablePagination
-                :scope="scope"
-                :position="'bottom'"
-                :resultTotal="resultTotal"
-                :perPageOptions="perPageOptions"
-                @update:changeRecordPerPage="changePagination"
-              />
-            </div>
-          </div>
-          </template>
+                <div class="q-pl-md">
+                  <QTablePagination
+                    :scope="scope"
+                    :position="'bottom'"
+                    :resultTotal="resultTotal"
+                    :perPageOptions="perPageOptions"
+                    @update:changeRecordPerPage="changePagination"
+                  />
+                </div>
+              </div>
+            </template>
             <template #no-data>
               <div v-if="!isLoading" class="tw:flex tw:mx-auto">
                 <NoData />
@@ -312,36 +326,36 @@
               </div>
             </template>
             <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Rendering the of the columns -->
-               <!-- here we can add the classes class so that the head will be sticky -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
+              <q-tr :props="props">
+                <!-- Rendering the of the columns -->
+                <!-- here we can add the classes class so that the head will be sticky -->
+                <q-th
+                  v-for="col in props.cols"
+                  :key="col.name"
+                  :props="props"
+                  :class="col.classes"
+                  :style="col.style"
+                >
+                  {{ col.label }}
+                </q-th>
+              </q-tr>
+            </template>
           </q-table>
-        <ConfirmDialog
-          :title="t('search_scheduler_job.delete_job_title')"
-          :message="t('search_scheduler_job.delete_job_message')"
-          @update:ok="deleteSearchJob"
-          @update:cancel="confirmDelete = false"
-          v-model="confirmDelete"
-        />
-        <ConfirmDialog
-          :title="t('search_scheduler_job.cancel_job_title')"
-          :message="t('search_scheduler_job.cancel_job_message')"
-          @update:ok="cancelSearchJob"
-          @update:cancel="confirmCancel = false"
-          v-model="confirmCancel"
-        />
-      </div>
+          <ConfirmDialog
+            :title="t('search_scheduler_job.delete_job_title')"
+            :message="t('search_scheduler_job.delete_job_message')"
+            @update:ok="deleteSearchJob"
+            @update:cancel="confirmDelete = false"
+            v-model="confirmDelete"
+          />
+          <ConfirmDialog
+            :title="t('search_scheduler_job.cancel_job_title')"
+            :message="t('search_scheduler_job.cancel_job_message')"
+            @update:ok="cancelSearchJob"
+            @update:cancel="confirmCancel = false"
+            v-model="confirmCancel"
+          />
+        </div>
       </div>
     </div>
   </div>
@@ -450,11 +464,11 @@ export default defineComponent({
     ];
     const tabs = reactive([
       {
-        label: t('search_scheduler_job.query_function'),
+        label: t("search_scheduler_job.query_function"),
         value: "query",
       },
       {
-        label: t('search_scheduler_job.more_details'),
+        label: t("search_scheduler_job.more_details"),
         value: "more_details",
       },
     ]);
@@ -477,17 +491,17 @@ export default defineComponent({
       // Define the desired column order and names
       const desiredColumns = [
         { key: "#", label: "#", align: "center", sortable: false },
-        { key: "user_id", label: t('search_scheduler_job.user_id') },
-        { key: "created_at", label: t('search_scheduler_job.created_at') },
-        { key: "start_time", label: t('search_scheduler_job.start_time') },
-        { key: "duration", label: t('search_scheduler_job.duration') },
-        { key: "status", label: t('search_scheduler_job.status') },
-        { key: "Actions", label: t('search_scheduler_job.actions') },
+        { key: "user_id", label: t("search_scheduler_job.user_id") },
+        { key: "created_at", label: t("search_scheduler_job.created_at") },
+        { key: "start_time", label: t("search_scheduler_job.start_time") },
+        { key: "duration", label: t("search_scheduler_job.duration") },
+        { key: "status", label: t("search_scheduler_job.status") },
+        { key: "Actions", label: t("search_scheduler_job.actions") },
       ];
 
       return desiredColumns.map(({ key, label }) => {
         let columnWidth = 150;
-        let classes = '';
+        let classes = "";
 
         let align = "center";
         let sortable = true;
@@ -500,7 +514,7 @@ export default defineComponent({
           columnWidth = 150;
           align = "left";
           sortable = false;
-          classes = 'actions-column';
+          classes = "actions-column";
         }
         if (key == "trace_id") {
           columnWidth = 250;
@@ -535,7 +549,6 @@ export default defineComponent({
           sortable = false;
           align = "left";
         }
-
 
         // Custom width for each column
         return {
@@ -629,7 +642,7 @@ export default defineComponent({
             if (e.response.status != 403) {
               $q.notify({
                 type: "negative",
-                message: t('search_scheduler_job.fetch_failed'),
+                message: t("search_scheduler_job.fetch_failed"),
                 timeout: 5000,
               });
             }
@@ -641,7 +654,7 @@ export default defineComponent({
         if (error.response.status != 403) {
           $q.notify({
             type: "negative",
-            message: t('search_scheduler_job.fetch_failed'),
+            message: t("search_scheduler_job.fetch_failed"),
             timeout: 5000,
           });
         }
@@ -658,7 +671,7 @@ export default defineComponent({
         .then((res) => {
           $q.notify({
             type: "positive",
-            message: t('search_scheduler_job.job_cancelled_success'),
+            message: t("search_scheduler_job.job_cancelled_success"),
             timeout: 2000,
           });
         })
@@ -667,7 +680,8 @@ export default defineComponent({
             $q.notify({
               type: "negative",
               message:
-                e.response?.data?.message || t('search_scheduler_job.job_cancel_failed'),
+                e.response?.data?.message ||
+                t("search_scheduler_job.job_cancel_failed"),
               timeout: 2000,
             });
           }
@@ -685,7 +699,7 @@ export default defineComponent({
         .then((res) => {
           $q.notify({
             type: "positive",
-            message: t('search_scheduler_job.job_restarted_success'),
+            message: t("search_scheduler_job.job_restarted_success"),
             timeout: 2000,
           });
         })
@@ -694,7 +708,8 @@ export default defineComponent({
             $q.notify({
               type: "negative",
               message:
-                e.response?.data?.message || t('search_scheduler_job.job_restart_failed'),
+                e.response?.data?.message ||
+                t("search_scheduler_job.job_restart_failed"),
               timeout: 2000,
             });
           }
@@ -721,7 +736,7 @@ export default defineComponent({
           fetchSearchHistory();
           $q.notify({
             type: "positive",
-            message: t('search_scheduler_job.job_deleted_success'),
+            message: t("search_scheduler_job.job_deleted_success"),
             timeout: 2000,
           });
         })
@@ -730,7 +745,8 @@ export default defineComponent({
             $q.notify({
               type: "negative",
               message:
-                e.response?.data?.message || t('search_scheduler_job.job_delete_failed'),
+                e.response?.data?.message ||
+                t("search_scheduler_job.job_delete_failed"),
               timeout: 2000,
             });
           }
@@ -784,14 +800,14 @@ export default defineComponent({
         .then(() => {
           $q.notify({
             type: "positive",
-            message: `${type} ${t('search_scheduler_job.copy_success')}`,
+            message: `${type} ${t("search_scheduler_job.copy_success")}`,
             timeout: 5000,
           });
         })
         .catch(() => {
           $q.notify({
             type: "negative",
-            message: t('search_scheduler_job.copy_error'),
+            message: t("search_scheduler_job.copy_error"),
             timeout: 5000,
           });
         });
@@ -906,14 +922,13 @@ export default defineComponent({
         const functionContent = b64EncodeUnicode(row.function);
         queryObject["functionContent"] = functionContent;
         queryObject["fn_editor"] = "true";
-      }
-      else{
+      } else {
         queryObject["fn_editor"] = "false";
       }
 
       $q.notify({
         type: "positive",
-        message: t('search_scheduler_job.job_applied_success'),
+        message: t("search_scheduler_job.job_applied_success"),
         timeout: 2000,
       });
 
@@ -945,15 +960,15 @@ export default defineComponent({
     const getStatusText = (status) => {
       switch (status) {
         case 0:
-          return t('search_scheduler_job.status_pending');
+          return t("search_scheduler_job.status_pending");
         case 1:
-          return t('search_scheduler_job.status_running');
+          return t("search_scheduler_job.status_running");
         case 2:
-          return t('search_scheduler_job.status_finished');
+          return t("search_scheduler_job.status_finished");
         case 3:
-          return t('search_scheduler_job.status_cancelled');
+          return t("search_scheduler_job.status_cancelled");
         default:
-          return t('search_scheduler_job.status_unknown');
+          return t("search_scheduler_job.status_unknown");
       }
     };
 

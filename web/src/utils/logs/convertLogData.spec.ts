@@ -21,17 +21,17 @@ describe("convertLogData.ts", () => {
     vi.clearAllMocks();
 
     // Mock getComputedStyle to return the expected theme color
-    Object.defineProperty(window, 'getComputedStyle', {
+    Object.defineProperty(window, "getComputedStyle", {
       value: () => ({
         getPropertyValue: (prop: string) => {
-          if (prop === '--o2-theme-color') {
-            return '#7A80C2';
+          if (prop === "--o2-theme-color") {
+            return "#7A80C2";
           }
-          return '';
-        }
+          return "";
+        },
       }),
       writable: true,
-      configurable: true
+      configurable: true,
     });
   });
 
@@ -43,7 +43,11 @@ describe("convertLogData.ts", () => {
     it("should return basic chart options structure", () => {
       const x = [1640995200000, 1640998800000]; // Jan 1, 2022 timestamps
       const y = [10, 20];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -61,7 +65,11 @@ describe("convertLogData.ts", () => {
     it("should configure title correctly", () => {
       const x = [1640995200000];
       const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -77,7 +85,11 @@ describe("convertLogData.ts", () => {
     it("should set backgroundColor to transparent", () => {
       const x = [1640995200000];
       const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -87,7 +99,11 @@ describe("convertLogData.ts", () => {
     it("should configure grid layout properly", () => {
       const x = [1640995200000];
       const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -103,7 +119,11 @@ describe("convertLogData.ts", () => {
     it("should configure tooltip correctly", () => {
       const x = [1640995200000];
       const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -118,7 +138,11 @@ describe("convertLogData.ts", () => {
     it("should configure xAxis as time type", () => {
       const x = [1640995200000];
       const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -128,7 +152,11 @@ describe("convertLogData.ts", () => {
     it("should configure yAxis with correct properties", () => {
       const x = [1640995200000];
       const y = [10, 20, 5];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -141,7 +169,11 @@ describe("convertLogData.ts", () => {
     it("should calculate yAxis interval correctly with different values", () => {
       const x = [1640995200000];
       const y = [5, 15, 25, 35];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -151,7 +183,11 @@ describe("convertLogData.ts", () => {
     it("should have yAxis formatter that rounds values", () => {
       const x = [1640995200000];
       const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -163,7 +199,11 @@ describe("convertLogData.ts", () => {
     it("should configure toolbox correctly", () => {
       const x = [1640995200000];
       const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -189,7 +229,11 @@ describe("convertLogData.ts", () => {
     it("should map x and y data correctly to series for UTC timezone", () => {
       const x = [1640995200000, 1640998800000]; // Jan 1, 2022 timestamps
       const y = [10, 20];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -203,7 +247,11 @@ describe("convertLogData.ts", () => {
     it("should handle non-UTC timezone with date conversion", () => {
       const x = [1640995200000]; // Jan 1, 2022 00:00:00 UTC
       const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "America/New_York" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "America/New_York",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -215,7 +263,11 @@ describe("convertLogData.ts", () => {
     it("should configure series styling correctly", () => {
       const x = [1640995200000];
       const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -227,7 +279,11 @@ describe("convertLogData.ts", () => {
     it("should handle empty x array", () => {
       const x: any[] = [];
       const y: any[] = [];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -237,7 +293,11 @@ describe("convertLogData.ts", () => {
     it("should handle mismatched x and y arrays", () => {
       const x = [1640995200000, 1640998800000, 1641002400000];
       const y = [10, 20]; // y has fewer elements
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -251,7 +311,11 @@ describe("convertLogData.ts", () => {
     it("should handle x array longer than y array", () => {
       const x = [1640995200000, 1640998800000];
       const y = [10]; // y has fewer elements
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -264,7 +328,11 @@ describe("convertLogData.ts", () => {
     it("should handle y array with zero values", () => {
       const x = [1640995200000, 1640998800000];
       const y = [0, 0];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -278,7 +346,11 @@ describe("convertLogData.ts", () => {
     it("should handle negative y values", () => {
       const x = [1640995200000, 1640998800000];
       const y = [-10, -5];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -292,7 +364,11 @@ describe("convertLogData.ts", () => {
     it("should handle mixed positive and negative y values", () => {
       const x = [1640995200000, 1640998800000, 1641002400000];
       const y = [-10, 0, 20];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -307,7 +383,11 @@ describe("convertLogData.ts", () => {
     it("should handle single data point", () => {
       const x = [1640995200000];
       const y = [42];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -318,7 +398,11 @@ describe("convertLogData.ts", () => {
     it("should handle different timezone formats", () => {
       const x = [1640995200000];
       const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "Europe/London" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "Europe/London",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -329,7 +413,11 @@ describe("convertLogData.ts", () => {
     it("should handle large numbers in y values", () => {
       const x = [1640995200000];
       const y = [1000000];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -340,7 +428,11 @@ describe("convertLogData.ts", () => {
     it("should handle decimal values in y", () => {
       const x = [1640995200000, 1640998800000];
       const y = [10.5, 20.7];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -354,8 +446,16 @@ describe("convertLogData.ts", () => {
     it("should handle params with different timezone settings", () => {
       const x = [1640995200000];
       const y = [10];
-      const params1 = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-      const params2 = { title: "Test Chart", unparsed_x_data: [], timezone: "Asia/Tokyo" };
+      const params1 = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
+      const params2 = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "Asia/Tokyo",
+      };
 
       const result1 = convertLogData(x, y, params1);
       const result2 = convertLogData(x, y, params2);
@@ -370,7 +470,11 @@ describe("convertLogData.ts", () => {
     it("should handle tooltip formatter_test function", () => {
       const x = [1640995200000];
       const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
 
@@ -381,7 +485,11 @@ describe("convertLogData.ts", () => {
     it("should return empty string from formatter_test when name length is 0", () => {
       const x = [1640995200000];
       const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
       const formatterResult = result.options.tooltip.formatter_test([]);
@@ -392,7 +500,11 @@ describe("convertLogData.ts", () => {
     it("should format tooltip correctly with valid data", () => {
       const x = [1640995200000];
       const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
+      const params = {
+        title: "Test Chart",
+        unparsed_x_data: [],
+        timezone: "UTC",
+      };
 
       const result = convertLogData(x, y, params);
       const mockData = [{ data: [1640995200000], value: [1640995200000, 10] }];

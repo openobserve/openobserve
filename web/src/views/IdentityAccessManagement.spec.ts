@@ -195,7 +195,7 @@ describe("IdentityAccessManagement.vue Component", () => {
 
       // In open source mode, should have users, serviceAccounts, organizations
       const hasServiceAccounts = newWrapper.vm.tabs.some(
-        (tab: any) => tab.name === "serviceAccounts"
+        (tab: any) => tab.name === "serviceAccounts",
       );
       expect(hasServiceAccounts).toBe(true);
 
@@ -216,7 +216,7 @@ describe("IdentityAccessManagement.vue Component", () => {
       await flushPromises();
 
       const hasServiceAccounts = newWrapper.vm.tabs.some(
-        (tab: any) => tab.name === "serviceAccounts"
+        (tab: any) => tab.name === "serviceAccounts",
       );
       expect(hasServiceAccounts).toBe(false);
 
@@ -237,7 +237,7 @@ describe("IdentityAccessManagement.vue Component", () => {
       await flushPromises();
 
       const hasServiceAccounts = newWrapper.vm.tabs.some(
-        (tab: any) => tab.name === "serviceAccounts"
+        (tab: any) => tab.name === "serviceAccounts",
       );
       // Default should be true (service_account_enabled ?? true)
       expect(hasServiceAccounts).toBe(true);
@@ -263,8 +263,12 @@ describe("IdentityAccessManagement.vue Component", () => {
 
       await flushPromises();
 
-      const hasGroups = newWrapper.vm.tabs.some((tab: any) => tab.name === "groups");
-      const hasRoles = newWrapper.vm.tabs.some((tab: any) => tab.name === "roles");
+      const hasGroups = newWrapper.vm.tabs.some(
+        (tab: any) => tab.name === "groups",
+      );
+      const hasRoles = newWrapper.vm.tabs.some(
+        (tab: any) => tab.name === "roles",
+      );
 
       expect(hasGroups).toBe(true);
       expect(hasRoles).toBe(true);
@@ -285,8 +289,12 @@ describe("IdentityAccessManagement.vue Component", () => {
 
       await flushPromises();
 
-      const hasGroups = newWrapper.vm.tabs.some((tab: any) => tab.name === "groups");
-      const hasRoles = newWrapper.vm.tabs.some((tab: any) => tab.name === "roles");
+      const hasGroups = newWrapper.vm.tabs.some(
+        (tab: any) => tab.name === "groups",
+      );
+      const hasRoles = newWrapper.vm.tabs.some(
+        (tab: any) => tab.name === "roles",
+      );
 
       expect(hasGroups).toBe(false);
       expect(hasRoles).toBe(false);
@@ -318,7 +326,7 @@ describe("IdentityAccessManagement.vue Component", () => {
 
     it("should always include organizations tab", () => {
       const hasOrganizations = wrapper.vm.tabs.some(
-        (tab: any) => tab.name === "organizations"
+        (tab: any) => tab.name === "organizations",
       );
       expect(hasOrganizations).toBe(true);
     });
@@ -421,7 +429,9 @@ describe("IdentityAccessManagement.vue Component", () => {
 
       // Mock useRouter to return our test router
       const vueRouter = await import("vue-router");
-      const useRouterSpy = vi.spyOn(vueRouter, "useRouter").mockReturnValue(testRouter);
+      const useRouterSpy = vi
+        .spyOn(vueRouter, "useRouter")
+        .mockReturnValue(testRouter);
 
       // Mount component
       const testWrapper = mount(IdentityAccessManagement, {
@@ -807,7 +817,7 @@ describe("IdentityAccessManagement.vue Component", () => {
         await flushPromises();
 
         const hasServiceAccountsBefore = wrapper.vm.tabs.some(
-          (t: any) => t.name === "serviceAccounts"
+          (t: any) => t.name === "serviceAccounts",
         );
 
         store.state.zoConfig.service_account_enabled = false;
@@ -815,7 +825,7 @@ describe("IdentityAccessManagement.vue Component", () => {
         await flushPromises();
 
         const hasServiceAccountsAfter = wrapper.vm.tabs.some(
-          (t: any) => t.name === "serviceAccounts"
+          (t: any) => t.name === "serviceAccounts",
         );
 
         // Should be different based on config change
@@ -934,7 +944,7 @@ describe("IdentityAccessManagement.vue Component", () => {
               plugins: [i18n, router],
               stubs: { RouterView: true, RouteTabs: true },
             },
-          })
+          }),
         );
       }
 

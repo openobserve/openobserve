@@ -12,9 +12,9 @@ vi.mock("../../../aws-exports", () => ({
       scope: ["test-scope"],
       redirectSignIn: "http://localhost:8080/",
       redirectSignOut: "http://localhost:8080/",
-      responseType: "code"
-    }
-  }
+      responseType: "code",
+    },
+  },
 }));
 
 vi.mock("../../../utils/zincutils", () => ({
@@ -23,18 +23,18 @@ vi.mock("../../../utils/zincutils", () => ({
     host: "test.example.com",
     port: "5080",
     protocol: "https",
-    tls: true
+    tls: true,
   })),
   getImageURL: vi.fn(() => "https://test.example.com/image.png"),
-  getIngestionURL: vi.fn(() => "https://test.example.com:5080")
+  getIngestionURL: vi.fn(() => "https://test.example.com:5080"),
 }));
 
 vi.mock("@/components/CopyContent.vue", () => ({
   default: {
     name: "CopyContent",
     template: "<div class='copy-content'><slot /></div>",
-    props: ["content"]
-  }
+    props: ["content"],
+  },
 }));
 
 describe("FileBeat.vue", () => {
@@ -47,16 +47,16 @@ describe("FileBeat.vue", () => {
         selectedOrganization: {
           identifier: "test-org",
           label: "Test Organization",
-          id: 123
+          id: 123,
         },
         API_ENDPOINT: "https://test.example.com:5080",
         theme: "dark",
         userInfo: {
-          email: "test@example.com"
-        }
+          email: "test@example.com",
+        },
       },
       mutations: {},
-      actions: {}
+      actions: {},
     });
   };
 
@@ -68,14 +68,14 @@ describe("FileBeat.vue", () => {
         stubs: {
           CopyContent: {
             template: "<div class='copy-content-stub'>{{ content }}</div>",
-            props: ["content"]
-          }
-        }
+            props: ["content"],
+          },
+        },
       },
       props: {
         currOrgIdentifier: "test-org",
-        currUserEmail: "test@example.com"
-      }
+        currUserEmail: "test@example.com",
+      },
     });
   });
 
@@ -159,7 +159,7 @@ describe("FileBeat.vue", () => {
       expect(content).toContain("output.elasticsearch:");
       expect(content).toContain("hosts:");
       expect(content).toContain("timeout: 10");
-      expect(content).toContain("index: \"default\"");
+      expect(content).toContain('index: "default"');
     });
 
     it("should use correct endpoint in hosts configuration", () => {
@@ -174,8 +174,8 @@ describe("FileBeat.vue", () => {
 
     it("should include placeholder credentials", () => {
       const content = wrapper.vm.content;
-      expect(content).toContain("username: \"[EMAIL]\"");
-      expect(content).toContain("password: \"[PASSCODE]\"");
+      expect(content).toContain('username: "[EMAIL]"');
+      expect(content).toContain('password: "[PASSCODE]"');
     });
 
     it("should generate content as string", () => {
@@ -223,11 +223,11 @@ describe("FileBeat.vue", () => {
       const wrapperWithoutProp = mount(FileBeat, {
         global: {
           plugins: [store, Quasar],
-          stubs: { CopyContent: true }
+          stubs: { CopyContent: true },
         },
         props: {
-          currUserEmail: "test@example.com"
-        }
+          currUserEmail: "test@example.com",
+        },
       });
       expect(wrapperWithoutProp.props("currOrgIdentifier")).toBeUndefined();
     });
@@ -236,11 +236,11 @@ describe("FileBeat.vue", () => {
       const wrapperWithoutProp = mount(FileBeat, {
         global: {
           plugins: [store, Quasar],
-          stubs: { CopyContent: true }
+          stubs: { CopyContent: true },
         },
         props: {
-          currOrgIdentifier: "test-org"
-        }
+          currOrgIdentifier: "test-org",
+        },
       });
       expect(wrapperWithoutProp.props("currUserEmail")).toBeUndefined();
     });
@@ -263,8 +263,8 @@ describe("FileBeat.vue", () => {
       const newWrapper = mount(FileBeat, {
         global: {
           plugins: [store, Quasar],
-          stubs: { CopyContent: true }
-        }
+          stubs: { CopyContent: true },
+        },
       });
       expect(newWrapper.vm.content).toContain("/api/different-org/");
     });
@@ -272,7 +272,9 @@ describe("FileBeat.vue", () => {
 
   describe("Utility Functions Integration", () => {
     it("should call getIngestionURL function", async () => {
-      const { getIngestionURL } = await vi.importMock("../../../utils/zincutils");
+      const { getIngestionURL } = await vi.importMock(
+        "../../../utils/zincutils",
+      );
       expect(getIngestionURL).toHaveBeenCalled();
     });
 
@@ -297,7 +299,7 @@ describe("FileBeat.vue", () => {
 
     it("should maintain endpoint structure", () => {
       const requiredKeys = ["url", "host", "port", "protocol", "tls"];
-      requiredKeys.forEach(key => {
+      requiredKeys.forEach((key) => {
         expect(wrapper.vm.endpoint).toHaveProperty(key);
       });
     });
@@ -309,8 +311,8 @@ describe("FileBeat.vue", () => {
       const newWrapper = mount(FileBeat, {
         global: {
           plugins: [store, Quasar],
-          stubs: { CopyContent: true }
-        }
+          stubs: { CopyContent: true },
+        },
       });
       expect(newWrapper.vm.content).toContain("/api//");
     });
@@ -321,22 +323,22 @@ describe("FileBeat.vue", () => {
           selectedOrganization: {
             identifier: "fallback-org",
             label: "Fallback Organization",
-            id: 999
+            id: 999,
           },
           API_ENDPOINT: "https://test.example.com:5080",
           theme: "dark",
           userInfo: {
-            email: "test@example.com"
-          }
+            email: "test@example.com",
+          },
         },
         mutations: {},
-        actions: {}
+        actions: {},
       });
       const newWrapper = mount(FileBeat, {
         global: {
           plugins: [storeWithNullOrg, Quasar],
-          stubs: { CopyContent: true }
-        }
+          stubs: { CopyContent: true },
+        },
       });
       expect(newWrapper.exists()).toBe(true);
       expect(newWrapper.vm.content).toContain("/api/fallback-org/");
@@ -346,8 +348,8 @@ describe("FileBeat.vue", () => {
       const wrapperWithoutProps = mount(FileBeat, {
         global: {
           plugins: [store, Quasar],
-          stubs: { CopyContent: true }
-        }
+          stubs: { CopyContent: true },
+        },
       });
       expect(wrapperWithoutProps.exists()).toBe(true);
     });
@@ -363,21 +365,21 @@ describe("FileBeat.vue", () => {
 
     it("should return all required values from setup", () => {
       const setupFunction = FileBeat.setup!;
-      
+
       // Mock the store for the setup function
       const mockStore = {
         state: {
           selectedOrganization: {
-            identifier: "test-org"
-          }
-        }
+            identifier: "test-org",
+          },
+        },
       };
-      
+
       // Mock useStore to return our mock store
       vi.doMock("vuex", () => ({
-        useStore: () => mockStore
+        useStore: () => mockStore,
       }));
-      
+
       // Since we can't call setup directly due to Vue composition API,
       // we'll verify the component structure instead
       expect(typeof setupFunction).toBe("function");

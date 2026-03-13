@@ -327,7 +327,11 @@ function reconstructCaseExpression(caseExpr: any, sqlParser: any): string {
 }
 
 // Function to extract field names, aliases, aggregation functions, and stream aliases
-export function extractFields(parsedAst: any, timeField: string, sqlParser?: any) {
+export function extractFields(
+  parsedAst: any,
+  timeField: string,
+  sqlParser?: any,
+) {
   let fields = parsedAst.columns.map((column: any) => {
     const field: any = {
       column: "",
@@ -397,7 +401,9 @@ export function extractJoins(parsedAst: any): any[] {
 
     if (fromItem.join) {
       // Parse join type from "INNER JOIN", "LEFT JOIN", etc.
-      const joinTypeMatch = fromItem.join.match(/^(INNER|LEFT|RIGHT|FULL|CROSS)/i);
+      const joinTypeMatch = fromItem.join.match(
+        /^(INNER|LEFT|RIGHT|FULL|CROSS)/i,
+      );
       const joinType = joinTypeMatch ? joinTypeMatch[1].toLowerCase() : "inner";
 
       // Extract join conditions from ON clause
@@ -430,15 +436,19 @@ function extractJoinConditions(onClause: any, conditions: any[]): void {
       // Recurse into left and right
       extractJoinConditions(onClause.left, conditions);
       extractJoinConditions(onClause.right, conditions);
-    } else if (["=", "!=", "<>", ">", "<", ">=", "<="].includes(onClause.operator)) {
+    } else if (
+      ["=", "!=", "<>", ">", "<", ">=", "<="].includes(onClause.operator)
+    ) {
       // Comparison condition like "a.field = b.field" or "a.field >= b.field"
       const leftField = {
         streamAlias: onClause.left?.table || null,
-        field: onClause.left?.column?.expr?.value || onClause.left?.column || "",
+        field:
+          onClause.left?.column?.expr?.value || onClause.left?.column || "",
       };
       const rightField = {
         streamAlias: onClause.right?.table || null,
-        field: onClause.right?.column?.expr?.value || onClause.right?.column || "",
+        field:
+          onClause.right?.column?.expr?.value || onClause.right?.column || "",
       };
 
       // Normalize "<>" to "!=" for consistency
@@ -791,7 +801,9 @@ export const getFieldsFromQuery = async (
     const joins = extractJoins(ast);
 
     // remove wrong fields and filters (but keep raw fields)
-    fields = fields.filter((field: any) => field.column || field.type === "raw");
+    fields = fields.filter(
+      (field: any) => field.column || field.type === "raw",
+    );
 
     // if type is condition
     if (filters?.filterType === "condition") {

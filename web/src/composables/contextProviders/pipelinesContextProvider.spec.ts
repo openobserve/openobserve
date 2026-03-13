@@ -12,74 +12,77 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { describe, it, expect } from 'vitest';
-import { createPipelinesContextProvider } from './pipelinesContextProvider';
+import { describe, it, expect } from "vitest";
+import { createPipelinesContextProvider } from "./pipelinesContextProvider";
 
-describe('createPipelinesContextProvider', () => {
-  it('should create a context provider for creating new pipeline', () => {
+describe("createPipelinesContextProvider", () => {
+  it("should create a context provider for creating new pipeline", () => {
     const pipelineObj = {
       currentSelectedPipeline: {
-        pipeline_id: 'pipeline-123',
-        name: 'Test Pipeline'
+        pipeline_id: "pipeline-123",
+        name: "Test Pipeline",
       },
-      isEditPipeline: false
+      isEditPipeline: false,
     };
 
     const store = {
       state: {
         selectedOrganization: {
-          identifier: 'org-456'
-        }
-      }
+          identifier: "org-456",
+        },
+      },
     };
 
     const provider = createPipelinesContextProvider(pipelineObj, store);
     const context = provider.getContext();
 
-    expect(context.currentPage).toBe('Pipelines');
-    expect(context.pipelineId).toBe('pipeline-123');
-    expect(context.pipelineName).toBe('Test Pipeline');
-    expect(context.organization_identifier).toBe('org-456');
-    expect(context.user_intent).toBe('create new pipeline query node');
+    expect(context.currentPage).toBe("Pipelines");
+    expect(context.pipelineId).toBe("pipeline-123");
+    expect(context.pipelineName).toBe("Test Pipeline");
+    expect(context.organization_identifier).toBe("org-456");
+    expect(context.user_intent).toBe("create new pipeline query node");
   });
 
-  it('should create a context provider for editing existing pipeline', () => {
+  it("should create a context provider for editing existing pipeline", () => {
     const pipelineObj = {
       currentSelectedPipeline: {
-        pipeline_id: 'pipeline-789',
-        name: 'Updated Pipeline'
+        pipeline_id: "pipeline-789",
+        name: "Updated Pipeline",
       },
-      isEditPipeline: true
+      isEditPipeline: true,
     };
 
     const store = {
       state: {
         selectedOrganization: {
-          identifier: 'org-123'
-        }
-      }
+          identifier: "org-123",
+        },
+      },
     };
 
     const provider = createPipelinesContextProvider(pipelineObj, store);
     const context = provider.getContext();
 
-    expect(context.currentPage).toBe('Pipelines');
-    expect(context.pipelineId).toBe('pipeline-789');
-    expect(context.pipelineName).toBe('Updated Pipeline');
-    expect(context.organization_identifier).toBe('org-123');
-    expect(context.user_intent).toBe('edit existing pipeline');
+    expect(context.currentPage).toBe("Pipelines");
+    expect(context.pipelineId).toBe("pipeline-789");
+    expect(context.pipelineName).toBe("Updated Pipeline");
+    expect(context.organization_identifier).toBe("org-123");
+    expect(context.user_intent).toBe("edit existing pipeline");
   });
 
-  it('should handle missing pipeline data gracefully', () => {
-    const pipelineObj = { currentSelectedPipeline: null, isEditPipeline: false };
+  it("should handle missing pipeline data gracefully", () => {
+    const pipelineObj = {
+      currentSelectedPipeline: null,
+      isEditPipeline: false,
+    };
     const store = { state: { selectedOrganization: null } };
 
     const provider = createPipelinesContextProvider(pipelineObj, store);
     const context = provider.getContext();
 
-    expect(context.currentPage).toBe('Pipelines');
-    expect(context.pipelineId).toBe('');
-    expect(context.pipelineName).toBe('');
-    expect(context.organization_identifier).toBe('');
+    expect(context.currentPage).toBe("Pipelines");
+    expect(context.pipelineId).toBe("");
+    expect(context.pipelineName).toBe("");
+    expect(context.organization_identifier).toBe("");
   });
 });

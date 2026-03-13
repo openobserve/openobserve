@@ -25,24 +25,24 @@ import DashboardSettings from "./DashboardSettings.vue";
 const mockGeneralSettings = {
   name: "GeneralSettings",
   template: '<div data-test="general-settings-mock">GeneralSettings</div>',
-  emits: ["save"]
+  emits: ["save"],
 };
 
 const mockVariableSettings = {
-  name: "VariableSettings", 
+  name: "VariableSettings",
   template: '<div data-test="variable-settings-mock">VariableSettings</div>',
-  emits: ["save"]
+  emits: ["save"],
 };
 
 const mockTabsSettings = {
   name: "TabsSettings",
   template: '<div data-test="tabs-settings-mock">TabsSettings</div>',
-  emits: ["refresh"]
+  emits: ["refresh"],
 };
 
 // Mock getImageURL utility
 vi.mock("../../utils/zincutils", () => ({
-  getImageURL: vi.fn((path: string) => `mocked-${path}`)
+  getImageURL: vi.fn((path: string) => `mocked-${path}`),
 }));
 
 describe("DashboardSettings.vue", () => {
@@ -57,12 +57,12 @@ describe("DashboardSettings.vue", () => {
       state: {
         theme,
         selectedOrganization: {
-          identifier: "test-org"
-        }
+          identifier: "test-org",
+        },
       },
       getters: {},
       mutations: {},
-      actions: {}
+      actions: {},
     });
   };
 
@@ -70,9 +70,7 @@ describe("DashboardSettings.vue", () => {
   const createMockRouter = () => {
     return createRouter({
       history: createWebHistory(),
-      routes: [
-        { path: "/", component: { template: "<div>Home</div>" } }
-      ]
+      routes: [{ path: "/", component: { template: "<div>Home</div>" } }],
     });
   };
 
@@ -85,12 +83,12 @@ describe("DashboardSettings.vue", () => {
         en: {
           dashboard: {
             setting: "Dashboard Settings",
-            generalSettings: "General Settings", 
+            generalSettings: "General Settings",
             variableSettings: "Variable Settings",
-            tabSettings: "Tab Settings"
-          }
-        }
-      }
+            tabSettings: "Tab Settings",
+          },
+        },
+      },
     });
   };
 
@@ -115,9 +113,9 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
       expect(wrapper.exists()).toBe(true);
@@ -130,9 +128,9 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
       const vm = wrapper.vm as any;
@@ -148,9 +146,9 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
       expect(wrapper.vm.$options.name).toBe("AppSettings");
@@ -166,9 +164,9 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
       const mainContainer = wrapper.find(".q-pa-none");
@@ -185,9 +183,9 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
       const mainContainer = wrapper.find(".q-pa-none");
@@ -203,9 +201,9 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
       const title = wrapper.find(".text-h6");
@@ -220,12 +218,14 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
-      const closeButton = wrapper.find('[data-test="dashboard-settings-close-btn"]');
+      const closeButton = wrapper.find(
+        '[data-test="dashboard-settings-close-btn"]',
+      );
       expect(closeButton.exists()).toBe(true);
     });
 
@@ -236,9 +236,9 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
       const splitter = wrapper.findComponent({ name: "QSplitter" });
@@ -255,13 +255,17 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
-      const generalTab = wrapper.find('[data-test="dashboard-settings-general-tab"]');
-      const variableTab = wrapper.find('[data-test="dashboard-settings-variable-tab"]');  
+      const generalTab = wrapper.find(
+        '[data-test="dashboard-settings-general-tab"]',
+      );
+      const variableTab = wrapper.find(
+        '[data-test="dashboard-settings-variable-tab"]',
+      );
       const tabTab = wrapper.find('[data-test="dashboard-settings-tab-tab"]');
 
       expect(generalTab.exists()).toBe(true);
@@ -280,9 +284,9 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
       const tabs = wrapper.findComponent({ name: "QTabs" });
@@ -297,12 +301,14 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
-      const variableTab = wrapper.find('[data-test="dashboard-settings-variable-tab"]');
+      const variableTab = wrapper.find(
+        '[data-test="dashboard-settings-variable-tab"]',
+      );
       await variableTab.trigger("click");
 
       expect(wrapper.vm.activeTab).toBe("variableSettings");
@@ -315,9 +321,9 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
       const tabPanels = wrapper.findComponent({ name: "QTabPanels" });
@@ -332,12 +338,14 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
-      const generalSettings = wrapper.findComponent({ name: "GeneralSettings" });
+      const generalSettings = wrapper.findComponent({
+        name: "GeneralSettings",
+      });
       expect(generalSettings.exists()).toBe(true);
     });
 
@@ -348,16 +356,20 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
       // Change to variable tab
-      const variableTab = wrapper.find('[data-test="dashboard-settings-variable-tab"]');
+      const variableTab = wrapper.find(
+        '[data-test="dashboard-settings-variable-tab"]',
+      );
       await variableTab.trigger("click");
 
-      const variableSettings = wrapper.findComponent({ name: "VariableSettings" });
+      const variableSettings = wrapper.findComponent({
+        name: "VariableSettings",
+      });
       expect(variableSettings.exists()).toBe(true);
     });
 
@@ -368,9 +380,9 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
       // Change to tab tab
@@ -390,9 +402,9 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
       // Call the refreshRequired method directly
@@ -411,13 +423,15 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
-      const generalSettings = wrapper.findComponent({ name: "GeneralSettings" });
-      
+      const generalSettings = wrapper.findComponent({
+        name: "GeneralSettings",
+      });
+
       // Emit save event from GeneralSettings
       await generalSettings.vm.$emit("save");
 
@@ -433,17 +447,21 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
       // Switch to variable tab first
-      const variableTab = wrapper.find('[data-test="dashboard-settings-variable-tab"]');
+      const variableTab = wrapper.find(
+        '[data-test="dashboard-settings-variable-tab"]',
+      );
       await variableTab.trigger("click");
 
-      const variableSettings = wrapper.findComponent({ name: "VariableSettings" });
-      
+      const variableSettings = wrapper.findComponent({
+        name: "VariableSettings",
+      });
+
       // Emit save event from VariableSettings
       await variableSettings.vm.$emit("save");
 
@@ -459,9 +477,9 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
       // Switch to tab tab first
@@ -469,7 +487,7 @@ describe("DashboardSettings.vue", () => {
       await tabTab.trigger("click");
 
       const tabsSettings = wrapper.findComponent({ name: "TabsSettings" });
-      
+
       // Emit refresh event from TabsSettings
       await tabsSettings.vm.$emit("refresh");
 
@@ -485,20 +503,22 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
-      const closeButton = wrapper.find('[data-test="dashboard-settings-close-btn"]');
+      const closeButton = wrapper.find(
+        '[data-test="dashboard-settings-close-btn"]',
+      );
       expect(closeButton.exists()).toBe(true);
-      
+
       // Verify it's a button element
-      expect(closeButton.element.tagName.toLowerCase()).toBe('i');
-      
+      expect(closeButton.element.tagName.toLowerCase()).toBe("i");
+
       // Test that clicking the button doesn't throw an error
-      await closeButton.trigger('click');
-      
+      await closeButton.trigger("click");
+
       // The button should be clickable
       expect(closeButton.exists()).toBe(true);
     });
@@ -510,22 +530,22 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
       const splitter = wrapper.findComponent({ name: "QSplitter" });
       expect(splitter.exists()).toBe(true);
-      
+
       // Test initial splitter value
       expect(splitter.props("modelValue")).toBe(220);
-      
+
       // Test changing splitter value
       const vm = wrapper.vm as any;
       vm.splitterModel = 300;
       await wrapper.vm.$nextTick();
-      
+
       expect(vm.splitterModel).toBe(300);
     });
   });
@@ -541,9 +561,9 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
       const mainContainer = wrapper.find(".q-pa-none");
@@ -562,9 +582,9 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
       const mainContainer = wrapper.find(".q-pa-none");
@@ -580,9 +600,9 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
       const vm = wrapper.vm as any;
@@ -597,15 +617,19 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
       // Rapidly switch tabs
-      const variableTab = wrapper.find('[data-test="dashboard-settings-variable-tab"]');
+      const variableTab = wrapper.find(
+        '[data-test="dashboard-settings-variable-tab"]',
+      );
       const tabTab = wrapper.find('[data-test="dashboard-settings-tab-tab"]');
-      const generalTab = wrapper.find('[data-test="dashboard-settings-general-tab"]');
+      const generalTab = wrapper.find(
+        '[data-test="dashboard-settings-general-tab"]',
+      );
 
       await variableTab.trigger("click");
       expect(wrapper.vm.activeTab).toBe("variableSettings");
@@ -624,14 +648,14 @@ describe("DashboardSettings.vue", () => {
           components: {
             GeneralSettings: mockGeneralSettings,
             VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+            TabsSettings: mockTabsSettings,
+          },
+        },
       });
 
       const vm = wrapper.vm as any;
       expect(typeof vm.getImageURL).toBe("function");
-      
+
       // Test that getImageURL returns expected format
       const result = vm.getImageURL("test-path");
       expect(result).toBe("mocked-test-path");

@@ -17,7 +17,7 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify, Quasar } from "quasar";
-import { nextTick, ref } from 'vue';
+import { nextTick, ref } from "vue";
 
 // Mock userService
 vi.mock("@/services/users", () => ({
@@ -25,16 +25,16 @@ vi.mock("@/services/users", () => ({
     create: vi.fn(),
     update: vi.fn(),
     updateexistinguser: vi.fn(),
-    getUserRoles: vi.fn()
-  }
+    getUserRoles: vi.fn(),
+  },
 }));
 
 // Mock aws-exports
 vi.mock("@/aws-exports", () => ({
   default: {
     isEnterprise: "true",
-    isCloud: false
-  }
+    isCloud: false,
+  },
 }));
 
 // Mock composables that use inject()
@@ -42,24 +42,27 @@ vi.mock("@/composables/useStreams", () => ({
   default: vi.fn(() => ({
     streamList: ref([]),
     loading: ref(false),
-    error: ref(null)
-  }))
+    error: ref(null),
+  })),
 }));
 
 vi.mock("@/composables/useLogs", () => ({
   default: vi.fn(() => ({
-    searchObj: ref({ loading: false, data: { queryResults: [], aggs: { histogram: [] } } }),
+    searchObj: ref({
+      loading: false,
+      data: { queryResults: [], aggs: { histogram: [] } },
+    }),
     searchAggData: ref({ histogram: [], total: 0 }),
-    searchResultData: ref({ list: [] })
-  }))
+    searchResultData: ref({ list: [] }),
+  })),
 }));
 
 vi.mock("@/composables/useDashboard", () => ({
   default: vi.fn(() => ({
     dashboards: ref([]),
     loading: ref(false),
-    error: ref(null)
-  }))
+    error: ref(null),
+  })),
 }));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
@@ -69,9 +72,12 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
     getImageURL: vi.fn(() => ""),
     verifyOrganizationStatus: vi.fn(() => Promise.resolve(true)),
     logsErrorMessage: vi.fn((code) => `Error: ${code}`),
-    mergeRoutes: vi.fn((route1, route2) => [...(route1 || []), ...(route2 || [])]),
+    mergeRoutes: vi.fn((route1, route2) => [
+      ...(route1 || []),
+      ...(route2 || []),
+    ]),
     getPath: vi.fn(() => "/"),
-    useLocalTimezone: vi.fn(() => "UTC")
+    useLocalTimezone: vi.fn(() => "UTC"),
   };
 });
 
@@ -79,23 +85,23 @@ vi.mock("@/services/auth", () => ({
   default: {
     sign_in_user: vi.fn(),
     sign_out: vi.fn(),
-    get_dex_config: vi.fn()
-  }
+    get_dex_config: vi.fn(),
+  },
 }));
 
 vi.mock("@/services/organizations", () => ({
   default: {
     get_organization: vi.fn(),
     list: vi.fn(),
-    add_members: vi.fn()
-  }
+    add_members: vi.fn(),
+  },
 }));
 
 vi.mock("@/services/billings", () => ({
   default: {
     get_billing_info: vi.fn(),
-    get_invoice_history: vi.fn()
-  }
+    get_invoice_history: vi.fn(),
+  },
 }));
 
 import AddUser from "@/components/iam/users/AddUser.vue";
@@ -123,8 +129,8 @@ const platform = {
 installQuasar({
   plugins: [Dialog, Notify],
   config: {
-    platform
-  }
+    platform,
+  },
 });
 
 describe("AddUser Component", () => {
@@ -170,14 +176,17 @@ describe("AddUser Component", () => {
     // Setup store state
     store.state.organizations = [
       { name: "Test Org", identifier: "test-org" },
-      { name: "Another Org", identifier: "another-org" }
+      { name: "Another Org", identifier: "another-org" },
     ];
-    store.state.selectedOrganization = { identifier: "test-org", name: "Test Org" };
+    store.state.selectedOrganization = {
+      identifier: "test-org",
+      name: "Test Org",
+    };
     store.state.userInfo = { email: "test@example.com" };
 
     // Setup router mock
     mockRouter = {
-      push: vi.fn()
+      push: vi.fn(),
     };
 
     // Setup notify mock
@@ -186,31 +195,28 @@ describe("AddUser Component", () => {
     wrapper = mount(AddUser, {
       props: defaultProps,
       global: {
-        plugins: [
-          [Quasar, { platform }],
-          [i18n]
-        ],
-        provide: { 
+        plugins: [[Quasar, { platform }], [i18n]],
+        provide: {
           store,
-          platform
+          platform,
         },
         mocks: {
           $router: mockRouter,
           $q: {
             platform,
             notify: mockNotify,
-            dialog: Dialog
-          }
-        }
+            dialog: Dialog,
+          },
+        },
       },
-      attachTo: document.body
+      attachTo: document.body,
     });
 
     await flushPromises();
   });
 
   afterEach(() => {
-    if (wrapper && typeof wrapper.unmount === 'function') {
+    if (wrapper && typeof wrapper.unmount === "function") {
       wrapper.unmount();
     }
     vi.clearAllMocks();
@@ -220,8 +226,6 @@ describe("AddUser Component", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
-
-
   it("validates email format", async () => {
     // Set existingUser to true to show email input
     wrapper.vm.existingUser = true;
@@ -230,11 +234,11 @@ describe("AddUser Component", () => {
 
     const emailInput = wrapper.find('[data-test="user-email-field"]');
     expect(emailInput.exists()).toBe(true);
-    
-    await emailInput.setValue('invalid-email');
-    await emailInput.trigger('blur');
-    
-    expect(wrapper.vm.formData.email).toBe('invalid-email');
+
+    await emailInput.setValue("invalid-email");
+    await emailInput.trigger("blur");
+
+    expect(wrapper.vm.formData.email).toBe("invalid-email");
   });
 
   it("validates password length", async () => {
@@ -245,11 +249,11 @@ describe("AddUser Component", () => {
 
     const passwordInput = wrapper.find('[data-test="user-password-field"]');
     expect(passwordInput.exists()).toBe(true);
-    
-    await passwordInput.setValue('short');
-    await passwordInput.trigger('blur');
-    
-    expect(wrapper.vm.formData.password).toBe('short');
+
+    await passwordInput.setValue("short");
+    await passwordInput.trigger("blur");
+
+    expect(wrapper.vm.formData.password).toBe("short");
   });
 
   describe("Form Submission", () => {
@@ -272,16 +276,16 @@ describe("AddUser Component", () => {
 
       await nextTick();
 
-      const form = wrapper.find('form');
-      await form.trigger('submit.prevent');
+      const form = wrapper.find("form");
+      await form.trigger("submit.prevent");
       await flushPromises();
 
       expect(userService.create).toHaveBeenCalledWith(
         expect.objectContaining({
           email: "test@example.com",
-          password: "password123"
+          password: "password123",
         }),
-        "test-org"
+        "test-org",
       );
     });
 
@@ -303,8 +307,8 @@ describe("AddUser Component", () => {
 
       await nextTick();
 
-      const form = wrapper.find('form');
-      await form.trigger('submit.prevent');
+      const form = wrapper.find("form");
+      await form.trigger("submit.prevent");
       await flushPromises();
 
       expect(userService.update).toHaveBeenCalled();
@@ -316,14 +320,14 @@ describe("AddUser Component", () => {
       // Set conditions to show custom roles select
       await wrapper.setProps({
         ...defaultProps,
-        userRole: "admin"
+        userRole: "admin",
       });
       wrapper.vm.existingUser = true;
       await nextTick();
 
       const filterFn = wrapper.vm.filterFn;
       const updateFn = vi.fn();
-      
+
       filterFn("role1", updateFn);
       expect(updateFn).toHaveBeenCalled();
 
@@ -344,7 +348,7 @@ describe("AddUser Component", () => {
 
       expect(userService.getUserRoles).toHaveBeenCalledWith(
         "test-org",
-        "test@example.com"
+        "test@example.com",
       );
     });
   });
@@ -352,7 +356,7 @@ describe("AddUser Component", () => {
   describe("Password Change", () => {
     it("shows logout confirmation when changing own password", async () => {
       const email = store.state.userInfo.email;
-      
+
       // Mount a new wrapper specifically for this test
       const passwordWrapper = mount(AddUser, {
         props: {
@@ -360,26 +364,22 @@ describe("AddUser Component", () => {
           isUpdated: true,
           modelValue: {
             ...defaultProps.modelValue,
-            email: email
-          }
+            email: email,
+          },
         },
         global: {
-          plugins: [
-            i18n, 
-            router,
-            [Quasar, { platform }]
-          ],
-          provide: { 
+          plugins: [i18n, router, [Quasar, { platform }]],
+          provide: {
             store,
-            platform
+            platform,
           },
           mocks: {
             $q: {
               platform,
-              notify: vi.fn()
-            }
-          }
-        }
+              notify: vi.fn(),
+            },
+          },
+        },
       });
 
       await nextTick();
@@ -390,7 +390,7 @@ describe("AddUser Component", () => {
         email: email,
         change_password: true,
         new_password: "newpassword123",
-        old_password: "oldpassword123"
+        old_password: "oldpassword123",
       };
       passwordWrapper.vm.beingUpdated = true;
       passwordWrapper.vm.loggedInUserEmail = email;
@@ -404,12 +404,12 @@ describe("AddUser Component", () => {
       });
 
       // Submit the form
-      const form = passwordWrapper.find('form');
-      await form.trigger('submit.prevent');
+      const form = passwordWrapper.find("form");
+      await form.trigger("submit.prevent");
       await flushPromises();
 
       expect(passwordWrapper.vm.logout_confirm).toBe(true);
-      
+
       passwordWrapper.unmount();
     });
   });
@@ -420,9 +420,9 @@ describe("AddUser Component", () => {
       wrapper.vm.beingUpdated = false;
       await nextTick();
 
-      const form = wrapper.find('form');
-      await form.trigger('submit.prevent');
-      
+      const form = wrapper.find("form");
+      await form.trigger("submit.prevent");
+
       // Check if validation prevented submission
       expect(userService.create).not.toHaveBeenCalled();
     });
@@ -434,9 +434,9 @@ describe("AddUser Component", () => {
       wrapper.vm.formData.other_organization = "123-invalid";
       await nextTick();
 
-      const form = wrapper.find('form');
-      await form.trigger('submit.prevent');
-      
+      const form = wrapper.find("form");
+      await form.trigger("submit.prevent");
+
       // Should show validation error for organization name
       expect(wrapper.text()).toContain("Input must start with a letter");
     });
@@ -447,26 +447,26 @@ describe("AddUser Component", () => {
         props: {
           ...defaultProps,
           isUpdated: true,
-          modelValue: { ...defaultProps.modelValue, email }
+          modelValue: { ...defaultProps.modelValue, email },
         },
         global: {
           plugins: [i18n, router, [Quasar, { platform }]],
           provide: { store, platform },
-          mocks: { $q: { platform, notify: vi.fn() } }
-        }
+          mocks: { $q: { platform, notify: vi.fn() } },
+        },
       });
 
       passwordWrapper.vm.formData = {
         email,
         change_password: true,
         old_password: "oldpassword123",
-        new_password: "short" // Too short password
+        new_password: "short", // Too short password
       };
       passwordWrapper.vm.beingUpdated = true;
 
       await nextTick();
-      const form = passwordWrapper.find('form');
-      await form.trigger('submit.prevent');
+      const form = passwordWrapper.find("form");
+      await form.trigger("submit.prevent");
 
       expect(userService.update).not.toHaveBeenCalled();
       passwordWrapper.unmount();
@@ -479,19 +479,21 @@ describe("AddUser Component", () => {
         props: {
           ...defaultProps,
           userRole: "admin",
-          customRoles: ["role1", "role2"]
+          customRoles: ["role1", "role2"],
         },
         global: {
           plugins: [i18n, router, [Quasar, { platform }]],
           provide: { store, platform },
-          mocks: { $q: { platform, notify: vi.fn() } }
-        }
+          mocks: { $q: { platform, notify: vi.fn() } },
+        },
       });
 
       adminWrapper.vm.existingUser = true;
       await nextTick();
 
-      const customRoleField = adminWrapper.find('[data-test="user-custom-role-field"]');
+      const customRoleField = adminWrapper.find(
+        '[data-test="user-custom-role-field"]',
+      );
       expect(customRoleField.exists()).toBe(true);
       adminWrapper.unmount();
     });
@@ -501,19 +503,21 @@ describe("AddUser Component", () => {
         props: {
           ...defaultProps,
           userRole: "member",
-          customRoles: ["role1", "role2"]
+          customRoles: ["role1", "role2"],
         },
         global: {
           plugins: [i18n, router, [Quasar, { platform }]],
           provide: { store, platform },
-          mocks: { $q: { platform, notify: vi.fn() } }
-        }
+          mocks: { $q: { platform, notify: vi.fn() } },
+        },
       });
 
       memberWrapper.vm.existingUser = true;
       await nextTick();
 
-      const customRoleField = memberWrapper.find('[data-test="user-custom-role-field"]');
+      const customRoleField = memberWrapper.find(
+        '[data-test="user-custom-role-field"]',
+      );
       expect(customRoleField.exists()).toBe(false);
       memberWrapper.unmount();
     });
@@ -523,61 +527,66 @@ describe("AddUser Component", () => {
     it("fetches user roles in enterprise mode", async () => {
       const email = "test@example.com";
       const roles = ["role1", "role2"];
-      
+
       vi.mocked(userService.getUserRoles).mockResolvedValue({
-        data: roles
+        data: roles,
       });
 
       const enterpriseWrapper = mount(AddUser, {
         props: {
           ...defaultProps,
           isUpdated: true,
-          modelValue: { ...defaultProps.modelValue, email }
+          modelValue: { ...defaultProps.modelValue, email },
         },
         global: {
           plugins: [i18n, router, [Quasar, { platform }]],
           provide: { store, platform },
-          mocks: { $q: { platform, notify: vi.fn() } }
-        }
+          mocks: { $q: { platform, notify: vi.fn() } },
+        },
       });
 
       await flushPromises();
 
       expect(userService.getUserRoles).toHaveBeenCalledWith(
         store.state.selectedOrganization.identifier,
-        email
+        email,
       );
-      
+
       enterpriseWrapper.unmount();
     });
 
     it("handles error in fetching user roles", async () => {
       const email = "test@example.com";
       const errorMessage = "Failed to fetch roles";
-      
+
       vi.mocked(userService.getUserRoles).mockRejectedValue({
-        message: errorMessage
+        message: errorMessage,
       });
 
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       const enterpriseWrapper = mount(AddUser, {
         props: {
           ...defaultProps,
           isUpdated: true,
-          modelValue: { ...defaultProps.modelValue, email }
+          modelValue: { ...defaultProps.modelValue, email },
         },
         global: {
           plugins: [i18n, router, [Quasar, { platform }]],
           provide: { store, platform },
-          mocks: { $q: { platform, notify: vi.fn() } }
-        }
+          mocks: { $q: { platform, notify: vi.fn() } },
+        },
       });
 
       await flushPromises();
 
-      expect(consoleSpy).toHaveBeenCalledWith("Error fetching user roles:", expect.any(Object));
-      
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Error fetching user roles:",
+        expect.any(Object),
+      );
+
       consoleSpy.mockRestore();
       enterpriseWrapper.unmount();
     });
@@ -590,7 +599,7 @@ describe("AddUser Component", () => {
         props: {
           ...defaultProps,
           isUpdated: true,
-          modelValue: { ...defaultProps.modelValue, email: "test@example.com" }
+          modelValue: { ...defaultProps.modelValue, email: "test@example.com" },
         },
         global: {
           plugins: [i18n, router, [Quasar, { platform }]],
@@ -598,9 +607,9 @@ describe("AddUser Component", () => {
           mocks: { $q: { platform, notify: vi.fn() } },
           stubs: {
             QIcon: false,
-            QInput: false
-          }
-        }
+            QInput: false,
+          },
+        },
       });
 
       wrapper.vm.formData.change_password = true;
@@ -620,7 +629,10 @@ describe("AddUser Component", () => {
         props: {
           ...defaultProps,
           isUpdated: true,
-          modelValue: { ...defaultProps.modelValue, email: store.state.userInfo.email }
+          modelValue: {
+            ...defaultProps.modelValue,
+            email: store.state.userInfo.email,
+          },
         },
         global: {
           plugins: [i18n, router, [Quasar, { platform }]],
@@ -628,9 +640,9 @@ describe("AddUser Component", () => {
           mocks: { $q: { platform, notify: vi.fn() } },
           stubs: {
             QIcon: false,
-            QInput: false
-          }
-        }
+            QInput: false,
+          },
+        },
       });
 
       wrapper.vm.formData.change_password = true;
@@ -651,7 +663,7 @@ describe("AddUser Component", () => {
       const validEmails = [
         "test@example.com",
         "user.name@domain.co.uk",
-        "user+label@example.com"
+        "user+label@example.com",
       ];
 
       const invalidEmails = [
@@ -659,7 +671,7 @@ describe("AddUser Component", () => {
         "@domain.com",
         "user@",
         "user@domain",
-        "user.domain.com"
+        "user.domain.com",
       ];
 
       wrapper.vm.existingUser = true;
@@ -708,13 +720,15 @@ describe("AddUser Component", () => {
 
   describe("Organization Handling", () => {
     it("initializes with selected organization", () => {
-      expect(wrapper.vm.formData.organization).toBe(store.state.selectedOrganization.identifier);
+      expect(wrapper.vm.formData.organization).toBe(
+        store.state.selectedOrganization.identifier,
+      );
     });
 
     it("updates organization options when store changes", async () => {
       const newOrgs = [
         { name: "New Org", identifier: "new-org" },
-        { name: "Another New Org", identifier: "another-new-org" }
+        { name: "Another New Org", identifier: "another-new-org" },
       ];
 
       store.state.organizations = newOrgs;
@@ -723,8 +737,8 @@ describe("AddUser Component", () => {
       expect(wrapper.vm.organizationOptions).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ value: "new-org" }),
-          expect.objectContaining({ value: "another-new-org" })
-        ])
+          expect.objectContaining({ value: "another-new-org" }),
+        ]),
       );
     });
   });
@@ -735,13 +749,13 @@ describe("AddUser Component", () => {
         props: {
           ...defaultProps,
           isUpdated: true,
-          modelValue: { ...defaultProps.modelValue, email: "test@example.com" }
+          modelValue: { ...defaultProps.modelValue, email: "test@example.com" },
         },
         global: {
           plugins: [i18n, router, [Quasar, { platform }]],
           provide: { store, platform },
-          mocks: { $q: { platform, notify: vi.fn() } }
-        }
+          mocks: { $q: { platform, notify: vi.fn() } },
+        },
       });
 
       // Initially change_password is false
@@ -768,12 +782,12 @@ describe("AddUser Component", () => {
         email: "test@example.com",
         first_name: "John",
         last_name: "Doe",
-        password: "short" // Invalid password
+        password: "short", // Invalid password
       };
       await nextTick();
 
-      const form = wrapper.find('form');
-      await form.trigger('submit.prevent');
+      const form = wrapper.find("form");
+      await form.trigger("submit.prevent");
       await flushPromises();
 
       expect(wrapper.vm.formData.email).toBe("test@example.com");
@@ -785,8 +799,8 @@ describe("AddUser Component", () => {
   describe("UI Interactions", () => {
     it("closes form on cancel button click", async () => {
       const cancelButton = wrapper.find('[data-test="cancel-user-button"]');
-      await cancelButton.trigger('click');
-      expect(wrapper.emitted()['cancel:hideform']).toBeTruthy();
+      await cancelButton.trigger("click");
+      expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
     });
 
     it("shows/hides fields based on user type", async () => {
@@ -806,7 +820,9 @@ describe("AddUser Component", () => {
       await nextTick();
 
       const newEmailField = wrapper.find('[data-test="user-email-field"]');
-      const newPasswordField = wrapper.find('[data-test="user-password-field"]');
+      const newPasswordField = wrapper.find(
+        '[data-test="user-password-field"]',
+      );
 
       expect(newEmailField.exists()).toBe(false);
       expect(newPasswordField.exists()).toBe(true);
@@ -822,17 +838,17 @@ describe("AddUser Component", () => {
         first_name: "John",
         last_name: "Doe",
         role: "admin",
-        organization: store.state.selectedOrganization.identifier
+        organization: store.state.selectedOrganization.identifier,
       };
 
       vi.mocked(userService.create).mockResolvedValue({
         data: { message: "User created successfully" },
-        status: 200
+        status: 200,
       });
 
       await nextTick();
-      const form = wrapper.find('form');
-      await form.trigger('submit.prevent');
+      const form = wrapper.find("form");
+      await form.trigger("submit.prevent");
       await flushPromises();
 
       expect(userService.create).toHaveBeenCalledWith(
@@ -841,9 +857,9 @@ describe("AddUser Component", () => {
           password: "validPassword123",
           first_name: "John",
           last_name: "Doe",
-          role: "admin"
+          role: "admin",
         }),
-        store.state.selectedOrganization.identifier
+        store.state.selectedOrganization.identifier,
       );
     });
 
@@ -855,12 +871,12 @@ describe("AddUser Component", () => {
         first_name: "John",
         last_name: "Doe",
         role: "admin",
-        organization: store.state.selectedOrganization.identifier
+        organization: store.state.selectedOrganization.identifier,
       };
 
       await nextTick();
-      const form = wrapper.find('form');
-      await form.trigger('submit.prevent');
+      const form = wrapper.find("form");
+      await form.trigger("submit.prevent");
       await flushPromises();
 
       expect(userService.create).not.toHaveBeenCalled();
@@ -868,7 +884,6 @@ describe("AddUser Component", () => {
   });
 
   describe("Password Change Functionality", () => {
-
     it("validates old and new password fields when changing password", async () => {
       wrapper.vm.formData = {
         email: "user@example.com",
@@ -878,13 +893,13 @@ describe("AddUser Component", () => {
         first_name: "John",
         last_name: "Doe",
         role: "admin",
-        organization: store.state.selectedOrganization.identifier
+        organization: store.state.selectedOrganization.identifier,
       };
       wrapper.vm.beingUpdated = true;
 
       await nextTick();
-      const form = wrapper.find('form');
-      await form.trigger('submit.prevent');
+      const form = wrapper.find("form");
+      await form.trigger("submit.prevent");
       await flushPromises();
 
       expect(userService.update).not.toHaveBeenCalled();
@@ -900,7 +915,7 @@ describe("AddUser Component", () => {
         last_name: "Doe",
         role: "admin",
         organization: "other",
-        other_organization: "custom-org"
+        other_organization: "custom-org",
       };
       wrapper.vm.existingUser = false;
 
@@ -909,12 +924,12 @@ describe("AddUser Component", () => {
       wrapper.vm.$q.notify = mockNotify;
 
       vi.mocked(userService.create).mockResolvedValue({
-        data: { message: "User created successfully" }
+        data: { message: "User created successfully" },
       });
 
       await nextTick();
-      const form = wrapper.find('form');
-      await form.trigger('submit.prevent');
+      const form = wrapper.find("form");
+      await form.trigger("submit.prevent");
       await flushPromises();
 
       expect(userService.create).toHaveBeenCalledWith(
@@ -925,9 +940,9 @@ describe("AddUser Component", () => {
           last_name: "Doe",
           role: "admin",
           organization: "other",
-          other_organization: "custom-org"
+          other_organization: "custom-org",
         },
-        "custom-org"
+        "custom-org",
       );
     });
 
@@ -939,13 +954,13 @@ describe("AddUser Component", () => {
         last_name: "Doe",
         role: "admin",
         organization: "other",
-        other_organization: "123-invalid" // Invalid format
+        other_organization: "123-invalid", // Invalid format
       };
       wrapper.vm.existingUser = false;
 
       await nextTick();
-      const form = wrapper.find('form');
-      await form.trigger('submit.prevent');
+      const form = wrapper.find("form");
+      await form.trigger("submit.prevent");
       await flushPromises();
 
       expect(userService.create).not.toHaveBeenCalled();
@@ -956,9 +971,9 @@ describe("AddUser Component", () => {
     it("fetches and displays custom roles for admin users", async () => {
       const email = "test@example.com";
       const roles = ["role1", "role2"];
-      
+
       vi.mocked(userService.getUserRoles).mockResolvedValue({
-        data: roles
+        data: roles,
       });
 
       wrapper.vm.existingUser = true;
@@ -968,10 +983,9 @@ describe("AddUser Component", () => {
 
       expect(userService.getUserRoles).toHaveBeenCalledWith(
         store.state.selectedOrganization.identifier,
-        email
+        email,
       );
       expect(wrapper.vm.filterdOption).toEqual(roles);
     });
-
   });
 });

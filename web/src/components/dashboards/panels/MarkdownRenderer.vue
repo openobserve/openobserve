@@ -65,7 +65,11 @@ export default defineComponent({
         tabId: props.tabId,
         panelId: props.panelId,
       };
-      return processVariableContent(props.markdownContent, props.variablesData, context);
+      return processVariableContent(
+        props.markdownContent,
+        props.variablesData,
+        context,
+      );
     });
 
     return {

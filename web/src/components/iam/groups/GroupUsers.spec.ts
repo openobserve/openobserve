@@ -36,8 +36,8 @@ const enhancedStore = {
         status: "active",
         CustomerBillingObj: {
           subscription_type: "premium",
-          note: "Test note"
-        }
+          note: "Test note",
+        },
       },
       {
         name: "TestOrg2",
@@ -48,16 +48,16 @@ const enhancedStore = {
         status: "active",
         CustomerBillingObj: {
           subscription_type: "basic",
-          note: "Another note"
-        }
-      }
+          note: "Another note",
+        },
+      },
     ],
     zoConfig: {
       ...store.state.zoConfig,
-      meta_org: "meta_org"
+      meta_org: "meta_org",
     },
-    theme: "light" // Set to light for consistent theme testing
-  }
+    theme: "light", // Set to light for consistent theme testing
+  },
 };
 
 installQuasar({
@@ -111,7 +111,9 @@ describe("GroupUsers Component", () => {
       ]),
     };
 
-    vi.mocked(await import("@/composables/iam/usePermissions")).default.mockReturnValue({
+    vi.mocked(
+      await import("@/composables/iam/usePermissions"),
+    ).default.mockReturnValue({
       usersState: mockUsersState,
     });
 
@@ -134,19 +136,25 @@ describe("GroupUsers Component", () => {
   describe("Component Mounting", () => {
     it("renders the component correctly", () => {
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('.col').exists()).toBe(true);
+      expect(wrapper.find(".col").exists()).toBe(true);
     });
 
     it("renders filter options", () => {
-      const showToggle = wrapper.find('[data-test="iam-users-selection-show-toggle"]');
-      const showText = wrapper.find('[data-test="iam-users-selection-show-text"]');
-      
+      const showToggle = wrapper.find(
+        '[data-test="iam-users-selection-show-toggle"]',
+      );
+      const showText = wrapper.find(
+        '[data-test="iam-users-selection-show-text"]',
+      );
+
       expect(showToggle.exists()).toBe(true);
       expect(showText.text()).toBe("Show");
     });
 
     it("renders search input", () => {
-      const searchInput = wrapper.find('[data-test="iam-users-selection-search-input"]');
+      const searchInput = wrapper.find(
+        '[data-test="iam-users-selection-search-input"]',
+      );
       expect(searchInput.exists()).toBe(true);
     });
 
@@ -169,17 +177,23 @@ describe("GroupUsers Component", () => {
     });
 
     it("renders filter buttons for each option", () => {
-      const allButton = wrapper.find('[data-test="iam-users-selection-show-all-btn"]');
-      const selectedButton = wrapper.find('[data-test="iam-users-selection-show-selected-btn"]');
-      
+      const allButton = wrapper.find(
+        '[data-test="iam-users-selection-show-all-btn"]',
+      );
+      const selectedButton = wrapper.find(
+        '[data-test="iam-users-selection-show-selected-btn"]',
+      );
+
       expect(allButton.exists()).toBe(true);
       expect(selectedButton.exists()).toBe(true);
     });
 
     it("switches display option when button is clicked", async () => {
-      const allButton = wrapper.find('[data-test="iam-users-selection-show-all-btn"]');
+      const allButton = wrapper.find(
+        '[data-test="iam-users-selection-show-all-btn"]',
+      );
       await allButton.trigger("click");
-      
+
       expect(wrapper.vm.usersDisplay).toBe("all");
     });
   });
@@ -194,23 +208,26 @@ describe("GroupUsers Component", () => {
           selectedOrganization: { identifier: "meta_org" },
           zoConfig: { ...enhancedStore.state.zoConfig, meta_org: "meta_org" },
           organizations: [
-            { 
-              name: "Org1", 
-              identifier: "org1", 
+            {
+              name: "Org1",
+              identifier: "org1",
               id: "1",
               ingest_threshold: 100,
               search_threshold: 50,
               status: "active",
-              CustomerBillingObj: { subscription_type: "basic", note: "" }
+              CustomerBillingObj: { subscription_type: "basic", note: "" },
             },
-            { 
-              name: "Org2", 
-              identifier: "org2", 
+            {
+              name: "Org2",
+              identifier: "org2",
               id: "2",
               ingest_threshold: 200,
               search_threshold: 100,
               status: "active",
-              CustomerBillingObj: { subscription_type: "premium", note: "Test" }
+              CustomerBillingObj: {
+                subscription_type: "premium",
+                note: "Test",
+              },
             },
           ],
           userInfo: { email: "test@example.com" },
@@ -233,7 +250,7 @@ describe("GroupUsers Component", () => {
       wrapper.vm.usersDisplay = "all";
       await flushPromises(); // Wait for component initialization
 
-      const orgSelect = wrapper.find('select, .organizationlist');
+      const orgSelect = wrapper.find("select, .organizationlist");
       expect(wrapper.vm.selectedOrg).toBeDefined();
       // Check that the orgOptions array has at least 3 items (All + 2 orgs)
       expect(wrapper.vm.orgOptions).toHaveLength(3);
@@ -248,13 +265,13 @@ describe("GroupUsers Component", () => {
         state: {
           ...store.state,
           organizations: [
-            { 
-              name: "TestOrg", 
-              identifier: "test-org", 
+            {
+              name: "TestOrg",
+              identifier: "test-org",
               id: "1",
               ingest_threshold: 100,
               search_threshold: 50,
-              status: "active"
+              status: "active",
             },
           ],
           userInfo: { email: "test@example.com" },
@@ -300,7 +317,7 @@ describe("GroupUsers Component", () => {
     it("updates search key when typing", async () => {
       const searchInput = wrapper.find('input[type="text"]');
       await searchInput.setValue("user1");
-      
+
       expect(wrapper.vm.userSearchKey).toBe("user1");
     });
 
@@ -348,7 +365,7 @@ describe("GroupUsers Component", () => {
     it("fetches users on component mount", async () => {
       expect(mockUsersState.getOrgUsers).toHaveBeenCalledWith(
         enhancedStore.state.selectedOrganization.identifier,
-        { list_all: true }
+        { list_all: true },
       );
     });
 
@@ -385,9 +402,15 @@ describe("GroupUsers Component", () => {
     it("marks users as selected based on groupUsers prop", async () => {
       await wrapper.vm.getchOrgUsers();
 
-      const user1 = wrapper.vm.users.find((user: any) => user.email === "user1@example.com");
-      const admin = wrapper.vm.users.find((user: any) => user.email === "admin@example.com");
-      const root = wrapper.vm.users.find((user: any) => user.email === "root@example.com");
+      const user1 = wrapper.vm.users.find(
+        (user: any) => user.email === "user1@example.com",
+      );
+      const admin = wrapper.vm.users.find(
+        (user: any) => user.email === "admin@example.com",
+      );
+      const root = wrapper.vm.users.find(
+        (user: any) => user.email === "root@example.com",
+      );
 
       expect(user1.isInGroup).toBe(true);
       expect(admin.isInGroup).toBe(true);
@@ -397,7 +420,9 @@ describe("GroupUsers Component", () => {
     it("handles users with no organizations", async () => {
       await wrapper.vm.getchOrgUsers();
 
-      const rootUser = wrapper.vm.users.find((user: any) => user.email === "root@example.com");
+      const rootUser = wrapper.vm.users.find(
+        (user: any) => user.email === "root@example.com",
+      );
       expect(rootUser.org).toBe("");
     });
 
@@ -419,7 +444,7 @@ describe("GroupUsers Component", () => {
   describe("Table Structure", () => {
     it("has correct column structure for regular org", () => {
       expect(wrapper.vm.columns).toHaveLength(2);
-      
+
       const selectColumn = wrapper.vm.columns[0];
       expect(selectColumn.name).toBe("select");
       expect(selectColumn.slot).toBe(true);
@@ -455,7 +480,7 @@ describe("GroupUsers Component", () => {
       });
 
       expect(wrapper.vm.columns).toHaveLength(3);
-      
+
       const orgColumn = wrapper.vm.columns[2];
       expect(orgColumn.name).toBe("organization");
       expect(orgColumn.field).toBe("org");
@@ -474,7 +499,9 @@ describe("GroupUsers Component", () => {
       wrapper.vm.rows = [];
       await wrapper.vm.$nextTick();
 
-      const noUsersText = wrapper.find('[data-test="iam-users-selection-table-no-users-text"]');
+      const noUsersText = wrapper.find(
+        '[data-test="iam-users-selection-table-no-users-text"]',
+      );
       expect(noUsersText.exists()).toBe(true);
       expect(noUsersText.text()).toBe("No users added");
     });
@@ -482,14 +509,16 @@ describe("GroupUsers Component", () => {
 
   describe("User Selection", () => {
     it("renders checkboxes for user selection", () => {
-      const checkbox = wrapper.find('[data-test="iam-users-selection-table-body-row-test@example.com-checkbox"]');
+      const checkbox = wrapper.find(
+        '[data-test="iam-users-selection-table-body-row-test@example.com-checkbox"]',
+      );
       expect(checkbox.exists()).toBe(true);
     });
 
     it("handles user selection toggle", () => {
       const addedUsers = new Set();
       const removedUsers = new Set();
-      
+
       wrapper = mount(GroupUsers, {
         global: {
           provide: { store: enhancedStore },
@@ -504,18 +533,18 @@ describe("GroupUsers Component", () => {
       });
 
       const testUser = { email: "user2@example.com", isInGroup: false };
-      
+
       // Simulate checking the checkbox (selecting the user)
       testUser.isInGroup = true;
       wrapper.vm.toggleUserSelection(testUser);
-      
+
       expect(addedUsers.has("user2@example.com")).toBe(true);
     });
 
     it("adds user to addedUsers when selecting unassigned user", () => {
       const addedUsers = new Set();
       const removedUsers = new Set();
-      
+
       wrapper = mount(GroupUsers, {
         global: {
           provide: { store: enhancedStore },
@@ -531,16 +560,16 @@ describe("GroupUsers Component", () => {
 
       wrapper.vm.groupUsersMap = new Set([]);
       const testUser = { email: "user1@example.com", isInGroup: true };
-      
+
       wrapper.vm.toggleUserSelection(testUser);
-      
+
       expect(addedUsers.has("user1@example.com")).toBe(true);
     });
 
     it("adds user to removedUsers when deselecting assigned user", () => {
       const addedUsers = new Set();
       const removedUsers = new Set();
-      
+
       wrapper = mount(GroupUsers, {
         global: {
           provide: { store: enhancedStore },
@@ -556,16 +585,16 @@ describe("GroupUsers Component", () => {
 
       wrapper.vm.groupUsersMap = new Set(["user1@example.com"]);
       const testUser = { email: "user1@example.com", isInGroup: false };
-      
+
       wrapper.vm.toggleUserSelection(testUser);
-      
+
       expect(removedUsers.has("user1@example.com")).toBe(true);
     });
 
     it("removes user from addedUsers when deselecting newly added user", () => {
       const addedUsers = new Set(["user2@example.com"]);
       const removedUsers = new Set();
-      
+
       wrapper = mount(GroupUsers, {
         global: {
           provide: { store: enhancedStore },
@@ -581,16 +610,16 @@ describe("GroupUsers Component", () => {
 
       wrapper.vm.groupUsersMap = new Set([]);
       const testUser = { email: "user2@example.com", isInGroup: false };
-      
+
       wrapper.vm.toggleUserSelection(testUser);
-      
+
       expect(addedUsers.has("user2@example.com")).toBe(false);
     });
 
     it.skip("removes user from removedUsers when reselecting removed user", async () => {
       const addedUsers = new Set();
       const removedUsers = new Set(["user1@example.com"]);
-      
+
       await wrapper.setProps({
         groupUsers: ["user1@example.com"],
         activeTab: "users",
@@ -600,9 +629,9 @@ describe("GroupUsers Component", () => {
 
       wrapper.vm.groupUsersMap = new Set(["user1@example.com"]);
       const testUser = { email: "user1@example.com", isInGroup: true };
-      
+
       wrapper.vm.toggleUserSelection(testUser);
-      
+
       expect(removedUsers.has("user1@example.com")).toBe(false);
     });
   });
@@ -617,53 +646,76 @@ describe("GroupUsers Component", () => {
       wrapper.vm.users = [
         { email: "user1@example.com", isInGroup: true, org: "TestOrg1" },
         { email: "user2@example.com", isInGroup: false, org: "TestOrg2" },
-        { email: "user3@example.com", isInGroup: true, org: "TestOrg1" }
+        { email: "user3@example.com", isInGroup: true, org: "TestOrg1" },
       ];
       wrapper.vm.usersDisplay = "all"; // Make sure we're in 'all' mode
-      
+
       wrapper.vm.updateOrganization();
-      
+
       expect(wrapper.vm.rows).toHaveLength(3); // All users should be shown
     });
 
     it("filters users by organization", () => {
       wrapper.vm.selectedOrg = { value: "test", label: "TestOrg1" };
       wrapper.vm.usersDisplay = "all";
-      
+
       wrapper.vm.updateOrganization();
-      
+
       // Should include users with TestOrg1 in their orgs and root users
       const filteredUsers = wrapper.vm.rows;
-      expect(filteredUsers.some((user: any) => user.email === "user1@example.com")).toBe(true);
-      expect(filteredUsers.some((user: any) => user.email === "admin@example.com")).toBe(true);
-      expect(filteredUsers.some((user: any) => user.role === "root")).toBe(true);
+      expect(
+        filteredUsers.some((user: any) => user.email === "user1@example.com"),
+      ).toBe(true);
+      expect(
+        filteredUsers.some((user: any) => user.email === "admin@example.com"),
+      ).toBe(true);
+      expect(filteredUsers.some((user: any) => user.role === "root")).toBe(
+        true,
+      );
     });
 
     it("includes root role users regardless of organization filter", () => {
-      wrapper.vm.selectedOrg = { value: "nonexistent", label: "NonexistentOrg" };
+      wrapper.vm.selectedOrg = {
+        value: "nonexistent",
+        label: "NonexistentOrg",
+      };
       wrapper.vm.usersDisplay = "all";
-      
+
       wrapper.vm.updateOrganization();
-      
-      const rootUsers = wrapper.vm.rows.filter((user: any) => user.role === "root");
+
+      const rootUsers = wrapper.vm.rows.filter(
+        (user: any) => user.role === "root",
+      );
       expect(rootUsers.length).toBeGreaterThan(0);
     });
 
     it("respects isInGroup filter when organization is selected", () => {
       wrapper.vm.selectedOrg = { value: "test", label: "TestOrg1" };
       wrapper.vm.usersDisplay = "selected";
-      
+
       // Set up test data with mixed isInGroup values
       wrapper.vm.users = [
-        { email: "user1@example.com", isInGroup: true, org: "TestOrg1, TestOrg2", role: "user" },
-        { email: "admin@example.com", isInGroup: true, org: "TestOrg1", role: "admin" },
-        { email: "root@example.com", isInGroup: false, org: "", role: "root" }
+        {
+          email: "user1@example.com",
+          isInGroup: true,
+          org: "TestOrg1, TestOrg2",
+          role: "user",
+        },
+        {
+          email: "admin@example.com",
+          isInGroup: true,
+          org: "TestOrg1",
+          role: "admin",
+        },
+        { email: "root@example.com", isInGroup: false, org: "", role: "root" },
       ];
-      
+
       wrapper.vm.updateOrganization();
-      
+
       // Should only show selected users from the organization
-      const hasNonSelectedUsers = wrapper.vm.rows.some((user: any) => !user.isInGroup);
+      const hasNonSelectedUsers = wrapper.vm.rows.some(
+        (user: any) => !user.isInGroup,
+      );
       expect(hasNonSelectedUsers).toBe(true); // Root users are always included
     });
   });
@@ -680,17 +732,19 @@ describe("GroupUsers Component", () => {
 
     it("shows only selected users when display is 'selected'", async () => {
       await wrapper.vm.updateUserTable("selected");
-      
-      const selectedUsers = wrapper.vm.rows.filter((user: any) => user.isInGroup);
+
+      const selectedUsers = wrapper.vm.rows.filter(
+        (user: any) => user.isInGroup,
+      );
       expect(wrapper.vm.rows).toEqual(selectedUsers);
     });
 
     it("fetches data when switching to 'all' for first time", async () => {
       wrapper.vm.hasFetchedOrgUsers = false;
       const initialDataLength = wrapper.vm.users.length;
-      
+
       await wrapper.vm.updateUserTable("all");
-      
+
       // Test behavior: hasFetchedOrgUsers should be set to true after fetch
       expect(wrapper.vm.hasFetchedOrgUsers).toBe(true);
     });
@@ -698,9 +752,9 @@ describe("GroupUsers Component", () => {
     it("does not refetch data when switching to 'all' after first fetch", async () => {
       const fetchSpy = vi.spyOn(wrapper.vm, "getchOrgUsers");
       wrapper.vm.hasFetchedOrgUsers = true;
-      
+
       await wrapper.vm.updateUserTable("all");
-      
+
       expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
@@ -708,10 +762,12 @@ describe("GroupUsers Component", () => {
   describe("Props Watching", () => {
     it("updates when groupUsers prop changes", async () => {
       const initialGroupUsersMapSize = wrapper.vm.groupUsersMap.size;
-      
-      await wrapper.setProps({ groupUsers: ["user1@example.com", "root@example.com"] });
+
+      await wrapper.setProps({
+        groupUsers: ["user1@example.com", "root@example.com"],
+      });
       await flushPromises();
-      
+
       // Test behavior: groupUsersMap should be updated with new prop values
       expect(wrapper.vm.groupUsersMap.size).toBe(2);
       expect(wrapper.vm.groupUsersMap.has("user1@example.com")).toBe(true);
@@ -721,10 +777,10 @@ describe("GroupUsers Component", () => {
 
     it("resets selectedOrg when groupUsers changes", async () => {
       wrapper.vm.selectedOrg = { value: "test", label: "Test" };
-      
+
       await wrapper.setProps({ groupUsers: ["newuser@example.com"] });
       await flushPromises();
-      
+
       expect(wrapper.vm.selectedOrg.value).toBe("all");
     });
   });
@@ -750,7 +806,7 @@ describe("GroupUsers Component", () => {
     it("handles API error when fetching users", async () => {
       // Simply test that the method exists and can handle errors
       expect(typeof wrapper.vm.getchOrgUsers).toBe("function");
-      
+
       // The getchOrgUsers method should always return a promise that resolves to true
       // even when there's an error, as it has a catch block that handles errors gracefully
       const result = wrapper.vm.getchOrgUsers();
@@ -778,13 +834,13 @@ describe("GroupUsers Component", () => {
         state: {
           ...enhancedStore.state,
           organizations: [
-            { 
-              name: "IncompleteOrg", 
-              identifier: "incomplete", 
+            {
+              name: "IncompleteOrg",
+              identifier: "incomplete",
               id: "1",
               status: "active",
               ingest_threshold: 100,
-              search_threshold: 50
+              search_threshold: 50,
               // Missing CustomerBillingObj
             },
           ],
@@ -812,7 +868,7 @@ describe("GroupUsers Component", () => {
           label: "IncompleteOrg",
           subscription_type: "",
           note: "",
-        })
+        }),
       );
     });
   });
@@ -829,7 +885,7 @@ describe("GroupUsers Component", () => {
         ...enhancedStore,
         state: {
           ...enhancedStore.state,
-          theme: 'dark',
+          theme: "dark",
         },
       };
 
@@ -861,7 +917,7 @@ describe("GroupUsers Component", () => {
         "iam-users-selection-table",
       ];
 
-      sections.forEach(selector => {
+      sections.forEach((selector) => {
         expect(wrapper.find(`[data-test="${selector}"]`).exists()).toBe(true);
       });
     });
@@ -872,7 +928,7 @@ describe("GroupUsers Component", () => {
     });
 
     it("has proper button styling", () => {
-      const filterButtons = wrapper.findAll('.visual-selection-btn');
+      const filterButtons = wrapper.findAll(".visual-selection-btn");
       expect(filterButtons.length).toBeGreaterThan(0);
     });
 

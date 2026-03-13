@@ -41,7 +41,11 @@ describe("Invitations", () => {
       history: createWebHistory(),
       routes: [
         { path: "/", name: "home", component: { template: "<div>Home</div>" } },
-        { path: "/users", name: "users", component: { template: "<div>Users</div>" } },
+        {
+          path: "/users",
+          name: "users",
+          component: { template: "<div>Users</div>" },
+        },
       ],
     });
   });

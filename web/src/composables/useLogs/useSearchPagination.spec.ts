@@ -160,7 +160,7 @@ describe("useSearchPagination", () => {
 
       expect(result).toBe(false);
       expect(mockState.notificationMsg.value).toContain(
-        "Error while refreshing partition pagination"
+        "Error while refreshing partition pagination",
       );
     });
   });
@@ -229,7 +229,9 @@ describe("useSearchPagination", () => {
 
       expect(mockState.searchObj.data.queryResults.pagination).toEqual([]);
       expect(mockState.searchObj.data.queryResults.total).toBe(0);
-      expect(mockState.searchObj.data.queryResults.pageCountTotal).toBeUndefined();
+      expect(
+        mockState.searchObj.data.queryResults.pageCountTotal,
+      ).toBeUndefined();
     });
   });
 
@@ -317,7 +319,9 @@ describe("useSearchPagination", () => {
 
       pagination.updatePageCountTotal(queryReq, 100, 100);
 
-      expect(mockState.searchObj.data.queryResults.pageCountTotal).toBeUndefined();
+      expect(
+        mockState.searchObj.data.queryResults.pageCountTotal,
+      ).toBeUndefined();
     });
   });
 
@@ -482,7 +486,9 @@ describe("useSearchPagination", () => {
 
       pagination.handlePageCountResponse(queryReq, "trace-123", response);
 
-      expect(Array.isArray(mockState.searchObj.data.queryResults.aggs)).toBe(true);
+      expect(Array.isArray(mockState.searchObj.data.queryResults.aggs)).toBe(
+        true,
+      );
     });
 
     it("should set regenerate flag when hits length differs from rowsPerPage", () => {

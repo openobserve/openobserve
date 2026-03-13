@@ -1,6 +1,11 @@
 <script setup>
-import { BaseEdge, EdgeLabelRenderer, getBezierPath, useVueFlow } from '@vue-flow/core'
-import { computed } from 'vue'
+import {
+  BaseEdge,
+  EdgeLabelRenderer,
+  getBezierPath,
+  useVueFlow,
+} from "@vue-flow/core";
+import { computed } from "vue";
 
 const props = defineProps({
   id: {
@@ -39,13 +44,14 @@ const props = defineProps({
     type: Object,
     required: false,
   },
-})
+});
 
-const { removeEdges, getSelectedEdges, addSelectedEdges, removeSelectedEdges } = useVueFlow()
+const { removeEdges, getSelectedEdges, addSelectedEdges, removeSelectedEdges } =
+  useVueFlow();
 
-const path = computed(() => getBezierPath(props))
+const path = computed(() => getBezierPath(props));
 
-let clickTimeout = null
+let clickTimeout = null;
 
 // Edge click handling moved to PipelineFlow.vue using VueFlow events
 // These handlers are no longer used but kept for backwards compatibility
@@ -54,15 +60,15 @@ let clickTimeout = null
 <script>
 export default {
   inheritAttrs: false,
-}
+};
 </script>
 
 <template>
   <!-- You can use the `BaseEdge` component to create your own custom edge more easily -->
-  <BaseEdge 
-    :id="id" 
-    :style="{ ...style, cursor: 'pointer', strokeDasharray: 'none' }" 
-    :path="path[0]" 
+  <BaseEdge
+    :id="id"
+    :style="{ ...style, cursor: 'pointer', strokeDasharray: 'none' }"
+    :path="path[0]"
     :marker-end="markerEnd"
   />
 

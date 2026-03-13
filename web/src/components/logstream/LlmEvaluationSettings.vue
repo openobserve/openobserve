@@ -161,7 +161,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
           </div>
 
           <!-- Sampling rate slider -->
-          <div v-if="enableSampling" class="setting-group llm-eval-settings__field">
+          <div
+            v-if="enableSampling"
+            class="setting-group llm-eval-settings__field"
+          >
             <div class="llm-eval-settings__sampling-header">
               <span
                 class="llm-eval-settings__sampling-label"
@@ -451,8 +454,7 @@ export default defineComponent({
             data: {
               node_type: "stream",
               org_id: orgId,
-              stream_name:
-                outputStream.value || `${streamName}_evaluations`,
+              stream_name: outputStream.value || `${streamName}_evaluations`,
               stream_type: "logs",
             },
           },
@@ -574,8 +576,12 @@ export default defineComponent({
       border-bottom-width: 0.0625rem;
       border-bottom-style: solid;
 
-      &-light { border-bottom-color: #e5e7eb; }
-      &-dark  { border-bottom-color: #4b5563; }
+      &-light {
+        border-bottom-color: #e5e7eb;
+      }
+      &-dark {
+        border-bottom-color: #4b5563;
+      }
     }
   }
 
@@ -591,8 +597,12 @@ export default defineComponent({
     font-size: 0.8125rem;
     font-weight: 600;
 
-    &--light { color: #374151; }
-    &--dark  { color: #e5e7eb; }
+    &--light {
+      color: #374151;
+    }
+    &--dark {
+      color: #e5e7eb;
+    }
   }
 
   &__field {
@@ -616,8 +626,12 @@ export default defineComponent({
     font-style: italic;
     margin-top: 0.25rem;
 
-    &--light { color: #6b7280; }
-    &--dark  { color: #9ca3af; }
+    &--light {
+      color: #6b7280;
+    }
+    &--dark {
+      color: #9ca3af;
+    }
   }
 
   &__sampling-header {

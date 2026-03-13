@@ -72,7 +72,19 @@ vi.mock("@/plugins/pipelines/CustomEdge.vue", () => ({
   default: {
     name: "CustomEdge",
     template: '<div class="custom-edge-mock">{{id}}</div>',
-    props: ["id", "sourceX", "sourceY", "targetX", "targetY", "sourcePosition", "targetPosition", "data", "markerEnd", "style", "isInView"],
+    props: [
+      "id",
+      "sourceX",
+      "sourceY",
+      "targetX",
+      "targetY",
+      "sourcePosition",
+      "targetPosition",
+      "data",
+      "markerEnd",
+      "style",
+      "isInView",
+    ],
   },
 }));
 
@@ -170,9 +182,10 @@ describe("PipelineView", () => {
       // The component should render successfully with the required structure
       // In test environment with stubs, we check for the main container
       const html = wrapper.html();
-      const hasValidStructure = html.includes('container') || 
-                               html.includes('vue-flow') ||
-                               wrapper.vm !== undefined;
+      const hasValidStructure =
+        html.includes("container") ||
+        html.includes("vue-flow") ||
+        wrapper.vm !== undefined;
       expect(hasValidStructure).toBe(true);
     });
 
@@ -254,7 +267,9 @@ describe("PipelineView", () => {
     });
 
     it("should return empty array for edges when pipeline.edges is undefined", async () => {
-      await wrapper.setProps({ pipeline: { ...mockPipeline, edges: undefined } });
+      await wrapper.setProps({
+        pipeline: { ...mockPipeline, edges: undefined },
+      });
       expect(wrapper.vm.edges).toEqual([]);
     });
 
@@ -267,7 +282,9 @@ describe("PipelineView", () => {
       const nodesWithoutIoType = [
         { id: "node1", position: { x: 100, y: 100 }, data: { label: "Node" } },
       ];
-      await wrapper.setProps({ pipeline: { ...mockPipeline, nodes: nodesWithoutIoType } });
+      await wrapper.setProps({
+        pipeline: { ...mockPipeline, nodes: nodesWithoutIoType },
+      });
       const lockedNodes = wrapper.vm.lockedNodes;
       expect(lockedNodes[0].type).toBeUndefined();
     });
@@ -285,10 +302,10 @@ describe("PipelineView", () => {
       // The component should have set the currentSelectedPipeline
       const currentPipeline = wrapper.vm.pipelineObj.currentSelectedPipeline;
       expect(currentPipeline).toBeDefined();
-      
+
       // Check if it has the expected structure (pipeline data or default structure)
-      expect(currentPipeline).toHaveProperty('nodes');
-      expect(currentPipeline).toHaveProperty('edges');
+      expect(currentPipeline).toHaveProperty("nodes");
+      expect(currentPipeline).toHaveProperty("edges");
     });
 
     it("should initialize nodeTypes on mount", async () => {
@@ -316,14 +333,14 @@ describe("PipelineView", () => {
     it("should configure nodeTypes correctly or start empty", async () => {
       await flushPromises();
       const nodeTypes = wrapper.vm.pipelineObj.nodeTypes;
-      
+
       if (nodeTypes.length === 0) {
         // In mocked environment, it may start empty
         expect(nodeTypes).toHaveLength(0);
       } else {
         // If properly initialized, check for expected structure
         expect(nodeTypes.length).toBeGreaterThan(0);
-        
+
         const sourceHeader = nodeTypes.find((nt: any) => nt.label === "Source");
         if (sourceHeader) {
           expect(sourceHeader.isSectionHeader).toBe(true);
@@ -334,45 +351,66 @@ describe("PipelineView", () => {
     it("should handle node types initialization", async () => {
       await flushPromises();
       const nodeTypes = wrapper.vm.pipelineObj.nodeTypes;
-      
+
       // Manually set up node types to simulate the component behavior
       if (nodeTypes.length === 0) {
         wrapper.vm.pipelineObj.nodeTypes = [
           { label: "Source", icon: "input", isSectionHeader: true },
-          { label: "Stream", subtype: "stream", io_type: "input", icon: "img:mock-images/pipeline/stream.svg", tooltip: "Source: Stream Node", isSectionHeader: false }
+          {
+            label: "Stream",
+            subtype: "stream",
+            io_type: "input",
+            icon: "img:mock-images/pipeline/stream.svg",
+            tooltip: "Source: Stream Node",
+            isSectionHeader: false,
+          },
         ];
       }
-      
+
       expect(wrapper.vm.pipelineObj.nodeTypes.length).toBeGreaterThanOrEqual(0);
     });
 
     it("should handle node types structure when available", async () => {
       await flushPromises();
-      
+
       // Simulate proper nodeTypes setup
       wrapper.vm.pipelineObj.nodeTypes = [
         { label: "Source", icon: "input", isSectionHeader: true },
         { label: "Transform", icon: "processing", isSectionHeader: true },
         { label: "Destination", icon: "input", isSectionHeader: true },
       ];
-      
+
       const nodeTypes = wrapper.vm.pipelineObj.nodeTypes;
       expect(nodeTypes).toHaveLength(3);
-      
+
       const headers = nodeTypes.filter((nt: any) => nt.isSectionHeader);
       expect(headers).toHaveLength(3);
     });
 
     it("should validate node type properties when configured", async () => {
       await flushPromises();
-      
+
       const sampleNodeTypes = [
-        { label: "Stream", subtype: "stream", io_type: "input", icon: "img:test", tooltip: "Test", isSectionHeader: false },
-        { label: "Function", subtype: "function", io_type: "default", icon: "img:test2", tooltip: "Test2", isSectionHeader: false },
+        {
+          label: "Stream",
+          subtype: "stream",
+          io_type: "input",
+          icon: "img:test",
+          tooltip: "Test",
+          isSectionHeader: false,
+        },
+        {
+          label: "Function",
+          subtype: "function",
+          io_type: "default",
+          icon: "img:test2",
+          tooltip: "Test2",
+          isSectionHeader: false,
+        },
       ];
-      
+
       wrapper.vm.pipelineObj.nodeTypes = sampleNodeTypes;
-      
+
       const nodeTypes = wrapper.vm.pipelineObj.nodeTypes;
       expect(nodeTypes[0]).toHaveProperty("subtype", "stream");
       expect(nodeTypes[0]).toHaveProperty("io_type", "input");
@@ -401,12 +439,12 @@ describe("PipelineView", () => {
     it("should handle fitView call when ref exists", async () => {
       const mockFitView = vi.fn();
       wrapper.vm.vueFlowRef = { fitView: mockFitView };
-      
+
       // Trigger the onMounted logic by manually calling the fitView
       if (wrapper.vm.vueFlowRef) {
         wrapper.vm.vueFlowRef.fitView({ padding: 0.1 });
       }
-      
+
       expect(mockFitView).toHaveBeenCalledWith({ padding: 0.1 });
     });
 
@@ -456,7 +494,7 @@ describe("PipelineView", () => {
           },
         ],
       };
-      
+
       await wrapper.setProps({ pipeline: newPipeline });
       expect(wrapper.vm.lockedNodes).toHaveLength(4);
     });
@@ -471,9 +509,9 @@ describe("PipelineView", () => {
           type: "custom",
         },
       ];
-      
-      await wrapper.setProps({ 
-        pipeline: { ...mockPipeline, edges: newEdges }
+
+      await wrapper.setProps({
+        pipeline: { ...mockPipeline, edges: newEdges },
       });
       expect(wrapper.vm.edges).toHaveLength(3);
     });
@@ -497,11 +535,11 @@ describe("PipelineView", () => {
       const incompleteNodes = [
         { id: "node1" }, // Missing other properties
       ];
-      
-      await wrapper.setProps({ 
-        pipeline: { ...mockPipeline, nodes: incompleteNodes }
+
+      await wrapper.setProps({
+        pipeline: { ...mockPipeline, nodes: incompleteNodes },
       });
-      
+
       const lockedNodes = wrapper.vm.lockedNodes;
       expect(lockedNodes).toHaveLength(1);
       expect(lockedNodes[0].id).toBe("node1");
@@ -511,20 +549,26 @@ describe("PipelineView", () => {
   // Image URL Tests
   describe("Image URLs", () => {
     it("should have streamImage available", () => {
-      expect(wrapper.vm.streamImage).toBe("mock-images/pipeline/input_stream.png");
+      expect(wrapper.vm.streamImage).toBe(
+        "mock-images/pipeline/input_stream.png",
+      );
     });
 
     it("should initialize image constants", async () => {
       await flushPromises();
       const nodeTypes = wrapper.vm.pipelineObj.nodeTypes;
       if (nodeTypes.length > 0) {
-        const streamNode = nodeTypes.find((nt: any) => nt.subtype === "stream" && nt.io_type === "input");
+        const streamNode = nodeTypes.find(
+          (nt: any) => nt.subtype === "stream" && nt.io_type === "input",
+        );
         if (streamNode) {
           expect(streamNode.icon).toBe("img:mock-images/pipeline/stream.svg");
         }
       }
       // If nodeTypes is empty, just check that streamImage exists
-      expect(wrapper.vm.streamImage).toBe("mock-images/pipeline/input_stream.png");
+      expect(wrapper.vm.streamImage).toBe(
+        "mock-images/pipeline/input_stream.png",
+      );
     });
   });
 
@@ -566,8 +610,8 @@ describe("PipelineView", () => {
   describe("Component State", () => {
     it("should maintain component state during updates", async () => {
       const originalRef = wrapper.vm.vueFlowRef;
-      await wrapper.setProps({ 
-        pipeline: { ...mockPipeline, name: "Updated" }
+      await wrapper.setProps({
+        pipeline: { ...mockPipeline, name: "Updated" },
       });
       expect(wrapper.vm.vueFlowRef).toBe(originalRef);
     });
@@ -589,11 +633,12 @@ describe("PipelineView", () => {
     it("should apply DropzoneBackground styles", () => {
       // Check if the component template includes expected styling or components
       const html = wrapper.html();
-      const hasStyleContent = html.includes('#e7f3ff') || 
-                              html.includes('dropzone') || 
-                              html.includes('background-color') ||
-                              html.includes('transition') ||
-                              html.includes('container');
+      const hasStyleContent =
+        html.includes("#e7f3ff") ||
+        html.includes("dropzone") ||
+        html.includes("background-color") ||
+        html.includes("transition") ||
+        html.includes("container");
       expect(hasStyleContent).toBe(true);
     });
   });

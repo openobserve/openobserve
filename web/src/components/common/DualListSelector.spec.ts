@@ -42,7 +42,9 @@ describe("DualListSelector", () => {
             "q-list": { template: "<div><slot /></div>" },
             "q-item": { template: "<div><slot /></div>" },
             "q-item-section": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button @click='$attrs.onClick'><slot /></button>" },
+            "q-btn": {
+              template: "<button @click='$attrs.onClick'><slot /></button>",
+            },
             "q-icon": { template: "<i />" },
             "q-checkbox": { template: "<input type='checkbox' />" },
             "q-tooltip": { template: "<div />" },
@@ -127,7 +129,11 @@ describe("DualListSelector", () => {
 
       const available = wrapper.vm.availableItems;
       expect(available).toHaveLength(3);
-      expect(available.map((i: any) => i.value)).toEqual(["item-2", "item-4", "item-5"]);
+      expect(available.map((i: any) => i.value)).toEqual([
+        "item-2",
+        "item-4",
+        "item-5",
+      ]);
     });
 
     it("correctly maps selected items using itemsMap", () => {
@@ -288,7 +294,9 @@ describe("DualListSelector", () => {
       wrapper.vm.addSelected();
 
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      expect(wrapper.emitted("update:modelValue")![0]).toEqual([["item-1", "item-3"]]);
+      expect(wrapper.emitted("update:modelValue")![0]).toEqual([
+        ["item-1", "item-3"],
+      ]);
       expect(wrapper.vm.rightSelected).toHaveLength(0);
     });
 
@@ -613,7 +621,10 @@ describe("DualListSelector", () => {
 
       // Should filter out invalid items
       expect(wrapper.vm.selectedItems).toHaveLength(2);
-      expect(wrapper.vm.selectedItems.map((i: any) => i.value)).toEqual(["item-1", "item-2"]);
+      expect(wrapper.vm.selectedItems.map((i: any) => i.value)).toEqual([
+        "item-1",
+        "item-2",
+      ]);
     });
   });
 
@@ -667,7 +678,10 @@ describe("DualListSelector", () => {
 
       wrapper.vm.moveUp(1);
 
-      expect(wrapper.emitted("update:modelValue")![0][0]).toEqual(["item-2", "item-1"]);
+      expect(wrapper.emitted("update:modelValue")![0][0]).toEqual([
+        "item-2",
+        "item-1",
+      ]);
     });
 
     it("emits update:modelValue on removeItem", () => {
@@ -692,7 +706,10 @@ describe("DualListSelector", () => {
 
       wrapper.vm.removeItem("item-2");
 
-      expect(wrapper.emitted("update:modelValue")![0][0]).toEqual(["item-1", "item-3"]);
+      expect(wrapper.emitted("update:modelValue")![0][0]).toEqual([
+        "item-1",
+        "item-3",
+      ]);
     });
   });
 });

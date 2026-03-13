@@ -17,11 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div class="column full-height">
-      <DashboardHeader :title="title" backButton @back="close">
+      <DashboardHeader :title="title"
+backButton @back="close">
       </DashboardHeader>
 
       <div class="scrollable-content">
-        <q-form greedy ref="addVariableForm" @submit="onSubmit">
+        <q-form greedy
+ref="addVariableForm" @submit="onSubmit">
           <div class="q-mt-md">
             <div class="q-mb-md">
               <q-select
@@ -87,7 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <q-item-section>{{ opt.label }}</q-item-section>
                   </q-item>
-                  <q-item v-else v-ripple clickable @click="toggleOption(opt)">
+                  <q-item v-else v-ripple
+clickable @click="toggleOption(opt)">
                     <q-item-section side>
                       <q-checkbox
                         :model-value="selected"
@@ -149,7 +152,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-item-section>{{ opt.label }}</q-item-section>
                   </q-item>
                   <!-- Panel options (including Current Panel) -->
-                  <q-item v-else v-ripple clickable @click="toggleOption(opt)">
+                  <q-item v-else v-ripple
+clickable @click="toggleOption(opt)">
                     <q-item-section side>
                       <q-checkbox
                         :model-value="selected"
@@ -1312,7 +1316,8 @@ export default defineComponent({
               // if stream type and stream is exists
               if (variableData?.query_data?.stream) {
                 // Check if stream is a variable reference (contains $)
-                const isVariableReference = variableData.query_data.stream?.includes('$');
+                const isVariableReference =
+                  variableData.query_data.stream?.includes("$");
 
                 if (isVariableReference) {
                   // Don't fetch schema for variable references - field list will be empty
@@ -1339,7 +1344,8 @@ export default defineComponent({
             }
           } catch (error: any) {
             // Check if the error is for a variable reference (should be suppressed)
-            const isVariableReference = variableData?.query_data?.stream?.includes('$');
+            const isVariableReference =
+              variableData?.query_data?.stream?.includes("$");
 
             if (!isVariableReference) {
               // Only show error if it's NOT a variable reference
@@ -1605,10 +1611,10 @@ export default defineComponent({
     };
 
     const streamUpdated = async () => {
-
       try {
         // Check if stream is a variable reference FIRST (contains $)
-        const isVariableReference = variableData.query_data.stream?.includes('$');
+        const isVariableReference =
+          variableData.query_data.stream?.includes("$");
 
         if (isVariableReference) {
           // Don't reset field if it already has a value (editing mode)
@@ -1643,7 +1649,8 @@ export default defineComponent({
         }
       } catch (error: any) {
         // Only show error if it's not a variable reference
-        const isVariableReference = variableData.query_data.stream?.includes('$');
+        const isVariableReference =
+          variableData.query_data.stream?.includes("$");
 
         if (!isVariableReference) {
           showErrorNotification(error ?? "Failed to get stream fields", {

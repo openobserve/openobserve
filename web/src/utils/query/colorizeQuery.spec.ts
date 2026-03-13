@@ -27,7 +27,10 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
 }));
 
 // Mock SQL contribution
-vi.mock("monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js", () => ({}));
+vi.mock(
+  "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js",
+  () => ({}),
+);
 
 // Mock VRL language definition
 vi.mock("@/utils/query/vrlLanguageDefinition", () => ({
@@ -86,7 +89,7 @@ describe("colorizeQuery", () => {
     });
 
     it("should colorize valid VRL query", async () => {
-      const query = ".level = \"error\"";
+      const query = '.level = "error"';
       const result = await colorizeQuery(query, "vrl");
 
       expect(mockColorize).toHaveBeenCalledWith(query, "vrl", {});
@@ -183,7 +186,8 @@ describe("colorizeQuery", () => {
     });
 
     it("should colorize SQL query with aggregations", async () => {
-      const query = "SELECT COUNT(*), AVG(price), MAX(quantity) FROM products GROUP BY category";
+      const query =
+        "SELECT COUNT(*), AVG(price), MAX(quantity) FROM products GROUP BY category";
       const result = await colorizeQuery(query, "sql");
 
       expect(mockColorize).toHaveBeenCalledWith(query, "sql", {});
@@ -217,7 +221,8 @@ describe("colorizeQuery", () => {
 
   describe("Special Characters and Edge Cases", () => {
     it("should handle query with special characters", async () => {
-      const query = "SELECT * FROM logs WHERE message LIKE '%error%' AND status != 'ok'";
+      const query =
+        "SELECT * FROM logs WHERE message LIKE '%error%' AND status != 'ok'";
       const result = await colorizeQuery(query, "sql");
 
       expect(mockColorize).toHaveBeenCalledWith(query, "sql", {});
@@ -265,7 +270,8 @@ describe("colorizeQuery", () => {
     });
 
     it("should handle query with comments", async () => {
-      const query = "SELECT * FROM logs -- This is a comment\nWHERE level = 'error'";
+      const query =
+        "SELECT * FROM logs -- This is a comment\nWHERE level = 'error'";
       const result = await colorizeQuery(query, "sql");
 
       expect(mockColorize).toHaveBeenCalledWith(query, "sql", {});
@@ -273,7 +279,8 @@ describe("colorizeQuery", () => {
     });
 
     it("should handle query with multi-line comments", async () => {
-      const query = "SELECT * FROM logs /* This is a\nmulti-line comment */ WHERE level = 'error'";
+      const query =
+        "SELECT * FROM logs /* This is a\nmulti-line comment */ WHERE level = 'error'";
       const result = await colorizeQuery(query, "sql");
 
       expect(mockColorize).toHaveBeenCalledWith(query, "sql", {});
@@ -281,7 +288,10 @@ describe("colorizeQuery", () => {
     });
 
     it("should handle very long queries", async () => {
-      const query = "SELECT * FROM logs WHERE " + "condition AND ".repeat(100) + "final_condition";
+      const query =
+        "SELECT * FROM logs WHERE " +
+        "condition AND ".repeat(100) +
+        "final_condition";
       const result = await colorizeQuery(query, "sql");
 
       expect(mockColorize).toHaveBeenCalledWith(query, "sql", {});
@@ -363,7 +373,7 @@ describe("colorizeQuery", () => {
       ];
 
       const results = await Promise.all(
-        queries.map((q) => colorizeQuery(q, "sql"))
+        queries.map((q) => colorizeQuery(q, "sql")),
       );
 
       expect(results).toHaveLength(3);
@@ -396,12 +406,27 @@ describe("colorizeQuery", () => {
     it("should handle switching between different languages", async () => {
       await colorizeQuery("SELECT * FROM logs", "sql");
       await colorizeQuery("rate(http_requests[5m])", "promql");
-      await colorizeQuery(".level = \"error\"", "vrl");
+      await colorizeQuery('.level = "error"', "vrl");
 
       expect(mockColorize).toHaveBeenCalledTimes(3);
-      expect(mockColorize).toHaveBeenNthCalledWith(1, "SELECT * FROM logs", "sql", {});
-      expect(mockColorize).toHaveBeenNthCalledWith(2, "rate(http_requests[5m])", "promql", {});
-      expect(mockColorize).toHaveBeenNthCalledWith(3, ".level = \"error\"", "vrl", {});
+      expect(mockColorize).toHaveBeenNthCalledWith(
+        1,
+        "SELECT * FROM logs",
+        "sql",
+        {},
+      );
+      expect(mockColorize).toHaveBeenNthCalledWith(
+        2,
+        "rate(http_requests[5m])",
+        "promql",
+        {},
+      );
+      expect(mockColorize).toHaveBeenNthCalledWith(
+        3,
+        '.level = "error"',
+        "vrl",
+        {},
+      );
     });
 
     it("should preserve HTML entities in colorized output", async () => {
@@ -423,7 +448,8 @@ describe("colorizeQuery", () => {
 
   describe("Language-Specific Features", () => {
     it("should colorize SQL keywords", async () => {
-      const query = "SELECT COUNT(*) FROM logs WHERE timestamp BETWEEN 1000 AND 2000";
+      const query =
+        "SELECT COUNT(*) FROM logs WHERE timestamp BETWEEN 1000 AND 2000";
       await colorizeQuery(query, "sql");
 
       expect(mockColorize).toHaveBeenCalledWith(query, "sql", {});

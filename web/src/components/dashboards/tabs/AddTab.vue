@@ -53,7 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label="Name*"
           class="q-py-md showLabelOnTop"
           stack-label
-          borderless hide-bottom-space
+          borderless
+          hide-bottom-space
           dense
           :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
           :lazy-rules="true"
@@ -65,7 +66,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-close-popup="true"
             :label="t('dashboard.cancel')"
             class="o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
             flat
             data-test="dashboard-add-cancel"
           />
@@ -74,7 +79,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="onSubmit.isLoading.value"
             :label="t('dashboard.save')"
             class="o2-primary-button tw:h-[36px] q-ml-md"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
             flat
             borderless
             type="submit"
@@ -149,14 +158,14 @@ export default defineComponent({
         dashboardData.value = await getDashboard(
           store,
           props.dashboardId,
-          props.folderId ?? route.query.folder ?? "default"
+          props.folderId ?? route.query.folder ?? "default",
         );
         tabData.value = JSON.parse(
           JSON.stringify(
             dashboardData?.value?.tabs?.find(
-              (tab: any) => tab.tabId === props.tabId
-            )
-          )
+              (tab: any) => tab.tabId === props.tabId,
+            ),
+          ),
         );
       }
     };
@@ -177,7 +186,7 @@ export default defineComponent({
               props.dashboardId,
               props.folderId ?? route.query.folder ?? "default",
               tabData.value.tabId,
-              tabData.value
+              tabData.value,
             );
 
             // emit refresh to rerender
@@ -193,7 +202,7 @@ export default defineComponent({
               store,
               props.dashboardId,
               props.folderId ?? route.query.folder ?? "default",
-              tabData.value
+              tabData.value,
             );
 
             // emit refresh to rerender
@@ -213,7 +222,7 @@ export default defineComponent({
             showConfictErrorNotificationWithRefreshBtn(
               error?.response?.data?.message ??
                 error?.message ??
-                (props.editMode ? "Failed to update tab" : "Failed to add tab")
+                (props.editMode ? "Failed to update tab" : "Failed to add tab"),
             );
           } else {
             showErrorNotification(
@@ -221,7 +230,7 @@ export default defineComponent({
                 (props.editMode ? "Failed to update tab" : "Failed to add tab"),
               {
                 timeout: 2000,
-              }
+              },
             );
           }
         } finally {

@@ -40,12 +40,15 @@ const azureMarketplace = {
    */
   linkSubscription: (
     org_identifier: string,
-    token: string
+    token: string,
   ): Promise<{ data: LinkSubscriptionResponse }> => {
-    return http().post(`/api/${org_identifier}/azure-marketplace/link-subscription`, {
-      token,
-    });
-  }
+    return http().post(
+      `/api/${org_identifier}/azure-marketplace/link-subscription`,
+      {
+        token,
+      },
+    );
+  },
 };
 
 export default azureMarketplace;

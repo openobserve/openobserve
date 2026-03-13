@@ -11,7 +11,8 @@
       v-bind="$attrs"
       style="width: 100%"
       data-test="common-auto-complete"
-     hide-bottom-space>
+      hide-bottom-space
+    >
       <template v-if="hasSlot('label')" v-slot:label>
         <slot name="label"></slot>
       </template>

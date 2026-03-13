@@ -281,9 +281,8 @@ describe("OperationsList", () => {
 
       wrapper.vm.searchQuery = "rate";
 
-      const filtered = wrapper.vm.getFilteredOperationsForCategory(
-        "Range Functions",
-      );
+      const filtered =
+        wrapper.vm.getFilteredOperationsForCategory("Range Functions");
       expect(filtered.some((op: any) => op.id === PromOperationId.Rate)).toBe(
         true,
       );
@@ -294,9 +293,8 @@ describe("OperationsList", () => {
 
       wrapper.vm.searchQuery = "";
 
-      const filtered = wrapper.vm.getFilteredOperationsForCategory(
-        "Range Functions",
-      );
+      const filtered =
+        wrapper.vm.getFilteredOperationsForCategory("Range Functions");
       expect(filtered.length).toBeGreaterThan(0);
     });
   });
@@ -348,9 +346,8 @@ describe("OperationsList", () => {
     it("should get operations for specific category", () => {
       wrapper = createWrapper();
 
-      const rangeOps = wrapper.vm.getFilteredOperationsForCategory(
-        "Range Functions",
-      );
+      const rangeOps =
+        wrapper.vm.getFilteredOperationsForCategory("Range Functions");
       expect(rangeOps.length).toBeGreaterThan(0);
     });
   });
@@ -427,12 +424,12 @@ describe("OperationsList", () => {
     it("should have proper data-test attributes", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper.find('[data-test="promql-add-operation"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="promql-operation-0"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="promql-add-operation"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="promql-operation-0"]').exists()).toBe(
+        true,
+      );
       expect(
         wrapper.find('[data-test="promql-operation-remove-0"]').exists(),
       ).toBe(true);

@@ -14,9 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import {
-  createTrellisHelpers,
-} from "@/utils/dashboard/sql/shared/trellisConfig";
+import { createTrellisHelpers } from "@/utils/dashboard/sql/shared/trellisConfig";
 import { getTrellisGrid } from "@/utils/dashboard/calculateGridForSubPlot";
 
 vi.mock("@/utils/dashboard/chartDimensionUtils", () => ({

@@ -39,7 +39,6 @@ installQuasar({
   plugins: [quasar.Dialog, quasar.Notify],
 });
 
-
 /**
  * Test Suite: TraceDetails Component - Missing span_kind Field
  *

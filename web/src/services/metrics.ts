@@ -2,7 +2,7 @@ import http from "./http";
 
 const formatPromqlQuery = ({ org_identifier = "", query = "" }) => {
   return http().get(
-    `/api/${org_identifier}/prometheus/api/v1/format_query?query=${query}`
+    `/api/${org_identifier}/prometheus/api/v1/format_query?query=${query}`,
   );
 };
 

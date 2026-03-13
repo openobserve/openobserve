@@ -24,7 +24,9 @@ vi.mock("@vue-flow/core", () => ({
     template: "<div class='base-edge'></div>",
     props: ["id", "style", "path", "markerEnd", "type"],
   },
-  getBezierPath: vi.fn((props) => [[`M${props.sourceX},${props.sourceY} L${props.targetX},${props.targetY}`]]),
+  getBezierPath: vi.fn((props) => [
+    [`M${props.sourceX},${props.sourceY} L${props.targetX},${props.targetY}`],
+  ]),
   EdgeLabelRenderer: {
     template: "<div class='edge-label-renderer'><slot /></div>",
   },
@@ -195,7 +197,7 @@ describe("CustomEdge.vue", () => {
           targetY: 400,
           sourcePosition: "right",
           targetPosition: "left",
-        })
+        }),
       );
     });
   });

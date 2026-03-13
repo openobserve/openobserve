@@ -1,19 +1,15 @@
 import { ref } from "vue";
 import useHttpStreaming from "../useStreamingSearch";
 import { useStore } from "vuex";
-import {
-  generateTraceContext,
-} from "../../utils/zincutils";
+import { generateTraceContext } from "../../utils/zincutils";
 
 const traceIdMapper = ref<{ [key: string]: string[] }>({});
 
 const useValuesWebSocket = () => {
   const store = useStore();
 
-  const {
-    fetchQueryDataWithHttpStream,
-    cancelStreamQueryBasedOnRequestId,
-  } = useHttpStreaming();
+  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
+    useHttpStreaming();
 
   // Utility functions
   const addTraceId = (field: string, traceId: string) => {

@@ -29,7 +29,6 @@ vi.mock("@/utils/zincutils", () => ({
 }));
 
 describe("FieldExpansion.vue", () => {
-
   const defaultProps = {
     field: {
       name: "status",

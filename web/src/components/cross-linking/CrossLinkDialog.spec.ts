@@ -32,8 +32,7 @@ describe("CrossLinkDialog Component", () => {
         provide: { store },
         stubs: {
           "q-dialog": {
-            template:
-              '<div class="q-dialog"><slot /></div>',
+            template: '<div class="q-dialog"><slot /></div>',
             props: ["modelValue"],
           },
           "q-card": {
@@ -46,7 +45,7 @@ describe("CrossLinkDialog Component", () => {
             template: '<div class="q-card-actions"><slot /></div>',
           },
           "q-form": {
-            template: '<form @submit.prevent><slot /></form>',
+            template: "<form @submit.prevent><slot /></form>",
           },
           "q-input": {
             template:
@@ -56,7 +55,7 @@ describe("CrossLinkDialog Component", () => {
           },
           "q-select": {
             template:
-              '<select :data-test="$attrs[\'data-test\']"><slot /></select>',
+              "<select :data-test=\"$attrs['data-test']\"><slot /></select>",
             props: ["modelValue", "options"],
             methods: {
               updateInputValue: vi.fn(),
@@ -111,7 +110,9 @@ describe("CrossLinkDialog Component", () => {
 
     it("should accept availableFields prop", () => {
       wrapper = createWrapper();
-      expect(wrapper.props("availableFields")).toEqual(defaultProps.availableFields);
+      expect(wrapper.props("availableFields")).toEqual(
+        defaultProps.availableFields,
+      );
     });
 
     it("should have default availableFields as empty array", () => {
@@ -154,9 +155,7 @@ describe("CrossLinkDialog Component", () => {
       await nextTick();
 
       expect(wrapper.vm.form.name).toBe("View Trace");
-      expect(wrapper.vm.form.url).toBe(
-        "https://example.com/trace/${trace_id}",
-      );
+      expect(wrapper.vm.form.url).toBe("https://example.com/trace/${trace_id}");
       expect(wrapper.vm.form.fields).toEqual([
         { name: "trace_id" },
         { name: "span_id" },

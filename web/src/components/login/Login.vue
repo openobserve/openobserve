@@ -42,7 +42,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
               store.state.zoConfig?.custom_logo_img != null
             "
-            :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
+            :src="
+              `data:image; base64, ` + store.state.zoConfig?.custom_logo_img
+            "
             style="max-width: 150px; max-height: 31px"
           />
         </span>
@@ -82,7 +84,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="autoRedirectDexLogin">
         <p>
           Redirecting to SSO login page. If you are not redirected, please
-          <a href="#" @click="loginWithSSo" class="cursor-pointer tw:underline">click here</a>.
+          <a href="#" @click="loginWithSSo"
+class="cursor-pointer tw:underline"
+            >click here</a
+          >.
         </p>
       </div>
 
@@ -124,11 +129,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
+          v-if="
+            !showSSO || (showSSO && loginAsInternalUser && showInternalLogin)
+          "
           class="o2-input login-inputs"
         >
-          <q-form ref="loginform"
-  class="q-gutter-md" @submit.prevent="">
+          <q-form ref="loginform" class="q-gutter-md"
+@submit.prevent="">
             <q-input
               v-model="name"
               data-cy="login-user-id"
@@ -224,11 +231,7 @@ export default defineComponent({
     const loginAsInternalUser = ref(false);
 
     onBeforeMount(() => {
-
-      if (
-        config.isCloud == "true" &&
-        router.currentRoute.value.path != "/cb"
-      ) {
+      if (config.isCloud == "true" && router.currentRoute.value.path != "/cb") {
         autoRedirectDexLogin.value = true;
         loginWithSSo();
       }
@@ -303,7 +306,7 @@ export default defineComponent({
                 useLocalCurrentUser(JSON.stringify(userInfo));
                 store.dispatch("setCurrentUser", userInfo);
 
-                if(store.state.zoConfig?.rum?.enabled) {
+                if (store.state.zoConfig?.rum?.enabled) {
                   // Set user information first
                   openobserveRum.setUser({
                     name: userInfo.given_name + " " + userInfo.family_name,
@@ -408,7 +411,7 @@ export default defineComponent({
                       }
                     });
                 }
-                  redirectUser(redirectURI);
+                redirectUser(redirectURI);
               } else {
                 //if user is not authorized, show error message and reset form.
                 submitting.value = false;

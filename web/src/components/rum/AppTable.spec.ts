@@ -59,7 +59,7 @@ describe("AppTable", () => {
     },
     {
       name: "session_id",
-      label: "Session ID", 
+      label: "Session ID",
       field: (row: any) => row.session_id,
       align: "left",
       style: { width: "150px" },
@@ -109,7 +109,8 @@ describe("AppTable", () => {
             template: '<div data-test="no-data">No Data Available</div>',
           },
           "q-icon": {
-            template: '<i data-test="icon" :class="name" :style="`font-size: ${size}`"></i>',
+            template:
+              '<i data-test="icon" :class="name" :style="`font-size: ${size}`"></i>',
             props: ["name", "size"],
           },
         },
@@ -304,7 +305,8 @@ describe("AppTable", () => {
               template: '<div data-test="no-data">No Data Available</div>',
             },
             "q-icon": {
-              template: '<i data-test="icon" :class="name" :style="`font-size: ${size}`"></i>',
+              template:
+                '<i data-test="icon" :class="name" :style="`font-size: ${size}`"></i>',
               props: ["name", "size"],
             },
           },

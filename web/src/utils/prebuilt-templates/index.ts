@@ -18,25 +18,45 @@
  */
 
 // Types
-export * from './types';
+export * from "./types";
 
 // Template configurations
-export { slackTemplate, slackConfig, slackDestinationType } from './slack';
-export { discordTemplate, discordConfig, discordDestinationType } from './discord';
-export { msteamsTemplate, msteamsConfig, msteamsDestinationType } from './msteams';
-export { pagerdutyTemplate, pagerdutyConfig, pagerdutyDestinationType } from './pagerduty';
-export { servicenowTemplate, servicenowConfig, servicenowDestinationType } from './servicenow';
-export { emailTemplate, emailConfig, emailDestinationType } from './email';
-export { opsgenieTemplate, opsgenieConfig, opsgenieDestinationType } from './opsgenie';
+export { slackTemplate, slackConfig, slackDestinationType } from "./slack";
+export {
+  discordTemplate,
+  discordConfig,
+  discordDestinationType,
+} from "./discord";
+export {
+  msteamsTemplate,
+  msteamsConfig,
+  msteamsDestinationType,
+} from "./msteams";
+export {
+  pagerdutyTemplate,
+  pagerdutyConfig,
+  pagerdutyDestinationType,
+} from "./pagerduty";
+export {
+  servicenowTemplate,
+  servicenowConfig,
+  servicenowDestinationType,
+} from "./servicenow";
+export { emailTemplate, emailConfig, emailDestinationType } from "./email";
+export {
+  opsgenieTemplate,
+  opsgenieConfig,
+  opsgenieDestinationType,
+} from "./opsgenie";
 
-import { slackConfig, slackDestinationType } from './slack';
-import { discordConfig, discordDestinationType } from './discord';
-import { msteamsConfig, msteamsDestinationType } from './msteams';
-import { pagerdutyConfig, pagerdutyDestinationType } from './pagerduty';
-import { servicenowConfig, servicenowDestinationType } from './servicenow';
-import { emailConfig, emailDestinationType } from './email';
-import { opsgenieConfig, opsgenieDestinationType } from './opsgenie';
-import { PrebuiltConfig, PrebuiltType } from './types';
+import { slackConfig, slackDestinationType } from "./slack";
+import { discordConfig, discordDestinationType } from "./discord";
+import { msteamsConfig, msteamsDestinationType } from "./msteams";
+import { pagerdutyConfig, pagerdutyDestinationType } from "./pagerduty";
+import { servicenowConfig, servicenowDestinationType } from "./servicenow";
+import { emailConfig, emailDestinationType } from "./email";
+import { opsgenieConfig, opsgenieDestinationType } from "./opsgenie";
+import { PrebuiltConfig, PrebuiltType } from "./types";
 
 /**
  * All available prebuilt destination types
@@ -48,7 +68,7 @@ export const PREBUILT_DESTINATION_TYPES: PrebuiltType[] = [
   emailDestinationType as PrebuiltType,
   pagerdutyDestinationType as PrebuiltType,
   opsgenieDestinationType as PrebuiltType,
-  servicenowDestinationType as PrebuiltType
+  servicenowDestinationType as PrebuiltType,
 ];
 
 /**
@@ -61,7 +81,7 @@ export const PREBUILT_CONFIGS: Record<string, PrebuiltConfig> = {
   pagerduty: pagerdutyConfig,
   servicenow: servicenowConfig,
   email: emailConfig,
-  opsgenie: opsgenieConfig
+  opsgenie: opsgenieConfig,
 };
 
 /**
@@ -83,10 +103,14 @@ export function isPrebuiltType(type: string): boolean {
  */
 export function getPrebuiltTypesByCategory() {
   const categories = {
-    messaging: PREBUILT_DESTINATION_TYPES.filter(t => t.category === 'messaging'),
-    incident: PREBUILT_DESTINATION_TYPES.filter(t => t.category === 'incident'),
-    email: PREBUILT_DESTINATION_TYPES.filter(t => t.category === 'email'),
-    custom: []
+    messaging: PREBUILT_DESTINATION_TYPES.filter(
+      (t) => t.category === "messaging",
+    ),
+    incident: PREBUILT_DESTINATION_TYPES.filter(
+      (t) => t.category === "incident",
+    ),
+    email: PREBUILT_DESTINATION_TYPES.filter((t) => t.category === "email"),
+    custom: [],
   };
   return categories;
 }
@@ -95,7 +119,7 @@ export function getPrebuiltTypesByCategory() {
  * Get popular prebuilt destination types (for prioritized display)
  */
 export function getPopularPrebuiltTypes(): PrebuiltType[] {
-  return PREBUILT_DESTINATION_TYPES.filter(t => t.popular);
+  return PREBUILT_DESTINATION_TYPES.filter((t) => t.popular);
 }
 
 /**
@@ -113,36 +137,42 @@ export function detectPrebuiltTypeFromUrl(url: string): string | null {
 /**
  * Generate URL for prebuilt destination based on credentials
  */
-export function generateDestinationUrl(type: string, credentials: Record<string, any>): string {
+export function generateDestinationUrl(
+  type: string,
+  credentials: Record<string, any>,
+): string {
   if (!credentials) {
-    console.error('generateDestinationUrl: credentials is null or undefined');
-    return '';
+    console.error("generateDestinationUrl: credentials is null or undefined");
+    return "";
   }
 
   switch (type) {
-    case 'slack':
-    case 'discord':
-    case 'msteams':
-      return credentials.webhookUrl || '';
-    case 'servicenow':
-      return credentials.instanceUrl || '';
-    case 'pagerduty':
-      return 'https://events.pagerduty.com/v2/enqueue';
-    case 'opsgenie':
+    case "slack":
+    case "discord":
+    case "msteams":
+      return credentials.webhookUrl || "";
+    case "servicenow":
+      return credentials.instanceUrl || "";
+    case "pagerduty":
+      return "https://events.pagerduty.com/v2/enqueue";
+    case "opsgenie":
       return credentials.euRegion
-        ? 'https://api.eu.opsgenie.com/v2/alerts'
-        : 'https://api.opsgenie.com/v2/alerts';
-    case 'email':
-      return ''; // Email doesn't use URL
+        ? "https://api.eu.opsgenie.com/v2/alerts"
+        : "https://api.opsgenie.com/v2/alerts";
+    case "email":
+      return ""; // Email doesn't use URL
     default:
-      return '';
+      return "";
   }
 }
 
 /**
  * Generate headers for prebuilt destination based on credentials
  */
-export function generateDestinationHeaders(type: string, credentials: Record<string, any>): Record<string, string> {
+export function generateDestinationHeaders(
+  type: string,
+  credentials: Record<string, any>,
+): Record<string, string> {
   const config = getPrebuiltConfig(type);
   if (!config) return {};
 
@@ -150,16 +180,16 @@ export function generateDestinationHeaders(type: string, credentials: Record<str
 
   // Add dynamic headers based on credentials
   switch (type) {
-    case 'pagerduty':
+    case "pagerduty":
       // PagerDuty uses X-Routing-Key header for integration key
       if (credentials.integrationKey) {
-        headers['X-Routing-Key'] = credentials.integrationKey;
+        headers["X-Routing-Key"] = credentials.integrationKey;
       }
       break;
-    case 'opsgenie':
-      headers['Authorization'] = `GenieKey ${credentials.apiKey}`;
+    case "opsgenie":
+      headers["Authorization"] = `GenieKey ${credentials.apiKey}`;
       break;
-    case 'servicenow':
+    case "servicenow":
       // Note: Basic auth credentials are passed separately to backend for secure handling
       // Backend will encode credentials and add Authorization header
       // DO NOT encode credentials on frontend for security reasons

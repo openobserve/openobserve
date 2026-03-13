@@ -43,7 +43,7 @@ var index = {
     org_identifier: string,
     stream_name: string,
     type: string,
-    data: any
+    data: any,
   ) => {
     let url = `/api/${org_identifier}/streams/${stream_name}/settings`;
 

@@ -141,7 +141,10 @@ describe("PatternDetailsDialog", () => {
       await wrapper.setProps({
         selectedPattern: {
           ...mockSelectedPattern,
-          pattern: { ...mockSelectedPattern.pattern, examples: [{ variables: {} }] },
+          pattern: {
+            ...mockSelectedPattern.pattern,
+            examples: [{ variables: {} }],
+          },
         },
       });
 
@@ -221,9 +224,7 @@ describe("PatternDetailsDialog", () => {
 
   describe("Navigation Buttons", () => {
     it("should display previous button", () => {
-      const prevBtn = wrapper.find(
-        '[data-test="pattern-detail-previous-btn"]',
-      );
+      const prevBtn = wrapper.find('[data-test="pattern-detail-previous-btn"]');
       expect(prevBtn.exists()).toBe(true);
     });
 
@@ -233,9 +234,7 @@ describe("PatternDetailsDialog", () => {
     });
 
     it("should disable previous button on first pattern", () => {
-      const prevBtn = wrapper.find(
-        '[data-test="pattern-detail-previous-btn"]',
-      );
+      const prevBtn = wrapper.find('[data-test="pattern-detail-previous-btn"]');
       expect(prevBtn.attributes("disabled")).toBeDefined();
     });
 
@@ -247,9 +246,7 @@ describe("PatternDetailsDialog", () => {
         },
       });
 
-      const prevBtn = wrapper.find(
-        '[data-test="pattern-detail-previous-btn"]',
-      );
+      const prevBtn = wrapper.find('[data-test="pattern-detail-previous-btn"]');
       expect(prevBtn.attributes("disabled")).toBeUndefined();
     });
 
@@ -274,9 +271,7 @@ describe("PatternDetailsDialog", () => {
         },
       });
 
-      const prevBtn = wrapper.find(
-        '[data-test="pattern-detail-previous-btn"]',
-      );
+      const prevBtn = wrapper.find('[data-test="pattern-detail-previous-btn"]');
       await prevBtn.trigger("click");
 
       expect(wrapper.emitted("navigate")).toBeTruthy();

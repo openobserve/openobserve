@@ -12,16 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { PrebuiltConfig } from './types';
+import { PrebuiltConfig } from "./types";
 
-const TEAMS_WEBHOOK_ALLOWED_HOSTS = ['outlook.office.com', 'webhook.office.com'];
+const TEAMS_WEBHOOK_ALLOWED_HOSTS = [
+  "outlook.office.com",
+  "webhook.office.com",
+];
 
 function isValidTeamsWebhookUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
     const hostname = parsed.hostname.toLowerCase();
     return (
-      parsed.protocol === 'https:' &&
+      parsed.protocol === "https:" &&
       TEAMS_WEBHOOK_ALLOWED_HOSTS.includes(hostname)
     );
   } catch {
@@ -34,92 +37,96 @@ function isValidTeamsWebhookUrl(url: string): boolean {
  * Uses Adaptive Cards for rich formatting
  */
 export const msteamsTemplate = {
-  name: 'prebuilt_msteams',
-  body: JSON.stringify({
-    "@type": "MessageCard",
-    "@context": "http://schema.org/extensions",
-    "themeColor": "D63638",
-    "summary": "Alert: {alert_name}",
-    "sections": [
-      {
-        "activityTitle": "🚨 Alert: {alert_name}",
-        "activitySubtitle": "OpenObserve Alert Notification",
-        "activityImage": "https://openobserve.ai/favicon.ico",
-        "facts": [
-          {
-            "name": "Stream",
-            "value": "{stream_name}"
-          },
-          {
-            "name": "Type",
-            "value": "{stream_type}"
-          },
-          {
-            "name": "Status",
-            "value": "🔴 Firing"
-          },
-          {
-            "name": "Count",
-            "value": "{alert_count}"
-          },
-          {
-            "name": "Threshold",
-            "value": "{alert_operator} {alert_threshold}"
-          },
-          {
-            "name": "Time",
-            "value": "{alert_time}"
-          }
-        ],
-        "markdown": true
-      }
-    ],
-    "potentialActions": [
-      {
-        "@type": "OpenUri",
-        "name": "View in OpenObserve",
-        "targets": [
-          {
-            "os": "default",
-            "uri": "{alert_url}"
-          }
-        ]
-      }
-    ]
-  }, null, 2),
-  type: 'http' as const,
-  isDefault: false
+  name: "prebuilt_msteams",
+  body: JSON.stringify(
+    {
+      "@type": "MessageCard",
+      "@context": "http://schema.org/extensions",
+      themeColor: "D63638",
+      summary: "Alert: {alert_name}",
+      sections: [
+        {
+          activityTitle: "🚨 Alert: {alert_name}",
+          activitySubtitle: "OpenObserve Alert Notification",
+          activityImage: "https://openobserve.ai/favicon.ico",
+          facts: [
+            {
+              name: "Stream",
+              value: "{stream_name}",
+            },
+            {
+              name: "Type",
+              value: "{stream_type}",
+            },
+            {
+              name: "Status",
+              value: "🔴 Firing",
+            },
+            {
+              name: "Count",
+              value: "{alert_count}",
+            },
+            {
+              name: "Threshold",
+              value: "{alert_operator} {alert_threshold}",
+            },
+            {
+              name: "Time",
+              value: "{alert_time}",
+            },
+          ],
+          markdown: true,
+        },
+      ],
+      potentialActions: [
+        {
+          "@type": "OpenUri",
+          name: "View in OpenObserve",
+          targets: [
+            {
+              os: "default",
+              uri: "{alert_url}",
+            },
+          ],
+        },
+      ],
+    },
+    null,
+    2,
+  ),
+  type: "http" as const,
+  isDefault: false,
 };
 
 export const msteamsConfig: PrebuiltConfig = {
-  templateName: 'prebuilt_msteams',
+  templateName: "prebuilt_msteams",
   templateBody: msteamsTemplate.body,
   headers: {
-    'Content-Type': 'application/json'
+    "Content-Type": "application/json",
   },
-  method: 'post',
+  method: "post",
   urlValidator: (url: string) => isValidTeamsWebhookUrl(url),
   credentialFields: [
     {
-      key: 'webhookUrl',
-      label: 'Microsoft Teams Webhook URL',
-      type: 'text',
+      key: "webhookUrl",
+      label: "Microsoft Teams Webhook URL",
+      type: "text",
       required: true,
-      hint: 'Get your webhook URL from Teams channel connectors',
+      hint: "Get your webhook URL from Teams channel connectors",
       validator: (url: string) =>
-        isValidTeamsWebhookUrl(url) || 'Invalid Microsoft Teams webhook URL'
-    }
-  ]
+        isValidTeamsWebhookUrl(url) || "Invalid Microsoft Teams webhook URL",
+    },
+  ],
 };
 
-import msteamsLogo from '@/assets/images/alerts/destinations/msteams.png';
+import msteamsLogo from "@/assets/images/alerts/destinations/msteams.png";
 
 export const msteamsDestinationType = {
-  id: 'msteams',
-  name: 'Microsoft Teams',
-  description: 'Send notifications to Teams channels',
-  icon: 'msteams',
+  id: "msteams",
+  name: "Microsoft Teams",
+  description: "Send notifications to Teams channels",
+  icon: "msteams",
   image: msteamsLogo,
   popular: true,
-  category: 'messaging'
+  category: "messaging",
 };

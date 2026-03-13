@@ -29,11 +29,16 @@ vi.mock("quasar", async (importOriginal) => {
     date: {
       subtractFromDate: vi.fn((dateInput: any, subtractObj: any) => {
         const result = new Date(dateInput);
-        if (subtractObj.seconds) result.setSeconds(result.getSeconds() - subtractObj.seconds);
-        if (subtractObj.minutes) result.setMinutes(result.getMinutes() - subtractObj.minutes);
-        if (subtractObj.hours) result.setHours(result.getHours() - subtractObj.hours);
-        if (subtractObj.days) result.setDate(result.getDate() - subtractObj.days);
-        if (subtractObj.months) result.setMonth(result.getMonth() - subtractObj.months);
+        if (subtractObj.seconds)
+          result.setSeconds(result.getSeconds() - subtractObj.seconds);
+        if (subtractObj.minutes)
+          result.setMinutes(result.getMinutes() - subtractObj.minutes);
+        if (subtractObj.hours)
+          result.setHours(result.getHours() - subtractObj.hours);
+        if (subtractObj.days)
+          result.setDate(result.getDate() - subtractObj.days);
+        if (subtractObj.months)
+          result.setMonth(result.getMonth() - subtractObj.months);
         return result;
       }),
     },
@@ -256,7 +261,10 @@ describe("dateTimeUtils", () => {
     it("handles different timezones", () => {
       const ts = new Date("2024-01-15T12:00:00Z").getTime();
       const utcResult = getUTCTimestampFromZonedTimestamp(ts, "UTC");
-      const nyResult = getUTCTimestampFromZonedTimestamp(ts, "America/New_York");
+      const nyResult = getUTCTimestampFromZonedTimestamp(
+        ts,
+        "America/New_York",
+      );
       // Results should differ for different timezones
       expect(utcResult).not.toBe(nyResult);
     });

@@ -104,14 +104,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template v-slot:body-selection="scope">
-          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+          <q-checkbox
+            v-model="scope.selected"
+            size="sm"
+            class="o2-table-checkbox"
+          />
         </template>
 
         <template #bottom="scope">
-          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[230px] tw:mr-md">
-                  {{ resultTotal }} {{ t('pipeline_destinations.header') }}
-                </div>
+          <div
+            class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+          >
+            <div
+              class="o2-table-footer-title tw:flex tw:items-center tw:w-[230px] tw:mr-md"
+            >
+              {{ resultTotal }} {{ t("pipeline_destinations.header") }}
+            </div>
             <q-btn
               v-if="selectedDestinations.length > 0"
               data-test="pipeline-destination-list-delete-destinations-btn"
@@ -128,39 +136,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="delete" size="16px" />
               <span class="tw:ml-2">Delete</span>
             </q-btn>
-          <QTablePagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
+            <QTablePagination
+              :scope="scope"
+              :position="'bottom'"
+              :resultTotal="resultTotal"
+              :perPageOptions="perPageOptions"
+              @update:changeRecordPerPage="changePagination"
+            />
           </div>
         </template>
         <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Adding this block to render the select-all checkbox -->
-              <q-th v-if="columns.length > 0" auto-width>
-                <q-checkbox
-                  v-model="props.selected"
-                  size="sm"
-                  :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                  class="o2-table-checkbox"
-                />
-              </q-th>
+          <q-tr :props="props">
+            <!-- Adding this block to render the select-all checkbox -->
+            <q-th v-if="columns.length > 0" auto-width>
+              <q-checkbox
+                v-model="props.selected"
+                size="sm"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-table-checkbox-dark'
+                    : 'o2-table-checkbox-light'
+                "
+                class="o2-table-checkbox"
+              />
+            </q-th>
 
-              <!-- render the table headers -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
+            <!-- render the table headers -->
+            <q-th
+              v-for="col in props.cols"
+              :key="col.name"
+              :props="props"
+              :class="col.classes"
+              :style="col.style"
+            >
+              {{ col.label }}
+            </q-th>
+          </q-tr>
+        </template>
       </q-table>
     </div>
     <div v-else>
@@ -593,7 +605,7 @@ export default defineComponent({
 
         const response = await destinationService.bulkDelete(
           store.state.selectedOrganization.identifier,
-          payload
+          payload,
         );
 
         dismiss();
@@ -643,7 +655,10 @@ export default defineComponent({
         console.error("Error deleting destinations:", error);
 
         // Show error message from response if available
-        const errorMessage = error.response?.data?.message || error?.message || "Error deleting destinations. Please try again.";
+        const errorMessage =
+          error.response?.data?.message ||
+          error?.message ||
+          "Error deleting destinations. Please try again.";
         if (error.response?.status != 403 || error?.status != 403) {
           q.notify({
             type: "negative",

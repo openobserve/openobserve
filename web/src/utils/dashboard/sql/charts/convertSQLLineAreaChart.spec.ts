@@ -54,7 +54,15 @@ function makeMockContext(overrides: Partial<any> = {}): any {
 
   return {
     options: {
-      xAxis: [{ data: ["Jan", "Feb", "Mar"], axisLabel: { rotate: 0, width: 120, margin: 5 }, axisTick: {}, nameGap: 25, name: "" }],
+      xAxis: [
+        {
+          data: ["Jan", "Feb", "Mar"],
+          axisLabel: { rotate: 0, width: 120, margin: 5 },
+          axisTick: {},
+          nameGap: 25,
+          name: "",
+        },
+      ],
       yAxis: [{ data: [], axisLabel: { width: 80 }, name: "" }],
       series: [],
       tooltip: { axisPointer: {}, textStyle: {} },
@@ -71,9 +79,16 @@ function makeMockContext(overrides: Partial<any> = {}): any {
         trellis: { layout: null },
         background: { value: { color: "#FFFFFF" } },
       },
-      queries: [{ fields: { y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+      queries: [
+        {
+          fields: { y: [{ label: "Value" }], breakdown: [] },
+          customQuery: false,
+        },
+      ],
     },
-    store: { state: { theme: "light", zoConfig: { timestamp_column: "_timestamp" } } },
+    store: {
+      state: { theme: "light", zoConfig: { timestamp_column: "_timestamp" } },
+    },
     chartPanelRef: { value: { offsetWidth: 800, offsetHeight: 400 } },
     hoveredSeriesState: { value: null },
     xAxisKeys: ["x1"],
@@ -105,7 +120,12 @@ describe("applyLineAreaScatterBarChart - area-stacked (Branch A)", () => {
           trellis: { layout: null },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [] },
+            customQuery: false,
+          },
+        ],
       },
     });
     ctx.options.xAxis.push({ data: ["extra"] });
@@ -126,7 +146,12 @@ describe("applyLineAreaScatterBarChart - area-stacked (Branch A)", () => {
           trellis: { layout: null },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [] },
+            customQuery: false,
+          },
+        ],
       },
     });
     applyLineAreaScatterBarChart(ctx);
@@ -147,7 +172,12 @@ describe("applyLineAreaScatterBarChart - area-stacked (Branch A)", () => {
           trellis: { layout: null },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [] },
+            customQuery: false,
+          },
+        ],
       },
     });
     applyLineAreaScatterBarChart(ctx);
@@ -168,7 +198,12 @@ describe("applyLineAreaScatterBarChart - area-stacked (Branch A)", () => {
           trellis: { layout: null },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [] },
+            customQuery: false,
+          },
+        ],
       },
     });
     applyLineAreaScatterBarChart(ctx);
@@ -188,7 +223,12 @@ describe("applyLineAreaScatterBarChart - area-stacked (Branch A)", () => {
           trellis: { layout: "grid" },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [{ label: "Cat" }] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [{ label: "Cat" }] },
+            customQuery: false,
+          },
+        ],
       },
       breakDownKeys: ["breakdown"],
     });
@@ -211,7 +251,12 @@ describe("applyLineAreaScatterBarChart - line with breakdown (Branch A)", () => 
           trellis: { layout: null },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [{ label: "Cat" }] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [{ label: "Cat" }] },
+            customQuery: false,
+          },
+        ],
       },
       breakDownKeys: ["breakdown"],
     });
@@ -234,7 +279,12 @@ describe("applyLineAreaScatterBarChart - line with breakdown (Branch A)", () => 
           trellis: { layout: null },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [{ label: "Cat" }] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [{ label: "Cat" }] },
+            customQuery: false,
+          },
+        ],
       },
       breakDownKeys: ["breakdown"],
     });
@@ -257,7 +307,12 @@ describe("applyLineAreaScatterBarChart - bar without breakdown", () => {
           trellis: { layout: null },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [] },
+            customQuery: false,
+          },
+        ],
       },
       breakDownKeys: [],
     });
@@ -280,7 +335,12 @@ describe("applyLineAreaScatterBarChart - scatter without breakdown (Branch B)", 
           trellis: { layout: null },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [] },
+            customQuery: false,
+          },
+        ],
       },
       breakDownKeys: [],
     });
@@ -301,7 +361,12 @@ describe("applyLineAreaScatterBarChart - scatter without breakdown (Branch B)", 
           trellis: { layout: null },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [] },
+            customQuery: false,
+          },
+        ],
       },
       breakDownKeys: [],
     });
@@ -324,7 +389,12 @@ describe("applyLineAreaScatterBarChart - line without breakdown", () => {
           trellis: { layout: null },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [] },
+            customQuery: false,
+          },
+        ],
       },
       breakDownKeys: [],
     });
@@ -344,7 +414,12 @@ describe("applyLineAreaScatterBarChart - line without breakdown", () => {
           trellis: { layout: null },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [] },
+            customQuery: false,
+          },
+        ],
       },
       breakDownKeys: [],
     });
@@ -367,7 +442,12 @@ describe("applyLineAreaScatterBarChart - trellis behavior", () => {
           trellis: { layout: "grid" },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [{ label: "Cat" }] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [{ label: "Cat" }] },
+            customQuery: false,
+          },
+        ],
       },
       breakDownKeys: ["breakdown"],
     });
@@ -390,7 +470,12 @@ describe("applyLineAreaScatterBarChart - additional coverage", () => {
           trellis: { layout: null },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [] },
+            customQuery: false,
+          },
+        ],
       },
       breakDownKeys: [],
     });
@@ -411,7 +496,12 @@ describe("applyLineAreaScatterBarChart - additional coverage", () => {
           trellis: { layout: null },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [] },
+            customQuery: false,
+          },
+        ],
       },
     });
     applyLineAreaScatterBarChart(ctx);
@@ -434,7 +524,12 @@ describe("applyLineAreaScatterBarChart - additional coverage", () => {
           trellis: { layout: null },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [] },
+            customQuery: false,
+          },
+        ],
       },
       breakDownKeys: [],
     });

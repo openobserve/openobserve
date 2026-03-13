@@ -92,7 +92,9 @@ describe("IAM Service", () => {
       it("should get specific group with correct URL", async () => {
         await getGroup("admin-group", "test-org");
 
-        expect(mockHttp.get).toHaveBeenCalledWith("/api/test-org/groups/admin-group");
+        expect(mockHttp.get).toHaveBeenCalledWith(
+          "/api/test-org/groups/admin-group",
+        );
       });
 
       it("should handle different group name formats", async () => {
@@ -107,7 +109,9 @@ describe("IAM Service", () => {
 
         for (const groupName of groupNames) {
           await getGroup(groupName, "test-org");
-          expect(mockHttp.get).toHaveBeenCalledWith(`/api/test-org/groups/${groupName}`);
+          expect(mockHttp.get).toHaveBeenCalledWith(
+            `/api/test-org/groups/${groupName}`,
+          );
         }
       });
 
@@ -121,7 +125,9 @@ describe("IAM Service", () => {
 
         for (const { group, org } of testCases) {
           await getGroup(group, org);
-          expect(mockHttp.get).toHaveBeenCalledWith(`/api/${org}/groups/${group}`);
+          expect(mockHttp.get).toHaveBeenCalledWith(
+            `/api/${org}/groups/${group}`,
+          );
         }
       });
 
@@ -136,7 +142,9 @@ describe("IAM Service", () => {
       it("should delete group with correct URL", async () => {
         await deleteGroup("admin-group", "test-org");
 
-        expect(mockHttp.delete).toHaveBeenCalledWith("/api/test-org/groups/admin-group");
+        expect(mockHttp.delete).toHaveBeenCalledWith(
+          "/api/test-org/groups/admin-group",
+        );
       });
 
       it("should handle different group names for deletion", async () => {
@@ -150,21 +158,25 @@ describe("IAM Service", () => {
 
         for (const groupName of groupNames) {
           await deleteGroup(groupName, "test-org");
-          expect(mockHttp.delete).toHaveBeenCalledWith(`/api/test-org/groups/${groupName}`);
+          expect(mockHttp.delete).toHaveBeenCalledWith(
+            `/api/test-org/groups/${groupName}`,
+          );
         }
       });
 
       it("should handle different organizations for deletion", async () => {
         const organizations = [
           "cleanup-org",
-          "maintenance-org", 
+          "maintenance-org",
           "archived_org",
           "test.environment",
         ];
 
         for (const org of organizations) {
           await deleteGroup("target-group", org);
-          expect(mockHttp.delete).toHaveBeenCalledWith(`/api/${org}/groups/target-group`);
+          expect(mockHttp.delete).toHaveBeenCalledWith(
+            `/api/${org}/groups/target-group`,
+          );
         }
       });
     });
@@ -252,7 +264,7 @@ describe("IAM Service", () => {
 
         expect(mockHttp.put).toHaveBeenCalledWith(
           "/api/test-org/groups/admin-group",
-          updateData.payload
+          updateData.payload,
         );
       });
 
@@ -270,7 +282,7 @@ describe("IAM Service", () => {
           },
           {
             group_name: "managers",
-            org_identifier: "corporate", 
+            org_identifier: "corporate",
             payload: {
               add_roles: [],
               remove_roles: ["temporary"],
@@ -294,7 +306,7 @@ describe("IAM Service", () => {
           await updateGroup(scenario);
           expect(mockHttp.put).toHaveBeenCalledWith(
             `/api/${scenario.org_identifier}/groups/${scenario.group_name}`,
-            scenario.payload
+            scenario.payload,
           );
         }
       });
@@ -315,7 +327,7 @@ describe("IAM Service", () => {
 
         expect(mockHttp.put).toHaveBeenCalledWith(
           "/api/test-org/groups/test-group",
-          emptyUpdateData.payload
+          emptyUpdateData.payload,
         );
       });
 
@@ -325,9 +337,18 @@ describe("IAM Service", () => {
           org_identifier: "enterprise",
           payload: {
             add_roles: Array.from({ length: 20 }, (_, i) => `role-${i + 1}`),
-            remove_roles: Array.from({ length: 10 }, (_, i) => `old-role-${i + 1}`),
-            add_users: Array.from({ length: 50 }, (_, i) => `user${i + 1}@company.com`),
-            remove_users: Array.from({ length: 25 }, (_, i) => `olduser${i + 1}@company.com`),
+            remove_roles: Array.from(
+              { length: 10 },
+              (_, i) => `old-role-${i + 1}`,
+            ),
+            add_users: Array.from(
+              { length: 50 },
+              (_, i) => `user${i + 1}@company.com`,
+            ),
+            remove_users: Array.from(
+              { length: 25 },
+              (_, i) => `olduser${i + 1}@company.com`,
+            ),
           },
         };
 
@@ -335,7 +356,7 @@ describe("IAM Service", () => {
 
         expect(mockHttp.put).toHaveBeenCalledWith(
           "/api/enterprise/groups/large-group",
-          largeUpdateData.payload
+          largeUpdateData.payload,
         );
       });
     });
@@ -369,7 +390,9 @@ describe("IAM Service", () => {
       it("should get specific role with correct URL", async () => {
         await getRole("admin-role", "test-org");
 
-        expect(mockHttp.get).toHaveBeenCalledWith("/api/test-org/roles/admin-role");
+        expect(mockHttp.get).toHaveBeenCalledWith(
+          "/api/test-org/roles/admin-role",
+        );
       });
 
       it("should handle different role ID formats", async () => {
@@ -384,7 +407,9 @@ describe("IAM Service", () => {
 
         for (const roleId of roleIds) {
           await getRole(roleId, "test-org");
-          expect(mockHttp.get).toHaveBeenCalledWith(`/api/test-org/roles/${roleId}`);
+          expect(mockHttp.get).toHaveBeenCalledWith(
+            `/api/test-org/roles/${roleId}`,
+          );
         }
       });
     });
@@ -393,7 +418,9 @@ describe("IAM Service", () => {
       it("should delete role with correct URL", async () => {
         await deleteRole("admin-role", "test-org");
 
-        expect(mockHttp.delete).toHaveBeenCalledWith("/api/test-org/roles/admin-role");
+        expect(mockHttp.delete).toHaveBeenCalledWith(
+          "/api/test-org/roles/admin-role",
+        );
       });
 
       it("should handle different role deletions", async () => {
@@ -405,7 +432,9 @@ describe("IAM Service", () => {
 
         for (const { roleId, org } of rolesToDelete) {
           await deleteRole(roleId, org);
-          expect(mockHttp.delete).toHaveBeenCalledWith(`/api/${org}/roles/${roleId}`);
+          expect(mockHttp.delete).toHaveBeenCalledWith(
+            `/api/${org}/roles/${roleId}`,
+          );
         }
       });
     });
@@ -468,7 +497,7 @@ describe("IAM Service", () => {
 
         expect(mockHttp.put).toHaveBeenCalledWith(
           "/api/test-org/roles/admin-role",
-          updateData.payload
+          updateData.payload,
         );
       });
 
@@ -512,7 +541,7 @@ describe("IAM Service", () => {
           await updateRole(scenario);
           expect(mockHttp.put).toHaveBeenCalledWith(
             `/api/${scenario.org_identifier}/roles/${scenario.role_id}`,
-            scenario.payload
+            scenario.payload,
           );
         }
       });
@@ -522,7 +551,9 @@ describe("IAM Service", () => {
       it("should get role users with correct URL", async () => {
         await getRoleUsers("admin-role", "test-org");
 
-        expect(mockHttp.get).toHaveBeenCalledWith("/api/test-org/roles/admin-role/users");
+        expect(mockHttp.get).toHaveBeenCalledWith(
+          "/api/test-org/roles/admin-role/users",
+        );
       });
 
       it("should handle different role names", async () => {
@@ -536,7 +567,9 @@ describe("IAM Service", () => {
 
         for (const roleName of roleNames) {
           await getRoleUsers(roleName, "test-org");
-          expect(mockHttp.get).toHaveBeenCalledWith(`/api/test-org/roles/${roleName}/users`);
+          expect(mockHttp.get).toHaveBeenCalledWith(
+            `/api/test-org/roles/${roleName}/users`,
+          );
         }
       });
 
@@ -550,7 +583,9 @@ describe("IAM Service", () => {
 
         for (const org of organizations) {
           await getRoleUsers("standard-role", org);
-          expect(mockHttp.get).toHaveBeenCalledWith(`/api/${org}/roles/standard-role/users`);
+          expect(mockHttp.get).toHaveBeenCalledWith(
+            `/api/${org}/roles/standard-role/users`,
+          );
         }
       });
     });
@@ -567,7 +602,7 @@ describe("IAM Service", () => {
       it("should handle different organization identifiers", async () => {
         const organizations = [
           "simple-org",
-          "org-with-dashes", 
+          "org-with-dashes",
           "org_with_underscores",
           "production.environment",
           "12345",
@@ -589,7 +624,7 @@ describe("IAM Service", () => {
         });
 
         expect(mockHttp.get).toHaveBeenCalledWith(
-          "/api/test-org/roles/admin-role/permissions/dashboards"
+          "/api/test-org/roles/admin-role/permissions/dashboards",
         );
       });
 
@@ -616,7 +651,7 @@ describe("IAM Service", () => {
             resource: resource,
           });
           expect(mockHttp.get).toHaveBeenCalledWith(
-            `/api/test-org/roles/admin/permissions/${resource}`
+            `/api/test-org/roles/admin/permissions/${resource}`,
           );
         }
       });
@@ -641,7 +676,7 @@ describe("IAM Service", () => {
             role_name: roleName,
           });
           expect(mockHttp.get).toHaveBeenCalledWith(
-            `/api/test-org/roles/${roleName}/permissions/dashboards`
+            `/api/test-org/roles/${roleName}/permissions/dashboards`,
           );
         }
       });
@@ -665,7 +700,7 @@ describe("IAM Service", () => {
             org_identifier: org,
           });
           expect(mockHttp.get).toHaveBeenCalledWith(
-            `/api/${org}/roles/admin/permissions/dashboards`
+            `/api/${org}/roles/admin/permissions/dashboards`,
           );
         }
       });
@@ -692,7 +727,7 @@ describe("IAM Service", () => {
         for (const query of complexQueries) {
           await getResourcePermission(query);
           expect(mockHttp.get).toHaveBeenCalledWith(
-            `/api/${query.org_identifier}/roles/${query.role_name}/permissions/${query.resource}`
+            `/api/${query.org_identifier}/roles/${query.role_name}/permissions/${query.resource}`,
           );
         }
       });
@@ -734,15 +769,19 @@ describe("IAM Service", () => {
         roles: [],
       });
       expect(mockHttp.get).toHaveBeenCalledWith(`/api/${org}/groups`);
-      expect(mockHttp.get).toHaveBeenCalledWith(`/api/${org}/groups/${groupName}`);
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        `/api/${org}/groups/${groupName}`,
+      );
       expect(mockHttp.put).toHaveBeenCalledWith(
         `/api/${org}/groups/${groupName}`,
         expect.objectContaining({
           add_roles: ["admin"],
           add_users: ["user@example.com"],
-        })
+        }),
       );
-      expect(mockHttp.delete).toHaveBeenCalledWith(`/api/${org}/groups/${groupName}`);
+      expect(mockHttp.delete).toHaveBeenCalledWith(
+        `/api/${org}/groups/${groupName}`,
+      );
     });
 
     it("should handle complete role lifecycle", async () => {
@@ -771,14 +810,20 @@ describe("IAM Service", () => {
       // Delete role
       await deleteRole(roleId, org);
 
-      expect(mockHttp.post).toHaveBeenCalledWith(`/api/${org}/roles`, { role: roleId });
+      expect(mockHttp.post).toHaveBeenCalledWith(`/api/${org}/roles`, {
+        role: roleId,
+      });
       expect(mockHttp.get).toHaveBeenCalledWith(`/api/${org}/roles`);
       expect(mockHttp.get).toHaveBeenCalledWith(`/api/${org}/roles/${roleId}`);
-      expect(mockHttp.get).toHaveBeenCalledWith(`/api/${org}/roles/${roleId}/users`);
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        `/api/${org}/roles/${roleId}/users`,
+      );
       expect(mockHttp.put).toHaveBeenCalledWith(`/api/${org}/roles/${roleId}`, {
         permissions: ["read", "write"],
       });
-      expect(mockHttp.delete).toHaveBeenCalledWith(`/api/${org}/roles/${roleId}`);
+      expect(mockHttp.delete).toHaveBeenCalledWith(
+        `/api/${org}/roles/${roleId}`,
+      );
     });
 
     it("should maintain URL consistency across all IAM operations", async () => {

@@ -9,22 +9,32 @@ import GoogleWorkspace from "@/components/ingestion/security/GoogleWorkspace.vue
 vi.mock("@/composables/useIngestion", () => ({
   default: vi.fn(() => ({
     endpoint: "https://api.example.com/ingest",
-    securityContent: "curl -X POST https://api.example.com/ingest -d '{\"stream\": \"[STREAM_NAME]\"}' ",
-    securityDocURLs: { googleworkspace: "https://docs.example.com/googleworkspace" },
+    securityContent:
+      'curl -X POST https://api.example.com/ingest -d \'{"stream": "[STREAM_NAME]"}\' ',
+    securityDocURLs: {
+      googleworkspace: "https://docs.example.com/googleworkspace",
+    },
   })),
 }));
 
 describe("GoogleWorkspace.vue", () => {
   let store: any;
   beforeEach(() => {
-    store = createStore({ state: { selectedOrganization: { identifier: "test-org" } } });
+    store = createStore({
+      state: { selectedOrganization: { identifier: "test-org" } },
+    });
   });
 
   const mountComponent = () => {
     return mount(GoogleWorkspace, {
       global: {
         plugins: [store, Quasar],
-        stubs: { CopyContent: { template: '<div data-test="copy-content-stub">{{ content }}</div>', props: ["content"] } },
+        stubs: {
+          CopyContent: {
+            template: '<div data-test="copy-content-stub">{{ content }}</div>',
+            props: ["content"],
+          },
+        },
       },
     });
   };
@@ -34,12 +44,16 @@ describe("GoogleWorkspace.vue", () => {
   });
 
   it("should render CopyContent component", () => {
-    expect(mountComponent().find('[data-test="copy-content-stub"]').exists()).toBe(true);
+    expect(
+      mountComponent().find('[data-test="copy-content-stub"]').exists(),
+    ).toBe(true);
   });
 
   it("should render documentation link", () => {
     const wrapper = mountComponent();
-    expect(wrapper.find("a").attributes("href")).toBe("https://docs.example.com/googleworkspace");
+    expect(wrapper.find("a").attributes("href")).toBe(
+      "https://docs.example.com/googleworkspace",
+    );
   });
 
   it("should replace [STREAM_NAME] with googleworkspace", () => {

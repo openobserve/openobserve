@@ -43,7 +43,9 @@ describe("AppTraces.vue", () => {
       },
     });
 
-    expect(wrapper.find('[data-test="zinc-traces-component"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="zinc-traces-component"]').exists()).toBe(
+      true,
+    );
   });
 
   it("should render without errors", () => {

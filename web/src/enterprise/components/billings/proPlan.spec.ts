@@ -137,7 +137,7 @@ describe("proPlan.vue", () => {
     it("first feature: Logs, Metrics, Traces header (parent, no price)", () => {
       const f = wrapper.vm.features[0];
       expect(f.name).toBe(
-        "Logs, Metrics, Traces, RUM, Session Replay, Error tracking"
+        "Logs, Metrics, Traces, RUM, Session Replay, Error tracking",
       );
       expect(f.price).toBe("");
       expect(f.is_parent).toBe(true);

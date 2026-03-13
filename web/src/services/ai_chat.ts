@@ -18,6 +18,8 @@ import { generateTraceContext } from "@/utils/zincutils";
 
 export const getAiChat = (messages: any) => {
   const { traceparent } = generateTraceContext();
-  return http({ headers: { traceparent } }).post("/api/default/ai/chat_stream", { messages });
+  return http({ headers: { traceparent } }).post(
+    "/api/default/ai/chat_stream",
+    { messages },
+  );
 };
-

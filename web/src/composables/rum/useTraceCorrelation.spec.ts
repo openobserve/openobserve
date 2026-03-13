@@ -92,10 +92,7 @@ function createMockSearchResponse(
 /**
  * Helper to mock successful RUM and APM search calls
  */
-function mockSuccessfulSearch(
-  rumEvents: any[] = [],
-  backendSpans: any[] = [],
-) {
+function mockSuccessfulSearch(rumEvents: any[] = [], backendSpans: any[] = []) {
   vi.mocked(searchService.search)
     .mockResolvedValueOnce(createMockSearchResponse(rumEvents))
     .mockResolvedValueOnce(createMockSearchResponse(backendSpans));

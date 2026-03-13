@@ -78,7 +78,9 @@ import { defineComponent, ref, onMounted, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { defineAsyncComponent } from "vue";
-const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
+const QueryEditor = defineAsyncComponent(
+  () => import("@/components/CodeQueryEditor.vue"),
+);
 import { getImageURL } from "@/utils/zincutils";
 import { validateDashboardJson } from "@/utils/dashboard/panelValidation";
 

@@ -165,9 +165,10 @@ describe("ImportDashboard.vue", () => {
         plugins: [store, router, i18n],
         stubs: {
           // Stub QueryEditor component properly
-          "QueryEditor": {
+          QueryEditor: {
             name: "QueryEditor",
-            template: '<div data-test="query-editor" class="query-editor"><slot /></div>',
+            template:
+              '<div data-test="query-editor" class="query-editor"><slot /></div>',
             props: ["debounceTime", "language", "editorId", "query"],
             emits: ["update:query"],
           },
@@ -180,7 +181,7 @@ describe("ImportDashboard.vue", () => {
   it("should mount successfully", async () => {
     wrapper = mountComponent();
     await nextTick();
-    
+
     expect(wrapper.exists()).toBe(true);
   });
 
@@ -206,7 +207,7 @@ describe("ImportDashboard.vue", () => {
   it("should open community dashboards in a new window", async () => {
     // Mock window.open
     const mockWindowOpen = vi.fn();
-    Object.defineProperty(window, 'open', {
+    Object.defineProperty(window, "open", {
       value: mockWindowOpen,
       writable: true,
     });
@@ -219,7 +220,7 @@ describe("ImportDashboard.vue", () => {
 
     expect(mockWindowOpen).toHaveBeenCalledWith(
       "https://github.com/openobserve/dashboards",
-      "_blank"
+      "_blank",
     );
   });
 
@@ -246,13 +247,15 @@ describe("ImportDashboard.vue", () => {
     await nextTick();
 
     const testJson = '{"title": "Test Dashboard", "panels": []}';
-    
+
     // Test the jsonStr watcher directly
     wrapper.vm.jsonStr = testJson;
     await nextTick();
 
     // Should format the JSON
-    expect(wrapper.vm.jsonStr).toBe(JSON.stringify(JSON.parse(testJson), null, 2));
+    expect(wrapper.vm.jsonStr).toBe(
+      JSON.stringify(JSON.parse(testJson), null, 2),
+    );
   });
 
   it("should test jsonStr watcher - invalid JSON shows error", async () => {
@@ -280,7 +283,7 @@ describe("ImportDashboard.vue", () => {
     wrapper = mountComponent();
     await nextTick();
 
-    // Set some values first 
+    // Set some values first
     wrapper.vm.url = "http://example.com";
     wrapper.vm.jsonFiles = null; // Set to a valid initial state
 
@@ -288,7 +291,7 @@ describe("ImportDashboard.vue", () => {
     // Let's first set it to something, then to empty string
     wrapper.vm.jsonStr = '{"test": "data"}';
     await nextTick();
-    
+
     // Now set to empty string to trigger the reset logic
     wrapper.vm.jsonStr = "";
     await nextTick();
@@ -304,15 +307,15 @@ describe("ImportDashboard.vue", () => {
 
     const testDashboards = [
       { title: "Dashboard 1", panels: [] },
-      { title: "Dashboard 2", panels: [] }
+      { title: "Dashboard 2", panels: [] },
     ];
 
     wrapper.vm.jsonStr = JSON.stringify(testDashboards);
     wrapper.vm.activeTab = "import_json_file";
-    
+
     // Call importDashboard method
     wrapper.vm.importDashboard();
-    
+
     // Should not have validation errors
     expect(wrapper.vm.dashboardErrorsToDisplay.length).toBe(0);
   });
@@ -322,12 +325,14 @@ describe("ImportDashboard.vue", () => {
     await nextTick();
 
     wrapper.vm.jsonStr = "invalid json";
-    
+
     // Call importDashboard method
     wrapper.vm.importDashboard();
-    
+
     // Should handle the error gracefully
-    expect(wrapper.vm.dashboardErrorsToDisplay.length).toBeGreaterThanOrEqual(0);
+    expect(wrapper.vm.dashboardErrorsToDisplay.length).toBeGreaterThanOrEqual(
+      0,
+    );
   });
 
   it("should validate dashboard with missing title through importDashboard", async () => {
@@ -337,14 +342,18 @@ describe("ImportDashboard.vue", () => {
     const dashboard = { title: "", panels: [] };
     wrapper.vm.jsonStr = JSON.stringify(dashboard);
     wrapper.vm.activeTab = "import_json_file";
-    
+
     // Call importDashboard which will trigger validation
     wrapper.vm.importDashboard();
-    
+
     // Should add error for missing title
     expect(wrapper.vm.dashboardErrorsToDisplay.length).toBe(1);
-    expect(wrapper.vm.dashboardErrorsToDisplay[0].field).toBe("dashboard_title");
-    expect(wrapper.vm.dashboardErrorsToDisplay[0].message).toContain("Title is required");
+    expect(wrapper.vm.dashboardErrorsToDisplay[0].field).toBe(
+      "dashboard_title",
+    );
+    expect(wrapper.vm.dashboardErrorsToDisplay[0].message).toContain(
+      "Title is required",
+    );
   });
 
   it("should validate dashboard with non-string title through importDashboard", async () => {
@@ -354,30 +363,31 @@ describe("ImportDashboard.vue", () => {
     const dashboard = { title: 123, panels: [] };
     wrapper.vm.jsonStr = JSON.stringify(dashboard);
     wrapper.vm.activeTab = "import_json_file";
-    
+
     // Call importDashboard which will trigger validation
     wrapper.vm.importDashboard();
-    
+
     // Should add error for invalid title type
     expect(wrapper.vm.dashboardErrorsToDisplay.length).toBe(1);
-    expect(wrapper.vm.dashboardErrorsToDisplay[0].field).toBe("dashboard_title");
-    expect(wrapper.vm.dashboardErrorsToDisplay[0].message).toContain("should be a string");
+    expect(wrapper.vm.dashboardErrorsToDisplay[0].field).toBe(
+      "dashboard_title",
+    );
+    expect(wrapper.vm.dashboardErrorsToDisplay[0].message).toContain(
+      "should be a string",
+    );
   });
 
   it("should test updateDashboardTitle with array JSON", async () => {
     wrapper = mountComponent();
     await nextTick();
 
-    const dashboards = [
-      { title: "Old Title 1" },
-      { title: "Old Title 2" }
-    ];
-    
+    const dashboards = [{ title: "Old Title 1" }, { title: "Old Title 2" }];
+
     wrapper.vm.jsonStr = JSON.stringify(dashboards);
-    
+
     // Update first dashboard title
     wrapper.vm.updateDashboardTitle("New Title", 0);
-    
+
     const updatedJson = JSON.parse(wrapper.vm.jsonStr);
     expect(updatedJson[0].title).toBe("New Title");
     expect(updatedJson[1].title).toBe("Old Title 2");
@@ -389,10 +399,10 @@ describe("ImportDashboard.vue", () => {
 
     const dashboard = { title: "Old Title" };
     wrapper.vm.jsonStr = JSON.stringify(dashboard);
-    
+
     // Update dashboard title
     wrapper.vm.updateDashboardTitle("New Title", 0);
-    
+
     const updatedJson = JSON.parse(wrapper.vm.jsonStr);
     expect(updatedJson.title).toBe("New Title");
   });
@@ -401,24 +411,34 @@ describe("ImportDashboard.vue", () => {
     wrapper = mountComponent();
     await nextTick();
 
-    const dashboards = [{
-      title: "Test",
-      tabs: [{
-        panels: [{
-          queries: [{
-            fields: { stream_type: "logs" }
-          }]
-        }]
-      }]
-    }];
-    
+    const dashboards = [
+      {
+        title: "Test",
+        tabs: [
+          {
+            panels: [
+              {
+                queries: [
+                  {
+                    fields: { stream_type: "logs" },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ];
+
     wrapper.vm.jsonStr = JSON.stringify(dashboards);
-    
+
     // Update stream type
     wrapper.vm.updateStreamType("metrics", 0, 0, 0, 0);
-    
+
     const updatedJson = JSON.parse(wrapper.vm.jsonStr);
-    expect(updatedJson[0].tabs[0].panels[0].queries[0].fields.stream_type).toBe("metrics");
+    expect(updatedJson[0].tabs[0].panels[0].queries[0].fields.stream_type).toBe(
+      "metrics",
+    );
   });
 
   it("should test updateStreamType with single object JSON", async () => {
@@ -427,28 +447,36 @@ describe("ImportDashboard.vue", () => {
 
     const dashboard = {
       title: "Test",
-      tabs: [{
-        panels: [{
-          queries: [{
-            fields: { stream_type: "logs" }
-          }]
-        }]
-      }]
+      tabs: [
+        {
+          panels: [
+            {
+              queries: [
+                {
+                  fields: { stream_type: "logs" },
+                },
+              ],
+            },
+          ],
+        },
+      ],
     };
-    
+
     wrapper.vm.jsonStr = JSON.stringify(dashboard);
-    
+
     // Update stream type
     wrapper.vm.updateStreamType("traces", 0, 0, 0, 0);
-    
+
     const updatedJson = JSON.parse(wrapper.vm.jsonStr);
-    expect(updatedJson.tabs[0].panels[0].queries[0].fields.stream_type).toBe("traces");
+    expect(updatedJson.tabs[0].panels[0].queries[0].fields.stream_type).toBe(
+      "traces",
+    );
   });
 
   it("should test onSubmit function", async () => {
     wrapper = mountComponent();
     await nextTick();
-    
+
     // onSubmit should do nothing - testing for coverage
     const result = wrapper.vm.onSubmit();
     expect(result).toBeUndefined();
@@ -461,10 +489,10 @@ describe("ImportDashboard.vue", () => {
     const dashboard = { title: "Test Dashboard", panels: [] };
     wrapper.vm.jsonStr = JSON.stringify(dashboard);
     wrapper.vm.activeTab = "import_json_url";
-    
+
     // Call importDashboard with URL tab active
     wrapper.vm.importDashboard();
-    
+
     // Should not have validation errors for valid dashboard
     expect(wrapper.vm.dashboardErrorsToDisplay.length).toBe(0);
   });
@@ -477,18 +505,20 @@ describe("ImportDashboard.vue", () => {
     wrapper.vm.jsonStr = JSON.stringify(dashboard);
     wrapper.vm.activeTab = "import_json_file";
     wrapper.vm.jsonFiles = undefined;
-    
+
     // Call importDashboard - should call importFromJsonStr
     wrapper.vm.importDashboard();
-    
+
     // Should not have validation errors for valid dashboard
     expect(wrapper.vm.dashboardErrorsToDisplay.length).toBe(0);
   });
 
   it("should test importDashboard with file tab and jsonFiles defined", async () => {
     // Mock file for testing
-    const mockFile = new File(['{"title": "Test"}'], 'test.json', { type: 'application/json' });
-    
+    const mockFile = new File(['{"title": "Test"}'], "test.json", {
+      type: "application/json",
+    });
+
     wrapper = mountComponent();
     await nextTick();
 
@@ -496,10 +526,10 @@ describe("ImportDashboard.vue", () => {
     wrapper.vm.jsonStr = JSON.stringify([dashboard]);
     wrapper.vm.activeTab = "import_json_file";
     wrapper.vm.jsonFiles = [mockFile];
-    
+
     // Call importDashboard - should call importFiles
     wrapper.vm.importDashboard();
-    
+
     // Should not have validation errors for valid dashboard
     expect(wrapper.vm.dashboardErrorsToDisplay.length).toBe(0);
   });
@@ -509,17 +539,21 @@ describe("ImportDashboard.vue", () => {
     await nextTick();
 
     // Simulate having a dashboard title error
-    wrapper.vm.dashboardErrorsToDisplay = [{
-      field: "dashboard_title",
-      message: "Title is required",
-      dashboardIndex: 0
-    }];
+    wrapper.vm.dashboardErrorsToDisplay = [
+      {
+        field: "dashboard_title",
+        message: "Title is required",
+        dashboardIndex: 0,
+      },
+    ];
     wrapper.vm.dashboardTitles = { 0: "New Title" };
-    
+
     await nextTick();
-    
+
     // Template should show error input
-    expect(wrapper.vm.dashboardErrorsToDisplay[0].field).toBe("dashboard_title");
+    expect(wrapper.vm.dashboardErrorsToDisplay[0].field).toBe(
+      "dashboard_title",
+    );
   });
 
   it("should test template conditions for stream_type error", async () => {
@@ -527,18 +561,20 @@ describe("ImportDashboard.vue", () => {
     await nextTick();
 
     // Simulate having a stream type error
-    wrapper.vm.dashboardErrorsToDisplay = [{
-      field: "stream_type",
-      message: "Invalid stream type",
-      dashboardIndex: 0,
-      tabIndex: 0,
-      panelIndex: 0,
-      queryIndex: 0
-    }];
+    wrapper.vm.dashboardErrorsToDisplay = [
+      {
+        field: "stream_type",
+        message: "Invalid stream type",
+        dashboardIndex: 0,
+        tabIndex: 0,
+        panelIndex: 0,
+        queryIndex: 0,
+      },
+    ];
     wrapper.vm.streamTypes = { 0: "logs" };
-    
+
     await nextTick();
-    
+
     // Template should show stream type selector
     expect(wrapper.vm.dashboardErrorsToDisplay[0].field).toBe("stream_type");
   });
@@ -548,15 +584,19 @@ describe("ImportDashboard.vue", () => {
     await nextTick();
 
     // Simulate having a dashboard validation error
-    wrapper.vm.dashboardErrorsToDisplay = [{
-      field: "dashboard_validation",
-      message: "Invalid dashboard structure"
-    }];
-    
+    wrapper.vm.dashboardErrorsToDisplay = [
+      {
+        field: "dashboard_validation",
+        message: "Invalid dashboard structure",
+      },
+    ];
+
     await nextTick();
-    
+
     // Template should show validation error
-    expect(wrapper.vm.dashboardErrorsToDisplay[0].field).toBe("dashboard_validation");
+    expect(wrapper.vm.dashboardErrorsToDisplay[0].field).toBe(
+      "dashboard_validation",
+    );
   });
 
   it("should test template conditions for generic error", async () => {
@@ -564,13 +604,15 @@ describe("ImportDashboard.vue", () => {
     await nextTick();
 
     // Simulate having a generic error
-    wrapper.vm.dashboardErrorsToDisplay = [{
-      field: "other",
-      message: "Some other error"
-    }];
-    
+    wrapper.vm.dashboardErrorsToDisplay = [
+      {
+        field: "other",
+        message: "Some other error",
+      },
+    ];
+
     await nextTick();
-    
+
     // Template should show generic error
     expect(wrapper.vm.dashboardErrorsToDisplay[0].field).toBe("other");
   });
@@ -582,7 +624,7 @@ describe("ImportDashboard.vue", () => {
     // Test URL tab visibility
     wrapper.vm.activeTab = "import_json_url";
     await nextTick();
-    
+
     expect(wrapper.vm.activeTab).toBe("import_json_url");
   });
 
@@ -593,7 +635,7 @@ describe("ImportDashboard.vue", () => {
     // Test file tab visibility
     wrapper.vm.activeTab = "import_json_file";
     await nextTick();
-    
+
     expect(wrapper.vm.activeTab).toBe("import_json_file");
   });
 
@@ -602,22 +644,29 @@ describe("ImportDashboard.vue", () => {
     await nextTick();
 
     // Test file import results display
-    wrapper.vm.filesImportResults = [{
-      status: "rejected",
-      reason: {
-        file: "test.json",
-        error: "Import failed"
-      }
-    }];
-    
+    wrapper.vm.filesImportResults = [
+      {
+        status: "rejected",
+        reason: {
+          file: "test.json",
+          error: "Import failed",
+        },
+      },
+    ];
+
     await nextTick();
-    
+
     expect(wrapper.vm.filesImportResults.length).toBe(1);
   });
 
   it("should test importFromJsonStr with validation errors", async () => {
     // Mock validateDashboardJson to return validation errors
-    const mockValidateDashboardJson = vi.fn().mockReturnValue(["Invalid dashboard structure", "Missing required field"]);
+    const mockValidateDashboardJson = vi
+      .fn()
+      .mockReturnValue([
+        "Invalid dashboard structure",
+        "Missing required field",
+      ]);
     vi.doMock("@/utils/dashboard/panelValidation", () => ({
       validateDashboardJson: mockValidateDashboardJson,
     }));
@@ -627,10 +676,10 @@ describe("ImportDashboard.vue", () => {
 
     const dashboard = { title: "Test Dashboard", panels: [] };
     wrapper.vm.jsonStr = JSON.stringify(dashboard);
-    
+
     // Call importFromJsonStr - should handle validation errors
     await wrapper.vm.importFromJsonStr();
-    
+
     // Should handle validation error gracefully (line 739 should be covered)
     expect(wrapper.vm.isLoading).toBe(false);
   });
@@ -641,10 +690,10 @@ describe("ImportDashboard.vue", () => {
 
     // Set invalid JSON that will cause JSON.parse to fail
     wrapper.vm.jsonStr = "invalid json string";
-    
+
     // Call importFromJsonStr - should trigger catch block (line 752)
     await wrapper.vm.importFromJsonStr();
-    
+
     expect(wrapper.vm.isLoading).toBe(false);
   });
 
@@ -655,21 +704,23 @@ describe("ImportDashboard.vue", () => {
     // Create a dashboard that will fail validation
     const dashboard = { title: "Valid Title" }; // Missing panels or other required fields
     wrapper.vm.jsonStr = JSON.stringify(dashboard);
-    
+
     // Clear any existing errors
     wrapper.vm.dashboardErrorsToDisplay = [];
-    
+
     // Call importDashboard which will trigger validation
     wrapper.vm.importDashboard();
-    
+
     // The dashboard might have validation errors added by the validation function
-    expect(wrapper.vm.dashboardErrorsToDisplay.length).toBeGreaterThanOrEqual(0);
+    expect(wrapper.vm.dashboardErrorsToDisplay.length).toBeGreaterThanOrEqual(
+      0,
+    );
   });
 
   it("should test onMounted lifecycle hook", async () => {
     wrapper = mountComponent();
     await nextTick();
-    
+
     // Should initialize with empty filesImportResults
     expect(wrapper.vm.filesImportResults).toEqual([]);
   });
@@ -692,14 +743,22 @@ describe("ImportDashboard.vue", () => {
     await nextTick();
 
     // Test the case where file contains array of objects
-    const mockFile = new File(['[{"title": "Dashboard 1"}, {"title": "Dashboard 2"}]'], 'dashboards.json', { type: 'application/json' });
-    
+    const mockFile = new File(
+      ['[{"title": "Dashboard 1"}, {"title": "Dashboard 2"}]'],
+      "dashboards.json",
+      { type: "application/json" },
+    );
+
     // Mock FileReader
     const originalFileReader = global.FileReader;
     global.FileReader = vi.fn(() => ({
-      readAsText: vi.fn(function() {
+      readAsText: vi.fn(function () {
         setTimeout(() => {
-          this.onload({ target: { result: '[{"title": "Dashboard 1"}, {"title": "Dashboard 2"}]' } });
+          this.onload({
+            target: {
+              result: '[{"title": "Dashboard 1"}, {"title": "Dashboard 2"}]',
+            },
+          });
         }, 0);
       }),
       onload: vi.fn(),
@@ -707,29 +766,33 @@ describe("ImportDashboard.vue", () => {
 
     // Trigger the watcher
     wrapper.vm.jsonFiles = [mockFile];
-    
+
     // Wait for async processing
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     global.FileReader = originalFileReader;
-    
+
     expect(wrapper.vm.jsonFiles).toEqual([mockFile]);
   });
 
   it("should test error handling in jsonFiles watcher", async () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
     wrapper = mountComponent();
     await nextTick();
 
-    const mockFile = new File(['invalid json'], 'invalid.json', { type: 'application/json' });
-    
+    const mockFile = new File(["invalid json"], "invalid.json", {
+      type: "application/json",
+    });
+
     // Mock FileReader to produce invalid JSON
     const originalFileReader = global.FileReader;
     global.FileReader = vi.fn(() => ({
-      readAsText: vi.fn(function() {
+      readAsText: vi.fn(function () {
         setTimeout(() => {
-          this.onload({ target: { result: 'invalid json content' } });
+          this.onload({ target: { result: "invalid json content" } });
         }, 0);
       }),
       onload: vi.fn(),
@@ -737,12 +800,12 @@ describe("ImportDashboard.vue", () => {
 
     // Trigger the watcher - should handle JSON parse errors gracefully
     wrapper.vm.jsonFiles = [mockFile];
-    
-    await new Promise(resolve => setTimeout(resolve, 50));
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     global.FileReader = originalFileReader;
     consoleErrorSpy.mockRestore();
-    
+
     expect(wrapper.vm.jsonFiles).toEqual([mockFile]);
   });
 
@@ -788,11 +851,11 @@ describe("ImportDashboard.vue", () => {
   it("should test URL watcher with valid URL and proper response handling", async () => {
     const mockAxiosGet = vi.fn().mockResolvedValue({
       data: { title: "Test Dashboard", panels: [] },
-      headers: { "content-type": "application/json" }
+      headers: { "content-type": "application/json" },
     });
-    
+
     vi.doMock("axios", () => ({
-      default: { get: mockAxiosGet }
+      default: { get: mockAxiosGet },
     }));
 
     wrapper = mountComponent();
@@ -800,10 +863,10 @@ describe("ImportDashboard.vue", () => {
 
     // Set a valid HTTPS URL to trigger the URL watcher
     wrapper.vm.url = "https://example.com/dashboard.json";
-    
+
     // Wait for the async operation
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
     // Should have processed the response
     expect(wrapper.vm.url).toBe("https://example.com/dashboard.json");
   });
@@ -814,15 +877,15 @@ describe("ImportDashboard.vue", () => {
 
     // Test query editor placeholder flag changes
     expect(wrapper.vm.queryEditorPlaceholderFlag).toBe(true);
-    
+
     // Test loading state
     wrapper.vm.isLoading = "files";
     await nextTick();
     expect(wrapper.vm.isLoading).toBe("files");
-    
+
     // Test splitter model
     expect(wrapper.vm.splitterModel).toBe(60);
-    
+
     // Test stream type options
     expect(wrapper.vm.streamTypeOptions).toEqual(["logs", "metrics", "traces"]);
   });

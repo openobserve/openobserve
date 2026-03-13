@@ -57,7 +57,9 @@ export function useEventFormatters() {
     fromMicroseconds = false,
   ): string => {
     if (!duration) return "N/A";
-    const durationInMs = fromMicroseconds ? duration / 1000000 : duration / 1000;
+    const durationInMs = fromMicroseconds
+      ? duration / 1000000
+      : duration / 1000;
     return formatDuration(durationInMs);
   };
 

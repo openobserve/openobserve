@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-btn rounded flat dense :ripple="false" @click="toggleDarkMode">
+  <q-btn rounded
+flat dense
+:ripple="false" @click="toggleDarkMode">
     <q-icon :name="DarkModeIcon" class="header-icon"></q-icon>
     <q-tooltip anchor="top middle" self="bottom middle">
       {{ tooltipText }}
@@ -68,7 +70,9 @@ export default defineComponent({
     });
 
     const tooltipText = computed(() => {
-      const mode = darkMode.value ? t("common.lightMode") : t("common.darkMode");
+      const mode = darkMode.value
+        ? t("common.lightMode")
+        : t("common.darkMode");
       return `${t("common.switchTo")} ${mode}`;
     });
 
@@ -85,7 +89,7 @@ export default defineComponent({
         if (darkMode.value !== shouldBeDark) {
           darkMode.value = shouldBeDark;
         }
-      }
+      },
     );
 
     const setTheme = (theme: any) => {

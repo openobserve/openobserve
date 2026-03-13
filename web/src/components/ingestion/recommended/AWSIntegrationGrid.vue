@@ -54,7 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="filteredIntegrations.length === 0"
       class="tw:text-center tw:py-12 empty-state"
     >
-      <q-icon name="search_off" size="3rem" class="tw:mb-2" />
+      <q-icon name="search_off" size="3rem"
+class="tw:mb-2" />
       <div class="tw:text-base">No integrations found matching your search</div>
     </div>
 
@@ -93,21 +94,28 @@ export default defineComponent({
 
     // Watch for changes in route query parameter
     const route = useRoute();
-    watch(() => route.query.search, (newSearch) => {
-      if (newSearch && typeof newSearch === 'string') {
-        searchQuery.value = newSearch;
-      } else if (newSearch === undefined) {
-        // Clear search when query param is removed
-        searchQuery.value = "";
-      }
-    }, { immediate: true });
+    watch(
+      () => route.query.search,
+      (newSearch) => {
+        if (newSearch && typeof newSearch === "string") {
+          searchQuery.value = newSearch;
+        } else if (newSearch === undefined) {
+          // Clear search when query param is removed
+          searchQuery.value = "";
+        }
+      },
+      { immediate: true },
+    );
 
     // Watch for changes in initialSearch prop
-    watch(() => props.initialSearch, (newSearch) => {
-      if (newSearch !== undefined) {
-        searchQuery.value = newSearch;
-      }
-    });
+    watch(
+      () => props.initialSearch,
+      (newSearch) => {
+        if (newSearch !== undefined) {
+          searchQuery.value = newSearch;
+        }
+      },
+    );
 
     const filteredIntegrations = computed(() => {
       let filtered = [...awsIntegrations];
@@ -119,14 +127,14 @@ export default defineComponent({
           (integration) =>
             integration.displayName.toLowerCase().includes(query) ||
             integration.description.toLowerCase().includes(query) ||
-            integration.name.toLowerCase().includes(query)
+            integration.name.toLowerCase().includes(query),
         );
       }
 
       // Filter by category
       if (activeCategory.value !== "all") {
         filtered = filtered.filter(
-          (integration) => integration.category === activeCategory.value
+          (integration) => integration.category === activeCategory.value,
         );
       }
 

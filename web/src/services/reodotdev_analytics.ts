@@ -15,7 +15,8 @@ let reoInstance: any = null;
 
 const clientID = config.REO_CLIENT_KEY || "";
 const source = "app";
-const enableAnalytics = config.enableAnalytics === "true" && config.isCloud === "true";
+const enableAnalytics =
+  config.enableAnalytics === "true" && config.isCloud === "true";
 
 // queue for events fired before SDK is ready
 const eventQueue: Array<{ type: "track" | "identify"; args: any[] }> = [];
@@ -27,7 +28,7 @@ function flushQueue() {
         const [eventName, payload] = item.args;
         reoInstance.pushData({
           activity: eventName,
-          ...payload
+          ...payload,
         });
       } else if (item.type === "identify") {
         reoInstance.identify(...item.args);
@@ -83,10 +84,9 @@ export function useReo() {
 
     reoInstance.pushData({
       activity: eventName,
-      ...payload
+      ...payload,
     });
   };
-  
 
   return {
     reoInit,

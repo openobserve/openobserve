@@ -22,13 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="tw:flex tw:items-start tw:justify-between tw:mb-1">
       <div class="tw:flex tw:items-center tw:gap-2">
-        <q-icon
-          v-if="icon"
-          :name="icon"
-          size="1rem"
-          :color="statusColor"
-        />
-        <span class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-secondary)]">
+        <q-icon v-if="icon" :name="icon" size="1rem" :color="statusColor" />
+        <span
+          class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-secondary)]"
+        >
           {{ label }}
         </span>
       </div>
@@ -44,12 +41,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="tw:text-2xl tw:font-bold">
         {{ formattedValue }}
       </span>
-      <span v-if="displayUnit" class="tw:text-xs tw:text-[var(--o2-text-secondary)]">
+      <span
+        v-if="displayUnit"
+        class="tw:text-xs tw:text-[var(--o2-text-secondary)]"
+      >
         {{ displayUnit }}
       </span>
     </div>
 
-    <div v-if="description" class="tw:mt-2 tw:text-[10px] tw:text-[var(--o2-text-secondary)]">
+    <div
+      v-if="description"
+      class="tw:mt-2 tw:text-[10px] tw:text-[var(--o2-text-secondary)]"
+    >
       {{ description }}
     </div>
 

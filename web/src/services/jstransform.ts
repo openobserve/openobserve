@@ -123,12 +123,8 @@ const jstransform = {
       { url, replace_failed },
     );
   },
-  get_all_enrichment_table_statuses: (
-    org_identifier: string,
-  ) => {
-    return http().get(
-      `/api/${org_identifier}/enrichment_tables/status`,
-    );
+  get_all_enrichment_table_statuses: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/enrichment_tables/status`);
   },
   test: (org_identifier: string, data: TestFunctionPayload) => {
     return http().post(`/api/${org_identifier}/functions/test`, data);

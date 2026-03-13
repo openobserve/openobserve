@@ -17,21 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="relative-position full-height" data-test="edit-role-page">
     <!-- TODO OK : Add button to delete role in toolbar -->
-    <div
-      data-test="edit-role-title"
-      class="tw:pb-[0.625rem]"
-    >
-    <div class="card-container q-py-sm">
-          <span style="font-size: 18px;" class="q-px-md ">{{ editingRole }}</span> 
-           <AppTabs
-              data-test="edit-role-tabs"
-              :tabs="tabs"
-              :active-tab="activeTab"
-              @update:active-tab="updateActiveTab"
-            />
+    <div data-test="edit-role-title" class="tw:pb-[0.625rem]">
+      <div class="card-container q-py-sm">
+        <span style="font-size: 18px" class="q-px-md">{{ editingRole }}</span>
+        <AppTabs
+          data-test="edit-role-tabs"
+          :tabs="tabs"
+          :active-tab="activeTab"
+          @update:active-tab="updateActiveTab"
+        />
+      </div>
     </div>
-</div>
-
 
     <template v-if="isFetchingInitialRoles">
       <div data-test="edit-role-page-loading-spinner" style="margin-top: 64px">
@@ -78,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-show="permissionsUiType === 'table'"
               data-test="edit-role-permissions-filters"
-              class=" flex items-start q-px-md q-py-sm justify-start"
+              class="flex items-start q-px-md q-py-sm justify-start"
               style="position: sticky; top: 0px; z-index: 2"
             >
               <div
@@ -93,12 +89,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <div
                   class="q-ml-xs"
-                   style="
-                  border: 1px solid var(--o2-border-color);
-                  width: fit-content;
-                  border-radius: 0.3rem;
-                  padding: 2px;
-                "
+                  style="
+                    border: 1px solid var(--o2-border-color);
+                    width: fit-content;
+                    border-radius: 0.3rem;
+                    padding: 2px;
+                  "
                 >
                   <template
                     v-for="visual in permissionDisplayOptions"
@@ -115,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="11px"
                       class="q-px-md visual-selection-btn"
                       @click="updateTableData(visual.value)"
-                      style="height: 30px;"
+                      style="height: 30px"
                     >
                       {{ visual.label }}</q-btn
                     >
@@ -129,12 +125,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :debounce="500"
                   dense
                   class="no-border q-mr-md o2-search-input tw:h-[36px] tw:w-[200px]"
-                  :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'o2-search-input-dark'
+                      : 'o2-search-input-light'
+                  "
                   :placeholder="`Search Permissions`"
                   @update:model-value="onResourceChange"
                 >
                   <template #prepend>
-                    <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
+                    <q-icon
+                      name="search"
+                      class="cursor-pointer o2-search-input-icon"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'o2-search-input-icon-dark'
+                          : 'o2-search-input-icon-light'
+                      "
+                    />
                   </template>
                 </q-input>
               </div>
@@ -165,11 +173,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="edit-role-permissions-ui-type-toggle"
               class="q-mr-md q-my-xs"
               style="
-              border: 1px solid #d7d7d7;
-              width: fit-content;
-              border-radius: 0.3rem;
-              padding: 2px;
-            "
+                border: 1px solid #d7d7d7;
+                width: fit-content;
+                border-radius: 0.3rem;
+                padding: 2px;
+              "
             >
               <template
                 v-for="visual in permissionUiOptions"
@@ -191,7 +199,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div data-test="edit-role-permissions-table-section" class="el-border-radius q-px-md">
+          <div
+            data-test="edit-role-permissions-table-section"
+            class="el-border-radius q-px-md"
+          >
             <div v-show="permissionsUiType === 'table'">
               <permissions-table
                 ref="permissionTableRef"
@@ -236,7 +247,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="height: calc(100vh - 295px)"
                   />
                 </div>
-                <div v-if="isHelpOpen" style="width: 350px" class="q-pa-sm">
+                <div v-if="isHelpOpen" style="width: 350px"
+class="q-pa-sm">
                   <div class="flex justify-between items-center q-px-sm">
                     <div style="font-size: 16px">Quick Reference</div>
                     <q-icon
@@ -276,23 +288,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex justify-end tw:w-full"
         style="position: sticky; bottom: 0.45rem; z-index: 2"
       >
-      <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex">
-        <q-btn
-          data-test="edit-role-cancel-btn"
-          class="o2-secondary-button"
-          :label="t('alerts.cancel')"
-          no-caps
-          @click="cancelPermissionsUpdate"
-        />
-        <q-btn
-          data-test="edit-role-save-btn"
-          :label="t('alerts.save')"
-          class="o2-primary-button q-ml-md"
-          no-caps
-          @click="saveRole"
-        />
-      </div>
-        
+        <div
+          class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex"
+        >
+          <q-btn
+            data-test="edit-role-cancel-btn"
+            class="o2-secondary-button"
+            :label="t('alerts.cancel')"
+            no-caps
+            @click="cancelPermissionsUpdate"
+          />
+          <q-btn
+            data-test="edit-role-save-btn"
+            :label="t('alerts.save')"
+            class="o2-primary-button q-ml-md"
+            no-caps
+            @click="saveRole"
+          />
+        </div>
       </div>
     </template>
   </div>
@@ -488,9 +501,11 @@ const getRoleDetails = () => {
     .catch((error) => {
       isFetchingInitialRoles.value = false;
       q.notify({
-        message: error?.response?.status === 404
-          ? "Role not found or has been deleted. Redirecting to roles list."
-          : error?.message || "Failed to load role details. Redirecting to roles list.",
+        message:
+          error?.response?.status === 404
+            ? "Role not found or has been deleted. Redirecting to roles list."
+            : error?.message ||
+              "Failed to load role details. Redirecting to roles list.",
         color: "negative",
         position: "bottom",
         timeout: 3000,
@@ -860,13 +875,12 @@ const decodePermission = (permission: string) => {
 };
 
 const cancelPermissionsUpdate = () => {
-  router.push(
-    { name: "roles",
+  router.push({
+    name: "roles",
     query: {
-        org_identifier: store.state.selectedOrganization.identifier,
-        }
-     } 
-);
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
+  });
 };
 
 const handlePermissionChange = (row: any, permission: string) => {
@@ -2012,10 +2026,7 @@ const updateResourceEntities = (
         ?.top_level,
     });
     // Hide non-applicable permissions for logs_pattern and logs_insights entities
-    if (
-      resourceName === "logs_pattern" ||
-      resourceName === "logs_insights"
-    ) {
+    if (resourceName === "logs_pattern" || resourceName === "logs_insights") {
       const entity = resource.entities[resource.entities.length - 1];
       entity.permission.AllowList.show = false;
       entity.permission.AllowDelete.show = false;

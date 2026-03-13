@@ -13,7 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  afterAll,
+} from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DomainManagement from "./DomainManagement.vue";
@@ -158,11 +166,11 @@ describe("DomainManagement Integration Tests", () => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
     vi.resetAllMocks();
-    
+
     // Clear any leftover DOM elements
     const testNode = document.getElementById(uniqueNodeId);
     if (testNode) {
-      testNode.innerHTML = '';
+      testNode.innerHTML = "";
     }
   });
 
@@ -186,7 +194,14 @@ describe("DomainManagement Integration Tests", () => {
         stubs: {
           QDrawer: {
             template: '<div class="q-drawer-stub"><slot /></div>',
-            props: ['modelValue', 'side', 'bordered', 'width', 'overlay', 'elevated'],
+            props: [
+              "modelValue",
+              "side",
+              "bordered",
+              "width",
+              "overlay",
+              "elevated",
+            ],
           },
         },
       },
@@ -202,7 +217,7 @@ describe("DomainManagement Integration Tests", () => {
 
       // 1. Load initial data
       expect(mockDomainManagement.getDomainRestrictions).toHaveBeenCalledWith(
-        "test-meta-org"
+        "test-meta-org",
       );
       expect(vm.domains.length).toBe(3); // From mockDomainData.complex
 
@@ -229,7 +244,9 @@ describe("DomainManagement Integration Tests", () => {
       // 5. Save changes
       await vm.saveChanges();
 
-      expect(mockDomainManagement.updateDomainRestrictions).toHaveBeenCalledWith(
+      expect(
+        mockDomainManagement.updateDomainRestrictions,
+      ).toHaveBeenCalledWith(
         "test-meta-org",
         expect.objectContaining({
           domains: expect.arrayContaining([
@@ -239,7 +256,7 @@ describe("DomainManagement Integration Tests", () => {
               allowed_emails: ["admin@newcompany.com", "user@newcompany.com"],
             }),
           ]),
-        })
+        }),
       );
 
       // 6. Verify success emission
@@ -279,15 +296,17 @@ describe("DomainManagement Integration Tests", () => {
       await flushPromises();
 
       const vm = wrapper.vm;
-      const restrictedDomain = vm.domains.find(d => !d.allowAllUsers);
-      
+      const restrictedDomain = vm.domains.find((d) => !d.allowAllUsers);
+
       if (restrictedDomain) {
         const initialEmailCount = restrictedDomain.allowedEmails.length;
 
         // Remove an email directly (simulating confirmed dialog)
         restrictedDomain.allowedEmails.splice(0, 1);
 
-        expect(restrictedDomain.allowedEmails.length).toBe(initialEmailCount - 1);
+        expect(restrictedDomain.allowedEmails.length).toBe(
+          initialEmailCount - 1,
+        );
       }
     });
   });
@@ -300,7 +319,7 @@ describe("DomainManagement Integration Tests", () => {
 
     describe("Domain Validation", () => {
       domainValidationTestCases.forEach(({ input, expected, description }) => {
-        it(`should ${expected ? 'accept' : 'reject'} ${description}: "${input}"`, () => {
+        it(`should ${expected ? "accept" : "reject"} ${description}: "${input}"`, () => {
           const vm = wrapper.vm;
           expect(vm.isValidDomain(input)).toBe(expected);
         });
@@ -308,12 +327,14 @@ describe("DomainManagement Integration Tests", () => {
     });
 
     describe("Email Validation", () => {
-      emailValidationTestCases.forEach(({ email, domain, expected, description }) => {
-        it(`should ${expected ? 'accept' : 'reject'} ${description}`, () => {
-          const vm = wrapper.vm;
-          expect(vm.isValidEmail(email, domain)).toBe(expected);
-        });
-      });
+      emailValidationTestCases.forEach(
+        ({ email, domain, expected, description }) => {
+          it(`should ${expected ? "accept" : "reject"} ${description}`, () => {
+            const vm = wrapper.vm;
+            expect(vm.isValidEmail(email, domain)).toBe(expected);
+          });
+        },
+      );
     });
   });
 
@@ -321,7 +342,7 @@ describe("DomainManagement Integration Tests", () => {
     apiErrorScenarios.forEach(({ name, error, expectedMessage }) => {
       it(`should handle ${name} gracefully`, async () => {
         mockDomainManagement.getDomainRestrictions.mockRejectedValue(error);
-        
+
         wrapper = createWrapper();
         await flushPromises();
 
@@ -363,7 +384,9 @@ describe("DomainManagement Integration Tests", () => {
       await vm.resetForm();
 
       // Should reload original data
-      expect(mockDomainManagement.getDomainRestrictions).toHaveBeenCalledTimes(2);
+      expect(mockDomainManagement.getDomainRestrictions).toHaveBeenCalledTimes(
+        2,
+      );
     });
 
     it("should handle concurrent operations gracefully", async () => {
@@ -412,20 +435,20 @@ describe("DomainManagement Integration Tests", () => {
       // Test add domain button state
       vm.newDomain = "";
       await nextTick();
-      
+
       // Try to find the add domain button with a simpler selector
-      const addDomainButton = wrapper.find('button');
-      const buttons = wrapper.findAll('button');
-      
+      const addDomainButton = wrapper.find("button");
+      const buttons = wrapper.findAll("button");
+
       // Look for button with "Add Domain" text
       let addButton = null;
       for (let i = 0; i < buttons.length; i++) {
-        if (buttons[i].text().includes('Add Domain')) {
+        if (buttons[i].text().includes("Add Domain")) {
           addButton = buttons[i];
           break;
         }
       }
-      
+
       if (addButton) {
         expect(addButton.element.disabled).toBe(true);
       }
@@ -433,7 +456,7 @@ describe("DomainManagement Integration Tests", () => {
       // Set valid domain
       vm.newDomain = "valid.com";
       await nextTick();
-      
+
       if (addButton) {
         expect(addButton.element.disabled).toBe(false);
       }
@@ -459,13 +482,13 @@ describe("DomainManagement Integration Tests", () => {
       await flushPromises();
 
       const vm = wrapper.vm;
-      
+
       // Start a save operation
       const savePromise = vm.saveChanges();
-      
+
       // Unmount component
       wrapper.unmount();
-      
+
       // Save operation should complete without errors
       await expect(savePromise).resolves.not.toThrow();
     });
@@ -543,37 +566,39 @@ describe("DomainManagement Integration Tests", () => {
     describe("Boundary Testing", () => {
       it("should handle maximum number of domains gracefully", async () => {
         const vm = wrapper.vm;
-        
+
         // Add many domains to test performance and limits (reduced count)
         for (let i = 0; i < 30; i++) {
           vm.domains.push({
             name: `domain${i}.com`,
             allowAllUsers: true,
-            allowedEmails: []
+            allowedEmails: [],
           });
         }
 
         // Should still function properly
         expect(vm.domains.length).toBe(33); // 3 from mock + 30 added
-        
+
         // Save operation should handle large payload
         await vm.saveChanges();
-        expect(mockDomainManagement.updateDomainRestrictions).toHaveBeenCalled();
+        expect(
+          mockDomainManagement.updateDomainRestrictions,
+        ).toHaveBeenCalled();
       }, 10000);
 
       it("should handle maximum number of emails per domain", async () => {
         const vm = wrapper.vm;
-        
+
         // Add a domain with many emails
         const testDomain = {
           name: "test.com",
           allowAllUsers: false,
           allowedEmails: [],
-          newEmail: ""
+          newEmail: "",
         };
-        
+
         vm.domains.push(testDomain);
-        
+
         // Add many emails
         for (let i = 0; i < 50; i++) {
           testDomain.newEmail = `user${i}@test.com`;
@@ -585,15 +610,15 @@ describe("DomainManagement Integration Tests", () => {
 
       it("should handle empty and whitespace-only inputs", async () => {
         const vm = wrapper.vm;
-        
+
         // Test empty domain
         vm.newDomain = "";
         expect(vm.isValidDomain("")).toBe(true); // Empty is considered valid (optional)
-        
+
         // Test whitespace-only domain
         vm.newDomain = "   ";
         expect(vm.isValidDomain("   ")).toBe(false);
-        
+
         // Test tabs and newlines
         expect(vm.isValidDomain("\t\n")).toBe(false);
         expect(vm.isValidEmail("   ", "example.com")).toBe(false);
@@ -603,46 +628,46 @@ describe("DomainManagement Integration Tests", () => {
     describe("Concurrency and Race Condition Testing", () => {
       it("should handle rapid consecutive operations", async () => {
         const vm = wrapper.vm;
-        
+
         // Rapid domain additions
         const addPromises = [];
         for (let i = 0; i < 5; i++) {
           vm.newDomain = `rapid${i}.com`;
           addPromises.push(vm.addDomain());
         }
-        
+
         await Promise.all(addPromises);
-        
+
         // Should handle without crashing
         expect(vm.domains.length).toBeGreaterThan(3); // Original 3 + some new ones
       });
 
       it("should handle save operations during form modifications", async () => {
         const vm = wrapper.vm;
-        
+
         // Start save operation
         const savePromise = vm.saveChanges();
-        
+
         // Modify data while saving
         vm.newDomain = "concurrent.com";
         vm.addDomain();
-        
+
         // Should complete without errors
         await expect(savePromise).resolves.not.toThrow();
       });
 
       it("should handle multiple simultaneous save attempts", async () => {
         const vm = wrapper.vm;
-        
+
         // Start multiple save operations simultaneously
         const savePromises = [
           vm.saveChanges(),
           vm.saveChanges(),
-          vm.saveChanges()
+          vm.saveChanges(),
         ];
-        
+
         await Promise.all(savePromises);
-        
+
         // Should maintain consistent state
         expect(vm.saving).toBe(false);
       });
@@ -651,10 +676,10 @@ describe("DomainManagement Integration Tests", () => {
     describe("State Corruption Prevention", () => {
       it("should prevent invalid state mutations", async () => {
         const vm = wrapper.vm;
-        
+
         // Try to corrupt the domains array
         const originalLength = vm.domains.length;
-        
+
         try {
           // Attempt various state corruptions
           vm.domains.push(null);
@@ -664,7 +689,7 @@ describe("DomainManagement Integration Tests", () => {
         } catch (error) {
           // Errors are expected for invalid mutations
         }
-        
+
         // Component should still function
         await vm.saveChanges();
         expect(vm.saving).toBe(false);
@@ -678,18 +703,18 @@ describe("DomainManagement Integration Tests", () => {
               undefined, // Invalid domain
               "string", // Invalid domain
               { invalid: true }, // Missing required fields
-              { 
+              {
                 domain: "valid.com",
                 allow_all_users: "not_boolean", // Invalid type
-                allowed_emails: "not_array" // Invalid type
-              }
-            ]
-          }
+                allowed_emails: "not_array", // Invalid type
+              },
+            ],
+          },
         });
-        
+
         wrapper = createWrapper();
         await flushPromises();
-        
+
         // Component should handle gracefully
         expect(wrapper.exists()).toBeTruthy();
       });
@@ -699,38 +724,40 @@ describe("DomainManagement Integration Tests", () => {
       it("should handle component unmounting during operations", async () => {
         wrapper = createWrapper();
         await flushPromises();
-        
+
         const vm = wrapper.vm;
-        
+
         // Start operations
         vm.newDomain = "test.com";
         const addPromise = vm.addDomain();
         const savePromise = vm.saveChanges();
-        
+
         // Unmount component immediately
         wrapper.unmount();
-        
+
         // Operations should complete without memory leaks
-        await expect(Promise.all([addPromise, savePromise])).resolves.not.toThrow();
+        await expect(
+          Promise.all([addPromise, savePromise]),
+        ).resolves.not.toThrow();
       });
 
       it("should clean up event listeners and timers", async () => {
         wrapper = createWrapper();
         await flushPromises();
-        
+
         const vm = wrapper.vm;
-        
+
         // Trigger various operations to create potential listeners
         vm.newDomain = "test.com";
         await vm.addDomain();
         await vm.saveChanges();
-        
+
         // Store a reference to test that the component exists
         expect(wrapper.exists()).toBe(true);
-        
+
         // Unmount should clean up properly without throwing errors
         expect(() => wrapper.unmount()).not.toThrow();
-        
+
         // Component should no longer exist after unmounting
         expect(wrapper.exists()).toBe(false);
       });
@@ -739,28 +766,28 @@ describe("DomainManagement Integration Tests", () => {
     describe("Accessibility and Error Handling", () => {
       it("should handle keyboard navigation edge cases", async () => {
         const vm = wrapper.vm;
-        
+
         // Test with invalid focus targets
         try {
           // Simulate keyboard events on non-existent elements
-          const event = new KeyboardEvent('keydown', { key: 'Enter' });
+          const event = new KeyboardEvent("keydown", { key: "Enter" });
           vm.$el?.dispatchEvent?.(event);
         } catch (error) {
           // Should not crash the component
         }
-        
+
         expect(wrapper.exists()).toBeTruthy();
       });
 
       it("should maintain form state during validation errors", async () => {
         const vm = wrapper.vm;
-        
+
         // Set up form data
         vm.newDomain = "invalid domain with spaces";
-        
+
         // Try to add invalid domain
         await vm.addDomain();
-        
+
         // Form should maintain state and not be corrupted
         expect(vm.newDomain).toBe("invalid domain with spaces");
         expect(vm.domains.length).toBe(3); // Should not have been added

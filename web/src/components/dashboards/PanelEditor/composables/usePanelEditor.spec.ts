@@ -186,7 +186,8 @@ describe("usePanelEditor", () => {
     it("should update expandedSplitterHeight when query bar is shown", () => {
       dashboardPanelData.layout.showQueryBar = true;
 
-      const { querySplitterUpdated, expandedSplitterHeight } = usePanelEditor(options);
+      const { querySplitterUpdated, expandedSplitterHeight } =
+        usePanelEditor(options);
       querySplitterUpdated(75);
 
       expect(expandedSplitterHeight.value).toBe(75);
@@ -195,7 +196,8 @@ describe("usePanelEditor", () => {
     it("should not update expandedSplitterHeight when query bar is hidden", () => {
       dashboardPanelData.layout.showQueryBar = false;
 
-      const { querySplitterUpdated, expandedSplitterHeight } = usePanelEditor(options);
+      const { querySplitterUpdated, expandedSplitterHeight } =
+        usePanelEditor(options);
       querySplitterUpdated(75);
 
       expect(expandedSplitterHeight.value).toBeNull();
@@ -274,7 +276,10 @@ describe("usePanelEditor", () => {
 
       expect(seriesData.value).toEqual(complexData);
       expect(seriesData.value[0].areaStyle).toEqual({ opacity: 0.5 });
-      expect(seriesData.value[1].label).toEqual({ show: true, position: "top" });
+      expect(seriesData.value[1].label).toEqual({
+        show: true,
+        position: "top",
+      });
       expect(seriesData.value[2].data[0].symbolSize).toBe(10);
     });
 
@@ -363,7 +368,12 @@ describe("usePanelEditor", () => {
     it("should update indices via setIndex", () => {
       const { hoveredSeriesState } = usePanelEditor(options);
 
-      hoveredSeriesState.value.setIndex(5, 3, "panel-1", new Date("2024-01-01"));
+      hoveredSeriesState.value.setIndex(
+        5,
+        3,
+        "panel-1",
+        new Date("2024-01-01"),
+      );
 
       expect(hoveredSeriesState.value.dataIndex).toBe(5);
       expect(hoveredSeriesState.value.seriesIndex).toBe(3);
@@ -374,7 +384,12 @@ describe("usePanelEditor", () => {
     it("should handle null values in setIndex", () => {
       const { hoveredSeriesState } = usePanelEditor(options);
 
-      hoveredSeriesState.value.setIndex(null as any, null as any, null as any, null);
+      hoveredSeriesState.value.setIndex(
+        null as any,
+        null as any,
+        null as any,
+        null,
+      );
 
       expect(hoveredSeriesState.value.dataIndex).toBe(-1);
       expect(hoveredSeriesState.value.seriesIndex).toBe(-1);
@@ -406,7 +421,9 @@ describe("usePanelEditor", () => {
     });
 
     it("should filter out customQueryFields", () => {
-      dashboardPanelData.meta.stream.customQueryFields = [{ name: "customField" }];
+      dashboardPanelData.meta.stream.customQueryFields = [
+        { name: "customField" },
+      ];
       dashboardPanelData.data.queries[0].customQuery = true;
 
       const { updateVrlFunctionFieldList } = usePanelEditor(options);
@@ -482,7 +499,12 @@ describe("usePanelEditor", () => {
 
       const { updateVrlFunctionFieldList } = usePanelEditor(options);
 
-      const fieldList = ["weight_val", "source_node", "target_node", "remainingField"];
+      const fieldList = [
+        "weight_val",
+        "source_node",
+        "target_node",
+        "remainingField",
+      ];
       updateVrlFunctionFieldList(fieldList);
 
       expect(dashboardPanelData.meta.stream.vrlFunctionFieldList).toEqual([
@@ -667,7 +689,8 @@ describe("usePanelEditor", () => {
 
   describe("handleChartApiError", () => {
     it("should set errorMessage from string", () => {
-      const { handleChartApiError, errorMessage, errorData } = usePanelEditor(options);
+      const { handleChartApiError, errorMessage, errorData } =
+        usePanelEditor(options);
 
       handleChartApiError("Test error message");
 
@@ -676,7 +699,8 @@ describe("usePanelEditor", () => {
     });
 
     it("should set errorMessage from object with message property", () => {
-      const { handleChartApiError, errorMessage, errorData } = usePanelEditor(options);
+      const { handleChartApiError, errorMessage, errorData } =
+        usePanelEditor(options);
 
       handleChartApiError({ message: "Object error message" });
 
@@ -700,7 +724,8 @@ describe("usePanelEditor", () => {
 
   describe("handleLastTriggeredAtUpdate", () => {
     it("should update lastTriggeredAt", () => {
-      const { handleLastTriggeredAtUpdate, lastTriggeredAt } = usePanelEditor(options);
+      const { handleLastTriggeredAtUpdate, lastTriggeredAt } =
+        usePanelEditor(options);
 
       const testDate = new Date("2024-01-15T10:30:00Z");
       handleLastTriggeredAtUpdate(testDate);
@@ -711,21 +736,28 @@ describe("usePanelEditor", () => {
 
   describe("handleLimitNumberOfSeriesWarningMessage", () => {
     it("should update limitNumberOfSeriesWarningMessage", () => {
-      const { handleLimitNumberOfSeriesWarningMessage, limitNumberOfSeriesWarningMessage } =
-        usePanelEditor(options);
+      const {
+        handleLimitNumberOfSeriesWarningMessage,
+        limitNumberOfSeriesWarningMessage,
+      } = usePanelEditor(options);
 
       handleLimitNumberOfSeriesWarningMessage("Series limit exceeded");
 
-      expect(limitNumberOfSeriesWarningMessage.value).toBe("Series limit exceeded");
+      expect(limitNumberOfSeriesWarningMessage.value).toBe(
+        "Series limit exceeded",
+      );
     });
   });
 
   describe("handleResultMetadataUpdate", () => {
     it("should process metadata and update maxQueryRangeWarning", async () => {
-      const { handleResultMetadataUpdate, maxQueryRangeWarning } = usePanelEditor(options);
+      const { handleResultMetadataUpdate, maxQueryRangeWarning } =
+        usePanelEditor(options);
       const { processQueryMetadataErrors } = await import("@/utils/zincutils");
 
-      (processQueryMetadataErrors as any).mockReturnValue("Max query range warning");
+      (processQueryMetadataErrors as any).mockReturnValue(
+        "Max query range warning",
+      );
 
       handleResultMetadataUpdate({ some: "metadata" });
 
@@ -815,10 +847,10 @@ describe("usePanelEditor", () => {
       updateDateTime(newDateTime);
 
       expect(dashboardPanelData.meta.dateTime.start_time).toEqual(
-        new Date("2024-02-01T00:00:00Z")
+        new Date("2024-02-01T00:00:00Z"),
       );
       expect(dashboardPanelData.meta.dateTime.end_time).toEqual(
-        new Date("2024-02-02T00:00:00Z")
+        new Date("2024-02-02T00:00:00Z"),
       );
     });
 
@@ -843,15 +875,20 @@ describe("usePanelEditor", () => {
 
       updateDateTime(null as any);
 
-      expect(dashboardPanelData.meta.dateTime.start_time).toEqual(originalStartTime);
+      expect(dashboardPanelData.meta.dateTime.start_time).toEqual(
+        originalStartTime,
+      );
     });
   });
 
   describe("isLoading", () => {
     it("should return true when searchRequestTraceIds has items", async () => {
-      const { isLoading, variablesAndPanelsDataLoadingState } = usePanelEditor(options);
+      const { isLoading, variablesAndPanelsDataLoadingState } =
+        usePanelEditor(options);
 
-      variablesAndPanelsDataLoadingState.searchRequestTraceIds["panel-1"] = ["trace-1"];
+      variablesAndPanelsDataLoadingState.searchRequestTraceIds["panel-1"] = [
+        "trace-1",
+      ];
 
       await nextTick();
 
@@ -877,7 +914,8 @@ describe("usePanelEditor", () => {
     it("should combine renderer data with config", () => {
       dashboardPanelData.data.config = { unit: "bytes" };
 
-      const { currentPanelData, panelSchemaRendererRef } = usePanelEditor(options);
+      const { currentPanelData, panelSchemaRendererRef } =
+        usePanelEditor(options);
 
       // Mock panelSchemaRendererRef
       panelSchemaRendererRef.value = {
@@ -952,7 +990,9 @@ describe("usePanelEditor", () => {
 
       // Verify errors are set
       expect(errorMessage.value).toBe("Error 1");
-      expect(limitNumberOfSeriesWarningMessage.value).toBe("Series limit warning");
+      expect(limitNumberOfSeriesWarningMessage.value).toBe(
+        "Series limit warning",
+      );
       expect(maxQueryRangeWarning.value).toBe("Query range warning");
 
       // Reset all
@@ -1029,7 +1069,8 @@ describe("usePanelEditor", () => {
       const dispatchEventSpy = vi.spyOn(window, "dispatchEvent");
       dashboardPanelData.layout.showQueryBar = true;
 
-      const { querySplitterUpdated, expandedSplitterHeight } = usePanelEditor(options);
+      const { querySplitterUpdated, expandedSplitterHeight } =
+        usePanelEditor(options);
 
       // Test with various heights
       querySplitterUpdated(25);
@@ -1067,7 +1108,7 @@ describe("usePanelEditor", () => {
       runQuery();
 
       expect(dashboardPanelData.meta.dateTime.start_time).toEqual(
-        new Date("2024-03-01")
+        new Date("2024-03-01"),
       );
     });
   });

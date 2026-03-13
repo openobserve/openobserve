@@ -332,12 +332,16 @@ describe("CompareWithPast.vue", () => {
 
     it("should show correct tooltip for custom tab", async () => {
       await wrapper.setProps({ selectedTab: "custom" });
-      expect(wrapper.vm.comparisonDisabledTooltip).toContain("switch to SQL mode");
+      expect(wrapper.vm.comparisonDisabledTooltip).toContain(
+        "switch to SQL mode",
+      );
     });
 
     it("should show correct tooltip for promql tab", async () => {
       await wrapper.setProps({ selectedTab: "promql" });
-      expect(wrapper.vm.comparisonDisabledTooltip).toContain("switch to SQL mode");
+      expect(wrapper.vm.comparisonDisabledTooltip).toContain(
+        "switch to SQL mode",
+      );
     });
 
     it("should show empty tooltip for sql tab", async () => {
@@ -396,7 +400,9 @@ describe("CompareWithPast.vue", () => {
     });
 
     it("should render add comparison button", () => {
-      const addBtn = wrapper.find('[data-test="multi-time-range-alerts-add-btn"]');
+      const addBtn = wrapper.find(
+        '[data-test="multi-time-range-alerts-add-btn"]',
+      );
       expect(addBtn.exists()).toBe(true);
     });
 
@@ -425,7 +431,9 @@ describe("CompareWithPast.vue", () => {
       });
       await flushPromises();
       // Check that the correct number of reference windows are rendered
-      const deleteBtns = wrapper.findAll('[data-test="multi-time-range-alerts-delete-btn"]');
+      const deleteBtns = wrapper.findAll(
+        '[data-test="multi-time-range-alerts-delete-btn"]',
+      );
       expect(deleteBtns.length).toBe(2);
     });
 
@@ -437,7 +445,9 @@ describe("CompareWithPast.vue", () => {
         ],
       });
       await flushPromises();
-      const deleteBtns = wrapper.findAll('[data-test="multi-time-range-alerts-delete-btn"]');
+      const deleteBtns = wrapper.findAll(
+        '[data-test="multi-time-range-alerts-delete-btn"]',
+      );
       expect(deleteBtns.length).toBe(2);
     });
   });

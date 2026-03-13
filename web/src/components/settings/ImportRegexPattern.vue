@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:active-tab="handleTabChange"
   >
     <template #output-content>
-      <div class="tw:w-full" style="min-width: 400px;">
+      <div class="tw:w-full" style="min-width: 400px">
         <div
           v-if="regexPatternErrorsToDisplay.length > 0"
           class="text-center text-h6 tw:py-2"
@@ -45,121 +45,121 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
         <q-separator class="q-mx-md q-mt-md" />
         <div class="error-report-container">
-              <!-- Regex Pattern Errors Section -->
+          <!-- Regex Pattern Errors Section -->
+          <div
+            class="error-section"
+            v-if="regexPatternErrorsToDisplay.length > 0"
+          >
+            <div class="error-list">
+              <!-- Iterate through the outer array -->
               <div
-                class="error-section"
-                v-if="regexPatternErrorsToDisplay.length > 0"
+                v-for="(errorGroup, index) in regexPatternErrorsToDisplay"
+                :key="index"
               >
-                <div class="error-list">
-                  <!-- Iterate through the outer array -->
-                  <div
-                    v-for="(errorGroup, index) in regexPatternErrorsToDisplay"
-                    :key="index"
+                <!-- Iterate through each inner array (the individual error message) -->
+                <div
+                  v-for="(errorMessage, errorIndex) in errorGroup"
+                  :key="errorIndex"
+                  class="error-item"
+                  :data-test="`regex-pattern-import-error-${index}-${errorIndex}`"
+                >
+                  <span
+                    data-test="regex-pattern-import-name-error"
+                    class="text-red"
+                    v-if="
+                      typeof errorMessage === 'object' &&
+                      errorMessage.field == 'regex_pattern_name'
+                    "
                   >
-                    <!-- Iterate through each inner array (the individual error message) -->
-                    <div
-                      v-for="(errorMessage, errorIndex) in errorGroup"
-                      :key="errorIndex"
-                      class="error-item"
-                      :data-test="`regex-pattern-import-error-${index}-${errorIndex}`"
-                    >
-                      <span
-                        data-test="regex-pattern-import-name-error"
-                        class="text-red"
-                        v-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'regex_pattern_name'
+                    {{ errorMessage.message }}
+                    <!-- name is required so we need to show the input field -->
+                    <div style="width: 300px">
+                      <q-input
+                        data-test="regex-pattern-import-name-input"
+                        v-model="userSelectedRegexPatternName[index]"
+                        :label="'Regex Pattern Name *'"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="showLabelOnTop"
+                        stack-label
+                        outlined
+                        filled
+                        dense
+                        tabindex="0"
+                        @update:model-value="
+                          updateRegexPatternName(
+                            userSelectedRegexPatternName[index],
+                            index,
+                          )
                         "
-                      >
-                        {{ errorMessage.message }}
-                        <!-- name is required so we need to show the input field -->
-                        <div style="width: 300px">
-                          <q-input
-                            data-test="regex-pattern-import-name-input"
-                            v-model="userSelectedRegexPatternName[index]"
-                            :label="'Regex Pattern Name *'"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="showLabelOnTop"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            tabindex="0"
-                            @update:model-value="
-                              updateRegexPatternName(
-                                userSelectedRegexPatternName[index],
-                                index,
-                              )
-                            "
-                          />
-                        </div>
-                      </span>
-                      <span
-                        data-test="regex-pattern-import-pattern-error"
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'regex_pattern'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <!-- name is required so we need to show the input field -->
-                        <div style="width: 300px">
-                          <q-input
-                            data-test="regex-pattern-import-name-input"
-                            v-model="userSelectedRegexPattern[index]"
-                            :label="'Regex Pattern *'"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="showLabelOnTop"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            tabindex="0"
-                            @update:model-value="
-                              updateRegexPattern(
-                                userSelectedRegexPattern[index],
-                                index,
-                              )
-                            "
-                          />
-                        </div>
-                      </span>
-                      <span class="text-red" v-else>{{ errorMessage }}</span>
+                      />
                     </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="error-section" v-if="regexPatternCreators.length > 0">
-                <div
-                  class="section-title text-primary"
-                  data-test="regex-pattern-import-creation-title"
-                >
-                  Regex Pattern Creation
-                </div>
-                <div
-                  class="error-list"
-                  v-for="(val, index) in regexPatternCreators"
-                  :key="index"
-                  :data-test="`regex-pattern-import-creation-${index}`"
-                >
-                  <div
-                    :class="{
-                      'error-item text-bold': true,
-                      'text-green ': val.success,
-                      'text-red': !val.success,
-                    }"
-                    :data-test="`regex-pattern-import-creation-${index}-message`"
+                  </span>
+                  <span
+                    data-test="regex-pattern-import-pattern-error"
+                    class="text-red"
+                    v-else-if="
+                      typeof errorMessage === 'object' &&
+                      errorMessage.field == 'regex_pattern'
+                    "
                   >
-                    <pre class="creators-message">{{ val.message }}</pre>
-                  </div>
+                    {{ errorMessage.message }}
+                    <!-- name is required so we need to show the input field -->
+                    <div style="width: 300px">
+                      <q-input
+                        data-test="regex-pattern-import-name-input"
+                        v-model="userSelectedRegexPattern[index]"
+                        :label="'Regex Pattern *'"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="showLabelOnTop"
+                        stack-label
+                        outlined
+                        filled
+                        dense
+                        tabindex="0"
+                        @update:model-value="
+                          updateRegexPattern(
+                            userSelectedRegexPattern[index],
+                            index,
+                          )
+                        "
+                      />
+                    </div>
+                  </span>
+                  <span class="text-red" v-else>{{ errorMessage }}</span>
                 </div>
               </div>
             </div>
           </div>
+
+          <div class="error-section" v-if="regexPatternCreators.length > 0">
+            <div
+              class="section-title text-primary"
+              data-test="regex-pattern-import-creation-title"
+            >
+              Regex Pattern Creation
+            </div>
+            <div
+              class="error-list"
+              v-for="(val, index) in regexPatternCreators"
+              :key="index"
+              :data-test="`regex-pattern-import-creation-${index}`"
+            >
+              <div
+                :class="{
+                  'error-item text-bold': true,
+                  'text-green ': val.success,
+                  'text-red': !val.success,
+                }"
+                :data-test="`regex-pattern-import-creation-${index}-message`"
+              >
+                <pre class="creators-message">{{ val.message }}</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </template>
   </base-import>
 
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="activeTab === 'import_built_in_patterns'"
     class="o2-custom-bg"
-    style="height: calc(100vh - 50px);"
+    style="height: calc(100vh - 50px)"
   >
     <div class="card-container tw:mb-[0.625rem]">
       <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]">
@@ -220,7 +220,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="editor-container-built-in">
-      <div class="card-container tw:py-[0.625rem] tw:px-[0.625rem] tw:mb-[0.625rem]">
+      <div
+        class="card-container tw:py-[0.625rem] tw:px-[0.625rem] tw:mb-[0.625rem]"
+      >
         <div class="app-tabs-container tw:h-[36px] tw:w-fit">
           <app-tabs
             data-test="regex-pattern-import-tabs"
@@ -296,7 +298,7 @@ export default defineComponent({
     const jsonArrayOfObj = computed({
       get: () => {
         // For built-in patterns tab, use local ref
-        if (activeTab.value === 'import_built_in_patterns') {
+        if (activeTab.value === "import_built_in_patterns") {
           return localJsonArrayOfObj.value;
         }
         // For other tabs, use BaseImport's ref
@@ -304,13 +306,13 @@ export default defineComponent({
       },
       set: (val) => {
         // For built-in patterns tab, set local ref
-        if (activeTab.value === 'import_built_in_patterns') {
+        if (activeTab.value === "import_built_in_patterns") {
           localJsonArrayOfObj.value = val;
         } else if (baseImportRef.value) {
           // For other tabs, set BaseImport's ref
           baseImportRef.value.jsonArrayOfObj = val;
         }
-      }
+      },
     });
 
     // All tabs including the built-in patterns tab
@@ -343,7 +345,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -355,7 +357,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -432,11 +434,14 @@ export default defineComponent({
           index,
         );
         if (!validationResult) {
-          return false;  // Validation error
+          return false; // Validation error
         }
 
         if (regexPatternErrorsToDisplay.value.length === 0) {
-          const hasCreatedRegexPattern = await createRegexPattern(jsonObj, index);
+          const hasCreatedRegexPattern = await createRegexPattern(
+            jsonObj,
+            index,
+          );
           return hasCreatedRegexPattern;
         }
         return false;
@@ -452,25 +457,43 @@ export default defineComponent({
     };
 
     const validateRegexPatternInputs = async (jsonObj: any, index: number) => {
-      if(!jsonObj.name || !jsonObj.name.trim() || typeof jsonObj.name !== 'string'){
-        regexPatternErrorsToDisplay.value.push([{
-          field: 'regex_pattern_name',
-          message: `Regex pattern - ${index}: name is required`
-        }]);
+      if (
+        !jsonObj.name ||
+        !jsonObj.name.trim() ||
+        typeof jsonObj.name !== "string"
+      ) {
+        regexPatternErrorsToDisplay.value.push([
+          {
+            field: "regex_pattern_name",
+            message: `Regex pattern - ${index}: name is required`,
+          },
+        ]);
         return false;
       }
       // Note: Duplicate pattern names are allowed.
       // Primary key is UUID-based (id), so multiple patterns can have the same name.
       // The backend will handle duplicates by appending a suffix automatically.
-      if(!jsonObj.pattern || !jsonObj.pattern.trim() || typeof jsonObj.pattern !== 'string'){
-        regexPatternErrorsToDisplay.value.push([{
-          field: 'regex_pattern',
-          message: `Regex pattern - ${index}: is required`
-        }]);
+      if (
+        !jsonObj.pattern ||
+        !jsonObj.pattern.trim() ||
+        typeof jsonObj.pattern !== "string"
+      ) {
+        regexPatternErrorsToDisplay.value.push([
+          {
+            field: "regex_pattern",
+            message: `Regex pattern - ${index}: is required`,
+          },
+        ]);
         return false;
       }
-      if(typeof jsonObj.description !== 'string' && jsonObj.description !== null && jsonObj.description !== undefined){
-        regexPatternErrorsToDisplay.value.push([`Regex pattern - ${index}: description must be a string or should be empty`]);
+      if (
+        typeof jsonObj.description !== "string" &&
+        jsonObj.description !== null &&
+        jsonObj.description !== undefined
+      ) {
+        regexPatternErrorsToDisplay.value.push([
+          `Regex pattern - ${index}: description must be a string or should be empty`,
+        ]);
         return false;
       }
       return true;
@@ -478,43 +501,46 @@ export default defineComponent({
 
     const createRegexPattern = async (jsonObj: any, index: number) => {
       try {
-          const payload = {
-              name: jsonObj.name,
-              pattern: jsonObj.pattern,
-              description: jsonObj.description,
-          }
-          await regexPatternsService.create(store.state.selectedOrganization.identifier, payload);
-          regexPatternCreators.value.push({
-              success: true,
-              message: `Regex pattern - ${index}: "${jsonObj.name}" created successfully \nNote: please remove the created regex pattern object ${jsonObj.name} from the json file`,
-          });
-          return true;
+        const payload = {
+          name: jsonObj.name,
+          pattern: jsonObj.pattern,
+          description: jsonObj.description,
+        };
+        await regexPatternsService.create(
+          store.state.selectedOrganization.identifier,
+          payload,
+        );
+        regexPatternCreators.value.push({
+          success: true,
+          message: `Regex pattern - ${index}: "${jsonObj.name}" created successfully \nNote: please remove the created regex pattern object ${jsonObj.name} from the json file`,
+        });
+        return true;
       } catch (error: any) {
-          const errorMessage = error?.response?.data?.message || "Unknown Error";
+        const errorMessage = error?.response?.data?.message || "Unknown Error";
 
-          // Check if it's a duplicate pattern error
-          if (errorMessage.includes("already exists")) {
-            q.notify({
-              message: `Pattern "${jsonObj.name}" already exists. Please use a different name.`,
-              color: "negative",
-              position: "bottom",
-              timeout: 4000,
-            });
-          } else {
-            // Show generic error notification for other errors
-            q.notify({
-              message: `Failed to import pattern "${jsonObj.name}": ${errorMessage}`,
-              color: "negative",
-              position: "bottom",
-              timeout: 4000,
-            });
-          }
-
-          regexPatternCreators.value.push({
-              success: false,
-              message: `Regex pattern - ${index}: "${jsonObj.name}" creation failed --> \n Reason: ${errorMessage}`,
+        // Check if it's a duplicate pattern error
+        if (errorMessage.includes("already exists")) {
+          q.notify({
+            message: `Pattern "${jsonObj.name}" already exists. Please use a different name.`,
+            color: "negative",
+            position: "bottom",
+            timeout: 4000,
           });
-          return false;
+        } else {
+          // Show generic error notification for other errors
+          q.notify({
+            message: `Failed to import pattern "${jsonObj.name}": ${errorMessage}`,
+            color: "negative",
+            position: "bottom",
+            timeout: 4000,
+          });
+        }
+
+        regexPatternCreators.value.push({
+          success: false,
+          message: `Regex pattern - ${index}: "${jsonObj.name}" creation failed --> \n Reason: ${errorMessage}`,
+        });
+        return false;
       }
     };
 
@@ -534,7 +560,10 @@ export default defineComponent({
 
     const updateActiveTab = () => {
       // This is called when switching between built-in patterns and other tabs
-      if (activeTab.value !== 'import_built_in_patterns' && baseImportRef.value) {
+      if (
+        activeTab.value !== "import_built_in_patterns" &&
+        baseImportRef.value
+      ) {
         baseImportRef.value.jsonStr = "";
         baseImportRef.value.jsonFiles = null;
         baseImportRef.value.url = "";
@@ -547,13 +576,13 @@ export default defineComponent({
       // with manually constructed payload
       const payload = {
         jsonStr: JSON.stringify(patternsToImport, null, 2),
-        jsonArray: patternsToImport
+        jsonArray: patternsToImport,
       };
       await importJson(payload);
     };
 
     const handleImportClick = async () => {
-      if (activeTab.value === 'import_built_in_patterns') {
+      if (activeTab.value === "import_built_in_patterns") {
         // For built-in patterns tab, trigger import from the child component
         if (builtInPatternsTabRef.value) {
           builtInPatternsTabRef.value.importSelectedPatterns();
@@ -634,13 +663,13 @@ export default defineComponent({
 }
 .editor-container-json {
   .monaco-editor {
-   height: calc(100vh - 310px) !important; /* Total editor height */
+    height: calc(100vh - 310px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
   }
 }
 .monaco-editor {
-height: calc(100vh - 315px) !important; /* Total editor height */
+  height: calc(100vh - 315px) !important; /* Total editor height */
   overflow: auto; /* Allows scrolling if content overflows */
   resize: none; /* Remove resize behavior */
   border: 1px solid var(--o2-border-color);

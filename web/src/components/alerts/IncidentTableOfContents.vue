@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="toc-container" class="tw:px-2 tw:pt-4 tw:pb-2 tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
+  <div
+    data-test="toc-container"
+    class="tw:px-2 tw:pt-4 tw:pb-2 tw:flex tw:flex-col tw:h-full tw:overflow-hidden"
+  >
     <div
       data-test="toc-section-container"
       class="section-container tw:overflow-hidden tw:flex tw:flex-col tw:flex-1"
@@ -25,13 +28,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="toc-header"
         :class="[
           'section-header-bg tw:px-3 tw:py-2 tw:flex tw:items-center tw:gap-2 tw:border-b tw:flex-shrink-0',
-          isDarkMode
-            ? 'tw:border-gray-700'
-            : 'tw:border-gray-200'
+          isDarkMode ? 'tw:border-gray-700' : 'tw:border-gray-200',
         ]"
       >
-        <q-icon data-test="toc-header-icon" name="format_list_bulleted" size="16px" class="tw:opacity-80" />
-        <span data-test="toc-header-title" :class="isDarkMode ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-xs tw:font-semibold">
+        <q-icon
+          data-test="toc-header-icon"
+          name="format_list_bulleted"
+          size="16px"
+          class="tw:opacity-80"
+        />
+        <span
+          data-test="toc-header-title"
+          :class="isDarkMode ? 'tw:text-gray-300' : 'tw:text-gray-700'"
+          class="tw:text-xs tw:font-semibold"
+        >
           Table of Contents
         </span>
       </div>
@@ -39,7 +49,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Content -->
       <div data-test="toc-content" class="tw:p-3 tw:flex-1 tw:overflow-auto">
         <!-- Table of Contents -->
-        <div v-if="tableOfContents.length === 0" data-test="toc-empty-state" :class="isDarkMode ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:text-xs tw:italic">
+        <div
+          v-if="tableOfContents.length === 0"
+          data-test="toc-empty-state"
+          :class="isDarkMode ? 'tw:text-gray-500' : 'tw:text-gray-400'"
+          class="tw:text-xs tw:italic"
+        >
           No sections available
         </div>
         <div v-else class="tw:space-y-1">
@@ -51,9 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`toc-level1-content-${item.id}`"
                 :class="[
                   'tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1.5 tw:rounded tw:transition-colors',
-                  isDarkMode
-                    ? 'tw:text-gray-200'
-                    : 'tw:text-gray-900'
+                  isDarkMode ? 'tw:text-gray-200' : 'tw:text-gray-900',
                 ]"
               >
                 <!-- Icon on the left -->
@@ -71,9 +84,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     'tw:text-xs tw:font-medium tw:truncate tw:flex-1 tw:cursor-pointer',
                     isDarkMode
                       ? 'hover:tw:text-blue-400'
-                      : 'hover:tw:text-blue-600'
+                      : 'hover:tw:text-blue-600',
                   ]"
-                >{{ item.text }}</span>
+                  >{{ item.text }}</span
+                >
                 <!-- Expand button on the right (only for items with children) -->
                 <q-btn
                   v-if="item.children.length > 0"
@@ -82,16 +96,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   round
                   size="xs"
-                  :icon="expandedSections[item.id] ? 'expand_more' : 'chevron_right'"
+                  :icon="
+                    expandedSections[item.id] ? 'expand_more' : 'chevron_right'
+                  "
                   @click="$emit('toggle-section', item, $event)"
                   class="tw:flex-shrink-0"
                 >
-                  <q-tooltip data-test="toc-expand-tooltip" :delay="500">{{ expandedSections[item.id] ? 'Collapse' : 'Expand' }}</q-tooltip>
+                  <q-tooltip data-test="toc-expand-tooltip" :delay="500">{{
+                    expandedSections[item.id] ? "Collapse" : "Expand"
+                  }}</q-tooltip>
                 </q-btn>
               </div>
 
               <!-- Level 2 Children -->
-              <div v-if="expandedSections[item.id] && item.children.length > 0" :data-test="`toc-level2-container-${item.id}`" class="tw:ml-4 tw:space-y-1 tw:mt-1">
+              <div
+                v-if="expandedSections[item.id] && item.children.length > 0"
+                :data-test="`toc-level2-container-${item.id}`"
+                class="tw:ml-4 tw:space-y-1 tw:mt-1"
+              >
                 <template v-for="child in item.children" :key="child.id">
                   <div :data-test="`toc-level2-item-${child.id}`">
                     <!-- Level 2 Item -->
@@ -99,9 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`toc-level2-content-${child.id}`"
                       :class="[
                         'tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:rounded tw:transition-colors',
-                        isDarkMode
-                          ? 'tw:text-gray-300'
-                          : 'tw:text-gray-700'
+                        isDarkMode ? 'tw:text-gray-300' : 'tw:text-gray-700',
                       ]"
                     >
                       <!-- Icon on the left -->
@@ -119,9 +139,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'tw:text-xs tw:truncate tw:flex-1 tw:cursor-pointer',
                           isDarkMode
                             ? 'hover:tw:text-blue-400'
-                            : 'hover:tw:text-blue-600'
+                            : 'hover:tw:text-blue-600',
                         ]"
-                      >{{ child.text }}</span>
+                        >{{ child.text }}</span
+                      >
                       <!-- Expand button on the right (only for items with children) -->
                       <q-btn
                         v-if="child.children.length > 0"
@@ -130,16 +151,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dense
                         round
                         size="xs"
-                        :icon="expandedSections[child.id] ? 'expand_more' : 'chevron_right'"
+                        :icon="
+                          expandedSections[child.id]
+                            ? 'expand_more'
+                            : 'chevron_right'
+                        "
                         @click="$emit('toggle-section', child, $event)"
                         class="tw:flex-shrink-0"
                       >
-                        <q-tooltip data-test="toc-expand-tooltip" :delay="500">{{ expandedSections[child.id] ? 'Collapse' : 'Expand' }}</q-tooltip>
+                        <q-tooltip
+                          data-test="toc-expand-tooltip"
+                          :delay="500"
+                          >{{
+                            expandedSections[child.id] ? "Collapse" : "Expand"
+                          }}</q-tooltip
+                        >
                       </q-btn>
                     </div>
 
                     <!-- Level 3 Children -->
-                    <div v-if="expandedSections[child.id] && child.children.length > 0" :data-test="`toc-level3-container-${child.id}`" class="tw:ml-4 tw:space-y-1 tw:mt-1">
+                    <div
+                      v-if="
+                        expandedSections[child.id] && child.children.length > 0
+                      "
+                      :data-test="`toc-level3-container-${child.id}`"
+                      class="tw:ml-4 tw:space-y-1 tw:mt-1"
+                    >
                       <div
                         v-for="grandchild in child.children"
                         :key="grandchild.id"
@@ -149,11 +186,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:rounded tw:cursor-pointer tw:transition-colors',
                           isDarkMode
                             ? 'hover:tw:bg-gray-700 tw:text-gray-400'
-                            : 'hover:tw:bg-blue-50 tw:text-gray-600'
+                            : 'hover:tw:bg-blue-50 tw:text-gray-600',
                         ]"
                       >
-                        <q-icon :data-test="`toc-level3-icon-${grandchild.id}`" name="fiber_manual_record" size="8px" class="tw:opacity-60" />
-                        <span :data-test="`toc-level3-text-${grandchild.id}`" class="tw:text-[11px] tw:truncate">{{ grandchild.text }}</span>
+                        <q-icon
+                          :data-test="`toc-level3-icon-${grandchild.id}`"
+                          name="fiber_manual_record"
+                          size="8px"
+                          class="tw:opacity-60"
+                        />
+                        <span
+                          :data-test="`toc-level3-text-${grandchild.id}`"
+                          class="tw:text-[11px] tw:truncate"
+                          >{{ grandchild.text }}</span
+                        >
                       </div>
                     </div>
                   </div>
@@ -194,7 +240,7 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['scroll-to-section', 'toggle-section'],
+  emits: ["scroll-to-section", "toggle-section"],
 });
 </script>
 

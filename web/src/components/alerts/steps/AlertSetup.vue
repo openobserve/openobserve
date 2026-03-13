@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="step-alert-setup" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+  <div
+    class="step-alert-setup"
+    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
+  >
     <div class="step-content card-container tw:px-3 tw:py-4">
       <q-form ref="step1Form" @submit.prevent>
         <!-- Alert Name -->
@@ -194,7 +197,12 @@ export default defineComponent({
       default: null,
     },
   },
-  emits: ["update:streams", "filter:streams", "update:stream-name", "update:active-folder-id"],
+  emits: [
+    "update:streams",
+    "filter:streams",
+    "update:stream-name",
+    "update:active-folder-id",
+  ],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();

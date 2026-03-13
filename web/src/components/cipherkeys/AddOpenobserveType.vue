@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div>
-    <div v-if="!formData.isUpdate || isUpdate || formData.key.store.local === ''">
+    <div
+      v-if="!formData.isUpdate || isUpdate || formData.key.store.local === ''"
+    >
       <q-input
         data-test="add-cipher-key-openobserve-secret-input"
         v-model="formData.key.store.local"
@@ -31,14 +33,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dense
         :rules="[(val: any) => !!val || 'Secret is required']"
       />
-      <q-btn data-test="add-cipher-key-openobserve-secret-input-cancel" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.local != ''" @click="isUpdate = false" size="sm" color="primary" :label="t('common.cancel')" />
+      <q-btn
+        data-test="add-cipher-key-openobserve-secret-input-cancel"
+        class="q-mt-sm"
+        v-if="formData.isUpdate && formData.key.store.local != ''"
+        @click="isUpdate = false"
+        size="sm"
+        color="primary"
+        :label="t('common.cancel')"
+      />
     </div>
     <div v-else>
       <label class="row q-field q-mb-md">
-        <b>{{ t('cipherKey.secret') }}</b>
+        <b>{{ t("cipherKey.secret") }}</b>
       </label>
       <pre class="pre-text">{{ formData.key.store.local }}</pre>
-      <q-btn data-test="add-cipher-key-openobserve-secret-input-update" @click="isUpdate = true" size="sm" color="primary" :label="t('common.update')" />
+      <q-btn
+        data-test="add-cipher-key-openobserve-secret-input-update"
+        @click="isUpdate = true"
+        size="sm"
+        color="primary"
+        :label="t('common.update')"
+      />
     </div>
   </div>
 </template>
@@ -102,7 +118,7 @@ export default defineComponent({
 .pre-text {
   text-wrap: auto;
   word-wrap: break-word;
-  border: 1px solid #E1E1E1;
+  border: 1px solid #e1e1e1;
   padding: 5px;
   margin-bottom: 5px;
 }

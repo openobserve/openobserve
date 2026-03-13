@@ -1,7 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Dialog, Notify } from "quasar";
-import useDnD from '@/plugins/pipelines/useDnD';
+import useDnD from "@/plugins/pipelines/useDnD";
 import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -33,7 +33,7 @@ vi.mock("@/composables/useStreams", () => ({
 }));
 
 const mockAddNode = vi.fn();
-vi.mock('@/plugins/pipelines/useDnD', () => ({
+vi.mock("@/plugins/pipelines/useDnD", () => ({
   default: vi.fn(),
   useDnD: () => ({
     addNode: mockAddNode,
@@ -43,8 +43,8 @@ vi.mock('@/plugins/pipelines/useDnD', () => ({
       userClickedNode: {},
       userSelectedNode: {},
     },
-    deletePipelineNode: vi.fn()
-  })
+    deletePipelineNode: vi.fn(),
+  }),
 }));
 
 describe("Query Component", () => {
@@ -56,32 +56,32 @@ describe("Query Component", () => {
     // Setup mock store
     mockStore = {
       state: {
-        theme: 'light',
+        theme: "light",
         selectedOrganization: {
-          identifier: "test-org"
+          identifier: "test-org",
         },
         zoConfig: {
           min_auto_refresh_interval: 900,
-          sql_base64_enabled: false
-        }
-      }
+          sql_base64_enabled: false,
+        },
+      },
     };
 
     // Setup mock pipeline object
     mockPipelineObj = {
       currentSelectedNodeData: {
         data: {},
-        type: 'query'
+        type: "query",
       },
       userSelectedNode: {},
-      isEditNode: false
+      isEditNode: false,
     };
 
     // Mock useDnD composable
     vi.mocked(useDnD).mockImplementation(() => ({
       pipelineObj: mockPipelineObj,
       addNode: mockAddNode,
-      deletePipelineNode: vi.fn()
+      deletePipelineNode: vi.fn(),
     }));
 
     // Mount component
@@ -94,13 +94,13 @@ describe("Query Component", () => {
         stubs: {
           ScheduledPipeline: true,
           ConfirmDialog: true,
-        }
+        },
       },
       props: {
         streamName: "test-stream",
         streamType: "logs",
-        streamRoutes: {}
-      }
+        streamRoutes: {},
+      },
     });
 
     const notifyMock = vi.fn();
@@ -149,48 +149,50 @@ describe("Query Component", () => {
   describe("SQL Query Validation", () => {
     it("validates SQL query successfully", async () => {
       searchService.search.mockResolvedValueOnce({ hits: [] });
-      
+
       await wrapper.vm.validateSqlQuery();
-      
+
       expect(wrapper.vm.isValidSqlQuery).toBe(true);
       expect(wrapper.vm.validatingSqlQuery).toBe(false);
     });
 
     it("handles SQL query validation failure", async () => {
       const errorMessage = "Invalid SQL syntax";
-      
+
       // Setup the mock rejection
-      searchService.search.mockImplementationOnce(() => 
+      searchService.search.mockImplementationOnce(() =>
         Promise.reject({
-            response: { data: { message: errorMessage } },
-            message: errorMessage
-          })
-      )
-      
+          response: { data: { message: errorMessage } },
+          message: errorMessage,
+        }),
+      );
+
       // Set initial state
       wrapper.vm.streamRoute.query_condition.type = "sql";
       wrapper.vm.streamRoute.query_condition.sql = "SELECT * FROM logs";
       wrapper.vm.isValidSqlQuery = true;
       wrapper.vm.validatingSqlQuery = true;
-      
+
       // Call validate and wait for next tick
       await wrapper.vm.validateSqlQuery();
       await flushPromises();
       await wrapper.vm.$nextTick();
-      
+
       // Verify the final state
       expect(wrapper.vm.isValidSqlQuery).toBe(false);
       expect(wrapper.vm.validatingSqlQuery).toBe(false);
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(expect.objectContaining({
-        type: "negative",
-        message: `Invalid SQL Query: ${errorMessage}`
-      }));
+      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "negative",
+          message: `Invalid SQL Query: ${errorMessage}`,
+        }),
+      );
     });
 
     it("skips validation for promql query type", async () => {
       wrapper.vm.streamRoute.query_condition.type = "promql";
       await wrapper.vm.validateSqlQuery();
-      
+
       expect(wrapper.vm.isValidSqlQuery).toBe(true);
       expect(wrapper.vm.validatingSqlQuery).toBe(false);
       expect(searchService.search).not.toHaveBeenCalled();
@@ -201,32 +203,36 @@ describe("Query Component", () => {
     it("opens cancel dialog when form has changes", async () => {
       wrapper.vm.streamRoute.name = "modified";
       await wrapper.vm.openCancelDialog();
-      
+
       expect(wrapper.vm.dialog.show).toBe(true);
       expect(wrapper.vm.dialog.title).toBe("Discard Changes");
-      expect(wrapper.vm.dialog.message).toBe("Are you sure you want to cancel routing changes?");
+      expect(wrapper.vm.dialog.message).toBe(
+        "Are you sure you want to cancel routing changes?",
+      );
     });
 
     it("closes form directly when no changes made", async () => {
       await wrapper.vm.openCancelDialog();
-      
+
       expect(wrapper.vm.dialog.show).toBe(false);
       expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
     });
 
     it("opens delete dialog with correct content", async () => {
       await wrapper.vm.openDeleteDialog();
-      
+
       expect(wrapper.vm.dialog.show).toBe(true);
       expect(wrapper.vm.dialog.title).toBe("Delete Node");
-      expect(wrapper.vm.dialog.message).toBe("Are you sure you want to delete stream routing?");
+      expect(wrapper.vm.dialog.message).toBe(
+        "Are you sure you want to delete stream routing?",
+      );
     });
   });
 
   describe("Form Submission", () => {
     it("saves query data with valid inputs", async () => {
       const scheduledPipelineRef = {
-        validateInputs: vi.fn().mockReturnValue(true)
+        validateInputs: vi.fn().mockReturnValue(true),
       };
       wrapper.vm.scheduledPipelineRef = scheduledPipelineRef;
       searchService.search.mockResolvedValueOnce({ hits: [] });
@@ -239,7 +245,7 @@ describe("Query Component", () => {
 
     it("does not save when pipeline validation fails", async () => {
       const scheduledPipelineRef = {
-        validateInputs: vi.fn().mockReturnValue(false)
+        validateInputs: vi.fn().mockReturnValue(false),
       };
       wrapper.vm.scheduledPipelineRef = scheduledPipelineRef;
 

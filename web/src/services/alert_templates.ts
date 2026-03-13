@@ -22,9 +22,9 @@ const template = {
   update: ({ org_identifier, template_name, data }: any) => {
     return http().put(
       `/api/${org_identifier}/alerts/templates/${encodeURIComponent(
-        template_name
+        template_name,
       )}`,
-      data
+      data,
     );
   },
   list: ({ org_identifier }: any) => {
@@ -33,22 +33,26 @@ const template = {
   get_by_name: ({ org_identifier, template_name }: any) => {
     return http().get(
       `/api/${org_identifier}/alerts/templates/${encodeURIComponent(
-        template_name
-      )}`
+        template_name,
+      )}`,
     );
   },
   delete: ({ org_identifier, template_name }: any) => {
     return http().delete(
       `/api/${org_identifier}/alerts/templates/${encodeURIComponent(
-        template_name
-      )}`
+        template_name,
+      )}`,
     );
   },
   bulkDelete: (org_identifier: string, data: any) => {
-    return http().delete(`/api/${org_identifier}/alerts/templates/bulk`, { data });
+    return http().delete(`/api/${org_identifier}/alerts/templates/bulk`, {
+      data,
+    });
   },
   get_system_templates: ({ org_identifier }: any) => {
-    return http().get(`/api/${org_identifier}/alerts/templates/system/prebuilt`);
+    return http().get(
+      `/api/${org_identifier}/alerts/templates/system/prebuilt`,
+    );
   },
 };
 

@@ -41,7 +41,7 @@ const http = () => {
               textColor: "white",
               icon: "warning",
               message: JSON.stringify(
-                error.response.data["error"] || "Bad Request"
+                error.response.data["error"] || "Bad Request",
               ),
             });
             break;
@@ -80,7 +80,7 @@ const http = () => {
               textColor: "white",
               icon: "warning",
               message: JSON.stringify(
-                error.response.data["error"] || "Internal ServerError"
+                error.response.data["error"] || "Internal ServerError",
               ),
             });
             break;
@@ -89,7 +89,7 @@ const http = () => {
         }
       }
       return Promise.reject(error);
-    }
+    },
   );
 
   return instance;

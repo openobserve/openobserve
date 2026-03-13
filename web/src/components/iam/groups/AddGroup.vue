@@ -65,7 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('alerts.cancel')"
             no-caps
             flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
             @click="$emit('cancel:hideform')"
             data-test="add-group-cancel-btn"
           />
@@ -75,7 +79,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('alerts.save')"
             no-caps
             flat
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
             @click="saveGroup"
             data-test="add-group-submit-btn"
           />
@@ -136,20 +144,19 @@ const saveGroup = () => {
       });
     })
     .catch((err) => {
-      if(err.response.status != 403){
+      if (err.response.status != 403) {
         q.notify({
-        message: "Error while creating group",
-        color: "negative",
-        position: "bottom",
-        timeout: 3000,
-      });
+          message: "Error while creating group",
+          color: "negative",
+          position: "bottom",
+          timeout: 3000,
+        });
       }
       console.log(err);
     });
-    track("Button Click", {
-      button: "Save Group",
-      page: "Add Group"
-    });
+  track("Button Click", {
+    button: "Save Group",
+    page: "Add Group",
+  });
 };
 </script>
-

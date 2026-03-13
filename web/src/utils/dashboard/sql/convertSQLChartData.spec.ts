@@ -220,8 +220,21 @@ describe("convertSQLChartData", () => {
     // metric type is excluded from series filter in post-processing
     ctx.options.series = [];
     vi.mocked(buildSQLContext).mockReturnValue(ctx as any);
-    const panelSchema = { type: "metric", config: { trellis: { layout: null } } };
-    await convertSQLChartData(panelSchema, [], store, chartPanelRef, null, [], metadata, {}, []);
+    const panelSchema = {
+      type: "metric",
+      config: { trellis: { layout: null } },
+    };
+    await convertSQLChartData(
+      panelSchema,
+      [],
+      store,
+      chartPanelRef,
+      null,
+      [],
+      metadata,
+      {},
+      [],
+    );
     expect(applyMetricChart).toHaveBeenCalledTimes(1);
   });
 
@@ -230,8 +243,21 @@ describe("convertSQLChartData", () => {
     ctx.panelSchema = { ...ctx.panelSchema, type: "gauge" };
     ctx.options.series = [];
     vi.mocked(buildSQLContext).mockReturnValue(ctx as any);
-    const panelSchema = { type: "gauge", config: { trellis: { layout: null } } };
-    await convertSQLChartData(panelSchema, [], store, chartPanelRef, null, [], metadata, {}, []);
+    const panelSchema = {
+      type: "gauge",
+      config: { trellis: { layout: null } },
+    };
+    await convertSQLChartData(
+      panelSchema,
+      [],
+      store,
+      chartPanelRef,
+      null,
+      [],
+      metadata,
+      {},
+      [],
+    );
     expect(applyGaugeChart).toHaveBeenCalledTimes(1);
   });
 

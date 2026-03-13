@@ -19,9 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:px-[0.625rem] tw:py-[0.1rem]">
       <div class="card-container tw:mb-[0.625rem]">
         <!-- Header -->
-        <div
-          class="insights-header flex justify-between items-center"
-        >
+        <div class="insights-header flex justify-between items-center">
           <div class="flex items-center">
             <q-btn
               no-caps
@@ -32,7 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="goBack"
               data-test="alert-insights-back-btn"
             />
-            <div class="q-table__title tw:font-[600] q-ml-sm">{{ t("alerts.insights.title") }}</div>
+            <div class="q-table__title tw:font-[600] q-ml-sm">
+              {{ t("alerts.insights.title") }}
+            </div>
           </div>
 
           <div class="flex items-center">
@@ -73,7 +73,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           align="left"
           data-test="alert-insights-tabs"
         >
-          <q-tab name="overview" :label="t('alerts.insights.tabs.overview')" data-test="tab-overview" />
+          <q-tab
+            name="overview"
+            :label="t('alerts.insights.tabs.overview')"
+            data-test="tab-overview"
+          />
           <q-tab
             v-if="isEnterprise"
             name="frequency"
@@ -86,7 +90,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('alerts.insights.tabs.correlation')"
             data-test="tab-correlation"
           />
-          <q-tab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
+          <q-tab
+            name="quality"
+            :label="t('alerts.insights.tabs.quality')"
+            data-test="tab-quality"
+          />
         </q-tabs>
 
         <!-- Filters Section -->
@@ -101,11 +109,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="showFailedOnly"
             :label="t('alerts.insights.filters.failedOnly')"
             class="o2-toggle-button-sm"
-            :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-sm-dark'
+                : 'o2-toggle-button-sm-light'
+            "
             @update:model-value="onFilterChange"
             data-test="failed-only-toggle"
           >
-            <q-tooltip>{{ t("alerts.insights.filters.failedOnlyTooltip") }}</q-tooltip>
+            <q-tooltip>{{
+              t("alerts.insights.filters.failedOnlyTooltip")
+            }}</q-tooltip>
           </q-toggle>
 
           <!-- Silenced Only Toggle -->
@@ -113,11 +127,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="showSilencedOnly"
             :label="t('alerts.insights.filters.silenced')"
             class="o2-toggle-button-sm"
-            :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-sm-dark'
+                : 'o2-toggle-button-sm-light'
+            "
             @update:model-value="onFilterChange"
             data-test="silenced-only-toggle"
           >
-            <q-tooltip>{{ t("alerts.insights.filters.silencedTooltip") }}</q-tooltip>
+            <q-tooltip>{{
+              t("alerts.insights.filters.silencedTooltip")
+            }}</q-tooltip>
           </q-toggle>
 
           <!-- Range Filter Chips -->
@@ -174,9 +194,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="action-buttons-row tw:bg-primary tw:bg-opacity-10 tw:flex tw:items-center"
       data-test="action-buttons-row"
     >
-      <q-icon name="campaign" color="primary" size="sm" />
+      <q-icon name="campaign" color="primary"
+size="sm" />
       <span class="tw:text-sm tw:font-medium"
-        >{{ t("alerts.insights.actions.actionsFor") }} <strong>{{ selectedAlertForAction }}</strong></span
+        >{{ t("alerts.insights.actions.actionsFor") }}
+        <strong>{{ selectedAlertForAction }}</strong></span
       >
 
       <q-btn
@@ -188,7 +210,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="openDedupConfig"
         data-test="configure-dedup-btn"
       >
-        <q-tooltip>{{ t("alerts.insights.actions.configureDedupTooltip") }}</q-tooltip>
+        <q-tooltip>{{
+          t("alerts.insights.actions.configureDedupTooltip")
+        }}</q-tooltip>
       </q-btn>
 
       <q-btn
@@ -200,7 +224,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="editAlert"
         data-test="edit-alert-btn"
       >
-        <q-tooltip>{{ t("alerts.insights.actions.editAlertTooltip") }}</q-tooltip>
+        <q-tooltip>{{
+          t("alerts.insights.actions.editAlertTooltip")
+        }}</q-tooltip>
       </q-btn>
 
       <q-btn
@@ -212,7 +238,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="viewHistory"
         data-test="view-history-btn"
       >
-        <q-tooltip>{{ t("alerts.insights.actions.viewHistoryTooltip") }}</q-tooltip>
+        <q-tooltip>{{
+          t("alerts.insights.actions.viewHistoryTooltip")
+        }}</q-tooltip>
       </q-btn>
 
       <q-space />
@@ -232,10 +260,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Dashboard Content -->
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
       <div class="card-container tw:mb-[0.625rem] tw:h-[calc(100vh-208px)]">
-        <div
-          @contextmenu="handleNativeContextMenu"
-        >
-          <div v-show="isLoading" class="loading-container flex items-center justify-center">
+        <div @contextmenu="handleNativeContextMenu">
+          <div
+            v-show="isLoading"
+            class="loading-container flex items-center justify-center"
+          >
             <q-spinner-hourglass color="primary" size="40px" />
             <div class="q-ml-md">Loading insights...</div>
           </div>
@@ -282,7 +311,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick, reactive, provide } from "vue";
+import {
+  ref,
+  computed,
+  onMounted,
+  watch,
+  nextTick,
+  reactive,
+  provide,
+} from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -365,13 +402,15 @@ const hasActiveFilters = computed(() => {
 // Function to load dashboard data (replaces computed)
 const loadDashboard = () => {
   // Deep clone to avoid mutating the original imported config
-  const config = convertDashboardSchemaVersion(JSON.parse(JSON.stringify(insightsConfig)));
+  const config = convertDashboardSchemaVersion(
+    JSON.parse(JSON.stringify(insightsConfig)),
+  );
   const baseFilters = getBaseFilters();
   const org = store.state.selectedOrganization.identifier;
 
   // Find the current tab
   const currentTabData = config.tabs?.find(
-    (tab: any) => tab.tabId === currentTab.value
+    (tab: any) => tab.tabId === currentTab.value,
   );
 
   if (!currentTabData) {
@@ -387,9 +426,7 @@ const loadDashboard = () => {
 
         // Build base filters that always apply
         // Note: module = 'alert' is now hardcoded in all queries in insights-metrics.json
-        const mandatoryFilters = [
-          `org = '${org}'`
-        ];
+        const mandatoryFilters = [`org = '${org}'`];
 
         // Combine with user filters
         const allFilters = [...mandatoryFilters, ...baseFilters];
@@ -404,7 +441,8 @@ const loadDashboard = () => {
         query = query.replace(/\[WHERE_CLAUSE\]/g, whereClause);
 
         // Handle [WHERE_CLAUSE_ADDITIONAL] for queries that already have WHERE
-        const additionalClause = allFilters.length > 0 ? `AND ${allFilters.join(" AND ")}` : "";
+        const additionalClause =
+          allFilters.length > 0 ? `AND ${allFilters.join(" AND ")}` : "";
         query = query.replace(/\[WHERE_CLAUSE_ADDITIONAL\]/g, additionalClause);
 
         panel.queries[0].query = query;
@@ -436,9 +474,9 @@ const fetchAlerts = async () => {
       "name",
       false,
       "",
-      store.state.selectedOrganization.identifier,//store.state.selectedOrganization.identifier,
+      store.state.selectedOrganization.identifier, //store.state.selectedOrganization.identifier,
       "", // Empty folder to get all alerts
-      ""
+      "",
     );
     alertsList.value = res.data.list || [];
   } catch (error) {
@@ -451,14 +489,17 @@ const fetchAlerts = async () => {
 };
 
 const goBack = () => {
-  router.push({ name: "alertList", query: { org_identifier: store.state.selectedOrganization.identifier } });
+  router.push({
+    name: "alertList",
+    query: { org_identifier: store.state.selectedOrganization.identifier },
+  });
 };
 
 const updateDateTime = (value: any) => {
   timeRange.value = {
     __global: {
-      start_time: new Date(value.startTime ),
-      end_time: new Date(value.endTime ),
+      start_time: new Date(value.startTime),
+      end_time: new Date(value.endTime),
     },
   };
 
@@ -513,14 +554,14 @@ const onDataZoom = (data: any) => {
 
 const handleNativeContextMenu = (event: MouseEvent) => {
   // Only handle context menu on Frequency & Dedup tab
-  if (currentTab.value !== 'frequency') {
+  if (currentTab.value !== "frequency") {
     return; // Let other handlers or default behavior work
   }
 
   const target = event.target as HTMLElement;
 
   // Find if we clicked on a table cell
-  const tableCell = target.closest('td');
+  const tableCell = target.closest("td");
   if (!tableCell) {
     return; // Not a table cell, let default behavior work
   }
@@ -530,10 +571,12 @@ const handleNativeContextMenu = (event: MouseEvent) => {
 
   // Extract alert name (remove the /unique_id part)
   // Format: alert_name/unique_id -> alert_name
-  const alertName = alertKey?.split('/')[0];
+  const alertName = alertKey?.split("/")[0];
 
   // Check if this is the "Alert Key" column (first column in Dedup table)
-  const cellIndex = Array.from(tableCell.parentElement?.children || []).indexOf(tableCell);
+  const cellIndex = Array.from(tableCell.parentElement?.children || []).indexOf(
+    tableCell,
+  );
 
   // Only show context menu for the first column (Alert Key column)
   if (cellIndex === 0 && alertName && alertName.length > 0) {
@@ -544,15 +587,15 @@ const handleNativeContextMenu = (event: MouseEvent) => {
     // Find the panel title from dashboard data
     const currentTabData = dashboardData.value?.tabs?.[0];
     const dedupPanel = currentTabData?.panels?.find((p: any) =>
-      p.title?.includes('Dedup')
+      p.title?.includes("Dedup"),
     );
 
     contextMenu.show = true;
     contextMenu.x = event.clientX;
     contextMenu.y = event.clientY;
     contextMenu.value = alertName;
-    contextMenu.panelId = dedupPanel?.id || '';
-    contextMenu.panelTitle = dedupPanel?.title || 'Dedup Impact Analysis';
+    contextMenu.panelId = dedupPanel?.id || "";
+    contextMenu.panelTitle = dedupPanel?.title || "Dedup Impact Analysis";
   }
   // If not first column or no alert name, let default context menu show
 };
@@ -683,7 +726,8 @@ const openDedupConfig = () => {
   $q.notify({
     type: "info",
     message: `Opening dedup configuration for: ${selectedAlertForAction.value}`,
-    caption: "This would navigate to alert edit page with dedup section focused",
+    caption:
+      "This would navigate to alert edit page with dedup section focused",
   });
 
   // TODO: Navigate to alert edit page with dedup section
@@ -707,7 +751,7 @@ const editAlert = () => {
   //   params: { alertName: selectedAlertForAction.value }
   // });
 };
-const org = 'default'
+const org = "default";
 const viewHistory = () => {
   // Navigate to alert history with filter
   router.push({

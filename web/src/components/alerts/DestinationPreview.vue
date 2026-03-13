@@ -18,7 +18,8 @@ limitations under the License.
     <q-card data-test="destination-preview-card" class="preview-card">
       <q-card-section class="row items-center no-wrap">
         <div class="text-h6" data-test="preview-title">
-          {{ t('alerts.destinationPreview') }} - {{ getDestinationTypeName(type) }}
+          {{ t("alerts.destinationPreview") }} -
+          {{ getDestinationTypeName(type) }}
         </div>
         <q-space />
         <q-btn
@@ -35,14 +36,20 @@ limitations under the License.
 
       <q-card-section class="preview-container">
         <!-- Slack Preview -->
-        <div v-if="type === 'slack'" data-test="slack-preview" class="slack-message">
+        <div
+          v-if="type === 'slack'"
+          data-test="slack-preview"
+          class="slack-message"
+        >
           <div class="slack-message-container">
             <div class="slack-avatar">
               <div class="avatar-circle">OO</div>
             </div>
             <div class="slack-content">
               <div class="slack-header">
-                <strong data-test="slack-bot-name" class="bot-name">OpenObserve Bot</strong>
+                <strong data-test="slack-bot-name" class="bot-name"
+                  >OpenObserve Bot</strong
+                >
                 <span class="slack-timestamp">{{ getCurrentTime() }}</span>
               </div>
               <div data-test="slack-message-body" class="slack-body">
@@ -77,7 +84,11 @@ limitations under the License.
         </div>
 
         <!-- MS Teams Preview -->
-        <div v-if="type === 'msteams'" data-test="msteams-preview" class="teams-card">
+        <div
+          v-if="type === 'msteams'"
+          data-test="msteams-preview"
+          class="teams-card"
+        >
           <div data-test="msteams-card-content" class="teams-card-content">
             <div class="teams-header">
               <div class="teams-title">🚨 Alert: High CPU Usage</div>
@@ -116,7 +127,11 @@ limitations under the License.
         </div>
 
         <!-- Email Preview -->
-        <div v-if="type === 'email'" data-test="email-preview" class="email-client">
+        <div
+          v-if="type === 'email'"
+          data-test="email-preview"
+          class="email-client"
+        >
           <div class="email-header">
             <div data-test="email-subject" class="email-subject">
               Subject: 🚨 OpenObserve Alert Notification
@@ -133,7 +148,10 @@ limitations under the License.
             </div>
             <div class="email-alert-info">
               <h2>High CPU Usage</h2>
-              <p>An alert has been triggered in your OpenObserve monitoring system.</p>
+              <p>
+                An alert has been triggered in your OpenObserve monitoring
+                system.
+              </p>
             </div>
             <div class="email-details">
               <div class="email-detail-row">
@@ -166,7 +184,11 @@ limitations under the License.
         </div>
 
         <!-- PagerDuty Preview -->
-        <div v-if="type === 'pagerduty'" data-test="pagerduty-preview" class="pagerduty-incident">
+        <div
+          v-if="type === 'pagerduty'"
+          data-test="pagerduty-preview"
+          class="pagerduty-incident"
+        >
           <div class="pagerduty-header">
             <div class="pagerduty-title">PagerDuty Incident</div>
             <div class="pagerduty-status">Triggered</div>
@@ -194,14 +216,19 @@ limitations under the License.
         </div>
 
         <!-- ServiceNow Preview -->
-        <div v-if="type === 'servicenow'" data-test="servicenow-preview" class="servicenow-incident">
+        <div
+          v-if="type === 'servicenow'"
+          data-test="servicenow-preview"
+          class="servicenow-incident"
+        >
           <div class="servicenow-header">
             <div class="servicenow-title">ServiceNow Incident</div>
             <div class="servicenow-number">INC0000123</div>
           </div>
           <div class="servicenow-content">
             <div class="servicenow-field">
-              <strong>Short Description:</strong> OpenObserve Alert: High CPU Usage
+              <strong>Short Description:</strong> OpenObserve Alert: High CPU
+              Usage
             </div>
             <div class="servicenow-field">
               <strong>Category:</strong> Software
@@ -209,24 +236,26 @@ limitations under the License.
             <div class="servicenow-field">
               <strong>Priority:</strong> 2 - High
             </div>
-            <div class="servicenow-field">
-              <strong>State:</strong> New
-            </div>
+            <div class="servicenow-field"><strong>State:</strong> New</div>
             <div class="servicenow-description">
-              <strong>Description:</strong><br>
-              Alert Details:<br><br>
-              Stream: system-metrics<br>
-              Type: metrics<br>
-              Count: 15<br>
-              Threshold: greater than 80%<br>
-              Time: {{ getCurrentTime() }}<br><br>
+              <strong>Description:</strong><br />
+              Alert Details:<br /><br />
+              Stream: system-metrics<br />
+              Type: metrics<br />
+              Count: 15<br />
+              Threshold: greater than 80%<br />
+              Time: {{ getCurrentTime() }}<br /><br />
               View in OpenObserve: https://openobserve.example.com/alerts/123
             </div>
           </div>
         </div>
 
         <!-- Opsgenie Preview -->
-        <div v-if="type === 'opsgenie'" data-test="opsgenie-preview" class="opsgenie-alert">
+        <div
+          v-if="type === 'opsgenie'"
+          data-test="opsgenie-preview"
+          class="opsgenie-alert"
+        >
           <div class="opsgenie-header">
             <div class="opsgenie-title">Opsgenie Alert</div>
             <div class="opsgenie-priority">P3</div>
@@ -276,32 +305,32 @@ limitations under the License.
 </template>
 
 <script lang="ts" setup>
-import { computed } from 'vue';
-import { useQuasar } from 'quasar';
-import { useI18n } from 'vue-i18n';
+import { computed } from "vue";
+import { useQuasar } from "quasar";
+import { useI18n } from "vue-i18n";
 
 const props = defineProps({
   modelValue: {
     type: Boolean,
-    default: false
+    default: false,
   },
   type: {
     type: String,
-    required: true
+    required: true,
   },
   templateContent: {
     type: String,
-    default: ''
-  }
+    default: "",
+  },
 });
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits(["update:modelValue"]);
 const $q = useQuasar();
 const { t } = useI18n();
 
 const isOpen = computed({
   get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value)
+  set: (value) => emit("update:modelValue", value),
 });
 
 // Get current time for display
@@ -312,31 +341,34 @@ const getCurrentTime = (): string => {
 // Get destination type display name
 const getDestinationTypeName = (type: string): string => {
   const typeNames = {
-    slack: 'Slack',
-    msteams: 'Microsoft Teams',
-    email: 'Email',
-    pagerduty: 'PagerDuty',
-    servicenow: 'ServiceNow',
-    opsgenie: 'Opsgenie'
+    slack: "Slack",
+    msteams: "Microsoft Teams",
+    email: "Email",
+    pagerduty: "PagerDuty",
+    servicenow: "ServiceNow",
+    opsgenie: "Opsgenie",
   };
   return typeNames[type] || type;
 };
 
 // Copy template to clipboard
 const copyTemplate = () => {
-  navigator.clipboard.writeText(props.templateContent).then(() => {
-    $q.notify({
-      type: 'positive',
-      message: 'Template copied to clipboard',
-      timeout: 2000
+  navigator.clipboard
+    .writeText(props.templateContent)
+    .then(() => {
+      $q.notify({
+        type: "positive",
+        message: "Template copied to clipboard",
+        timeout: 2000,
+      });
+    })
+    .catch(() => {
+      $q.notify({
+        type: "negative",
+        message: "Failed to copy template",
+        timeout: 2000,
+      });
     });
-  }).catch(() => {
-    $q.notify({
-      type: 'negative',
-      message: 'Failed to copy template',
-      timeout: 2000
-    });
-  });
 };
 </script>
 
@@ -362,7 +394,7 @@ const copyTemplate = () => {
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   padding: 1rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .slack-message-container {
@@ -464,7 +496,7 @@ const copyTemplate = () => {
   border: 1px solid #e1e5e9;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .teams-header {
@@ -533,7 +565,7 @@ const copyTemplate = () => {
   border: 1px solid #ddd;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .email-header {
@@ -547,7 +579,9 @@ const copyTemplate = () => {
     margin-bottom: 0.5rem;
   }
 
-  .email-from, .email-to, .email-time {
+  .email-from,
+  .email-to,
+  .email-time {
     color: #6c757d;
     font-size: 0.875rem;
     margin-bottom: 0.25rem;
@@ -626,7 +660,7 @@ const copyTemplate = () => {
   border: 1px solid #ddd;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .pagerduty-header {
@@ -684,7 +718,7 @@ const copyTemplate = () => {
   border: 1px solid #ddd;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .servicenow-header {
@@ -732,7 +766,7 @@ const copyTemplate = () => {
   border: 1px solid #ddd;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .opsgenie-header {

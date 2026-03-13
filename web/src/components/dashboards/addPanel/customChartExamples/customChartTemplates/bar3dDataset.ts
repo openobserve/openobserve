@@ -89,5 +89,5 @@ option = {
 // Export with common name for consistency across all templates
 export const customChartExample = {
   code: chartCode,
-  query: exampleQuery
+  query: exampleQuery,
 };

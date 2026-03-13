@@ -249,7 +249,7 @@ export const countries: Country[] = [
  */
 export const getCountryName = (code: string): string => {
   const country = countries.find(
-    (c) => c.alpha2 === code || c.alpha3 === code || c.name === code
+    (c) => c.alpha2 === code || c.alpha3 === code || c.name === code,
   );
   return country ? country.name : code;
 };

@@ -1,41 +1,54 @@
-import { fileURLToPath } from 'node:url'
-import { mergeConfig, defineConfig, configDefaults } from 'vitest/config'
-import type { ConfigEnv } from 'vite'
-import type { UserConfig } from 'vite'
-import viteConfig from './vite.config'
+import { fileURLToPath } from "node:url";
+import { mergeConfig, defineConfig, configDefaults } from "vitest/config";
+import type { ConfigEnv } from "vite";
+import type { UserConfig } from "vite";
+import viteConfig from "./vite.config";
 
 // Convert the vite config to a plain object if it's a function
-const viteConfigObj = typeof viteConfig === 'function'
-  ? (viteConfig as (options: ConfigEnv) => UserConfig)({ command: 'serve', mode: 'development' })
-  : viteConfig
+const viteConfigObj =
+  typeof viteConfig === "function"
+    ? (viteConfig as (options: ConfigEnv) => UserConfig)({
+        command: "serve",
+        mode: "development",
+      })
+    : viteConfig;
 
 export default mergeConfig(
   viteConfigObj,
   defineConfig({
-    logLevel: 'error', // Suppress Vite warnings (e.g., Monaco editor source map issues)
+    logLevel: "error", // Suppress Vite warnings (e.g., Monaco editor source map issues)
     customLogger: {
       info: (msg) => console.info(msg),
       warn: (msg) => {
         // Suppress Monaco editor source map warnings
         const msgStr = String(msg);
-        if ((msgStr.includes('Failed to load source map') || msgStr.includes('marked.umd.js.map')) &&
-            msgStr.includes('monaco-editor')) {
+        if (
+          (msgStr.includes("Failed to load source map") ||
+            msgStr.includes("marked.umd.js.map")) &&
+          msgStr.includes("monaco-editor")
+        ) {
           return;
         }
         console.warn(msg);
       },
       warnOnce: (msg) => {
         const msgStr = String(msg);
-        if ((msgStr.includes('Failed to load source map') || msgStr.includes('marked.umd.js.map')) &&
-            msgStr.includes('monaco-editor')) {
+        if (
+          (msgStr.includes("Failed to load source map") ||
+            msgStr.includes("marked.umd.js.map")) &&
+          msgStr.includes("monaco-editor")
+        ) {
           return;
         }
         console.warn(msg);
       },
       error: (msg) => {
         const msgStr = String(msg);
-        if ((msgStr.includes('Failed to load source map') || msgStr.includes('marked.umd.js.map')) &&
-            msgStr.includes('monaco-editor')) {
+        if (
+          (msgStr.includes("Failed to load source map") ||
+            msgStr.includes("marked.umd.js.map")) &&
+          msgStr.includes("monaco-editor")
+        ) {
           return;
         }
         console.error(msg);
@@ -46,40 +59,45 @@ export default mergeConfig(
     },
     resolve: {
       alias: {
-        '@': fileURLToPath(new URL('./src', import.meta.url))
-      }
+        "@": fileURLToPath(new URL("./src", import.meta.url)),
+      },
     },
     test: {
-      environment: 'jsdom',
-      exclude: [...configDefaults.exclude, 'e2e/**'],
+      environment: "jsdom",
+      exclude: [...configDefaults.exclude, "e2e/**"],
       include: ["src/**/*.spec.{ts,js,vue}"],
-      root: fileURLToPath(new URL('.', import.meta.url)),
-      setupFiles: ['src/test/unit/helpers/setupTests.ts'],
+      root: fileURLToPath(new URL(".", import.meta.url)),
+      setupFiles: ["src/test/unit/helpers/setupTests.ts"],
       server: {
         deps: {
-          inline: ["monaco-editor", "vitest-canvas-mock", "@openobserve/browser-rum", "@openobserve/browser-logs"],
+          inline: [
+            "monaco-editor",
+            "vitest-canvas-mock",
+            "@openobserve/browser-rum",
+            "@openobserve/browser-logs",
+          ],
         },
       },
       // Prevent unhandled errors from failing the test suite
       dangerouslyIgnoreUnhandledErrors: true,
       // Suppress all console output during tests except test results
       silent: false,
-      reporters: ['default'],
+      reporters: ["default"],
       // Suppress all console output (both stderr and stdout)
-      onConsoleLog: (log: string, type: 'stdout' | 'stderr') => {
+      onConsoleLog: (log: string, type: "stdout" | "stderr") => {
         // Return false to prevent all console logs from being printed
         // This keeps test output clean and only shows test results
         return false;
       },
       coverage: {
-        provider: 'v8',
+        provider: "v8",
         reporter: ["text", "json", "html", "json-summary"],
-        include: ['src/**/*.{js,ts,vue}'],
+        include: ["src/**/*.{js,ts,vue}"],
         thresholds: {
           lines: 33,
           functions: 33,
           branches: 40,
-          statements: 33
+          statements: 33,
         },
         exclude: [
           "coverage/**",
@@ -126,8 +144,7 @@ export default mergeConfig(
       },
     },
   }),
-)
-
+);
 
 // import { defineConfig } from 'vitest/config';
 // import path from 'path';
@@ -174,4 +191,4 @@ export default mergeConfig(
 //       '@': path.resolve(__dirname, './src'),
 //     },
 //   },
-// }); 
+// });

@@ -15,239 +15,291 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="step-alert-conditions" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+  <div
+    class="step-alert-conditions"
+    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
+  >
     <div class="step-content card-container tw:px-3 tw:py-4">
       <q-form ref="alertSettingsForm" @submit.prevent>
-      <!-- For Real-Time Alerts -->
-      <template v-if="isRealTime === 'true'">
-        <!-- Silence Notification (Cooldown) -->
-        <div class="flex justify-start items-start tw:pb-3 tw:mb-4">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-            {{ t("alerts.silenceNotification") + " *" }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+        <!-- For Real-Time Alerts -->
+        <template v-if="isRealTime === 'true'">
+          <!-- Silence Notification (Cooldown) -->
+          <div class="flex justify-start items-start tw:pb-3 tw:mb-4">
+            <div
+              class="tw:font-semibold flex items-center"
+              style="width: 190px; height: 36px"
             >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">
-                  {{ t('alerts.alertSettings.cooldownTooltip') }}
-                </span>
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <div>
-            <div class="flex items-center q-mr-sm" style="width: fit-content">
-              <div
-                style="width: 87px; margin-left: 0 !important"
-                class="silence-notification-input"
+              {{ t("alerts.silenceNotification") + " *" }}
+              <q-icon
+                name="info"
+                size="17px"
+                class="q-ml-xs cursor-pointer"
+                :class="
+                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                "
               >
-                <q-input
-                  v-model.number="formData.trigger_condition.silence"
-                  type="number"
+                <q-tooltip
+                  anchor="center right"
+                  self="center left"
+                  max-width="300px"
+                >
+                  <span style="font-size: 14px">
+                    {{ t("alerts.alertSettings.cooldownTooltip") }}
+                  </span>
+                </q-tooltip>
+              </q-icon>
+            </div>
+            <div>
+              <div class="flex items-center q-mr-sm" style="width: fit-content">
+                <div
+                  style="width: 87px; margin-left: 0 !important"
+                  class="silence-notification-input"
+                >
+                  <q-input
+                    v-model.number="formData.trigger_condition.silence"
+                    type="number"
+                    dense
+                    borderless
+                    min="0"
+                    style="background: none"
+                    @update:model-value="
+                      $emit('update:trigger', formData.trigger_condition)
+                    "
+                  />
+                </div>
+                <div
+                  style="
+                    min-width: 90px;
+                    margin-left: 0 !important;
+                    height: 36px;
+                  "
+                  :class="
+                    store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'
+                  "
+                  class="flex justify-center items-center"
+                >
+                  {{ t("alerts.minutes") }}
+                </div>
+              </div>
+              <div
+                v-if="
+                  formData.trigger_condition.silence < 0 ||
+                  formData.trigger_condition.silence === undefined ||
+                  formData.trigger_condition.silence === null ||
+                  formData.trigger_condition.silence === ''
+                "
+                class="text-red-8 q-pt-xs"
+                style="font-size: 11px; line-height: 12px"
+              >
+                Field is required!
+              </div>
+            </div>
+          </div>
+
+          <!-- Destinations -->
+          <div class="flex items-start tw:pb-4 tw:mb-4">
+            <div
+              style="width: 190px; height: 36px"
+              class="flex items-center tw:font-semibold"
+            >
+              <span>{{ t("alerts.destination") }} *</span>
+            </div>
+            <div class="tw:flex tw:flex-col">
+              <div class="tw:flex tw:items-center">
+                <q-select
+                  v-model="localDestinations"
+                  :options="filteredDestinations"
+                  data-test="alert-destinations-select"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="showLabelOnTop no-case destinations-select-field"
+                  filled
                   dense
-                  borderless
-                  min="0"
-                  style="background: none"
-                  @update:model-value="$emit('update:trigger', formData.trigger_condition)"
+                  multiple
+                  use-input
+                  input-debounce="0"
+                  @filter="filterDestinations"
+                  style="width: 300px; max-width: 300px"
+                  @update:model-value="emitDestinationsUpdate"
+                >
+                  <template v-slot:selected>
+                    <div v-if="localDestinations.length > 0" class="ellipsis">
+                      {{ localDestinations.join(", ") }}
+                    </div>
+                  </template>
+                  <template v-slot:option="option">
+                    <q-list dense>
+                      <q-item
+                        tag="label"
+                        :data-test="`alert-destination-option-${option.opt}`"
+                      >
+                        <q-item-section avatar>
+                          <q-checkbox
+                            size="xs"
+                            dense
+                            v-model="localDestinations"
+                            :val="option.opt"
+                            @update:model-value="emitDestinationsUpdate"
+                          />
+                        </q-item-section>
+                        <q-item-section>
+                          <q-item-label class="ellipsis">{{
+                            option.opt
+                          }}</q-item-label>
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
+                  </template>
+                  <template v-slot:no-option>
+                    <q-item>
+                      <q-item-section class="text-grey"
+                        >No destinations available</q-item-section
+                      >
+                    </q-item>
+                  </template>
+                </q-select>
+                <q-btn
+                  icon="refresh"
+                  class="iconHoverBtn q-ml-xs"
+                  :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
+                  padding="xs"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  title="Refresh latest Destinations"
+                  @click="$emit('refresh:destinations')"
+                  style="min-width: auto"
+                />
+                <q-btn
+                  data-test="create-destination-btn"
+                  :label="t('alerts.alertSettings.addNewDestination')"
+                  class="o2-secondary-button q-ml-sm"
+                  no-caps
+                  @click="routeToCreateDestination"
                 />
               </div>
               <div
-                style="
-                  min-width: 90px;
-                  margin-left: 0 !important;
-                  height: 36px;
-                "
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'bg-grey-9'
-                    : 'bg-grey-2'
-                "
-                class="flex justify-center items-center"
+                v-if="!localDestinations || localDestinations.length === 0"
+                class="text-red-8 q-pt-xs"
+                style="font-size: 11px; line-height: 12px"
               >
-                {{ t("alerts.minutes") }}
+                Field is required!
               </div>
             </div>
-            <div
-              v-if="formData.trigger_condition.silence < 0 || formData.trigger_condition.silence === undefined || formData.trigger_condition.silence === null || formData.trigger_condition.silence === ''"
-              class="text-red-8 q-pt-xs"
-              style="font-size: 11px; line-height: 12px"
-            >
-              Field is required!
-            </div>
           </div>
-        </div>
 
-        <!-- Destinations -->
-        <div class="flex items-start tw:pb-4 tw:mb-4">
-          <div style="width: 190px; height: 36px" class="flex items-center tw:font-semibold">
-            <span>{{ t("alerts.destination") }} *</span>
-          </div>
-          <div class="tw:flex tw:flex-col">
-            <div class="tw:flex tw:items-center">
-              <q-select
-                v-model="localDestinations"
-                :options="filteredDestinations"
-                data-test="alert-destinations-select"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop no-case destinations-select-field"
-                filled
-                dense
-                multiple
-                use-input
-                input-debounce="0"
-                @filter="filterDestinations"
-                style="width: 300px; max-width: 300px"
-                @update:model-value="emitDestinationsUpdate"
+          <!-- Template Override for Real-Time Alerts -->
+          <div class="flex items-start tw:pb-4 tw:mb-4">
+            <div
+              class="tw:font-semibold flex items-center"
+              style="width: 190px; height: 36px"
+            >
+              {{ t("alerts.template") }}
+              <q-icon
+                name="info"
+                size="17px"
+                class="q-ml-xs cursor-pointer"
+                :class="
+                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                "
               >
-                <template v-slot:selected>
-                  <div v-if="localDestinations.length > 0" class="ellipsis">
-                    {{ localDestinations.join(", ") }}
-                  </div>
-                </template>
-                <template v-slot:option="option">
-                  <q-list dense>
-                    <q-item tag="label" :data-test="`alert-destination-option-${option.opt}`">
-                      <q-item-section avatar>
-                        <q-checkbox
-                          size="xs"
-                          dense
-                          v-model="localDestinations"
-                          :val="option.opt"
-                          @update:model-value="emitDestinationsUpdate"
-                        />
-                      </q-item-section>
-                      <q-item-section>
-                        <q-item-label class="ellipsis">{{ option.opt }}</q-item-label>
-                      </q-item-section>
+                <q-tooltip
+                  anchor="center right"
+                  self="center left"
+                  max-width="300px"
+                >
+                  <span style="font-size: 14px">
+                    {{ t("alerts.alertSettings.templateTooltip") }}
+                  </span>
+                </q-tooltip>
+              </q-icon>
+            </div>
+            <div>
+              <div class="flex items-center">
+                <q-select
+                  v-model="localTemplate"
+                  :options="filteredTemplates"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="showLabelOnTop no-case template-select-field"
+                  filled
+                  dense
+                  use-input
+                  clearable
+                  emit-value
+                  input-debounce="0"
+                  @filter="filterTemplates"
+                  @update:model-value="emitTemplateUpdate"
+                  style="width: 300px; max-width: 300px"
+                >
+                  <template v-slot:selected>
+                    <div v-if="localTemplate" class="ellipsis">
+                      {{ localTemplate }}
+                      <q-tooltip>{{ localTemplate }}</q-tooltip>
+                    </div>
+                  </template>
+                  <template v-slot:no-option>
+                    <q-item>
+                      <q-item-section class="text-grey"
+                        >No templates available</q-item-section
+                      >
                     </q-item>
-                  </q-list>
-                </template>
-                <template v-slot:no-option>
-                  <q-item>
-                    <q-item-section class="text-grey">No destinations available</q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
-              <q-btn
-                icon="refresh"
-                class="iconHoverBtn q-ml-xs"
-                :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-                padding="xs"
-                unelevated
-                size="sm"
-                round
-                flat
-                title="Refresh latest Destinations"
-                @click="$emit('refresh:destinations')"
-                style="min-width: auto"
-              />
-              <q-btn
-                data-test="create-destination-btn"
-                :label="t('alerts.alertSettings.addNewDestination')"
-                class="o2-secondary-button q-ml-sm"
-                no-caps
-                @click="routeToCreateDestination"
-              />
+                  </template>
+                </q-select>
+                <q-btn
+                  icon="refresh"
+                  class="iconHoverBtn q-ml-xs"
+                  :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
+                  padding="xs"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  title="Refresh latest Templates"
+                  @click="$emit('refresh:templates')"
+                  style="min-width: auto"
+                />
+              </div>
             </div>
+          </div>
+        </template>
+
+        <!-- For Scheduled Alerts -->
+        <template v-else>
+          <!-- Threshold (for custom and sql queries without aggregation, always shown for promql) -->
+          <div
+            class="flex justify-start items-start q-mb-xs no-wrap alert-settings-row"
+          >
             <div
-              v-if="!localDestinations || localDestinations.length === 0"
-              class="text-red-8 q-pt-xs"
-              style="font-size: 11px; line-height: 12px"
+              class="tw:font-semibold flex items-center"
+              style="width: 190px; height: 36px"
             >
-              Field is required!
-            </div>
-          </div>
-        </div>
-
-        <!-- Template Override for Real-Time Alerts -->
-        <div class="flex items-start tw:pb-4 tw:mb-4">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-            {{ t("alerts.template") }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">
-                  {{ t('alerts.alertSettings.templateTooltip') }}
-                </span>
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <div>
-            <div class="flex items-center">
-              <q-select
-                v-model="localTemplate"
-                :options="filteredTemplates"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop no-case template-select-field"
-                filled
-                dense
-                use-input
-                clearable
-                emit-value
-                input-debounce="0"
-                @filter="filterTemplates"
-                @update:model-value="emitTemplateUpdate"
-                style="width: 300px; max-width: 300px"
+              {{ t("alerts.threshold") + " *" }}
+              <q-icon
+                name="info"
+                size="17px"
+                class="q-ml-xs cursor-pointer"
+                :class="
+                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                "
               >
-                <template v-slot:selected>
-                  <div v-if="localTemplate" class="ellipsis">
-                    {{ localTemplate }}
-                    <q-tooltip>{{ localTemplate }}</q-tooltip>
-                  </div>
-                </template>
-                <template v-slot:no-option>
-                  <q-item>
-                    <q-item-section class="text-grey">No templates available</q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
-              <q-btn
-                icon="refresh"
-                class="iconHoverBtn q-ml-xs"
-                :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-                padding="xs"
-                unelevated
-                size="sm"
-                round
-                flat
-                title="Refresh latest Templates"
-                @click="$emit('refresh:templates')"
-                style="min-width: auto"
-              />
+                <q-tooltip
+                  anchor="center right"
+                  self="center left"
+                  max-width="300px"
+                >
+                  <span style="font-size: 14px">
+                    {{ t("alerts.alertSettings.thresholdTooltip") }}
+                  </span>
+                </q-tooltip>
+              </q-icon>
             </div>
-          </div>
-        </div>
-      </template>
-
-      <!-- For Scheduled Alerts -->
-      <template v-else>
-        <!-- Threshold (for custom and sql queries without aggregation, always shown for promql) -->
-        <div class="flex justify-start items-start q-mb-xs no-wrap alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-            {{ t("alerts.threshold") + " *" }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">
-                  {{ t('alerts.alertSettings.thresholdTooltip') }}
-                </span>
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <div style="width: calc(100% - 190px)">
-            <div ref="thresholdFieldRef" class="flex tw:flex-col justify-start items-start tw:w-full">
+            <div style="width: calc(100% - 190px)">
+              <div
+                ref="thresholdFieldRef"
+                class="flex tw:flex-col justify-start items-start tw:w-full"
+              >
                 <!-- Main threshold input row -->
                 <div class="flex items-start tw:w-full">
                   <div class="tw:flex tw:flex-col">
@@ -263,10 +315,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       fill-input
                       :rules="[(val: any) => !!val || 'Field is required!']"
                       :style="{
-                        width: (formData.trigger_condition.operator === 'Contains' || formData.trigger_condition.operator === 'NotContains')
-                          ? '124px'
-                          : '88px',
-                        minWidth: '88px'
+                        width:
+                          formData.trigger_condition.operator === 'Contains' ||
+                          formData.trigger_condition.operator === 'NotContains'
+                            ? '124px'
+                            : '88px',
+                        minWidth: '88px',
                       }"
                       @update:model-value="emitTriggerUpdate"
                     />
@@ -278,7 +332,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       Field is required!
                     </div>
                   </div>
-                  <div class="flex items-start tw:flex-col" style="border-left: none">
+                  <div
+                    class="flex items-start tw:flex-col"
+                    style="border-left: none"
+                  >
                     <div class="tw:flex tw:items-center">
                       <div style="width: 89px; margin-left: 0 !important">
                         <q-input
@@ -293,8 +350,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @update:model-value="emitTriggerUpdate"
                         />
                       </div>
-                      <div class="tw:ml-2 tw:flex tw:items-center" style="height: 36px; font-weight: normal">
-                        <span class="tw:text-sm">{{ thresholdMetricType }}</span>
+                      <div
+                        class="tw:ml-2 tw:flex tw:items-center"
+                        style="height: 36px; font-weight: normal"
+                      >
+                        <span class="tw:text-sm">{{
+                          thresholdMetricType
+                        }}</span>
                       </div>
                     </div>
                     <div
@@ -308,476 +370,638 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Context lines (GROUP BY and HAVING) -->
-                <div v-if="showGroupByContext || showHavingContext" class="tw:mt-3 tw:ml-0 tw:text-sm tw:space-y-2" style="line-height: 1.6">
-                  <div v-if="showGroupByContext" class="tw:flex tw:flex-row tw:items-center tw:gap-2">
-                    <span class="tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'">
-                      {{ t('alerts.thresholdDynamic.contextLabels.groupedBy') }}
+                <div
+                  v-if="showGroupByContext || showHavingContext"
+                  class="tw:mt-3 tw:ml-0 tw:text-sm tw:space-y-2"
+                  style="line-height: 1.6"
+                >
+                  <div
+                    v-if="showGroupByContext"
+                    class="tw:flex tw:flex-row tw:items-center tw:gap-2"
+                  >
+                    <span
+                      class="tw:font-semibold tw:whitespace-nowrap"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'tw:text-gray-300'
+                          : 'tw:text-gray-700'
+                      "
+                    >
+                      {{ t("alerts.thresholdDynamic.contextLabels.groupedBy") }}
                     </span>
                     <span
                       class="tw:px-2 tw:py-1 tw:rounded tw:font-mono tw:text-xs"
-                      :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:text-gray-200' : 'tw:bg-gray-100 tw:text-gray-800'"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'tw:bg-gray-800 tw:text-gray-200'
+                          : 'tw:bg-gray-100 tw:text-gray-800'
+                      "
                     >
                       {{ groupByFieldsText }}
                     </span>
                   </div>
-                  <div v-if="showHavingContext" class="tw:flex tw:flex-row tw:items-center tw:gap-2">
-                    <span class="tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'">
-                      {{ t('alerts.thresholdDynamic.contextLabels.havingConditions') }}
+                  <div
+                    v-if="showHavingContext"
+                    class="tw:flex tw:flex-row tw:items-center tw:gap-2"
+                  >
+                    <span
+                      class="tw:font-semibold tw:whitespace-nowrap"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'tw:text-gray-300'
+                          : 'tw:text-gray-700'
+                      "
+                    >
+                      {{
+                        t(
+                          "alerts.thresholdDynamic.contextLabels.havingConditions",
+                        )
+                      }}
                     </span>
                     <span
                       class="tw:px-2 tw:py-1 tw:rounded tw:font-mono tw:text-xs"
-                      :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:text-gray-200' : 'tw:bg-gray-100 tw:text-gray-800'"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'tw:bg-gray-800 tw:text-gray-200'
+                          : 'tw:bg-gray-100 tw:text-gray-800'
+                      "
                     >
                       {{ havingFieldsText }}
                     </span>
                   </div>
                 </div>
               </div>
-          </div>
-        </div>
-
-        <!-- Period -->
-        <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-            {{ t("alerts.period") + " *" }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">
-                  {{ t('alerts.alertSettings.periodTooltip') }}
-                </span>
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <div>
-            <div ref="periodFieldRef" class="flex items-center q-mr-sm" style="width: fit-content">
-              <div style="width: 87px; margin-left: 0 !important" class="period-input-container">
-                <q-input
-                  v-model.number="formData.trigger_condition.period"
-                  type="number"
-                  dense
-                  borderless
-                  min="1"
-                  style="background: none"
-                  debounce="300"
-                  @update:model-value="handlePeriodChange"
-                />
-              </div>
-              <div
-                style="min-width: 90px; margin-left: 0 !important; height: 36px; font-weight: normal"
-               
-                :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
-                class="flex justify-center items-center"
-              >
-                {{ t("alerts.minutes") }}
-              </div>
             </div>
+          </div>
+
+          <!-- Period -->
+          <div class="flex items-start q-mr-sm alert-settings-row">
             <div
-              v-if="!Number(formData.trigger_condition.period)"
-              class="text-red-8 q-pt-xs"
-              style="font-size: 11px; line-height: 12px"
+              class="tw:font-semibold flex items-center"
+              style="width: 190px; height: 36px"
             >
-              Field is required!
-            </div>
-          </div>
-        </div>
-
-        <!-- Frequency (with inline interval/cron toggle) -->
-        <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-            {{ t("alerts.frequency") + " *" }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              <q-tooltip anchor="center right" self="center left" max-width="auto">
-                <span style="font-size: 14px" v-if="formData.trigger_condition.frequency_type === 'minutes'">
-                  {{ t('alerts.alertSettings.frequencyTooltipMinutes') }}
-                </span>
-                <span style="font-size: 14px" v-else>
-                  {{ t('alerts.alertSettings.frequencyTooltipCron') }}
-                </span>
-              </q-tooltip>
-            </q-icon>
-            <template v-if="formData.trigger_condition.frequency_type === 'cron' && showTimezoneWarning">
+              {{ t("alerts.period") + " *" }}
               <q-icon
-                name="warning"
-                size="18px"
-                class="cursor-pointer tw:ml-2"
-                :class="store.state.theme === 'dark' ? 'tw:text-orange-500' : 'tw:text-orange-500'"
+                name="info"
+                size="17px"
+                class="q-ml-xs cursor-pointer"
+                :class="
+                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                "
               >
                 <q-tooltip
                   anchor="center right"
                   self="center left"
-                  max-width="auto"
-                  class="tw:text-[14px]"
+                  max-width="300px"
                 >
-                  {{ t('alerts.alertSettings.timezoneWarning') }}
+                  <span style="font-size: 14px">
+                    {{ t("alerts.alertSettings.periodTooltip") }}
+                  </span>
                 </q-tooltip>
               </q-icon>
-            </template>
-          </div>
-          <div class="tw:flex tw:flex-col" style="min-height: 78px">
-            <!-- Interval/Cron Mode Buttons -->
-            <div class="tw:flex frequency-toggle-group tw:mb-3">
-              <q-btn
-                :label="t('alerts.interval')"
-                :outline="formData.trigger_condition.frequency_type === 'cron'"
-                :unelevated="formData.trigger_condition.frequency_type === 'minutes'"
-                :color="formData.trigger_condition.frequency_type === 'minutes' ? 'primary' : 'grey-7'"
-                no-caps
-                size="sm"
-                class="tw:px-4 frequency-toggle-btn frequency-toggle-left"
-                :class="formData.trigger_condition.frequency_type === 'minutes' ? 'active' : 'inactive'"
-                style="min-width: 90px"
-                @click="handleFrequencyTypeChange('minutes')"
-              />
-              <q-btn
-                :label="t('alerts.alertSettings.cronSchedule')"
-                :outline="formData.trigger_condition.frequency_type === 'minutes'"
-                :unelevated="formData.trigger_condition.frequency_type === 'cron'"
-                :color="formData.trigger_condition.frequency_type === 'cron' ? 'primary' : 'grey-7'"
-                no-caps
-                size="sm"
-                class="tw:px-4 frequency-toggle-btn frequency-toggle-right"
-                :class="formData.trigger_condition.frequency_type === 'cron' ? 'active' : 'inactive'"
-                style="min-width: 130px"
-                @click="handleFrequencyTypeChange('cron')"
-              />
             </div>
-
-            <!-- Input Fields Container (fixed height to prevent shifting) -->
-            <div class="tw:flex tw:items-start" style="min-height: 36px">
-              <!-- Interval Mode -->
-              <div v-if="formData.trigger_condition.frequency_type === 'minutes'" class="tw:flex tw:items-center">
-                <div style="width: 87px; margin-left: 0 !important">
+            <div>
+              <div
+                ref="periodFieldRef"
+                class="flex items-center q-mr-sm"
+                style="width: fit-content"
+              >
+                <div
+                  style="width: 87px; margin-left: 0 !important"
+                  class="period-input-container"
+                >
                   <q-input
-                    v-model.number="formData.trigger_condition.frequency"
+                    v-model.number="formData.trigger_condition.period"
                     type="number"
                     dense
                     borderless
                     min="1"
                     style="background: none"
                     debounce="300"
-                    @update:model-value="emitTriggerUpdate"
+                    @update:model-value="handlePeriodChange"
                   />
                 </div>
                 <div
-                  style="min-width: 90px; margin-left: 0 !important; height: 36px; font-weight: normal"
-                 
-                  :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
+                  style="
+                    min-width: 90px;
+                    margin-left: 0 !important;
+                    height: 36px;
+                    font-weight: normal;
+                  "
+                  :class="
+                    store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'
+                  "
                   class="flex justify-center items-center"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
               </div>
-
-              <!-- Cron Mode -->
-              <div v-else class="tw:flex tw:items-center tw:gap-2">
-                <q-input
-                  v-model="formData.trigger_condition.cron"
-                  dense
-                  borderless
-                  placeholder="Cron Expression *"
-                  style="background: none; width: 180px"
-                  debounce="300"
-                  @update:model-value="emitTriggerUpdate"
-                />
-                <q-select
-                  v-model="formData.trigger_condition.timezone"
-                  :options="filteredTimezone"
-                  @blur="
-                    browserTimezone =
-                      browserTimezone === ''
-                        ? Intl.DateTimeFormat().resolvedOptions().timeZone
-                        : browserTimezone
-                  "
-                  use-input
-                  @filter="timezoneFilterFn"
-                  input-debounce="0"
-                  dense
-                  borderless
-                  emit-value
-                  fill-input
-                  hide-selected
-                  :title="formData.trigger_condition.timezone"
-                  placeholder="Timezone *"
-                  :display-value="`${browserTimezone || 'Select timezone'}`"
-                  style="width: 210px"
-                  @update:model-value="emitTriggerUpdate"
-                />
-              </div>
-            </div>
-
-            <!-- Error Message -->
-            <div
-              v-if="
-                (formData.trigger_condition.frequency_type === 'minutes' && !Number(formData.trigger_condition.frequency)) ||
-                (formData.trigger_condition.frequency_type === 'cron' && (!formData.trigger_condition.cron || !formData.trigger_condition.timezone)) ||
-                cronJobError
-              "
-              class="text-red-8 tw:mt-1"
-              style="font-size: 11px; line-height: 12px"
-            >
-              {{ cronJobError || "Field is required!" }}
-            </div>
-          </div>
-        </div>
-
-        <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
-        <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-            {{ t("alerts.silenceNotification") + " *" }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">
-                  {{ t('alerts.alertSettings.cooldownTooltip') }}
-                </span>
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <div>
-            <div ref="silenceFieldRef" class="flex items-center q-mr-sm" style="width: fit-content">
               <div
-                style="width: 87px; margin-left: 0 !important"
+                v-if="!Number(formData.trigger_condition.period)"
+                class="text-red-8 q-pt-xs"
+                style="font-size: 11px; line-height: 12px"
               >
-                <q-input
-                  v-model.number="formData.trigger_condition.silence"
-                  type="number"
-                  dense
-                  borderless
-                  min="0"
-                  debounce="300"
-                  @update:model-value="emitTriggerUpdate"
-                />
+                Field is required!
               </div>
-              <div
-                style="
-                  min-width: 90px;
-                  margin-left: 0 !important;
-                  height: 36px;
-                "
-               
+            </div>
+          </div>
+
+          <!-- Frequency (with inline interval/cron toggle) -->
+          <div class="flex items-start q-mr-sm alert-settings-row">
+            <div
+              class="tw:font-semibold flex items-center"
+              style="width: 190px; height: 36px"
+            >
+              {{ t("alerts.frequency") + " *" }}
+              <q-icon
+                name="info"
+                size="17px"
+                class="q-ml-xs cursor-pointer"
                 :class="
-                  store.state.theme === 'dark'
-                    ? 'bg-grey-9'
-                    : 'bg-grey-2'
+                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
                 "
-                class="flex justify-center items-center"
               >
-                {{ t("alerts.minutes") }}
+                <q-tooltip
+                  anchor="center right"
+                  self="center left"
+                  max-width="auto"
+                >
+                  <span
+                    style="font-size: 14px"
+                    v-if="
+                      formData.trigger_condition.frequency_type === 'minutes'
+                    "
+                  >
+                    {{ t("alerts.alertSettings.frequencyTooltipMinutes") }}
+                  </span>
+                  <span style="font-size: 14px" v-else>
+                    {{ t("alerts.alertSettings.frequencyTooltipCron") }}
+                  </span>
+                </q-tooltip>
+              </q-icon>
+              <template
+                v-if="
+                  formData.trigger_condition.frequency_type === 'cron' &&
+                  showTimezoneWarning
+                "
+              >
+                <q-icon
+                  name="warning"
+                  size="18px"
+                  class="cursor-pointer tw:ml-2"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'tw:text-orange-500'
+                      : 'tw:text-orange-500'
+                  "
+                >
+                  <q-tooltip
+                    anchor="center right"
+                    self="center left"
+                    max-width="auto"
+                    class="tw:text-[14px]"
+                  >
+                    {{ t("alerts.alertSettings.timezoneWarning") }}
+                  </q-tooltip>
+                </q-icon>
+              </template>
+            </div>
+            <div class="tw:flex tw:flex-col" style="min-height: 78px">
+              <!-- Interval/Cron Mode Buttons -->
+              <div class="tw:flex frequency-toggle-group tw:mb-3">
+                <q-btn
+                  :label="t('alerts.interval')"
+                  :outline="
+                    formData.trigger_condition.frequency_type === 'cron'
+                  "
+                  :unelevated="
+                    formData.trigger_condition.frequency_type === 'minutes'
+                  "
+                  :color="
+                    formData.trigger_condition.frequency_type === 'minutes'
+                      ? 'primary'
+                      : 'grey-7'
+                  "
+                  no-caps
+                  size="sm"
+                  class="tw:px-4 frequency-toggle-btn frequency-toggle-left"
+                  :class="
+                    formData.trigger_condition.frequency_type === 'minutes'
+                      ? 'active'
+                      : 'inactive'
+                  "
+                  style="min-width: 90px"
+                  @click="handleFrequencyTypeChange('minutes')"
+                />
+                <q-btn
+                  :label="t('alerts.alertSettings.cronSchedule')"
+                  :outline="
+                    formData.trigger_condition.frequency_type === 'minutes'
+                  "
+                  :unelevated="
+                    formData.trigger_condition.frequency_type === 'cron'
+                  "
+                  :color="
+                    formData.trigger_condition.frequency_type === 'cron'
+                      ? 'primary'
+                      : 'grey-7'
+                  "
+                  no-caps
+                  size="sm"
+                  class="tw:px-4 frequency-toggle-btn frequency-toggle-right"
+                  :class="
+                    formData.trigger_condition.frequency_type === 'cron'
+                      ? 'active'
+                      : 'inactive'
+                  "
+                  style="min-width: 130px"
+                  @click="handleFrequencyTypeChange('cron')"
+                />
+              </div>
+
+              <!-- Input Fields Container (fixed height to prevent shifting) -->
+              <div class="tw:flex tw:items-start" style="min-height: 36px">
+                <!-- Interval Mode -->
+                <div
+                  v-if="formData.trigger_condition.frequency_type === 'minutes'"
+                  class="tw:flex tw:items-center"
+                >
+                  <div style="width: 87px; margin-left: 0 !important">
+                    <q-input
+                      v-model.number="formData.trigger_condition.frequency"
+                      type="number"
+                      dense
+                      borderless
+                      min="1"
+                      style="background: none"
+                      debounce="300"
+                      @update:model-value="emitTriggerUpdate"
+                    />
+                  </div>
+                  <div
+                    style="
+                      min-width: 90px;
+                      margin-left: 0 !important;
+                      height: 36px;
+                      font-weight: normal;
+                    "
+                    :class="
+                      store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'
+                    "
+                    class="flex justify-center items-center"
+                  >
+                    {{ t("alerts.minutes") }}
+                  </div>
+                </div>
+
+                <!-- Cron Mode -->
+                <div v-else class="tw:flex tw:items-center tw:gap-2">
+                  <q-input
+                    v-model="formData.trigger_condition.cron"
+                    dense
+                    borderless
+                    placeholder="Cron Expression *"
+                    style="background: none; width: 180px"
+                    debounce="300"
+                    @update:model-value="emitTriggerUpdate"
+                  />
+                  <q-select
+                    v-model="formData.trigger_condition.timezone"
+                    :options="filteredTimezone"
+                    @blur="
+                      browserTimezone =
+                        browserTimezone === ''
+                          ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                          : browserTimezone
+                    "
+                    use-input
+                    @filter="timezoneFilterFn"
+                    input-debounce="0"
+                    dense
+                    borderless
+                    emit-value
+                    fill-input
+                    hide-selected
+                    :title="formData.trigger_condition.timezone"
+                    placeholder="Timezone *"
+                    :display-value="`${browserTimezone || 'Select timezone'}`"
+                    style="width: 210px"
+                    @update:model-value="emitTriggerUpdate"
+                  />
+                </div>
+              </div>
+
+              <!-- Error Message -->
+              <div
+                v-if="
+                  (formData.trigger_condition.frequency_type === 'minutes' &&
+                    !Number(formData.trigger_condition.frequency)) ||
+                  (formData.trigger_condition.frequency_type === 'cron' &&
+                    (!formData.trigger_condition.cron ||
+                      !formData.trigger_condition.timezone)) ||
+                  cronJobError
+                "
+                class="text-red-8 tw:mt-1"
+                style="font-size: 11px; line-height: 12px"
+              >
+                {{ cronJobError || "Field is required!" }}
               </div>
             </div>
-            <div
-              v-if="formData.trigger_condition.silence < 0 || formData.trigger_condition.silence === undefined || formData.trigger_condition.silence === null || formData.trigger_condition.silence === ''"
-              class="text-red-8 q-pt-xs"
-              style="font-size: 11px; line-height: 12px"
-            >
-              Field is required!
-            </div>
           </div>
-        </div>
 
-        <!-- Destinations -->
-        <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-            {{ t("alerts.destination") + " *" }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+          <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
+          <div class="flex items-start q-mr-sm alert-settings-row">
+            <div
+              class="tw:font-semibold flex items-center"
+              style="width: 190px; height: 36px"
             >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">{{ t('alerts.alertSettings.destinationsTooltip') }}</span>
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <div>
-            <div class="flex items-center">
-              <q-select
-                ref="destinationsFieldRef"
-                v-model="localDestinations"
-                :options="filteredDestinations"
-                data-test="alert-destinations-select"
-                class="no-case q-py-none destinations-select-field"
-                borderless
-                dense
-                multiple
-                use-input
-                fill-input
-                :input-debounce="400"
-                hide-bottom-space
-                @filter="filterDestinations"
-                @update:model-value="emitDestinationsUpdate"
-                style="width: 180px; max-width: 300px"
+              {{ t("alerts.silenceNotification") + " *" }}
+              <q-icon
+                name="info"
+                size="17px"
+                class="q-ml-xs cursor-pointer"
+                :class="
+                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                "
               >
-                <template v-slot:selected>
-                  <div
-                    v-if="localDestinations.length > 0"
-                    class="ellipsis"
-                  >
-                    {{ localDestinations.join(", ") }}
-                    <q-tooltip>{{ localDestinations.join(", ") }}</q-tooltip>
-                  </div>
-                </template>
-                <template v-slot:option="option">
-                  <q-list dense>
-                    <q-item tag="label" :data-test="`alert-destination-option-${option.opt}`">
-                      <q-item-section avatar>
-                        <q-checkbox
-                          size="xs"
-                          dense
-                          v-model="localDestinations"
-                          :val="option.opt"
-                          @update:model-value="emitDestinationsUpdate"
-                        />
-                      </q-item-section>
-                      <q-item-section>
-                        <q-item-label class="ellipsis">{{ option.opt }}</q-item-label>
-                      </q-item-section>
-                    </q-item>
-                  </q-list>
-                </template>
-                <template v-slot:no-option>
-                  <q-item>
-                    <q-item-section class="text-grey">No destinations available</q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
-              <q-btn
-                icon="refresh"
-                class=" q-ml-xs"
-                padding="xs"
-                unelevated
-                size="sm"
-                round
-                flat
-                title="Refresh latest Destinations"
-                @click="$emit('refresh:destinations')"
-                style="min-width: auto"
-              />
-              <q-btn
-                data-test="create-destination-btn"
-                :label="t('alerts.alertSettings.addNewDestination')"
-                class="o2-secondary-button q-ml-sm"
-                no-caps
-                @click="routeToCreateDestination"
-              />
+                <q-tooltip
+                  anchor="center right"
+                  self="center left"
+                  max-width="300px"
+                >
+                  <span style="font-size: 14px">
+                    {{ t("alerts.alertSettings.cooldownTooltip") }}
+                  </span>
+                </q-tooltip>
+              </q-icon>
             </div>
-            <div
-              v-if="!localDestinations || localDestinations.length === 0"
-              class="text-red-8 q-pt-xs"
-              style="font-size: 11px; line-height: 12px"
-            >
-              Field is required!
+            <div>
+              <div
+                ref="silenceFieldRef"
+                class="flex items-center q-mr-sm"
+                style="width: fit-content"
+              >
+                <div style="width: 87px; margin-left: 0 !important">
+                  <q-input
+                    v-model.number="formData.trigger_condition.silence"
+                    type="number"
+                    dense
+                    borderless
+                    min="0"
+                    debounce="300"
+                    @update:model-value="emitTriggerUpdate"
+                  />
+                </div>
+                <div
+                  style="
+                    min-width: 90px;
+                    margin-left: 0 !important;
+                    height: 36px;
+                  "
+                  :class="
+                    store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'
+                  "
+                  class="flex justify-center items-center"
+                >
+                  {{ t("alerts.minutes") }}
+                </div>
+              </div>
+              <div
+                v-if="
+                  formData.trigger_condition.silence < 0 ||
+                  formData.trigger_condition.silence === undefined ||
+                  formData.trigger_condition.silence === null ||
+                  formData.trigger_condition.silence === ''
+                "
+                class="text-red-8 q-pt-xs"
+                style="font-size: 11px; line-height: 12px"
+              >
+                Field is required!
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Template Override -->
-        <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-            {{ t("alerts.template") }}
+          <!-- Destinations -->
+          <div class="flex items-start q-mr-sm alert-settings-row">
+            <div
+              class="tw:font-semibold flex items-center"
+              style="width: 190px; height: 36px"
+            >
+              {{ t("alerts.destination") + " *" }}
+              <q-icon
+                name="info"
+                size="17px"
+                class="q-ml-xs cursor-pointer"
+                :class="
+                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                "
+              >
+                <q-tooltip
+                  anchor="center right"
+                  self="center left"
+                  max-width="300px"
+                >
+                  <span style="font-size: 14px">{{
+                    t("alerts.alertSettings.destinationsTooltip")
+                  }}</span>
+                </q-tooltip>
+              </q-icon>
+            </div>
+            <div>
+              <div class="flex items-center">
+                <q-select
+                  ref="destinationsFieldRef"
+                  v-model="localDestinations"
+                  :options="filteredDestinations"
+                  data-test="alert-destinations-select"
+                  class="no-case q-py-none destinations-select-field"
+                  borderless
+                  dense
+                  multiple
+                  use-input
+                  fill-input
+                  :input-debounce="400"
+                  hide-bottom-space
+                  @filter="filterDestinations"
+                  @update:model-value="emitDestinationsUpdate"
+                  style="width: 180px; max-width: 300px"
+                >
+                  <template v-slot:selected>
+                    <div v-if="localDestinations.length > 0" class="ellipsis">
+                      {{ localDestinations.join(", ") }}
+                      <q-tooltip>{{ localDestinations.join(", ") }}</q-tooltip>
+                    </div>
+                  </template>
+                  <template v-slot:option="option">
+                    <q-list dense>
+                      <q-item
+                        tag="label"
+                        :data-test="`alert-destination-option-${option.opt}`"
+                      >
+                        <q-item-section avatar>
+                          <q-checkbox
+                            size="xs"
+                            dense
+                            v-model="localDestinations"
+                            :val="option.opt"
+                            @update:model-value="emitDestinationsUpdate"
+                          />
+                        </q-item-section>
+                        <q-item-section>
+                          <q-item-label class="ellipsis">{{
+                            option.opt
+                          }}</q-item-label>
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
+                  </template>
+                  <template v-slot:no-option>
+                    <q-item>
+                      <q-item-section class="text-grey"
+                        >No destinations available</q-item-section
+                      >
+                    </q-item>
+                  </template>
+                </q-select>
+                <q-btn
+                  icon="refresh"
+                  class="q-ml-xs"
+                  padding="xs"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  title="Refresh latest Destinations"
+                  @click="$emit('refresh:destinations')"
+                  style="min-width: auto"
+                />
+                <q-btn
+                  data-test="create-destination-btn"
+                  :label="t('alerts.alertSettings.addNewDestination')"
+                  class="o2-secondary-button q-ml-sm"
+                  no-caps
+                  @click="routeToCreateDestination"
+                />
+              </div>
+              <div
+                v-if="!localDestinations || localDestinations.length === 0"
+                class="text-red-8 q-pt-xs"
+                style="font-size: 11px; line-height: 12px"
+              >
+                Field is required!
+              </div>
+            </div>
+          </div>
+
+          <!-- Template Override -->
+          <div class="flex items-start q-mr-sm alert-settings-row">
+            <div
+              class="tw:font-semibold flex items-center"
+              style="width: 190px; height: 36px"
+            >
+              {{ t("alerts.template") }}
+              <q-icon
+                name="info"
+                size="17px"
+                class="q-ml-xs cursor-pointer"
+                :class="
+                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                "
+              >
+                <q-tooltip
+                  anchor="center right"
+                  self="center left"
+                  max-width="300px"
+                >
+                  <span style="font-size: 14px">
+                    {{ t("alerts.alertSettings.templateTooltip") }}
+                  </span>
+                </q-tooltip>
+              </q-icon>
+            </div>
+            <div>
+              <div class="flex items-center">
+                <q-select
+                  ref="templateFieldRef"
+                  v-model="localTemplate"
+                  :options="filteredTemplates"
+                  class="no-case q-py-none template-select-field"
+                  borderless
+                  dense
+                  use-input
+                  clearable
+                  emit-value
+                  :input-debounce="400"
+                  hide-bottom-space
+                  @filter="filterTemplates"
+                  @update:model-value="emitTemplateUpdate"
+                  style="width: 180px; max-width: 300px"
+                >
+                  <template v-slot:selected>
+                    <div v-if="localTemplate" class="ellipsis">
+                      {{ localTemplate }}
+                      <q-tooltip>{{ localTemplate }}</q-tooltip>
+                    </div>
+                  </template>
+                  <template v-slot:no-option>
+                    <q-item>
+                      <q-item-section class="text-grey"
+                        >No templates available</q-item-section
+                      >
+                    </q-item>
+                  </template>
+                </q-select>
+                <q-btn
+                  icon="refresh"
+                  class="q-ml-xs"
+                  padding="xs"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  title="Refresh latest Templates"
+                  @click="$emit('refresh:templates')"
+                  style="min-width: auto"
+                />
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- Creates Incident toggle — shown for all alert types -->
+        <div class="flex items-start tw:pb-4 tw:mb-4">
+          <div
+            class="tw:font-semibold flex items-center"
+            style="width: 190px; height: 36px"
+          >
+            {{ t("alerts.alertSettings.createsIncident") }}
             <q-icon
               name="info"
               size="17px"
               class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+              :class="
+                store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+              "
             >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
+              <q-tooltip
+                anchor="center right"
+                self="center left"
+                max-width="350px"
+              >
                 <span style="font-size: 14px">
-                  {{ t('alerts.alertSettings.templateTooltip') }}
+                  {{ t("alerts.alertSettings.createsIncidentTooltip") }}
                 </span>
               </q-tooltip>
             </q-icon>
           </div>
-          <div>
-            <div class="flex items-center">
-              <q-select
-                ref="templateFieldRef"
-                v-model="localTemplate"
-                :options="filteredTemplates"
-                class="no-case q-py-none template-select-field"
-                borderless
-                dense
-                use-input
-                clearable
-                emit-value
-                :input-debounce="400"
-                hide-bottom-space
-                @filter="filterTemplates"
-                @update:model-value="emitTemplateUpdate"
-                style="width: 180px; max-width: 300px"
-              >
-                <template v-slot:selected>
-                  <div v-if="localTemplate" class="ellipsis">
-                    {{ localTemplate }}
-                    <q-tooltip>{{ localTemplate }}</q-tooltip>
-                  </div>
-                </template>
-                <template v-slot:no-option>
-                  <q-item>
-                    <q-item-section class="text-grey">No templates available</q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
-              <q-btn
-                icon="refresh"
-                class="q-ml-xs"
-                padding="xs"
-                unelevated
-                size="sm"
-                round
-                flat
-                title="Refresh latest Templates"
-                @click="$emit('refresh:templates')"
-                style="min-width: auto"
-              />
-            </div>
-          </div>
+          <q-toggle
+            v-model="formData.creates_incident"
+            data-test="alert-creates-incident-toggle"
+            color="primary"
+            size="30px"
+            class="o2-toggle-button-xs"
+          />
         </div>
-      </template>
-
-      <!-- Creates Incident toggle — shown for all alert types -->
-      <div class="flex items-start tw:pb-4 tw:mb-4">
-        <div
-          class="tw:font-semibold flex items-center"
-          style="width: 190px; height: 36px"
-        >
-          {{ t("alerts.alertSettings.createsIncident") }}
-          <q-icon
-            name="info"
-            size="17px"
-            class="q-ml-xs cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-          >
-            <q-tooltip anchor="center right" self="center left" max-width="350px">
-              <span style="font-size: 14px">
-                {{ t("alerts.alertSettings.createsIncidentTooltip") }}
-              </span>
-            </q-tooltip>
-          </q-icon>
-        </div>
-        <q-toggle
-          v-model="formData.creates_incident"
-          data-test="alert-creates-incident-toggle"
-          color="primary"
-          size="30px"
-          class="o2-toggle-button-xs"
-        />
-      </div>
       </q-form>
     </div>
   </div>
@@ -858,9 +1082,11 @@ export default defineComponent({
 
     // Local state for aggregation toggle
     // Only enable aggregation when query type is "custom" (not "sql" or "promql")
-    const queryType = computed(() => props.formData.query_condition?.type || "custom");
+    const queryType = computed(
+      () => props.formData.query_condition?.type || "custom",
+    );
     const localIsAggregationEnabled = ref(
-      queryType.value === "custom" && props.isAggregationEnabled
+      queryType.value === "custom" && props.isAggregationEnabled,
     );
     const localDestinations = ref(props.destinations);
     const localTemplate = ref(props.template);
@@ -875,7 +1101,7 @@ export default defineComponent({
 
     // Query schema information from result_schema API
     interface HavingCondition {
-      type: 'condition';
+      type: "condition";
       expression: string;
       alias?: string;
       operator: string;
@@ -883,8 +1109,8 @@ export default defineComponent({
     }
 
     interface HavingLogicalOp {
-      type: 'logical_op';
-      operator: 'AND' | 'OR';
+      type: "logical_op";
+      operator: "AND" | "OR";
       conditions: HavingNode[];
     }
 
@@ -907,7 +1133,7 @@ export default defineComponent({
       const queryType = props.formData.query_condition?.type;
 
       // Skip for PromQL mode - it doesn't use result_schema
-      if (queryType === 'promql') {
+      if (queryType === "promql") {
         querySchema.value = { group_by: [], having: null, projections: [] };
         return;
       }
@@ -936,7 +1162,7 @@ export default defineComponent({
             page_type: props.formData.stream_type || "logs",
             is_streaming: false,
           },
-          "ui"
+          "ui",
         );
 
         if (response.data) {
@@ -945,7 +1171,7 @@ export default defineComponent({
             having: response.data.having || null,
             projections: response.data.projections || [],
           };
-          console.log('Query schema fetched:', querySchema.value);
+          console.log("Query schema fetched:", querySchema.value);
         }
       } catch (error) {
         console.error("Error fetching query schema:", error);
@@ -957,32 +1183,37 @@ export default defineComponent({
     // Clean up DataFusion expression to make it more readable
     const cleanExpression = (expr: string): string => {
       // Replace count(Int64(1)) with count(*)
-      expr = expr.replace(/count\(Int64\(\d+\)\)/gi, 'count(*)');
+      expr = expr.replace(/count\(Int64\(\d+\)\)/gi, "count(*)");
 
       // Replace qualified table names: default.field_name -> field_name
-      expr = expr.replace(/\w+\.(\w+)/g, '$1');
+      expr = expr.replace(/\w+\.(\w+)/g, "$1");
 
       // Replace Utf8("string") with just "string"
       expr = expr.replace(/Utf8\("([^"]+)"\)/g, '"$1"');
 
       // Replace Int64(number) with just number
-      expr = expr.replace(/Int64\((\d+)\)/g, '$1');
+      expr = expr.replace(/Int64\((\d+)\)/g, "$1");
 
       // Replace Float64(number) with just number
-      expr = expr.replace(/Float64\(([\d.]+)\)/g, '$1');
+      expr = expr.replace(/Float64\(([\d.]+)\)/g, "$1");
 
       return expr;
     };
 
     // Parse HavingNode tree into human-readable text
-    const parseHavingNode = (node: HavingNode, isRoot: boolean = true): string => {
-      if (node.type === 'condition') {
+    const parseHavingNode = (
+      node: HavingNode,
+      isRoot: boolean = true,
+    ): string => {
+      if (node.type === "condition") {
         // Use alias if present, otherwise clean up the expression
         const field = node.alias || cleanExpression(node.expression);
         return `${field} ${node.operator} ${node.value}`;
-      } else if (node.type === 'logical_op') {
+      } else if (node.type === "logical_op") {
         // Recursively parse child conditions
-        const childTexts = node.conditions.map(child => parseHavingNode(child, false));
+        const childTexts = node.conditions.map((child) =>
+          parseHavingNode(child, false),
+        );
 
         // Join with the logical operator
         const joinedText = childTexts.join(` ${node.operator} `);
@@ -992,17 +1223,21 @@ export default defineComponent({
 
         return needsParentheses ? `(${joinedText})` : joinedText;
       }
-      return '';
+      return "";
     };
 
     // Initialize timezone
     const initializeTimezone = () => {
       try {
-        const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const detectedTimezone =
+          Intl.DateTimeFormat().resolvedOptions().timeZone;
         browserTimezone.value = detectedTimezone;
 
         // Auto-detect and set timezone if not already set and in cron mode
-        if (props.formData.trigger_condition.frequency_type === 'cron' && !props.formData.trigger_condition.timezone) {
+        if (
+          props.formData.trigger_condition.frequency_type === "cron" &&
+          !props.formData.trigger_condition.timezone
+        ) {
           props.formData.trigger_condition.timezone = detectedTimezone;
           showTimezoneWarning.value = true;
         }
@@ -1010,7 +1245,10 @@ export default defineComponent({
         // Get all available timezones
         try {
           // @ts-ignore - supportedValuesOf is not in all TypeScript versions
-          if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+          if (
+            typeof Intl !== "undefined" &&
+            typeof Intl.supportedValuesOf === "function"
+          ) {
             // @ts-ignore
             filteredTimezone.value = Intl.supportedValuesOf("timeZone");
           } else {
@@ -1021,7 +1259,7 @@ export default defineComponent({
           filteredTimezone.value = [detectedTimezone];
         }
       } catch (e) {
-        console.error('Error initializing timezone:', e);
+        console.error("Error initializing timezone:", e);
         browserTimezone.value = "UTC";
         filteredTimezone.value = ["UTC"];
       }
@@ -1032,11 +1270,14 @@ export default defineComponent({
 
     // Watch for SQL/PromQL query changes
     watch(
-      () => [props.formData.query_condition?.sql, props.formData.query_condition?.promql],
+      () => [
+        props.formData.query_condition?.sql,
+        props.formData.query_condition?.promql,
+      ],
       () => {
         fetchQuerySchema();
       },
-      { immediate: true }
+      { immediate: true },
     );
 
     // Watch for prop changes
@@ -1044,58 +1285,77 @@ export default defineComponent({
       () => props.isAggregationEnabled,
       (newVal) => {
         // Only enable aggregation if query type is "custom"
-        localIsAggregationEnabled.value = queryType.value === "custom" && newVal;
-      }
+        localIsAggregationEnabled.value =
+          queryType.value === "custom" && newVal;
+      },
     );
 
-     watch(
+    watch(
       () => props.template,
       (newVal) => {
         localTemplate.value = newVal;
-      }
+      },
     );
 
     // Watch for query type changes
-    watch(
-      queryType,
-      (newType) => {
-        // Disable aggregation when switching to sql or promql
-        if (newType !== "custom") {
-          localIsAggregationEnabled.value = false;
-          emit("update:isAggregationEnabled", false);
-        } else {
-          // Re-enable aggregation if it was previously enabled
-          localIsAggregationEnabled.value = props.isAggregationEnabled;
-        }
+    watch(queryType, (newType) => {
+      // Disable aggregation when switching to sql or promql
+      if (newType !== "custom") {
+        localIsAggregationEnabled.value = false;
+        emit("update:isAggregationEnabled", false);
+      } else {
+        // Re-enable aggregation if it was previously enabled
+        localIsAggregationEnabled.value = props.isAggregationEnabled;
       }
-    );
+    });
 
     watch(
       () => props.destinations,
       (newVal) => {
         localDestinations.value = newVal;
-      }
+      },
     );
 
     // Watch for frequency type changes to manage timezone
     watch(
       () => props.formData.trigger_condition.frequency_type,
       (newVal) => {
-        if (newVal === 'cron') {
+        if (newVal === "cron") {
           initializeTimezone();
         }
-      }
+      },
     );
 
     // Aggregation functions
-    const aggFunctions = ["count", "min", "max", "avg", "sum", "median", "p50", "p75", "p90", "p95", "p99"];
+    const aggFunctions = [
+      "count",
+      "min",
+      "max",
+      "avg",
+      "sum",
+      "median",
+      "p50",
+      "p75",
+      "p90",
+      "p95",
+      "p99",
+    ];
 
     // Trigger operators
-    const triggerOperators = ["=", "!=", ">=", ">", "<=", "<", "Contains", "NotContains"];
+    const triggerOperators = [
+      "=",
+      "!=",
+      ">=",
+      ">",
+      "<=",
+      "<",
+      "Contains",
+      "NotContains",
+    ];
 
     const havingFieldsText = computed(() => {
       if (!querySchema.value.having) {
-        return '';
+        return "";
       }
       return parseHavingNode(querySchema.value.having);
     });
@@ -1112,8 +1372,10 @@ export default defineComponent({
     const thresholdMetricType = computed(() => {
       const hasGroupBy = querySchema.value.group_by.length > 0;
       const hasHaving = querySchema.value.having !== null;
-      const isAggEnabled = localIsAggregationEnabled.value && props.formData.query_condition.aggregation;
-      const isPromQL = queryType.value === 'promql';
+      const isAggEnabled =
+        localIsAggregationEnabled.value &&
+        props.formData.query_condition.aggregation;
+      const isPromQL = queryType.value === "promql";
 
       // Case 1: Complex Filters (HAVING) & Aggregations
       // Logic: HAVING count > 5 or SELECT COUNT(*)
@@ -1124,7 +1386,10 @@ export default defineComponent({
       //              GROUP BY service HAVING COUNT(*) > 10
       // Reality: Counts number of services (groups) that passed HAVING filter
       if (hasGroupBy && hasHaving) {
-        return t('alerts.thresholdDynamic.metricTypes.resultsPassedFilter') || 'results passed filter';
+        return (
+          t("alerts.thresholdDynamic.metricTypes.resultsPassedFilter") ||
+          "results passed filter"
+        );
       }
 
       // Case 2: Grouped Data (GROUP BY)
@@ -1136,17 +1401,21 @@ export default defineComponent({
       // Example PromQL: avg(cpu_usage) by (hostname)
       // Reality: Counts number of distinct groups (services/hostnames)
       if (hasGroupBy) {
-        return t('alerts.thresholdDynamic.metricTypes.distinctGroupsAffected') || 'distinct groups affected';
+        return (
+          t("alerts.thresholdDynamic.metricTypes.distinctGroupsAffected") ||
+          "distinct groups affected"
+        );
       }
 
       // Case 3: SQL/PromQL without GROUP BY
-      if (queryType.value === 'sql' || queryType.value === 'promql') {
-        const hasAggregates = querySchema.value.projections.some(p =>
-          p.toLowerCase().includes('count') ||
-          p.toLowerCase().includes('sum') ||
-          p.toLowerCase().includes('avg') ||
-          p.toLowerCase().includes('min') ||
-          p.toLowerCase().includes('max')
+      if (queryType.value === "sql" || queryType.value === "promql") {
+        const hasAggregates = querySchema.value.projections.some(
+          (p) =>
+            p.toLowerCase().includes("count") ||
+            p.toLowerCase().includes("sum") ||
+            p.toLowerCase().includes("avg") ||
+            p.toLowerCase().includes("min") ||
+            p.toLowerCase().includes("max"),
         );
 
         // Case 3a: With aggregation (COUNT/SUM/AVG)
@@ -1157,7 +1426,10 @@ export default defineComponent({
         // Reality: Always returns 1 row. Threshold > 1 will NEVER trigger!
         // Fix: Use HAVING clause for SQL, or use PromQL conditions with 'value > X'
         if (hasAggregates) {
-          return t('alerts.thresholdDynamic.metricTypes.resultsPassedFilter') || 'results passed filter';
+          return (
+            t("alerts.thresholdDynamic.metricTypes.resultsPassedFilter") ||
+            "results passed filter"
+          );
         }
 
         // Case 3b: Simple query without aggregation
@@ -1166,15 +1438,22 @@ export default defineComponent({
         // Example SQL: SELECT * FROM logs WHERE level='error'
         // Example PromQL: cpu_usage_percent{hostname="server-01"}
         if (isPromQL) {
-          return t('alerts.thresholdDynamic.metricTypes.metricsMatchCriteria') || 'metrics match criteria';
+          return (
+            t("alerts.thresholdDynamic.metricTypes.metricsMatchCriteria") ||
+            "metrics match criteria"
+          );
         }
-        return t('alerts.thresholdDynamic.metricTypes.matchingLogsFound') || 'matching logs found';
+        return (
+          t("alerts.thresholdDynamic.metricTypes.matchingLogsFound") ||
+          "matching logs found"
+        );
       }
 
       // Case 4: Custom query with aggregation
       if (isAggEnabled) {
-        const hasGroupByFields = props.formData.query_condition.aggregation.group_by?.length > 0 &&
-                                  props.formData.query_condition.aggregation.group_by[0]?.trim() !== "";
+        const hasGroupByFields =
+          props.formData.query_condition.aggregation.group_by?.length > 0 &&
+          props.formData.query_condition.aggregation.group_by[0]?.trim() !== "";
 
         // Case 4a: Custom with GROUP BY - counts distinct groups
         // Natural: "distinct groups affected"
@@ -1182,14 +1461,20 @@ export default defineComponent({
         // Reality: ✅ Correctly counts number of distinct services
         // Note: This is already handled by Case 2 above, but kept for clarity
         if (hasGroupByFields) {
-          return t('alerts.thresholdDynamic.metricTypes.distinctGroupsAffected') || 'distinct groups affected';
+          return (
+            t("alerts.thresholdDynamic.metricTypes.distinctGroupsAffected") ||
+            "distinct groups affected"
+          );
         }
 
         // Case 4b: Custom with aggregation only (no GROUP BY)
         // Natural: "results passed filter"
         // ⚠️ MAJOR CONFUSION: Same issue as Case 3a - always returns 1 row
         // Fix: Add GROUP BY or use HAVING conditions
-        return t('alerts.thresholdDynamic.metricTypes.resultsPassedFilter') || 'results passed filter';
+        return (
+          t("alerts.thresholdDynamic.metricTypes.resultsPassedFilter") ||
+          "results passed filter"
+        );
       }
 
       // Default: Standard Log Searches (Simple SQL/Custom)
@@ -1197,21 +1482,29 @@ export default defineComponent({
       // Natural: "matching logs found"
       // Why: Direct and conversational - you searched for logs, system found logs
       // Reality: ✅ Correctly counts number of matching rows/events
-      return t('alerts.thresholdDynamic.metricTypes.matchingLogsFound') || 'matching logs found';
+      return (
+        t("alerts.thresholdDynamic.metricTypes.matchingLogsFound") ||
+        "matching logs found"
+      );
     });
 
     const showGroupByContext = computed(() => {
       const hasGroupBy = querySchema.value.group_by.length > 0;
-      return (queryType.value === 'sql' || queryType.value === 'promql') && hasGroupBy;
+      return (
+        (queryType.value === "sql" || queryType.value === "promql") &&
+        hasGroupBy
+      );
     });
 
     const showHavingContext = computed(() => {
       const hasHaving = querySchema.value.having !== null;
-      return (queryType.value === 'sql' || queryType.value === 'promql') && hasHaving;
+      return (
+        (queryType.value === "sql" || queryType.value === "promql") && hasHaving
+      );
     });
 
     const groupByFieldsText = computed(() => {
-      return querySchema.value.group_by.join(', ');
+      return querySchema.value.group_by.join(", ");
     });
 
     // Filtered numeric columns for aggregation
@@ -1222,7 +1515,9 @@ export default defineComponent({
           filteredNumericColumns.value = [...props.columns];
         } else {
           const needle = val.toLowerCase();
-          filteredNumericColumns.value = props.columns.filter((v: any) => v.toLowerCase().indexOf(needle) > -1);
+          filteredNumericColumns.value = props.columns.filter(
+            (v: any) => v.toLowerCase().indexOf(needle) > -1,
+          );
         }
       });
     };
@@ -1236,14 +1531,16 @@ export default defineComponent({
         } else {
           const needle = val.toLowerCase();
           filteredDestinations.value = props.formattedDestinations.filter(
-            (v: any) => v.toLowerCase().indexOf(needle) > -1
+            (v: any) => v.toLowerCase().indexOf(needle) > -1,
           );
         }
       });
     };
 
-       // Filtered templates
-    const formattedTemplates = computed(() => props.templates.map((t: any) => t.name));
+    // Filtered templates
+    const formattedTemplates = computed(() =>
+      props.templates.map((t: any) => t.name),
+    );
     const filteredTemplates = ref<string[]>([]);
     const filterTemplates = (val: string, update: any) => {
       update(() => {
@@ -1252,7 +1549,7 @@ export default defineComponent({
         } else {
           const needle = val.toLowerCase();
           filteredTemplates.value = formattedTemplates.value.filter(
-            (v: string) => v.toLowerCase().indexOf(needle) > -1
+            (v: string) => v.toLowerCase().indexOf(needle) > -1,
           );
         }
       });
@@ -1263,7 +1560,7 @@ export default defineComponent({
       () => {
         filteredTemplates.value = [...formattedTemplates.value];
       },
-      { immediate: true }
+      { immediate: true },
     );
 
     // Timezone filter function
@@ -1272,7 +1569,10 @@ export default defineComponent({
         if (val === "") {
           try {
             // @ts-ignore
-            if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+            if (
+              typeof Intl !== "undefined" &&
+              typeof Intl.supportedValuesOf === "function"
+            ) {
               // @ts-ignore
               filteredTimezone.value = Intl.supportedValuesOf("timeZone");
             }
@@ -1284,37 +1584,51 @@ export default defineComponent({
           const allTimezones: string[] = [];
           try {
             // @ts-ignore
-            if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+            if (
+              typeof Intl !== "undefined" &&
+              typeof Intl.supportedValuesOf === "function"
+            ) {
               // @ts-ignore
               allTimezones.push(...Intl.supportedValuesOf("timeZone"));
             }
           } catch (e) {
             allTimezones.push(browserTimezone.value);
           }
-          filteredTimezone.value = allTimezones.filter((v: string) =>
-            v.toLowerCase().indexOf(needle) > -1
+          filteredTimezone.value = allTimezones.filter(
+            (v: string) => v.toLowerCase().indexOf(needle) > -1,
           );
         }
       });
     };
 
     // Handle frequency type change with conversion
-    const handleFrequencyTypeChange = (type: 'minutes' | 'cron') => {
+    const handleFrequencyTypeChange = (type: "minutes" | "cron") => {
       // If switching to cron and we have a frequency value, convert it
       // Only convert if there's no existing cron expression
-      if (type === 'cron' && props.formData.trigger_condition.frequency_type === 'minutes') {
-        const frequencyMinutes = Number(props.formData.trigger_condition.frequency);
+      if (
+        type === "cron" &&
+        props.formData.trigger_condition.frequency_type === "minutes"
+      ) {
+        const frequencyMinutes = Number(
+          props.formData.trigger_condition.frequency,
+        );
         const existingCron = props.formData.trigger_condition.cron;
 
         // Only convert if we have a frequency value and no existing cron expression
-        if (frequencyMinutes && frequencyMinutes > 0 && (!existingCron || existingCron.trim() === '')) {
+        if (
+          frequencyMinutes &&
+          frequencyMinutes > 0 &&
+          (!existingCron || existingCron.trim() === "")
+        ) {
           // Convert minutes to cron expression (6-field format: second minute hour day month dayOfWeek)
           const cronExpression = convertMinutesToCron(frequencyMinutes);
           props.formData.trigger_condition.cron = cronExpression;
 
           // Set timezone if not already set
           if (!props.formData.trigger_condition.timezone) {
-            props.formData.trigger_condition.timezone = browserTimezone.value || Intl.DateTimeFormat().resolvedOptions().timeZone;
+            props.formData.trigger_condition.timezone =
+              browserTimezone.value ||
+              Intl.DateTimeFormat().resolvedOptions().timeZone;
           }
         }
       }
@@ -1324,20 +1638,22 @@ export default defineComponent({
       emitTriggerUpdate();
     };
 
-
     // Validate cron expression
     const validateFrequency = () => {
       cronJobError.value = "";
 
       if (props.formData.trigger_condition.frequency_type === "cron") {
         try {
-          const intervalInSecs = getCronIntervalDifferenceInSeconds(props.formData.trigger_condition.cron);
+          const intervalInSecs = getCronIntervalDifferenceInSeconds(
+            props.formData.trigger_condition.cron,
+          );
 
           if (
             typeof intervalInSecs === "number" &&
             !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)
           ) {
-            const minInterval = Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
+            const minInterval =
+              Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
             cronJobError.value = `Frequency should be greater than ${minInterval - 1} seconds.`;
             return;
           }
@@ -1347,10 +1663,13 @@ export default defineComponent({
       }
 
       if (props.formData.trigger_condition.frequency_type === "minutes") {
-        const intervalInMins = Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60);
+        const intervalInMins = Math.ceil(
+          store.state?.zoConfig?.min_auto_refresh_interval / 60,
+        );
 
         if (props.formData.trigger_condition.frequency < intervalInMins) {
-          cronJobError.value = "Minimum frequency should be " + intervalInMins + " minutes";
+          cronJobError.value =
+            "Minimum frequency should be " + intervalInMins + " minutes";
           return;
         }
       }
@@ -1369,7 +1688,9 @@ export default defineComponent({
       if (periodValue && periodValue > 0) {
         // Only sync frequency if period is above minimum refresh interval
         // This prevents frequency from going below the minimum allowed value
-        const minFrequency = Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60) || 10;
+        const minFrequency =
+          Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60) ||
+          10;
         if (periodValue >= minFrequency) {
           props.formData.trigger_condition.frequency = periodValue;
         }
@@ -1381,7 +1702,9 @@ export default defineComponent({
 
         // Ensure timezone is set
         if (!props.formData.trigger_condition.timezone) {
-          props.formData.trigger_condition.timezone = browserTimezone.value || Intl.DateTimeFormat().resolvedOptions().timeZone;
+          props.formData.trigger_condition.timezone =
+            browserTimezone.value ||
+            Intl.DateTimeFormat().resolvedOptions().timeZone;
         }
 
         // Always sync silence notification
@@ -1404,7 +1727,10 @@ export default defineComponent({
     };
 
     const emitPromqlConditionUpdate = () => {
-      emit("update:promqlCondition", props.formData.query_condition.promql_condition);
+      emit(
+        "update:promqlCondition",
+        props.formData.query_condition.promql_condition,
+      );
     };
 
     const routeToCreateDestination = () => {
@@ -1429,15 +1755,18 @@ export default defineComponent({
       }
 
       // For Real-Time Alerts
-      if (props.isRealTime === 'true') {
+      if (props.isRealTime === "true") {
         // Check silence notification
         if (
           props.formData.trigger_condition.silence < 0 ||
           props.formData.trigger_condition.silence === undefined ||
           props.formData.trigger_condition.silence === null ||
-          props.formData.trigger_condition.silence === ''
+          props.formData.trigger_condition.silence === ""
         ) {
-          return { valid: false, message: `${t('alerts.silenceNotification')} should be greater than or equal to 0` };
+          return {
+            valid: false,
+            message: `${t("alerts.silenceNotification")} should be greater than or equal to 0`,
+          };
         }
 
         // Check destinations (required for both real-time and scheduled)
@@ -1451,10 +1780,10 @@ export default defineComponent({
       // For Scheduled Alerts
       // Check if aggregation is enabled
       // Check if query type is PromQL - validate both promql_condition AND threshold
-      if (queryType.value === 'promql') {
+      if (queryType.value === "promql") {
         // Validate PromQL condition
         if (!props.formData.query_condition.promql_condition) {
-          return { valid: false, message: 'PromQL condition is required' };
+          return { valid: false, message: "PromQL condition is required" };
         }
         if (!props.formData.query_condition.promql_condition.operator) {
           return { valid: false, message: null };
@@ -1462,7 +1791,7 @@ export default defineComponent({
         if (
           props.formData.query_condition.promql_condition.value === undefined ||
           props.formData.query_condition.promql_condition.value === null ||
-          props.formData.query_condition.promql_condition.value === ''
+          props.formData.query_condition.promql_condition.value === ""
         ) {
           return { valid: false, message: null };
         }
@@ -1473,24 +1802,37 @@ export default defineComponent({
         }
         const threshold = Number(props.formData.trigger_condition.threshold);
         if (isNaN(threshold) || threshold < 1) {
-          return { valid: false, message: `${t('alerts.threshold')} should be greater than 0` };
+          return {
+            valid: false,
+            message: `${t("alerts.threshold")} should be greater than 0`,
+          };
         }
-      } else if (localIsAggregationEnabled.value && props.formData.query_condition.aggregation) {
+      } else if (
+        localIsAggregationEnabled.value &&
+        props.formData.query_condition.aggregation
+      ) {
         // Validate group by fields (if any are added, they must not be empty)
-        const groupByFields = props.formData.query_condition.aggregation.group_by;
+        const groupByFields =
+          props.formData.query_condition.aggregation.group_by;
         if (groupByFields && groupByFields.length > 0) {
           for (const field of groupByFields) {
-            if (!field || field === '') {
+            if (!field || field === "") {
               return { valid: false, message: null }; // Show inline error only
             }
           }
         }
 
         // Validate aggregation having clause
-        if (!props.formData.query_condition.aggregation.having.column || props.formData.query_condition.aggregation.having.column === '') {
+        if (
+          !props.formData.query_condition.aggregation.having.column ||
+          props.formData.query_condition.aggregation.having.column === ""
+        ) {
           return { valid: false, message: null };
         }
-        if (!props.formData.query_condition.aggregation.having.value || props.formData.query_condition.aggregation.having.value === '') {
+        if (
+          !props.formData.query_condition.aggregation.having.value ||
+          props.formData.query_condition.aggregation.having.value === ""
+        ) {
           return { valid: false, message: null };
         }
         if (!props.formData.query_condition.aggregation.having.operator) {
@@ -1503,7 +1845,10 @@ export default defineComponent({
         }
         const threshold = Number(props.formData.trigger_condition.threshold);
         if (isNaN(threshold) || threshold < 1) {
-          return { valid: false, message: `${t('alerts.threshold')} should be greater than 0` };
+          return {
+            valid: false,
+            message: `${t("alerts.threshold")} should be greater than 0`,
+          };
         }
       } else {
         // Validate threshold without aggregation
@@ -1512,24 +1857,36 @@ export default defineComponent({
         }
         const threshold = Number(props.formData.trigger_condition.threshold);
         if (isNaN(threshold) || threshold < 1) {
-          return { valid: false, message: `${t('alerts.threshold')} should be greater than 0` };
+          return {
+            valid: false,
+            message: `${t("alerts.threshold")} should be greater than 0`,
+          };
         }
       }
 
       // Validate period
       const period = Number(props.formData.trigger_condition.period);
       if (isNaN(period) || period < 1) {
-        return { valid: false, message: `${t('alerts.period')} should be greater than 0` };
+        return {
+          valid: false,
+          message: `${t("alerts.period")} should be greater than 0`,
+        };
       }
 
       // Validate frequency
-      if (props.formData.trigger_condition.frequency_type === 'minutes') {
+      if (props.formData.trigger_condition.frequency_type === "minutes") {
         const frequency = Number(props.formData.trigger_condition.frequency);
         if (isNaN(frequency) || frequency < 1) {
-          return { valid: false, message: `${t('alerts.frequency')} should be greater than 0` };
+          return {
+            valid: false,
+            message: `${t("alerts.frequency")} should be greater than 0`,
+          };
         }
-      } else if (props.formData.trigger_condition.frequency_type === 'cron') {
-        if (!props.formData.trigger_condition.cron || !props.formData.trigger_condition.timezone) {
+      } else if (props.formData.trigger_condition.frequency_type === "cron") {
+        if (
+          !props.formData.trigger_condition.cron ||
+          !props.formData.trigger_condition.timezone
+        ) {
           return { valid: false, message: null };
         }
       }
@@ -1539,9 +1896,12 @@ export default defineComponent({
         props.formData.trigger_condition.silence < 0 ||
         props.formData.trigger_condition.silence === undefined ||
         props.formData.trigger_condition.silence === null ||
-        props.formData.trigger_condition.silence === ''
+        props.formData.trigger_condition.silence === ""
       ) {
-        return { valid: false, message: `${t('alerts.silenceNotification')} should be greater than or equal to 0` };
+        return {
+          valid: false,
+          message: `${t("alerts.silenceNotification")} should be greater than or equal to 0`,
+        };
       }
 
       // Check destinations (required for both real-time and scheduled)

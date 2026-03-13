@@ -60,11 +60,15 @@ describe("AddGroup Component", () => {
   describe("Component Mounting", () => {
     it("renders the component correctly", () => {
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="add-group-section"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-group-section"]').exists()).toBe(
+        true,
+      );
     });
 
     it("displays the correct title", () => {
-      const titleElement = wrapper.find('[data-test="add-group-section-title"]');
+      const titleElement = wrapper.find(
+        '[data-test="add-group-section-title"]',
+      );
       expect(titleElement.exists()).toBe(true);
       expect(titleElement.text()).toContain("New user group");
     });
@@ -72,13 +76,17 @@ describe("AddGroup Component", () => {
 
   describe("Form Input", () => {
     it("renders the group name input field", () => {
-      const nameInput = wrapper.find('[data-test="add-group-groupname-input-btn"]');
+      const nameInput = wrapper.find(
+        '[data-test="add-group-groupname-input-btn"]',
+      );
       expect(nameInput.exists()).toBe(true);
     });
 
     it("displays validation hint text", () => {
       // Check if hint text is in the component (it's in the template)
-      expect(wrapper.text()).toContain("Use alphanumeric and '_' characters only, without spaces.");
+      expect(wrapper.text()).toContain(
+        "Use alphanumeric and '_' characters only, without spaces.",
+      );
     });
 
     it("updates name value when input changes", async () => {
@@ -125,7 +133,7 @@ describe("AddGroup Component", () => {
     it("renders cancel and save buttons", () => {
       const cancelButton = wrapper.find('[data-test="add-group-cancel-btn"]');
       const saveButton = wrapper.find('[data-test="add-group-submit-btn"]');
-      
+
       expect(cancelButton.exists()).toBe(true);
       expect(saveButton.exists()).toBe(true);
       expect(cancelButton.text()).toContain("Cancel");
@@ -133,7 +141,9 @@ describe("AddGroup Component", () => {
     });
 
     it("emits cancel event when close button is clicked", async () => {
-      const closeButton = wrapper.find('[data-test="add-group-close-dialog-btn"]');
+      const closeButton = wrapper.find(
+        '[data-test="add-group-close-dialog-btn"]',
+      );
       await closeButton.trigger("click");
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
@@ -154,18 +164,18 @@ describe("AddGroup Component", () => {
     it("does not save when group name is empty", async () => {
       const { createGroup } = await import("@/services/iam");
       wrapper.vm.name = "";
-      
+
       await wrapper.vm.saveGroup();
-      
+
       expect(createGroup).not.toHaveBeenCalled();
     });
 
     it("does not save when group name is invalid", async () => {
       const { createGroup } = await import("@/services/iam");
       wrapper.vm.name = "invalid group name";
-      
+
       await wrapper.vm.saveGroup();
-      
+
       expect(createGroup).not.toHaveBeenCalled();
     });
 
@@ -173,12 +183,15 @@ describe("AddGroup Component", () => {
       const { createGroup } = await import("@/services/iam");
       const mockResponse = { data: { name: "test_group" } };
       vi.mocked(createGroup).mockResolvedValue(mockResponse);
-      
+
       wrapper.vm.name = "test_group";
-      
+
       await wrapper.vm.saveGroup();
-      
-      expect(createGroup).toHaveBeenCalledWith("test_group", store.state.selectedOrganization.identifier);
+
+      expect(createGroup).toHaveBeenCalledWith(
+        "test_group",
+        store.state.selectedOrganization.identifier,
+      );
       expect(wrapper.emitted("added:group")).toBeTruthy();
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
@@ -187,11 +200,11 @@ describe("AddGroup Component", () => {
       const { createGroup } = await import("@/services/iam");
       const mockResponse = { data: { name: "test_group" } };
       vi.mocked(createGroup).mockResolvedValue(mockResponse);
-      
+
       wrapper.vm.name = "test_group";
-      
+
       await wrapper.vm.saveGroup();
-      
+
       expect(mockNotify).toHaveBeenCalledWith({
         message: 'User Group "test_group" Created Successfully!',
         color: "positive",
@@ -204,18 +217,18 @@ describe("AddGroup Component", () => {
       const { createGroup } = await import("@/services/iam");
       const mockError = { response: { status: 400 } };
       vi.mocked(createGroup).mockRejectedValue(mockError);
-      
+
       wrapper.vm.name = "test_group";
-      
+
       try {
         await wrapper.vm.saveGroup();
       } catch (e) {
         // Error should be caught by component
       }
-      
+
       // Give time for async operations
-      await new Promise(resolve => setTimeout(resolve, 0));
-      
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
       expect(mockNotify).toHaveBeenCalledWith({
         message: "Error while creating group",
         color: "negative",
@@ -228,11 +241,11 @@ describe("AddGroup Component", () => {
       const { createGroup } = await import("@/services/iam");
       const mockError = { response: { status: 403 } };
       vi.mocked(createGroup).mockRejectedValue(mockError);
-      
+
       wrapper.vm.name = "test_group";
-      
+
       await wrapper.vm.saveGroup();
-      
+
       expect(mockNotify).not.toHaveBeenCalled();
     });
   });
@@ -271,11 +284,12 @@ describe("AddGroup Component", () => {
   describe("Input Validation Rules", () => {
     it("validates required field rule", () => {
       const input = wrapper.find('input[type="text"]');
-      const rules = wrapper.vm.$el.querySelector('.q-input').getAttribute('rules') || [];
-      
+      const rules =
+        wrapper.vm.$el.querySelector(".q-input").getAttribute("rules") || [];
+
       wrapper.vm.name = "";
       wrapper.vm.isValidGroupName = false;
-      
+
       const validationResult = wrapper.vm.name ? "valid" : "Name is required";
       expect(validationResult).toBe("Name is required");
     });
@@ -283,9 +297,13 @@ describe("AddGroup Component", () => {
     it("validates format rule when name exists", () => {
       wrapper.vm.name = "invalid name";
       wrapper.vm.isValidGroupName = false;
-      
-      const validationResult = wrapper.vm.isValidGroupName || "Use alphanumeric and '_' characters only, without spaces.";
-      expect(validationResult).toBe("Use alphanumeric and '_' characters only, without spaces.");
+
+      const validationResult =
+        wrapper.vm.isValidGroupName ||
+        "Use alphanumeric and '_' characters only, without spaces.";
+      expect(validationResult).toBe(
+        "Use alphanumeric and '_' characters only, without spaces.",
+      );
     });
   });
 
@@ -298,7 +316,15 @@ describe("AddGroup Component", () => {
     it("handles empty organization identifier", async () => {
       const wrapper = mount(AddGroup, {
         global: {
-          provide: { store: { ...store, state: { ...store.state, selectedOrganization: { identifier: "" } } } },
+          provide: {
+            store: {
+              ...store,
+              state: {
+                ...store.state,
+                selectedOrganization: { identifier: "" },
+              },
+            },
+          },
           plugins: [i18n],
         },
       });
@@ -306,19 +332,21 @@ describe("AddGroup Component", () => {
       const { createGroup } = await import("@/services/iam");
       const mockResponse = { data: { name: "test_group" } };
       vi.mocked(createGroup).mockResolvedValue(mockResponse);
-      
+
       wrapper.vm.name = "test_group";
       wrapper.vm.q = { notify: vi.fn() };
-      
+
       await wrapper.vm.saveGroup();
-      
+
       expect(createGroup).toHaveBeenCalledWith("test_group", "");
     });
   });
 
   describe("Accessibility", () => {
     it("has proper button attributes", () => {
-      const closeButton = wrapper.find('[data-test="add-group-close-dialog-btn"]');
+      const closeButton = wrapper.find(
+        '[data-test="add-group-close-dialog-btn"]',
+      );
       const cancelButton = wrapper.find('[data-test="add-group-cancel-btn"]');
       const saveButton = wrapper.find('[data-test="add-group-submit-btn"]');
 

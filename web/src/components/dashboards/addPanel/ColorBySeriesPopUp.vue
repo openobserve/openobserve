@@ -99,7 +99,9 @@
                     style="width: 90%"
                     class="input-spacing"
                     dense
-                   borderless hide-bottom-space>
+                    borderless
+                    hide-bottom-space
+                  >
                     <template v-slot:append>
                       <q-icon
                         name="colorize"

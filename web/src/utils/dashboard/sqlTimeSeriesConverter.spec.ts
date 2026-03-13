@@ -45,7 +45,9 @@ import * as dateTimeUtils from "@/utils/dashboard/dateTimeUtils";
 // Helpers
 // ────────────────────────────────────────────────────────────
 
-function makeOptions(xAxisData: any[] = ["2024-01-15 10:00:00", "2024-01-15 11:00:00"]): any {
+function makeOptions(
+  xAxisData: any[] = ["2024-01-15 10:00:00", "2024-01-15 11:00:00"],
+): any {
   return {
     xAxis: [
       {
@@ -120,28 +122,54 @@ describe("applyAutoSQLTimeSeries", () => {
   it("returns false for h-bar type", () => {
     const options = makeOptions();
     const panelSchema = makePanelSchema("h-bar", false, [makeHistogramField()]);
-    const result = applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    const result = applyAutoSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeMetadata(),
+      { value: null },
+    );
     expect(result).toBe(false);
   });
 
   it("returns false for h-stacked type", () => {
     const options = makeOptions();
-    const panelSchema = makePanelSchema("h-stacked", false, [makeHistogramField()]);
-    const result = applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    const panelSchema = makePanelSchema("h-stacked", false, [
+      makeHistogramField(),
+    ]);
+    const result = applyAutoSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeMetadata(),
+      { value: null },
+    );
     expect(result).toBe(false);
   });
 
   it("returns false for pie type", () => {
     const options = makeOptions();
     const panelSchema = makePanelSchema("pie", false, [makeHistogramField()]);
-    const result = applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    const result = applyAutoSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeMetadata(),
+      { value: null },
+    );
     expect(result).toBe(false);
   });
 
   it("returns false when customQuery is true", () => {
     const options = makeOptions();
     const panelSchema = makePanelSchema("line", true, [makeHistogramField()]);
-    const result = applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    const result = applyAutoSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeMetadata(),
+      { value: null },
+    );
     expect(result).toBe(false);
   });
 
@@ -149,28 +177,54 @@ describe("applyAutoSQLTimeSeries", () => {
     const options = makeOptions();
     options.xAxis = [];
     const panelSchema = makePanelSchema("line", false, [makeHistogramField()]);
-    const result = applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    const result = applyAutoSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeMetadata(),
+      { value: null },
+    );
     expect(result).toBe(false);
   });
 
   it("returns false when xAxis[0].data is empty", () => {
     const options = makeOptions([]);
     const panelSchema = makePanelSchema("line", false, [makeHistogramField()]);
-    const result = applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    const result = applyAutoSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeMetadata(),
+      { value: null },
+    );
     expect(result).toBe(false);
   });
 
   it("returns false when no histogram or timestamp field", () => {
     const options = makeOptions();
-    const panelSchema = makePanelSchema("line", false, [{ functionName: "count", args: [] }]);
-    const result = applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    const panelSchema = makePanelSchema("line", false, [
+      { functionName: "count", args: [] },
+    ]);
+    const result = applyAutoSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeMetadata(),
+      { value: null },
+    );
     expect(result).toBe(false);
   });
 
   it("returns true and sets xAxis.type to time when histogram field present", () => {
     const options = makeOptions();
     const panelSchema = makePanelSchema("line", false, [makeHistogramField()]);
-    const result = applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    const result = applyAutoSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeMetadata(),
+      { value: null },
+    );
     expect(result).toBe(true);
     expect(options.xAxis[0].type).toBe("time");
   });
@@ -179,7 +233,9 @@ describe("applyAutoSQLTimeSeries", () => {
     const options = makeOptions(["2024-01-15 10:00:00", "2024-01-15 11:00:00"]);
     options.series = [{ name: "s1", data: [10, 20] }];
     const panelSchema = makePanelSchema("line", false, [makeHistogramField()]);
-    applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), {
+      value: null,
+    });
     expect(Array.isArray(options.series[0].data[0])).toBe(true);
     expect(options.series[0].data[0]).toHaveLength(2);
     expect(options.series[0].data[1]).toHaveLength(2);
@@ -188,21 +244,27 @@ describe("applyAutoSQLTimeSeries", () => {
   it("clears xAxis[0].data after conversion", () => {
     const options = makeOptions(["2024-01-15 10:00:00"]);
     const panelSchema = makePanelSchema("line", false, [makeHistogramField()]);
-    applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), {
+      value: null,
+    });
     expect(options.xAxis[0].data).toEqual([]);
   });
 
   it("sets tooltip.formatter function when histogram field present", () => {
     const options = makeOptions();
     const panelSchema = makePanelSchema("line", false, [makeHistogramField()]);
-    applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), {
+      value: null,
+    });
     expect(typeof options.tooltip.formatter).toBe("function");
   });
 
   it("sets tooltip.axisPointer when histogram field present", () => {
     const options = makeOptions();
     const panelSchema = makePanelSchema("line", false, [makeHistogramField()]);
-    applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), {
+      value: null,
+    });
     expect(options.tooltip.axisPointer).toBeDefined();
     expect(options.tooltip.axisPointer.type).toBe("cross");
   });
@@ -210,7 +272,13 @@ describe("applyAutoSQLTimeSeries", () => {
   it("returns true when timestampField present (no functionName)", () => {
     const options = makeOptions(["1705320000000", "1705323600000"]);
     const panelSchema = makePanelSchema("line", false, [makeTimestampField()]);
-    const result = applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    const result = applyAutoSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeMetadata(),
+      { value: null },
+    );
     expect(result).toBe(true);
   });
 
@@ -218,7 +286,9 @@ describe("applyAutoSQLTimeSeries", () => {
     const options = makeOptions(["1705320000000", "1705323600000"]);
     options.series = [{ name: "s1", data: [5, 15] }];
     const panelSchema = makePanelSchema("bar", false, [makeTimestampField()]);
-    applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), {
+      value: null,
+    });
     expect(Array.isArray(options.series[0].data[0])).toBe(true);
     expect(options.series[0].data[0]).toHaveLength(2);
   });
@@ -240,7 +310,13 @@ describe("applyCustomSQLTimeSeries", () => {
     vi.mocked(dateTimeUtils.isTimeSeries).mockReturnValue(true as any);
     const options = makeOptions();
     const panelSchema = makePanelSchema("heatmap", true);
-    const result = applyCustomSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    const result = applyCustomSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeMetadata(),
+      { value: null },
+    );
     expect(result).toBe(false);
   });
 
@@ -248,14 +324,26 @@ describe("applyCustomSQLTimeSeries", () => {
     vi.mocked(dateTimeUtils.isTimeSeries).mockReturnValue(true as any);
     const options = makeOptions();
     const panelSchema = makePanelSchema("line", false);
-    const result = applyCustomSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    const result = applyCustomSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeMetadata(),
+      { value: null },
+    );
     expect(result).toBe(false);
   });
 
   it("returns false when xAxis data is not time series and not timestamp", () => {
     const options = makeOptions(["A", "B", "C"]);
     const panelSchema = makePanelSchema("line", true);
-    const result = applyCustomSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    const result = applyCustomSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeMetadata(),
+      { value: null },
+    );
     expect(result).toBe(false);
   });
 
@@ -263,7 +351,13 @@ describe("applyCustomSQLTimeSeries", () => {
     vi.mocked(dateTimeUtils.isTimeSeries).mockReturnValue(true as any);
     const options = makeOptions(["2024-01-15 10:00:00", "2024-01-15 11:00:00"]);
     const panelSchema = makePanelSchema("line", true);
-    const result = applyCustomSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    const result = applyCustomSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeMetadata(),
+      { value: null },
+    );
     expect(result).toBe(true);
     expect(options.xAxis[0].type).toBe("time");
   });
@@ -273,7 +367,13 @@ describe("applyCustomSQLTimeSeries", () => {
     const options = makeOptions(["2024-01-15 10:00:00", "2024-01-15 11:00:00"]);
     options.series = [{ name: "custom", data: [100, 200] }];
     const panelSchema = makePanelSchema("line", true);
-    applyCustomSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    applyCustomSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeMetadata(),
+      { value: null },
+    );
     expect(Array.isArray(options.series[0].data[0])).toBe(true);
     expect(options.series[0].data[0]).toHaveLength(2);
   });
@@ -282,7 +382,13 @@ describe("applyCustomSQLTimeSeries", () => {
     vi.mocked(dateTimeUtils.isTimeStamp).mockReturnValue(true as any);
     const options = makeOptions(["1705320000000", "1705323600000"]);
     const panelSchema = makePanelSchema("bar", true);
-    const result = applyCustomSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    const result = applyCustomSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeMetadata(),
+      { value: null },
+    );
     expect(result).toBe(true);
     expect(options.xAxis[0].type).toBe("time");
   });
@@ -291,7 +397,13 @@ describe("applyCustomSQLTimeSeries", () => {
     vi.mocked(dateTimeUtils.isTimeSeries).mockReturnValue(true as any);
     const options = makeOptions(["2024-01-15 10:00:00"]);
     const panelSchema = makePanelSchema("line", true);
-    applyCustomSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    applyCustomSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeMetadata(),
+      { value: null },
+    );
     expect(options.xAxis[0].data).toEqual([]);
   });
 
@@ -299,7 +411,13 @@ describe("applyCustomSQLTimeSeries", () => {
     vi.mocked(dateTimeUtils.isTimeSeries).mockReturnValue(true as any);
     const options = makeOptions();
     const panelSchema = makePanelSchema("line", true);
-    applyCustomSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    applyCustomSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeMetadata(),
+      { value: null },
+    );
     expect(typeof options.tooltip.formatter).toBe("function");
   });
 
@@ -308,7 +426,13 @@ describe("applyCustomSQLTimeSeries", () => {
     const options = makeOptions();
     options.xAxis = [];
     const panelSchema = makePanelSchema("line", true);
-    const result = applyCustomSQLTimeSeries(options, panelSchema, makeStore(), makeMetadata(), { value: null });
+    const result = applyCustomSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeMetadata(),
+      { value: null },
+    );
     expect(result).toBe(false);
   });
 });

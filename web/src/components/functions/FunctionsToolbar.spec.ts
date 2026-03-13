@@ -41,7 +41,11 @@ describe("FunctionsToolbar", () => {
     router = createRouter({
       history: createWebHistory(),
       routes: [
-        { path: "/functions", name: "functions", component: { template: "<div>Functions</div>" } },
+        {
+          path: "/functions",
+          name: "functions",
+          component: { template: "<div>Functions</div>" },
+        },
       ],
     });
 
@@ -153,16 +157,16 @@ describe("FunctionsToolbar", () => {
     const wrapper = mount(FunctionsToolbar, {
       props: {
         name: "testFunction",
-        transformTypeOptions: [
-          { label: "VRL", value: "0" },
-        ],
+        transformTypeOptions: [{ label: "VRL", value: "0" }],
       },
       global: {
         plugins: [i18n, store, router],
       },
     });
 
-    const vrlRadio = wrapper.find('[data-test="function-transform-type-vrl-radio"]');
+    const vrlRadio = wrapper.find(
+      '[data-test="function-transform-type-vrl-radio"]',
+    );
     expect(vrlRadio.exists()).toBe(true);
   });
 
@@ -180,7 +184,9 @@ describe("FunctionsToolbar", () => {
       },
     });
 
-    const jsRadio = wrapper.find('[data-test="function-transform-type-js-radio"]');
+    const jsRadio = wrapper.find(
+      '[data-test="function-transform-type-js-radio"]',
+    );
     expect(jsRadio.exists()).toBe(true);
   });
 
@@ -263,7 +269,9 @@ describe("FunctionsToolbar", () => {
       },
     });
 
-    const fullscreenButton = wrapper.find('[data-test="add-function-fullscreen-btn"]');
+    const fullscreenButton = wrapper.find(
+      '[data-test="add-function-fullscreen-btn"]',
+    );
     await fullscreenButton.trigger("click");
 
     // Just verify that clicking the button doesn't throw an error

@@ -55,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :rules="[(val: any) => !!val || 'Algorithm is required']"
       tabindex="1"
     />
-
   </div>
 </template>
 
@@ -95,6 +94,6 @@ export default defineComponent({
 .cipher-keys-add-encryption-mechanism {
   .q-field--labeled.showLabelOnTop .q-field__bottom {
     padding: 0px;
-  }  
+  }
 }
 </style>

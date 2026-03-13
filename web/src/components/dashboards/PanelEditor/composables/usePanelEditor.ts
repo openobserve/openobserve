@@ -57,7 +57,10 @@ export interface UsePanelEditorOptions {
   /** Selected date value */
   selectedDate?: Ref<any>;
   /** Validate panel fields (from useDashboardPanelData) */
-  validatePanel?: (errors: string[], isFieldsValidationRequired?: boolean) => void;
+  validatePanel?: (
+    errors: string[],
+    isFieldsValidationRequired?: boolean,
+  ) => void;
 }
 
 /**
@@ -145,13 +148,18 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
    * If no parent provides it, create a new one (e.g., for dashboard AddPanel).
    * This ensures PanelSchemaRenderer updates the correct state that SearchBar reads from.
    */
-  const injectedLoadingState = inject<any>("variablesAndPanelsDataLoadingState", null);
+  const injectedLoadingState = inject<any>(
+    "variablesAndPanelsDataLoadingState",
+    null,
+  );
 
-  const variablesAndPanelsDataLoadingState = injectedLoadingState || reactive({
-    variablesData: {} as Record<string, boolean>,
-    panels: {} as Record<string, boolean>,
-    searchRequestTraceIds: {} as Record<string, string[]>,
-  });
+  const variablesAndPanelsDataLoadingState =
+    injectedLoadingState ||
+    reactive({
+      variablesData: {} as Record<string, boolean>,
+      panels: {} as Record<string, boolean>,
+      searchRequestTraceIds: {} as Record<string, string[]>,
+    });
 
   // Provide loading state for child components (either injected or newly created)
   // This ensures PanelSchemaRenderer can inject it
@@ -409,7 +417,9 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
    * Handle cached data differs from current time range update
    * @param value - Whether cached data differs from current time range
    */
-  const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (value: boolean): void => {
+  const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (
+    value: boolean,
+  ): void => {
     isCachedDataDifferWithCurrentTimeRange.value = value;
   };
 
@@ -702,7 +712,8 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
 
   // Check if externalChartData has actual VALUE (not just if the ref exists)
   // A ref is always truthy even if its value is undefined, so we must check .value
-  const hasExternalChartData = externalChartData && externalChartData.value !== undefined;
+  const hasExternalChartData =
+    externalChartData && externalChartData.value !== undefined;
 
   // Watch external chart data (for logs mode) - sync to internal state
   // Only set up this watcher if externalChartData actually has data
@@ -734,7 +745,6 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     } else {
       chartData.value = {};
     }
-
   };
 
   // ============================================================================

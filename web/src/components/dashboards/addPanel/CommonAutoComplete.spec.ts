@@ -49,7 +49,7 @@ global.console = {
   ...console,
   error: vi.fn(),
   warn: vi.fn(),
-  log: vi.fn()
+  log: vi.fn(),
 };
 
 const node = document.createElement("div");
@@ -192,7 +192,7 @@ describe("CommonAutoComplete", () => {
     it("should emit update:modelValue when input changes", async () => {
       const input = wrapper.find("input");
       await input.setValue("new value");
-      
+
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
       expect(wrapper.emitted("update:modelValue")[0]).toEqual(["new value"]);
     });
@@ -205,7 +205,7 @@ describe("CommonAutoComplete", () => {
     it("should show options on focus", async () => {
       const input = wrapper.find("input");
       await input.trigger("focus");
-      
+
       expect(wrapper.vm.showOptions).toBe(true);
     });
 
@@ -213,7 +213,7 @@ describe("CommonAutoComplete", () => {
       wrapper.vm.showOptions = true;
       const input = wrapper.find("input");
       await input.trigger("blur");
-      
+
       expect(wrapper.vm.showOptions).toBe(false);
     });
   });
@@ -223,7 +223,7 @@ describe("CommonAutoComplete", () => {
       wrapper = createWrapper();
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
-      
+
       const optionsContainer = wrapper.find(".options-container");
       expect(optionsContainer.exists()).toBeTruthy();
     });
@@ -232,7 +232,7 @@ describe("CommonAutoComplete", () => {
       wrapper = createWrapper();
       wrapper.vm.showOptions = false;
       await wrapper.vm.$nextTick();
-      
+
       const optionsContainer = wrapper.find(".options-container");
       expect(optionsContainer.exists()).toBeFalsy();
     });
@@ -242,7 +242,7 @@ describe("CommonAutoComplete", () => {
       wrapper = createWrapper();
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
-      
+
       const optionsContainer = wrapper.find(".options-container");
       expect(optionsContainer.exists()).toBeFalsy();
     });
@@ -251,8 +251,10 @@ describe("CommonAutoComplete", () => {
       wrapper = createWrapper();
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
-      
-      const options = wrapper.findAll("[data-test='common-auto-complete-option']");
+
+      const options = wrapper.findAll(
+        "[data-test='common-auto-complete-option']",
+      );
       expect(options.length).toBe(mockFilteredOptions.length);
     });
 
@@ -260,7 +262,7 @@ describe("CommonAutoComplete", () => {
       wrapper = createWrapper();
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
-      
+
       const options = wrapper.findAll(".option");
       options.forEach((option, index) => {
         expect(option.text()).toBe(mockFilteredOptions[index].label);
@@ -278,15 +280,17 @@ describe("CommonAutoComplete", () => {
     it("should emit update:modelValue when option is selected", async () => {
       const option = wrapper.find(".option");
       await option.trigger("mousedown");
-      
+
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      expect(wrapper.emitted("update:modelValue")[0]).toEqual([mockFilteredOptions[0].value]);
+      expect(wrapper.emitted("update:modelValue")[0]).toEqual([
+        mockFilteredOptions[0].value,
+      ]);
     });
 
     it("should hide options when option is selected", async () => {
       const option = wrapper.find(".option");
       await option.trigger("mousedown");
-      
+
       expect(wrapper.vm.showOptions).toBe(false);
     });
 
@@ -295,18 +299,20 @@ describe("CommonAutoComplete", () => {
       wrapper = createWrapper({ valueReplaceFn: customFn });
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
-      
+
       const option = wrapper.find(".option");
       await option.trigger("mousedown");
-      
+
       expect(customFn).toHaveBeenCalledWith(mockFilteredOptions[0].value);
-      expect(wrapper.emitted("update:modelValue")[0]).toEqual([`processed_${mockFilteredOptions[0].value}`]);
+      expect(wrapper.emitted("update:modelValue")[0]).toEqual([
+        `processed_${mockFilteredOptions[0].value}`,
+      ]);
     });
 
     it("should handle selectOption method call", () => {
       const testOption = { label: "Test", value: "test" };
       wrapper.vm.selectOption(testOption);
-      
+
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
       expect(wrapper.vm.showOptions).toBe(false);
     });
@@ -318,9 +324,11 @@ describe("CommonAutoComplete", () => {
       wrapper = createWrapper();
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
-      
+
       const optionsContainer = wrapper.find(".options-container");
-      expect(optionsContainer.attributes("style")).toContain("background-color: white");
+      expect(optionsContainer.attributes("style")).toContain(
+        "background-color: white",
+      );
     });
 
     it("should use dark theme background when theme is dark", async () => {
@@ -328,30 +336,38 @@ describe("CommonAutoComplete", () => {
       wrapper = createWrapper();
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
-      
+
       const optionsContainer = wrapper.find(".options-container");
       const style = optionsContainer.attributes("style");
       // Check for either hex or rgb format of the same dark color
-      expect(style).toMatch(/(background-color: #2d2d2d|background-color: rgb\(45, 45, 45\))/);
+      expect(style).toMatch(
+        /(background-color: #2d2d2d|background-color: rgb\(45, 45, 45\))/,
+      );
     });
   });
 
   describe("Slots", () => {
     it("should render label slot when provided", () => {
-      wrapper = createWrapper({}, {
-        label: '<span class="custom-label">Custom Label</span>',
-      });
-      
+      wrapper = createWrapper(
+        {},
+        {
+          label: '<span class="custom-label">Custom Label</span>',
+        },
+      );
+
       const customLabel = wrapper.find(".custom-label");
       expect(customLabel.exists()).toBeTruthy();
       expect(customLabel.text()).toBe("Custom Label");
     });
 
     it("should detect slot presence correctly", () => {
-      wrapper = createWrapper({}, {
-        label: '<span>Custom Label</span>',
-      });
-      
+      wrapper = createWrapper(
+        {},
+        {
+          label: "<span>Custom Label</span>",
+        },
+      );
+
       expect(wrapper.vm.hasSlot("label")).toBe(true);
       expect(wrapper.vm.hasSlot("nonexistent")).toBe(false);
     });
@@ -366,20 +382,20 @@ describe("CommonAutoComplete", () => {
     it("should sync inputValue when modelValue prop changes", async () => {
       wrapper = createWrapper({ modelValue: "initial" });
       expect(wrapper.vm.inputValue).toBe("initial");
-      
+
       await wrapper.setProps({ modelValue: "updated" });
       expect(wrapper.vm.inputValue).toBe("updated");
     });
 
     it("should call fieldsFilterFn when inputValue changes", async () => {
       wrapper = createWrapper();
-      
+
       // Clear previous calls
       mockFilterFn.mockClear();
-      
+
       // Simulate input value change by triggering the watcher manually
       wrapper.vm.onModelValueChanged("test");
-      
+
       expect(mockFilterFn).toHaveBeenCalledWith("test");
     });
   });
@@ -387,9 +403,9 @@ describe("CommonAutoComplete", () => {
   describe("Event Handling", () => {
     it("should handle onModelValueChanged correctly", () => {
       wrapper = createWrapper();
-      
+
       wrapper.vm.onModelValueChanged("new value");
-      
+
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
       expect(wrapper.emitted("update:modelValue")[0]).toEqual(["new value"]);
       expect(mockFilterFn).toHaveBeenCalledWith("new value");
@@ -398,9 +414,9 @@ describe("CommonAutoComplete", () => {
     it("should hide options correctly", () => {
       wrapper = createWrapper();
       wrapper.vm.showOptions = true;
-      
+
       wrapper.vm.hideOptions();
-      
+
       expect(wrapper.vm.showOptions).toBe(false);
     });
   });
@@ -422,9 +438,9 @@ describe("CommonAutoComplete", () => {
       wrapper = createWrapper();
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
-      
+
       const options = wrapper.findAll(".option");
-      options.forEach(option => {
+      options.forEach((option) => {
         expect(option.classes()).toContain("option");
       });
     });
@@ -449,7 +465,7 @@ describe("CommonAutoComplete", () => {
 
     it("should handle undefined option in selectOption", () => {
       wrapper = createWrapper();
-      
+
       expect(() => {
         wrapper.vm.selectOption(undefined);
       }).not.toThrow();
@@ -458,9 +474,9 @@ describe("CommonAutoComplete", () => {
     it("should handle option with undefined value", () => {
       wrapper = createWrapper();
       const optionWithUndefined = { label: "Test", value: undefined };
-      
+
       wrapper.vm.selectOption(optionWithUndefined);
-      
+
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
     });
   });
@@ -473,16 +489,16 @@ describe("CommonAutoComplete", () => {
 
     it("should maintain state across interactions", async () => {
       wrapper = createWrapper();
-      
+
       // Focus to show options
       const input = wrapper.find("input");
       await input.trigger("focus");
       expect(wrapper.vm.showOptions).toBe(true);
-      
+
       // Type to filter
       await input.setValue("test");
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      
+
       // Blur to hide
       await input.trigger("blur");
       expect(wrapper.vm.showOptions).toBe(false);
@@ -490,18 +506,18 @@ describe("CommonAutoComplete", () => {
 
     it("should handle form-like behavior", async () => {
       wrapper = createWrapper();
-      
+
       const input = wrapper.find("input");
-      
+
       // Focus and show options
       await input.trigger("focus");
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
-      
+
       // Select option
       const option = wrapper.find(".option");
       await option.trigger("mousedown");
-      
+
       expect(wrapper.vm.showOptions).toBe(false);
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
     });
@@ -510,7 +526,7 @@ describe("CommonAutoComplete", () => {
   describe("Component Lifecycle", () => {
     it("should initialize correctly", () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.vm.showOptions).toBe(false);
       expect(wrapper.vm.inputValue).toBe("");
       expect(wrapper.vm.fieldsFilterFn).toBe(mockFilterFn);
@@ -523,20 +539,20 @@ describe("CommonAutoComplete", () => {
     it("should cleanup properly on unmount", () => {
       wrapper = createWrapper();
       const vm = wrapper.vm;
-      
+
       wrapper.unmount();
-      
+
       expect(() => vm.showOptions).not.toThrow();
     });
 
     it("should maintain reactivity", async () => {
       wrapper = createWrapper();
-      
+
       // Test reactivity
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
       expect(wrapper.find(".options-container").exists()).toBeTruthy();
-      
+
       wrapper.vm.showOptions = false;
       await wrapper.vm.$nextTick();
       expect(wrapper.find(".options-container").exists()).toBeFalsy();
@@ -547,7 +563,7 @@ describe("CommonAutoComplete", () => {
     it("should have proper input attributes", () => {
       wrapper = createWrapper();
       const input = wrapper.find("[data-test='common-auto-complete']");
-      
+
       expect(input.exists()).toBeTruthy();
       expect(input.attributes("data-test")).toBe("common-auto-complete");
     });
@@ -556,8 +572,10 @@ describe("CommonAutoComplete", () => {
       wrapper = createWrapper();
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
-      
-      const options = wrapper.findAll("[data-test='common-auto-complete-option']");
+
+      const options = wrapper.findAll(
+        "[data-test='common-auto-complete-option']",
+      );
       expect(options.length).toBeGreaterThan(0);
     });
   });
@@ -566,29 +584,29 @@ describe("CommonAutoComplete", () => {
     it("should handle rapid focus/blur events", async () => {
       wrapper = createWrapper();
       const input = wrapper.find("input");
-      
+
       for (let i = 0; i < 5; i++) {
         await input.trigger("focus");
         await input.trigger("blur");
       }
-      
+
       expect(wrapper.vm.showOptions).toBe(false);
     });
 
     it("should handle special characters in input", async () => {
       wrapper = createWrapper();
-      
+
       const specialChars = "!@#$%^&*()";
       wrapper.vm.onModelValueChanged(specialChars);
-      
+
       expect(mockFilterFn).toHaveBeenCalledWith(specialChars);
     });
 
     it("should handle empty string input", async () => {
       wrapper = createWrapper();
-      
+
       wrapper.vm.onModelValueChanged("");
-      
+
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
       expect(mockFilterFn).toHaveBeenCalledWith("");
     });
@@ -604,7 +622,9 @@ describe("CommonAutoComplete", () => {
       await option.trigger("mousedown");
 
       expect(wrapper.emitted("select")).toBeTruthy();
-      expect(wrapper.emitted("select")[0]).toEqual([mockFilteredOptions[0].value]);
+      expect(wrapper.emitted("select")[0]).toEqual([
+        mockFilteredOptions[0].value,
+      ]);
     });
 
     it("should emit both update:modelValue and select events on selection", async () => {
@@ -620,7 +640,9 @@ describe("CommonAutoComplete", () => {
       expect(wrapper.emitted("select")).toBeTruthy();
 
       // Both should have the same value
-      expect(wrapper.emitted("update:modelValue")[0]).toEqual(wrapper.emitted("select")[0]);
+      expect(wrapper.emitted("update:modelValue")[0]).toEqual(
+        wrapper.emitted("select")[0],
+      );
     });
 
     it("should emit select event with valueReplaceFn applied", async () => {
@@ -633,7 +655,9 @@ describe("CommonAutoComplete", () => {
       await option.trigger("mousedown");
 
       expect(wrapper.emitted("select")).toBeTruthy();
-      expect(wrapper.emitted("select")[0]).toEqual([`processed_${mockFilteredOptions[0].value}`]);
+      expect(wrapper.emitted("select")[0]).toEqual([
+        `processed_${mockFilteredOptions[0].value}`,
+      ]);
     });
 
     it("should emit select event when selectOption is called directly", () => {

@@ -36,7 +36,6 @@ document.body.appendChild(node);
 describe.skip("Alert List", async () => {
   let wrapper: any;
   beforeEach(async () => {
-    
     // wrapper = mount(AddDestination, {
     //   attachTo: "#app",
     //   props: {
@@ -59,31 +58,31 @@ describe.skip("Alert List", async () => {
 
   it("Should render add destination title", () => {
     expect(wrapper.find('[data-test="add-destination-title"]').text()).toBe(
-      "Add Destination"
+      "Add Destination",
     );
   });
 
   it("Should render name input", () => {
     expect(
-      wrapper.find('[data-test="add-destination-name-input"]').exists()
+      wrapper.find('[data-test="add-destination-name-input"]').exists(),
     ).toBeTruthy();
   });
 
   it("Should render template select", () => {
     expect(
-      wrapper.find('[data-test="add-destination-template-select"]').exists()
+      wrapper.find('[data-test="add-destination-template-select"]').exists(),
     ).toBeTruthy();
   });
 
   it("Should render url input", () => {
     expect(
-      wrapper.find('[data-test="add-destination-url-input"]').exists()
+      wrapper.find('[data-test="add-destination-url-input"]').exists(),
     ).toBeTruthy();
   });
 
   it("Should reder method select input", () => {
     expect(
-      wrapper.find('[data-test="add-destination-method-select"]').exists()
+      wrapper.find('[data-test="add-destination-method-select"]').exists(),
     ).toBeTruthy();
   });
 
@@ -93,12 +92,12 @@ describe.skip("Alert List", async () => {
     expect(
       wrapper
         .find(`[data-test="add-destination-header-${headerKey}-key-input"]`)
-        .exists()
+        .exists(),
     ).toBeTruthy();
     expect(
       wrapper
         .find(`[data-test="add-destination-header-${headerValue}-value-input"]`)
-        .exists()
+        .exists(),
     ).toBeTruthy();
   });
 
@@ -115,8 +114,8 @@ describe.skip("Alert List", async () => {
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/destinations/${dest_name}`,
           (req: any, res: any, ctx: any) => {
             return res(ctx.status(200), ctx.json({ code: 200 }));
-          }
-        )
+          },
+        ),
       );
       await wrapper
         .find('[data-test="add-destination-name-input"]')

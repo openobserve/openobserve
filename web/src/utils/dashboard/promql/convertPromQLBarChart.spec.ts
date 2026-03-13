@@ -21,7 +21,9 @@ import type { ProcessedPromQLData } from "./shared/types";
 vi.mock("./shared/dataProcessor", () => ({
   applyAggregation: vi.fn((values, aggregation) => {
     if (!values || values.length === 0) return 0;
-    const numericValues = values.map((v: any) => (Array.isArray(v) ? parseFloat(v[1]) : v));
+    const numericValues = values.map((v: any) =>
+      Array.isArray(v) ? parseFloat(v[1]) : v,
+    );
     if (aggregation === "last") return numericValues[numericValues.length - 1];
     if (aggregation === "first") return numericValues[0];
     if (aggregation === "min") return Math.min(...numericValues);
@@ -30,7 +32,8 @@ vi.mock("./shared/dataProcessor", () => ({
       const sum = numericValues.reduce((a: number, b: number) => a + b, 0);
       return sum / numericValues.length;
     }
-    if (aggregation === "sum") return numericValues.reduce((a: number, b: number) => a + b, 0);
+    if (aggregation === "sum")
+      return numericValues.reduce((a: number, b: number) => a + b, 0);
     return numericValues[numericValues.length - 1];
   }),
 }));
@@ -58,14 +61,16 @@ vi.mock("./shared/gridBuilder", () => ({
 }));
 
 vi.mock("../colorPalette", () => ({
-  getSeriesColor: vi.fn((colorConfig, name, values, min, max, theme, colorBySeries) => {
-    const colors: Record<string, string> = {
-      series1: "#FF0000",
-      series2: "#00FF00",
-      series3: "#0000FF",
-    };
-    return colors[name] || "#CCCCCC";
-  }),
+  getSeriesColor: vi.fn(
+    (colorConfig, name, values, min, max, theme, colorBySeries) => {
+      const colors: Record<string, string> = {
+        series1: "#FF0000",
+        series2: "#00FF00",
+        series3: "#0000FF",
+      };
+      return colors[name] || "#CCCCCC";
+    },
+  ),
 }));
 
 vi.mock("../convertDataIntoUnitValue", () => ({
@@ -113,7 +118,11 @@ describe("BarConverter", () => {
 
   describe("supportedTypes", () => {
     it("should support h-bar, stacked, and h-stacked chart types", () => {
-      expect(converter.supportedTypes).toEqual(["h-bar", "stacked", "h-stacked"]);
+      expect(converter.supportedTypes).toEqual([
+        "h-bar",
+        "stacked",
+        "h-stacked",
+      ]);
     });
   });
 
@@ -143,7 +152,12 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series).toHaveLength(1);
       expect(result.series[0].type).toBe("bar");
@@ -177,7 +191,12 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].data[0].value).toBe(30);
     });
@@ -208,7 +227,12 @@ describe("BarConverter", () => {
         },
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].data[0].value).toBe(60);
     });
@@ -233,7 +257,12 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].data[0].itemStyle).toBeDefined();
       expect(result.series[0].data[0].itemStyle.color).toBe("#FF0000");
@@ -262,7 +291,12 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].data[0].itemStyle).toBeUndefined();
     });
@@ -289,7 +323,12 @@ describe("BarConverter", () => {
         },
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.yAxis.axisLabel.width).toBe(200);
     });
@@ -314,7 +353,12 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.yAxis.axisLabel.width).toBe(150);
     });
@@ -339,7 +383,12 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.grid.left).toBe("15%");
       expect(result.grid.right).toBe("4%");
@@ -369,7 +418,12 @@ describe("BarConverter", () => {
         },
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].barWidth).toBe(30);
     });
@@ -399,7 +453,12 @@ describe("BarConverter", () => {
         },
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].label.show).toBe(true);
       expect(result.series[0].label.position).toBe("right");
@@ -426,7 +485,12 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].label.show).toBe(false);
     });
@@ -454,7 +518,12 @@ describe("BarConverter", () => {
         },
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       const formatted = result.series[0].label.formatter({ value: 2048 });
       expect(formatted).toBe("2.00KB");
@@ -496,7 +565,12 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series).toHaveLength(2);
       expect(result.series[0].type).toBe("bar");
@@ -569,7 +643,12 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.xAxis.data).toEqual(["14:30:45", "15:45:30"]);
     });
@@ -600,7 +679,12 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.xAxis.data).toEqual(["14:30:45", "15:45:30"]);
     });
@@ -627,7 +711,12 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.xAxis.data).toEqual(["2021-01-01"]);
     });
@@ -658,9 +747,14 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
-      expect(result.series[0].data).toEqual([10, '-']);
+      expect(result.series[0].data).toEqual([10, "-"]);
     });
 
     it("should apply colors to stacked series", () => {
@@ -685,7 +779,12 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].color).toBe("#FF0000");
     });
@@ -715,7 +814,12 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].color).toBeUndefined();
     });
@@ -742,7 +846,12 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.grid.left).toBe("3%");
       expect(result.grid.right).toBe("4%");
@@ -773,7 +882,12 @@ describe("BarConverter", () => {
         },
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].barWidth).toBe(40);
     });
@@ -803,7 +917,12 @@ describe("BarConverter", () => {
         },
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       const formatted = result.series[0].label.formatter({ value: 2048 });
       expect(formatted).toBe("2.00KB");
@@ -833,7 +952,12 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series).toHaveLength(1);
       expect(result.series[0].stack).toBe("total");
@@ -865,7 +989,12 @@ describe("BarConverter", () => {
         },
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.yAxis.axisLabel.width).toBe(180);
     });
@@ -892,7 +1021,12 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.grid.left).toBe("15%");
     });
@@ -921,7 +1055,12 @@ describe("BarConverter", () => {
         },
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result).toBeDefined();
     });
@@ -950,7 +1089,12 @@ describe("BarConverter", () => {
         },
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].label.position).toBe("top");
     });
@@ -980,7 +1124,12 @@ describe("BarConverter", () => {
         },
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].label.rotate).toBe(0);
     });
@@ -1009,7 +1158,12 @@ describe("BarConverter", () => {
         },
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result).toBeDefined();
     });
@@ -1036,7 +1190,12 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.tooltip.trigger).toBe("axis");
     });
@@ -1061,7 +1220,12 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].emphasis.focus).toBe("series");
     });
@@ -1074,7 +1238,12 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series).toHaveLength(1);
       expect(result.series[0].data).toEqual([]);
@@ -1099,7 +1268,12 @@ describe("BarConverter", () => {
         type: "h-bar",
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result).toBeDefined();
     });
@@ -1124,14 +1298,16 @@ describe("BarConverter", () => {
         config: {},
       };
 
-      const mockChartPanelRef = { value: { clientWidth: 500, clientHeight: 400 } };
+      const mockChartPanelRef = {
+        value: { clientWidth: 500, clientHeight: 400 },
+      };
 
       const result = converter.convert(
         processedData,
         panelSchema,
         mockStore,
         mockExtras,
-        mockChartPanelRef
+        mockChartPanelRef,
       );
 
       expect(result).toBeDefined();
@@ -1159,7 +1335,12 @@ describe("BarConverter", () => {
         },
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.grid.left).toBe(250);
     });

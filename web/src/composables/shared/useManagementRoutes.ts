@@ -3,7 +3,8 @@ import { routeGuard } from "@/utils/zincutils";
 
 const Settings = () => import("@/components/settings/index.vue");
 const TemplateList = () => import("@/components/alerts/TemplateList.vue");
-const AlertsDestinationList = () => import("@/components/alerts/AlertsDestinationList.vue");
+const AlertsDestinationList = () =>
+  import("@/components/alerts/AlertsDestinationList.vue");
 
 const useManagementRoutes = () => {
   const routes: any = [
@@ -33,7 +34,7 @@ const useManagementRoutes = () => {
         {
           path: "organization",
           name: "organizationSettings",
-          meta:{
+          meta: {
             title: "Organization Parameters",
           },
           component: () =>
@@ -45,7 +46,7 @@ const useManagementRoutes = () => {
         {
           path: "alert_destinations",
           name: "alertDestinations",
-          meta:{
+          meta: {
             title: "Alert Destinations",
           },
           component: AlertsDestinationList,
@@ -56,7 +57,7 @@ const useManagementRoutes = () => {
         {
           path: "templates",
           name: "alertTemplates",
-          meta:{
+          meta: {
             title: "Templates",
           },
           component: TemplateList,
@@ -97,7 +98,7 @@ const useManagementRoutes = () => {
         {
           path: "pipeline_destinations",
           name: "pipelineDestinations",
-          meta:{
+          meta: {
             title: "Pipeline Destinations",
           },
           component: () =>
@@ -141,12 +142,12 @@ const useManagementRoutes = () => {
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
-
         },
         {
           path: "correlation_settings",
           name: "correlationSettings",
-          component: () => import("@/components/settings/CorrelationSettings.vue"),
+          component: () =>
+            import("@/components/settings/CorrelationSettings.vue"),
           meta: {
             keepAlive: true,
             title: "Correlation Settings",
@@ -172,7 +173,8 @@ const useManagementRoutes = () => {
         {
           path: "organization_management",
           name: "orgnizationManagement",
-          component: () => import("@/components/settings/OrganizationManagement.vue"),
+          component: () =>
+            import("@/components/settings/OrganizationManagement.vue"),
           meta: {
             keepAlive: true,
             title: "Organization Management",
@@ -180,9 +182,9 @@ const useManagementRoutes = () => {
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
-        }
-      ]
-    )
+        },
+      ],
+    );
   }
   return routes;
 };

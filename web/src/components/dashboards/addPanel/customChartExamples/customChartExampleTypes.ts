@@ -24,17 +24,23 @@ export const chartTypesData: { data: ChartCategory[] } = {
         {
           label: "Confidence Band",
           value: "confidence-band",
-          asset: getImageURL("dashboard/CustomChartAssets/confidence-band.webp"),
+          asset: getImageURL(
+            "dashboard/CustomChartAssets/confidence-band.webp",
+          ),
         },
         {
           label: "Multiple X Axes",
           value: "multiple-x-axis",
-          asset: getImageURL("dashboard/CustomChartAssets/multiple-x-axis.webp"),
+          asset: getImageURL(
+            "dashboard/CustomChartAssets/multiple-x-axis.webp",
+          ),
         },
         {
           label: "Intraday Line Breaks 1",
           value: "intraday-breaks-1",
-          asset: getImageURL("dashboard/CustomChartAssets/intraday-breaks-1.webp"),
+          asset: getImageURL(
+            "dashboard/CustomChartAssets/intraday-breaks-1.webp",
+          ),
         },
       ],
     },
@@ -49,12 +55,16 @@ export const chartTypesData: { data: ChartCategory[] } = {
         {
           label: "Stacked Bar Normalization",
           value: "bar-stack-normalization",
-          asset: getImageURL("dashboard/CustomChartAssets/bar-stack-normalization.webp"),
+          asset: getImageURL(
+            "dashboard/CustomChartAssets/bar-stack-normalization.webp",
+          ),
         },
         {
           label: "Stacked Radial Bar (Polar)",
           value: "bar-polar-stack-radial",
-          asset: getImageURL("dashboard/CustomChartAssets/bar-polar-stack-radial.webp"),
+          asset: getImageURL(
+            "dashboard/CustomChartAssets/bar-polar-stack-radial.webp",
+          ),
         },
       ],
     },
@@ -64,12 +74,16 @@ export const chartTypesData: { data: ChartCategory[] } = {
         {
           label: "Pie with Border",
           value: "pie-border-radius",
-          asset: getImageURL("dashboard/CustomChartAssets/pie-border-radius.webp"),
+          asset: getImageURL(
+            "dashboard/CustomChartAssets/pie-border-radius.webp",
+          ),
         },
         {
           label: "Partition Data to Pies",
           value: "data-transform-multiple-pie",
-          asset: getImageURL("dashboard/CustomChartAssets/data-transform-multiple-pie.webp"),
+          asset: getImageURL(
+            "dashboard/CustomChartAssets/data-transform-multiple-pie.webp",
+          ),
         },
       ],
     },
@@ -84,7 +98,9 @@ export const chartTypesData: { data: ChartCategory[] } = {
         {
           label: "Scatter Polynomial Regression",
           value: "scatter-polynomial-regression",
-          asset: getImageURL("dashboard/CustomChartAssets/scatter-polynomial-regression.webp"),
+          asset: getImageURL(
+            "dashboard/CustomChartAssets/scatter-polynomial-regression.webp",
+          ),
         },
       ],
     },
@@ -99,7 +115,9 @@ export const chartTypesData: { data: ChartCategory[] } = {
         {
           label: "Multiple Radar",
           value: "radar-multiple-2",
-          asset: getImageURL("dashboard/CustomChartAssets/radar-multiple-2.webp"),
+          asset: getImageURL(
+            "dashboard/CustomChartAssets/radar-multiple-2.webp",
+          ),
         },
       ],
     },
@@ -109,7 +127,9 @@ export const chartTypesData: { data: ChartCategory[] } = {
         {
           label: "Data Transform Simple Aggregate",
           value: "data-transform-aggregate",
-          asset: getImageURL("dashboard/CustomChartAssets/data-transform-aggregate.webp"),
+          asset: getImageURL(
+            "dashboard/CustomChartAssets/data-transform-aggregate.webp",
+          ),
         },
       ],
     },
@@ -119,7 +139,9 @@ export const chartTypesData: { data: ChartCategory[] } = {
         {
           label: "Graph on Cartesian",
           value: "graph-on-cartesian",
-          asset: getImageURL("dashboard/CustomChartAssets/graph-on-cartesian.webp"),
+          asset: getImageURL(
+            "dashboard/CustomChartAssets/graph-on-cartesian.webp",
+          ),
         },
       ],
     },
@@ -139,7 +161,9 @@ export const chartTypesData: { data: ChartCategory[] } = {
         {
           label: "Customized Funnel",
           value: "funnel-customize",
-          asset: getImageURL("dashboard/CustomChartAssets/funnel-customize.webp"),
+          asset: getImageURL(
+            "dashboard/CustomChartAssets/funnel-customize.webp",
+          ),
         },
       ],
     },
@@ -149,7 +173,9 @@ export const chartTypesData: { data: ChartCategory[] } = {
         {
           label: "Series Layout",
           value: "dataset-series-layout",
-          asset: getImageURL("dashboard/CustomChartAssets/dataset-series-layout.webp"),
+          asset: getImageURL(
+            "dashboard/CustomChartAssets/dataset-series-layout.webp",
+          ),
         },
       ],
     },
@@ -164,17 +190,23 @@ export const chartTypesData: { data: ChartCategory[] } = {
         {
           label: "Bar3D Punch Card",
           value: "bar3d-punchcard",
-          asset: getImageURL("dashboard/CustomChartAssets/bar3d-punchcard.webp"),
+          asset: getImageURL(
+            "dashboard/CustomChartAssets/bar3d-punchcard.webp",
+          ),
         },
         {
           label: "3D Scatter with Scatter Matrix",
           value: "scatter3d-scatter-matrix",
-          asset: getImageURL("dashboard/CustomChartAssets/scatter3d-scatter-matrix.webp"),
+          asset: getImageURL(
+            "dashboard/CustomChartAssets/scatter3d-scatter-matrix.webp",
+          ),
         },
         {
           label: "3D Scatter Dataset",
           value: "scatter3d-dataset",
-          asset: getImageURL("dashboard/CustomChartAssets/scatter3D-dataset.webp"),
+          asset: getImageURL(
+            "dashboard/CustomChartAssets/scatter3D-dataset.webp",
+          ),
         },
       ],
     },

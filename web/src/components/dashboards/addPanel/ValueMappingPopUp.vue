@@ -72,7 +72,8 @@
               borderless
               dense
               class="q-mb-xs tw:flex-1 o2-custom-select-dashboard"
-             hide-bottom-space></q-select>
+              hide-bottom-space
+            ></q-select>
             <div
               v-if="mapping.type === 'value'"
               class="input-container tw:flex-1"
@@ -83,7 +84,9 @@
                 class="input-spacing"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-value-input-${index}`"
-               borderless hide-bottom-space/>
+                borderless
+                hide-bottom-space
+              />
             </div>
             <div
               v-if="mapping.type === 'regex'"
@@ -95,7 +98,9 @@
                 class="input-spacing"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-pattern-input-${index}`"
-               borderless hide-bottom-space/>
+                borderless
+                hide-bottom-space
+              />
             </div>
             <div
               v-if="mapping.type === 'range'"
@@ -107,14 +112,18 @@
                 class="input-spacing"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-from-input-${index}`"
-               borderless hide-bottom-space/>
+                borderless
+                hide-bottom-space
+              />
               <q-input
                 v-model="mapping.to"
                 label="To"
                 class="input-spacing tw:flex-1"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-to-input-${index}`"
-               borderless hide-bottom-space/>
+                borderless
+                hide-bottom-space
+              />
             </div>
             <q-input
               v-model="mapping.text"
@@ -122,7 +131,9 @@
               class="input-spacing tw:flex-1"
               dense
               :data-test="`dashboard-addpanel-config-value-mapping-text-input-${index}`"
-             borderless hide-bottom-space/>
+              borderless
+              hide-bottom-space
+            />
             <div class="color-section tw:flex-1">
               <div
                 v-if="mapping.color !== null"
@@ -133,7 +144,9 @@
                   style="width: 90%"
                   class="input-spacing"
                   dense
-                 borderless hide-bottom-space>
+                  borderless
+                  hide-bottom-space
+                >
                   <template v-slot:append>
                     <q-icon name="colorize" class="cursor-pointer">
                       <q-popup-proxy cover transition-show="scale">

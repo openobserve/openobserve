@@ -36,7 +36,6 @@ document.body.appendChild(node);
 describe.skip("Alert List", async () => {
   let wrapper: any;
   beforeEach(async () => {
-    
     wrapper = mount(AddTemplate, {
       attachTo: "#app",
       props: {
@@ -58,22 +57,22 @@ describe.skip("Alert List", async () => {
 
   it("Should render add template title", () => {
     expect(wrapper.find('[data-test="add-template-title"]').text()).toBe(
-      "Add Template"
+      "Add Template",
     );
   });
 
   it("Should render name input", () => {
     expect(
-      wrapper.find('[data-test="add-template-name-input"]').exists()
+      wrapper.find('[data-test="add-template-name-input"]').exists(),
     ).toBeTruthy();
   });
 
   it("Should render template body input", () => {
     expect(
-      wrapper.find('[data-test="add-template-body-input-title"]').text()
+      wrapper.find('[data-test="add-template-body-input-title"]').text(),
     ).toBe("Body");
     expect(
-      wrapper.find('[data-test="add-template-body-input"]').exists()
+      wrapper.find('[data-test="add-template-body-input"]').exists(),
     ).toBeTruthy();
   });
 
@@ -89,8 +88,8 @@ describe.skip("Alert List", async () => {
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates/${template_name}`,
           (req: any, res: any, ctx: any) => {
             return res(ctx.status(200), ctx.json({ code: 200 }));
-          }
-        )
+          },
+        ),
       );
       await wrapper
         .find('[data-test="add-template-name-input"]')

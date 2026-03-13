@@ -33,26 +33,43 @@ describe("Common Service", () => {
     it("should list folders with correct URL for basic folder types", async () => {
       await common.list_Folders("test-org", "alerts");
 
-      expect(mockHttp.get).toHaveBeenCalledWith("/api/v2/test-org/folders/alerts");
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        "/api/v2/test-org/folders/alerts",
+      );
     });
 
     it("should handle different folder types", async () => {
-      const folderTypes = ["alerts", "dashboards", "reports", "templates", "notebooks"];
+      const folderTypes = [
+        "alerts",
+        "dashboards",
+        "reports",
+        "templates",
+        "notebooks",
+      ];
 
       for (const folderType of folderTypes) {
         await common.list_Folders("test-org", folderType);
-        expect(mockHttp.get).toHaveBeenCalledWith(`/api/v2/test-org/folders/${folderType}`);
+        expect(mockHttp.get).toHaveBeenCalledWith(
+          `/api/v2/test-org/folders/${folderType}`,
+        );
       }
 
       expect(mockHttp.get).toHaveBeenCalledTimes(folderTypes.length);
     });
 
     it("should handle different organization names", async () => {
-      const organizations = ["org1", "my-organization", "test_org_123", "PROD-ORG"];
+      const organizations = [
+        "org1",
+        "my-organization",
+        "test_org_123",
+        "PROD-ORG",
+      ];
 
       for (const org of organizations) {
         await common.list_Folders(org, "alerts");
-        expect(mockHttp.get).toHaveBeenCalledWith(`/api/v2/${org}/folders/alerts`);
+        expect(mockHttp.get).toHaveBeenCalledWith(
+          `/api/v2/${org}/folders/alerts`,
+        );
       }
     });
 
@@ -66,7 +83,9 @@ describe("Common Service", () => {
 
       for (const { org, folderType } of testCases) {
         await common.list_Folders(org, folderType);
-        expect(mockHttp.get).toHaveBeenCalledWith(`/api/v2/${org}/folders/${folderType}`);
+        expect(mockHttp.get).toHaveBeenCalledWith(
+          `/api/v2/${org}/folders/${folderType}`,
+        );
       }
     });
 
@@ -95,7 +114,7 @@ describe("Common Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/v2/test-org/folders/alerts",
         folderData,
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
 
@@ -108,7 +127,7 @@ describe("Common Service", () => {
         expect(mockHttp.post).toHaveBeenCalledWith(
           `/api/v2/test-org/folders/${folderType}`,
           folderData,
-          { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+          { headers: { "Content-Type": "application/json; charset=UTF-8" } },
         );
       }
     });
@@ -138,7 +157,7 @@ describe("Common Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/v2/prod-org/folders/dashboards",
         complexFolderData,
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
 
@@ -148,7 +167,7 @@ describe("Common Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/v2/test-org/folders/alerts",
         {},
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
 
@@ -164,7 +183,7 @@ describe("Common Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/v2/test-org/folders/alerts",
         specialData,
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
   });
@@ -181,7 +200,7 @@ describe("Common Service", () => {
       expect(mockHttp.put).toHaveBeenCalledWith(
         "/api/v2/test-org/folders/alerts/folder-123",
         updatedData,
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
 
@@ -202,7 +221,7 @@ describe("Common Service", () => {
         expect(mockHttp.put).toHaveBeenCalledWith(
           `/api/v2/test-org/folders/alerts/${folderId}`,
           updateData,
-          { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+          { headers: { "Content-Type": "application/json; charset=UTF-8" } },
         );
       }
     });
@@ -212,11 +231,16 @@ describe("Common Service", () => {
       const updateData = { name: "Updated Folder" };
 
       for (const folderType of folderTypes) {
-        await common.edit_Folder("test-org", folderType, "folder-id", updateData);
+        await common.edit_Folder(
+          "test-org",
+          folderType,
+          "folder-id",
+          updateData,
+        );
         expect(mockHttp.put).toHaveBeenCalledWith(
           `/api/v2/test-org/folders/${folderType}/folder-id`,
           updateData,
-          { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+          { headers: { "Content-Type": "application/json; charset=UTF-8" } },
         );
       }
     });
@@ -235,7 +259,7 @@ describe("Common Service", () => {
         expect(mockHttp.put).toHaveBeenCalledWith(
           "/api/v2/test-org/folders/alerts/folder-id",
           update,
-          { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+          { headers: { "Content-Type": "application/json; charset=UTF-8" } },
         );
       }
     });
@@ -243,7 +267,8 @@ describe("Common Service", () => {
     it("should handle large update data", async () => {
       const largeUpdate = {
         name: "Large Folder Update",
-        description: "A very long description that contains lots of details about this folder and what it's used for",
+        description:
+          "A very long description that contains lots of details about this folder and what it's used for",
         tags: Array.from({ length: 50 }, (_, i) => `tag-${i}`),
         metadata: {
           history: Array.from({ length: 100 }, (_, i) => ({
@@ -260,12 +285,17 @@ describe("Common Service", () => {
         },
       };
 
-      await common.edit_Folder("test-org", "dashboards", "large-folder", largeUpdate);
+      await common.edit_Folder(
+        "test-org",
+        "dashboards",
+        "large-folder",
+        largeUpdate,
+      );
 
       expect(mockHttp.put).toHaveBeenCalledWith(
         "/api/v2/test-org/folders/dashboards/large-folder",
         largeUpdate,
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
   });
@@ -274,7 +304,9 @@ describe("Common Service", () => {
     it("should delete folder with correct URL", async () => {
       await common.delete_Folder("test-org", "alerts", "folder-123");
 
-      expect(mockHttp.delete).toHaveBeenCalledWith("/api/v2/test-org/folders/alerts/folder-123");
+      expect(mockHttp.delete).toHaveBeenCalledWith(
+        "/api/v2/test-org/folders/alerts/folder-123",
+      );
     });
 
     it("should handle different folder ID types", async () => {
@@ -289,28 +321,46 @@ describe("Common Service", () => {
 
       for (const folderId of folderIds) {
         await common.delete_Folder("org", "alerts", folderId);
-        expect(mockHttp.delete).toHaveBeenCalledWith(`/api/v2/org/folders/alerts/${folderId}`);
+        expect(mockHttp.delete).toHaveBeenCalledWith(
+          `/api/v2/org/folders/alerts/${folderId}`,
+        );
       }
     });
 
     it("should handle different organizations and folder types", async () => {
       const testCases = [
         { org: "org1", folderType: "alerts", folderId: "folder1" },
-        { org: "production-env", folderType: "dashboards", folderId: "analytics-folder" },
+        {
+          org: "production-env",
+          folderType: "dashboards",
+          folderId: "analytics-folder",
+        },
         { org: "dev", folderType: "reports", folderId: 999 },
-        { org: "test_org", folderType: "notebooks", folderId: "notebook-folder" },
+        {
+          org: "test_org",
+          folderType: "notebooks",
+          folderId: "notebook-folder",
+        },
       ];
 
       for (const { org, folderType, folderId } of testCases) {
         await common.delete_Folder(org, folderType, folderId);
-        expect(mockHttp.delete).toHaveBeenCalledWith(`/api/v2/${org}/folders/${folderType}/${folderId}`);
+        expect(mockHttp.delete).toHaveBeenCalledWith(
+          `/api/v2/${org}/folders/${folderType}/${folderId}`,
+        );
       }
     });
 
     it("should handle special characters in parameters", async () => {
-      await common.delete_Folder("org@domain.com", "folder-type", "folder-id-with-special-chars_$%");
+      await common.delete_Folder(
+        "org@domain.com",
+        "folder-type",
+        "folder-id-with-special-chars_$%",
+      );
 
-      expect(mockHttp.delete).toHaveBeenCalledWith("/api/v2/org@domain.com/folders/folder-type/folder-id-with-special-chars_$%");
+      expect(mockHttp.delete).toHaveBeenCalledWith(
+        "/api/v2/org@domain.com/folders/folder-type/folder-id-with-special-chars_$%",
+      );
     });
   });
 
@@ -318,15 +368,25 @@ describe("Common Service", () => {
     it("should get folder with correct URL", async () => {
       await common.get_Folder("test-org", "alerts", "folder-123");
 
-      expect(mockHttp.get).toHaveBeenCalledWith("/api/v2/test-org/folders/alerts/folder-123");
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        "/api/v2/test-org/folders/alerts/folder-123",
+      );
     });
 
     it("should handle different folder types when getting", async () => {
-      const folderTypes = ["alerts", "dashboards", "reports", "notebooks", "templates"];
+      const folderTypes = [
+        "alerts",
+        "dashboards",
+        "reports",
+        "notebooks",
+        "templates",
+      ];
 
       for (const folderType of folderTypes) {
         await common.get_Folder("test-org", folderType, "folder-id");
-        expect(mockHttp.get).toHaveBeenCalledWith(`/api/v2/test-org/folders/${folderType}/folder-id`);
+        expect(mockHttp.get).toHaveBeenCalledWith(
+          `/api/v2/test-org/folders/${folderType}/folder-id`,
+        );
       }
     });
 
@@ -343,7 +403,9 @@ describe("Common Service", () => {
 
       for (const folderId of folderIds) {
         await common.get_Folder("test-org", "alerts", folderId);
-        expect(mockHttp.get).toHaveBeenCalledWith(`/api/v2/test-org/folders/alerts/${folderId}`);
+        expect(mockHttp.get).toHaveBeenCalledWith(
+          `/api/v2/test-org/folders/alerts/${folderId}`,
+        );
       }
     });
 
@@ -351,7 +413,7 @@ describe("Common Service", () => {
       const organizations = [
         "simple-org",
         "org-with-dashes",
-        "org_with_underscores", 
+        "org_with_underscores",
         "org.with.dots",
         "ORG123",
         "12345",
@@ -359,7 +421,9 @@ describe("Common Service", () => {
 
       for (const org of organizations) {
         await common.get_Folder(org, "alerts", "folder-id");
-        expect(mockHttp.get).toHaveBeenCalledWith(`/api/v2/${org}/folders/alerts/folder-id`);
+        expect(mockHttp.get).toHaveBeenCalledWith(
+          `/api/v2/${org}/folders/alerts/folder-id`,
+        );
       }
     });
   });
@@ -376,7 +440,7 @@ describe("Common Service", () => {
 
       expect(mockHttp.patch).toHaveBeenCalledWith(
         "/api/v2/test-org/alerts/move",
-        moveData
+        moveData,
       );
     });
 
@@ -387,23 +451,34 @@ describe("Common Service", () => {
         target_folder: "target",
       };
 
-      await common.move_across_folders("test-org", "dashboards", moveData, "target-folder");
+      await common.move_across_folders(
+        "test-org",
+        "dashboards",
+        moveData,
+        "target-folder",
+      );
 
       expect(mockHttp.patch).toHaveBeenCalledWith(
         "/api/v2/test-org/dashboards/move?folder=target-folder",
-        moveData
+        moveData,
       );
     });
 
     it("should handle different resource types", async () => {
-      const resourceTypes = ["alerts", "dashboards", "reports", "notebooks", "templates"];
+      const resourceTypes = [
+        "alerts",
+        "dashboards",
+        "reports",
+        "notebooks",
+        "templates",
+      ];
       const moveData = { items: ["item1"], target: "folder" };
 
       for (const type of resourceTypes) {
         await common.move_across_folders("test-org", type, moveData);
         expect(mockHttp.patch).toHaveBeenCalledWith(
           `/api/v2/test-org/${type}/move`,
-          moveData
+          moveData,
         );
       }
     });
@@ -412,7 +487,7 @@ describe("Common Service", () => {
       const complexMoveData = {
         items: Array.from({ length: 50 }, (_, i) => `item-${i}`),
         source_folder: "analytics-folder",
-        target_folder: "archive-folder", 
+        target_folder: "archive-folder",
         preserve_permissions: true,
         move_metadata: true,
         options: {
@@ -424,11 +499,16 @@ describe("Common Service", () => {
         user: "admin@company.com",
       };
 
-      await common.move_across_folders("prod-org", "dashboards", complexMoveData, "archive");
+      await common.move_across_folders(
+        "prod-org",
+        "dashboards",
+        complexMoveData,
+        "archive",
+      );
 
       expect(mockHttp.patch).toHaveBeenCalledWith(
         "/api/v2/prod-org/dashboards/move?folder=archive",
-        complexMoveData
+        complexMoveData,
       );
     });
 
@@ -437,7 +517,7 @@ describe("Common Service", () => {
 
       expect(mockHttp.patch).toHaveBeenCalledWith(
         "/api/v2/test-org/alerts/move",
-        {}
+        {},
       );
     });
 
@@ -454,10 +534,15 @@ describe("Common Service", () => {
       const moveData = { items: ["item1"] };
 
       for (const folderId of folderIds) {
-        await common.move_across_folders("test-org", "alerts", moveData, folderId);
+        await common.move_across_folders(
+          "test-org",
+          "alerts",
+          moveData,
+          folderId,
+        );
         expect(mockHttp.patch).toHaveBeenCalledWith(
           `/api/v2/test-org/alerts/move?folder=${folderId}`,
-          moveData
+          moveData,
         );
       }
     });
@@ -469,11 +554,16 @@ describe("Common Service", () => {
         target: "folder-with-dashes",
       };
 
-      await common.move_across_folders("org@domain.com", "custom-type", moveData, "target@folder");
+      await common.move_across_folders(
+        "org@domain.com",
+        "custom-type",
+        moveData,
+        "target@folder",
+      );
 
       expect(mockHttp.patch).toHaveBeenCalledWith(
         "/api/v2/org@domain.com/custom-type/move?folder=target@folder",
-        moveData
+        moveData,
       );
     });
   });
@@ -537,33 +627,37 @@ describe("Common Service", () => {
       const org = "test-org";
       const folderType = "alerts";
       const folderId = "lifecycle-folder";
-      
+
       // Create
       const createData = { name: "Lifecycle Folder" };
       await common.new_Folder(org, folderType, createData);
-      
+
       // Get
       await common.get_Folder(org, folderType, folderId);
-      
+
       // Edit
       const updateData = { name: "Updated Lifecycle Folder" };
       await common.edit_Folder(org, folderType, folderId, updateData);
-      
+
       // Delete
       await common.delete_Folder(org, folderType, folderId);
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         `/api/v2/${org}/folders/${folderType}`,
         createData,
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
-      expect(mockHttp.get).toHaveBeenCalledWith(`/api/v2/${org}/folders/${folderType}/${folderId}`);
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        `/api/v2/${org}/folders/${folderType}/${folderId}`,
+      );
       expect(mockHttp.put).toHaveBeenCalledWith(
         `/api/v2/${org}/folders/${folderType}/${folderId}`,
         updateData,
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
-      expect(mockHttp.delete).toHaveBeenCalledWith(`/api/v2/${org}/folders/${folderType}/${folderId}`);
+      expect(mockHttp.delete).toHaveBeenCalledWith(
+        `/api/v2/${org}/folders/${folderType}/${folderId}`,
+      );
     });
 
     it("should use consistent URL patterns across all methods", async () => {
@@ -579,19 +673,25 @@ describe("Common Service", () => {
       await common.delete_Folder(org, folderType, folderId);
 
       // Verify all folder-related methods use v2 API
-      expect(mockHttp.get).toHaveBeenCalledWith(`/api/v2/${org}/folders/${folderType}`);
-      expect(mockHttp.get).toHaveBeenCalledWith(`/api/v2/${org}/folders/${folderType}/${folderId}`);
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        `/api/v2/${org}/folders/${folderType}`,
+      );
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        `/api/v2/${org}/folders/${folderType}/${folderId}`,
+      );
       expect(mockHttp.post).toHaveBeenCalledWith(
         `/api/v2/${org}/folders/${folderType}`,
         data,
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
       expect(mockHttp.put).toHaveBeenCalledWith(
         `/api/v2/${org}/folders/${folderType}/${folderId}`,
         data,
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
-      expect(mockHttp.delete).toHaveBeenCalledWith(`/api/v2/${org}/folders/${folderType}/${folderId}`);
+      expect(mockHttp.delete).toHaveBeenCalledWith(
+        `/api/v2/${org}/folders/${folderType}/${folderId}`,
+      );
     });
   });
 });

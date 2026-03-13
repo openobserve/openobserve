@@ -109,7 +109,7 @@ export default defineComponent({
     const router: any = useRouter();
     const tabs = ref("");
     const currentOrgIdentifier: any = ref(
-      store.state.selectedOrganization.identifier
+      store.state.selectedOrganization.identifier,
     );
     const metricRoutes = [
       "prometheus",
@@ -231,7 +231,6 @@ export default defineComponent({
   .head {
     padding-bottom: 1rem;
   }
-  
 }
 </style>
 <style lang="scss">

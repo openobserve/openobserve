@@ -374,9 +374,7 @@ describe("TraceDetailsSidebar", async () => {
         '[data-test="trace-details-sidebar-process-table"]',
       );
       expect(processTable.exists()).toBe(true);
-      expect(processTable.text()).toContain(
-        "dev2-openobserve-alertmanager-1",
-      );
+      expect(processTable.text()).toContain("dev2-openobserve-alertmanager-1");
     });
   });
 

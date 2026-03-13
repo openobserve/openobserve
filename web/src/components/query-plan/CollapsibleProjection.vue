@@ -20,21 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <span v-else>
       <span v-if="!expanded">
         {{ visibleFields }}
-        <span
-          class="expand-link"
-          @click="expanded = true"
-        >
+        <span class="expand-link" @click="expanded = true">
           ... {{ hiddenCount }} more ▼
         </span>
       </span>
       <span v-else>
         {{ fieldsText }}
-        <span
-          class="expand-link"
-          @click="expanded = false"
-        >
-          ▲ collapse
-        </span>
+        <span class="expand-link" @click="expanded = false"> ▲ collapse </span>
       </span>
     </span>
   </span>
@@ -65,20 +57,26 @@ export default defineComponent({
 
       const fieldsList = match[1];
       const parsed: string[] = [];
-      let current = '';
+      let current = "";
       let depth = 0;
       let inQuotes = false;
 
       for (const char of fieldsList) {
         if (char === '"' || char === "'") {
           inQuotes = !inQuotes;
-        } else if (!inQuotes && (char === '(' || char === '[' || char === '{')) {
+        } else if (
+          !inQuotes &&
+          (char === "(" || char === "[" || char === "{")
+        ) {
           depth++;
-        } else if (!inQuotes && (char === ')' || char === ']' || char === '}')) {
+        } else if (
+          !inQuotes &&
+          (char === ")" || char === "]" || char === "}")
+        ) {
           depth--;
-        } else if (!inQuotes && depth === 0 && char === ',') {
+        } else if (!inQuotes && depth === 0 && char === ",") {
           parsed.push(current.trim());
-          current = '';
+          current = "";
           continue;
         }
         current += char;
@@ -97,9 +95,14 @@ export default defineComponent({
     const visibleFields = computed(() => {
       if (!isCollapsible.value) return props.fieldsText;
 
-      const prefix = props.fieldsText.substring(0, props.fieldsText.indexOf('[') + 1);
-      const suffix = props.fieldsText.substring(props.fieldsText.lastIndexOf(']'));
-      const visible = fields.value.slice(0, 3).join(', ');
+      const prefix = props.fieldsText.substring(
+        0,
+        props.fieldsText.indexOf("[") + 1,
+      );
+      const suffix = props.fieldsText.substring(
+        props.fieldsText.lastIndexOf("]"),
+      );
+      const visible = fields.value.slice(0, 3).join(", ");
 
       return `${prefix}${visible}`;
     });

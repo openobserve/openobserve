@@ -181,7 +181,9 @@ export function classifyMetric(metricName: string): MetricGroupId {
  * //
  * // grouped.groups  → [{id:'infra',...}, {id:'network',...}, {id:'others',...}]
  */
-export function groupMetricsByCategory(streams: StreamInfo[]): GroupedMetricStreams {
+export function groupMetricsByCategory(
+  streams: StreamInfo[],
+): GroupedMetricStreams {
   const infra: StreamInfo[] = [];
   const network: StreamInfo[] = [];
   const others: StreamInfo[] = [];

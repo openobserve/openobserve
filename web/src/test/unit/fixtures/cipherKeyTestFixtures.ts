@@ -21,7 +21,7 @@ import { Quasar } from "quasar";
 
 /**
  * Shared test fixtures for cipher key components to avoid repetitive setup
- * This consolidates common patterns found across AddCipherKey, AddAkeylessType, 
+ * This consolidates common patterns found across AddCipherKey, AddAkeylessType,
  * AddOpenobserveType, and AddEncryptionMechanism test files
  */
 
@@ -144,7 +144,7 @@ export const createMockStore = () =>
     },
   });
 
-// Common mock router factory  
+// Common mock router factory
 export const createMockRouter = () =>
   createRouter({
     history: createWebHistory(),
@@ -188,7 +188,8 @@ export const createQuasarStubs = () => ({
     template: "<div class='q-page'><slot /></div>",
   },
   QForm: {
-    template: "<form class='create-cipher-form' @submit.prevent='$emit(\"submit\")'><slot /></form>",
+    template:
+      "<form class='create-cipher-form' @submit.prevent='$emit(\"submit\")'><slot /></form>",
     emits: ["submit"],
   },
   QInput: {
@@ -284,7 +285,10 @@ export const mockCipherKeysService = {
 export const mockZincUtils = {
   isValidResourceName: vi.fn((val: string) => {
     if (!val) return "Name is required";
-    return !/[:\?\/\#\s]/.test(val) || "Characters like :, ?, /, #, and spaces are not allowed.";
+    return (
+      !/[:\?\/\#\s]/.test(val) ||
+      "Characters like :, ?, /, #, and spaces are not allowed."
+    );
   }),
   maxLengthCharValidation: vi.fn((val: string, maxLength: number) => {
     if (!val) return true;
@@ -308,9 +312,9 @@ export const mockZincUtils = {
  * @returns Mount configuration object
  */
 export const createCipherKeyMountConfig = (
-  component: any, 
-  props: any, 
-  customStubs: Record<string, any> = {}
+  component: any,
+  props: any,
+  customStubs: Record<string, any> = {},
 ) => {
   const store = createMockStore();
   const router = createMockRouter();
@@ -322,12 +326,7 @@ export const createCipherKeyMountConfig = (
     component,
     props,
     global: {
-      plugins: [
-        [Quasar, quasarConfig],
-        store,
-        router,
-        i18n,
-      ],
+      plugins: [[Quasar, quasarConfig], store, router, i18n],
       stubs,
     },
     store,
@@ -351,13 +350,14 @@ export const setupCipherKeyMocks = () => {
       name: "test-cipher",
       key: {
         store: { type: "local", local: "" },
-        mechanism: { type: "simple", simple_algorithm: "aes-256-siv" }
-      }
-    }
+        mechanism: { type: "simple", simple_algorithm: "aes-256-siv" },
+      },
+    },
   });
 };
 
 /**
  * Creates a deep clone of mock data to prevent test contamination
  */
-export const cloneMockData = <T>(data: T): T => JSON.parse(JSON.stringify(data));
+export const cloneMockData = <T>(data: T): T =>
+  JSON.parse(JSON.stringify(data));

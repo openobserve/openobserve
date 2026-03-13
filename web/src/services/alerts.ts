@@ -206,7 +206,10 @@ const alerts = {
     return http().get(`/api/${org_identifier}/alerts/deduplication/config`);
   },
   setOrganizationDeduplicationConfig: (org_identifier: string, data: any) => {
-    return http().post(`/api/${org_identifier}/alerts/deduplication/config`, data);
+    return http().post(
+      `/api/${org_identifier}/alerts/deduplication/config`,
+      data,
+    );
   },
   deleteOrganizationDeduplicationConfig: (org_identifier: string) => {
     return http().delete(`/api/${org_identifier}/alerts/deduplication/config`);
@@ -216,13 +219,21 @@ const alerts = {
   },
   // Semantic field groups management
   getSemanticGroups: (org_identifier: string) => {
-    return http().get(`/api/${org_identifier}/alerts/deduplication/semantic-groups`);
+    return http().get(
+      `/api/${org_identifier}/alerts/deduplication/semantic-groups`,
+    );
   },
   previewSemanticGroupsDiff: (org_identifier: string, groups: any[]) => {
-    return http().post(`/api/${org_identifier}/alerts/deduplication/semantic-groups/preview-diff`, groups);
+    return http().post(
+      `/api/${org_identifier}/alerts/deduplication/semantic-groups/preview-diff`,
+      groups,
+    );
   },
   saveSemanticGroups: (org_identifier: string, groups: any[]) => {
-    return http().put(`/api/${org_identifier}/alerts/deduplication/semantic-groups`, groups);
+    return http().put(
+      `/api/${org_identifier}/alerts/deduplication/semantic-groups`,
+      groups,
+    );
   },
   trigger_alert: (
     org_identifier: string,
@@ -235,14 +246,8 @@ const alerts = {
     }
     return http().patch(url);
   },
-  generate_sql: (
-    org_identifier: string,
-    data: any,
-  ) => {
-    return http().post(
-      `/api/v2/${org_identifier}/alerts/generate_sql`,
-      data,
-    );
+  generate_sql: (org_identifier: string, data: any) => {
+    return http().post(`/api/v2/${org_identifier}/alerts/generate_sql`, data);
   },
 };
 

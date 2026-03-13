@@ -17,15 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 
-
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
+  <q-page
+    class="q-pa-none"
+    style="min-height: inherit; height: calc(100vh - 44px)"
+  >
     <div>
       <div class="card-container tw:mb-[0.625rem]">
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:full-width tw:h-[68px] tw:border-b-[1px]"
-      >
-
         <div
+          class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:full-width tw:h-[68px] tw:border-b-[1px]"
+        >
+          <div
             class="q-table__title full-width tw:font-[600]"
             data-test="service-accounts-title-text"
           >
@@ -33,25 +35,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="full-width tw:flex tw:justify-end">
             <q-input
-                v-model="filterQuery"
-                borderless
-                dense
-                class="q-ml-auto no-border o2-search-input tw:h-[36px]"
-                :placeholder="t('serviceAccounts.search')"
-              >
-                <template #prepend>
-                  <q-icon class="o2-search-input-icon" name="search" />
-                </template>
-              </q-input>
-              <q-btn
-                class="q-ml-sm o2-primary-button tw:h-[36px]"
-                flat
-                no-caps
-                :label="t(`serviceAccounts.add`)"
-                @click="addRoutePush({})"
-              />
+              v-model="filterQuery"
+              borderless
+              dense
+              class="q-ml-auto no-border o2-search-input tw:h-[36px]"
+              :placeholder="t('serviceAccounts.search')"
+            >
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" name="search" />
+              </template>
+            </q-input>
+            <q-btn
+              class="q-ml-sm o2-primary-button tw:h-[36px]"
+              flat
+              no-caps
+              :label="t(`serviceAccounts.add`)"
+              @click="addRoutePush({})"
+            />
           </div>
-      </div>
+        </div>
       </div>
       <div class="tw:w-full tw:h-full">
         <div class="card-container tw:h-[calc(100vh-127px)]">
@@ -65,7 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model:selected="selectedAccounts"
             :pagination="pagination"
             :filter="filterQuery"
-            :style="hasVisibleRows ? 'height: calc(100vh - 127px); overflow-y: auto;' : ''"
+            :style="
+              hasVisibleRows
+                ? 'height: calc(100vh - 127px); overflow-y: auto;'
+                : ''
+            "
           >
             <template #no-data>
               <NoData></NoData>
@@ -73,55 +79,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template v-slot:body-selection="scope">
               <q-td auto-width>
-                <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+                <q-checkbox
+                  v-model="scope.selected"
+                  size="sm"
+                  class="o2-table-checkbox"
+                />
               </q-td>
             </template>
 
             <template #body-cell-token="props">
-            <q-td :props="props" side >
-              <div class="tw:flex tw:items-center" v-if="props.row.isLoading">
-                <q-spinner-dots color="primary"  />
-              </div>
-              <!-- Display the token or masked text based on visibility -->
-            <div v-else  class="tw:flex tw:items-center">
-              <span 
-                style="
-                display: inline-block;
-                width: 150px; /* Set a fixed width */
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-                text-align: center;
-              "
-                >
-                {{ getDisplayToken(props.row) }}
-                </span>
+              <q-td :props="props" side>
+                <div class="tw:flex tw:items-center" v-if="props.row.isLoading">
+                  <q-spinner-dots color="primary" />
+                </div>
+                <!-- Display the token or masked text based on visibility -->
+                <div v-else class="tw:flex tw:items-center">
+                  <span
+                    style="
+                      display: inline-block;
+                      width: 150px; /* Set a fixed width */
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      white-space: nowrap;
+                      text-align: center;
+                    "
+                  >
+                    {{ getDisplayToken(props.row) }}
+                  </span>
 
-                <!-- Button to fetch or toggle token visibility -->
-                <q-btn
-                  :icon="props.row.isTokenVisible ? 'visibility_off' : 'visibility'"
-                  :title="props.row.isTokenVisible ? t('serviceAccounts.hideToken') : t('serviceAccounts.showToken')"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  style="cursor: pointer !important; "
-                  @click="getServiceToken(props.row)"
-                />
-                <q-btn
-                  @click.stop="copyToClipboard(props.row.token)"
-                  size="sm"
-                  dense
-                  flat
-                  :title="t('serviceAccounts.copyToken')"
-                  icon="content_copy"
-                  :disable="!props.row.token"
-                  :class="{ 'disabled-opacity': !props.row.token }"
-                  class="copy-btn-sql"
-                />
-              </div>
-            </q-td>
-          </template>
+                  <!-- Button to fetch or toggle token visibility -->
+                  <q-btn
+                    :icon="
+                      props.row.isTokenVisible ? 'visibility_off' : 'visibility'
+                    "
+                    :title="
+                      props.row.isTokenVisible
+                        ? t('serviceAccounts.hideToken')
+                        : t('serviceAccounts.showToken')
+                    "
+                    unelevated
+                    size="sm"
+                    round
+                    flat
+                    style="cursor: pointer !important"
+                    @click="getServiceToken(props.row)"
+                  />
+                  <q-btn
+                    @click.stop="copyToClipboard(props.row.token)"
+                    size="sm"
+                    dense
+                    flat
+                    :title="t('serviceAccounts.copyToken')"
+                    icon="content_copy"
+                    :disable="!props.row.token"
+                    :class="{ 'disabled-opacity': !props.row.token }"
+                    class="copy-btn-sql"
+                  />
+                </div>
+              </q-td>
+            </template>
 
             <template #body-cell-actions="props">
               <q-td :props="props" side>
@@ -167,13 +183,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="confirmDeleteAction(props)"
                 >
                 </q-btn>
-
               </q-td>
             </template>
             <template #bottom="scope">
-              <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-                <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
-                  {{ resultTotal }} {{ t('serviceAccounts.header') }}
+              <div
+                class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+              >
+                <div
+                  class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md"
+                >
+                  {{ resultTotal }} {{ t("serviceAccounts.header") }}
                 </div>
                 <q-btn
                   v-if="selectedAccounts.length > 0"
@@ -202,33 +221,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template v-slot:header="props">
-                  <q-tr :props="props">
-                    <!-- Adding this block to render the select-all checkbox -->
-                    <q-th v-if="columns.length > 0" auto-width>
-                      <q-checkbox
-                        v-model="props.selected"
-                        size="sm"
-                        :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                        class="o2-table-checkbox"
-                      />
-                    </q-th>
+              <q-tr :props="props">
+                <!-- Adding this block to render the select-all checkbox -->
+                <q-th v-if="columns.length > 0" auto-width>
+                  <q-checkbox
+                    v-model="props.selected"
+                    size="sm"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-table-checkbox-dark'
+                        : 'o2-table-checkbox-light'
+                    "
+                    class="o2-table-checkbox"
+                  />
+                </q-th>
 
-                    <!-- Rendering the rest of the columns -->
-                    <q-th
-                      v-for="col in props.cols"
-                      :key="col.name"
-                      :props="props"
-                      :class="col.classes"
-                      :style="col.style"
-                    >
-                      {{ col.label }}
-                    </q-th>
-                  </q-tr>
-                </template>
+                <!-- Rendering the rest of the columns -->
+                <q-th
+                  v-for="col in props.cols"
+                  :key="col.name"
+                  :props="props"
+                  :class="col.classes"
+                  :style="col.style"
+                >
+                  {{ col.label }}
+                </q-th>
+              </q-tr>
+            </template>
           </q-table>
+        </div>
       </div>
-      </div>
-  </div>
+    </div>
     <q-dialog
       v-model="showAddUserDialog"
       position="right"
@@ -268,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             class="no-border"
             color="primary"
-            @click="refreshServiceToken(toBeRefreshed,false)"
+            @click="refreshServiceToken(toBeRefreshed, false)"
           >
             {{ t("user.ok") }}
           </q-btn>
@@ -283,7 +306,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated
+no-caps class="q-mr-sm">
             {{ t("user.cancel") }}
           </q-btn>
           <q-btn
@@ -304,11 +328,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card style="width: 280px">
         <q-card-section class="confirmBody">
           <div class="head">Delete Service Accounts</div>
-          <div class="para">Are you sure you want to delete {{ selectedAccounts.length }} service account(s)?</div>
+          <div class="para">
+            Are you sure you want to delete
+            {{ selectedAccounts.length }} service account(s)?
+          </div>
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated
+no-caps class="q-mr-sm">
             Cancel
           </q-btn>
           <q-btn
@@ -325,61 +353,90 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card>
     </q-dialog>
 
-    <q-dialog v-model="isShowToken"  persistent>
-  <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto;">
-    <q-card-section  class="text-h6 dialog-heading tw:flex tw:justify-between tw:items-center" >
-      <div>Service Account Token </div>
-          <q-btn data-test="sa-cancel-button" dense flat icon="cancel" size="md" @click="isShowToken = false" style="cursor: pointer" />
-    </q-card-section>
+    <q-dialog v-model="isShowToken" persistent>
+      <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto">
+        <q-card-section
+          class="text-h6 dialog-heading tw:flex tw:justify-between tw:items-center"
+        >
+          <div>Service Account Token</div>
+          <q-btn
+            data-test="sa-cancel-button"
+            dense
+            flat
+            icon="cancel"
+            size="md"
+            @click="isShowToken = false"
+            style="cursor: pointer"
+          />
+        </q-card-section>
 
-    <q-card-section>
+        <q-card-section>
+          <div
+            class="tw:flex tw:items-center tw:gap-2"
+            style="padding: 0rem 1rem; border-radius: 8px"
+          >
+            <!-- Token section taking 75% of the width -->
+            <div
+              class="text-h6 text-center tw:truncate el-border"
+              style="
+                flex: 3;
+                padding: 0.5rem;
+                border-radius: 6px;
+                font-family: monospace;
+                text-align: center;
+                overflow: hidden;
+              "
+            >
+              {{ serviceToken }}
+            </div>
+            <!-- Buttons section taking 25% of the width -->
+            <div
+              class="tw:flex tw:justify-end tw:gap-1"
+              style="flex: 1; max-width: 25%"
+            >
+              <q-btn
+                @click.stop="copyToClipboard(serviceToken)"
+                size="lg"
+                dense
+                outline
+                :title="t('serviceAccounts.copyToken')"
+                icon="content_copy"
+                class="q-mr-xs"
+              />
+              <q-btn
+                @click.stop="downloadTokenAsFile(serviceToken)"
+                size="lg"
+                dense
+                outline
+                :title="t('serviceAccounts.downloadToken')"
+                icon="file_download"
+              />
+            </div>
+          </div>
 
-      <div class="tw:flex tw:items-center tw:gap-2" style="padding: 0rem 1rem;  border-radius: 8px;">
-  <!-- Token section taking 75% of the width -->
-  <div
-    class="text-h6 text-center tw:truncate el-border"
-    style="flex: 3;  padding: 0.5rem; border-radius: 6px; font-family: monospace; text-align: center; overflow: hidden;"
-  >
-    {{  serviceToken }}
-  </div>
-  <!-- Buttons section taking 25% of the width -->
-  <div class="tw:flex tw:justify-end tw:gap-1" style="flex: 1; max-width: 25%;">
-    <q-btn
-      @click.stop="copyToClipboard(serviceToken)"
-      size="lg"
-      dense
-      outline
-      :title="t('serviceAccounts.copyToken')"
-      icon="content_copy"
-      class="q-mr-xs"
-    />
-    <q-btn
-      @click.stop="downloadTokenAsFile(serviceToken)"
-      size="lg"
-      dense
-      outline
-      :title="t('serviceAccounts.downloadToken')"
-      icon="file_download"
-    />
-  </div>
-  
-</div>
-
-    <div class="q-pt-md flex items-center warning-text">
-      <q-icon name="info" class="q-mr-xs " size="16px" />
-      <span class="text-p">Make sure to copy / download the token. You will not be able to see it again.
-      </span>
-    </div>
-   
-    </q-card-section>
-
-  </q-card>
-</q-dialog>
+          <div class="q-pt-md flex items-center warning-text">
+            <q-icon name="info"
+class="q-mr-xs" size="16px" />
+            <span class="text-p"
+              >Make sure to copy / download the token. You will not be able to
+              see it again.
+            </span>
+          </div>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, onBeforeMount, onMounted, watch } from "vue";
+import {
+  defineComponent,
+  ref,
+  onActivated,
+  onBeforeMount,
+  onMounted,
+  watch,
+} from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
@@ -396,7 +453,10 @@ import {
   verifyOrganizationStatus,
   maskText,
 } from "@/utils/zincutils";
-import { outlinedDelete,outlinedVisibility } from "@quasar/extras/material-icons-outlined";
+import {
+  outlinedDelete,
+  outlinedVisibility,
+} from "@quasar/extras/material-icons-outlined";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
@@ -406,7 +466,7 @@ import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { QTablePagination,  NoData,AddServiceAccount, },
+  components: { QTablePagination, NoData, AddServiceAccount },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();
@@ -425,21 +485,19 @@ export default defineComponent({
     const isEnterprise = ref(false);
     const isCurrentUserInternal = ref(false);
     const isShowToken = ref(false);
-    const confirmRefresh  = ref(false);
+    const confirmRefresh = ref(false);
     const filterQuery = ref("");
-    const toBeRefreshed = ref({
+    const toBeRefreshed = ref({});
 
-    });
-
-    const serviceToken  = ref("");
+    const serviceToken = ref("");
 
     const serviceAccounts = ref([]);
     const selectedAccounts: any = ref([]);
     const confirmBulkDelete = ref(false);
 
-    onBeforeMount(()=>{
+    onBeforeMount(() => {
       getServiceAccountsUsers();
-    })
+    });
 
     const columns: any = ref<QTableProps["columns"]>([
       {
@@ -512,8 +570,6 @@ export default defineComponent({
 
     const currentUser = computed(() => store.state.userInfo.email);
 
-
-
     const changeMaxRecordToReturn = (val: any) => {
       maxRecordToReturn.value = val;
     };
@@ -522,40 +578,48 @@ export default defineComponent({
       confirmDelete.value = true;
       deleteUserEmail = props.row.email;
     };
-    const getServiceToken = async (row:any, fromColum = true) =>{
-      if(fromColum){ row.isLoading = true;
-        if(!row.isTokenVisible){
+    const getServiceToken = async (row: any, fromColum = true) => {
+      if (fromColum) {
+        row.isLoading = true;
+        if (!row.isTokenVisible) {
           row.isTokenVisible = true;
-          setTimeout(() => {
-            row.isTokenVisible = false;
-          }, 5 * 60 * 1000);
-        }
-        else{
+          setTimeout(
+            () => {
+              row.isTokenVisible = false;
+            },
+            5 * 60 * 1000,
+          );
+        } else {
           row.isTokenVisible = false;
         }
-      if(row.token){
-        row.isLoading = false;
-        return;
-      }
-      }
-       service_accounts.get_service_token(store.state.selectedOrganization.identifier,row.email).then((res)=>{
-        if(fromColum) row.token = res.data.token;
-        else serviceToken.value = res.data.token;
-       }).catch((err)=>{
-        if(err.response?.status != 403){
-          $q.notify({
-          color: "negative",
-          message: `Error fetching token: ${err.response?.data?.message || 'Unknown error'}`,
-          });
+        if (row.token) {
+          row.isLoading = false;
+          return;
         }
-        
-       }).finally(()=>{
-        row.isLoading = false;
-       });
-    }
+      }
+      service_accounts
+        .get_service_token(
+          store.state.selectedOrganization.identifier,
+          row.email,
+        )
+        .then((res) => {
+          if (fromColum) row.token = res.data.token;
+          else serviceToken.value = res.data.token;
+        })
+        .catch((err) => {
+          if (err.response?.status != 403) {
+            $q.notify({
+              color: "negative",
+              message: `Error fetching token: ${err.response?.data?.message || "Unknown error"}`,
+            });
+          }
+        })
+        .finally(() => {
+          row.isLoading = false;
+        });
+    };
 
-
-    const getServiceAccountsUsers = async () =>{
+    const getServiceAccountsUsers = async () => {
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait while loading service accounts...",
@@ -563,22 +627,22 @@ export default defineComponent({
 
       return new Promise((resolve, reject) => {
         service_accounts
-          .list(
-            store.state.selectedOrganization.identifier
-          )
+          .list(store.state.selectedOrganization.identifier)
           .then((res) => {
             resultTotal.value = res.data.data.length;
             let counter = 1;
             currentUserRole.value = "";
-            serviceAccountsState.service_accounts_users = res.data.data.map((data: any) => {
-              return {
-                "#": counter <= 9 ? `0${counter++}` : counter++,
-                email: maskText(data.email),
-                first_name: data.first_name,
-                last_name: data.last_name,
-                isTokenVisible: false,
-              };
-            });
+            serviceAccountsState.service_accounts_users = res.data.data.map(
+              (data: any) => {
+                return {
+                  "#": counter <= 9 ? `0${counter++}` : counter++,
+                  email: maskText(data.email),
+                  first_name: data.first_name,
+                  last_name: data.last_name,
+                  isTokenVisible: false,
+                };
+              },
+            );
 
             dismiss();
 
@@ -589,7 +653,7 @@ export default defineComponent({
             reject(false);
           });
       });
-    }
+    };
     const addUser = (props: any, is_updated: boolean) => {
       isUpdated.value = is_updated;
       selectedUser.value.organization =
@@ -618,12 +682,12 @@ export default defineComponent({
           {
             row: props.row,
           },
-          true
+          true,
         );
       } else {
         track("Button Click", {
           button: "Add Service Account",
-          page: "Service Accounts"
+          page: "Service Accounts",
         });
         addUser({}, false);
         router.push({
@@ -647,12 +711,12 @@ export default defineComponent({
 
     const addMember = async (res: any, data: any, operationType: string) => {
       showAddUserDialog.value = false;
-      if (res.code == 200 ) {
+      if (res.code == 200) {
         if (operationType == "created") {
-            $q.notify({
-              color: "positive",
-              message: "Service Account created successfully.",
-            });
+          $q.notify({
+            color: "positive",
+            message: "Service Account created successfully.",
+          });
 
           await getServiceToken(data, false);
           isShowToken.value = true;
@@ -661,7 +725,7 @@ export default defineComponent({
           ) {
             const user = {
               "#":
-              serviceAccountsState.service_accounts_users.length + 1 <= 9
+                serviceAccountsState.service_accounts_users.length + 1 <= 9
                   ? `0${serviceAccountsState.service_accounts_users.length + 1}`
                   : serviceAccountsState.service_accounts_users.length + 1,
               email: data.email,
@@ -670,7 +734,8 @@ export default defineComponent({
             };
 
             serviceAccountsState.service_accounts_users.push(user);
-            resultTotal.value = serviceAccountsState.service_accounts_users.length;
+            resultTotal.value =
+              serviceAccountsState.service_accounts_users.length;
           }
         } else {
           setTimeout(() => {
@@ -679,14 +744,16 @@ export default defineComponent({
               message: "Service Account updated successfully.",
             });
           }, 2000);
-          serviceAccountsState.service_accounts_users.forEach((member: any, key: number) => {
-            if (member.email == data.email) {
-              serviceAccountsState.service_accounts_users[key] = {
-                ...serviceAccountsState.service_accounts_users[key],
-                ...data,
-              };
-            }
-          });
+          serviceAccountsState.service_accounts_users.forEach(
+            (member: any, key: number) => {
+              if (member.email == data.email) {
+                serviceAccountsState.service_accounts_users[key] = {
+                  ...serviceAccountsState.service_accounts_users[key],
+                  ...data,
+                };
+              }
+            },
+          );
         }
       }
       router.replace({
@@ -710,13 +777,13 @@ export default defineComponent({
           }
         })
         .catch((err: any) => {
-          if(err.response?.status != 403){
+          if (err.response?.status != 403) {
             $q.notify({
-            color: "negative",
-            message: err.response?.data?.message || "Error while deleting user.",
+              color: "negative",
+              message:
+                err.response?.data?.message || "Error while deleting user.",
             });
           }
-
         });
     };
 
@@ -725,12 +792,14 @@ export default defineComponent({
     };
 
     const bulkDeleteServiceAccounts = async () => {
-      const accountEmails = selectedAccounts.value.map((account: any) => account.email);
+      const accountEmails = selectedAccounts.value.map(
+        (account: any) => account.email,
+      );
 
       try {
         const res = await service_accounts.bulkDelete(
           store.state.selectedOrganization.identifier,
-          { ids: accountEmails }
+          { ids: accountEmails },
         );
         const { successful, unsuccessful } = res.data;
 
@@ -761,55 +830,64 @@ export default defineComponent({
         if (err.response?.status != 403 || err?.status != 403) {
           $q.notify({
             color: "negative",
-            message: err?.response?.data?.message || err?.message || "Error while deleting service accounts",
+            message:
+              err?.response?.data?.message ||
+              err?.message ||
+              "Error while deleting service accounts",
             timeout: 2000,
           });
         }
       }
     };
 
-    const refreshServiceToken = async (row:any,fromColum = true) =>{
-      if(fromColum) row.isLoading = true;
-      await service_accounts.refresh_token(store.state.selectedOrganization.identifier,row.email).then((res)=>{
+    const refreshServiceToken = async (row: any, fromColum = true) => {
+      if (fromColum) row.isLoading = true;
+      await service_accounts
+        .refresh_token(store.state.selectedOrganization.identifier, row.email)
+        .then((res) => {
           row.token = res.data.token;
           serviceToken.value = res.data.token;
           row.isTokenVisible = true;
           isShowToken.value = true;
 
-        $q.notify({
-          color: "positive",
-          message: "Service token refreshed successfully.",
-        });
-      }).catch((err)=>{
-        if(err.response?.status != 403){
           $q.notify({
-          color: "negative",
-          message: err.response?.data?.message || "Error while refreshing token.",
+            color: "positive",
+            message: "Service token refreshed successfully.",
           });
-        }
-        
-      }).finally(()=>{
-        row.isLoading = false;
-      });
-
-    }
-    const  copyToClipboard = (text:string) => {
-      navigator.clipboard.writeText(text).then(() => {
-        $q.notify({
+        })
+        .catch((err) => {
+          if (err.response?.status != 403) {
+            $q.notify({
+              color: "negative",
+              message:
+                err.response?.data?.message || "Error while refreshing token.",
+            });
+          }
+        })
+        .finally(() => {
+          row.isLoading = false;
+        });
+    };
+    const copyToClipboard = (text: string) => {
+      navigator.clipboard
+        .writeText(text)
+        .then(() => {
+          $q.notify({
             type: "positive",
             message: `token Copied Successfully!`,
             timeout: 5000,
           });
-      }).catch(() => {
+        })
+        .catch(() => {
           $q.notify({
             type: "negative",
             message: "Error while copy content.",
             timeout: 5000,
           });
-      });
-    }
+        });
+    };
 
-    const downloadTokenAsFile = (token:string) => {
+    const downloadTokenAsFile = (token: string) => {
       const blob = new Blob([token], { type: "text/plain" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
@@ -824,8 +902,8 @@ export default defineComponent({
     };
 
     const getDisplayToken = (row: any): string => {
-      if (!row.token) return '* * * * * * * * * * * * * * * *';
-      if (!row.isTokenVisible) return '* * * * * * * * * * * * * * * *';
+      if (!row.token) return "* * * * * * * * * * * * * * * *";
+      if (!row.isTokenVisible) return "* * * * * * * * * * * * * * * *";
       return maskToken(row.token);
     };
 
@@ -850,15 +928,23 @@ export default defineComponent({
     };
 
     const visibleRows = computed(() => {
-      if (!filterQuery.value) return serviceAccountsState.service_accounts_users || []
-      return filterData(serviceAccountsState.service_accounts_users || [], filterQuery.value)
+      if (!filterQuery.value)
+        return serviceAccountsState.service_accounts_users || [];
+      return filterData(
+        serviceAccountsState.service_accounts_users || [],
+        filterQuery.value,
+      );
     });
     const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
     // Watch visibleRows to sync resultTotal with search filter
-    watch(visibleRows, (newVisibleRows) => {
-      resultTotal.value = newVisibleRows.length;
-    }, { immediate: true });
+    watch(
+      visibleRows,
+      (newVisibleRows) => {
+        resultTotal.value = newVisibleRows.length;
+      },
+      { immediate: true },
+    );
 
     return {
       $q,
@@ -923,7 +1009,6 @@ export default defineComponent({
 });
 </script>
 
-
 <style lang="scss" scoped>
 .disabled-opacity {
   opacity: 0.1 !important;
@@ -931,6 +1016,4 @@ export default defineComponent({
 .warning-text {
   color: #ec960c;
 }
-
-
 </style>

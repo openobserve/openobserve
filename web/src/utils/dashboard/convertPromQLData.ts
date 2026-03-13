@@ -13,14 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  formatUnitValue,
-  getUnitValue,
-} from "./convertDataIntoUnitValue";
-import {
-  applySeriesColorMappings,
-  getContrastColor,
-} from "./chartColorUtils";
+import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+import { applySeriesColorMappings, getContrastColor } from "./chartColorUtils";
 import {
   calculateOptimalFontSize,
   calculateDynamicNameGap,
@@ -40,7 +34,10 @@ import {
   calculateRightLegendWidth,
 } from "./legendConfiguration";
 import { convertPromQLChartData } from "./promql/convertPromQLChartData";
-import { getPromqlLegendName, getLegendPosition } from "./promql/shared/legendBuilder";
+import {
+  getPromqlLegendName,
+  getLegendPosition,
+} from "./promql/shared/legendBuilder";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 
 let moment: any;
@@ -135,7 +132,11 @@ export const convertPromQLData = async (
       });
 
       // Apply annotations if present (only for ECharts-based charts)
-      if (annotations && annotations.length > 0 && panelSchema.type !== "table") {
+      if (
+        annotations &&
+        annotations.length > 0 &&
+        panelSchema.type !== "table"
+      ) {
         const annotationResults = await getAnnotationsData(
           annotations,
           store,
@@ -199,7 +200,9 @@ export const convertPromQLData = async (
       extras.limitNumberOfSeriesWarningMessage =
         "Limiting the displayed series to ensure optimal performance";
     }
-  } else if (totalSeries > (store.state?.zoConfig?.max_dashboard_series ?? 100)) {
+  } else if (
+    totalSeries > (store.state?.zoConfig?.max_dashboard_series ?? 100)
+  ) {
     // Fallback: Series limiting happens here (for non-streaming queries)
     extras.limitNumberOfSeriesWarningMessage =
       "Limiting the displayed series to ensure optimal performance";
@@ -342,7 +345,8 @@ export const convertPromQLData = async (
       top: "15",
       bottom: (() => {
         const baseBottom =
-          legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
+          legendConfig.orient === "horizontal" &&
+          panelSchema.config?.show_legends
             ? panelSchema.config?.axis_width == null
               ? 30
               : 50
@@ -469,7 +473,9 @@ export const convertPromQLData = async (
         fontSize: 14,
       },
       axisLine: {
-        show: searchQueryData?.every((it: any) => it && it.result && it.result.length == 0)
+        show: searchQueryData?.every(
+          (it: any) => it && it.result && it.result.length == 0,
+        )
           ? true
           : (panelSchema.config?.axis_border_show ?? false),
       },
@@ -506,7 +512,9 @@ export const convertPromQLData = async (
         },
       },
       axisLine: {
-        show: searchQueryData?.every((it: any) => it && it.result && it.result.length == 0)
+        show: searchQueryData?.every(
+          (it: any) => it && it.result && it.result.length == 0,
+        )
           ? true
           : (panelSchema.config?.axis_border_show ?? false),
       },
@@ -1096,12 +1104,12 @@ export const convertPromQLData = async (
         panelSchema.config.legend_height.unit === "%"
           ? chartHeight * (panelSchema.config.legend_height.value / 100)
           : panelSchema.config.legend_height.value;
-      
+
       // Apply the configured height using the same approach as calculateBottomLegendHeight
       if (options.grid) {
         options.grid.bottom = legendHeight;
       }
-      
+
       const legendTopPosition = chartHeight - legendHeight + 10; // 10px padding from bottom
       options.legend.top = legendTopPosition;
       options.legend.height = legendHeight - 20; // Constrain height within allocated space
@@ -1137,12 +1145,12 @@ export const convertPromQLData = async (
       panelSchema.config.legend_height.unit === "%"
         ? chartHeight * (panelSchema.config.legend_height.value / 100)
         : panelSchema.config.legend_height.value;
-    
+
     // Apply the configured height using the same approach as calculateBottomLegendHeight
     if (options.grid) {
       options.grid.bottom = legendHeight;
     }
-    
+
     const legendTopPosition = chartHeight - legendHeight + 10; // 10px padding from bottom
     options.legend.top = legendTopPosition;
     options.legend.height = legendHeight - 20; // Constrain height within allocated space
@@ -1159,5 +1167,3 @@ export const convertPromQLData = async (
     },
   };
 };
-
-

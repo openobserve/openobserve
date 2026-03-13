@@ -20,20 +20,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <div class="step-content card-container tw:px-3 tw:py-4">
-
       <!-- Enable Notifications toggle -->
       <div class="flex items-start alert-settings-row">
-        <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
+        <div
+          class="tw:font-semibold flex items-center"
+          style="width: 190px; height: 36px"
+        >
           Notifications
           <q-icon
             name="info"
             size="17px"
             class="q-ml-xs cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+            :class="
+              store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+            "
           >
-            <q-tooltip anchor="center right" self="center left" max-width="300px">
+            <q-tooltip
+              anchor="center right"
+              self="center left"
+              max-width="300px"
+            >
               <span style="font-size: 14px">
-                When enabled, a notification will be sent to the selected destination whenever an anomaly is detected.
+                When enabled, a notification will be sent to the selected
+                destination whenever an anomaly is detected.
               </span>
             </q-tooltip>
           </q-icon>
@@ -52,9 +61,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Destination picker (shown when alert_enabled) -->
-      <div v-if="config.alert_enabled" class="flex items-start alert-settings-row">
-        <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-          {{ t("alerts.destination") }} <span class="text-negative tw:ml-1">*</span>
+      <div
+        v-if="config.alert_enabled"
+        class="flex items-start alert-settings-row"
+      >
+        <div
+          class="tw:font-semibold flex items-center"
+          style="width: 190px; height: 36px"
+        >
+          {{ t("alerts.destination") }}
+          <span class="text-negative tw:ml-1">*</span>
         </div>
         <div class="tw:flex tw:flex-col">
           <div class="tw:flex tw:items-center">
@@ -75,7 +91,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #no-option>
                 <q-item>
-                  <q-item-section class="text-grey">No destinations found</q-item-section>
+                  <q-item-section class="text-grey"
+                    >No destinations found</q-item-section
+                  >
                 </q-item>
               </template>
             </q-select>
@@ -116,13 +134,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:flex tw:items-start tw:gap-2 text-caption tw:mt-2"
         :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
       >
-        <q-icon name="info" size="16px" class="tw:mt-px tw:flex-shrink-0" />
+        <q-icon name="info" size="16px"
+class="tw:mt-px tw:flex-shrink-0" />
         <span>
-          Anomaly detection will still run and write results to the <code>_anomalies</code> stream.
-          Enable notifications to receive alerts when anomalies are detected.
+          Anomaly detection will still run and write results to the
+          <code>_anomalies</code> stream. Enable notifications to receive alerts
+          when anomalies are detected.
         </span>
       </div>
-
     </div>
   </div>
 </template>
@@ -159,7 +178,9 @@ export default defineComponent({
     // Sync when parent loads destinations asynchronously after component mount.
     watch(
       () => props.destinations,
-      (val) => { filteredDestinations.value = val; },
+      (val) => {
+        filteredDestinations.value = val;
+      },
     );
 
     const filterDestinations = (val: string, update: any) => {

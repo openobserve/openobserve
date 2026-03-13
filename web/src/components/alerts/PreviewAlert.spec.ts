@@ -114,9 +114,9 @@ describe("PreviewAlert.vue", () => {
     });
 
     it("should apply light mode class when theme is light", () => {
-      expect(
-        wrapper.find(".preview-alert-container-light").exists()
-      ).toBe(true);
+      expect(wrapper.find(".preview-alert-container-light").exists()).toBe(
+        true,
+      );
     });
 
     it("should not apply light mode class when theme is dark", async () => {
@@ -133,9 +133,9 @@ describe("PreviewAlert.vue", () => {
         },
       });
 
-      expect(
-        darkWrapper.find(".preview-alert-container-light").exists()
-      ).toBe(false);
+      expect(darkWrapper.find(".preview-alert-container-light").exists()).toBe(
+        false,
+      );
       darkWrapper.unmount();
     });
 
@@ -198,7 +198,7 @@ describe("PreviewAlert.vue", () => {
 
       expect(wrapper.find(".sql-preview").exists()).toBe(true);
       expect(wrapper.find(".sql-preview").text()).toContain(
-        "Preview is not available in SQL mode"
+        "Preview is not available in SQL mode",
       );
     });
 
@@ -220,7 +220,9 @@ describe("PreviewAlert.vue", () => {
       await wrapper.setProps({ selectedTab: "sql" });
       await nextTick();
 
-      const panelRenderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      const panelRenderer = wrapper.findComponent({
+        name: "PanelSchemaRenderer",
+      });
       expect(panelRenderer.exists()).toBe(false);
     });
   });
@@ -228,10 +230,15 @@ describe("PreviewAlert.vue", () => {
   describe("PanelSchemaRenderer Integration", () => {
     it("should render PanelSchemaRenderer when chartData exists and not in SQL mode", async () => {
       wrapper.vm.chartData = { type: "line" };
-      await wrapper.setProps({ selectedTab: "custom", query: "SELECT * FROM test" });
+      await wrapper.setProps({
+        selectedTab: "custom",
+        query: "SELECT * FROM test",
+      });
       await nextTick();
 
-      const panelRenderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      const panelRenderer = wrapper.findComponent({
+        name: "PanelSchemaRenderer",
+      });
       expect(panelRenderer.exists()).toBe(true);
     });
 
@@ -240,7 +247,9 @@ describe("PreviewAlert.vue", () => {
       wrapper.vm.chartData = mockChartData;
       await nextTick();
 
-      const panelRenderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      const panelRenderer = wrapper.findComponent({
+        name: "PanelSchemaRenderer",
+      });
       expect(panelRenderer.props().panelSchema).toEqual(mockChartData);
     });
 
@@ -248,7 +257,9 @@ describe("PreviewAlert.vue", () => {
       wrapper.vm.chartData = { type: "line" };
       await nextTick();
 
-      const panelRenderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      const panelRenderer = wrapper.findComponent({
+        name: "PanelSchemaRenderer",
+      });
       expect(panelRenderer.props().searchType).toBe("UI");
     });
 
@@ -256,7 +267,9 @@ describe("PreviewAlert.vue", () => {
       wrapper.vm.chartData = { type: "line" };
       await nextTick();
 
-      const panelRenderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      const panelRenderer = wrapper.findComponent({
+        name: "PanelSchemaRenderer",
+      });
       expect(panelRenderer.props().variablesData).toEqual({});
     });
 
@@ -265,7 +278,9 @@ describe("PreviewAlert.vue", () => {
       await wrapper.setProps({ isUsingBackendSql: true });
       await nextTick();
 
-      const panelRenderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      const panelRenderer = wrapper.findComponent({
+        name: "PanelSchemaRenderer",
+      });
       expect(panelRenderer.props().is_ui_histogram).toBe(true);
     });
 
@@ -274,7 +289,9 @@ describe("PreviewAlert.vue", () => {
       await wrapper.setProps({ isUsingBackendSql: false });
       await nextTick();
 
-      const panelRenderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      const panelRenderer = wrapper.findComponent({
+        name: "PanelSchemaRenderer",
+      });
       expect(panelRenderer.props().is_ui_histogram).toBe(false);
     });
   });
@@ -309,10 +326,15 @@ describe("PreviewAlert.vue", () => {
 
     it("should watch isUsingBackendSql changes", async () => {
       wrapper.vm.chartData = { type: "line" };
-      await wrapper.setProps({ isUsingBackendSql: false, query: "SELECT * FROM test" });
+      await wrapper.setProps({
+        isUsingBackendSql: false,
+        query: "SELECT * FROM test",
+      });
       await nextTick();
 
-      let panelRenderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      let panelRenderer = wrapper.findComponent({
+        name: "PanelSchemaRenderer",
+      });
       expect(panelRenderer.props().is_ui_histogram).toBe(false);
 
       await wrapper.setProps({ isUsingBackendSql: true });
@@ -325,7 +347,11 @@ describe("PreviewAlert.vue", () => {
     it("should trigger refreshData when isUsingBackendSql changes", async () => {
       // Test by checking that chartData changes when isUsingBackendSql changes
       wrapper.vm.chartData = { type: "line" };
-      await wrapper.setProps({ isUsingBackendSql: true, query: "SELECT * FROM test", selectedTab: "custom" });
+      await wrapper.setProps({
+        isUsingBackendSql: true,
+        query: "SELECT * FROM test",
+        selectedTab: "custom",
+      });
       await nextTick();
       await flushPromises();
 
@@ -343,15 +369,20 @@ describe("PreviewAlert.vue", () => {
     it("should set dateTime in dashboardPanelData", () => {
       wrapper.vm.refreshData();
 
-      expect(wrapper.vm.dashboardPanelData.meta.dateTime.start_time).toBeDefined();
-      expect(wrapper.vm.dashboardPanelData.meta.dateTime.end_time).toBeDefined();
+      expect(
+        wrapper.vm.dashboardPanelData.meta.dateTime.start_time,
+      ).toBeDefined();
+      expect(
+        wrapper.vm.dashboardPanelData.meta.dateTime.end_time,
+      ).toBeDefined();
     });
 
     it("should calculate time range based on period", () => {
       wrapper.vm.formData.trigger_condition.period = 10;
       wrapper.vm.refreshData();
 
-      const { start_time, end_time } = wrapper.vm.dashboardPanelData.meta.dateTime;
+      const { start_time, end_time } =
+        wrapper.vm.dashboardPanelData.meta.dateTime;
       const duration = end_time - start_time;
 
       // Should be at least 2 minutes (minimum period)
@@ -363,7 +394,8 @@ describe("PreviewAlert.vue", () => {
       wrapper.vm.formData.trigger_condition.period = 1;
       wrapper.vm.refreshData();
 
-      const { start_time, end_time } = wrapper.vm.dashboardPanelData.meta.dateTime;
+      const { start_time, end_time } =
+        wrapper.vm.dashboardPanelData.meta.dateTime;
       const duration = end_time - start_time;
 
       // Duration is in microseconds (multiply by 1000)
@@ -437,7 +469,9 @@ describe("PreviewAlert.vue", () => {
       await wrapper.setProps({ query: testQuery });
       wrapper.vm.refreshData();
 
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toBe(testQuery);
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toBe(
+        testQuery,
+      );
     });
 
     // Note: Stream name update mechanism changed during alert revamp
@@ -446,7 +480,7 @@ describe("PreviewAlert.vue", () => {
       wrapper.vm.refreshData();
 
       expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.stream).toBe(
-        "test-logs"
+        "test-logs",
       );
     });
 
@@ -456,7 +490,7 @@ describe("PreviewAlert.vue", () => {
       wrapper.vm.refreshData();
 
       expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.stream_type
+        wrapper.vm.dashboardPanelData.data.queries[0].fields.stream_type,
       ).toBe("metrics");
     });
 
@@ -479,9 +513,7 @@ describe("PreviewAlert.vue", () => {
       wrapper.vm.refreshData();
 
       expect(wrapper.vm.chartData).toBeDefined();
-      expect(wrapper.vm.chartData).not.toBe(
-        wrapper.vm.dashboardPanelData.data
-      );
+      expect(wrapper.vm.chartData).not.toBe(wrapper.vm.dashboardPanelData.data);
     });
   });
 
@@ -752,13 +784,19 @@ describe("PreviewAlert.vue", () => {
 
     // Note: SQL preview behavior changed during alert revamp
     it.skip("should handle switching between tabs", async () => {
-      await wrapper.setProps({ selectedTab: "custom", query: "SELECT * FROM test" });
+      await wrapper.setProps({
+        selectedTab: "custom",
+        query: "SELECT * FROM test",
+      });
       await nextTick();
 
       await wrapper.setProps({ selectedTab: "promql", query: "up" });
       await nextTick();
 
-      await wrapper.setProps({ selectedTab: "sql", query: "SELECT * FROM test" });
+      await wrapper.setProps({
+        selectedTab: "sql",
+        query: "SELECT * FROM test",
+      });
       await nextTick();
 
       expect(wrapper.find(".sql-preview").exists()).toBe(true);
@@ -767,9 +805,9 @@ describe("PreviewAlert.vue", () => {
 
   describe("Theme Handling", () => {
     it("should react to theme changes", async () => {
-      expect(
-        wrapper.find(".preview-alert-container-light").exists()
-      ).toBe(true);
+      expect(wrapper.find(".preview-alert-container-light").exists()).toBe(
+        true,
+      );
 
       mockStore.state.theme = "dark";
       await nextTick();
@@ -787,9 +825,9 @@ describe("PreviewAlert.vue", () => {
         },
       });
 
-      expect(
-        darkWrapper.find(".preview-alert-container-light").exists()
-      ).toBe(false);
+      expect(darkWrapper.find(".preview-alert-container-light").exists()).toBe(
+        false,
+      );
 
       darkWrapper.unmount();
     });

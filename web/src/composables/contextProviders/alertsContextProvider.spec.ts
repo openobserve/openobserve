@@ -12,77 +12,77 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { describe, it, expect } from 'vitest';
-import { createAlertsContextProvider } from './alertsContextProvider';
+import { describe, it, expect } from "vitest";
+import { createAlertsContextProvider } from "./alertsContextProvider";
 
-describe('createAlertsContextProvider', () => {
-  it('should create a context provider for creating new alert', () => {
+describe("createAlertsContextProvider", () => {
+  it("should create a context provider for creating new alert", () => {
     const formData = {
       value: {
-        id: 'alert-123',
-        name: 'Test Alert',
-        type: 'scheduled'
-      }
+        id: "alert-123",
+        name: "Test Alert",
+        type: "scheduled",
+      },
     };
 
     const store = {
       state: {
         selectedOrganization: {
-          identifier: 'org-456'
-        }
-      }
+          identifier: "org-456",
+        },
+      },
     };
 
     const provider = createAlertsContextProvider(formData, store, false);
     const context = provider.getContext();
 
-    expect(context.currentPage).toBe('Alerts');
-    expect(context.alertId).toBe('alert-123');
-    expect(context.alertName).toBe('Test Alert');
+    expect(context.currentPage).toBe("Alerts");
+    expect(context.alertId).toBe("alert-123");
+    expect(context.alertName).toBe("Test Alert");
     expect(context.isRealTime).toBe(false);
-    expect(context.organization_identifier).toBe('org-456');
-    expect(context.user_intent).toBe('create new alert');
+    expect(context.organization_identifier).toBe("org-456");
+    expect(context.user_intent).toBe("create new alert");
   });
 
-  it('should create a context provider for editing existing alert', () => {
+  it("should create a context provider for editing existing alert", () => {
     const formData = {
       value: {
-        id: 'alert-789',
-        name: 'Updated Alert',
-        type: 'realtime'
-      }
+        id: "alert-789",
+        name: "Updated Alert",
+        type: "realtime",
+      },
     };
 
     const store = {
       state: {
         selectedOrganization: {
-          identifier: 'org-123'
-        }
-      }
+          identifier: "org-123",
+        },
+      },
     };
 
     const provider = createAlertsContextProvider(formData, store, true);
     const context = provider.getContext();
 
-    expect(context.currentPage).toBe('Alerts');
-    expect(context.alertId).toBe('alert-789');
-    expect(context.alertName).toBe('Updated Alert');
+    expect(context.currentPage).toBe("Alerts");
+    expect(context.alertId).toBe("alert-789");
+    expect(context.alertName).toBe("Updated Alert");
     expect(context.isRealTime).toBe(true);
-    expect(context.organization_identifier).toBe('org-123');
-    expect(context.user_intent).toBe('edit existing alert');
+    expect(context.organization_identifier).toBe("org-123");
+    expect(context.user_intent).toBe("edit existing alert");
   });
 
-  it('should handle missing form data gracefully', () => {
+  it("should handle missing form data gracefully", () => {
     const formData = { value: null };
     const store = { state: { selectedOrganization: null } };
 
     const provider = createAlertsContextProvider(formData, store, false);
     const context = provider.getContext();
 
-    expect(context.currentPage).toBe('Alerts');
-    expect(context.alertId).toBe('');
-    expect(context.alertName).toBe('');
+    expect(context.currentPage).toBe("Alerts");
+    expect(context.alertId).toBe("");
+    expect(context.alertName).toBe("");
     expect(context.isRealTime).toBe(false);
-    expect(context.organization_identifier).toBe('');
+    expect(context.organization_identifier).toBe("");
   });
 });

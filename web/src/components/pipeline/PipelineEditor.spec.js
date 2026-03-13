@@ -1,59 +1,59 @@
-import { sanitizeStreamName } from './utils/pipelineCommonValidation'
-import PipelineEditor from './PipelineEditor.vue'
+import { sanitizeStreamName } from "./utils/pipelineCommonValidation";
+import PipelineEditor from "./PipelineEditor.vue";
 
 import { flushPromises, mount } from "@vue/test-utils";
-import useDnD from '@/plugins/pipelines/useDnD'
+import useDnD from "@/plugins/pipelines/useDnD";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Dialog, Notify } from "quasar";
 import store from "@/test/unit/helpers/store";
 import { installQuasar } from "@/test/unit/helpers";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
-import { ref } from 'vue';
+import { ref } from "vue";
 
 installQuasar({
   plugins: [Dialog, Notify],
 });
 const mockAddNode = vi.fn();
 // Mock the useDnD composable
-vi.mock('@/plugins/pipelines/useDnD', () => ({
+vi.mock("@/plugins/pipelines/useDnD", () => ({
   default: vi.fn(),
   useDnD: () => ({
-    addNode: mockAddNode
-  })
+    addNode: mockAddNode,
+  }),
 }));
 
-vi.mock('@/composables/useStreams', () => ({
+vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     search: vi.fn(),
-    getStreams: vi.fn().mockResolvedValue({ 
+    getStreams: vi.fn().mockResolvedValue({
       list: [
         { name: "test_stream1", stream_type: "logs" },
-        { name: "test_stream2", stream_type: "logs" }
-      ]
-    })
-  })
+        { name: "test_stream2", stream_type: "logs" },
+      ],
+    }),
+  }),
 }));
 
-vi.mock('@/composables/usePipelines', () => ({
+vi.mock("@/composables/usePipelines", () => ({
   default: () => ({
     getUsedStreamsList: vi.fn().mockResolvedValue([]),
-    getPipelineDestinations: vi.fn().mockResolvedValue([])
-  })
+    getPipelineDestinations: vi.fn().mockResolvedValue([]),
+  }),
 }));
 
-vi.mock('@/services/jstransform', () => ({
+vi.mock("@/services/jstransform", () => ({
   default: {
-    list: vi.fn().mockResolvedValue({ data: { list: [] } })
-  }
+    list: vi.fn().mockResolvedValue({ data: { list: [] } }),
+  },
 }));
 
-vi.mock('@/services/pipelines', () => ({
+vi.mock("@/services/pipelines", () => ({
   default: {
     getPipelines: vi.fn().mockResolvedValue({ data: { list: [] } }),
     createPipeline: vi.fn().mockResolvedValue({}),
-    updatePipeline: vi.fn().mockResolvedValue({})
-  }
+    updatePipeline: vi.fn().mockResolvedValue({}),
+  },
 }));
 
 describe("PipelineEditor", () => {
@@ -79,15 +79,15 @@ describe("PipelineEditor", () => {
     mockShowJsonEditorDialog = { value: false };
     mockEditingFunctionName = { value: "" };
     mockEditingStreamRouteName = { value: "" };
-    
+
     mockConfirmDialogMeta = {
       value: {
         show: false,
         title: "",
         message: "",
         onConfirm: vi.fn(),
-        data: null
-      }
+        data: null,
+      },
     };
 
     mockRouter = {
@@ -97,17 +97,17 @@ describe("PipelineEditor", () => {
         value: {
           query: { id: "test-pipeline-id" },
           name: "pipelineEditor",
-          path: "/pipeline/pipelines/edit"
-        }
-      }
+          path: "/pipeline/pipelines/edit",
+        },
+      },
     };
 
     mockStore = {
       state: {
         selectedOrganization: {
-          identifier: "test-org"
-        }
-      }
+          identifier: "test-org",
+        },
+      },
     };
 
     // Create a mock notify function
@@ -117,16 +117,16 @@ describe("PipelineEditor", () => {
         nodes: [],
         edges: [],
         source: {
-          source_type: "realtime"
+          source_type: "realtime",
         },
-        name: "test-pipeline"
+        name: "test-pipeline",
       },
       isEditPipeline: false,
       dirtyFlag: false,
       dialog: {
         show: false,
-        name: ""
-      }
+        name: "",
+      },
     };
 
     // Update the useDnD mock with our test data
@@ -145,35 +145,35 @@ describe("PipelineEditor", () => {
       editNode: vi.fn(),
       deletePipelineNode: vi.fn(),
       resetPipelineData: vi.fn(),
-      comparePipelinesById: vi.fn()
+      comparePipelinesById: vi.fn(),
     }));
 
     wrapper = mount(PipelineEditor, {
       global: {
-        provide: { 
+        provide: {
           store: store,
         },
         plugins: [i18n, router],
-      }
+      },
     });
   });
 
   afterEach(async () => {
     // Clean up any pending promises
     await flushPromises();
-    
+
     // Ensure all Quasar dialogs are closed
     if (wrapper) {
       // Close any open dialogs
       wrapper.vm.confirmDialogMeta.show = false;
       wrapper.vm.showJsonEditorDialog = false;
       wrapper.vm.confirmDialogBasicPipeline = false;
-      
+
       // Unmount the component
       wrapper.unmount();
       wrapper = null;
     }
-    
+
     vi.clearAllMocks();
     vi.clearAllTimers();
   });
@@ -186,16 +186,16 @@ describe("PipelineEditor", () => {
           {
             type: "input",
             data: {
-              node_type: "stream"
-            }
+              node_type: "stream",
+            },
           },
           {
             type: "output",
             data: {
               node_type: "stream",
-              stream_type: "enrichment_tables"
-            }
-          }
+              stream_type: "enrichment_tables",
+            },
+          },
         ];
 
         const result = wrapper.vm.validatePipeline();
@@ -208,16 +208,16 @@ describe("PipelineEditor", () => {
           {
             type: "input",
             data: {
-              node_type: "stream"
-            }
+              node_type: "stream",
+            },
           },
           {
             type: "output",
             data: {
               node_type: "stream",
-              stream_type: "logs"
-            }
-          }
+              stream_type: "logs",
+            },
+          },
         ];
 
         const result = wrapper.vm.validatePipeline();
@@ -230,16 +230,16 @@ describe("PipelineEditor", () => {
           {
             type: "input",
             data: {
-              node_type: "query"
-            }
+              node_type: "query",
+            },
           },
           {
             type: "output",
             data: {
               node_type: "stream",
-              stream_type: "enrichment_tables"
-            }
-          }
+              stream_type: "enrichment_tables",
+            },
+          },
         ];
 
         const result = wrapper.vm.validatePipeline();
@@ -250,16 +250,16 @@ describe("PipelineEditor", () => {
     describe("dialog management functions", () => {
       it("should open the cancel dialog when there are changes", async () => {
         mockPipelineObj.dirtyFlag = true;
-        
+
         // Mock the component's confirmDialogMeta reactive reference
-        const mockConfirmDialogRef = { 
-          show: false, 
-          title: "", 
-          message: "", 
-          onConfirm: vi.fn() 
+        const mockConfirmDialogRef = {
+          show: false,
+          title: "",
+          message: "",
+          onConfirm: vi.fn(),
         };
         wrapper.vm.confirmDialogMeta = { value: mockConfirmDialogRef };
-        
+
         wrapper.vm.openCancelDialog();
 
         expect(wrapper.vm.confirmDialogMeta.show).toBe(true);
@@ -267,15 +267,15 @@ describe("PipelineEditor", () => {
       });
 
       it("should reset confirm dialog correctly", async () => {
-        const mockConfirmDialogRef = { 
-          show: true, 
-          title: "Test", 
-          message: "Test message", 
+        const mockConfirmDialogRef = {
+          show: true,
+          title: "Test",
+          message: "Test message",
           onConfirm: vi.fn(),
-          data: { test: "data" }
+          data: { test: "data" },
         };
         wrapper.vm.confirmDialogMeta = { value: mockConfirmDialogRef };
-        
+
         wrapper.vm.resetConfirmDialog();
 
         expect(wrapper.vm.confirmDialogMeta.show).toBe(false);
@@ -287,7 +287,7 @@ describe("PipelineEditor", () => {
       it("should open JSON editor", async () => {
         wrapper.vm.showJsonEditorDialog = { value: false };
         wrapper.vm.openJsonEditor();
-        
+
         expect(wrapper.vm.showJsonEditorDialog).toBe(true);
       });
 
@@ -296,9 +296,9 @@ describe("PipelineEditor", () => {
         mockPipelineObj.dialog.name = "test";
         wrapper.vm.editingFunctionName = { value: "testFunction" };
         wrapper.vm.editingStreamRouteName = { value: "testStream" };
-        
+
         wrapper.vm.resetDialog();
-        
+
         expect(mockPipelineObj.dialog.show).toBe(false);
         expect(mockPipelineObj.dialog.name).toBe("");
         expect(wrapper.vm.editingFunctionName).toBe("");
@@ -310,9 +310,11 @@ describe("PipelineEditor", () => {
       it("should find missing edges", async () => {
         mockPipelineObj.currentSelectedPipeline.nodes = [
           { id: "1", type: "default" },
-          { id: "2", type: "default" }
+          { id: "2", type: "default" },
         ];
-        mockPipelineObj.currentSelectedPipeline.edges = [{ source: "1", target: "3" }];
+        mockPipelineObj.currentSelectedPipeline.edges = [
+          { source: "1", target: "3" },
+        ];
 
         const result = wrapper.vm.findMissingEdges();
         expect(result).toBe(true);
@@ -321,10 +323,10 @@ describe("PipelineEditor", () => {
       it("should return false when all nodes are connected", async () => {
         mockPipelineObj.currentSelectedPipeline.nodes = [
           { id: "1", type: "input" },
-          { id: "2", type: "output" }
+          { id: "2", type: "output" },
         ];
         mockPipelineObj.currentSelectedPipeline.edges = [
-          { source: "1", target: "2" }
+          { source: "1", target: "2" },
         ];
 
         const result = wrapper.vm.findMissingEdges();
@@ -335,7 +337,7 @@ describe("PipelineEditor", () => {
         const nodes = [
           { io_type: "input", data: { node_type: "stream" } },
           { io_type: "default", data: { node_type: "function" } },
-          { io_type: "output", data: { node_type: "stream" } }
+          { io_type: "output", data: { node_type: "stream" } },
         ];
 
         const result = wrapper.vm.isValidNodes(nodes);
@@ -344,22 +346,22 @@ describe("PipelineEditor", () => {
 
       it("should validate nodes correctly - return false for same stream input and output", async () => {
         const nodes = [
-          { 
-            io_type: "input", 
-            data: { 
-              node_type: "stream", 
-              stream_name: "test-stream", 
-              stream_type: "logs" 
-            } 
+          {
+            io_type: "input",
+            data: {
+              node_type: "stream",
+              stream_name: "test-stream",
+              stream_type: "logs",
+            },
           },
-          { 
-            io_type: "output", 
-            data: { 
-              node_type: "stream", 
-              stream_name: "test-stream", 
-              stream_type: "logs" 
-            } 
-          }
+          {
+            io_type: "output",
+            data: {
+              node_type: "stream",
+              stream_name: "test-stream",
+              stream_type: "logs",
+            },
+          },
         ];
 
         const result = wrapper.vm.isValidNodes(nodes);
@@ -369,23 +371,27 @@ describe("PipelineEditor", () => {
     describe("event handlers", () => {
       it("should handle beforeUnloadHandler when there are changes", async () => {
         mockPipelineObj.dirtyFlag = true;
-        
+
         const mockEvent = { returnValue: null };
         const result = wrapper.vm.beforeUnloadHandler(mockEvent);
-        
+
         // The actual message returned is the translated text, not the key
-        expect(mockEvent.returnValue).toBe("You have unsaved changes. Are you sure you want to leave?");
-        expect(result).toBe("You have unsaved changes. Are you sure you want to leave?");
+        expect(mockEvent.returnValue).toBe(
+          "You have unsaved changes. Are you sure you want to leave?",
+        );
+        expect(result).toBe(
+          "You have unsaved changes. Are you sure you want to leave?",
+        );
       });
 
       it("should handle beforeUnloadHandler when there are no changes", async () => {
         mockPipelineObj.dirtyFlag = false;
         mockPipelineObj.currentSelectedPipeline.nodes = [];
         mockPipelineObj.isEditPipeline = true;
-        
+
         const mockEvent = { returnValue: null };
         const result = wrapper.vm.beforeUnloadHandler(mockEvent);
-        
+
         expect(result).toBeUndefined();
       });
     });
@@ -394,23 +400,26 @@ describe("PipelineEditor", () => {
       it("should handle onNodeDragStart correctly", async () => {
         const mockEvent = {
           dataTransfer: {
-            setData: vi.fn()
-          }
+            setData: vi.fn(),
+          },
         };
         const testData = "test-node-data";
-        
+
         wrapper.vm.onNodeDragStart(mockEvent, testData);
-        
-        expect(mockEvent.dataTransfer.setData).toHaveBeenCalledWith("text", testData);
+
+        expect(mockEvent.dataTransfer.setData).toHaveBeenCalledWith(
+          "text",
+          testData,
+        );
       });
 
       it("should handle onNodeDragOver correctly", async () => {
         const mockEvent = {
-          preventDefault: vi.fn()
+          preventDefault: vi.fn(),
         };
-        
+
         wrapper.vm.onNodeDragOver(mockEvent);
-        
+
         expect(mockEvent.preventDefault).toHaveBeenCalled();
       });
 
@@ -418,12 +427,12 @@ describe("PipelineEditor", () => {
         const mockEvent = {
           preventDefault: vi.fn(),
           dataTransfer: {
-            getData: vi.fn().mockReturnValue("test-node-type")
-          }
+            getData: vi.fn().mockReturnValue("test-node-type"),
+          },
         };
-        
+
         wrapper.vm.onNodeDrop(mockEvent);
-        
+
         expect(mockEvent.preventDefault).toHaveBeenCalled();
         expect(mockEvent.dataTransfer.getData).toHaveBeenCalledWith("text");
       });
@@ -435,30 +444,32 @@ describe("PipelineEditor", () => {
           name: "test-pipeline",
           nodes: [],
           edges: [],
-          source: { source_type: "realtime" }
+          source: { source_type: "realtime" },
         });
-        
+
         wrapper.vm.savePipeline = vi.fn();
         wrapper.vm.validationErrors = { value: [] };
-        
+
         // Mock the validation utility to return valid
-        vi.doMock('../../utils/validatePipeline', () => ({
-          validatePipeline: vi.fn().mockReturnValue({ isValid: true, errors: [] })
+        vi.doMock("../../utils/validatePipeline", () => ({
+          validatePipeline: vi
+            .fn()
+            .mockReturnValue({ isValid: true, errors: [] }),
         }));
-        
+
         await wrapper.vm.savePipelineJson(validJson);
-        
+
         expect(wrapper.vm.validationErrors).toEqual([]);
       });
 
       it("should handle savePipelineJson with invalid JSON", async () => {
         const invalidJson = "{ invalid json }";
-        
+
         wrapper.vm.validationErrors = { value: [] };
-        
+
         await wrapper.vm.savePipelineJson(invalidJson);
 
-        expect(wrapper.vm.validationErrors).toEqual(['Invalid JSON format']);
+        expect(wrapper.vm.validationErrors).toEqual(["Invalid JSON format"]);
       });
     });
 
@@ -472,14 +483,14 @@ describe("PipelineEditor", () => {
 
       it("should show error when pipeline name is empty", async () => {
         mockPipelineObj.currentSelectedPipeline.name = "";
-        
-        await wrapper.vm.savePipeline();
-        
 
-        
-        expect(wrapper.vm.q.notify).toHaveBeenCalledWith(expect.objectContaining({
-          message: "Pipeline name is required"
-        }));
+        await wrapper.vm.savePipeline();
+
+        expect(wrapper.vm.q.notify).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: "Pipeline name is required",
+          }),
+        );
       });
 
       it("should show error when source node is missing", async () => {
@@ -487,16 +498,17 @@ describe("PipelineEditor", () => {
         mockPipelineObj.currentSelectedPipeline.nodes = [
           {
             io_type: "output",
-            data: { node_type: "stream" }
-          }
+            data: { node_type: "stream" },
+          },
         ];
-        
+
         await wrapper.vm.savePipeline();
-      
-        
-        expect(wrapper.vm.q.notify).toHaveBeenCalledWith(expect.objectContaining({
-          message: "Source node is required"
-        }));
+
+        expect(wrapper.vm.q.notify).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: "Source node is required",
+          }),
+        );
       });
 
       it("should show error when destination node is missing", async () => {
@@ -504,16 +516,17 @@ describe("PipelineEditor", () => {
         mockPipelineObj.currentSelectedPipeline.nodes = [
           {
             io_type: "input",
-            data: { node_type: "stream" }
-          }
+            data: { node_type: "stream" },
+          },
         ];
-        
+
         await wrapper.vm.savePipeline();
-        
-        
-        expect(wrapper.vm.q.notify).toHaveBeenCalledWith(expect.objectContaining({
-          message: "Destination node is required"
-        }));
+
+        expect(wrapper.vm.q.notify).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: "Destination node is required",
+          }),
+        );
       });
 
       it("should set source type to realtime for stream input", async () => {
@@ -523,25 +536,27 @@ describe("PipelineEditor", () => {
             id: "node-1",
             io_type: "input",
             type: "input",
-            data: { node_type: "stream" }
+            data: { node_type: "stream" },
           },
           {
             id: "node-2",
             io_type: "output",
             type: "output",
-            data: { node_type: "stream" }
-          }
+            data: { node_type: "stream" },
+          },
         ];
         mockPipelineObj.currentSelectedPipeline.edges = [
-          { source: "node-1", target: "node-2" }
+          { source: "node-1", target: "node-2" },
         ];
-        
+
         wrapper.vm.findMissingEdges = vi.fn().mockReturnValue(false);
         wrapper.vm.isValidNodes = vi.fn().mockReturnValue(true);
-        
+
         await wrapper.vm.savePipeline();
-        
-        expect(mockPipelineObj.currentSelectedPipeline.source.source_type).toBe("realtime");
+
+        expect(mockPipelineObj.currentSelectedPipeline.source.source_type).toBe(
+          "realtime",
+        );
       });
 
       it("should set source type to scheduled for query input", async () => {
@@ -551,25 +566,27 @@ describe("PipelineEditor", () => {
             id: "node-1",
             io_type: "input",
             type: "input",
-            data: { node_type: "query" }
+            data: { node_type: "query" },
           },
           {
             id: "node-2",
             io_type: "output",
             type: "output",
-            data: { node_type: "stream" }
-          }
+            data: { node_type: "stream" },
+          },
         ];
         mockPipelineObj.currentSelectedPipeline.edges = [
-          { source: "node-1", target: "node-2" }
+          { source: "node-1", target: "node-2" },
         ];
-        
+
         wrapper.vm.findMissingEdges = vi.fn().mockReturnValue(false);
         wrapper.vm.isValidNodes = vi.fn().mockReturnValue(true);
-        
+
         await wrapper.vm.savePipeline();
-        
-        expect(mockPipelineObj.currentSelectedPipeline.source.source_type).toBe("scheduled");
+
+        expect(mockPipelineObj.currentSelectedPipeline.source.source_type).toBe(
+          "scheduled",
+        );
       });
 
       it("should show error when nodes are not connected", async () => {
@@ -579,23 +596,25 @@ describe("PipelineEditor", () => {
             id: "node-1",
             type: "input",
             io_type: "input",
-            data: { node_type: "stream" }
+            data: { node_type: "stream" },
           },
           {
             id: "node-2",
             type: "output",
             io_type: "output",
-            data: { node_type: "stream" }
-          }
+            data: { node_type: "stream" },
+          },
         ];
         // No edges defined - this should trigger the missing edges error
         mockPipelineObj.currentSelectedPipeline.edges = [];
-        
+
         await wrapper.vm.savePipeline();
-        
-        expect(wrapper.vm.q.notify).toHaveBeenCalledWith(expect.objectContaining({
-          message: "Please connect all nodes before saving"
-        }));
+
+        expect(wrapper.vm.q.notify).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: "Please connect all nodes before saving",
+          }),
+        );
       });
 
       it("should handle stream name objects correctly", async () => {
@@ -605,27 +624,29 @@ describe("PipelineEditor", () => {
           {
             id: "node-1",
             type: "input",
-            data: { 
+            data: {
               node_type: "stream",
-              stream_name:testStreamName
-            }
+              stream_name: testStreamName,
+            },
           },
           {
             id: "node-2",
             type: "output",
-            data: { node_type: "stream" }
-          }
+            data: { node_type: "stream" },
+          },
         ];
         mockPipelineObj.currentSelectedPipeline.edges = [
-          { source: "node-1", target: "node-2" }
+          { source: "node-1", target: "node-2" },
         ];
-        
+
         wrapper.vm.findMissingEdges = vi.fn().mockReturnValue(false);
         wrapper.vm.isValidNodes = vi.fn().mockReturnValue(true);
-        
+
         await wrapper.vm.savePipeline();
-        
-        expect(mockPipelineObj.currentSelectedPipeline.nodes[0].data.stream_name).toBe(testStreamName);
+
+        expect(
+          mockPipelineObj.currentSelectedPipeline.nodes[0].data.stream_name,
+        ).toBe(testStreamName);
       });
 
       it("should show basic pipeline dialog when nodes are invalid", async () => {
@@ -635,25 +656,25 @@ describe("PipelineEditor", () => {
             id: "node-1",
             type: "input",
             io_type: "input",
-            data: { node_type: "stream" }
+            data: { node_type: "stream" },
           },
           {
             id: "node-2",
             type: "output",
             io_type: "output",
-            data: { node_type: "stream" }
-          }
+            data: { node_type: "stream" },
+          },
         ];
         mockPipelineObj.currentSelectedPipeline.edges = [
-          { source: "node-1", target: "node-2" }
+          { source: "node-1", target: "node-2" },
         ];
-        
+
         wrapper.vm.findMissingEdges = vi.fn().mockReturnValue(false);
         wrapper.vm.isValidNodes = vi.fn().mockReturnValue(false);
         wrapper.vm.showJsonEditorDialog = false;
-        
+
         await wrapper.vm.savePipeline();
-        
+
         expect(wrapper.vm.confirmDialogBasicPipeline).toBe(true);
       });
 
@@ -665,31 +686,30 @@ describe("PipelineEditor", () => {
             id: "node-1",
             type: "input",
             io_type: "input",
-            data: { 
+            data: {
               node_type: "stream",
               stream_name: "input-stream",
-              stream_type: "logs"
-            }
+              stream_type: "logs",
+            },
           },
           {
             id: "node-2",
             type: "output",
             io_type: "output",
-            data: { 
+            data: {
               node_type: "stream",
               stream_name: "output-stream",
-              stream_type: "logs"
-            }
-          }
+              stream_type: "logs",
+            },
+          },
         ];
         mockPipelineObj.currentSelectedPipeline.edges = [
-          { source: "node-1", target: "node-2" }
+          { source: "node-1", target: "node-2" },
         ];
 
         await wrapper.vm.savePipeline();
-        
-        expect(wrapper.vm.isPipelineSaving).toBe(true);
 
+        expect(wrapper.vm.isPipelineSaving).toBe(true);
       });
     });
   });

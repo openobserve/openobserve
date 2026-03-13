@@ -19,11 +19,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Tool-specific rendering -->
     <div v-if="isToolObservation && toolContent !== null" class="tool-content">
       <div v-if="toolMetadata" class="tool-metadata q-mb-sm">
-        <q-badge v-if="toolMetadata.name" :label="`Tool: ${toolMetadata.name}`" color="orange" class="q-mr-sm" />
-        <q-badge v-if="toolMetadata.callId" :label="`Call ID: ${toolMetadata.callId}`" color="grey" />
+        <q-badge
+          v-if="toolMetadata.name"
+          :label="`Tool: ${toolMetadata.name}`"
+          color="orange"
+          class="q-mr-sm"
+        />
+        <q-badge
+          v-if="toolMetadata.callId"
+          :label="`Call ID: ${toolMetadata.callId}`"
+          color="grey"
+        />
       </div>
       <div class="tool-data">
-        <VueJsonPretty :data="toolContent" :deep="3" :showLength="true" />
+        <VueJsonPretty :data="toolContent" :deep="3"
+:showLength="true" />
       </div>
     </div>
 
@@ -44,13 +54,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <pre class="plain-text-content">{{ contentStats.previewText }}</pre>
           </div>
           <div v-else class="json-content">
-            <VueJsonPretty :data="parsedContent" :deep="3" :showLength="true" />
+            <VueJsonPretty :data="parsedContent" :deep="3"
+:showLength="true" />
           </div>
         </div>
 
         <!-- JSON mode -->
         <div v-else class="json-content">
-          <VueJsonPretty :data="parsedContent" :deep="3" :showLength="true" />
+          <VueJsonPretty :data="parsedContent" :deep="3"
+:showLength="true" />
         </div>
 
         <div class="expand-indicator q-mt-sm">
@@ -81,13 +93,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <pre class="plain-text-content">{{ fullText }}</pre>
           </div>
           <div v-else class="json-content">
-            <VueJsonPretty :data="parsedContent" :deep="3" :showLength="true" />
+            <VueJsonPretty :data="parsedContent" :deep="3"
+:showLength="true" />
           </div>
         </div>
 
         <!-- JSON mode -->
         <div v-else class="json-content">
-          <VueJsonPretty :data="parsedContent" :deep="3" :showLength="true" />
+          <VueJsonPretty :data="parsedContent" :deep="3"
+:showLength="true" />
         </div>
 
         <div v-if="contentStats.shouldTruncate" class="collapse-btn q-mt-sm">
@@ -107,9 +121,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import VueJsonPretty from 'vue-json-pretty';
-import 'vue-json-pretty/lib/styles.css';
+import { computed, ref } from "vue";
+import VueJsonPretty from "vue-json-pretty";
+import "vue-json-pretty/lib/styles.css";
 
 const INITIAL_LINE_LIMIT = 15;
 
@@ -120,19 +134,19 @@ const props = defineProps({
   },
   observationType: {
     type: String,
-    default: 'SPAN',
+    default: "SPAN",
   },
   contentType: {
-    type: String as () => 'input' | 'output',
-    default: 'input',
+    type: String as () => "input" | "output",
+    default: "input",
   },
   span: {
     type: Object,
     default: null,
   },
   viewMode: {
-    type: String as () => 'formatted' | 'json',
-    default: 'formatted',
+    type: String as () => "formatted" | "json",
+    default: "formatted",
   },
 });
 
@@ -140,7 +154,7 @@ const isExpanded = ref(false);
 
 // Tool observation type handling
 const isToolObservation = computed(() => {
-  return props.observationType === 'TOOL';
+  return props.observationType === "TOOL";
 });
 
 const toolMetadata = computed(() => {
@@ -156,7 +170,7 @@ const toolContent = computed(() => {
 
   let content = null;
   if (props.span) {
-    if (props.contentType === 'input') {
+    if (props.contentType === "input") {
       content = props.span.llm_tool_call_arguments;
     } else {
       content = props.span.llm_tool_call_result;
@@ -169,9 +183,9 @@ const toolContent = computed(() => {
   }
 
   // Check if content is the string "null"
-  if (typeof content === 'string') {
+  if (typeof content === "string") {
     const trimmed = content.trim();
-    if (trimmed.toLowerCase() === 'null' || trimmed === '') {
+    if (trimmed.toLowerCase() === "null" || trimmed === "") {
       return null;
     }
     // Try to parse string content as JSON
@@ -183,11 +197,15 @@ const toolContent = computed(() => {
   }
 
   // Handle nested content structure: {content: [{type: "text", text: "..."}]}
-  if (content && typeof content === 'object') {
+  if (content && typeof content === "object") {
     // Check if it has the Anthropic content format
-    if (content.content && Array.isArray(content.content) && content.content.length > 0) {
+    if (
+      content.content &&
+      Array.isArray(content.content) &&
+      content.content.length > 0
+    ) {
       const firstContent = content.content[0];
-      if (firstContent.type === 'text' && firstContent.text) {
+      if (firstContent.type === "text" && firstContent.text) {
         // Try to parse the inner text as JSON
         try {
           return JSON.parse(firstContent.text);
@@ -212,9 +230,9 @@ const hasValidContent = computed(() => {
   // For regular content
   if (!props.content) return false;
 
-  if (typeof props.content === 'string') {
+  if (typeof props.content === "string") {
     const trimmed = props.content.trim();
-    if (trimmed === '' || trimmed.toLowerCase() === 'null') return false;
+    if (trimmed === "" || trimmed.toLowerCase() === "null") return false;
   }
 
   return true;
@@ -225,10 +243,10 @@ const parsedContent = computed(() => {
   if (!props.content) return null;
 
   try {
-    if (typeof props.content === 'string') {
+    if (typeof props.content === "string") {
       // Check for explicit "null" string before parsing
       const trimmed = props.content.trim();
-      if (trimmed.toLowerCase() === 'null' || trimmed === '') {
+      if (trimmed.toLowerCase() === "null" || trimmed === "") {
         return null;
       }
       // Try to parse as JSON
@@ -241,11 +259,15 @@ const parsedContent = computed(() => {
     }
 
     // Handle nested content structure: {content: [{type: "text", text: "..."}]}
-    if (props.content && typeof props.content === 'object') {
+    if (props.content && typeof props.content === "object") {
       // Check if it has the Anthropic content format
-      if (props.content.content && Array.isArray(props.content.content) && props.content.content.length > 0) {
+      if (
+        props.content.content &&
+        Array.isArray(props.content.content) &&
+        props.content.content.length > 0
+      ) {
         const firstContent = props.content.content[0];
-        if (firstContent.type === 'text' && firstContent.text) {
+        if (firstContent.type === "text" && firstContent.text) {
           // Try to parse the inner text as JSON
           try {
             const innerParsed = JSON.parse(firstContent.text);
@@ -271,7 +293,7 @@ const isMessagesArray = computed(() => {
     Array.isArray(parsedContent.value) &&
     parsedContent.value.length > 0 &&
     parsedContent.value.every(
-      (item: any) => item && typeof item === 'object' && 'role' in item
+      (item: any) => item && typeof item === "object" && "role" in item,
     )
   );
 });
@@ -280,9 +302,9 @@ const isMessagesArray = computed(() => {
 const isSingleMessage = computed(() => {
   return (
     parsedContent.value &&
-    typeof parsedContent.value === 'object' &&
+    typeof parsedContent.value === "object" &&
     !Array.isArray(parsedContent.value) &&
-    'role' in parsedContent.value
+    "role" in parsedContent.value
   );
 });
 
@@ -295,21 +317,25 @@ const isContentPartsArray = computed(() => {
     parsedContent.value.every(
       (item: any) =>
         item &&
-        typeof item === 'object' &&
-        'type' in item &&
-        (item.type === 'text' || item.type === 'image_url' || item.type === 'image')
+        typeof item === "object" &&
+        "type" in item &&
+        (item.type === "text" ||
+          item.type === "image_url" ||
+          item.type === "image"),
     )
   );
 });
 
 // Check if content should be rendered as messages (any format)
 const shouldRenderAsMessages = computed(() => {
-  return isMessagesArray.value || isSingleMessage.value || isContentPartsArray.value;
+  return (
+    isMessagesArray.value || isSingleMessage.value || isContentPartsArray.value
+  );
 });
 
 const isPlainText = computed(() => {
   // If parsedContent is different from original content, it means we successfully parsed JSON
-  if (typeof props.content === 'string') {
+  if (typeof props.content === "string") {
     try {
       JSON.parse(props.content);
       return false; // It's valid JSON, not plain text
@@ -326,25 +352,25 @@ const formatContent = (content: any): string => {
   if (Array.isArray(content)) {
     const parts: string[] = [];
     for (const part of content) {
-      if (part.type === 'text' && part.text) {
+      if (part.type === "text" && part.text) {
         parts.push(part.text);
-      } else if (part.type === 'image_url' && part.image_url?.url) {
+      } else if (part.type === "image_url" && part.image_url?.url) {
         parts.push(`[Image: ${part.image_url.url}]`);
-      } else if (part.type === 'image' && part.source) {
+      } else if (part.type === "image" && part.source) {
         // Handle Anthropic-style image content
-        parts.push(`[Image: ${part.source.type || 'base64'}]`);
+        parts.push(`[Image: ${part.source.type || "base64"}]`);
       } else {
         // Fallback for unknown part types
         parts.push(JSON.stringify(part));
       }
     }
-    return parts.join('\n\n');
-  } else if (typeof content === 'string') {
+    return parts.join("\n\n");
+  } else if (typeof content === "string") {
     return content;
   } else if (content) {
     return JSON.stringify(content, null, 2);
   }
-  return '';
+  return "";
 };
 
 // Extract messages
@@ -352,7 +378,7 @@ const parsedMessages = computed(() => {
   // Handle array of messages (input format)
   if (isMessagesArray.value) {
     return (parsedContent.value as any[]).map((msg: any) => ({
-      role: msg.role || 'unknown',
+      role: msg.role || "unknown",
       content: formatContent(msg.content),
     }));
   }
@@ -360,18 +386,22 @@ const parsedMessages = computed(() => {
   // Handle single message object (output format: {role: 'assistant', content: '...'})
   if (isSingleMessage.value) {
     const msg = parsedContent.value as any;
-    return [{
-      role: msg.role || 'assistant',
-      content: formatContent(msg.content),
-    }];
+    return [
+      {
+        role: msg.role || "assistant",
+        content: formatContent(msg.content),
+      },
+    ];
   }
 
   // Handle direct content parts array (output format: [{type: 'text', text: '...'}])
   if (isContentPartsArray.value) {
-    return [{
-      role: 'assistant',
-      content: formatContent(parsedContent.value),
-    }];
+    return [
+      {
+        role: "assistant",
+        content: formatContent(parsedContent.value),
+      },
+    ];
   }
 
   return [];
@@ -379,33 +409,33 @@ const parsedMessages = computed(() => {
 
 // Get text content for truncation
 const fullText = computed(() => {
-  if (typeof props.content === 'string') {
+  if (typeof props.content === "string") {
     return props.content;
   }
   if (props.content) {
     return JSON.stringify(props.content, null, 2);
   }
-  return '';
+  return "";
 });
 
 // Calculate content stats for truncation
 const contentStats = computed(() => {
-  let text = '';
+  let text = "";
 
   if (shouldRenderAsMessages.value) {
     // For messages, concatenate all message contents
     text = parsedMessages.value
       .map((m: any) => `${m.role}: ${m.content}`)
-      .join('\n');
+      .join("\n");
   } else {
     text = fullText.value;
   }
 
-  const lines = text.split('\n');
+  const lines = text.split("\n");
   const chars = text.length;
 
   const previewLines = lines.slice(0, INITIAL_LINE_LIMIT);
-  const previewText = previewLines.join('\n');
+  const previewText = previewLines.join("\n");
   const remainingChars = chars - previewText.length;
 
   return {
@@ -425,15 +455,18 @@ const previewMessages = computed(() => {
   const preview: any[] = [];
 
   for (const msg of parsedMessages.value) {
-    const msgLines = msg.content.split('\n').length;
+    const msgLines = msg.content.split("\n").length;
     if (lineCount + msgLines > INITIAL_LINE_LIMIT) {
       // Include partial message if possible
       const remainingLines = INITIAL_LINE_LIMIT - lineCount;
       if (remainingLines > 0) {
-        const truncatedContent = msg.content.split('\n').slice(0, remainingLines).join('\n');
+        const truncatedContent = msg.content
+          .split("\n")
+          .slice(0, remainingLines)
+          .join("\n");
         preview.push({
           ...msg,
-          content: truncatedContent + '...',
+          content: truncatedContent + "...",
         });
       }
       break;
@@ -448,19 +481,19 @@ const previewMessages = computed(() => {
 
 <script lang="ts">
 // Message Item Component - Renders message with markdown
-import { defineComponent, h } from 'vue';
-import VueJsonPretty from 'vue-json-pretty';
-import DOMPurify from 'dompurify';
-import { marked } from 'marked';
+import { defineComponent, h } from "vue";
+import VueJsonPretty from "vue-json-pretty";
+import DOMPurify from "dompurify";
+import { marked } from "marked";
 
 // Convert content to markdown format
 const toMarkdown = (content: string): string => {
   // Replace [Image: URL] markers with markdown image syntax
-  return content.replace(/\[Image: (https?:\/\/[^\]]+)\]/g, '![Image]($1)');
+  return content.replace(/\[Image: (https?:\/\/[^\]]+)\]/g, "![Image]($1)");
 };
 
 const MessageItem = defineComponent({
-  name: 'MessageItem',
+  name: "MessageItem",
   props: {
     message: {
       type: Object,
@@ -470,20 +503,20 @@ const MessageItem = defineComponent({
   setup(props) {
     const roleColor = (role: string) => {
       const colors: Record<string, string> = {
-        user: 'rgba(25, 118, 210, 0.1)',
-        assistant: 'rgba(76, 175, 80, 0.1)',
-        system: 'rgba(255, 152, 0, 0.1)',
-        tool: 'rgba(156, 39, 176, 0.1)',
+        user: "rgba(25, 118, 210, 0.1)",
+        assistant: "rgba(76, 175, 80, 0.1)",
+        system: "rgba(255, 152, 0, 0.1)",
+        tool: "rgba(156, 39, 176, 0.1)",
       };
-      return colors[role] || 'rgba(158, 158, 158, 0.1)';
+      return colors[role] || "rgba(158, 158, 158, 0.1)";
     };
 
     const roleLabel = (role: string) => {
       const labels: Record<string, string> = {
-        user: 'User',
-        assistant: 'Assistant',
-        system: 'System',
-        tool: 'Tool',
+        user: "User",
+        assistant: "Assistant",
+        system: "System",
+        tool: "Tool",
       };
       return labels[role] || role;
     };
@@ -504,71 +537,85 @@ const MessageItem = defineComponent({
       // If it's JSON, render with VueJsonPretty
       if (isJson) {
         return h(
-          'div',
+          "div",
           {
-            class: 'message-item q-mb-sm',
+            class: "message-item q-mb-sm",
             style: {
-              border: '1px solid var(--o2-border-color)',
-              borderRadius: '8px',
-              overflow: 'hidden',
+              border: "1px solid var(--o2-border-color)",
+              borderRadius: "8px",
+              overflow: "hidden",
             },
           },
           [
-            h('div', {
-              class: 'message-role text-caption text-bold q-pa-sm',
-              style: {
-                backgroundColor: roleColor(props.message.role),
-                borderBottom: '1px solid var(--o2-border-color)',
-                textTransform: 'capitalize',
+            h(
+              "div",
+              {
+                class: "message-role text-caption text-bold q-pa-sm",
+                style: {
+                  backgroundColor: roleColor(props.message.role),
+                  borderBottom: "1px solid var(--o2-border-color)",
+                  textTransform: "capitalize",
+                },
               },
-            }, roleLabel(props.message.role)),
-            h('div', {
-              class: 'message-content-json q-pa-sm',
-              style: {
-                backgroundColor: 'var(--o2-code-bg)',
+              roleLabel(props.message.role),
+            ),
+            h(
+              "div",
+              {
+                class: "message-content-json q-pa-sm",
+                style: {
+                  backgroundColor: "var(--o2-code-bg)",
+                },
               },
-            }, [
-              h(VueJsonPretty, {
-                data: jsonData,
-                deep: 3,
-                showLength: true,
-              }),
-            ]),
-          ]
+              [
+                h(VueJsonPretty, {
+                  data: jsonData,
+                  deep: 3,
+                  showLength: true,
+                }),
+              ],
+            ),
+          ],
         );
       }
 
       // Convert content to markdown and render
       const markdownContent = toMarkdown(content);
-      const htmlContent = DOMPurify.sanitize(marked.parse(markdownContent) as string);
+      const htmlContent = DOMPurify.sanitize(
+        marked.parse(markdownContent) as string,
+      );
 
       return h(
-        'div',
+        "div",
         {
-          class: 'message-item q-mb-sm',
+          class: "message-item q-mb-sm",
           style: {
-            border: '1px solid var(--o2-border-color)',
-            borderRadius: '8px',
-            overflow: 'hidden',
+            border: "1px solid var(--o2-border-color)",
+            borderRadius: "8px",
+            overflow: "hidden",
           },
         },
         [
-          h('div', {
-            class: 'message-role text-caption text-bold q-pa-sm',
-            style: {
-              backgroundColor: roleColor(props.message.role),
-              borderBottom: '1px solid var(--o2-border-color)',
-              textTransform: 'capitalize',
+          h(
+            "div",
+            {
+              class: "message-role text-caption text-bold q-pa-sm",
+              style: {
+                backgroundColor: roleColor(props.message.role),
+                borderBottom: "1px solid var(--o2-border-color)",
+                textTransform: "capitalize",
+              },
             },
-          }, roleLabel(props.message.role)),
-          h('div', {
-            class: 'message-content markdown-body q-pa-sm',
+            roleLabel(props.message.role),
+          ),
+          h("div", {
+            class: "message-content markdown-body q-pa-sm",
             style: {
-              backgroundColor: 'var(--o2-code-bg)',
+              backgroundColor: "var(--o2-code-bg)",
             },
             innerHTML: htmlContent,
           }),
-        ]
+        ],
       );
     };
   },
@@ -640,7 +687,8 @@ export default {
         padding: 0;
       }
 
-      :deep(ul), :deep(ol) {
+      :deep(ul),
+      :deep(ol) {
         margin: 8px 0;
         padding-left: 24px;
       }
@@ -670,7 +718,8 @@ export default {
         width: 100%;
         margin: 8px 0;
 
-        th, td {
+        th,
+        td {
           border: 1px solid var(--o2-border-color);
           padding: 6px 8px;
           text-align: left;

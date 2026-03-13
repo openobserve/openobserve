@@ -66,7 +66,7 @@ export interface CorrelationResult {
 export function extractSemanticDimensions(
   context: TelemetryContext,
   semanticGroups: SemanticFieldGroup[],
-  stableOnly: boolean = false
+  stableOnly: boolean = false,
 ): Record<string, string> {
   const dimensions: Record<string, string> = {};
 
@@ -76,7 +76,7 @@ export function extractSemanticDimensions(
     for (const field of group.fields) {
       fieldToDimension.set(field, {
         id: group.id,
-        isStable: group.is_stable ?? false
+        isStable: group.is_stable ?? false,
       });
     }
   }
@@ -103,9 +103,13 @@ export function extractSemanticDimensions(
  */
 function translateDimensionsToFields(
   dimensions: Record<string, string>,
-  semanticGroups: SemanticFieldGroup[]
+  semanticGroups: SemanticFieldGroup[],
 ): Array<{ dimensionId: string; possibleFields: string[]; value: string }> {
-  const translations: Array<{ dimensionId: string; possibleFields: string[]; value: string }> = [];
+  const translations: Array<{
+    dimensionId: string;
+    possibleFields: string[];
+    value: string;
+  }> = [];
 
   for (const [dimensionId, value] of Object.entries(dimensions)) {
     const group = semanticGroups.find((g) => g.id === dimensionId);
@@ -128,7 +132,7 @@ function translateDimensionsToFields(
  * Skips filters with SELECT_ALL_VALUE (wildcard - means match all values).
  */
 function buildExactDimensionConditions(
-  filters: Record<string, string>
+  filters: Record<string, string>,
 ): string[] {
   const conditions: string[] = [];
 
@@ -155,7 +159,7 @@ function buildExactDimensionConditions(
 export function buildTraceQuery(
   streamInfo: StreamInfo,
   context: TelemetryContext,
-  timeWindowMinutes: number = 5
+  timeWindowMinutes: number = 5,
 ): CorrelationQuery {
   const conditions: string[] = [];
 
@@ -198,7 +202,7 @@ export function buildTraceQuery(
 export function buildMetricQuery(
   streamInfo: StreamInfo,
   context: TelemetryContext,
-  timeWindowMinutes: number = 5
+  timeWindowMinutes: number = 5,
 ): CorrelationQuery {
   const conditions: string[] = [];
 
@@ -238,7 +242,7 @@ export function buildMetricQuery(
 export function buildLogQuery(
   streamInfo: StreamInfo,
   context: TelemetryContext,
-  timeWindowMinutes: number = 5
+  timeWindowMinutes: number = 5,
 ): CorrelationQuery {
   const conditions: string[] = [];
 
@@ -282,7 +286,7 @@ export function generateCorrelationQueries(
   sourceType: TelemetryType,
   semanticGroups: SemanticFieldGroup[],
   timeWindowMinutes: number = 5,
-  correlationData?: CorrelationResponse
+  correlationData?: CorrelationResponse,
 ): CorrelationQuery[] {
   const queries: CorrelationQuery[] = [];
 
@@ -320,7 +324,7 @@ export function generateCorrelationQueries(
  */
 export function findMatchingService(
   services: ServiceMetadata[],
-  dimensions: Record<string, string>
+  dimensions: Record<string, string>,
 ): ServiceMetadata | null {
   // Find service with most matching dimensions
   let bestMatch: ServiceMetadata | null = null;

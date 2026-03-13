@@ -89,7 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="getStarted"
           >
             {{ t("rum.getStartedLabel") }}
-            <q-icon name="arrow_forward" size="1.25rem" class="q-ml-xs" />
+            <q-icon name="arrow_forward" size="1.25rem"
+class="q-ml-xs" />
           </q-btn>
         </div>
       </div>

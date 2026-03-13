@@ -15,9 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="rca-analysis-container" class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden">
+  <div
+    data-test="rca-analysis-container"
+    class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden"
+  >
     <!-- Trigger button when no analysis exists and not loading and not in-flight -->
-    <div v-if="!hasExistingRca && !rcaLoading && !analysisInFlight" data-test="rca-trigger-section" class="tw:mb-2 tw:flex-shrink-0">
+    <div
+      v-if="!hasExistingRca && !rcaLoading && !analysisInFlight"
+      data-test="rca-trigger-section"
+      class="tw:mb-2 tw:flex-shrink-0"
+    >
       <q-btn
         data-test="trigger-rca-btn"
         size="sm"
@@ -36,21 +43,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="analysisInFlight || rcaLoading"
       data-test="rca-inflight-container"
       class="tw:flex tw:items-center tw:gap-3 tw:rounded-lg tw:px-4 tw:py-3 tw:mb-2 tw:flex-shrink-0"
-      :class="isDarkMode ? 'tw:bg-indigo-900/20 tw:border tw:border-indigo-700/40' : 'tw:bg-indigo-50 tw:border tw:border-indigo-200'"
+      :class="
+        isDarkMode
+          ? 'tw:bg-indigo-900/20 tw:border tw:border-indigo-700/40'
+          : 'tw:bg-indigo-50 tw:border tw:border-indigo-200'
+      "
     >
-      <q-spinner-dots size="20px" :color="isDarkMode ? 'indigo-3' : 'indigo-7'" />
+      <q-spinner-dots
+        size="20px"
+        :color="isDarkMode ? 'indigo-3' : 'indigo-7'"
+      />
       <div>
         <p
           class="tw:text-sm tw:font-medium tw:mb-0"
           :class="isDarkMode ? 'tw:text-indigo-200' : 'tw:text-indigo-800'"
         >
-          {{ hasExistingRca ? 'AI SRE Agent is seeing what changed since the last analysis…' : 'AI SRE Agent is analyzing this incident, please wait…' }}
+          {{
+            hasExistingRca
+              ? "AI SRE Agent is seeing what changed since the last analysis…"
+              : "AI SRE Agent is analyzing this incident, please wait…"
+          }}
         </p>
         <p
           class="tw:text-xs tw:mt-0.5 tw:mb-0"
-          :class="isDarkMode ? 'tw:text-indigo-300/70' : 'tw:text-indigo-600/70'"
+          :class="
+            isDarkMode ? 'tw:text-indigo-300/70' : 'tw:text-indigo-600/70'
+          "
         >
-          {{ hasExistingRca ? 'The report will be updated once the analysis is complete.' : 'The report will appear here once the analysis is complete.' }}
+          {{
+            hasExistingRca
+              ? "The report will be updated once the analysis is complete."
+              : "The report will appear here once the analysis is complete."
+          }}
         </p>
       </div>
     </div>
@@ -60,7 +84,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="rcaLoading && rcaStreamContent"
       data-test="rca-stream-container"
       class="rca-container tw:rounded tw:p-3 tw:flex-1 tw:overflow-auto tw:border"
-      :class="isDarkMode ? 'tw:bg-gray-800 tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'"
+      :class="
+        isDarkMode
+          ? 'tw:bg-gray-800 tw:border-gray-700'
+          : 'tw:bg-white tw:border-gray-200'
+      "
     >
       <div
         data-test="rca-stream-content"
@@ -70,7 +98,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Existing analysis content -->
-    <div v-else-if="hasExistingRca && !rcaLoading" data-test="rca-existing-container" class="rca-container tw:rounded tw:p-3 tw:flex-1 tw:overflow-auto tw:border" :class="isDarkMode ? ' tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'">
+    <div
+      v-else-if="hasExistingRca && !rcaLoading"
+      data-test="rca-existing-container"
+      class="rca-container tw:rounded tw:p-3 tw:flex-1 tw:overflow-auto tw:border"
+      :class="
+        isDarkMode ? ' tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'
+      "
+    >
       <div
         data-test="rca-existing-content"
         class="tw:text-sm tw:whitespace-pre-wrap rca-content"
@@ -111,7 +146,7 @@ export default defineComponent({
       default: false,
     },
   },
-  emits: ['trigger-rca'],
+  emits: ["trigger-rca"],
 });
 </script>
 

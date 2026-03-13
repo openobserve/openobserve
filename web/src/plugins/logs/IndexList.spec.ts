@@ -2432,9 +2432,8 @@ describe("removeFieldFromWhereAST", () => {
   let parser: any;
 
   beforeEach(async () => {
-    const mod = await import(
-      "@openobserve/node-sql-parser/build/datafusionsql"
-    );
+    const mod =
+      await import("@openobserve/node-sql-parser/build/datafusionsql");
     parser = new mod.Parser();
 
     wrapper = mount(IndexList, {

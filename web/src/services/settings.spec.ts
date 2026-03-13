@@ -31,12 +31,12 @@ describe("settings service", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     mockHttpInstance = {
       post: vi.fn(),
       delete: vi.fn(),
     };
-    
+
     mockHttpWithHeaders = {
       post: vi.fn(),
       delete: vi.fn(),
@@ -59,7 +59,11 @@ describe("settings service", () => {
       };
 
       // Add some data to FormData for testing
-      params.formData.append("logo", new Blob(["test"], { type: "image/png" }), "logo.png");
+      params.formData.append(
+        "logo",
+        new Blob(["test"], { type: "image/png" }),
+        "logo.png",
+      );
 
       mockHttpWithHeaders.post.mockResolvedValue({ data: { success: true } });
 
@@ -73,7 +77,7 @@ describe("settings service", () => {
       // Verify POST request was made with correct URL and form data (default theme is 'light')
       expect(mockHttpWithHeaders.post).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/settings/logo?theme=light`,
-        params.formData
+        params.formData,
       );
     });
 
@@ -84,11 +88,19 @@ describe("settings service", () => {
         theme: "dark",
       };
 
-      params.formData.append("logo", new Blob(["test"], { type: "image/png" }), "logo.png");
+      params.formData.append(
+        "logo",
+        new Blob(["test"], { type: "image/png" }),
+        "logo.png",
+      );
 
       mockHttpWithHeaders.post.mockResolvedValue({ data: { success: true } });
 
-      await settings.createLogo(params.org_identifier, params.formData, params.theme);
+      await settings.createLogo(
+        params.org_identifier,
+        params.formData,
+        params.theme,
+      );
 
       expect(http).toHaveBeenCalledWith({
         "Content-Type": "multipart/form-data",
@@ -96,7 +108,7 @@ describe("settings service", () => {
 
       expect(mockHttpWithHeaders.post).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/settings/logo?theme=dark`,
-        params.formData
+        params.formData,
       );
     });
 
@@ -112,7 +124,7 @@ describe("settings service", () => {
 
       expect(mockHttpWithHeaders.post).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/settings/logo?theme=light`,
-        params.formData
+        params.formData,
       );
     });
 
@@ -126,7 +138,7 @@ describe("settings service", () => {
       mockHttpWithHeaders.post.mockRejectedValue(error);
 
       await expect(
-        settings.createLogo(params.org_identifier, params.formData)
+        settings.createLogo(params.org_identifier, params.formData),
       ).rejects.toThrow("File too large");
     });
   });
@@ -144,7 +156,7 @@ describe("settings service", () => {
 
       // Verify DELETE request was made with correct URL (default theme is 'light')
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/settings/logo?theme=light`
+        `/api/${org_identifier}/settings/logo?theme=light`,
       );
     });
 
@@ -159,7 +171,7 @@ describe("settings service", () => {
       expect(http).toHaveBeenCalledWith();
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/settings/logo?theme=dark`
+        `/api/${org_identifier}/settings/logo?theme=dark`,
       );
     });
 
@@ -168,7 +180,9 @@ describe("settings service", () => {
       const error = new Error("Not found");
       mockHttpInstance.delete.mockRejectedValue(error);
 
-      await expect(settings.deleteLogo(org_identifier)).rejects.toThrow("Not found");
+      await expect(settings.deleteLogo(org_identifier)).rejects.toThrow(
+        "Not found",
+      );
     });
 
     it("should handle forbidden access error", async () => {
@@ -176,7 +190,9 @@ describe("settings service", () => {
       const error = new Error("Forbidden");
       mockHttpInstance.delete.mockRejectedValue(error);
 
-      await expect(settings.deleteLogo(org_identifier)).rejects.toThrow("Forbidden");
+      await expect(settings.deleteLogo(org_identifier)).rejects.toThrow(
+        "Forbidden",
+      );
     });
   });
 
@@ -193,7 +209,7 @@ describe("settings service", () => {
       await settings.updateCustomText(
         params.org_identifier,
         params.key,
-        params.value
+        params.value,
       );
 
       // Verify http was called without headers
@@ -202,7 +218,7 @@ describe("settings service", () => {
       // Verify POST request was made with correct URL and value
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/settings/logo/text`,
-        params.value
+        params.value,
       );
     });
 
@@ -218,12 +234,12 @@ describe("settings service", () => {
       await settings.updateCustomText(
         params.org_identifier,
         params.key,
-        params.value
+        params.value,
       );
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/settings/logo/text`,
-        params.value
+        params.value,
       );
     });
 
@@ -239,12 +255,12 @@ describe("settings service", () => {
       await settings.updateCustomText(
         params.org_identifier,
         params.key,
-        params.value
+        params.value,
       );
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/settings/logo/text`,
-        params.value
+        params.value,
       );
     });
 
@@ -260,12 +276,12 @@ describe("settings service", () => {
       await settings.updateCustomText(
         params.org_identifier,
         params.key,
-        params.value
+        params.value,
       );
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/settings/logo/text`,
-        params.value
+        params.value,
       );
     });
 
@@ -281,12 +297,12 @@ describe("settings service", () => {
       await settings.updateCustomText(
         params.org_identifier,
         params.key,
-        params.value
+        params.value,
       );
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/settings/logo/text`,
-        params.value
+        params.value,
       );
     });
 
@@ -304,8 +320,8 @@ describe("settings service", () => {
         settings.updateCustomText(
           params.org_identifier,
           params.key,
-          params.value
-        )
+          params.value,
+        ),
       ).rejects.toThrow("Validation error");
     });
   });
@@ -314,7 +330,11 @@ describe("settings service", () => {
     it("should handle complete logo management workflow", async () => {
       const org_identifier = "org123";
       const formData = new FormData();
-      formData.append("logo", new Blob(["logo"], { type: "image/png" }), "logo.png");
+      formData.append(
+        "logo",
+        new Blob(["logo"], { type: "image/png" }),
+        "logo.png",
+      );
 
       // Mock successful create
       mockHttpWithHeaders.post.mockResolvedValue({ data: { success: true } });
@@ -330,18 +350,22 @@ describe("settings service", () => {
 
       expect(mockHttpWithHeaders.post).toHaveBeenCalledWith(
         `/api/${org_identifier}/settings/logo?theme=light`,
-        formData
+        formData,
       );
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/settings/logo?theme=light`
+        `/api/${org_identifier}/settings/logo?theme=light`,
       );
     });
 
     it("should handle complete dark mode logo management workflow", async () => {
       const org_identifier = "org123";
       const formData = new FormData();
-      formData.append("logo", new Blob(["logo-dark"], { type: "image/png" }), "logo-dark.png");
+      formData.append(
+        "logo",
+        new Blob(["logo-dark"], { type: "image/png" }),
+        "logo-dark.png",
+      );
 
       // Mock successful create
       mockHttpWithHeaders.post.mockResolvedValue({ data: { success: true } });
@@ -357,11 +381,11 @@ describe("settings service", () => {
 
       expect(mockHttpWithHeaders.post).toHaveBeenCalledWith(
         `/api/${org_identifier}/settings/logo?theme=dark`,
-        formData
+        formData,
       );
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/settings/logo?theme=dark`
+        `/api/${org_identifier}/settings/logo?theme=dark`,
       );
     });
 
@@ -375,7 +399,7 @@ describe("settings service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${org_identifier}/settings/logo/text`,
-        customText
+        customText,
       );
     });
   });

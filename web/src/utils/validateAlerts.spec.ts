@@ -27,16 +27,18 @@ describe("Alert Validation", () => {
       conditions: {
         groupId: "group1",
         label: "test",
-        items: [{
-          column: "level",
-          operator: "=",
-          value: "ERROR",
-          ignore_case: true,
-          id: "1"
-        }]
+        items: [
+          {
+            column: "level",
+            operator: "=",
+            value: "ERROR",
+            ignore_case: true,
+            id: "1",
+          },
+        ],
       },
       multi_time_range: null,
-      vrl_function: null
+      vrl_function: null,
     },
     trigger_condition: {
       period: 10,
@@ -46,18 +48,18 @@ describe("Alert Validation", () => {
       threshold: 1,
       silence: 30,
       frequency_type: "minutes" as const,
-      timezone: "UTC"
+      timezone: "UTC",
     },
     destinations: ["webhook1"],
     context_attributes: [],
     enabled: true,
-    org_id: "org123"
+    org_id: "org123",
   };
 
   const validContext = {
     streamList: ["test_stream", "other_stream"],
     destinationsList: ["webhook1", "email1"],
-    selectedOrgId: "org123"
+    selectedOrgId: "org123",
   };
 
   describe("Valid alert validation", () => {
@@ -71,7 +73,7 @@ describe("Alert Validation", () => {
       // When no context is provided, we need to remove org_id to avoid validation error
       const alertWithoutOrgId = { ...validAlert };
       delete (alertWithoutOrgId as any).org_id;
-      
+
       const result = validateAlert(alertWithoutOrgId);
       expect(result.isValid).toBe(true);
       expect(result.errors).toHaveLength(0);
@@ -83,14 +85,18 @@ describe("Alert Validation", () => {
       const alert = { ...validAlert, name: "" };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("Name is mandatory and should be a valid string");
+      expect(result.errors).toContain(
+        "Name is mandatory and should be a valid string",
+      );
     });
 
     it("should fail if name is null", () => {
       const alert = { ...validAlert, name: null as any };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("Name is mandatory and should be a valid string");
+      expect(result.errors).toContain(
+        "Name is mandatory and should be a valid string",
+      );
     });
 
     it("should fail if name is undefined", () => {
@@ -98,14 +104,18 @@ describe("Alert Validation", () => {
       delete (alert as any).name;
       const result = validateAlert(alert as any, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("Name is mandatory and should be a valid string");
+      expect(result.errors).toContain(
+        "Name is mandatory and should be a valid string",
+      );
     });
 
     it("should fail if name is whitespace only", () => {
       const alert = { ...validAlert, name: "   " };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("Name is mandatory and should be a valid string");
+      expect(result.errors).toContain(
+        "Name is mandatory and should be a valid string",
+      );
     });
   });
 
@@ -120,7 +130,9 @@ describe("Alert Validation", () => {
       const alert = { ...validAlert, org_id: "wrong_org" };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("Organization Id should be equal to org123");
+      expect(result.errors).toContain(
+        "Organization Id should be equal to org123",
+      );
     });
 
     it("should pass if org_id is not provided", () => {
@@ -134,7 +146,7 @@ describe("Alert Validation", () => {
   describe("Stream type validation", () => {
     it("should pass for valid stream types", () => {
       const streamTypes = ["logs", "metrics", "traces"];
-      streamTypes.forEach(streamType => {
+      streamTypes.forEach((streamType) => {
         const alert = { ...validAlert, stream_type: streamType };
         const result = validateAlert(alert, validContext);
         expect(result.isValid).toBe(true);
@@ -145,14 +157,18 @@ describe("Alert Validation", () => {
       const alert = { ...validAlert, stream_type: "invalid" };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("Stream Type is mandatory and should be one of: logs, metrics, traces");
+      expect(result.errors).toContain(
+        "Stream Type is mandatory and should be one of: logs, metrics, traces",
+      );
     });
 
     it("should fail if stream_type is empty", () => {
       const alert = { ...validAlert, stream_type: "" };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("Stream Type is mandatory and should be one of: logs, metrics, traces");
+      expect(result.errors).toContain(
+        "Stream Type is mandatory and should be one of: logs, metrics, traces",
+      );
     });
   });
 
@@ -167,20 +183,24 @@ describe("Alert Validation", () => {
       const alert = { ...validAlert, stream_name: "nonexistent_stream" };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Stream "nonexistent_stream" does not exist in the stream list');
+      expect(result.errors).toContain(
+        'Stream "nonexistent_stream" does not exist in the stream list',
+      );
     });
 
     it("should fail if stream_name is empty", () => {
       const alert = { ...validAlert, stream_name: "" };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("Stream Name is mandatory and should be a valid string");
+      expect(result.errors).toContain(
+        "Stream Name is mandatory and should be a valid string",
+      );
     });
 
     it("should pass if no context provided", () => {
       const alert = { ...validAlert, stream_name: "any_stream" };
       delete (alert as any).org_id; // Remove org_id to avoid context validation error
-      
+
       const result = validateAlert(alert);
       expect(result.isValid).toBe(true);
     });
@@ -190,7 +210,7 @@ describe("Alert Validation", () => {
     it("should pass for boolean values", () => {
       const alert1 = { ...validAlert, is_real_time: true };
       const alert2 = { ...validAlert, is_real_time: false };
-      
+
       expect(validateAlert(alert1, validContext).isValid).toBe(true);
       expect(validateAlert(alert2, validContext).isValid).toBe(true);
     });
@@ -212,7 +232,7 @@ describe("Alert Validation", () => {
     it("should convert invalid string values to boolean", () => {
       const alert = { ...validAlert, is_real_time: "maybe" as any };
       const result = validateAlert(alert, validContext);
-      
+
       // The function converts any string to boolean:
       // - "true" becomes true
       // - any other string becomes false
@@ -225,7 +245,9 @@ describe("Alert Validation", () => {
       const alert = { ...validAlert, is_real_time: 123 as any };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("Is Real-Time is mandatory and should be a boolean value");
+      expect(result.errors).toContain(
+        "Is Real-Time is mandatory and should be a boolean value",
+      );
     });
   });
 
@@ -238,16 +260,18 @@ describe("Alert Validation", () => {
           conditions: {
             groupId: "group1",
             label: "test",
-            items: [{
-              column: "level",
-              operator: "=",
-              value: "ERROR",
-              ignore_case: true,
-              id: "1"
-            }]
+            items: [
+              {
+                column: "level",
+                operator: "=",
+                value: "ERROR",
+                ignore_case: true,
+                id: "1",
+              },
+            ],
           },
-          multi_time_range: null
-        }
+          multi_time_range: null,
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(true);
@@ -259,15 +283,17 @@ describe("Alert Validation", () => {
         query_condition: {
           type: "custom" as const,
           conditions: {
-            or: [{
-              column: "level",
-              operator: "=",
-              value: "ERROR",
-              ignore_case: true
-            }]
+            or: [
+              {
+                column: "level",
+                operator: "=",
+                value: "ERROR",
+                ignore_case: true,
+              },
+            ],
           },
-          multi_time_range: null
-        }
+          multi_time_range: null,
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(true);
@@ -279,15 +305,17 @@ describe("Alert Validation", () => {
         query_condition: {
           type: "custom" as const,
           conditions: {
-            and: [{
-              column: "level",
-              operator: ">=",
-              value: "100",
-              ignore_case: false
-            }]
+            and: [
+              {
+                column: "level",
+                operator: ">=",
+                value: "100",
+                ignore_case: false,
+              },
+            ],
           },
-          multi_time_range: null
-        }
+          multi_time_range: null,
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(true);
@@ -300,19 +328,43 @@ describe("Alert Validation", () => {
           type: "custom" as const,
           conditions: {
             items: [
-              { column: "", operator: "=", value: "ERROR", ignore_case: true, id: "1" },
-              { column: "level", operator: "", value: "ERROR", ignore_case: true, id: "2" },
-              { column: "level", operator: "=", value: undefined, ignore_case: true, id: "3" }
-            ]
+              {
+                column: "",
+                operator: "=",
+                value: "ERROR",
+                ignore_case: true,
+                id: "1",
+              },
+              {
+                column: "level",
+                operator: "",
+                value: "ERROR",
+                ignore_case: true,
+                id: "2",
+              },
+              {
+                column: "level",
+                operator: "=",
+                value: undefined,
+                ignore_case: true,
+                id: "3",
+              },
+            ],
           },
-          multi_time_range: null
-        }
+          multi_time_range: null,
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("Query condition item 1 must have column, operator, and value");
-      expect(result.errors).toContain("Query condition item 2 must have column, operator, and value");
-      expect(result.errors).toContain("Query condition item 3 must have column, operator, and value");
+      expect(result.errors).toContain(
+        "Query condition item 1 must have column, operator, and value",
+      );
+      expect(result.errors).toContain(
+        "Query condition item 2 must have column, operator, and value",
+      );
+      expect(result.errors).toContain(
+        "Query condition item 3 must have column, operator, and value",
+      );
     });
 
     it("should fail for invalid operators in items", () => {
@@ -321,41 +373,55 @@ describe("Alert Validation", () => {
         query_condition: {
           type: "custom" as const,
           conditions: {
-            items: [{
-              column: "level",
-              operator: "INVALID",
-              value: "ERROR",
-              ignore_case: true,
-              id: "1"
-            }]
+            items: [
+              {
+                column: "level",
+                operator: "INVALID",
+                value: "ERROR",
+                ignore_case: true,
+                id: "1",
+              },
+            ],
           },
-          multi_time_range: null
-        }
+          multi_time_range: null,
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Invalid operator "INVALID" in query condition item 1');
+      expect(result.errors).toContain(
+        'Invalid operator "INVALID" in query condition item 1',
+      );
     });
 
     it("should validate all valid operators", () => {
-      const validOperators = ['=', '>', '<', '>=', '<=', 'Contains', 'NotContains'];
-      
-      validOperators.forEach(operator => {
+      const validOperators = [
+        "=",
+        ">",
+        "<",
+        ">=",
+        "<=",
+        "Contains",
+        "NotContains",
+      ];
+
+      validOperators.forEach((operator) => {
         const alert = {
           ...validAlert,
           query_condition: {
             type: "custom" as const,
             conditions: {
-              items: [{
-                column: "level",
-                operator: operator,
-                value: "ERROR",
-                ignore_case: true,
-                id: "1"
-              }]
+              items: [
+                {
+                  column: "level",
+                  operator: operator,
+                  value: "ERROR",
+                  ignore_case: true,
+                  id: "1",
+                },
+              ],
             },
-            multi_time_range: null
-          }
+            multi_time_range: null,
+          },
         };
         const result = validateAlert(alert, validContext);
         expect(result.isValid).toBe(true);
@@ -368,20 +434,24 @@ describe("Alert Validation", () => {
         query_condition: {
           type: "custom" as const,
           conditions: {
-            items: [{
-              column: "level",
-              operator: "=",
-              value: "ERROR",
-              ignore_case: true,
-              id: "1"
-            }]
+            items: [
+              {
+                column: "level",
+                operator: "=",
+                value: "ERROR",
+                ignore_case: true,
+                id: "1",
+              },
+            ],
           },
-          multi_time_range: ["invalid"]
-        }
+          multi_time_range: ["invalid"],
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("Multi Time Range should be an empty array or null");
+      expect(result.errors).toContain(
+        "Multi Time Range should be an empty array or null",
+      );
     });
 
     it("should fail for invalid conditions format", () => {
@@ -391,14 +461,16 @@ describe("Alert Validation", () => {
           type: "custom" as const,
           conditions: {
             // No items, or, or and arrays
-            groupId: "test"
+            groupId: "test",
           },
-          multi_time_range: null
-        }
+          multi_time_range: null,
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("Invalid conditions format. Must use either items array or or/and array");
+      expect(result.errors).toContain(
+        "Invalid conditions format. Must use either items array or or/and array",
+      );
     });
   });
 
@@ -408,8 +480,8 @@ describe("Alert Validation", () => {
         ...validAlert,
         query_condition: {
           type: "sql" as const,
-          sql: "SELECT level, message FROM logs WHERE level = 'ERROR'"
-        }
+          sql: "SELECT level, message FROM logs WHERE level = 'ERROR'",
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(true);
@@ -420,20 +492,22 @@ describe("Alert Validation", () => {
         "SELECT * FROM logs",
         "select * from logs",
         "SELECT\n* FROM logs",
-        "SELECT\t* FROM logs"
+        "SELECT\t* FROM logs",
       ];
-      
-      queries.forEach(sql => {
+
+      queries.forEach((sql) => {
         const alert = {
           ...validAlert,
           query_condition: {
             type: "sql" as const,
-            sql: sql
-          }
+            sql: sql,
+          },
         };
         const result = validateAlert(alert, validContext);
         expect(result.isValid).toBe(false);
-        expect(result.errors).toContain("Selecting all columns is not allowed. Please specify the columns explicitly");
+        expect(result.errors).toContain(
+          "Selecting all columns is not allowed. Please specify the columns explicitly",
+        );
       });
     });
 
@@ -442,8 +516,8 @@ describe("Alert Validation", () => {
         ...validAlert,
         query_condition: {
           type: "sql" as const,
-          sql: "INSERT INTO logs VALUES (1, 'test')"
-        }
+          sql: "INSERT INTO logs VALUES (1, 'test')",
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
@@ -455,8 +529,8 @@ describe("Alert Validation", () => {
         ...validAlert,
         query_condition: {
           type: "sql" as const,
-          sql: ""
-        }
+          sql: "",
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
@@ -470,8 +544,8 @@ describe("Alert Validation", () => {
         ...validAlert,
         query_condition: {
           type: "promql" as const,
-          promql: "rate(http_requests_total[5m])"
-        }
+          promql: "rate(http_requests_total[5m])",
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(true);
@@ -482,8 +556,8 @@ describe("Alert Validation", () => {
         ...validAlert,
         query_condition: {
           type: "promql" as const,
-          promql: ""
-        }
+          promql: "",
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
@@ -497,8 +571,8 @@ describe("Alert Validation", () => {
         ...validAlert,
         query_condition: {
           ...validAlert.query_condition,
-          vrl_function: ". | select(.level == \"ERROR\")"
-        }
+          vrl_function: '. | select(.level == "ERROR")',
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(true);
@@ -509,12 +583,14 @@ describe("Alert Validation", () => {
         ...validAlert,
         query_condition: {
           ...validAlert.query_condition,
-          vrl_function: 123 as any
-        }
+          vrl_function: 123 as any,
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("VRL function should be a string when provided");
+      expect(result.errors).toContain(
+        "VRL function should be a string when provided",
+      );
     });
   });
 
@@ -530,10 +606,10 @@ describe("Alert Validation", () => {
             having: {
               column: "count",
               operator: ">=",
-              value: 10
-            }
-          }
-        }
+              value: 10,
+            },
+          },
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(true);
@@ -550,14 +626,16 @@ describe("Alert Validation", () => {
             having: {
               column: "count",
               operator: ">=",
-              value: 10
-            }
-          }
-        }
+              value: 10,
+            },
+          },
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("Aggregation group_by should be an array");
+      expect(result.errors).toContain(
+        "Aggregation group_by should be an array",
+      );
     });
 
     it("should fail if function is empty", () => {
@@ -571,14 +649,16 @@ describe("Alert Validation", () => {
             having: {
               column: "count",
               operator: ">=",
-              value: 10
-            }
-          }
-        }
+              value: 10,
+            },
+          },
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("Aggregation function is required and should be a non-empty string");
+      expect(result.errors).toContain(
+        "Aggregation function is required and should be a non-empty string",
+      );
     });
 
     it("should fail for invalid having operator", () => {
@@ -592,14 +672,16 @@ describe("Alert Validation", () => {
             having: {
               column: "count",
               operator: "INVALID",
-              value: 10
-            }
-          }
-        }
+              value: 10,
+            },
+          },
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("Aggregation having clause operator must be a valid comparison operator");
+      expect(result.errors).toContain(
+        "Aggregation having clause operator must be a valid comparison operator",
+      );
     });
 
     it("should fail if having value is not a number", () => {
@@ -613,14 +695,16 @@ describe("Alert Validation", () => {
             having: {
               column: "count",
               operator: ">=",
-              value: "not_a_number" as any
-            }
-          }
-        }
+              value: "not_a_number" as any,
+            },
+          },
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("Aggregation having clause value must be a number when provided");
+      expect(result.errors).toContain(
+        "Aggregation having clause value must be a number when provided",
+      );
     });
   });
 
@@ -636,8 +720,8 @@ describe("Alert Validation", () => {
           threshold: 1,
           silence: 30,
           frequency_type: "minutes" as const,
-          timezone: "UTC"
-        }
+          timezone: "UTC",
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(true);
@@ -654,8 +738,8 @@ describe("Alert Validation", () => {
           threshold: 1,
           silence: 30,
           frequency_type: "cron" as const,
-          timezone: "America/New_York"
-        }
+          timezone: "America/New_York",
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(true);
@@ -671,18 +755,20 @@ describe("Alert Validation", () => {
 
     it("should fail for invalid period values", () => {
       const invalidPeriods = [0, -1, "5" as any];
-      
-      invalidPeriods.forEach(period => {
+
+      invalidPeriods.forEach((period) => {
         const alert = {
           ...validAlert,
           trigger_condition: {
             ...validAlert.trigger_condition,
-            period: period
-          }
+            period: period,
+          },
         };
         const result = validateAlert(alert, validContext);
         expect(result.isValid).toBe(false);
-        expect(result.errors).toContain("Period should be a positive number greater than 0");
+        expect(result.errors).toContain(
+          "Period should be a positive number greater than 0",
+        );
       });
     });
 
@@ -691,24 +777,35 @@ describe("Alert Validation", () => {
         ...validAlert,
         trigger_condition: {
           ...validAlert.trigger_condition,
-          operator: "INVALID"
-        }
+          operator: "INVALID",
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Invalid operator "INVALID" in trigger condition');
+      expect(result.errors).toContain(
+        'Invalid operator "INVALID" in trigger condition',
+      );
     });
 
     it("should validate all valid trigger operators", () => {
-      const validOperators = ['=', '!=', '>=', '<=', '>', '<', 'Contains', 'NotContains'];
-      
-      validOperators.forEach(operator => {
+      const validOperators = [
+        "=",
+        "!=",
+        ">=",
+        "<=",
+        ">",
+        "<",
+        "Contains",
+        "NotContains",
+      ];
+
+      validOperators.forEach((operator) => {
         const alert = {
           ...validAlert,
           trigger_condition: {
             ...validAlert.trigger_condition,
-            operator: operator
-          }
+            operator: operator,
+          },
         };
         const result = validateAlert(alert, validContext);
         expect(result.isValid).toBe(true);
@@ -721,12 +818,14 @@ describe("Alert Validation", () => {
         trigger_condition: {
           ...validAlert.trigger_condition,
           frequency_type: "cron" as const,
-          cron: ""
-        }
+          cron: "",
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("Cron expression is required when frequency type is cron");
+      expect(result.errors).toContain(
+        "Cron expression is required when frequency type is cron",
+      );
     });
 
     it("should fail for cron frequency without timezone", () => {
@@ -736,12 +835,14 @@ describe("Alert Validation", () => {
           ...validAlert.trigger_condition,
           frequency_type: "cron" as const,
           cron: "0 */5 * * *",
-          timezone: ""
-        }
+          timezone: "",
+        },
       };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("Timezone is required when frequency type is cron");
+      expect(result.errors).toContain(
+        "Timezone is required when frequency type is cron",
+      );
     });
   });
 
@@ -767,10 +868,15 @@ describe("Alert Validation", () => {
     });
 
     it("should fail for invalid destinations", () => {
-      const alert = { ...validAlert, destinations: ["invalid1", "webhook1", "invalid2"] };
+      const alert = {
+        ...validAlert,
+        destinations: ["invalid1", "webhook1", "invalid2"],
+      };
       const result = validateAlert(alert, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Invalid destinations: "invalid1", "invalid2" - must be from available destinations list');
+      expect(result.errors).toContain(
+        'Invalid destinations: "invalid1", "invalid2" - must be from available destinations list',
+      );
     });
 
     it("should fail if context destinations list is empty", () => {
@@ -778,7 +884,9 @@ describe("Alert Validation", () => {
       const alert = { ...validAlert, destinations: ["webhook1"] };
       const result = validateAlert(alert, emptyContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("No available destinations found in system");
+      expect(result.errors).toContain(
+        "No available destinations found in system",
+      );
     });
   });
 
@@ -786,7 +894,7 @@ describe("Alert Validation", () => {
     it("should pass for boolean enabled values", () => {
       const alert1 = { ...validAlert, enabled: true };
       const alert2 = { ...validAlert, enabled: false };
-      
+
       expect(validateAlert(alert1, validContext).isValid).toBe(true);
       expect(validateAlert(alert2, validContext).isValid).toBe(true);
     });
@@ -807,13 +915,13 @@ describe("Alert Validation", () => {
         stream_name: "",
         is_real_time: "maybe" as any,
         query_condition: {
-          type: "invalid" as any
+          type: "invalid" as any,
         },
         destinations: [],
         context_attributes: [],
-        enabled: "yes" as any
+        enabled: "yes" as any,
       };
-      
+
       const result = validateAlert(invalidAlert as any, validContext);
       expect(result.isValid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(5);
@@ -821,14 +929,20 @@ describe("Alert Validation", () => {
 
     it("should handle missing required fields gracefully", () => {
       const incompleteAlert = {
-        name: "Test Alert"
+        name: "Test Alert",
       };
-      
+
       const result = validateAlert(incompleteAlert as any, validContext);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("Stream Type is mandatory and should be one of: logs, metrics, traces");
-      expect(result.errors).toContain("Stream Name is mandatory and should be a valid string");
-      expect(result.errors).toContain("Is Real-Time is mandatory and should be a boolean value");
+      expect(result.errors).toContain(
+        "Stream Type is mandatory and should be one of: logs, metrics, traces",
+      );
+      expect(result.errors).toContain(
+        "Stream Name is mandatory and should be a valid string",
+      );
+      expect(result.errors).toContain(
+        "Is Real-Time is mandatory and should be a boolean value",
+      );
       expect(result.errors).toContain("Trigger condition is required");
     });
   });

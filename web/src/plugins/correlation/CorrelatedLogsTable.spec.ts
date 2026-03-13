@@ -151,7 +151,8 @@ describe("CorrelatedLogsTable.vue", () => {
 
   describe("Column Visibility Management", () => {
     it("should initialize visible columns with only timestamp by default", async () => {
-      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      const mockUseCorrelatedLogs =
+        await import("@/composables/useCorrelatedLogs");
       (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
         ...mockUseCorrelatedLogs.useCorrelatedLogs(),
         searchResults: {
@@ -302,7 +303,7 @@ describe("CorrelatedLogsTable.vue", () => {
 
       const columns = wrapper.vm.tableColumns;
       const timestampColumn = columns.find(
-        (col: any) => col.id === "_timestamp"
+        (col: any) => col.id === "_timestamp",
       );
 
       expect(timestampColumn).toBeDefined();
@@ -350,7 +351,8 @@ describe("CorrelatedLogsTable.vue", () => {
 
     it("should call updateFilters when handleApplyFilters is called", async () => {
       const mockUpdateFilters = vi.fn();
-      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      const mockUseCorrelatedLogs =
+        await import("@/composables/useCorrelatedLogs");
       (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
         ...mockUseCorrelatedLogs.useCorrelatedLogs(),
         updateFilters: mockUpdateFilters,
@@ -441,7 +443,8 @@ describe("CorrelatedLogsTable.vue", () => {
         { _timestamp: 456, field1: "c", field3: "d" },
       ];
 
-      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      const mockUseCorrelatedLogs =
+        await import("@/composables/useCorrelatedLogs");
       (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
         ...mockUseCorrelatedLogs.useCorrelatedLogs(),
         searchResults: { value: mockResults },
@@ -765,7 +768,8 @@ describe("CorrelatedLogsTable.vue", () => {
 
   describe("Loading and Error States", () => {
     it("should show skeleton when loading and no results", async () => {
-      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      const mockUseCorrelatedLogs =
+        await import("@/composables/useCorrelatedLogs");
       (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
         ...mockUseCorrelatedLogs.useCorrelatedLogs(),
         isLoading: { value: true },
@@ -782,7 +786,8 @@ describe("CorrelatedLogsTable.vue", () => {
     });
 
     it("should disable column dropdown when no results", async () => {
-      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      const mockUseCorrelatedLogs =
+        await import("@/composables/useCorrelatedLogs");
       (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
         ...mockUseCorrelatedLogs.useCorrelatedLogs(),
         hasResults: { value: false },

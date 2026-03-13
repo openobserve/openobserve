@@ -31,7 +31,7 @@ export default defineComponent({
   name: "VariablesDependenciesGraph",
   components: {
     ChartRenderer: defineAsyncComponent(
-      () => import("../panels/ChartRenderer.vue")
+      () => import("../panels/ChartRenderer.vue"),
     ),
   },
   props: {
@@ -50,7 +50,7 @@ export default defineComponent({
     onMounted(() => {
       // make dependency graph
       variablesDependencyGraph = buildVariablesDependencyGraph(
-        props.variablesList
+        props.variablesList,
       );
       let edges = [];
 

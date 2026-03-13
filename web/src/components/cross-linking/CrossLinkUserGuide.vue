@@ -9,7 +9,8 @@
       icon="help_outline"
       data-test="cross-link-help-btn"
     >
-      <q-tooltip class="bg-grey-8" anchor="bottom middle" self="top middle">
+      <q-tooltip class="bg-grey-8" anchor="bottom middle"
+self="top middle">
         {{ t("crossLinks.userGuide") }}
       </q-tooltip>
     </q-btn>
@@ -39,10 +40,12 @@
     <p>{{ t("crossLinks.guideFieldDesc") }}</p>
     <ul>
       <li>
-        <span class="bg-highlight">${field.__name}</span> – {{ t("crossLinks.guideFieldName") }}
+        <span class="bg-highlight">${field.__name}</span> –
+        {{ t("crossLinks.guideFieldName") }}
       </li>
       <li>
-        <span class="bg-highlight">${field.__value}</span> – {{ t("crossLinks.guideFieldValue") }}
+        <span class="bg-highlight">${field.__value}</span> –
+        {{ t("crossLinks.guideFieldValue") }}
       </li>
     </ul>
 
@@ -52,10 +55,12 @@
     <p>{{ t("crossLinks.guideTimeDesc") }}</p>
     <ul>
       <li>
-        <span class="bg-highlight">${start_time}</span> – {{ t("crossLinks.guideStartTime") }}
+        <span class="bg-highlight">${start_time}</span> –
+        {{ t("crossLinks.guideStartTime") }}
       </li>
       <li>
-        <span class="bg-highlight">${end_time}</span> – {{ t("crossLinks.guideEndTime") }}
+        <span class="bg-highlight">${end_time}</span> –
+        {{ t("crossLinks.guideEndTime") }}
       </li>
     </ul>
     {{ t("crossLinks.guideTimeExample") }}
@@ -67,9 +72,13 @@
     <div class="header">{{ t("crossLinks.guideQueryHeader") }}</div>
     <p>{{ t("crossLinks.guideQueryDesc") }}</p>
     <ul>
-      <li><span class="bg-highlight">${query}</span> – {{ t("crossLinks.guideQuery") }}</li>
       <li>
-        <span class="bg-highlight">${query_encoded}</span> – {{ t("crossLinks.guideQueryEncoded") }}
+        <span class="bg-highlight">${query}</span> –
+        {{ t("crossLinks.guideQuery") }}
+      </li>
+      <li>
+        <span class="bg-highlight">${query_encoded}</span> –
+        {{ t("crossLinks.guideQueryEncoded") }}
       </li>
     </ul>
 

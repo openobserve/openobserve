@@ -137,7 +137,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="height: 100%; width: 100%"
           />
         </div>
-        <div v-else ref="gridStackContainer" class="grid-stack">
+        <div v-else ref="gridStackContainer"
+class="grid-stack">
           <div
             v-for="item in panels"
             :key="item.id + selectedTabId"

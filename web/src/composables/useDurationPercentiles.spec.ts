@@ -39,9 +39,7 @@ let parser: any;
 
 async function getParser() {
   if (parser) return parser;
-  const mod = await import(
-    "@openobserve/node-sql-parser/build/datafusionsql"
-  );
+  const mod = await import("@openobserve/node-sql-parser/build/datafusionsql");
   parser = new mod.default.Parser();
   return parser;
 }
@@ -102,11 +100,7 @@ describe("parseDurationWhereClause", () => {
     });
 
     it("should convert 'msec' alias correctly", () => {
-      const result = parseDurationWhereClause(
-        "duration >= '1.50msec'",
-        p,
-        "x",
-      );
+      const result = parseDurationWhereClause("duration >= '1.50msec'", p, "x");
       expect(result).toBe("duration >= 1500");
     });
 
@@ -150,11 +144,7 @@ describe("parseDurationWhereClause", () => {
     });
 
     it("should convert 'secs' alias correctly", () => {
-      const result = parseDurationWhereClause(
-        "duration >= '2.50secs'",
-        p,
-        "x",
-      );
+      const result = parseDurationWhereClause("duration >= '2.50secs'", p, "x");
       expect(result).toBe("duration >= 2500000");
     });
 
@@ -206,11 +196,7 @@ describe("parseDurationWhereClause", () => {
 
   describe("non-duration fields", () => {
     it("should pass through a non-duration field unchanged", () => {
-      const result = parseDurationWhereClause(
-        "service_name = 'foo'",
-        p,
-        "x",
-      );
+      const result = parseDurationWhereClause("service_name = 'foo'", p, "x");
       expect(result).toBe("service_name = 'foo'");
     });
   });
@@ -346,7 +332,9 @@ describe("useDurationPercentiles", () => {
         ` approx_percentile_cont(duration, 0.95) as p95,` +
         ` approx_percentile_cont(duration, 0.99) as p99` +
         ` FROM "${BASE_PAYLOAD.streamName}" WHERE duration >= 1000`;
-      expect(callArg.queryReq.query.sql).toBe(b64EncodeUnicode(expectedSqlFragment));
+      expect(callArg.queryReq.query.sql).toBe(
+        b64EncodeUnicode(expectedSqlFragment),
+      );
     });
 
     it("should not include a WHERE clause in the SQL when whereClause is absent", () => {
@@ -361,7 +349,9 @@ describe("useDurationPercentiles", () => {
         ` approx_percentile_cont(duration, 0.95) as p95,` +
         ` approx_percentile_cont(duration, 0.99) as p99` +
         ` FROM "${BASE_PAYLOAD.streamName}"`;
-      expect(callArg.queryReq.query.sql).toBe(b64EncodeUnicode(expectedSqlFragment));
+      expect(callArg.queryReq.query.sql).toBe(
+        b64EncodeUnicode(expectedSqlFragment),
+      );
     });
   });
 

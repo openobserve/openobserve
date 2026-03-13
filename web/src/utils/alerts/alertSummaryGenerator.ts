@@ -19,43 +19,53 @@ export interface SummarySegment {
  * @param previewQuery - The formatted preview query string
  * @param generatedSqlQuery - The generated SQL query for custom conditions (computed property)
  */
-export function generateAlertSummary(formData: any, destinations: any[], t?: (key: string) => string, wizardStep: number = 6, previewQuery: string = '', generatedSqlQuery: string = ''): string {
+export function generateAlertSummary(
+  formData: any,
+  destinations: any[],
+  t?: (key: string) => string,
+  wizardStep: number = 6,
+  previewQuery: string = "",
+  generatedSqlQuery: string = "",
+): string {
   // Generate summary based on available data (progressive disclosure)
   if (!formData) {
-    return '';
+    return "";
   }
 
   // At minimum, we need stream_name to show any summary
   if (!formData.stream_name) {
-    return '';
+    return "";
   }
 
   // Default translation function if not provided (fallback for backward compatibility)
-  const translate = t || ((key: string) => {
-    const fallbacks: Record<string, string> = {
-      'alerts.summary.monitors': 'Monitors',
-      'alerts.summary.from': 'from',
-      'alerts.summary.inRealTime': 'in real-time',
-      'alerts.summary.ofData': 'of data',
-      'alerts.summary.triggersWhen': 'Triggers when',
-      'alerts.summary.queryConditions': 'query conditions',
-      'alerts.summary.areMet': 'are met',
-      'alerts.summary.eventsDetected': 'events detected',
-      'alerts.summary.sendsTo': 'Sends to',
-      'alerts.summary.noDestination': 'No destination',
-      'alerts.summary.notSetupYet': '(not set up yet)',
-      'alerts.summary.cooldown': 'Cooldown',
-      'alerts.summary.betweenAlerts': 'between alerts',
-      'alerts.summary.alertName': 'Alert Name',
-      'alerts.summary.streamInfo': 'Data Source',
-      'alerts.summary.alertType': 'Alert Type',
-      'alerts.summary.queryCondition': 'Query Condition',
-    };
-    return fallbacks[key] || key;
-  });
+  const translate =
+    t ||
+    ((key: string) => {
+      const fallbacks: Record<string, string> = {
+        "alerts.summary.monitors": "Monitors",
+        "alerts.summary.from": "from",
+        "alerts.summary.inRealTime": "in real-time",
+        "alerts.summary.ofData": "of data",
+        "alerts.summary.triggersWhen": "Triggers when",
+        "alerts.summary.queryConditions": "query conditions",
+        "alerts.summary.areMet": "are met",
+        "alerts.summary.eventsDetected": "events detected",
+        "alerts.summary.sendsTo": "Sends to",
+        "alerts.summary.noDestination": "No destination",
+        "alerts.summary.notSetupYet": "(not set up yet)",
+        "alerts.summary.cooldown": "Cooldown",
+        "alerts.summary.betweenAlerts": "between alerts",
+        "alerts.summary.alertName": "Alert Name",
+        "alerts.summary.streamInfo": "Data Source",
+        "alerts.summary.alertType": "Alert Type",
+        "alerts.summary.queryCondition": "Query Condition",
+      };
+      return fallbacks[key] || key;
+    });
 
   const parts: string[] = [];
-  const isRealTime = formData.is_real_time === 'true' || formData.is_real_time === true;
+  const isRealTime =
+    formData.is_real_time === "true" || formData.is_real_time === true;
 
   // Helper function to wrap text with clickable span
   const clickable = (text: string, fieldId: string) => {
@@ -63,24 +73,31 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
   };
 
   // Build the bullet-point summary based on wizard step
-  const streamType = formData.stream_type || 'logs';
-  const streamName = formData.stream_name || 'the selected stream';
+  const streamType = formData.stream_type || "logs";
+  const streamName = formData.stream_name || "the selected stream";
 
   // Step 1: Show basic alert info (stream type, stream name, alert type)
   if (wizardStep >= 1) {
     // Capitalize stream type for better display
-    const displayStreamType = streamType.charAt(0).toUpperCase() + streamType.slice(1);
-    parts.push(`✓ ${translate('alerts.summary.streamInfo')}: ${clickable(displayStreamType, 'streamType')} - ${clickable(streamName, 'stream')}`);
+    const displayStreamType =
+      streamType.charAt(0).toUpperCase() + streamType.slice(1);
+    parts.push(
+      `✓ ${translate("alerts.summary.streamInfo")}: ${clickable(displayStreamType, "streamType")} - ${clickable(streamName, "stream")}`,
+    );
     if (isRealTime) {
-      parts.push(`✓ ${translate('alerts.summary.alertType')}: ${clickable('Real-Time', 'alertType')}`);
+      parts.push(
+        `✓ ${translate("alerts.summary.alertType")}: ${clickable("Real-Time", "alertType")}`,
+      );
     } else {
-      parts.push(`✓ ${translate('alerts.summary.alertType')}: ${clickable('Scheduled', 'alertType')}`);
+      parts.push(
+        `✓ ${translate("alerts.summary.alertType")}: ${clickable("Scheduled", "alertType")}`,
+      );
     }
   }
 
   // Step 2+: Show query condition (from step 2 onwards)
   if (wizardStep >= 2) {
-    let queryText = '';
+    let queryText = "";
 
     // Get query from different sources
     if (previewQuery && previewQuery.trim()) {
@@ -101,13 +118,16 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
     if (queryText) {
       // Truncate if longer than 50 characters
       const maxLength = 48;
-      const truncatedQuery = queryText.length > maxLength
-        ? queryText.substring(0, maxLength) + '...'
-        : queryText;
+      const truncatedQuery =
+        queryText.length > maxLength
+          ? queryText.substring(0, maxLength) + "..."
+          : queryText;
 
       // Create clickable span with query
-      const queryLabel = translate('alerts.summary.queryCondition');
-      parts.push(`✓ ${queryLabel}: <span class="summary-clickable" data-focus-target="query">${truncatedQuery}</span>`);
+      const queryLabel = translate("alerts.summary.queryCondition");
+      parts.push(
+        `✓ ${queryLabel}: <span class="summary-clickable" data-focus-target="query">${truncatedQuery}</span>`,
+      );
     }
   }
 
@@ -115,58 +135,93 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
   if (wizardStep >= 4) {
     if (isRealTime) {
       // Real-time alert summary - triggers immediately when query conditions match
-      parts.push(`✓ ${translate('alerts.summary.triggersWhen')}: ${translate('alerts.summary.eventsDetected')} ${translate('alerts.summary.inRealTime')}`);
+      parts.push(
+        `✓ ${translate("alerts.summary.triggersWhen")}: ${translate("alerts.summary.eventsDetected")} ${translate("alerts.summary.inRealTime")}`,
+      );
     } else {
       // Scheduled alert summary
       if (formData.trigger_condition?.period) {
         let period: string;
         let fieldId: string;
         // Check if multi-time range comparison is enabled
-        if (formData.query_condition?.multi_time_range && formData.query_condition.multi_time_range.length > 0) {
-          period = getMultiTimeRangeText(formData.query_condition.multi_time_range, formData.trigger_condition.period);
-          fieldId = 'multiwindow'; // Focus on Compare with Past section
+        if (
+          formData.query_condition?.multi_time_range &&
+          formData.query_condition.multi_time_range.length > 0
+        ) {
+          period = getMultiTimeRangeText(
+            formData.query_condition.multi_time_range,
+            formData.trigger_condition.period,
+          );
+          fieldId = "multiwindow"; // Focus on Compare with Past section
         } else {
           period = getPeriodText(formData.trigger_condition.period, translate);
-          fieldId = 'period'; // Focus on period field
+          fieldId = "period"; // Focus on period field
         }
-        parts.push(`✓ ${translate('alerts.summary.monitors')}: ${clickable(period, fieldId)} ${translate('alerts.summary.ofData')}`);
+        parts.push(
+          `✓ ${translate("alerts.summary.monitors")}: ${clickable(period, fieldId)} ${translate("alerts.summary.ofData")}`,
+        );
       }
 
       // Trigger condition (only for scheduled alerts - real-time doesn't use threshold)
-      if (formData.query_condition && formData.trigger_condition?.operator && formData.trigger_condition?.threshold !== undefined) {
+      if (
+        formData.query_condition &&
+        formData.trigger_condition?.operator &&
+        formData.trigger_condition?.threshold !== undefined
+      ) {
         const threshold = formData.trigger_condition.threshold;
         const operator = formData.trigger_condition.operator;
         const operatorText = getOperatorSymbol(operator, translate);
 
-        parts.push(`✓ ${translate('alerts.summary.triggersWhen')}: ${clickable(`${threshold} ${operatorText}`, 'threshold')} ${translate('alerts.summary.eventsDetected')}`);
+        parts.push(
+          `✓ ${translate("alerts.summary.triggersWhen")}: ${clickable(`${threshold} ${operatorText}`, "threshold")} ${translate("alerts.summary.eventsDetected")}`,
+        );
       }
     }
 
     // Notification section
     if (!destinations || destinations.length === 0) {
-      parts.push(`✓ ${translate('alerts.summary.sendsTo')}: ${clickable(translate('alerts.summary.noDestination'), 'destinations')} ${translate('alerts.summary.notSetupYet')} ⚠️`);
+      parts.push(
+        `✓ ${translate("alerts.summary.sendsTo")}: ${clickable(translate("alerts.summary.noDestination"), "destinations")} ${translate("alerts.summary.notSetupYet")} ⚠️`,
+      );
     } else {
-      const destNames = destinations.map(dest => {
-        if (typeof dest === 'string') return dest;
-        return dest.name || 'Unknown';
+      const destNames = destinations.map((dest) => {
+        if (typeof dest === "string") return dest;
+        return dest.name || "Unknown";
       });
       const uniqueNames = Array.from(new Set(destNames));
-      const destText = uniqueNames.join(', ');
-      parts.push(`✓ ${translate('alerts.summary.sendsTo')}: ${clickable(destText, 'destinations')}`);
+      const destText = uniqueNames.join(", ");
+      parts.push(
+        `✓ ${translate("alerts.summary.sendsTo")}: ${clickable(destText, "destinations")}`,
+      );
     }
 
     // Cooldown section (only if configured and not real-time)
-    if (!isRealTime && formData.trigger_condition?.silence !== undefined && formData.trigger_condition?.silence >= 0) {
-      const timeText = getSilenceText(formData.trigger_condition.silence, translate);
-      parts.push(`✓ ${translate('alerts.summary.cooldown')}: ${clickable(timeText, 'silence')} ${translate('alerts.summary.betweenAlerts')}`);
+    if (
+      !isRealTime &&
+      formData.trigger_condition?.silence !== undefined &&
+      formData.trigger_condition?.silence >= 0
+    ) {
+      const timeText = getSilenceText(
+        formData.trigger_condition.silence,
+        translate,
+      );
+      parts.push(
+        `✓ ${translate("alerts.summary.cooldown")}: ${clickable(timeText, "silence")} ${translate("alerts.summary.betweenAlerts")}`,
+      );
     }
   }
 
   // Build the final summary with plain English first, then bullet points
-  const bulletPoints = parts.join('\n');
+  const bulletPoints = parts.join("\n");
 
   // Add plain English summary first (show from step 1 onwards for better UX)
-  const plainEnglish = generatePlainEnglishSummary(formData, destinations, isRealTime, translate, wizardStep);
+  const plainEnglish = generatePlainEnglishSummary(
+    formData,
+    destinations,
+    isRealTime,
+    translate,
+    wizardStep,
+  );
   if (plainEnglish) {
     // Return plain English first, then bullet points (with single line break for tighter spacing)
     return `<div class="plain-english-section">"${plainEnglish}"</div>\n${bulletPoints}`;
@@ -178,14 +233,17 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
 /**
  * Get operator symbol for readable text
  */
-function getOperatorSymbol(operator: string, t: (key: string) => string): string {
+function getOperatorSymbol(
+  operator: string,
+  t: (key: string) => string,
+): string {
   const operatorMap: { [key: string]: string } = {
-    '=': `(=) ${t('alerts.summary.equalTo') || 'equal to'}`,
-    '!=': `(≠) ${t('alerts.summary.notEqualTo') || 'not equal to'}`,
-    '>': `(>) ${t('alerts.summary.orMore') || 'or more'}`,
-    '>=': `(≥) ${t('alerts.summary.orMore') || 'or more'}`,
-    '<': `(<) ${t('alerts.summary.orLess') || 'or less'}`,
-    '<=': `(≤) ${t('alerts.summary.orLess') || 'or less'}`,
+    "=": `(=) ${t("alerts.summary.equalTo") || "equal to"}`,
+    "!=": `(≠) ${t("alerts.summary.notEqualTo") || "not equal to"}`,
+    ">": `(>) ${t("alerts.summary.orMore") || "or more"}`,
+    ">=": `(≥) ${t("alerts.summary.orMore") || "or more"}`,
+    "<": `(<) ${t("alerts.summary.orLess") || "or less"}`,
+    "<=": `(≤) ${t("alerts.summary.orLess") || "or less"}`,
   };
 
   return operatorMap[operator] || operator;
@@ -195,33 +253,40 @@ function getOperatorSymbol(operator: string, t: (key: string) => string): string
  * Get period text (e.g., "the last 30 minutes", "the last 1 hour")
  */
 function getPeriodText(period: number, t: (key: string) => string): string {
-  if (!period) return 'recent data';
+  if (!period) return "recent data";
 
   const minutes = period;
-  const minuteText = t('alerts.summary.minute') || 'minute';
-  const minutesText = t('alerts.summary.minutes') || 'minutes';
-  const hourText = t('alerts.summary.hour') || 'hour';
-  const hoursText = t('alerts.summary.hours') || 'hours';
+  const minuteText = t("alerts.summary.minute") || "minute";
+  const minutesText = t("alerts.summary.minutes") || "minutes";
+  const hourText = t("alerts.summary.hour") || "hour";
+  const hoursText = t("alerts.summary.hours") || "hours";
 
   if (minutes < 60) {
-    return minutes === 1 ? `the last ${minuteText}` : `the last ${minutes} ${minutesText}`;
+    return minutes === 1
+      ? `the last ${minuteText}`
+      : `the last ${minutes} ${minutesText}`;
   }
 
   const hours = Math.floor(minutes / 60);
   if (hours < 24) {
-    return hours === 1 ? `the last ${hourText}` : `the last ${hours} ${hoursText}`;
+    return hours === 1
+      ? `the last ${hourText}`
+      : `the last ${hours} ${hoursText}`;
   }
 
   const days = Math.floor(hours / 24);
-  return days === 1 ? 'the last day' : `the last ${days} days`;
+  return days === 1 ? "the last day" : `the last ${days} days`;
 }
 
 /**
  * Get multi-window time range text (e.g., "3 time ranges (30m, 1h, 2h)")
  * Includes current window period plus all comparison windows
  */
-function getMultiTimeRangeText(timeRanges: any[], currentPeriod: number): string {
-  if (!timeRanges || timeRanges.length === 0) return '';
+function getMultiTimeRangeText(
+  timeRanges: any[],
+  currentPeriod: number,
+): string {
+  if (!timeRanges || timeRanges.length === 0) return "";
 
   // Parse offSet strings (e.g., "3d", "1h", "30m", "2w", "1M") to minutes
   const parseOffSet = (offSet: string): number => {
@@ -231,20 +296,22 @@ function getMultiTimeRangeText(timeRanges: any[], currentPeriod: number): string
     const value = parseInt(match[1]);
     const unit = match[2];
 
-    if (unit === 'm') return value;
-    if (unit === 'h') return value * 60;
-    if (unit === 'd') return value * 24 * 60;
-    if (unit === 'w') return value * 7 * 24 * 60;
-    if (unit === 'M') return value * 30 * 24 * 60; // Approximate month as 30 days
+    if (unit === "m") return value;
+    if (unit === "h") return value * 60;
+    if (unit === "d") return value * 24 * 60;
+    if (unit === "w") return value * 7 * 24 * 60;
+    if (unit === "M") return value * 30 * 24 * 60; // Approximate month as 30 days
     return 0;
   };
 
   // Create array with current period first, then comparison windows
-  const comparisonPeriods = timeRanges.map(r => parseOffSet(r.offSet || '0m'));
+  const comparisonPeriods = timeRanges.map((r) =>
+    parseOffSet(r.offSet || "0m"),
+  );
   const allPeriods = [currentPeriod, ...comparisonPeriods];
 
   const count = allPeriods.length;
-  const rangeTexts = allPeriods.map(period => {
+  const rangeTexts = allPeriods.map((period) => {
     if (period < 60) {
       return `${period}m`;
     }
@@ -264,19 +331,19 @@ function getMultiTimeRangeText(timeRanges: any[], currentPeriod: number): string
     return `${months}M`;
   });
 
-  const rangeList = rangeTexts.join(', ');
-  return `${count} time ${count === 1 ? 'range' : 'ranges'} (${rangeList})`;
+  const rangeList = rangeTexts.join(", ");
+  return `${count} time ${count === 1 ? "range" : "ranges"} (${rangeList})`;
 }
 
 /**
  * Get silence/cooldown text (e.g., "10 minutes", "2 hours")
  */
 function getSilenceText(silence: number, t: (key: string) => string): string {
-  const noCooldown = t('alerts.summary.noCooldown') || 'No cooldown';
-  const minuteText = t('alerts.summary.minute') || 'minute';
-  const minutesText = t('alerts.summary.minutes') || 'minutes';
-  const hourText = t('alerts.summary.hour') || 'hour';
-  const hoursText = t('alerts.summary.hours') || 'hours';
+  const noCooldown = t("alerts.summary.noCooldown") || "No cooldown";
+  const minuteText = t("alerts.summary.minute") || "minute";
+  const minutesText = t("alerts.summary.minutes") || "minutes";
+  const hourText = t("alerts.summary.hour") || "hour";
+  const hoursText = t("alerts.summary.hours") || "hours";
 
   if (silence === 0) return noCooldown;
   if (silence === 1) return `1 ${minuteText}`;
@@ -296,33 +363,48 @@ function getSilenceText(silence: number, t: (key: string) => string): string {
  * Generate a plain English summary of the alert
  * Shows progressive summary based on wizard step
  */
-function generatePlainEnglishSummary(formData: any, destinations: any[], isRealTime: boolean, t: (key: string) => string, wizardStep: number = 6): string {
-  if (!formData || !formData.stream_name) return '';
+function generatePlainEnglishSummary(
+  formData: any,
+  destinations: any[],
+  isRealTime: boolean,
+  t: (key: string) => string,
+  wizardStep: number = 6,
+): string {
+  if (!formData || !formData.stream_name) return "";
 
   const parts: string[] = [];
-  const eventsPlural = t('alerts.summary.plainEnglish.eventsPlural') || 'events';
-  const eventSingular = t('alerts.summary.plainEnglish.eventSingular') || 'event';
-  const minuteText = t('alerts.summary.minute') || 'minute';
-  const minutesText = t('alerts.summary.minutes') || 'minutes';
-  const hourText = t('alerts.summary.hour') || 'hour';
-  const hoursText = t('alerts.summary.hours') || 'hours';
+  const eventsPlural =
+    t("alerts.summary.plainEnglish.eventsPlural") || "events";
+  const eventSingular =
+    t("alerts.summary.plainEnglish.eventSingular") || "event";
+  const minuteText = t("alerts.summary.minute") || "minute";
+  const minutesText = t("alerts.summary.minutes") || "minutes";
+  const hourText = t("alerts.summary.hour") || "hour";
+  const hoursText = t("alerts.summary.hours") || "hours";
 
   // Step 1-3: Show basic information about configuring the alert
   if (wizardStep < 4) {
-    const streamType = formData.stream_type || 'logs';
+    const streamType = formData.stream_type || "logs";
     const streamName = formData.stream_name;
     if (isRealTime) {
-      const configuringText = t('alerts.summary.configuringRealTime') || 'Configuring a real-time alert for';
+      const configuringText =
+        t("alerts.summary.configuringRealTime") ||
+        "Configuring a real-time alert for";
       return `${configuringText} ${streamType} stream "${streamName}"`;
     } else {
-      const configuringText = t('alerts.summary.configuringScheduled') || 'Configuring a scheduled alert for';
+      const configuringText =
+        t("alerts.summary.configuringScheduled") ||
+        "Configuring a scheduled alert for";
       return `${configuringText} ${streamType} stream "${streamName}"`;
     }
   }
 
   // Step 4+: Show full alert logic
   if (isRealTime) {
-    parts.push(t('alerts.summary.plainEnglish.realTime') || 'Alert me immediately when matching events occur in real-time');
+    parts.push(
+      t("alerts.summary.plainEnglish.realTime") ||
+        "Alert me immediately when matching events occur in real-time",
+    );
   } else {
     // Get threshold and operator
     const threshold = formData.trigger_condition?.threshold;
@@ -331,60 +413,74 @@ function generatePlainEnglishSummary(formData: any, destinations: any[], isRealT
 
     if (threshold !== undefined && operator && period) {
       // Build the condition phrase
-      let conditionPhrase = '';
+      let conditionPhrase = "";
 
-      if (operator === '>=') {
+      if (operator === ">=") {
         conditionPhrase = `${threshold}+ ${eventsPlural}`;
-      } else if (operator === '>') {
-        const moreThan = t('alerts.summary.plainEnglish.moreThan') || 'more than';
+      } else if (operator === ">") {
+        const moreThan =
+          t("alerts.summary.plainEnglish.moreThan") || "more than";
         conditionPhrase = `${moreThan} ${threshold} ${eventsPlural}`;
-      } else if (operator === '=') {
-        const exactly = t('alerts.summary.plainEnglish.exactly') || 'exactly';
+      } else if (operator === "=") {
+        const exactly = t("alerts.summary.plainEnglish.exactly") || "exactly";
         conditionPhrase = `${exactly} ${threshold} ${threshold !== 1 ? eventsPlural : eventSingular}`;
-      } else if (operator === '<=') {
-        const orFewer = t('alerts.summary.plainEnglish.orFewer') || 'or fewer';
+      } else if (operator === "<=") {
+        const orFewer = t("alerts.summary.plainEnglish.orFewer") || "or fewer";
         conditionPhrase = `${threshold} ${orFewer} ${eventsPlural}`;
-      } else if (operator === '<') {
-        const fewerThan = t('alerts.summary.plainEnglish.fewerThan') || 'fewer than';
+      } else if (operator === "<") {
+        const fewerThan =
+          t("alerts.summary.plainEnglish.fewerThan") || "fewer than";
         conditionPhrase = `${fewerThan} ${threshold} ${eventsPlural}`;
-      } else if (operator === '!=') {
-        const not = t('alerts.summary.plainEnglish.not') || 'not';
+      } else if (operator === "!=") {
+        const not = t("alerts.summary.plainEnglish.not") || "not";
         conditionPhrase = `${not} ${threshold} ${eventsPlural}`;
       } else {
         conditionPhrase = `${threshold} ${eventsPlural} (${operator})`;
       }
 
       // Build the time period phrase
-      let periodPhrase = '';
+      let periodPhrase = "";
       if (period < 60) {
-        periodPhrase = period === 1 ? `1-${minuteText}` : `${period}-${minuteText}`;
+        periodPhrase =
+          period === 1 ? `1-${minuteText}` : `${period}-${minuteText}`;
       } else {
         const hours = Math.floor(period / 60);
         periodPhrase = hours === 1 ? `1-${hourText}` : `${hours}-${hourText}`;
       }
 
-      const occurInAny = t('alerts.summary.plainEnglish.occurInAny') || 'occur in any';
-      const periodWord = t('alerts.summary.plainEnglish.period') || 'period';
-      const alertMeWhen = t('alerts.summary.plainEnglish.alertMeWhen') || 'Alert me when';
-      parts.push(`${alertMeWhen} ${conditionPhrase} ${occurInAny} ${periodPhrase} ${periodWord}`);
+      const occurInAny =
+        t("alerts.summary.plainEnglish.occurInAny") || "occur in any";
+      const periodWord = t("alerts.summary.plainEnglish.period") || "period";
+      const alertMeWhen =
+        t("alerts.summary.plainEnglish.alertMeWhen") || "Alert me when";
+      parts.push(
+        `${alertMeWhen} ${conditionPhrase} ${occurInAny} ${periodPhrase} ${periodWord}`,
+      );
 
       // Add cooldown phrase if configured
       const silence = formData.trigger_condition?.silence;
       if (silence && silence > 0) {
-        const butNoMoreThan = t('alerts.summary.plainEnglish.butNoMoreThan') || ', but no more than once every';
+        const butNoMoreThan =
+          t("alerts.summary.plainEnglish.butNoMoreThan") ||
+          ", but no more than once every";
         if (silence < 60) {
-          const silenceText = silence === 1 ? `1 ${minuteText}` : `${silence} ${minutesText}`;
+          const silenceText =
+            silence === 1 ? `1 ${minuteText}` : `${silence} ${minutesText}`;
           parts.push(`${butNoMoreThan} ${silenceText}`);
         } else {
           const hours = Math.floor(silence / 60);
-          const hoursCount = hours === 1 ? `1 ${hourText}` : `${hours} ${hoursText}`;
+          const hoursCount =
+            hours === 1 ? `1 ${hourText}` : `${hours} ${hoursText}`;
           parts.push(`${butNoMoreThan} ${hoursCount}`);
         }
       }
     } else {
-      parts.push(t('alerts.summary.plainEnglish.defaultConditions') || 'Alert me when the configured conditions are met');
+      parts.push(
+        t("alerts.summary.plainEnglish.defaultConditions") ||
+          "Alert me when the configured conditions are met",
+      );
     }
   }
 
-  return parts.join('');
+  return parts.join("");
 }

@@ -19,10 +19,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Priority Order (Left) -->
     <div class="tw:flex-1 tw:border tw:rounded tw:p-4">
       <div class="tw:text-sm tw:font-semibold tw:mb-3">{{ leftTitle }}</div>
-      <q-input v-model="searchLeft" dense outlined placeholder="Search..." class="tw:mb-3">
+      <q-input
+        v-model="searchLeft"
+        dense
+        outlined
+        placeholder="Search..."
+        class="tw:mb-3"
+      >
         <template #prepend><q-icon name="search" /></template>
       </q-input>
-      <div class="tw:border tw:rounded tw:min-h-80 tw:max-h-96 tw:overflow-auto">
+      <div
+        class="tw:border tw:rounded tw:min-h-80 tw:max-h-96 tw:overflow-auto"
+      >
         <q-list dense>
           <q-item
             v-for="(item, index) in filteredSelected"
@@ -116,10 +124,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Available Items (Right) -->
     <div class="tw:flex-1 tw:border tw:rounded tw:p-4">
       <div class="tw:text-sm tw:font-semibold tw:mb-3">{{ rightTitle }}</div>
-      <q-input v-model="searchRight" dense outlined placeholder="Search..." class="tw:mb-3">
+      <q-input
+        v-model="searchRight"
+        dense
+        outlined
+        placeholder="Search..."
+        class="tw:mb-3"
+      >
         <template #prepend><q-icon name="search" /></template>
       </q-input>
-      <div class="tw:border tw:rounded tw:min-h-80 tw:max-h-96 tw:overflow-auto">
+      <div
+        class="tw:border tw:rounded tw:min-h-80 tw:max-h-96 tw:overflow-auto"
+      >
         <q-list dense>
           <q-item
             v-for="item in filteredAvailable"
@@ -149,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed } from "vue";
 
 interface Item {
   label: string;
@@ -164,44 +180,50 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  leftTitle: 'Selected',
-  rightTitle: 'Available',
+  leftTitle: "Selected",
+  rightTitle: "Available",
 });
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: string[]): void;
+  (e: "update:modelValue", value: string[]): void;
 }>();
 
-const searchLeft = ref('');
-const searchRight = ref('');
+const searchLeft = ref("");
+const searchRight = ref("");
 const leftSelected = ref<string[]>([]);
 const rightSelected = ref<string[]>([]);
 
 // Create a map for O(1) lookups instead of O(n) find operations
-const itemsMap = computed(() =>
-  new Map(props.allItems.map(item => [item.value, item]))
+const itemsMap = computed(
+  () => new Map(props.allItems.map((item) => [item.value, item])),
 );
 
 const availableItems = computed(() => {
-  return props.allItems.filter(item => !props.modelValue.includes(item.value));
+  return props.allItems.filter(
+    (item) => !props.modelValue.includes(item.value),
+  );
 });
 
 const selectedItems = computed(() => {
   return props.modelValue
-    .map(value => itemsMap.value.get(value))
+    .map((value) => itemsMap.value.get(value))
     .filter((item): item is Item => item !== undefined);
 });
 
 const filteredSelected = computed(() => {
   if (!searchLeft.value) return selectedItems.value;
   const query = searchLeft.value.toLowerCase();
-  return selectedItems.value.filter(item => item.label.toLowerCase().includes(query));
+  return selectedItems.value.filter((item) =>
+    item.label.toLowerCase().includes(query),
+  );
 });
 
 const filteredAvailable = computed(() => {
   if (!searchRight.value) return availableItems.value;
   const query = searchRight.value.toLowerCase();
-  return availableItems.value.filter(item => item.label.toLowerCase().includes(query));
+  return availableItems.value.filter((item) =>
+    item.label.toLowerCase().includes(query),
+  );
 });
 
 const toggleLeftSelection = (value: string) => {
@@ -224,44 +246,55 @@ const toggleRightSelection = (value: string) => {
 
 const addSelected = () => {
   const newValue = [...props.modelValue, ...rightSelected.value];
-  emit('update:modelValue', newValue);
+  emit("update:modelValue", newValue);
   rightSelected.value = [];
 };
 
 const addAll = () => {
-  const newValue = [...props.modelValue, ...availableItems.value.map(i => i.value)];
-  emit('update:modelValue', newValue);
+  const newValue = [
+    ...props.modelValue,
+    ...availableItems.value.map((i) => i.value),
+  ];
+  emit("update:modelValue", newValue);
   rightSelected.value = [];
 };
 
 const removeSelected = () => {
-  const newValue = props.modelValue.filter(v => !leftSelected.value.includes(v));
-  emit('update:modelValue', newValue);
+  const newValue = props.modelValue.filter(
+    (v) => !leftSelected.value.includes(v),
+  );
+  emit("update:modelValue", newValue);
   leftSelected.value = [];
 };
 
 const removeAll = () => {
-  emit('update:modelValue', []);
+  emit("update:modelValue", []);
   leftSelected.value = [];
   rightSelected.value = [];
 };
 
 const removeItem = (value: string) => {
-  const newValue = props.modelValue.filter(v => v !== value);
-  emit('update:modelValue', newValue);
+  const newValue = props.modelValue.filter((v) => v !== value);
+  emit("update:modelValue", newValue);
 };
 
 const moveUp = (index: number) => {
   if (index === 0) return;
   const newValue = [...props.modelValue];
-  [newValue[index - 1], newValue[index]] = [newValue[index], newValue[index - 1]];
-  emit('update:modelValue', newValue);
+  [newValue[index - 1], newValue[index]] = [
+    newValue[index],
+    newValue[index - 1],
+  ];
+  emit("update:modelValue", newValue);
 };
 
 const moveDown = (index: number) => {
   if (index === props.modelValue.length - 1) return;
   const newValue = [...props.modelValue];
-  [newValue[index], newValue[index + 1]] = [newValue[index + 1], newValue[index]];
-  emit('update:modelValue', newValue);
+  [newValue[index], newValue[index + 1]] = [
+    newValue[index + 1],
+    newValue[index],
+  ];
+  emit("update:modelValue", newValue);
 };
 </script>

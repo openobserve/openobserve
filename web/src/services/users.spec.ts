@@ -34,20 +34,20 @@ describe("Users Service", () => {
         data: {
           list: [
             { email: "user1@example.com", name: "User 1" },
-            { email: "user2@example.com", name: "User 2" }
+            { email: "user2@example.com", name: "User 2" },
           ],
-          total: 2
-        }
+          total: 2,
+        },
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockUsers)
+        get: vi.fn().mockResolvedValue(mockUsers),
       } as any);
 
       const result = await users.list(1, 10, "name", false, "test");
 
       expect(mockHttp().get).toHaveBeenCalledWith(
-        "/api/users?page_num=1&page_size=10&sort_by=name&desc=false&name=test"
+        "/api/users?page_num=1&page_size=10&sort_by=name&desc=false&name=test",
       );
       expect(result).toEqual(mockUsers);
     });
@@ -56,13 +56,13 @@ describe("Users Service", () => {
       const mockUsers = { data: { list: [], total: 0 } };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockUsers)
+        get: vi.fn().mockResolvedValue(mockUsers),
       } as any);
 
       await users.list(1, 10, "email", true, "");
 
       expect(mockHttp().get).toHaveBeenCalledWith(
-        "/api/users?page_num=1&page_size=10&sort_by=email&desc=true&name="
+        "/api/users?page_num=1&page_size=10&sort_by=email&desc=true&name=",
       );
     });
   });
@@ -72,22 +72,22 @@ describe("Users Service", () => {
       const userData = {
         email: "newuser@example.com",
         name: "New User",
-        role: "admin"
+        role: "admin",
       };
 
       const mockResponse = {
-        data: { id: 1, ...userData }
+        data: { id: 1, ...userData },
       };
 
       mockHttp.mockReturnValue({
-        post: vi.fn().mockResolvedValue(mockResponse)
+        post: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await users.create(userData, mockOrgId);
 
       expect(mockHttp().post).toHaveBeenCalledWith(
         `/api/${mockOrgId}/users`,
-        userData
+        userData,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -97,10 +97,12 @@ describe("Users Service", () => {
       const mockError = new Error("Email already exists");
 
       mockHttp.mockReturnValue({
-        post: vi.fn().mockRejectedValue(mockError)
+        post: vi.fn().mockRejectedValue(mockError),
       } as any);
 
-      await expect(users.create(userData, mockOrgId)).rejects.toThrow("Email already exists");
+      await expect(users.create(userData, mockOrgId)).rejects.toThrow(
+        "Email already exists",
+      );
     });
   });
 
@@ -108,22 +110,22 @@ describe("Users Service", () => {
     it("should update an existing user", async () => {
       const updateData = {
         name: "Updated User",
-        role: "viewer"
+        role: "viewer",
       };
 
       const mockResponse = {
-        data: { email: mockUserEmail, ...updateData }
+        data: { email: mockUserEmail, ...updateData },
       };
 
       mockHttp.mockReturnValue({
-        put: vi.fn().mockResolvedValue(mockResponse)
+        put: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await users.update(updateData, mockOrgId, mockUserEmail);
 
       expect(mockHttp().put).toHaveBeenCalledWith(
         `/api/${mockOrgId}/users/${mockUserEmail}`,
-        updateData
+        updateData,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -135,14 +137,18 @@ describe("Users Service", () => {
       const mockResponse = { data: { success: true } };
 
       mockHttp.mockReturnValue({
-        post: vi.fn().mockResolvedValue(mockResponse)
+        post: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
-      const result = await users.updateexistinguser(updateData, mockOrgId, mockUserEmail);
+      const result = await users.updateexistinguser(
+        updateData,
+        mockOrgId,
+        mockUserEmail,
+      );
 
       expect(mockHttp().post).toHaveBeenCalledWith(
         `/api/${mockOrgId}/users/${mockUserEmail}`,
-        updateData
+        updateData,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -153,13 +159,13 @@ describe("Users Service", () => {
       const mockResponse = { data: { message: "User deleted successfully" } };
 
       mockHttp.mockReturnValue({
-        delete: vi.fn().mockResolvedValue(mockResponse)
+        delete: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await users.delete(mockOrgId, mockUserEmail);
 
       expect(mockHttp().delete).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/users/${mockUserEmail}`
+        `/api/${mockOrgId}/users/${mockUserEmail}`,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -168,10 +174,12 @@ describe("Users Service", () => {
       const mockError = new Error("User not found");
 
       mockHttp.mockReturnValue({
-        delete: vi.fn().mockRejectedValue(mockError)
+        delete: vi.fn().mockRejectedValue(mockError),
       } as any);
 
-      await expect(users.delete(mockOrgId, mockUserEmail)).rejects.toThrow("User not found");
+      await expect(users.delete(mockOrgId, mockUserEmail)).rejects.toThrow(
+        "User not found",
+      );
     });
   });
 
@@ -180,13 +188,13 @@ describe("Users Service", () => {
       const mockResponse = { data: { exists: true, verified: true } };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockResponse)
+        get: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await users.verifyUser(mockUserEmail);
 
       expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/users/verifyuser/${mockUserEmail}`
+        `/api/users/verifyuser/${mockUserEmail}`,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -197,22 +205,22 @@ describe("Users Service", () => {
       const newUserData = {
         email: "newuser@example.com",
         name: "New User",
-        password: "password123"
+        password: "password123",
       };
 
       const mockResponse = {
-        data: { id: 1, email: newUserData.email, name: newUserData.name }
+        data: { id: 1, email: newUserData.email, name: newUserData.name },
       };
 
       mockHttp.mockReturnValue({
-        post: vi.fn().mockResolvedValue(mockResponse)
+        post: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await users.addNewUser(newUserData);
 
       expect(mockHttp().post).toHaveBeenCalledWith(
         "/api/users/new_user",
-        newUserData
+        newUserData,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -223,12 +231,12 @@ describe("Users Service", () => {
       const mockOrgUsers = {
         data: [
           { email: "admin@example.com", role: "admin" },
-          { email: "user@example.com", role: "user" }
-        ]
+          { email: "user@example.com", role: "user" },
+        ],
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockOrgUsers)
+        get: vi.fn().mockResolvedValue(mockOrgUsers),
       } as any);
 
       const result = await users.orgUsers(mockOrgId);
@@ -241,11 +249,11 @@ describe("Users Service", () => {
   describe("getRefreshToken", () => {
     it("should get refresh token", async () => {
       const mockTokenResponse = {
-        data: { token: "new-refresh-token", expires_at: "2024-12-31" }
+        data: { token: "new-refresh-token", expires_at: "2024-12-31" },
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockTokenResponse)
+        get: vi.fn().mockResolvedValue(mockTokenResponse),
       } as any);
 
       const result = await users.getRefreshToken();
@@ -258,16 +266,18 @@ describe("Users Service", () => {
   describe("getRoles", () => {
     it("should fetch available roles for organization", async () => {
       const mockRoles = {
-        data: ["admin", "user", "viewer", "editor"]
+        data: ["admin", "user", "viewer", "editor"],
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockRoles)
+        get: vi.fn().mockResolvedValue(mockRoles),
       } as any);
 
       const result = await users.getRoles(mockOrgId);
 
-      expect(mockHttp().get).toHaveBeenCalledWith(`/api/${mockOrgId}/users/roles`);
+      expect(mockHttp().get).toHaveBeenCalledWith(
+        `/api/${mockOrgId}/users/roles`,
+      );
       expect(result).toEqual(mockRoles);
     });
   });
@@ -275,11 +285,11 @@ describe("Users Service", () => {
   describe("logout", () => {
     it("should logout user", async () => {
       const mockLogoutResponse = {
-        data: { message: "Logged out successfully" }
+        data: { message: "Logged out successfully" },
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockLogoutResponse)
+        get: vi.fn().mockResolvedValue(mockLogoutResponse),
       } as any);
 
       const result = await users.logout();
@@ -294,18 +304,18 @@ describe("Users Service", () => {
       const mockGroups = {
         data: [
           { id: 1, name: "Admin Group" },
-          { id: 2, name: "User Group" }
-        ]
+          { id: 2, name: "User Group" },
+        ],
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockGroups)
+        get: vi.fn().mockResolvedValue(mockGroups),
       } as any);
 
       const result = await users.getUserGroups(mockOrgId, mockUserEmail);
 
       expect(mockHttp().get).toHaveBeenCalledWith(
-        `api/${mockOrgId}/users/${mockUserEmail}/groups`
+        `api/${mockOrgId}/users/${mockUserEmail}/groups`,
       );
       expect(result).toEqual(mockGroups);
     });
@@ -314,17 +324,17 @@ describe("Users Service", () => {
   describe("getUserRoles", () => {
     it("should fetch user roles", async () => {
       const mockUserRoles = {
-        data: ["admin", "user"]
+        data: ["admin", "user"],
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockUserRoles)
+        get: vi.fn().mockResolvedValue(mockUserRoles),
       } as any);
 
       const result = await users.getUserRoles(mockOrgId, mockUserEmail);
 
       expect(mockHttp().get).toHaveBeenCalledWith(
-        `api/${mockOrgId}/users/${mockUserEmail}/roles`
+        `api/${mockOrgId}/users/${mockUserEmail}/roles`,
       );
       expect(result).toEqual(mockUserRoles);
     });
@@ -335,12 +345,12 @@ describe("Users Service", () => {
       const mockInvites = {
         data: [
           { email: "invite1@example.com", status: "pending" },
-          { email: "invite2@example.com", status: "accepted" }
-        ]
+          { email: "invite2@example.com", status: "accepted" },
+        ],
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockInvites)
+        get: vi.fn().mockResolvedValue(mockInvites),
       } as any);
 
       const result = await users.invitedUsers(mockOrgId);
@@ -353,31 +363,41 @@ describe("Users Service", () => {
   describe("Error Handling", () => {
     it("should handle network errors across all methods", async () => {
       const networkError = new Error("Network connection failed");
-      
+
       mockHttp.mockReturnValue({
         get: vi.fn().mockRejectedValue(networkError),
         post: vi.fn().mockRejectedValue(networkError),
         put: vi.fn().mockRejectedValue(networkError),
-        delete: vi.fn().mockRejectedValue(networkError)
+        delete: vi.fn().mockRejectedValue(networkError),
       } as any);
 
-      await expect(users.list(1, 10, "name", false, "")).rejects.toThrow("Network connection failed");
-      await expect(users.orgUsers(mockOrgId)).rejects.toThrow("Network connection failed");
-      await expect(users.create({}, mockOrgId)).rejects.toThrow("Network connection failed");
-      await expect(users.update({}, mockOrgId, mockUserEmail)).rejects.toThrow("Network connection failed");
-      await expect(users.delete(mockOrgId, mockUserEmail)).rejects.toThrow("Network connection failed");
+      await expect(users.list(1, 10, "name", false, "")).rejects.toThrow(
+        "Network connection failed",
+      );
+      await expect(users.orgUsers(mockOrgId)).rejects.toThrow(
+        "Network connection failed",
+      );
+      await expect(users.create({}, mockOrgId)).rejects.toThrow(
+        "Network connection failed",
+      );
+      await expect(users.update({}, mockOrgId, mockUserEmail)).rejects.toThrow(
+        "Network connection failed",
+      );
+      await expect(users.delete(mockOrgId, mockUserEmail)).rejects.toThrow(
+        "Network connection failed",
+      );
     });
 
     it("should handle HTTP error responses", async () => {
       const httpError = {
         response: {
           status: 403,
-          data: { message: "Insufficient permissions" }
-        }
+          data: { message: "Insufficient permissions" },
+        },
       };
 
       mockHttp.mockReturnValue({
-        post: vi.fn().mockRejectedValue(httpError)
+        post: vi.fn().mockRejectedValue(httpError),
       } as any);
 
       await expect(users.create({}, mockOrgId)).rejects.toEqual(httpError);
@@ -389,16 +409,19 @@ describe("Users Service", () => {
       const userData = {
         email: "workflow@example.com",
         name: "Workflow User",
-        role: "admin"
+        role: "admin",
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn()
+        get: vi
+          .fn()
           .mockResolvedValueOnce({ data: { exists: false } }) // verifyUser
           .mockResolvedValueOnce({ data: [{ email: userData.email }] }), // orgUsers
         post: vi.fn().mockResolvedValue({ data: { id: 1, ...userData } }), // create
-        put: vi.fn().mockResolvedValue({ data: { ...userData, name: "Updated Name" } }), // update
-        delete: vi.fn().mockResolvedValue({ data: { message: "Deleted" } }) // delete
+        put: vi
+          .fn()
+          .mockResolvedValue({ data: { ...userData, name: "Updated Name" } }), // update
+        delete: vi.fn().mockResolvedValue({ data: { message: "Deleted" } }), // delete
       } as any);
 
       // Check if user exists
@@ -410,7 +433,11 @@ describe("Users Service", () => {
       expect(createdUser.data.email).toBe(userData.email);
 
       // Update user
-      const updatedUser = await users.update({ name: "Updated Name" }, mockOrgId, userData.email);
+      const updatedUser = await users.update(
+        { name: "Updated Name" },
+        mockOrgId,
+        userData.email,
+      );
       expect(updatedUser.data.name).toBe("Updated Name");
 
       // Get org users

@@ -61,7 +61,9 @@ const props = withDefaults(defineProps<Props>(), {
 const visibleFields = computed(() => {
   return props.fields.filter((field) => {
     // Show field if condition is not specified or if condition is true
-    return field.condition !== false && field.value != null && field.value !== "";
+    return (
+      field.condition !== false && field.value != null && field.value !== ""
+    );
   });
 });
 </script>

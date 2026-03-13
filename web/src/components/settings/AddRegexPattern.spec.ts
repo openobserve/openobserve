@@ -91,9 +91,7 @@ const setupStoreForTest = () => {
 // Create a real router instance for proper injection
 const router = createRouter({
   history: createWebHistory(),
-  routes: [
-    { path: '/', name: 'settings', component: AddRegexPattern },
-  ],
+  routes: [{ path: "/", name: "settings", component: AddRegexPattern }],
 });
 
 // Mock Vue Router
@@ -128,7 +126,20 @@ const createWrapper = (props = {}, options = {}) => {
             :data-test='$attrs["data-test"]'
             @click='$emit("click", $event)'
           ><slot></slot></button>`,
-          props: ["data-test", "disable", "label", "loading", "type", "ripple", "borderless", "flat", "dense", "class", "style", "no-caps"],
+          props: [
+            "data-test",
+            "disable",
+            "label",
+            "loading",
+            "type",
+            "ripple",
+            "borderless",
+            "flat",
+            "dense",
+            "class",
+            "style",
+            "no-caps",
+          ],
           emits: ["click"],
         },
         QInput: {
@@ -139,11 +150,20 @@ const createWrapper = (props = {}, options = {}) => {
             @input='$emit("update:modelValue", $event.target.value)'
             :disabled='disable || readonly'
           />`,
-          props: ["modelValue", "disable", "readonly", "label", "rules", "type", "rows"],
+          props: [
+            "modelValue",
+            "disable",
+            "readonly",
+            "label",
+            "rules",
+            "type",
+            "rows",
+          ],
           emits: ["update:modelValue"],
         },
         QForm: {
-          template: "<form data-test-stub='q-form' @submit.prevent='$emit(\"submit\")'><slot></slot></form>",
+          template:
+            "<form data-test-stub='q-form' @submit.prevent='$emit(\"submit\")'><slot></slot></form>",
           emits: ["submit"],
         },
         QSeparator: {
@@ -158,7 +178,8 @@ const createWrapper = (props = {}, options = {}) => {
           props: ["color", "size"],
         },
         FullViewContainer: {
-          template: "<div data-test-stub='full-view-container'><slot></slot><slot name='right'></slot></div>",
+          template:
+            "<div data-test-stub='full-view-container'><slot></slot><slot name='right'></slot></div>",
           props: ["name", "isExpanded", "label", "labelClass"],
           emits: ["update:isExpanded"],
         },
@@ -210,13 +231,17 @@ describe("AddRegexPattern", () => {
   describe("Props handling", () => {
     it("should handle isEdit prop correctly for create mode", () => {
       const wrapper = createWrapper({ isEdit: false });
-      const nameInput = wrapper.find('[data-test="add-regex-pattern-name-input"]');
+      const nameInput = wrapper.find(
+        '[data-test="add-regex-pattern-name-input"]',
+      );
       expect(nameInput.attributes("disabled")).toBeUndefined();
     });
 
     it("should handle isEdit prop correctly for edit mode", () => {
       const wrapper = createWrapper({ isEdit: true });
-      const nameInput = wrapper.find('[data-test="add-regex-pattern-name-input"]');
+      const nameInput = wrapper.find(
+        '[data-test="add-regex-pattern-name-input"]',
+      );
       expect(nameInput.attributes("disabled")).toBeDefined();
     });
 
@@ -226,14 +251,16 @@ describe("AddRegexPattern", () => {
         pattern: "\\d+",
         description: "Test Description",
       };
-      const wrapper = createWrapper({ 
-        isEdit: true, 
-        data: testData 
+      const wrapper = createWrapper({
+        isEdit: true,
+        data: testData,
       });
 
       expect(wrapper.vm.regexPatternInputs.name).toBe("Test Pattern");
       expect(wrapper.vm.regexPatternInputs.pattern).toBe("\\d+");
-      expect(wrapper.vm.regexPatternInputs.description).toBe("Test Description");
+      expect(wrapper.vm.regexPatternInputs.description).toBe(
+        "Test Description",
+      );
     });
   });
 
@@ -251,12 +278,12 @@ describe("AddRegexPattern", () => {
 
     it("should enable save button when required fields are filled", async () => {
       const wrapper = createWrapper();
-      
+
       // Directly modify the component's reactive data
       wrapper.vm.regexPatternInputs.name = "Test Pattern";
       wrapper.vm.regexPatternInputs.pattern = "\\d+";
       wrapper.vm.regexPatternInputs.description = "";
-      
+
       await nextTick();
       const saveBtn = wrapper.find('[data-test="add-regex-pattern-save-btn"]');
       if (saveBtn.exists()) {
@@ -274,12 +301,12 @@ describe("AddRegexPattern", () => {
 
     it("should validate pattern field is required", async () => {
       const wrapper = createWrapper();
-      
+
       // Directly modify the component's reactive data
       wrapper.vm.regexPatternInputs.name = "Test Pattern";
       wrapper.vm.regexPatternInputs.pattern = "";
       wrapper.vm.regexPatternInputs.description = "";
-      
+
       await nextTick();
       expect(wrapper.vm.isFormEmpty).toBe(true);
     });
@@ -288,8 +315,10 @@ describe("AddRegexPattern", () => {
   describe("Button interactions", () => {
     it("should emit close event when back button is clicked", async () => {
       const wrapper = createWrapper();
-      const backBtn = wrapper.find('[data-test-stub="q-btn"][data-test="add-regex-pattern-back-btn"]');
-      
+      const backBtn = wrapper.find(
+        '[data-test-stub="q-btn"][data-test="add-regex-pattern-back-btn"]',
+      );
+
       if (backBtn.exists()) {
         await backBtn.trigger("click");
         expect(wrapper.emitted("close")).toBeTruthy();
@@ -302,7 +331,7 @@ describe("AddRegexPattern", () => {
 
     it("should emit close event when close button is clicked", async () => {
       const wrapper = createWrapper();
-      
+
       // Test the component method directly
       wrapper.vm.$emit("close");
       expect(wrapper.emitted("close")).toBeTruthy();
@@ -310,7 +339,7 @@ describe("AddRegexPattern", () => {
 
     it("should emit close event when cancel button is clicked", async () => {
       const wrapper = createWrapper();
-      
+
       // Test the component method directly
       wrapper.vm.$emit("close");
       expect(wrapper.emitted("close")).toBeTruthy();
@@ -318,22 +347,27 @@ describe("AddRegexPattern", () => {
 
     it("should toggle full screen mode when fullscreen button is clicked", async () => {
       const wrapper = createWrapper();
-      
+
       const initialValue = wrapper.vm.isFullScreen;
       wrapper.vm.isFullScreen = !initialValue;
       await nextTick();
-      
+
       expect(wrapper.vm.isFullScreen).toBe(!initialValue);
     });
 
     it("should toggle AI chat when AI button is clicked", async () => {
       mockStore.state.zoConfig.ai_enabled = true;
       const wrapper = createWrapper();
-      const aiBtn = wrapper.find('[data-test="add-regex-pattern-open-close-ai-btn"]');
-      
+      const aiBtn = wrapper.find(
+        '[data-test="add-regex-pattern-open-close-ai-btn"]',
+      );
+
       if (aiBtn.exists()) {
         await aiBtn.trigger("click");
-        expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
+        expect(mockStore.dispatch).toHaveBeenCalledWith(
+          "setIsAiChatEnabled",
+          true,
+        );
       }
     });
   });
@@ -341,7 +375,7 @@ describe("AddRegexPattern", () => {
   describe("Form submission", () => {
     it("should create new regex pattern successfully", async () => {
       const wrapper = createWrapper();
-      
+
       // Directly set the component's reactive data instead of using setData
       wrapper.vm.regexPatternInputs.name = "Test Pattern";
       wrapper.vm.regexPatternInputs.pattern = "\\d+";
@@ -350,15 +384,15 @@ describe("AddRegexPattern", () => {
 
       // Call the save method directly
       const savePromise = wrapper.vm.saveRegexPattern();
-      
+
       // Initially isSaving should be true
       expect(wrapper.vm.isSaving).toBe(true);
 
       // Wait for async operation to complete
       await savePromise;
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       await wrapper.vm.$nextTick();
-      
+
       // After completion, isSaving should be false
       expect(wrapper.vm.isSaving).toBe(false);
     });
@@ -371,16 +405,16 @@ describe("AddRegexPattern", () => {
         description: "Test Description",
       };
 
-      const wrapper = createWrapper({ 
-        isEdit: true, 
-        data: testData 
+      const wrapper = createWrapper({
+        isEdit: true,
+        data: testData,
       });
 
       const form = wrapper.find('[data-test-stub="q-form"]');
       await form.trigger("submit");
 
       // Wait for async operation to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       await wrapper.vm.$nextTick();
 
       // Verify the component behavior after successful save
@@ -389,7 +423,7 @@ describe("AddRegexPattern", () => {
 
     it("should emit update:list event after successful save", async () => {
       const wrapper = createWrapper();
-      
+
       // Directly set the component's reactive data instead of using setData
       wrapper.vm.regexPatternInputs.name = "Test Pattern";
       wrapper.vm.regexPatternInputs.pattern = "\\d+";
@@ -398,11 +432,11 @@ describe("AddRegexPattern", () => {
 
       // Call the save method directly
       await wrapper.vm.saveRegexPattern();
-      
+
       // Wait for async operation to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.emitted("update:list")).toBeTruthy();
       expect(wrapper.emitted("close")).toBeTruthy();
     });
@@ -413,13 +447,13 @@ describe("AddRegexPattern", () => {
         http.post("http://localhost:5080/api/:org/re_patterns", () => {
           return HttpResponse.json(
             { message: "Pattern already exists" },
-            { status: 400 }
+            { status: 400 },
           );
-        })
+        }),
       );
 
       const wrapper = createWrapper();
-      
+
       // Set form data directly
       wrapper.vm.regexPatternInputs.name = "Test Pattern";
       wrapper.vm.regexPatternInputs.pattern = "\\d+";
@@ -428,7 +462,7 @@ describe("AddRegexPattern", () => {
 
       // Call the save method directly
       await wrapper.vm.saveRegexPattern();
-      
+
       await nextTick();
       expect(wrapper.vm.isSaving).toBe(false);
     });
@@ -437,7 +471,7 @@ describe("AddRegexPattern", () => {
   describe("Pattern testing functionality", () => {
     it("should test regex pattern with input string", async () => {
       const wrapper = createWrapper();
-      
+
       // Set test data directly
       wrapper.vm.regexPatternInputs.pattern = "\\d+";
       wrapper.vm.testString = "abc123def";
@@ -445,9 +479,9 @@ describe("AddRegexPattern", () => {
 
       // MSW will handle the HTTP request and return test results
       await wrapper.vm.testStringOutput();
-      
+
       // Wait for async operation to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.outputString).toBe("123");
@@ -460,38 +494,38 @@ describe("AddRegexPattern", () => {
         http.post("http://localhost:5080/api/:org/re_patterns/test", () => {
           return HttpResponse.json(
             { message: "Invalid pattern" },
-            { status: 400 }
+            { status: 400 },
           );
-        })
+        }),
       );
 
       const wrapper = createWrapper();
-      
+
       // Set test data directly
       wrapper.vm.regexPatternInputs.pattern = "[invalid";
       wrapper.vm.testString = "test";
       await nextTick();
 
       await wrapper.vm.testStringOutput();
-      
+
       expect(wrapper.vm.testLoading).toBe(false);
     });
 
     it("should show loading state during test", async () => {
       const wrapper = createWrapper();
-      
+
       // Directly set the component's reactive data instead of using setData
       wrapper.vm.regexPatternInputs.pattern = "\\d+";
       wrapper.vm.testString = "123";
       await nextTick();
 
       const testPromiseCall = wrapper.vm.testStringOutput();
-      
+
       expect(wrapper.vm.testLoading).toBe(true);
-      
+
       // Wait for the test to complete
       await testPromiseCall;
-      
+
       expect(wrapper.vm.testLoading).toBe(false);
     });
   });
@@ -500,20 +534,22 @@ describe("AddRegexPattern", () => {
     it("should show AI button when enterprise and AI is enabled", async () => {
       // Set up the conditions needed for AI button to show
       mockStore.state.zoConfig.ai_enabled = true;
-      
+
       const wrapper = createWrapper();
       await nextTick();
-      
+
       // Verify the conditions are met for AI button to show
-      expect(wrapper.vm.config.isEnterprise).toBe('true');
+      expect(wrapper.vm.config.isEnterprise).toBe("true");
       expect(wrapper.vm.store.state.zoConfig.ai_enabled).toBe(true);
-      
+
       // Look for button that should have the AI attributes
       const allBtns = wrapper.findAll('[data-test-stub="q-btn"]');
-      const aiBtn = allBtns.find(btn => {
-        return btn.attributes('data-test') === 'add-regex-pattern-open-close-ai-btn';
+      const aiBtn = allBtns.find((btn) => {
+        return (
+          btn.attributes("data-test") === "add-regex-pattern-open-close-ai-btn"
+        );
       });
-      
+
       if (aiBtn) {
         expect(aiBtn.exists()).toBe(true);
       } else {
@@ -525,15 +561,17 @@ describe("AddRegexPattern", () => {
 
     it("should hide AI button when AI is disabled", async () => {
       mockStore.state.zoConfig.ai_enabled = false;
-      
+
       // Keep enterprise enabled but AI disabled
       const config = await import("@/aws-exports");
       vi.mocked(config.default).isEnterprise = "true";
-      
+
       const wrapper = createWrapper();
       await nextTick();
-      
-      const aiBtn = wrapper.find('[data-test="add-regex-pattern-open-close-ai-btn"]');
+
+      const aiBtn = wrapper.find(
+        '[data-test="add-regex-pattern-open-close-ai-btn"]',
+      );
       expect(aiBtn.exists()).toBe(false);
     });
 
@@ -553,10 +591,10 @@ describe("AddRegexPattern", () => {
 
     it("should disable test button when pattern is empty", async () => {
       const wrapper = createWrapper();
-      
+
       wrapper.vm.regexPatternInputs.pattern = "";
       await nextTick();
-      
+
       // Test the component behavior rather than implementation
       expect(wrapper.vm.regexPatternInputs.pattern).toBe("");
       expect(wrapper.vm.regexPatternInputs.pattern.length).toBe(0);
@@ -567,7 +605,7 @@ describe("AddRegexPattern", () => {
     it("should apply dark theme classes when theme is dark", async () => {
       mockStore.state.theme = "dark";
       const wrapper = createWrapper();
-      
+
       const container = wrapper.find(".q-pt-md");
       expect(container.classes()).toContain("bg-dark");
       expect(container.classes()).toContain("add-regex-pattern-dark");
@@ -576,7 +614,7 @@ describe("AddRegexPattern", () => {
     it("should apply light theme classes when theme is light", async () => {
       mockStore.state.theme = "light";
       const wrapper = createWrapper();
-      
+
       const container = wrapper.find(".q-pt-md");
       expect(container.classes()).toContain("bg-white");
       expect(container.classes()).toContain("add-regex-pattern-light");
@@ -586,15 +624,21 @@ describe("AddRegexPattern", () => {
   describe("Accessibility", () => {
     it("should have proper data-test attributes for all interactive elements", () => {
       const wrapper = createWrapper();
-      
+
       // Test that the component has the main input fields
-      expect(wrapper.find('[data-test="add-regex-pattern-name-input"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="add-regex-pattern-input"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="add-regex-pattern-name-input"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="add-regex-pattern-input"]').exists(),
+      ).toBe(true);
     });
 
     it("should have tabindex on pattern input for keyboard navigation", () => {
       const wrapper = createWrapper();
-      const patternInput = wrapper.find('[data-test="add-regex-pattern-input"]');
+      const patternInput = wrapper.find(
+        '[data-test="add-regex-pattern-input"]',
+      );
       expect(patternInput.attributes("tabindex")).toBe("0");
     });
   });
@@ -612,9 +656,9 @@ describe("AddRegexPattern", () => {
         pattern: "\\d+",
         description: undefined,
       };
-      const wrapper = createWrapper({ 
-        isEdit: true, 
-        data: testData 
+      const wrapper = createWrapper({
+        isEdit: true,
+        data: testData,
       });
 
       expect(wrapper.vm.regexPatternInputs.description).toBe("");
@@ -624,16 +668,16 @@ describe("AddRegexPattern", () => {
       // Set up the store state
       mockStore.state.organizationData.regexPatternPrompt = "Test prompt";
       mockStore.state.organizationData.regexPatternTestValue = "Test value";
-      
+
       // Navigate to a route with the 'from' query parameter
-      await router.push({ path: '/', query: { from: 'logs' } });
-      
+      await router.push({ path: "/", query: { from: "logs" } });
+
       const wrapper = createWrapper();
-      
+
       // Wait for component to mount and process the data
       await wrapper.vm.$nextTick();
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       expect(wrapper.vm.inputContext).toBe("Test prompt");
       expect(wrapper.vm.testString).toBe("Test value");
     });
@@ -641,7 +685,7 @@ describe("AddRegexPattern", () => {
     it("should handle component width calculations based on AI chat state", async () => {
       mockStore.state.isAiChatEnabled = true;
       const wrapper = createWrapper();
-      
+
       // Component should adjust width when AI chat is enabled
       const container = wrapper.find(".q-pt-md");
       expect(container.attributes("style")).toContain("70vw");
@@ -649,10 +693,10 @@ describe("AddRegexPattern", () => {
 
     it("should handle full screen mode width calculations", async () => {
       const wrapper = createWrapper();
-      
+
       wrapper.vm.isFullScreen = true;
       await nextTick();
-      
+
       expect(wrapper.vm.isFullScreen).toBe(true);
     });
   });

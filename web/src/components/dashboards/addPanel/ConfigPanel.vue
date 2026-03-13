@@ -326,7 +326,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="info"
             data-test="dashboard-config-trellis-group-by-y-axis-info"
           />
-          <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
+          <q-tooltip class="bg-grey-8" anchor="top middle"
+self="bottom middle">
             <div>
               <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipTitle") }}</b>
               <br /><br />
@@ -2692,11 +2693,11 @@ export default defineComponent({
     const existingRange = dashboardPanelData.data.config?.panel_time_range;
     const pickerValue = ref(
       existingRange
-        ? convertPanelTimeRangeToPicker(existingRange) ?? {
+        ? (convertPanelTimeRangeToPicker(existingRange) ?? {
             type: "relative",
             valueType: "relative",
             relativeTimePeriod: "15m",
-          }
+          })
         : {
             type: "relative",
             valueType: "relative",

@@ -16,7 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="sidebar" :class="{ open: isOpen }">
-    <div v-if="!isOpen" class="sidebar-header-collapsed" @click="toggleSidebar">
+    <div v-if="!isOpen" class="sidebar-header-collapsed"
+@click="toggleSidebar">
       <!-- <div class="collapsed-icon">+</div> -->
       <q-icon
         name="expand_all"
@@ -35,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-sidebar-collapse-btn"
       />
     </div>
-    <q-separator style="margin-top: -1px; flex-shrink: 0;" />
+    <q-separator style="margin-top: -1px; flex-shrink: 0" />
     <div class="sidebar-content scroll" v-if="isOpen">
       <slot></slot>
     </div>
@@ -69,7 +70,7 @@ export default defineComponent({
       () => props.modelValue,
       (value) => {
         isOpen.value = value;
-      }
+      },
     );
 
     return {

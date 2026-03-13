@@ -114,7 +114,7 @@ describe("RealUserMonitoring.vue", () => {
       },
       iconMapFn: vi.fn((iconName: string) => iconName),
       iconSet: {
-        name: 'material-icons',
+        name: "material-icons",
       },
       notify: vi.fn(),
     };
@@ -176,7 +176,10 @@ describe("RealUserMonitoring.vue", () => {
     it("should show loading spinner when RUM status is being checked", async () => {
       let resolveGetStream: any;
       mockGetStream.mockImplementation(
-        () => new Promise((resolve) => { resolveGetStream = resolve; })
+        () =>
+          new Promise((resolve) => {
+            resolveGetStream = resolve;
+          }),
       );
 
       const wrapper = mount(RealUserMonitoring, {
@@ -200,7 +203,7 @@ describe("RealUserMonitoring.vue", () => {
 
       expect(wrapper.find(".q-spinner-hourglass").exists()).toBe(true);
       expect(wrapper.text()).toContain(
-        "Hold on tight, we're loading RUM data."
+        "Hold on tight, we're loading RUM data.",
       );
 
       // Resolve the promise
@@ -374,7 +377,7 @@ describe("RealUserMonitoring.vue", () => {
       expect(mockGetStream).toHaveBeenCalledWith(
         "_sessionreplay",
         "logs",
-        false
+        false,
       );
     });
 
@@ -399,7 +402,11 @@ describe("RealUserMonitoring.vue", () => {
 
       // Check that getStream was called to fetch schema
       expect(mockGetStream).toHaveBeenCalledWith("_rumdata", "logs", true);
-      expect(mockGetStream).toHaveBeenCalledWith("_sessionreplay", "logs", true);
+      expect(mockGetStream).toHaveBeenCalledWith(
+        "_sessionreplay",
+        "logs",
+        true,
+      );
     });
   });
 

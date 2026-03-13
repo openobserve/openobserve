@@ -12,128 +12,151 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { describe, it, expect } from 'vitest';
-import { slackTemplate, slackConfig, slackDestinationType } from '@/utils/prebuilt-templates/slack';
+import { describe, it, expect } from "vitest";
+import {
+  slackTemplate,
+  slackConfig,
+  slackDestinationType,
+} from "@/utils/prebuilt-templates/slack";
 
-describe('slack template', () => {
-  describe('slackTemplate', () => {
-    it('has correct name', () => {
-      expect(slackTemplate.name).toBe('prebuilt_slack');
+describe("slack template", () => {
+  describe("slackTemplate", () => {
+    it("has correct name", () => {
+      expect(slackTemplate.name).toBe("prebuilt_slack");
     });
 
-    it('has type as http', () => {
-      expect(slackTemplate.type).toBe('http');
+    it("has type as http", () => {
+      expect(slackTemplate.type).toBe("http");
     });
 
-    it('is not default', () => {
+    it("is not default", () => {
       expect(slackTemplate.isDefault).toBe(false);
     });
 
-    it('has valid JSON body', () => {
+    it("has valid JSON body", () => {
       expect(() => JSON.parse(slackTemplate.body)).not.toThrow();
     });
 
-    it('body contains Slack-specific fields', () => {
+    it("body contains Slack-specific fields", () => {
       const body = JSON.parse(slackTemplate.body);
-      expect(body).toHaveProperty('blocks');
+      expect(body).toHaveProperty("blocks");
       expect(Array.isArray(body.blocks)).toBe(true);
     });
 
-    it('body contains alert placeholders', () => {
-      expect(slackTemplate.body).toContain('{alert_name}');
+    it("body contains alert placeholders", () => {
+      expect(slackTemplate.body).toContain("{alert_name}");
     });
   });
 
-  describe('slackConfig', () => {
-    it('references correct template name', () => {
-      expect(slackConfig.templateName).toBe('prebuilt_slack');
+  describe("slackConfig", () => {
+    it("references correct template name", () => {
+      expect(slackConfig.templateName).toBe("prebuilt_slack");
     });
 
-    it('has correct headers', () => {
-      expect(slackConfig.headers).toHaveProperty('Content-Type');
-      expect(slackConfig.headers['Content-Type']).toBe('application/json');
+    it("has correct headers", () => {
+      expect(slackConfig.headers).toHaveProperty("Content-Type");
+      expect(slackConfig.headers["Content-Type"]).toBe("application/json");
     });
 
-    it('uses POST method', () => {
-      expect(slackConfig.method).toBe('post');
+    it("uses POST method", () => {
+      expect(slackConfig.method).toBe("post");
     });
 
-    it('has URL validator function', () => {
-      expect(typeof slackConfig.urlValidator).toBe('function');
+    it("has URL validator function", () => {
+      expect(typeof slackConfig.urlValidator).toBe("function");
     });
 
-    it('URL validator accepts valid Slack webhook URLs', () => {
-      const validUrl = 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX';
+    it("URL validator accepts valid Slack webhook URLs", () => {
+      const validUrl =
+        "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX";
       expect(slackConfig.urlValidator(validUrl)).toBe(true);
-      expect(slackConfig.urlValidator('https://hooks.slack.com/services/xxx')).toBe(true);
+      expect(
+        slackConfig.urlValidator("https://hooks.slack.com/services/xxx"),
+      ).toBe(true);
     });
 
-    it('URL validator rejects invalid URLs', () => {
-      expect(slackConfig.urlValidator('https://example.com/webhook')).toBe(false);
-      expect(slackConfig.urlValidator('http://hooks.slack.com/services/xxx')).toBe(false);
-      expect(slackConfig.urlValidator('https://evil.com?hooks.slack.com=fake')).toBe(false);
-      expect(slackConfig.urlValidator('invalid-url')).toBe(false);
+    it("URL validator rejects invalid URLs", () => {
+      expect(slackConfig.urlValidator("https://example.com/webhook")).toBe(
+        false,
+      );
+      expect(
+        slackConfig.urlValidator("http://hooks.slack.com/services/xxx"),
+      ).toBe(false);
+      expect(
+        slackConfig.urlValidator("https://evil.com?hooks.slack.com=fake"),
+      ).toBe(false);
+      expect(slackConfig.urlValidator("invalid-url")).toBe(false);
     });
 
-    it('has credential fields', () => {
+    it("has credential fields", () => {
       expect(slackConfig.credentialFields).toBeInstanceOf(Array);
       expect(slackConfig.credentialFields.length).toBeGreaterThan(0);
     });
 
-    it('webhook URL field is required', () => {
-      const webhookField = slackConfig.credentialFields.find(f => f.key === 'webhookUrl');
+    it("webhook URL field is required", () => {
+      const webhookField = slackConfig.credentialFields.find(
+        (f) => f.key === "webhookUrl",
+      );
       expect(webhookField).toBeDefined();
       expect(webhookField?.required).toBe(true);
-      expect(webhookField?.type).toBe('text');
+      expect(webhookField?.type).toBe("text");
     });
 
-    it('webhook URL validator validates Slack URLs', () => {
-      const webhookField = slackConfig.credentialFields.find(f => f.key === 'webhookUrl');
+    it("webhook URL validator validates Slack URLs", () => {
+      const webhookField = slackConfig.credentialFields.find(
+        (f) => f.key === "webhookUrl",
+      );
       const validator = webhookField?.validator;
-      expect(typeof validator).toBe('function');
+      expect(typeof validator).toBe("function");
 
       if (validator) {
         // Valid URLs
-        expect(validator('https://hooks.slack.com/services/xxx')).toBe(true);
-        expect(validator('https://hooks.slack.com/services/T00000000/B00000000/XXXX')).toBe(true);
+        expect(validator("https://hooks.slack.com/services/xxx")).toBe(true);
+        expect(
+          validator(
+            "https://hooks.slack.com/services/T00000000/B00000000/XXXX",
+          ),
+        ).toBe(true);
 
         // Invalid URLs
-        expect(validator('https://example.com')).not.toBe(true);
-        expect(validator('http://hooks.slack.com/services/xxx')).not.toBe(true);
-        expect(validator('https://evil.com?hooks.slack.com=fake')).not.toBe(true);
-        expect(validator('invalid-url')).not.toBe(true);
+        expect(validator("https://example.com")).not.toBe(true);
+        expect(validator("http://hooks.slack.com/services/xxx")).not.toBe(true);
+        expect(validator("https://evil.com?hooks.slack.com=fake")).not.toBe(
+          true,
+        );
+        expect(validator("invalid-url")).not.toBe(true);
       }
     });
   });
 
-  describe('slackDestinationType', () => {
-    it('has correct ID', () => {
-      expect(slackDestinationType.id).toBe('slack');
+  describe("slackDestinationType", () => {
+    it("has correct ID", () => {
+      expect(slackDestinationType.id).toBe("slack");
     });
 
-    it('has display name', () => {
-      expect(slackDestinationType.name).toBe('Slack');
+    it("has display name", () => {
+      expect(slackDestinationType.name).toBe("Slack");
     });
 
-    it('has description', () => {
+    it("has description", () => {
       expect(slackDestinationType.description).toBeTruthy();
-      expect(typeof slackDestinationType.description).toBe('string');
+      expect(typeof slackDestinationType.description).toBe("string");
     });
 
-    it('has icon', () => {
+    it("has icon", () => {
       expect(slackDestinationType.icon).toBeTruthy();
     });
 
-    it('has image', () => {
+    it("has image", () => {
       expect(slackDestinationType.image).toBeTruthy();
     });
 
-    it('is marked as popular', () => {
+    it("is marked as popular", () => {
       expect(slackDestinationType.popular).toBe(true);
     });
 
-    it('has correct category', () => {
-      expect(slackDestinationType.category).toBe('messaging');
+    it("has correct category", () => {
+      expect(slackDestinationType.category).toBe("messaging");
     });
   });
 });

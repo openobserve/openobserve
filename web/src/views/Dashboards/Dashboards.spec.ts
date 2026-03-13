@@ -51,57 +51,57 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
 }));
 
 // Mock DOM methods to prevent Quasar errors
-Object.defineProperty(Element.prototype, 'removeAttribute', {
+Object.defineProperty(Element.prototype, "removeAttribute", {
   writable: true,
   value: vi.fn(),
 });
 
-Object.defineProperty(Element.prototype, 'setAttribute', {
+Object.defineProperty(Element.prototype, "setAttribute", {
   writable: true,
   value: vi.fn(),
 });
 
-Object.defineProperty(Element.prototype, 'getAttribute', {
+Object.defineProperty(Element.prototype, "getAttribute", {
   writable: true,
-  value: vi.fn().mockReturnValue(''),
+  value: vi.fn().mockReturnValue(""),
 });
 
-Object.defineProperty(Element.prototype, 'insertBefore', {
-  writable: true,
-  value: vi.fn(),
-});
-
-Object.defineProperty(Element.prototype, 'appendChild', {
+Object.defineProperty(Element.prototype, "insertBefore", {
   writable: true,
   value: vi.fn(),
 });
 
-Object.defineProperty(Element.prototype, 'removeChild', {
+Object.defineProperty(Element.prototype, "appendChild", {
   writable: true,
   value: vi.fn(),
 });
 
-Object.defineProperty(Element.prototype, 'addEventListener', {
+Object.defineProperty(Element.prototype, "removeChild", {
   writable: true,
   value: vi.fn(),
 });
 
-Object.defineProperty(Element.prototype, 'removeEventListener', {
+Object.defineProperty(Element.prototype, "addEventListener", {
   writable: true,
   value: vi.fn(),
 });
 
-Object.defineProperty(Node.prototype, 'insertBefore', {
+Object.defineProperty(Element.prototype, "removeEventListener", {
   writable: true,
   value: vi.fn(),
 });
 
-Object.defineProperty(Node.prototype, 'appendChild', {
+Object.defineProperty(Node.prototype, "insertBefore", {
   writable: true,
   value: vi.fn(),
 });
 
-Object.defineProperty(Node.prototype, 'removeChild', {
+Object.defineProperty(Node.prototype, "appendChild", {
+  writable: true,
+  value: vi.fn(),
+});
+
+Object.defineProperty(Node.prototype, "removeChild", {
   writable: true,
   value: vi.fn(),
 });
@@ -198,7 +198,7 @@ describe("Dashboards.vue", () => {
     const mockElement = {
       setAttribute: vi.fn(),
       removeAttribute: vi.fn(),
-      getAttribute: vi.fn().mockReturnValue(''),
+      getAttribute: vi.fn().mockReturnValue(""),
       insertBefore: vi.fn(),
       appendChild: vi.fn(),
       removeChild: vi.fn(),
@@ -214,14 +214,14 @@ describe("Dashboards.vue", () => {
       parentNode: null,
       childNodes: [],
     };
-    
+
     document.createElement = vi.fn().mockReturnValue(mockElement);
     document.body.appendChild = vi.fn();
     document.body.insertBefore = vi.fn();
     document.body.removeChild = vi.fn();
 
     // Mock AbortController
-    global.AbortController = vi.fn(function() {
+    global.AbortController = vi.fn(function () {
       return {
         abort: vi.fn(),
         signal: {},
@@ -229,9 +229,9 @@ describe("Dashboards.vue", () => {
     }) as any;
 
     // Mock window methods
-    Object.defineProperty(window, 'getComputedStyle', {
+    Object.defineProperty(window, "getComputedStyle", {
       value: vi.fn().mockReturnValue({
-        getPropertyValue: vi.fn().mockReturnValue(''),
+        getPropertyValue: vi.fn().mockReturnValue(""),
       }),
     });
   });
@@ -403,7 +403,7 @@ describe("Dashboards.vue", () => {
 
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.vm.activeFolderId).toBeDefined();
-      
+
       // Test that updateActiveFolderId method works
       expect(wrapper.vm.updateActiveFolderId).toBeDefined();
       wrapper.vm.updateActiveFolderId("folder1");
@@ -465,7 +465,7 @@ describe("Dashboards.vue", () => {
       expect(columns).toBeDefined();
       expect(Array.isArray(columns)).toBe(true);
       expect(columns.length).toBeGreaterThan(0);
-      
+
       // Check specific required columns
       const columnNames = columns.map((col: any) => col.name);
       expect(columnNames).toContain("#");
@@ -479,8 +479,8 @@ describe("Dashboards.vue", () => {
       testStore.state.organizationData.allDashboardList = {
         default: [
           { dashboardId: "dash1", title: "Dashboard 1" },
-          { dashboardId: "dash2", title: "Dashboard 2" }
-        ]
+          { dashboardId: "dash2", title: "Dashboard 2" },
+        ],
       };
 
       wrapper = shallowMount(Dashboards, {
@@ -533,8 +533,8 @@ describe("Dashboards.vue", () => {
         default: [
           { dashboardId: "dash1", title: "Dashboard 1" },
           { dashboardId: "dash2", title: "Dashboard 2" },
-          { dashboardId: "dash3", title: "Dashboard 3" }
-        ]
+          { dashboardId: "dash3", title: "Dashboard 3" },
+        ],
       };
 
       wrapper = shallowMount(Dashboards, {
@@ -621,10 +621,10 @@ describe("Dashboards.vue", () => {
       await nextTick();
 
       expect(wrapper.vm.showAddDashboardDialog).toBe(false);
-      
+
       // Call addDashboard method
       wrapper.vm.addDashboard();
-      
+
       expect(wrapper.vm.showAddDashboardDialog).toBe(true);
     });
 
@@ -669,10 +669,10 @@ describe("Dashboards.vue", () => {
 
       expect(wrapper.vm.showAddFolderDialog).toBe(false);
       expect(wrapper.vm.isFolderEditMode).toBe(false);
-      
+
       // Call addFolder method
       wrapper.vm.addFolder();
-      
+
       expect(wrapper.vm.showAddFolderDialog).toBe(true);
       expect(wrapper.vm.isFolderEditMode).toBe(false);
     });
@@ -717,7 +717,7 @@ describe("Dashboards.vue", () => {
       await nextTick();
 
       expect(wrapper.vm.showDeleteDialogFn).toBeDefined();
-      expect(typeof wrapper.vm.showDeleteDialogFn).toBe('function');
+      expect(typeof wrapper.vm.showDeleteDialogFn).toBe("function");
     });
 
     it("should handle editFolder method", async () => {
@@ -760,13 +760,13 @@ describe("Dashboards.vue", () => {
       await nextTick();
 
       const testFolderId = "test-folder-id";
-      
+
       expect(wrapper.vm.selectedFolderToEdit).toBeFalsy();
       expect(wrapper.vm.isFolderEditMode).toBe(false);
       expect(wrapper.vm.showAddFolderDialog).toBe(false);
-      
+
       wrapper.vm.editFolder(testFolderId);
-      
+
       expect(wrapper.vm.selectedFolderToEdit).toBe(testFolderId);
       expect(wrapper.vm.isFolderEditMode).toBe(true);
       expect(wrapper.vm.showAddFolderDialog).toBe(true);
@@ -814,12 +814,12 @@ describe("Dashboards.vue", () => {
       // Set up some search data
       wrapper.vm.searchQuery = "test search";
       wrapper.vm.filteredResults = [{ id: 1, title: "Test Result" }];
-      
+
       expect(wrapper.vm.searchQuery).toBe("test search");
       expect(wrapper.vm.filteredResults).toHaveLength(1);
-      
+
       wrapper.vm.clearSearchHistory();
-      
+
       expect(wrapper.vm.searchQuery).toBe("");
       expect(wrapper.vm.filteredResults).toEqual([]);
     });

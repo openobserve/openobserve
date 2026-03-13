@@ -16,37 +16,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);">
-    <div v-if="!showAddDialog" >
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+  <q-page
+    class="q-pa-none"
+    style="min-height: inherit; height: calc(100vh - 88px)"
+  >
+    <div v-if="!showAddDialog">
+      <div
+        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
       >
-            <div
-              class="q-table__title tw:font-[600]"
-              data-test="cipher-keys-list-title"
-            >
-              {{ t("cipherKey.header") }}
-            </div>
-            <div class="col-auto flex">
-              <q-input
-                v-model="filterQuery"
-                borderless
-                dense
-                class="q-ml-auto no-border o2-search-input"
-                :placeholder="t('cipherKey.search')"
-              >
-                <template #prepend>
-                  <q-icon class="o2-search-input-icon" name="search" />
-                </template>
-              </q-input>
-              <q-btn
-                class="o2-primary-button q-ml-sm tw:h-[36px]"
-                no-caps
-                flat
-                :label="t(`cipherKey.add`)"
-                @click="addCipherKey"
-              />
-            </div>
-          </div>
+        <div
+          class="q-table__title tw:font-[600]"
+          data-test="cipher-keys-list-title"
+        >
+          {{ t("cipherKey.header") }}
+        </div>
+        <div class="col-auto flex">
+          <q-input
+            v-model="filterQuery"
+            borderless
+            dense
+            class="q-ml-auto no-border o2-search-input"
+            :placeholder="t('cipherKey.search')"
+          >
+            <template #prepend>
+              <q-icon class="o2-search-input-icon" name="search" />
+            </template>
+          </q-input>
+          <q-btn
+            class="o2-primary-button q-ml-sm tw:h-[36px]"
+            no-caps
+            flat
+            :label="t(`cipherKey.add`)"
+            @click="addCipherKey"
+          />
+        </div>
+      </div>
       <q-table
         ref="qTable"
         :rows="visibleRows"
@@ -56,13 +60,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model:selected="selectedKeys"
         :pagination="pagination"
         class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-        :style="hasVisibleRows
+        :style="
+          hasVisibleRows
             ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;'
-            : 'width: 100%'"
+            : 'width: 100%'
+        "
       >
         <template #no-data><NoData /></template>
         <template v-slot:body-selection="scope">
-          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+          <q-checkbox
+            v-model="scope.selected"
+            size="sm"
+            class="o2-table-checkbox"
+          />
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
@@ -93,9 +103,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
         </template>
         <template #bottom="scope">
-          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
-              {{ resultTotal }} {{ t('cipherKey.header') }}
+          <div
+            class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+          >
+            <div
+              class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md"
+            >
+              {{ resultTotal }} {{ t("cipherKey.header") }}
             </div>
             <q-btn
               v-if="selectedKeys.length > 0"
@@ -123,29 +137,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Adding this block to render the select-all checkbox -->
-              <q-th v-if="columns.length > 0" auto-width>
-                <q-checkbox
-                  v-model="props.selected"
-                  size="sm"
-                  :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                  class="o2-table-checkbox"
-                />
-              </q-th>
+          <q-tr :props="props">
+            <!-- Adding this block to render the select-all checkbox -->
+            <q-th v-if="columns.length > 0" auto-width>
+              <q-checkbox
+                v-model="props.selected"
+                size="sm"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-table-checkbox-dark'
+                    : 'o2-table-checkbox-light'
+                "
+                class="o2-table-checkbox"
+              />
+            </q-th>
 
-              <!-- Render the table headers -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
+            <!-- Render the table headers -->
+            <q-th
+              v-for="col in props.cols"
+              :key="col.name"
+              :props="props"
+              :class="col.classes"
+              :style="col.style"
+            >
+              {{ col.label }}
+            </q-th>
+          </q-tr>
+        </template>
       </q-table>
     </div>
     <div v-else>
@@ -170,7 +188,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onUpdated, watch, Ref, computed } from "vue";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  onUpdated,
+  watch,
+  Ref,
+  computed,
+} from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, date, copyToClipboard, QTableProps } from "quasar";
@@ -241,7 +267,7 @@ export default defineComponent({
         label: t("cipherKey.actions"),
         align: "left",
         sortable: false,
-        classes:'actions-column'
+        classes: "actions-column",
       },
     ]);
     const perPageOptions = [
@@ -422,15 +448,15 @@ export default defineComponent({
       confirmDelete.value.data = null;
     };
     const filterData = (rows: string | any[], terms: string) => {
-        const filtered = [];
-        terms = terms.toLowerCase();
-        for (let i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
+      const filtered = [];
+      terms = terms.toLowerCase();
+      for (let i = 0; i < rows.length; i++) {
+        if (rows[i]["name"].toLowerCase().includes(terms)) {
+          filtered.push(rows[i]);
         }
-        return filtered;
-      };
+      }
+      return filtered;
+    };
 
     const visibleRows = computed(() => {
       if (!filterQuery.value) return tabledata.value || [];
@@ -439,9 +465,13 @@ export default defineComponent({
     const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
     // Watch visibleRows to sync resultTotal with search filter
-    watch(visibleRows, (newVisibleRows) => {
-      resultTotal.value = newVisibleRows.length;
-    }, { immediate: true });
+    watch(
+      visibleRows,
+      (newVisibleRows) => {
+        resultTotal.value = newVisibleRows.length;
+      },
+      { immediate: true },
+    );
 
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
@@ -450,7 +480,10 @@ export default defineComponent({
     const bulkDeleteCipherKeys = () => {
       const keyNames = selectedKeys.value.map((key: any) => key.name);
 
-      CipherKeysService.bulkDelete(store.state.selectedOrganization.identifier, { ids: keyNames })
+      CipherKeysService.bulkDelete(
+        store.state.selectedOrganization.identifier,
+        { ids: keyNames },
+      )
         .then((res) => {
           const { successful, unsuccessful } = res.data;
 
@@ -482,7 +515,10 @@ export default defineComponent({
           if (err.response?.status != 403 || err?.status != 403) {
             $q.notify({
               type: "negative",
-              message: err.response?.data?.message || err?.message || "Error while deleting cipher keys",
+              message:
+                err.response?.data?.message ||
+                err?.message ||
+                "Error while deleting cipher keys",
               timeout: 2000,
             });
           }

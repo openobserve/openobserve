@@ -243,14 +243,16 @@ describe("LicensePeriod.vue", () => {
       const span = wrapper.find(".o2-license-subtitle");
       expect(span.exists()).toBe(true);
       expect(span.text()).toContain(
-        "Please update your license by contacting your administrator."
+        "Please update your license by contacting your administrator.",
       );
     });
 
     it("should display the expiry message text in the template", () => {
       wrapper = createWrapper(makeStore(nowPlusDays(5)));
       const span = wrapper.find(".o2-license-message");
-      expect(span.text()).toMatch(/5 days remaining until your license expires/);
+      expect(span.text()).toMatch(
+        /5 days remaining until your license expires/,
+      );
     });
 
     it("should display expired message in the template", () => {
@@ -268,9 +270,7 @@ describe("LicensePeriod.vue", () => {
     });
 
     it("should not throw when mounted without zoConfig", () => {
-      expect(() =>
-        createWrapper({ state: { zoConfig: {} } })
-      ).not.toThrow();
+      expect(() => createWrapper({ state: { zoConfig: {} } })).not.toThrow();
     });
 
     it("should unmount gracefully", () => {

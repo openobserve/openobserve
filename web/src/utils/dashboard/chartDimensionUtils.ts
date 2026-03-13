@@ -132,7 +132,8 @@ export const calculateRotatedLabelBottomSpace = (
     // We just need to add enough space for the axis name itself (~20px)
     // and some buffer.
     const axisNameEstimatedHeight = 20;
-    const totalNeededSpace = (nameGap || verticalHeight + 10) + axisNameEstimatedHeight;
+    const totalNeededSpace =
+      (nameGap || verticalHeight + 10) + axisNameEstimatedHeight;
 
     // Default bottom spacing in charts is typically ~35-50px.
     // Only add if totalNeeded exceeds a reasonable base (e.g., 40px)

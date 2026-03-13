@@ -594,11 +594,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Evaluations View - only for LLM traces with evaluation data -->
             <div
-              v-if="hasLLMSpans && evalPipelineExists && activeTab === 'evaluations'"
+              v-if="
+                hasLLMSpans && evalPipelineExists && activeTab === 'evaluations'
+              "
               style="display: flex; flex: 1; min-height: 0; overflow-y: auto"
               class="tw:w-full tw:bg-[var(--o2-card-bg)]!"
             >
               <TraceEvaluationsView
+                ref="traceEvaluationsViewRef"
                 data-test="trace-details-evaluations"
                 :eval-data="evalData"
                 :is-loading="isLoadingEvalData"
@@ -1025,6 +1028,7 @@ export default defineComponent({
     const evalPipelineStreamName = ref<string | null>(null);
     const evalData = ref<any[]>([]);
     const isLoadingEvalData = ref(false);
+    const traceEvaluationsViewRef = ref<any>(null);
 
     // Computed properties for new header
     const errorSpansCount = computed(() => {
@@ -1059,7 +1063,11 @@ export default defineComponent({
         tabs.push({ label: "DAG", value: "dag" });
       }
       // Conditionally add Evaluations tab for LLM traces with evaluation data
-      if (hasLLMSpans.value && evalPipelineExists.value && evalData.value.length > 0) {
+      if (
+        hasLLMSpans.value &&
+        evalPipelineExists.value &&
+        evalData.value.length > 0
+      ) {
         tabs.push({ label: "Evaluations", value: "evaluations" });
       }
       return tabs;
@@ -1156,7 +1164,11 @@ export default defineComponent({
 
     // Watch for trace ID changes to fetch evaluation data
     watch(
-      () => [effectiveTraceId.value, evalPipelineExists.value, evalPipelineStreamName.value],
+      () => [
+        effectiveTraceId.value,
+        evalPipelineExists.value,
+        evalPipelineStreamName.value,
+      ],
       async ([traceId, pipelineExists, streamName]) => {
         if (pipelineExists && streamName && traceId) {
           await fetchEvalData();
@@ -2321,7 +2333,12 @@ export default defineComponent({
         const res = await pipelineService.getPipelines(orgId);
         const pipelines: any[] = res.data?.list || [];
 
-        console.log("[TraceEval] Fetched pipelines:", pipelines.length, "Stream:", currentTraceStreamName.value);
+        console.log(
+          "[TraceEval] Fetched pipelines:",
+          pipelines.length,
+          "Stream:",
+          currentTraceStreamName.value,
+        );
 
         // Find pipeline with matching source stream and llm_evaluation node
         const evalPipeline = pipelines.find(
@@ -2341,9 +2358,15 @@ export default defineComponent({
           evalPipelineStreamName.value =
             evalOutputNode?.data?.stream_name ||
             `${currentTraceStreamName.value}_evaluations`;
-          console.log("[TraceEval] Found eval pipeline, stream:", evalPipelineStreamName.value);
+          console.log(
+            "[TraceEval] Found eval pipeline, stream:",
+            evalPipelineStreamName.value,
+          );
         } else {
-          console.log("[TraceEval] No eval pipeline found for stream:", currentTraceStreamName.value);
+          console.log(
+            "[TraceEval] No eval pipeline found for stream:",
+            currentTraceStreamName.value,
+          );
           evalPipelineExists.value = false;
           evalPipelineStreamName.value = null;
         }
@@ -2369,15 +2392,18 @@ export default defineComponent({
 
       isLoadingEvalData.value = true;
       try {
-        console.log("[TraceEval] Fetching data from stream:", evalPipelineStreamName.value, "traceId:", effectiveTraceId.value);
+        console.log(
+          "[TraceEval] Fetching data from stream:",
+          evalPipelineStreamName.value,
+          "traceId:",
+          effectiveTraceId.value,
+        );
 
         const req = {
           query: {
             sql: `SELECT * FROM "${evalPipelineStreamName.value}" WHERE trace_id = '${effectiveTraceId.value}' ORDER BY _timestamp ASC`,
-            start_time:
-              effectiveTimeRange.value.from - 60000000,
-            end_time:
-              effectiveTimeRange.value.to + 60000000,
+            start_time: effectiveTimeRange.value.from - 60000000,
+            end_time: effectiveTimeRange.value.to + 60000000,
             from: 0,
             size: 100,
           },
@@ -2395,7 +2421,20 @@ export default defineComponent({
         );
 
         evalData.value = res.data?.hits || [];
-        console.log("[TraceEval] Fetched evaluation records:", evalData.value.length);
+        console.log(
+          "[TraceEval] Fetched evaluation records:",
+          evalData.value.length,
+        );
+
+        // Load templates for the current org
+        if (
+          traceEvaluationsViewRef.value?.loadTemplates &&
+          effectiveOrgIdentifier.value
+        ) {
+          await traceEvaluationsViewRef.value.loadTemplates(
+            effectiveOrgIdentifier.value,
+          );
+        }
       } catch (error) {
         console.error("Error fetching evaluation data:", error);
         evalData.value = [];
@@ -2510,6 +2549,7 @@ export default defineComponent({
       evalPipelineStreamName,
       evalData,
       isLoadingEvalData,
+      traceEvaluationsViewRef,
       fetchEvalPipeline,
       fetchEvalData,
     };

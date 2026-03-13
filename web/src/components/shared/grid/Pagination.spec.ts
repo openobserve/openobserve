@@ -9,15 +9,15 @@ import { createRouter, createWebHistory } from "vue-router";
 installQuasar();
 
 vi.mock("@/utils/zincutils", () => ({
-  getImageURL: vi.fn((path) => `/mocked/${path}`)
+  getImageURL: vi.fn((path) => `/mocked/${path}`),
 }));
 
 const mockRouter = createRouter({
   history: createWebHistory(),
   routes: [
     { path: "/", component: { template: "<div>Home</div>" } },
-    { path: "/logs", name: "logs", component: { template: "<div>Logs</div>" } }
-  ]
+    { path: "/logs", name: "logs", component: { template: "<div>Logs</div>" } },
+  ],
 });
 
 describe("Pagination", () => {
@@ -52,7 +52,7 @@ describe("Pagination", () => {
         position: "bottom",
         maxRecordToReturn: 1000,
         perPageOptions: [10, 20, 50, 100],
-        ...props
+        ...props,
       },
       global: {
         plugins: [i18n, mockRouter],
@@ -60,22 +60,23 @@ describe("Pagination", () => {
           store,
         },
         stubs: {
-          'q-input': {
-            template: '<input @blur="$emit(\'blur\', $event)" />',
+          "q-input": {
+            template: "<input @blur=\"$emit('blur', $event)\" />",
           },
-          'q-select': {
-            template: '<select @update:modelValue="$emit(\'update:modelValue\', $event)"><option value="10">10</option><option value="20">20</option></select>',
+          "q-select": {
+            template:
+              '<select @update:modelValue="$emit(\'update:modelValue\', $event)"><option value="10">10</option><option value="20">20</option></select>',
           },
-          'q-btn': {
-            template: '<button @click="$emit(\'click\')"><slot /></button>'
+          "q-btn": {
+            template: "<button @click=\"$emit('click')\"><slot /></button>",
           },
-          'q-btn-group': {
-            template: '<div class="q-btn-group"><slot /></div>'
+          "q-btn-group": {
+            template: '<div class="q-btn-group"><slot /></div>',
           },
-          'q-separator': {
-            template: '<div class="q-separator"></div>'
-          }
-        }
+          "q-separator": {
+            template: '<div class="q-separator"></div>',
+          },
+        },
       },
     });
   };
@@ -87,9 +88,9 @@ describe("Pagination", () => {
 
   it("should have correct props", () => {
     wrapper = createWrapper({ maxRecordToReturn: 2000 });
-    expect(wrapper.props('scope')).toBeDefined();
-    expect(wrapper.props('maxRecordToReturn')).toBe(2000);
-    expect(wrapper.props('position')).toBe("bottom");
+    expect(wrapper.props("scope")).toBeDefined();
+    expect(wrapper.props("maxRecordToReturn")).toBe(2000);
+    expect(wrapper.props("position")).toBe("bottom");
   });
 
   it("should render without errors", () => {

@@ -18,7 +18,7 @@ import { computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
-import { b64EncodeUnicode, useLocalLogFilterField, } from "@/utils/zincutils";
+import { b64EncodeUnicode, useLocalLogFilterField } from "@/utils/zincutils";
 
 import {
   encodeVisualizationConfig,
@@ -179,7 +179,8 @@ export const logsUtils = () => {
       const sql: string | undefined = parser?.sqlify(parsedObj);
       return sql || "";
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       console.info(`Error while unparsing SQL : ${errorMessage}`);
       return "";
     }
@@ -215,9 +216,7 @@ export const logsUtils = () => {
    *
    * @throws {Error} Logs error to console for invalid period formats
    */
-  const extractTimestamps = (
-    period: string,
-  ): TimestampRange | undefined => {
+  const extractTimestamps = (period: string): TimestampRange | undefined => {
     if (!period || typeof period !== "string") {
       console.error("Invalid period: must be a non-empty string");
       return undefined;
@@ -330,14 +329,12 @@ export const logsUtils = () => {
    * console.log(isLimitQuery(null)); // false
    * ```
    */
-  const isLimitQuery = (
-    parsedSQL: ParsedSQLResult | null = null,
-  ): boolean => {
+  const isLimitQuery = (parsedSQL: ParsedSQLResult | null = null): boolean => {
     return Boolean(
       parsedSQL?.limit &&
-        parsedSQL.limit.value &&
-        Array.isArray(parsedSQL.limit.value) &&
-        parsedSQL.limit.value.length > 0,
+      parsedSQL.limit.value &&
+      Array.isArray(parsedSQL.limit.value) &&
+      parsedSQL.limit.value.length > 0,
     );
   };
 
@@ -394,13 +391,11 @@ export const logsUtils = () => {
    * console.log(isWithQuery(null)); // false
    * ```
    */
-  const isWithQuery = (
-    parsedSQL: ParsedSQLResult | any = null,
-  ): boolean => {
+  const isWithQuery = (parsedSQL: ParsedSQLResult | any = null): boolean => {
     return Boolean(
       parsedSQL?.with &&
-        Array.isArray(parsedSQL.with) &&
-        parsedSQL.with.length > 0,
+      Array.isArray(parsedSQL.with) &&
+      parsedSQL.with.length > 0,
     );
   };
 
@@ -680,10 +675,7 @@ export const logsUtils = () => {
 
     // Preserve build data in URL
     // - If in build mode and build panel data is provided, encode the buildPanelData
-    if (
-      searchObj.meta.logsVisualizeToggle === "build" &&
-      buildPanelData
-    ) {
+    if (searchObj.meta.logsVisualizeToggle === "build" && buildPanelData) {
       const buildData = getBuildConfig(buildPanelData);
       if (buildData) {
         const encoded = encodeBuildConfig(buildData);
@@ -703,10 +695,14 @@ export const logsUtils = () => {
     return query;
   };
 
-  const updateUrlQueryParams = (dashboardPanelData: any = null, buildPanelData: any = null) => {
+  const updateUrlQueryParams = (
+    dashboardPanelData: any = null,
+    buildPanelData: any = null,
+  ) => {
     const query = generateURLQuery(false, dashboardPanelData, buildPanelData);
     if (
-      (Object.hasOwn(query, "type") && query.type == "search_history_re_apply") ||
+      (Object.hasOwn(query, "type") &&
+        query.type == "search_history_re_apply") ||
       query.type == "search_scheduler"
     ) {
       delete query.type;

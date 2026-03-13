@@ -22,28 +22,28 @@ import StreamService from "@/services/stream";
 vi.mock("@/services/stream", () => ({
   default: {
     nameList: vi.fn(),
-    schema: vi.fn()
-  }
+    schema: vi.fn(),
+  },
 }));
 
 // Mock Quasar
 const mockNotify = vi.fn().mockReturnValue(() => {});
 vi.mock("quasar", () => ({
   useQuasar: () => ({
-    notify: mockNotify
-  })
+    notify: mockNotify,
+  }),
 }));
 
 // Mock utilities
 vi.mock("@/utils/zincutils", () => ({
-  deepCopy: vi.fn((obj) => JSON.parse(JSON.stringify(obj)))
+  deepCopy: vi.fn((obj) => JSON.parse(JSON.stringify(obj))),
 }));
 
 // Mock Store
 const createMockStore = () => ({
   state: {
     selectedOrganization: {
-      identifier: "test-org"
+      identifier: "test-org",
     },
     streams: {
       logs: null,
@@ -58,22 +58,22 @@ const createMockStore = () => ({
         traces: {},
         enrichment_tables: {},
         index: {},
-        metadata: {}
+        metadata: {},
       },
-      areStreamsFetched: false
+      areStreamsFetched: false,
     },
     organizationData: {
-      isDataIngested: false
-    }
+      isDataIngested: false,
+    },
   },
   dispatch: vi.fn(),
-  commit: vi.fn()
+  commit: vi.fn(),
 });
 
 let mockStore: ReturnType<typeof createMockStore>;
 
 vi.mock("vuex", () => ({
-  useStore: () => mockStore
+  useStore: () => mockStore,
 }));
 
 describe("useStreams Composable", () => {
@@ -82,15 +82,13 @@ describe("useStreams Composable", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockStore = createMockStore();
-    
+
     // Set up default mocks
     const mockStreamService = vi.mocked(StreamService);
     mockStreamService.nameList.mockResolvedValue({
-      data: { 
-        list: [
-          { name: "test-stream", stream_type: "logs" }
-        ]
-      }
+      data: {
+        list: [{ name: "test-stream", stream_type: "logs" }],
+      },
     });
     mockStreamService.schema.mockResolvedValue({
       data: {
@@ -100,9 +98,9 @@ describe("useStreams Composable", () => {
           { name: "field1", type: "string" },
           { name: "_o2_id", type: "string" },
           { name: "_original", type: "string" },
-          { name: "_all_values", type: "string" }
-        ]
-      }
+          { name: "_all_values", type: "string" },
+        ],
+      },
     });
 
     streamsInstance = useStreams();
@@ -116,18 +114,33 @@ describe("useStreams Composable", () => {
   describe("Composable Initialization", () => {
     it("should initialize useStreams composable with all methods", () => {
       expect(streamsInstance).toBeDefined();
-      
+
       const expectedMethods = [
-        'getStreams', 'getStream', 'setStreams', 'getMultiStreams',
-        'resetStreams', 'removeStream', 'addStream', 'getUpdatedSettings',
-        'resetStreamType', 'getPaginatedStreams', 'isStreamExists',
-        'isStreamFetched', 'addNewStreams', 'updateStreamsInStore',
-        'updateStreamIndexMappingInStore', 'updateStreamsFetchedInStore',
-        'getAllStreamsPayload', 'removeSchemaFields', 'getStreamPayload',
-        'compareArrays', 'deepEqual', 'comparePatternAssociations'
+        "getStreams",
+        "getStream",
+        "setStreams",
+        "getMultiStreams",
+        "resetStreams",
+        "removeStream",
+        "addStream",
+        "getUpdatedSettings",
+        "resetStreamType",
+        "getPaginatedStreams",
+        "isStreamExists",
+        "isStreamFetched",
+        "addNewStreams",
+        "updateStreamsInStore",
+        "updateStreamIndexMappingInStore",
+        "updateStreamsFetchedInStore",
+        "getAllStreamsPayload",
+        "removeSchemaFields",
+        "getStreamPayload",
+        "compareArrays",
+        "deepEqual",
+        "comparePatternAssociations",
       ];
 
-      expectedMethods.forEach(method => {
+      expectedMethods.forEach((method) => {
         expect(streamsInstance).toHaveProperty(method);
         expect(typeof streamsInstance[method]).toBe("function");
       });
@@ -139,35 +152,44 @@ describe("useStreams Composable", () => {
     it("should call store dispatch for updateStreamsInStore", () => {
       const streamType = "logs";
       const streams = { list: [] };
-      
+
       streamsInstance.updateStreamsInStore(streamType, streams);
-      
-      expect(mockStore.dispatch).toHaveBeenCalledWith("streams/setStreams", { streamType, streams });
+
+      expect(mockStore.dispatch).toHaveBeenCalledWith("streams/setStreams", {
+        streamType,
+        streams,
+      });
     });
 
     it("should call store commit for updateStreamIndexMappingInStore", () => {
-      const indexMapping = { logs: { "test": 0 } };
-      
+      const indexMapping = { logs: { test: 0 } };
+
       streamsInstance.updateStreamIndexMappingInStore(indexMapping);
-      
-      expect(mockStore.commit).toHaveBeenCalledWith("streams/updateStreamIndexMapping", indexMapping);
+
+      expect(mockStore.commit).toHaveBeenCalledWith(
+        "streams/updateStreamIndexMapping",
+        indexMapping,
+      );
     });
 
     it("should call store commit for updateStreamsFetchedInStore", () => {
       const areStreamsFetched = true;
-      
+
       streamsInstance.updateStreamsFetchedInStore(areStreamsFetched);
-      
-      expect(mockStore.commit).toHaveBeenCalledWith("streams/updateStreamsFetched", areStreamsFetched);
+
+      expect(mockStore.commit).toHaveBeenCalledWith(
+        "streams/updateStreamsFetched",
+        areStreamsFetched,
+      );
     });
 
     it("should return stream payload structure from getStreamPayload", () => {
       const payload = streamsInstance.getStreamPayload();
-      
+
       expect(payload).toEqual({
         name: "",
         list: [],
-        schema: false
+        schema: false,
       });
     });
   });
@@ -176,19 +198,23 @@ describe("useStreams Composable", () => {
   describe("Stream Fetching Functions", () => {
     it("should get streams for specific stream type", async () => {
       mockStore.state.streams.logs = null; // Not fetched yet
-      
+
       const result = await streamsInstance.getStreams("logs", false, false);
-      
-      expect(StreamService.nameList).toHaveBeenCalledWith("test-org", "logs", false);
+
+      expect(StreamService.nameList).toHaveBeenCalledWith(
+        "test-org",
+        "logs",
+        false,
+      );
       expect(result).toHaveProperty("name", "logs");
       expect(result).toHaveProperty("list");
     });
 
     it("should get all streams when streamName is 'all'", async () => {
       mockStore.state.streams.areStreamsFetched = false;
-      
+
       const result = await streamsInstance.getStreams("all", false, false);
-      
+
       expect(result).toHaveProperty("name", "all");
     });
 
@@ -196,28 +222,42 @@ describe("useStreams Composable", () => {
       // Mock streams as already fetched
       mockStore.state.streams.logs = { list: [{ name: "cached" }] };
       mockStore.state.streams.areStreamsFetched = false;
-      
+
       const result = await streamsInstance.getStreams("logs", false, false);
-      
+
       expect(result).toEqual({ list: [{ name: "cached" }] });
       expect(StreamService.nameList).not.toHaveBeenCalled();
     });
 
     it("should force fetch streams when force parameter is true", async () => {
       mockStore.state.streams.logs = { list: [{ name: "cached" }] };
-      
+
       await streamsInstance.getStreams("logs", false, false, true);
-      
+
       expect(StreamService.nameList).toHaveBeenCalled();
     });
 
     it("should handle getPaginatedStreams with all parameters", async () => {
       const result = await streamsInstance.getPaginatedStreams(
-        "logs", false, true, 0, 50, "test", "name", true
+        "logs",
+        false,
+        true,
+        0,
+        50,
+        "test",
+        "name",
+        true,
       );
-      
+
       expect(StreamService.nameList).toHaveBeenCalledWith(
-        "test-org", "logs", false, 0, 50, "test", "name", true
+        "test-org",
+        "logs",
+        false,
+        0,
+        50,
+        "test",
+        "name",
+        true,
       );
       expect(result).toHaveProperty("name", "logs");
       expect(result).toHaveProperty("total");
@@ -234,46 +274,55 @@ describe("useStreams Composable", () => {
     it("should get stream with schema when requested", async () => {
       // Set up stream in cache
       mockStore.state.streams.logs = {
-        list: [{ name: "test-stream", schema: [] }]
+        list: [{ name: "test-stream", schema: [] }],
       };
       mockStore.state.streams.streamsIndexMapping.logs["test-stream"] = 0;
-      
-      const result = await streamsInstance.getStream("test-stream", "logs", true);
-      
-      expect(StreamService.schema).toHaveBeenCalledWith("test-org", "test-stream", "logs");
+
+      const result = await streamsInstance.getStream(
+        "test-stream",
+        "logs",
+        true,
+      );
+
+      expect(StreamService.schema).toHaveBeenCalledWith(
+        "test-org",
+        "test-stream",
+        "logs",
+      );
     });
 
     it("should reject with 'Stream Not Found' for non-existent stream", async () => {
       mockStore.state.streams.logs = { list: [] };
 
-      await expect(streamsInstance.getStream("non-existent", "logs", false))
-        .rejects.toThrow("Stream 'non-existent' not found for type 'logs'");
+      await expect(
+        streamsInstance.getStream("non-existent", "logs", false),
+      ).rejects.toThrow("Stream 'non-existent' not found for type 'logs'");
     });
 
     it("should handle getMultiStreams with valid streams", async () => {
       const streams = [
         { streamName: "stream1", streamType: "logs", schema: false },
-        { streamName: "stream2", streamType: "metrics", schema: true }
+        { streamName: "stream2", streamType: "metrics", schema: true },
       ];
-      
+
       mockStore.state.streams.logs = { list: [{ name: "stream1" }] };
       mockStore.state.streams.metrics = { list: [{ name: "stream2" }] };
       mockStore.state.streams.streamsIndexMapping.logs["stream1"] = 0;
       mockStore.state.streams.streamsIndexMapping.metrics["stream2"] = 0;
-      
+
       const results = await streamsInstance.getMultiStreams(streams);
-      
+
       expect(results).toHaveLength(2);
     });
 
     it("should return null for getMultiStreams with empty parameters", async () => {
       const streams = [
         { streamName: "", streamType: "logs", schema: false },
-        { streamName: "test", streamType: "", schema: false }
+        { streamName: "test", streamType: "", schema: false },
       ];
-      
+
       const results = await streamsInstance.getMultiStreams(streams);
-      
+
       expect(results).toEqual([null, null]);
     });
   });
@@ -288,21 +337,24 @@ describe("useStreams Composable", () => {
           { name: "_o2_id", type: "string" },
           { name: "_original", type: "string" },
           { name: "_all_values", type: "string" },
-          { name: "field2", type: "number" }
-        ]
+          { name: "field2", type: "number" },
+        ],
       };
-      
+
       const result = streamsInstance.removeSchemaFields(streamData);
-      
+
       expect(result.schema).toHaveLength(2);
-      expect(result.schema.map((f: any) => f.name)).toEqual(["field1", "field2"]);
+      expect(result.schema.map((f: any) => f.name)).toEqual([
+        "field1",
+        "field2",
+      ]);
     });
 
     it("should handle removeSchemaFields with no schema", () => {
       const streamData = { name: "test" };
-      
+
       const result = streamsInstance.removeSchemaFields(streamData);
-      
+
       expect(result).toEqual({ name: "test" });
     });
 
@@ -321,14 +373,18 @@ describe("useStreams Composable", () => {
 
     it("should check if specific stream exists", () => {
       mockStore.state.streams.streamsIndexMapping.logs["existing-stream"] = 0;
-      
-      expect(streamsInstance.isStreamExists("existing-stream", "logs")).toBe(true);
-      expect(streamsInstance.isStreamExists("non-existing", "logs")).toBe(false);
+
+      expect(streamsInstance.isStreamExists("existing-stream", "logs")).toBe(
+        true,
+      );
+      expect(streamsInstance.isStreamExists("non-existing", "logs")).toBe(
+        false,
+      );
     });
 
     it("should handle isStreamExists with missing stream type", () => {
       mockStore.state.streams.streamsIndexMapping = {};
-      
+
       expect(streamsInstance.isStreamExists("any-stream", "logs")).toBe(false);
     });
   });
@@ -338,41 +394,44 @@ describe("useStreams Composable", () => {
     it("should set streams and update store correctly", () => {
       const streamList = [
         { name: "stream1", stream_type: "logs" },
-        { name: "stream2", stream_type: "logs" }
+        { name: "stream2", stream_type: "logs" },
       ];
-      
+
       streamsInstance.setStreams("logs", streamList);
-      
-      expect(mockStore.dispatch).toHaveBeenCalledWith("streams/setStreams", 
+
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "streams/setStreams",
         expect.objectContaining({
           streamType: "logs",
           streams: expect.objectContaining({
             name: "logs",
             list: streamList,
-            schema: false
-          })
-        })
+            schema: false,
+          }),
+        }),
       );
     });
 
     it("should handle setStreams with 'all' streamName", () => {
       const streamList = [
         { name: "stream1", stream_type: "logs" },
-        { name: "stream2", stream_type: "metrics" }
+        { name: "stream2", stream_type: "metrics" },
       ];
-      
+
       streamsInstance.setStreams("all", streamList);
-      
+
       // Should dispatch multiple times for different stream types
-      expect(mockStore.dispatch).toHaveBeenCalledWith("streams/setStreams", 
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "streams/setStreams",
         expect.objectContaining({
-          streamType: "logs"
-        })
+          streamType: "logs",
+        }),
       );
-      expect(mockStore.dispatch).toHaveBeenCalledWith("streams/setStreams", 
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "streams/setStreams",
         expect.objectContaining({
-          streamType: "metrics"
-        })
+          streamType: "metrics",
+        }),
       );
     });
 
@@ -380,43 +439,40 @@ describe("useStreams Composable", () => {
       const newStream = { name: "new-stream", stream_type: "logs" };
       mockStore.state.streams.logs = { list: [] };
       mockStore.state.streams.streamsIndexMapping.logs = {};
-      
+
       await streamsInstance.addStream(newStream);
-      
-      expect(mockStore.dispatch).toHaveBeenCalledWith("streams/setStreams", 
+
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "streams/setStreams",
         expect.objectContaining({
-          streamType: "logs"
-        })
+          streamType: "logs",
+        }),
       );
     });
 
     it("should not add duplicate stream", async () => {
       const existingStream = { name: "existing", stream_type: "logs" };
       mockStore.state.streams.logs = { list: [] };
-      mockStore.state.streams.streamsIndexMapping.logs = { "existing": 0 };
-      
+      mockStore.state.streams.streamsIndexMapping.logs = { existing: 0 };
+
       await streamsInstance.addStream(existingStream);
-      
+
       // Should not call dispatch since stream already exists
       expect(mockStore.dispatch).not.toHaveBeenCalled();
     });
 
     it("should remove stream from cache correctly", () => {
       mockStore.state.streams.logs = {
-        list: [
-          { name: "stream1" },
-          { name: "stream2" },
-          { name: "stream3" }
-        ]
+        list: [{ name: "stream1" }, { name: "stream2" }, { name: "stream3" }],
       };
       mockStore.state.streams.streamsIndexMapping.logs = {
-        "stream1": 0,
-        "stream2": 1,
-        "stream3": 2
+        stream1: 0,
+        stream2: 1,
+        stream3: 2,
       };
-      
+
       streamsInstance.removeStream("stream2", "logs");
-      
+
       expect(mockStore.dispatch).toHaveBeenCalled();
     });
   });
@@ -426,15 +482,15 @@ describe("useStreams Composable", () => {
     it("should compare arrays correctly", () => {
       const previousArray = {
         0: { field: "field1", value: "old" },
-        1: { field: "field2", value: "same" }
+        1: { field: "field2", value: "same" },
       };
       const currentArray = [
         { field: "field2", value: "same" },
-        { field: "field3", value: "new" }
+        { field: "field3", value: "new" },
       ];
-      
+
       const result = streamsInstance.compareArrays(previousArray, currentArray);
-      
+
       expect(result.add).toHaveLength(1);
       expect(result.add[0].field).toBe("field3");
       expect(result.remove).toHaveLength(1);
@@ -445,7 +501,7 @@ describe("useStreams Composable", () => {
       const obj1 = { a: 1, b: { c: 2 } };
       const obj2 = { a: 1, b: { c: 2 } };
       const obj3 = { a: 1, b: { c: 3 } };
-      
+
       expect(streamsInstance.deepEqual(obj1, obj2)).toBe(true);
       expect(streamsInstance.deepEqual(obj1, obj3)).toBe(false);
       expect(streamsInstance.deepEqual(null, null)).toBe(true);
@@ -455,22 +511,42 @@ describe("useStreams Composable", () => {
     it("should handle deepEqual with different key lengths", () => {
       const obj1 = { a: 1, b: 2 };
       const obj2 = { a: 1, b: 2, c: 3 };
-      
+
       expect(streamsInstance.deepEqual(obj1, obj2)).toBe(false);
     });
 
     it("should compare pattern associations correctly", () => {
       const prev = [
-        { field: "field1", pattern_id: "p1", policy: "policy1", apply_at: "ingest" },
-        { field: "field2", pattern_id: "p2", policy: "policy2", apply_at: null }
+        {
+          field: "field1",
+          pattern_id: "p1",
+          policy: "policy1",
+          apply_at: "ingest",
+        },
+        {
+          field: "field2",
+          pattern_id: "p2",
+          policy: "policy2",
+          apply_at: null,
+        },
       ];
       const curr = [
-        { field: "field1", pattern_id: "p1", policy: "policy1", apply_at: "ingest" },
-        { field: "field3", pattern_id: "p3", policy: "policy3", apply_at: "query" }
+        {
+          field: "field1",
+          pattern_id: "p1",
+          policy: "policy1",
+          apply_at: "ingest",
+        },
+        {
+          field: "field3",
+          pattern_id: "p3",
+          policy: "policy3",
+          apply_at: "query",
+        },
       ];
-      
+
       const result = streamsInstance.comparePatternAssociations(prev, curr);
-      
+
       expect(result.add).toHaveLength(1);
       expect(result.add[0].field).toBe("field3");
       expect(result.remove).toHaveLength(1);
@@ -478,11 +554,25 @@ describe("useStreams Composable", () => {
     });
 
     it("should handle pattern associations with null apply_at", () => {
-      const prev = [{ field: "field1", pattern_id: "p1", policy: "policy1", apply_at: null }];
-      const curr = [{ field: "field1", pattern_id: "p1", policy: "policy1", apply_at: undefined }];
-      
+      const prev = [
+        {
+          field: "field1",
+          pattern_id: "p1",
+          policy: "policy1",
+          apply_at: null,
+        },
+      ];
+      const curr = [
+        {
+          field: "field1",
+          pattern_id: "p1",
+          policy: "policy1",
+          apply_at: undefined,
+        },
+      ];
+
       const result = streamsInstance.comparePatternAssociations(prev, curr);
-      
+
       expect(result.add).toHaveLength(0);
       expect(result.remove).toHaveLength(0);
     });
@@ -499,9 +589,11 @@ describe("useStreams Composable", () => {
         bloom_filter_fields: ["bloom1"],
         defined_schema_fields: ["schema1"],
         extended_retention_days: [{ days: 30 }],
-        pattern_associations: [{ field: "f1", pattern_id: "p1", policy: "pol1", apply_at: "ingest" }]
+        pattern_associations: [
+          { field: "f1", pattern_id: "p1", policy: "pol1", apply_at: "ingest" },
+        ],
       };
-      
+
       const currentSettings = {
         fields: ["field1", "field3"],
         partition_keys: [{ field: "pk2", disabled: false }],
@@ -510,11 +602,16 @@ describe("useStreams Composable", () => {
         bloom_filter_fields: ["bloom2"],
         defined_schema_fields: ["schema2"],
         extended_retention_days: [{ days: 60 }],
-        pattern_associations: [{ field: "f2", pattern_id: "p2", policy: "pol2", apply_at: "query" }]
+        pattern_associations: [
+          { field: "f2", pattern_id: "p2", policy: "pol2", apply_at: "query" },
+        ],
       };
-      
-      const result = streamsInstance.getUpdatedSettings(previousSettings, currentSettings);
-      
+
+      const result = streamsInstance.getUpdatedSettings(
+        previousSettings,
+        currentSettings,
+      );
+
       expect(result.fields.add).toEqual(["field3"]);
       expect(result.fields.remove).toEqual(["field2"]);
       expect(result.index_fields.add).toEqual(["index2"]);
@@ -522,7 +619,7 @@ describe("useStreams Composable", () => {
 
     it("should handle empty settings in getUpdatedSettings", () => {
       const result = streamsInstance.getUpdatedSettings({}, {});
-      
+
       expect(result).toHaveProperty("fields");
       expect(result).toHaveProperty("partition_keys");
       expect(result.fields.add).toEqual([]);
@@ -531,26 +628,26 @@ describe("useStreams Composable", () => {
 
     it("should reset specific stream type", () => {
       streamsInstance.resetStreamType("logs");
-      
+
       expect(mockStore.dispatch).toHaveBeenCalledWith("streams/setStreams", {
         streamType: "logs",
-        streams: {}
+        streams: {},
       });
     });
 
     it("should handle resetStreamType with empty string", () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
       streamsInstance.resetStreamType("");
-      
+
       // Should not call dispatch
       expect(mockStore.dispatch).not.toHaveBeenCalled();
-      
+
       consoleSpy.mockRestore();
     });
 
     it("should handle resetStreamType error gracefully", () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
       // Mock store dispatch to throw error
       mockStore.dispatch = vi.fn().mockImplementation(() => {
@@ -559,7 +656,10 @@ describe("useStreams Composable", () => {
 
       streamsInstance.resetStreamType("logs");
 
-      expect(consoleSpy).toHaveBeenCalledWith("Error while clearing local cache for stream type.", expect.any(Error));
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Error while clearing local cache for stream type.",
+        expect.any(Error),
+      );
 
       // Restore
       consoleSpy.mockRestore();
@@ -568,31 +668,47 @@ describe("useStreams Composable", () => {
     });
   });
 
-  // Test 36-40: Advanced Stream Operations  
+  // Test 36-40: Advanced Stream Operations
   describe("Advanced Stream Operations", () => {
     it("should reset all streams completely", () => {
       streamsInstance.resetStreams();
-      
+
       // Should reset all stream types
-      const streamTypes = ['logs', 'metrics', 'traces', 'enrichment_tables', 'index', 'metadata'];
-      streamTypes.forEach(type => {
+      const streamTypes = [
+        "logs",
+        "metrics",
+        "traces",
+        "enrichment_tables",
+        "index",
+        "metadata",
+      ];
+      streamTypes.forEach((type) => {
         expect(mockStore.dispatch).toHaveBeenCalledWith("streams/setStreams", {
           streamType: type,
-          streams: null
+          streams: null,
         });
       });
-      
-      expect(mockStore.commit).toHaveBeenCalledWith("streams/updateStreamIndexMapping", {});
-      expect(mockStore.commit).toHaveBeenCalledWith("streams/updateStreamsFetched", false);
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsDataIngested", false);
+
+      expect(mockStore.commit).toHaveBeenCalledWith(
+        "streams/updateStreamIndexMapping",
+        {},
+      );
+      expect(mockStore.commit).toHaveBeenCalledWith(
+        "streams/updateStreamsFetched",
+        false,
+      );
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "setIsDataIngested",
+        false,
+      );
     });
 
     it("should get all streams payload correctly", () => {
       mockStore.state.streams.logs = { list: [{ name: "log1" }] };
       mockStore.state.streams.metrics = { list: [{ name: "metric1" }] };
-      
+
       const result = streamsInstance.getAllStreamsPayload();
-      
+
       expect(result.name).toBe("all");
       expect(result.schema).toBe(false);
       expect(result.list).toEqual([{ name: "log1" }, { name: "metric1" }]);
@@ -602,14 +718,14 @@ describe("useStreams Composable", () => {
       const existingStreams = [{ name: "existing", stream_type: "logs" }];
       const newStreams = [
         { name: "existing", stream_type: "logs" },
-        { name: "new-stream", stream_type: "logs" }
+        { name: "new-stream", stream_type: "logs" },
       ];
-      
+
       mockStore.state.streams.logs = { list: existingStreams };
-      mockStore.state.streams.streamsIndexMapping.logs = { "existing": 0 };
-      
+      mockStore.state.streams.streamsIndexMapping.logs = { existing: 0 };
+
       streamsInstance.addNewStreams("logs", newStreams);
-      
+
       // Should only add the new stream
       expect(mockStore.dispatch).toHaveBeenCalled();
     });
@@ -617,20 +733,20 @@ describe("useStreams Composable", () => {
     it("should not add streams if all exist", () => {
       const existingStreams = [{ name: "existing", stream_type: "logs" }];
       const duplicateStreams = [{ name: "existing", stream_type: "logs" }];
-      
+
       // Set up the cache properly
       mockStore.state.streams.logs = { list: existingStreams };
-      mockStore.state.streams.streamsIndexMapping.logs = { "existing": 0 };
-      
+      mockStore.state.streams.streamsIndexMapping.logs = { existing: 0 };
+
       // Clear previous calls
       vi.clearAllMocks();
-      
+
       streamsInstance.addNewStreams("logs", duplicateStreams);
-      
+
       // The function will still call setStreams with existing streams + no new streams
       // So we verify it's called with the same streams (no new additions)
       const setStreamsCalls = mockStore.dispatch.mock.calls.filter(
-        call => call[0] === "streams/setStreams"
+        (call) => call[0] === "streams/setStreams",
       );
       expect(setStreamsCalls).toHaveLength(1);
       expect(setStreamsCalls[0][1].streams.list).toEqual(existingStreams);
@@ -638,11 +754,11 @@ describe("useStreams Composable", () => {
 
     it("should handle addNewStreams with empty cache", () => {
       const newStreams = [{ name: "new-stream", stream_type: "logs" }];
-      
+
       mockStore.state.streams.logs = null;
-      
+
       streamsInstance.addNewStreams("logs", newStreams);
-      
+
       expect(mockStore.dispatch).toHaveBeenCalled();
     });
   });
@@ -650,56 +766,76 @@ describe("useStreams Composable", () => {
   // Test 41-45: Error Handling and Edge Cases
   describe("Error Handling and Edge Cases", () => {
     it("should handle StreamService.nameList rejection", async () => {
-      vi.mocked(StreamService.nameList).mockRejectedValueOnce(new Error("Service error"));
-      
-      await expect(streamsInstance.getStreams("logs", false, false))
-        .rejects.toThrow("Service error");
+      vi.mocked(StreamService.nameList).mockRejectedValueOnce(
+        new Error("Service error"),
+      );
+
+      await expect(
+        streamsInstance.getStreams("logs", false, false),
+      ).rejects.toThrow("Service error");
     });
 
     it("should handle StreamService.schema rejection in getStream", async () => {
       mockStore.state.streams.logs = { list: [{ name: "test", schema: [] }] };
       mockStore.state.streams.streamsIndexMapping.logs["test"] = 0;
-      
-      vi.mocked(StreamService.schema).mockRejectedValueOnce(new Error("Schema error"));
 
-      await expect(streamsInstance.getStream("test", "logs", true))
-        .rejects.toThrow("Error while fetching schema: Schema error");
+      vi.mocked(StreamService.schema).mockRejectedValueOnce(
+        new Error("Schema error"),
+      );
+
+      await expect(
+        streamsInstance.getStream("test", "logs", true),
+      ).rejects.toThrow("Error while fetching schema: Schema error");
     });
 
     it("should handle getPaginatedStreams service error", async () => {
-      vi.mocked(StreamService.nameList).mockRejectedValueOnce(new Error("Pagination error"));
-      
-      await expect(streamsInstance.getPaginatedStreams("logs", false, true))
-        .rejects.toThrow("Pagination error");
+      vi.mocked(StreamService.nameList).mockRejectedValueOnce(
+        new Error("Pagination error"),
+      );
+
+      await expect(
+        streamsInstance.getPaginatedStreams("logs", false, true),
+      ).rejects.toThrow("Pagination error");
     });
 
     it("should handle getMultiStreams with schema fetch error", async () => {
-      const streams = [{ streamName: "test", streamType: "logs", schema: true }];
-      
+      const streams = [
+        { streamName: "test", streamType: "logs", schema: true },
+      ];
+
       mockStore.state.streams.logs = { list: [{ name: "test", schema: null }] };
       mockStore.state.streams.streamsIndexMapping.logs["test"] = 0;
-      
-      vi.mocked(StreamService.schema).mockRejectedValueOnce(new Error("Schema error"));
-      
-      await expect(streamsInstance.getMultiStreams(streams)).rejects.toThrow("Schema error");
+
+      vi.mocked(StreamService.schema).mockRejectedValueOnce(
+        new Error("Schema error"),
+      );
+
+      await expect(streamsInstance.getMultiStreams(streams)).rejects.toThrow(
+        "Schema error",
+      );
     });
 
     it("should handle isStreamExists with store access error", () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      
+      const consoleWarnSpy = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => {});
+
       // Create a store with an invalid structure to trigger the try-catch
       const originalStore = mockStore;
       mockStore.state.streams.streamsIndexMapping = {
         get logs() {
-          throw new Error('Access error');
-        }
+          throw new Error("Access error");
+        },
       };
-      
+
       const result = streamsInstance.isStreamExists("test", "logs");
-      
+
       expect(result).toBe(false);
-      expect(consoleWarnSpy).toHaveBeenCalledWith('Error checking if stream exists:', expect.any(Error));
-      
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        "Error checking if stream exists:",
+        expect.any(Error),
+      );
+
       // Restore
       mockStore = originalStore;
       consoleWarnSpy.mockRestore();
@@ -710,12 +846,12 @@ describe("useStreams Composable", () => {
   describe("Promise and Async Behavior", () => {
     it("should handle concurrent getStreams calls properly", async () => {
       mockStore.state.streams.logs = null;
-      
+
       const promise1 = streamsInstance.getStreams("logs", false, false);
       const promise2 = streamsInstance.getStreams("logs", false, false);
-      
+
       const results = await Promise.all([promise1, promise2]);
-      
+
       expect(results).toHaveLength(2);
       // Due to the implementation, each composable instance may call the service
       expect(StreamService.nameList).toHaveBeenCalled();
@@ -724,15 +860,15 @@ describe("useStreams Composable", () => {
     it("should handle notification dismissal in getStreams", async () => {
       const dismissMock = vi.fn();
       mockNotify.mockReturnValueOnce(dismissMock);
-      
+
       mockStore.state.streams.logs = null;
-      
+
       await streamsInstance.getStreams("logs", false, true);
-      
+
       expect(mockNotify).toHaveBeenCalledWith({
         spinner: true,
         message: "Please wait while loading streams...",
-        timeout: 5000
+        timeout: 5000,
       });
       expect(dismissMock).toHaveBeenCalled();
     });
@@ -740,30 +876,32 @@ describe("useStreams Composable", () => {
     it("should handle notification dismissal in getPaginatedStreams", async () => {
       const dismissMock = vi.fn();
       mockNotify.mockReturnValueOnce(dismissMock);
-      
+
       await streamsInstance.getPaginatedStreams("logs", false, true);
-      
+
       expect(dismissMock).toHaveBeenCalled();
     });
 
     it("should handle getStreams with notify=false", async () => {
       mockStore.state.streams.logs = null;
-      
+
       await streamsInstance.getStreams("logs", false, false);
-      
+
       expect(mockNotify).not.toHaveBeenCalled();
     });
 
     it("should handle Promise.allSettled with mixed results in getStreams", async () => {
       mockStore.state.streams.areStreamsFetched = false;
-      
+
       // Mock one success and one failure
       vi.mocked(StreamService.nameList)
-        .mockResolvedValueOnce({ data: { list: [{ name: "success", stream_type: "logs" }] } })
+        .mockResolvedValueOnce({
+          data: { list: [{ name: "success", stream_type: "logs" }] },
+        })
         .mockRejectedValueOnce(new Error("Failed"));
-      
+
       const result = await streamsInstance.getStreams("all", false, false);
-      
+
       expect(result.name).toBe("all");
     });
   });
@@ -773,66 +911,75 @@ describe("useStreams Composable", () => {
     it("should set isDataIngested when streams are added", () => {
       mockStore.state.organizationData.isDataIngested = false;
       const streamList = [{ name: "test", stream_type: "logs" }];
-      
+
       streamsInstance.setStreams("logs", streamList);
-      
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsDataIngested", true);
+
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "setIsDataIngested",
+        true,
+      );
     });
 
     it("should not set isDataIngested for empty stream list", () => {
       mockStore.state.organizationData.isDataIngested = false;
-      
+
       streamsInstance.setStreams("logs", []);
-      
-      expect(mockStore.dispatch).not.toHaveBeenCalledWith("setIsDataIngested", expect.anything());
+
+      expect(mockStore.dispatch).not.toHaveBeenCalledWith(
+        "setIsDataIngested",
+        expect.anything(),
+      );
     });
 
     it("should handle deepEqual with nested objects", () => {
       const obj1 = { a: { b: { c: 1 } } };
       const obj2 = { a: { b: { c: 1 } } };
       const obj3 = { a: { b: { c: 2 } } };
-      
+
       expect(streamsInstance.deepEqual(obj1, obj2)).toBe(true);
       expect(streamsInstance.deepEqual(obj1, obj3)).toBe(false);
     });
 
     it("should handle setStreams force parameter behavior", () => {
       const streamList = [{ name: "test", stream_type: "logs" }];
-      
+
       // Test 1: setStreams with force=true always sets streams
       vi.clearAllMocks();
       streamsInstance.setStreams("logs", streamList, true);
-      expect(mockStore.dispatch).toHaveBeenCalledWith("streams/setStreams", 
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "streams/setStreams",
         expect.objectContaining({
           streamType: "logs",
           streams: expect.objectContaining({
             list: streamList,
-            name: "logs"
-          })
-        })
+            name: "logs",
+          }),
+        }),
       );
-      
+
       // Test 2: setStreams with force=true again should still work
       vi.clearAllMocks();
       streamsInstance.setStreams("logs", streamList, true);
-      expect(mockStore.dispatch).toHaveBeenCalledWith("streams/setStreams", 
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "streams/setStreams",
         expect.objectContaining({
-          streamType: "logs"
-        })
+          streamType: "logs",
+        }),
       );
-      
+
       // Test 3: Verify that force parameter is passed correctly to the function
       vi.clearAllMocks();
       const emptyStreamList: any[] = [];
       streamsInstance.setStreams("metrics", emptyStreamList, true);
-      expect(mockStore.dispatch).toHaveBeenCalledWith("streams/setStreams", 
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "streams/setStreams",
         expect.objectContaining({
           streamType: "metrics",
           streams: expect.objectContaining({
             name: "metrics",
-            list: emptyStreamList
-          })
-        })
+            list: emptyStreamList,
+          }),
+        }),
       );
     });
   });

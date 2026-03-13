@@ -598,7 +598,9 @@ describe("General", () => {
     });
 
     it("should upload dark mode image successfully", async () => {
-      const mockFile = new File(["test"], "test-dark.png", { type: "image/png" });
+      const mockFile = new File(["test"], "test-dark.png", {
+        type: "image/png",
+      });
       const wrapper = createWrapper();
 
       await wrapper.vm.uploadImage(mockFile, "dark");
@@ -655,7 +657,10 @@ describe("General", () => {
 
       await wrapper.vm.deleteLogo();
 
-      expect(mockSettingsService.deleteLogo).toHaveBeenCalledWith("test-org", "light");
+      expect(mockSettingsService.deleteLogo).toHaveBeenCalledWith(
+        "test-org",
+        "light",
+      );
       expect(mockNotify).toHaveBeenCalledWith({
         type: "positive",
         message: "Light Mode logo deleted successfully.",
@@ -668,7 +673,10 @@ describe("General", () => {
 
       await wrapper.vm.deleteLogo("dark");
 
-      expect(mockSettingsService.deleteLogo).toHaveBeenCalledWith("test-org", "dark");
+      expect(mockSettingsService.deleteLogo).toHaveBeenCalledWith(
+        "test-org",
+        "dark",
+      );
       expect(mockNotify).toHaveBeenCalledWith({
         type: "positive",
         message: "Dark Mode logo deleted successfully.",

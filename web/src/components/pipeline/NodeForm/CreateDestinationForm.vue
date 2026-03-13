@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               tabindex="0"
             >
               <template v-slot:hint>
-                {{ t('alert_destinations.separator_hint') }}
+                {{ t("alert_destinations.separator_hint") }}
               </template>
             </q-input>
           </div>
@@ -439,7 +439,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-slot:hint> Hostname for Datadog logs </template>
               </q-input>
             </template>
-
           </div>
 
           <div class="q-gutter-sm">

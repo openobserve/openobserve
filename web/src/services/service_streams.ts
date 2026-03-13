@@ -73,7 +73,12 @@ export interface CorrelationResponse {
   related_streams: RelatedStreams;
 }
 
-export type CardinalityClass = "VeryLow" | "Low" | "Medium" | "High" | "VeryHigh";
+export type CardinalityClass =
+  | "VeryLow"
+  | "Low"
+  | "Medium"
+  | "High"
+  | "VeryHigh";
 
 export interface DimensionAnalytics {
   dimension_name: string;
@@ -131,8 +136,12 @@ export interface GroupedServicesResponse {
  * Get semantic field groups for field name translation
  * Uses the existing alerts/deduplication/semantic-groups API
  */
-export const getSemanticGroups = (org_identifier: string): Promise<{ data: SemanticFieldGroup[] }> => {
-  return http().get(`/api/${org_identifier}/alerts/deduplication/semantic-groups`);
+export const getSemanticGroups = (
+  org_identifier: string,
+): Promise<{ data: SemanticFieldGroup[] }> => {
+  return http().get(
+    `/api/${org_identifier}/alerts/deduplication/semantic-groups`,
+  );
 };
 
 /**
@@ -149,9 +158,12 @@ export const getSemanticGroups = (org_identifier: string): Promise<{ data: Seman
  */
 export const correlate = (
   org_identifier: string,
-  request: CorrelationRequest
+  request: CorrelationRequest,
 ): Promise<{ data: CorrelationResponse }> => {
-  return http().post(`/api/${org_identifier}/service_streams/_correlate`, request);
+  return http().post(
+    `/api/${org_identifier}/service_streams/_correlate`,
+    request,
+  );
 };
 
 /**
@@ -166,7 +178,7 @@ export const correlate = (
  * @returns Dimension analytics summary
  */
 export const getDimensionAnalytics = (
-  org_identifier: string
+  org_identifier: string,
 ): Promise<{ data: DimensionAnalyticsSummary }> => {
   return http().get(`/api/${org_identifier}/service_streams/_analytics`);
 };
@@ -183,7 +195,7 @@ export const getDimensionAnalytics = (
  * @returns Grouped services response
  */
 export const getGroupedServices = (
-  org_identifier: string
+  org_identifier: string,
 ): Promise<{ data: GroupedServicesResponse }> => {
   return http().get(`/api/${org_identifier}/service_streams/_grouped`);
 };

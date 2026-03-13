@@ -24,7 +24,10 @@ const makeStore = (maxDashboardSeries = 100) => ({
   },
 });
 
-const makeSchema = (topResults: number | null = null, topResultsOthers = false) => ({
+const makeSchema = (
+  topResults: number | null = null,
+  topResultsOthers = false,
+) => ({
   config: {
     top_results: topResults,
     top_results_others: topResultsOthers,
@@ -39,12 +42,28 @@ describe("sqlProcessData - processData", () => {
     });
 
     it("returns empty array when data[0] is not an array", () => {
-      const result = processData([{}], makeSchema(), makeStore(), [], [], [], {});
+      const result = processData(
+        [{}],
+        makeSchema(),
+        makeStore(),
+        [],
+        [],
+        [],
+        {},
+      );
       expect(result).toEqual([]);
     });
 
     it("returns empty array for null/undefined inner array", () => {
-      const result = processData([null as any], makeSchema(), makeStore(), [], [], [], {});
+      const result = processData(
+        [null as any],
+        makeSchema(),
+        makeStore(),
+        [],
+        [],
+        [],
+        {},
+      );
       expect(result).toEqual([]);
     });
   });
@@ -55,13 +74,29 @@ describe("sqlProcessData - processData", () => {
         { x: "a", y: 10 },
         { x: "b", y: 20 },
       ];
-      const result = processData([innerData], makeSchema(), makeStore(), ["y"], [], ["x"], {});
+      const result = processData(
+        [innerData],
+        makeSchema(),
+        makeStore(),
+        ["y"],
+        [],
+        ["x"],
+        {},
+      );
       expect(result).toEqual(innerData);
     });
 
     it("returns inner array regardless of top_results when no breakdown", () => {
       const innerData = [{ x: "a", y: 10 }];
-      const result = processData([innerData], makeSchema(5), makeStore(), ["y"], [], ["x"], {});
+      const result = processData(
+        [innerData],
+        makeSchema(5),
+        makeStore(),
+        ["y"],
+        [],
+        ["x"],
+        {},
+      );
       expect(result).toEqual(innerData);
     });
   });
@@ -131,7 +166,9 @@ describe("sqlProcessData - processData", () => {
         ["time"],
         {},
       );
-      const othersEntry = result.find((r: any) => r.category === "others" && r.time === "2024-01");
+      const othersEntry = result.find(
+        (r: any) => r.category === "others" && r.time === "2024-01",
+      );
       expect(othersEntry).toBeDefined();
       expect(othersEntry?.value).toBe(10); // C's value at 2024-01
     });

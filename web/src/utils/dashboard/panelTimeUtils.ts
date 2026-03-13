@@ -157,9 +157,7 @@ export const buildPanelTimeRange = (
  * Returns true if panel_time_enabled is ON (regardless of whether a custom range is set)
  * When enabled with no custom range (panel_time_range=null), panel uses global time dynamically
  */
-export const hasPanelTime = (
-  panel: any,
-): boolean => {
+export const hasPanelTime = (panel: any): boolean => {
   return !!panel?.config?.panel_time_enabled;
 };
 
@@ -169,8 +167,7 @@ export const hasPanelTime = (
  */
 export const shouldUsePanelTime = (panel: any): boolean => {
   return !!(
-    panel?.config?.panel_time_enabled &&
-    panel?.config?.panel_time_range
+    panel?.config?.panel_time_enabled && panel?.config?.panel_time_range
   );
 };
 

@@ -15,25 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="report-list-page"
-    class="flex q-mt-xs"
-  >
+  <div data-test="report-list-page" class="flex q-mt-xs">
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
       <div class="card-container tw:mb-[0.625rem]">
-        <div class="tw:flex tw:justify-between tw:items-center tw:w-full tw:py-3 tw:px-4 tw:h-[68px]">
-          <div class="q-table__title tw:font-[600]" data-test="report-list-title">
+        <div
+          class="tw:flex tw:justify-between tw:items-center tw:w-full tw:py-3 tw:px-4 tw:h-[68px]"
+        >
+          <div
+            class="q-table__title tw:font-[600]"
+            data-test="report-list-title"
+          >
             {{ t("reports.header") }}
           </div>
 
           <div class="tw:flex tw:items-center">
             <div class="app-tabs-container q-mr-sm">
-            <app-tabs
-              class="tabs-selection-container"
-              :tabs="tabs"
-              v-model:active-tab="activeTab"
-              @update:active-tab="filterReports"
-            />
+              <app-tabs
+                class="tabs-selection-container"
+                :tabs="tabs"
+                v-model:active-tab="activeTab"
+                @update:active-tab="filterReports"
+              />
             </div>
             <q-input
               data-test="report-list-search-input"
@@ -59,7 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-        <div class="card-container full-width o2-quasar-table o2-row-md o2-quasar-table-header-sticky tw:h-[calc(100vh-128px)]">
+        <div
+          class="card-container full-width o2-quasar-table o2-row-md o2-quasar-table-header-sticky tw:h-[calc(100vh-128px)]"
+        >
           <q-table
             data-test="report-list-table"
             ref="reportListTableRef"
@@ -72,9 +76,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             selection="multiple"
             v-model:selected="selectedReports"
             style="width: 100%"
-            :style="hasVisibleRows
+            :style="
+              hasVisibleRows
                 ? 'width: 100%; height: calc(100vh - 124px)'
-                : 'width: 100%'"
+                : 'width: 100%'
+            "
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           >
             <template #no-data>
@@ -108,10 +114,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
                   round
                   flat
-                  :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
+                  :title="
+                    props.row.enabled ? t('alerts.pause') : t('alerts.start')
+                  "
                   @click="toggleReportState(props.row)"
                 >
-              </q-btn>
+                </q-btn>
                 <q-btn
                   :data-test="`report-list-${props.row.name}-edit-report`"
                   padding="sm"
@@ -123,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('alerts.edit')"
                   @click="editReport(props.row)"
                 >
-              </q-btn>
+                </q-btn>
                 <q-btn
                   :data-test="`report-list-${props.row.name}-delete-report`"
                   padding="sm"
@@ -135,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('alerts.delete')"
                   @click="confirmDeleteReport(props.row)"
                 >
-              </q-btn>
+                </q-btn>
               </q-td>
             </template>
 
@@ -149,14 +157,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template v-slot:body-selection="scope">
-              <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+              <q-checkbox
+                v-model="scope.selected"
+                size="sm"
+                class="o2-table-checkbox"
+              />
             </template>
 
             <template #bottom="scope">
-              <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-                <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
-                      {{ resultTotal }} {{ t('reports.header') }}
-                    </div>
+              <div
+                class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+              >
+                <div
+                  class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md"
+                >
+                  {{ resultTotal }} {{ t("reports.header") }}
+                </div>
                 <q-btn
                   v-if="selectedReports.length > 0"
                   data-test="report-list-delete-reports-btn"
@@ -174,40 +190,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="tw:ml-2">Delete</span>
                 </q-btn>
                 <QTablePagination
-                :scope="scope"
-                :position="'bottom'"
-                :resultTotal="resultTotal"
-                :perPageOptions="perPageOptions"
-                @update:changeRecordPerPage="changePagination"
-              />
+                  :scope="scope"
+                  :position="'bottom'"
+                  :resultTotal="resultTotal"
+                  :perPageOptions="perPageOptions"
+                  @update:changeRecordPerPage="changePagination"
+                />
               </div>
-
             </template>
 
             <template v-slot:header="props">
-                <q-tr :props="props">
-                  <!-- Adding this block to render the select-all checkbox -->
-                  <q-th v-if="columns.length > 0" auto-width>
-                    <q-checkbox
-                      v-model="props.selected"
-                      size="sm"
-                      :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                      class="o2-table-checkbox"
-                    />
-                  </q-th>
+              <q-tr :props="props">
+                <!-- Adding this block to render the select-all checkbox -->
+                <q-th v-if="columns.length > 0" auto-width>
+                  <q-checkbox
+                    v-model="props.selected"
+                    size="sm"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-table-checkbox-dark'
+                        : 'o2-table-checkbox-light'
+                    "
+                    class="o2-table-checkbox"
+                  />
+                </q-th>
 
-                  <!-- Rendering the rest of the columns -->
-                  <q-th
-                    v-for="col in props.cols"
-                    :key="col.name"
-                    :props="props"
-                    :class="col.classes"
-                    :style="col.style"
-                  >
-                    {{ col.label }}
-                  </q-th>
-                </q-tr>
-              </template>
+                <!-- Rendering the rest of the columns -->
+                <q-th
+                  v-for="col in props.cols"
+                  :key="col.name"
+                  :props="props"
+                  :class="col.classes"
+                  :style="col.style"
+                >
+                  {{ col.label }}
+                </q-th>
+              </q-tr>
+            </template>
           </q-table>
         </div>
       </div>
@@ -418,8 +437,6 @@ function convertUnixToQuasarFormat(unixMicroseconds: any) {
   return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
 }
 
-
-
 const filterData = (rows: any, terms: any) => {
   var filtered = [];
   terms = terms.toLowerCase();
@@ -542,9 +559,12 @@ const deleteReport = (report: any) => {
 const createNewReport = () => {
   track("Button Click", {
     button: "Add Report",
-    page: "Reports"
+    page: "Reports",
   });
-  router.push({ name: "createReport", query: { org_identifier: store.state.selectedOrganization.identifier } });
+  router.push({
+    name: "createReport",
+    query: { org_identifier: store.state.selectedOrganization.identifier },
+  });
 };
 
 const filterReports = () => {
@@ -579,9 +599,13 @@ const visibleRows = computed(() => {
 const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
 // Watch visibleRows to sync resultTotal with search filter
-watch(visibleRows, (newVisibleRows) => {
-  resultTotal.value = newVisibleRows.length;
-}, { immediate: true });
+watch(
+  visibleRows,
+  (newVisibleRows) => {
+    resultTotal.value = newVisibleRows.length;
+  },
+  { immediate: true },
+);
 
 const openBulkDeleteDialog = () => {
   confirmBulkDelete.value = true;
@@ -612,7 +636,7 @@ const bulkDeleteReports = async () => {
 
     const response = await reports.bulkDelete(
       store.state.selectedOrganization.identifier,
-      payload
+      payload,
     );
 
     dismiss();
@@ -646,10 +670,10 @@ const bulkDeleteReports = async () => {
         });
       }
 
-      // Remove deleted reports from staticReportsList by name 
+      // Remove deleted reports from staticReportsList by name
       const successfulNames = new Set(successful);
       staticReportsList.value = staticReportsList.value.filter(
-        (r: any) => !successfulNames.has(r.name)
+        (r: any) => !successfulNames.has(r.name),
       );
 
       // Refresh the table
@@ -663,9 +687,11 @@ const bulkDeleteReports = async () => {
       });
 
       // Remove all selected reports by name
-      const selectedNames = new Set(selectedReports.value.map((r: any) => r.name));
+      const selectedNames = new Set(
+        selectedReports.value.map((r: any) => r.name),
+      );
       staticReportsList.value = staticReportsList.value.filter(
-        (r: any) => !selectedNames.has(r.name)
+        (r: any) => !selectedNames.has(r.name),
       );
 
       // Refresh the table
@@ -678,7 +704,10 @@ const bulkDeleteReports = async () => {
     console.error("Error deleting reports:", error);
 
     // Show error message from response if available
-    const errorMessage = error.response?.data?.message || error?.message || "Error deleting reports. Please try again.";
+    const errorMessage =
+      error.response?.data?.message ||
+      error?.message ||
+      "Error deleting reports. Please try again.";
     if (error.response?.status != 403 || error?.status != 403) {
       q.notify({
         type: "negative",
@@ -690,7 +719,6 @@ const bulkDeleteReports = async () => {
 
   confirmBulkDelete.value = false;
 };
-
 </script>
 
 <style lang="scss" scoped>

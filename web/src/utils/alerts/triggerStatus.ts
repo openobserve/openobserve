@@ -37,7 +37,10 @@ export enum TriggerStatusLabel {
 /**
  * Mapping from backend status to UI display label
  */
-export const TRIGGER_STATUS_DISPLAY_MAP: Record<TriggerDataStatus, TriggerStatusLabel> = {
+export const TRIGGER_STATUS_DISPLAY_MAP: Record<
+  TriggerDataStatus,
+  TriggerStatusLabel
+> = {
   [TriggerDataStatus.Completed]: TriggerStatusLabel.Firing,
   [TriggerDataStatus.Failed]: TriggerStatusLabel.Errored,
   [TriggerDataStatus.ConditionNotSatisfied]: TriggerStatusLabel.Resolved,
@@ -55,7 +58,7 @@ export function getStatusDisplayLabel(status: string): string {
  * Generate SQL CASE statement to map backend statuses to UI labels
  * Usage: SELECT ${getStatusMappingSQL('status')} as display_status FROM triggers
  */
-export function getStatusMappingSQL(columnName: string = 'status'): string {
+export function getStatusMappingSQL(columnName: string = "status"): string {
   return `CASE
     WHEN ${columnName} = '${TriggerDataStatus.Completed}' THEN '${TriggerStatusLabel.Firing}'
     WHEN ${columnName} = '${TriggerDataStatus.Failed}' THEN '${TriggerStatusLabel.Errored}'
@@ -69,7 +72,9 @@ export function getStatusMappingSQL(columnName: string = 'status'): string {
  * Get the backend status value from a UI display label (reverse mapping)
  */
 export function getBackendStatusFromLabel(label: string): string | undefined {
-  for (const [backendStatus, displayLabel] of Object.entries(TRIGGER_STATUS_DISPLAY_MAP)) {
+  for (const [backendStatus, displayLabel] of Object.entries(
+    TRIGGER_STATUS_DISPLAY_MAP,
+  )) {
     if (displayLabel === label) {
       return backendStatus;
     }

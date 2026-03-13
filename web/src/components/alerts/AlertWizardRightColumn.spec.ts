@@ -144,13 +144,13 @@ describe("AlertWizardRightColumn.vue", () => {
 
     it("should render preview section", () => {
       expect(wrapper.find('[data-test="mock-preview-alert"]').exists()).toBe(
-        true
+        true,
       );
     });
 
     it("should render summary section", () => {
       expect(wrapper.find('[data-test="mock-alert-summary"]').exists()).toBe(
-        true
+        true,
       );
     });
 
@@ -175,7 +175,7 @@ describe("AlertWizardRightColumn.vue", () => {
       const savedState = { preview: false, summary: true };
       localStorage.setItem(
         "alertWizardExpandState",
-        JSON.stringify(savedState)
+        JSON.stringify(savedState),
       );
 
       const newWrapper = mount(AlertWizardRightColumn, {
@@ -330,7 +330,7 @@ describe("AlertWizardRightColumn.vue", () => {
     it("should save state to localStorage when preview toggled", async () => {
       await wrapper.vm.togglePreview();
       const saved = JSON.parse(
-        localStorage.getItem("alertWizardExpandState") || "{}"
+        localStorage.getItem("alertWizardExpandState") || "{}",
       );
       expect(saved.preview).toBe(wrapper.vm.expandState.preview);
     });
@@ -338,13 +338,15 @@ describe("AlertWizardRightColumn.vue", () => {
     it("should save state to localStorage when summary toggled", async () => {
       await wrapper.vm.toggleSummary();
       const saved = JSON.parse(
-        localStorage.getItem("alertWizardExpandState") || "{}"
+        localStorage.getItem("alertWizardExpandState") || "{}",
       );
       expect(saved.summary).toBe(wrapper.vm.expandState.summary);
     });
 
     it("should handle localStorage save errors gracefully", () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       // Mock localStorage to throw error
       const originalSetItem = Storage.prototype.setItem;
@@ -356,7 +358,7 @@ describe("AlertWizardRightColumn.vue", () => {
 
       expect(consoleSpy).toHaveBeenCalledWith(
         "Failed to save expand state:",
-        expect.any(Error)
+        expect.any(Error),
       );
 
       // Restore
@@ -589,7 +591,7 @@ describe("AlertWizardRightColumn.vue", () => {
       // Set preview to collapsed in localStorage
       localStorage.setItem(
         "alertWizardExpandState",
-        JSON.stringify({ preview: false, summary: true })
+        JSON.stringify({ preview: false, summary: true }),
       );
 
       // Create a new wrapper with preview collapsed and on step 2 with custom tab
@@ -785,7 +787,7 @@ describe("AlertWizardRightColumn.vue", () => {
       await wrapper.vm.togglePreview(); // Toggle back
 
       const saved = JSON.parse(
-        localStorage.getItem("alertWizardExpandState") || "{}"
+        localStorage.getItem("alertWizardExpandState") || "{}",
       );
       expect(saved.preview).toBe(true);
       expect(saved.summary).toBe(true);
@@ -800,7 +802,7 @@ describe("AlertWizardRightColumn.vue", () => {
       await wrapper.vm.togglePreview(); // Toggle back
 
       const saved = JSON.parse(
-        localStorage.getItem("alertWizardExpandState") || "{}"
+        localStorage.getItem("alertWizardExpandState") || "{}",
       );
       expect(saved.preview).toBe(false);
       expect(saved.summary).toBe(false);
@@ -815,7 +817,7 @@ describe("AlertWizardRightColumn.vue", () => {
       await wrapper.vm.togglePreview(); // Toggle back
 
       const saved = JSON.parse(
-        localStorage.getItem("alertWizardExpandState") || "{}"
+        localStorage.getItem("alertWizardExpandState") || "{}",
       );
       expect(saved.preview).toBe(true);
       expect(saved.summary).toBe(false);

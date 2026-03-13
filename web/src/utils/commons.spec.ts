@@ -132,9 +132,15 @@ describe("Commons Utility Functions", () => {
       const querySQL = "SELECT * FROM logs WHERE level = 'error'";
       const timestampColumn = "_timestamp";
 
-      const result = await modifySQLQuery(currentTimeObj, querySQL, timestampColumn);
+      const result = await modifySQLQuery(
+        currentTimeObj,
+        querySQL,
+        timestampColumn,
+      );
 
-      expect(result).toContain("time_range(_timestamp,'2023-01-01T12:00:00Z', '2023-01-01T12:00:00Z')");
+      expect(result).toContain(
+        "time_range(_timestamp,'2023-01-01T12:00:00Z', '2023-01-01T12:00:00Z')",
+      );
       expect(result).toContain("WHERE");
       expect(result).toContain("level = 'error'");
     });
@@ -144,14 +150,21 @@ describe("Commons Utility Functions", () => {
         start_time: "2023-01-01T00:00:00Z",
         end_time: "2023-01-01T23:59:59Z",
       };
-      const querySQL = "SELECT * FROM logs WHERE time_range(_timestamp,'old_start','old_end') AND level = 'error'";
+      const querySQL =
+        "SELECT * FROM logs WHERE time_range(_timestamp,'old_start','old_end') AND level = 'error'";
       const timestampColumn = "_timestamp";
 
-      const result = await modifySQLQuery(currentTimeObj, querySQL, timestampColumn);
+      const result = await modifySQLQuery(
+        currentTimeObj,
+        querySQL,
+        timestampColumn,
+      );
 
       expect(result).not.toContain("old_start");
       expect(result).not.toContain("old_end");
-      expect(result).toContain("time_range(_timestamp,'2023-01-01T12:00:00Z', '2023-01-01T12:00:00Z')");
+      expect(result).toContain(
+        "time_range(_timestamp,'2023-01-01T12:00:00Z', '2023-01-01T12:00:00Z')",
+      );
     });
 
     it.skip("should return original query when no WHERE clause and no existing time_range", async () => {
@@ -162,7 +175,11 @@ describe("Commons Utility Functions", () => {
       const querySQL = "SELECT * FROM logs";
       const timestampColumn = "_timestamp";
 
-      const result = await modifySQLQuery(currentTimeObj, querySQL, timestampColumn);
+      const result = await modifySQLQuery(
+        currentTimeObj,
+        querySQL,
+        timestampColumn,
+      );
 
       expect(result).toBe(querySQL);
     });
@@ -172,12 +189,19 @@ describe("Commons Utility Functions", () => {
         start_time: "2023-01-01T00:00:00Z",
         end_time: "2023-01-01T23:59:59Z",
       };
-      const querySQL = "SELECT * FROM logs WHERE time_range(_timestamp, '2023-01-01', '2023-01-02') AND user_id = 123";
+      const querySQL =
+        "SELECT * FROM logs WHERE time_range(_timestamp, '2023-01-01', '2023-01-02') AND user_id = 123";
       const timestampColumn = "_timestamp";
 
-      const result = await modifySQLQuery(currentTimeObj, querySQL, timestampColumn);
+      const result = await modifySQLQuery(
+        currentTimeObj,
+        querySQL,
+        timestampColumn,
+      );
 
-      expect(result).toContain("time_range(_timestamp,'2023-01-01T12:00:00Z', '2023-01-01T12:00:00Z')");
+      expect(result).toContain(
+        "time_range(_timestamp,'2023-01-01T12:00:00Z', '2023-01-01T12:00:00Z')",
+      );
       expect(result).toContain("user_id = 123");
     });
   });
@@ -322,9 +346,12 @@ describe("Commons Utility Functions", () => {
         "",
         "test-org",
         folderId,
-        ""
+        "",
       );
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setAllDashboardList", expect.any(Object));
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "setAllDashboardList",
+        expect.any(Object),
+      );
     });
 
     it("should return early when no folderId provided", async () => {
@@ -339,7 +366,9 @@ describe("Commons Utility Functions", () => {
       const error = new Error("API Error");
       (dashboardService.list as any).mockRejectedValue(error);
 
-      await expect(getAllDashboards(mockStore, folderId)).rejects.toThrow("API Error");
+      await expect(getAllDashboards(mockStore, folderId)).rejects.toThrow(
+        "API Error",
+      );
     });
 
     it("should sort dashboards by created date in descending order", async () => {
@@ -386,7 +415,7 @@ describe("Commons Utility Functions", () => {
             expect.objectContaining({ created: "2023-01-02T00:00:00Z" }),
             expect.objectContaining({ created: "2023-01-01T00:00:00Z" }),
           ]),
-        })
+        }),
       );
     });
   });
@@ -398,7 +427,11 @@ describe("Commons Utility Functions", () => {
         data: {
           list: [
             { folderId: "folder1", name: "Folder 1", description: "Folder 1" },
-            { folderId: "default", name: "Default", description: "Default folder" },
+            {
+              folderId: "default",
+              name: "Default",
+              description: "Default folder",
+            },
             { folderId: "folder2", name: "Folder 2", description: "Folder 2" },
           ],
         },
@@ -454,7 +487,9 @@ describe("Commons Utility Functions", () => {
       const error = new Error("API Error");
       (commonService.list_Folders as any).mockRejectedValue(error);
 
-      await expect(getFoldersListByType(mockStore, type)).rejects.toThrow("API Error");
+      await expect(getFoldersListByType(mockStore, type)).rejects.toThrow(
+        "API Error",
+      );
     });
   });
 
@@ -671,8 +706,11 @@ describe("Commons Utility Functions", () => {
         tabs: [{ tabId: "tab-1", panels: [] }],
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
-      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({
+        data: { success: true },
+      });
       (dashboardService.get_Dashboard as any).mockResolvedValue({
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
@@ -711,8 +749,11 @@ describe("Commons Utility Functions", () => {
         ],
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
-      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({
+        data: { success: true },
+      });
       (dashboardService.get_Dashboard as any).mockResolvedValue({
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
@@ -748,8 +789,11 @@ describe("Commons Utility Functions", () => {
         ],
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
-      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({
+        data: { success: true },
+      });
       (dashboardService.get_Dashboard as any).mockResolvedValue({
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
@@ -770,8 +814,11 @@ describe("Commons Utility Functions", () => {
 
       const mockDashboard = {};
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
-      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({
+        data: { success: true },
+      });
       (dashboardService.get_Dashboard as any).mockResolvedValue({
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
@@ -796,8 +843,11 @@ describe("Commons Utility Functions", () => {
         },
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
-      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({
+        data: { success: true },
+      });
       (dashboardService.get_Dashboard as any).mockResolvedValue({
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
@@ -820,10 +870,11 @@ describe("Commons Utility Functions", () => {
         },
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
 
       await expect(
-        addVariable(mockStore, dashboardId, variableData, folderId)
+        addVariable(mockStore, dashboardId, variableData, folderId),
       ).rejects.toThrow("Variable with same name already exists");
     });
   });
@@ -843,8 +894,11 @@ describe("Commons Utility Functions", () => {
         },
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
-      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({
+        data: { success: true },
+      });
       (dashboardService.get_Dashboard as any).mockResolvedValue({
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
@@ -860,7 +914,11 @@ describe("Commons Utility Functions", () => {
     it("should update variable data", async () => {
       const dashboardId = "dashboard-1";
       const variableName = "var1";
-      const variableData = { name: "var1", type: "query", query: "UPDATE SELECT 1" };
+      const variableData = {
+        name: "var1",
+        type: "query",
+        query: "UPDATE SELECT 1",
+      };
       const folderId = "test-folder";
 
       const mockDashboard = {
@@ -869,13 +927,22 @@ describe("Commons Utility Functions", () => {
         },
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
-      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({
+        data: { success: true },
+      });
       (dashboardService.get_Dashboard as any).mockResolvedValue({
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
 
-      await updateVariable(mockStore, dashboardId, variableName, variableData, folderId);
+      await updateVariable(
+        mockStore,
+        dashboardId,
+        variableName,
+        variableData,
+        folderId,
+      );
 
       expect(mockDashboard.variables.list[0]).toBe(variableData);
     });
@@ -895,10 +962,17 @@ describe("Commons Utility Functions", () => {
         },
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
 
       await expect(
-        updateVariable(mockStore, dashboardId, variableName, variableData, folderId)
+        updateVariable(
+          mockStore,
+          dashboardId,
+          variableName,
+          variableData,
+          folderId,
+        ),
       ).rejects.toThrow("Variable with same name already exists");
     });
   });
@@ -922,8 +996,11 @@ describe("Commons Utility Functions", () => {
         ],
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
-      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({
+        data: { success: true },
+      });
       (dashboardService.get_Dashboard as any).mockResolvedValue({
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
@@ -951,8 +1028,11 @@ describe("Commons Utility Functions", () => {
         ],
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
-      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({
+        data: { success: true },
+      });
       (dashboardService.get_Dashboard as any).mockResolvedValue({
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
@@ -982,9 +1062,16 @@ describe("Commons Utility Functions", () => {
         ],
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
 
-      const result = await getPanel(mockStore, dashboardId, panelId, folderId, tabId);
+      const result = await getPanel(
+        mockStore,
+        dashboardId,
+        panelId,
+        folderId,
+        tabId,
+      );
 
       expect(result).toEqual({ id: "panel-2", title: "Panel 2" });
     });
@@ -1004,9 +1091,16 @@ describe("Commons Utility Functions", () => {
         ],
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
 
-      const result = await getPanel(mockStore, dashboardId, panelId, folderId, tabId);
+      const result = await getPanel(
+        mockStore,
+        dashboardId,
+        panelId,
+        folderId,
+        tabId,
+      );
 
       expect(result).toBeUndefined();
     });
@@ -1025,8 +1119,11 @@ describe("Commons Utility Functions", () => {
         ],
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
-      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({
+        data: { success: true },
+      });
       (dashboardService.get_Dashboard as any).mockResolvedValue({
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
@@ -1048,23 +1145,36 @@ describe("Commons Utility Functions", () => {
           {
             tabId: "tab-1",
             name: "Tab 1",
-            panels: [{ id: "panel-1", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } }],
+            panels: [
+              { id: "panel-1", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } },
+            ],
           },
           {
             tabId: "tab-2",
             name: "Tab 2",
-            panels: [{ id: "panel-2", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } }],
+            panels: [
+              { id: "panel-2", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } },
+            ],
           },
         ],
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
-      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({
+        data: { success: true },
+      });
       (dashboardService.get_Dashboard as any).mockResolvedValue({
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
 
-      await deleteTab(mockStore, dashboardId, folderId, deleteTabId, moveToTabId);
+      await deleteTab(
+        mockStore,
+        dashboardId,
+        folderId,
+        deleteTabId,
+        moveToTabId,
+      );
 
       expect(mockDashboard.tabs).toHaveLength(1);
       expect(mockDashboard.tabs[0].panels).toHaveLength(2);
@@ -1087,13 +1197,22 @@ describe("Commons Utility Functions", () => {
         tabs: [{ tabId: "tab-1", name: "Old Tab Name" }],
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
-      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({
+        data: { success: true },
+      });
       (dashboardService.get_Dashboard as any).mockResolvedValue({
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
 
-      const result = await editTab(mockStore, dashboardId, folderId, tabId, tabData);
+      const result = await editTab(
+        mockStore,
+        dashboardId,
+        folderId,
+        tabId,
+        tabData,
+      );
 
       expect(mockDashboard.tabs[0].name).toBe("Updated Tab Name");
       expect(result.name).toBe("Updated Tab Name");
@@ -1110,8 +1229,11 @@ describe("Commons Utility Functions", () => {
         tabs: [{ tabId: "tab-1", name: "Existing Tab" }],
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
-      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({
+        data: { success: true },
+      });
       (dashboardService.get_Dashboard as any).mockResolvedValue({
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
@@ -1137,22 +1259,36 @@ describe("Commons Utility Functions", () => {
         tabs: [
           {
             tabId: "tab-1",
-            panels: [{ id: "panel-1", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } }],
+            panels: [
+              { id: "panel-1", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } },
+            ],
           },
           {
             tabId: "tab-2",
-            panels: [{ id: "panel-2", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } }],
+            panels: [
+              { id: "panel-2", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } },
+            ],
           },
         ],
       };
 
-      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
-      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      mockStore.state.organizationData.allDashboardData[dashboardId] =
+        mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({
+        data: { success: true },
+      });
       (dashboardService.get_Dashboard as any).mockResolvedValue({
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
 
-      await movePanelToAnotherTab(mockStore, dashboardId, panelId, folderId, currentTabId, moveToTabId);
+      await movePanelToAnotherTab(
+        mockStore,
+        dashboardId,
+        panelId,
+        folderId,
+        currentTabId,
+        moveToTabId,
+      );
 
       expect(mockDashboard.tabs[0].panels).toHaveLength(0); // Panel removed from original tab
       expect(mockDashboard.tabs[1].panels).toHaveLength(2); // Panel added to target tab
@@ -1170,7 +1306,11 @@ describe("Commons Utility Functions", () => {
         data: {
           list: [
             { folderId: "folder1", name: "Folder 1", description: "Folder 1" },
-            { folderId: "default", name: "Default", description: "Default folder" },
+            {
+              folderId: "default",
+              name: "Default",
+              description: "Default folder",
+            },
           ],
         },
       };
@@ -1189,7 +1329,9 @@ describe("Commons Utility Functions", () => {
     it("should create default folder when not present", async () => {
       const mockResponse = {
         data: {
-          list: [{ folderId: "folder1", name: "Folder 1", description: "Folder 1" }],
+          list: [
+            { folderId: "folder1", name: "Folder 1", description: "Folder 1" },
+          ],
         },
       };
 
@@ -1226,7 +1368,11 @@ describe("Commons Utility Functions", () => {
 
       await deleteDashboardById(mockStore, dashboardId, folderId);
 
-      expect(dashboardService.delete).toHaveBeenCalledWith("test-org", dashboardId, folderId);
+      expect(dashboardService.delete).toHaveBeenCalledWith(
+        "test-org",
+        dashboardId,
+        folderId,
+      );
       expect(mockStore.dispatch).toHaveBeenCalledWith("setAllDashboardList", {
         [folderId]: [{ dashboardId: "dashboard-2", title: "Dashboard 2" }],
       });
@@ -1240,11 +1386,16 @@ describe("Commons Utility Functions", () => {
       const mockResponse = { data: { folderId: "new-folder" } };
 
       (dashboardService.new_Folder as any).mockResolvedValue(mockResponse);
-      (dashboardService.list_Folders as any).mockResolvedValue({ data: { list: [] } });
+      (dashboardService.list_Folders as any).mockResolvedValue({
+        data: { list: [] },
+      });
 
       const result = await createFolder(mockStore, data);
 
-      expect(dashboardService.new_Folder).toHaveBeenCalledWith("test-org", data);
+      expect(dashboardService.new_Folder).toHaveBeenCalledWith(
+        "test-org",
+        data,
+      );
       expect(result).toBe(mockResponse);
     });
 
@@ -1252,23 +1403,38 @@ describe("Commons Utility Functions", () => {
       const folderId = "folder-1";
       const data = { name: "Updated Folder" };
 
-      (dashboardService.edit_Folder as any).mockResolvedValue({ success: true });
-      (dashboardService.list_Folders as any).mockResolvedValue({ data: { list: [] } });
+      (dashboardService.edit_Folder as any).mockResolvedValue({
+        success: true,
+      });
+      (dashboardService.list_Folders as any).mockResolvedValue({
+        data: { list: [] },
+      });
 
       await updateFolder(mockStore, folderId, data);
 
-      expect(dashboardService.edit_Folder).toHaveBeenCalledWith("test-org", folderId, data);
+      expect(dashboardService.edit_Folder).toHaveBeenCalledWith(
+        "test-org",
+        folderId,
+        data,
+      );
     });
 
     it("should delete folder by id", async () => {
       const folderId = "folder-1";
 
-      (dashboardService.delete_Folder as any).mockResolvedValue({ success: true });
-      (dashboardService.list_Folders as any).mockResolvedValue({ data: { list: [] } });
+      (dashboardService.delete_Folder as any).mockResolvedValue({
+        success: true,
+      });
+      (dashboardService.list_Folders as any).mockResolvedValue({
+        data: { list: [] },
+      });
 
       await deleteFolderById(mockStore, folderId);
 
-      expect(dashboardService.delete_Folder).toHaveBeenCalledWith("test-org", folderId);
+      expect(dashboardService.delete_Folder).toHaveBeenCalledWith(
+        "test-org",
+        folderId,
+      );
     });
   });
 
@@ -1279,11 +1445,17 @@ describe("Commons Utility Functions", () => {
       const mockResponse = { data: { folderId: "new-alert-folder" } };
 
       (commonService.new_Folder as any).mockResolvedValue(mockResponse);
-      (commonService.list_Folders as any).mockResolvedValue({ data: { list: [] } });
+      (commonService.list_Folders as any).mockResolvedValue({
+        data: { list: [] },
+      });
 
       const result = await createFolderByType(mockStore, data, type);
 
-      expect(commonService.new_Folder).toHaveBeenCalledWith("test-org", type, data);
+      expect(commonService.new_Folder).toHaveBeenCalledWith(
+        "test-org",
+        type,
+        data,
+      );
       expect(result).toBe(mockResponse);
     });
 
@@ -1293,11 +1465,18 @@ describe("Commons Utility Functions", () => {
       const type = "alerts";
 
       (commonService.edit_Folder as any).mockResolvedValue({ success: true });
-      (commonService.list_Folders as any).mockResolvedValue({ data: { list: [] } });
+      (commonService.list_Folders as any).mockResolvedValue({
+        data: { list: [] },
+      });
 
       await updateFolderByType(mockStore, folderId, data, type);
 
-      expect(commonService.edit_Folder).toHaveBeenCalledWith("test-org", type, folderId, data);
+      expect(commonService.edit_Folder).toHaveBeenCalledWith(
+        "test-org",
+        type,
+        folderId,
+        data,
+      );
     });
 
     it("should delete folder by id by type", async () => {
@@ -1305,11 +1484,17 @@ describe("Commons Utility Functions", () => {
       const type = "alerts";
 
       (commonService.delete_Folder as any).mockResolvedValue({ success: true });
-      (commonService.list_Folders as any).mockResolvedValue({ data: { list: [] } });
+      (commonService.list_Folders as any).mockResolvedValue({
+        data: { list: [] },
+      });
 
       await deleteFolderByIdByType(mockStore, folderId, type);
 
-      expect(commonService.delete_Folder).toHaveBeenCalledWith("test-org", type, folderId);
+      expect(commonService.delete_Folder).toHaveBeenCalledWith(
+        "test-org",
+        type,
+        folderId,
+      );
     });
   });
 
@@ -1319,26 +1504,46 @@ describe("Commons Utility Functions", () => {
       const from = "folder-1";
       const to = "folder-2";
 
-      (dashboardService.move_Dashboard as any).mockResolvedValue({ success: true });
-      (dashboardService.list as any).mockResolvedValue({ data: { dashboards: [] } });
+      (dashboardService.move_Dashboard as any).mockResolvedValue({
+        success: true,
+      });
+      (dashboardService.list as any).mockResolvedValue({
+        data: { dashboards: [] },
+      });
 
       await moveDashboardToAnotherFolder(mockStore, dashboardIds, from, to);
 
-      expect(dashboardService.move_Dashboard).toHaveBeenCalledWith("test-org", dashboardIds, from, to);
+      expect(dashboardService.move_Dashboard).toHaveBeenCalledWith(
+        "test-org",
+        dashboardIds,
+        from,
+        to,
+      );
     });
   });
 
   describe("moveModuleToAnotherFolder", () => {
     it("should move module items between folders", async () => {
-      const data = { itemIds: ["item-1", "item-2"], from: "folder-1", to: "folder-2" };
+      const data = {
+        itemIds: ["item-1", "item-2"],
+        from: "folder-1",
+        to: "folder-2",
+      };
       const type = "alerts";
       const folder_id = "folder-2";
 
-      (commonService.move_across_folders as any).mockResolvedValue({ success: true });
+      (commonService.move_across_folders as any).mockResolvedValue({
+        success: true,
+      });
 
       await moveModuleToAnotherFolder(mockStore, data, type, folder_id);
 
-      expect(commonService.move_across_folders).toHaveBeenCalledWith("test-org", type, data, folder_id);
+      expect(commonService.move_across_folders).toHaveBeenCalledWith(
+        "test-org",
+        type,
+        data,
+        folder_id,
+      );
     });
   });
 });

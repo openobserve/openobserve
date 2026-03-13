@@ -54,7 +54,15 @@ function makeMockContext(overrides: Partial<any> = {}): any {
 
   return {
     options: {
-      xAxis: [{ data: ["Jan", "Feb", "Mar"], axisLabel: { rotate: 0, width: 120, margin: 5 }, axisTick: {}, nameGap: 25, name: "" }],
+      xAxis: [
+        {
+          data: ["Jan", "Feb", "Mar"],
+          axisLabel: { rotate: 0, width: 120, margin: 5 },
+          axisTick: {},
+          nameGap: 25,
+          name: "",
+        },
+      ],
       yAxis: [{ data: [], axisLabel: { width: 80 }, name: "" }],
       series: [],
       tooltip: { axisPointer: {}, textStyle: {} },
@@ -71,9 +79,16 @@ function makeMockContext(overrides: Partial<any> = {}): any {
         trellis: { layout: null },
         background: { value: { color: "#FFFFFF" } },
       },
-      queries: [{ fields: { y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+      queries: [
+        {
+          fields: { y: [{ label: "Value" }], breakdown: [] },
+          customQuery: false,
+        },
+      ],
     },
-    store: { state: { theme: "light", zoConfig: { timestamp_column: "_timestamp" } } },
+    store: {
+      state: { theme: "light", zoConfig: { timestamp_column: "_timestamp" } },
+    },
     chartPanelRef: { value: { offsetWidth: 800, offsetHeight: 400 } },
     hoveredSeriesState: { value: null },
     xAxisKeys: ["x1"],
@@ -138,7 +153,9 @@ describe("applyStackedChart", () => {
 
   it("sets tooltip axisPointer label backgroundColor for dark theme", () => {
     const ctx = makeMockContext({
-      store: { state: { theme: "dark", zoConfig: { timestamp_column: "_timestamp" } } },
+      store: {
+        state: { theme: "dark", zoConfig: { timestamp_column: "_timestamp" } },
+      },
     });
     applyStackedChart(ctx);
     expect(ctx.options.tooltip.axisPointer.label.backgroundColor).toBe("#333");
@@ -146,7 +163,9 @@ describe("applyStackedChart", () => {
 
   it("sets tooltip axisPointer label backgroundColor to empty string for light theme", () => {
     const ctx = makeMockContext({
-      store: { state: { theme: "light", zoConfig: { timestamp_column: "_timestamp" } } },
+      store: {
+        state: { theme: "light", zoConfig: { timestamp_column: "_timestamp" } },
+      },
     });
     applyStackedChart(ctx);
     expect(ctx.options.tooltip.axisPointer.label.backgroundColor).toBe("");
@@ -188,7 +207,12 @@ describe("applyStackedChart", () => {
           trellis: { layout: null },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [] },
+            customQuery: false,
+          },
+        ],
       },
     });
     // Override xAxis axisLabel rotate to 45 to verify it gets overridden to 0
@@ -200,7 +224,9 @@ describe("applyStackedChart", () => {
   it("tooltip axisPointer label formatter is a function", () => {
     const ctx = makeMockContext();
     applyStackedChart(ctx);
-    expect(typeof ctx.options.tooltip.axisPointer.label.formatter).toBe("function");
+    expect(typeof ctx.options.tooltip.axisPointer.label.formatter).toBe(
+      "function",
+    );
   });
 
   it("tooltip formatter returns value string for x dimension", () => {

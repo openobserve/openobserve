@@ -35,9 +35,7 @@ const createMockStore = (overrides = {}) => ({
       identifier: "test-org",
     },
     organizationData: {
-      functions: [
-        { name: "test_func", function: "// test function" },
-      ],
+      functions: [{ name: "test_func", function: "// test function" }],
     },
     userInfo: {
       email: "test@example.com",
@@ -63,7 +61,14 @@ vi.mock("@/components/alerts/FilterGroup.vue", () => ({
   default: {
     name: "FilterGroup",
     template: "<div data-test='mock-filter-group'></div>",
-    props: ["streamFields", "streamFieldsMap", "showSqlPreview", "sqlQuery", "group", "depth"],
+    props: [
+      "streamFields",
+      "streamFieldsMap",
+      "showSqlPreview",
+      "sqlQuery",
+      "group",
+      "depth",
+    ],
     emits: ["add-condition", "add-group", "remove-group", "input:update"],
   },
 }));
@@ -73,8 +78,27 @@ vi.mock("@/components/alerts/QueryEditorDialog.vue", () => ({
   default: {
     name: "QueryEditorDialog",
     template: "<div data-test='mock-query-editor-dialog'></div>",
-    props: ["modelValue", "tab", "sqlQuery", "promqlQuery", "vrlFunction", "streamName", "streamType", "columns", "period", "multiTimeRange", "savedFunctions", "sqlQueryErrorMsg"],
-    emits: ["update:modelValue", "update:sqlQuery", "update:promqlQuery", "update:vrlFunction", "validate-sql"],
+    props: [
+      "modelValue",
+      "tab",
+      "sqlQuery",
+      "promqlQuery",
+      "vrlFunction",
+      "streamName",
+      "streamType",
+      "columns",
+      "period",
+      "multiTimeRange",
+      "savedFunctions",
+      "sqlQueryErrorMsg",
+    ],
+    emits: [
+      "update:modelValue",
+      "update:sqlQuery",
+      "update:promqlQuery",
+      "update:vrlFunction",
+      "validate-sql",
+    ],
   },
 }));
 
@@ -90,7 +114,7 @@ vi.mock("@/components/alerts/CustomConfirmDialog.vue", () => ({
 
 // Mock zincutils
 vi.mock("@/utils/zincutils", () => ({
-  b64EncodeUnicode: vi.fn((str: string) => Buffer.from(str).toString('base64')),
+  b64EncodeUnicode: vi.fn((str: string) => Buffer.from(str).toString("base64")),
 }));
 
 describe("QueryConfig.vue", () => {
@@ -184,7 +208,9 @@ describe("QueryConfig.vue", () => {
         },
       });
 
-      expect(darkWrapper.find(".step-query-config.dark-mode").exists()).toBe(true);
+      expect(darkWrapper.find(".step-query-config.dark-mode").exists()).toBe(
+        true,
+      );
       darkWrapper.unmount();
     });
 
@@ -268,7 +294,7 @@ describe("QueryConfig.vue", () => {
     });
 
     it("should handle VRL function prop", async () => {
-      const vrlFunction = ".field = \"value\"";
+      const vrlFunction = '.field = "value"';
       await wrapper.setProps({ vrlFunction });
       expect(wrapper.props().vrlFunction).toBe(vrlFunction);
     });
@@ -285,7 +311,11 @@ describe("QueryConfig.vue", () => {
       await wrapper.setProps({ streamType: "metrics" });
       const tabOptions = wrapper.vm.tabOptions;
       expect(tabOptions.length).toBe(3);
-      expect(tabOptions.map((t: any) => t.value)).toEqual(["custom", "sql", "promql"]);
+      expect(tabOptions.map((t: any) => t.value)).toEqual([
+        "custom",
+        "sql",
+        "promql",
+      ]);
     });
 
     it("should show only custom and SQL tabs for logs stream type", async () => {
@@ -790,19 +820,22 @@ describe("QueryConfig.vue", () => {
     });
 
     it("should handle very long SQL query", async () => {
-      const longQuery = "SELECT * FROM logs WHERE " + "field = 'value' AND ".repeat(100);
+      const longQuery =
+        "SELECT * FROM logs WHERE " + "field = 'value' AND ".repeat(100);
       await wrapper.vm.updateSqlQuery(longQuery);
       expect(wrapper.vm.localSqlQuery.length).toBeGreaterThan(1000);
     });
 
     it("should handle very long PromQL query", async () => {
-      const longQuery = "rate(http_requests_total[5m]) " + "+ ".repeat(100) + "0";
+      const longQuery =
+        "rate(http_requests_total[5m]) " + "+ ".repeat(100) + "0";
       await wrapper.vm.updatePromqlQuery(longQuery);
       expect(wrapper.vm.localPromqlQuery.length).toBeGreaterThan(100);
     });
 
     it("should handle special characters in queries", async () => {
-      const specialQuery = "SELECT * FROM logs WHERE msg LIKE '%error%' AND status = '500'";
+      const specialQuery =
+        "SELECT * FROM logs WHERE msg LIKE '%error%' AND status = '500'";
       await wrapper.vm.updateSqlQuery(specialQuery);
       expect(wrapper.vm.localSqlQuery).toBe(specialQuery);
     });
@@ -877,15 +910,21 @@ describe("QueryConfig.vue", () => {
       wrapper.vm.localTab = "custom";
       await nextTick();
 
-      expect(wrapper.find('[data-test="mock-filter-group"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="mock-filter-group"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should render QueryEditorDialog", () => {
-      expect(wrapper.find('[data-test="mock-query-editor-dialog"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="mock-query-editor-dialog"]').exists(),
+      ).toBe(true);
     });
 
     it("should render CustomConfirmDialog", () => {
-      expect(wrapper.find('[data-test="mock-custom-confirm-dialog"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="mock-custom-confirm-dialog"]').exists(),
+      ).toBe(true);
     });
   });
 

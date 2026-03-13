@@ -69,7 +69,9 @@ describe("CustomConfirmDialog", () => {
     await nextTick();
     await flushPromises();
 
-    const dialog = document.querySelector('[data-test="custom-confirm-dialog"]');
+    const dialog = document.querySelector(
+      '[data-test="custom-confirm-dialog"]',
+    );
     expect(dialog).toBeTruthy();
   });
 
@@ -143,7 +145,9 @@ describe("CustomConfirmDialog", () => {
     await nextTick();
     await flushPromises();
 
-    const cancelButton = document.querySelector('[data-test="custom-cancel-button"]');
+    const cancelButton = document.querySelector(
+      '[data-test="custom-cancel-button"]',
+    );
     expect(cancelButton).toBeTruthy();
     expect(cancelButton?.textContent?.trim()).toBe("Cancel");
   });
@@ -162,7 +166,9 @@ describe("CustomConfirmDialog", () => {
     await nextTick();
     await flushPromises();
 
-    const confirmButton = document.querySelector('[data-test="custom-confirm-button"]');
+    const confirmButton = document.querySelector(
+      '[data-test="custom-confirm-button"]',
+    );
     expect(confirmButton).toBeTruthy();
     expect(confirmButton?.textContent?.trim()).toBe("Clear & Continue");
   });
@@ -181,7 +187,9 @@ describe("CustomConfirmDialog", () => {
     await nextTick();
     await flushPromises();
 
-    const cancelButton = document.querySelector('[data-test="custom-cancel-button"]') as HTMLElement;
+    const cancelButton = document.querySelector(
+      '[data-test="custom-cancel-button"]',
+    ) as HTMLElement;
     cancelButton?.click();
     await nextTick();
 
@@ -202,7 +210,9 @@ describe("CustomConfirmDialog", () => {
     await nextTick();
     await flushPromises();
 
-    const confirmButton = document.querySelector('[data-test="custom-confirm-button"]') as HTMLElement;
+    const confirmButton = document.querySelector(
+      '[data-test="custom-confirm-button"]',
+    ) as HTMLElement;
     confirmButton?.click();
     await nextTick();
 
@@ -223,7 +233,9 @@ describe("CustomConfirmDialog", () => {
     await nextTick();
     await flushPromises();
 
-    const cancelButton = document.querySelector('[data-test="custom-cancel-button"]') as HTMLElement;
+    const cancelButton = document.querySelector(
+      '[data-test="custom-cancel-button"]',
+    ) as HTMLElement;
     cancelButton?.click();
     await nextTick();
 
@@ -245,7 +257,9 @@ describe("CustomConfirmDialog", () => {
     await nextTick();
     await flushPromises();
 
-    const confirmButton = document.querySelector('[data-test="custom-confirm-button"]') as HTMLElement;
+    const confirmButton = document.querySelector(
+      '[data-test="custom-confirm-button"]',
+    ) as HTMLElement;
     confirmButton?.click();
     await nextTick();
 

@@ -130,11 +130,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3">
-          <q-icon name="functions" size="sm" color="primary" />
+          <q-icon name="functions" size="sm"
+color="primary" />
           <span class="tw:font-semibold">{{
             t("settings.correlation.fqnFormulaTitle")
           }}</span>
-          <q-icon name="info" size="xs" class="tw:text-gray-400 tw:cursor-help">
+          <q-icon name="info" size="xs"
+class="tw:text-gray-400 tw:cursor-help">
             <q-tooltip max-width="350px">{{
               t("settings.correlation.fqnFormulaTooltip")
             }}</q-tooltip>
@@ -252,7 +254,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'tw:border-gray-300'
             "
           >
-            <q-icon name="info" size="xs" class="tw:mr-1" />
+            <q-icon name="info" size="xs"
+class="tw:mr-1" />
             {{ t("settings.correlation.fallbackNote") }}
           </div>
         </div>

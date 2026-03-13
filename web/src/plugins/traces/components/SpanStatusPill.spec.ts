@@ -34,9 +34,9 @@ describe("SpanStatusPill", () => {
     });
 
     it("should render the status pill container", () => {
-      expect(
-        wrapper.find('[data-test="span-row-status-pill"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="span-row-status-pill"]').exists()).toBe(
+        true,
+      );
     });
   });
 
@@ -47,17 +47,13 @@ describe("SpanStatusPill", () => {
 
     it("should apply the error class", () => {
       expect(
-        wrapper
-          .find('[data-test="span-row-status-pill"]')
-          .classes(),
+        wrapper.find('[data-test="span-row-status-pill"]').classes(),
       ).toContain("o2-status-pill--error");
     });
 
     it("should not apply the success class", () => {
       expect(
-        wrapper
-          .find('[data-test="span-row-status-pill"]')
-          .classes(),
+        wrapper.find('[data-test="span-row-status-pill"]').classes(),
       ).not.toContain("o2-status-pill--success");
     });
 
@@ -75,17 +71,13 @@ describe("SpanStatusPill", () => {
 
     it("should apply the error class treating it case-insensitively", () => {
       expect(
-        wrapper
-          .find('[data-test="span-row-status-pill"]')
-          .classes(),
+        wrapper.find('[data-test="span-row-status-pill"]').classes(),
       ).toContain("o2-status-pill--error");
     });
 
     it("should not apply the success class", () => {
       expect(
-        wrapper
-          .find('[data-test="span-row-status-pill"]')
-          .classes(),
+        wrapper.find('[data-test="span-row-status-pill"]').classes(),
       ).not.toContain("o2-status-pill--success");
     });
 
@@ -103,17 +95,13 @@ describe("SpanStatusPill", () => {
 
     it("should apply the success class", () => {
       expect(
-        wrapper
-          .find('[data-test="span-row-status-pill"]')
-          .classes(),
+        wrapper.find('[data-test="span-row-status-pill"]').classes(),
       ).toContain("o2-status-pill--success");
     });
 
     it("should not apply the error class", () => {
       expect(
-        wrapper
-          .find('[data-test="span-row-status-pill"]')
-          .classes(),
+        wrapper.find('[data-test="span-row-status-pill"]').classes(),
       ).not.toContain("o2-status-pill--error");
     });
 
@@ -131,17 +119,13 @@ describe("SpanStatusPill", () => {
 
     it("should apply the unset class", () => {
       expect(
-        wrapper
-          .find('[data-test="span-row-status-pill"]')
-          .classes(),
+        wrapper.find('[data-test="span-row-status-pill"]').classes(),
       ).toContain("o2-status-pill--unset");
     });
 
     it("should not apply the error class", () => {
       expect(
-        wrapper
-          .find('[data-test="span-row-status-pill"]')
-          .classes(),
+        wrapper.find('[data-test="span-row-status-pill"]').classes(),
       ).not.toContain("o2-status-pill--error");
     });
 

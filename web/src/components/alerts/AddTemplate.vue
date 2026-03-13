@@ -24,10 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center tw:h-[60px]">
         <div
           no-caps
-            padding="xs"
-            outline
-            icon="arrow_back_ios_new"
-            class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
+          padding="xs"
+          outline
+          icon="arrow_back_ios_new"
+          class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
           title="Go Back"
           @click="$emit('cancel:hideform')"
         >
@@ -53,75 +53,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="card-container tw:h-full tw:flex tw:flex-col">
           <div class="q-pa-md tw:flex-1 tw:overflow-auto">
             <div class="col-12 q-pb-sm q-pt-sm o2-input">
-            <q-input
-              data-test="add-template-name-input"
-              v-model="formData.name"
-              :label="t('alerts.name') + ' *'"
-              class="showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              v-bind:readonly="isUpdatingTemplate"
-              v-bind:disable="isUpdatingTemplate"
-              :rules="[
-                (val: any) =>
-                  !!val
-                    ? isValidResourceName(val) ||
-                      `Characters like :, ?, /, #, and spaces are not allowed.`
-                    : t('common.nameRequired'),
-              ]"
-              tabindex="0"
-            />
-          </div>
-          <div class="col-12 q-pb-md">
-            <div class="app-tabs-container tw:w-fit">
-              <app-tabs
-                class="tabs-selection-container"
-                :tabs="tabs"
-                v-model:active-tab="formData.type"
+              <q-input
+                data-test="add-template-name-input"
+                v-model="formData.name"
+                :label="t('alerts.name') + ' *'"
+                class="showLabelOnTop"
+                stack-label
+                borderless
+                dense
+                v-bind:readonly="isUpdatingTemplate"
+                v-bind:disable="isUpdatingTemplate"
+                :rules="[
+                  (val: any) =>
+                    !!val
+                      ? isValidResourceName(val) ||
+                        `Characters like :, ?, /, #, and spaces are not allowed.`
+                      : t('common.nameRequired'),
+                ]"
+                tabindex="0"
               />
             </div>
-          </div>
-          <div v-if="formData.type === 'email'" class="col-12 q-pt-xs o2-input">
-            <q-input
-              data-test="add-template-email-title-input"
-              v-model="formData.title"
-              :label="t('alerts.title') + ' *'"
-              class="showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-              tabindex="0"
-            />
-          </div>
-          <div class="col-12 q-pb-md">
+            <div class="col-12 q-pb-md">
+              <div class="app-tabs-container tw:w-fit">
+                <app-tabs
+                  class="tabs-selection-container"
+                  :tabs="tabs"
+                  v-model:active-tab="formData.type"
+                />
+              </div>
+            </div>
             <div
-              class="q-pb-sm text-bold"
-              data-test="add-template-body-input-title"
+              v-if="formData.type === 'email'"
+              class="col-12 q-pt-xs o2-input"
             >
-              {{ t("alert_templates.body") + " *" }}
+              <q-input
+                data-test="add-template-email-title-input"
+                v-model="formData.title"
+                :label="t('alerts.title') + ' *'"
+                class="showLabelOnTop"
+                stack-label
+                borderless
+                dense
+                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+                tabindex="0"
+              />
             </div>
-            <template v-if="formData.type === 'email'">
-              <query-editor
-                data-test="template-body-editor"
-                ref="queryEditorRef"
-                editor-id="template-body-editor"
-                class="monaco-editor q-mb-md"
-                language="markdown"
-                v-model:query="formData.body"
-              />
-            </template>
-            <template v-else>
-              <query-editor
-                data-test="template-body-editor"
-                ref="queryEditorRef"
-                editor-id="template-body-editor"
-                class="monaco-editor q-mb-md"
-                language="json"
-                v-model:query="formData.body"
-              />
-            </template>
+            <div class="col-12 q-pb-md">
+              <div
+                class="q-pb-sm text-bold"
+                data-test="add-template-body-input-title"
+              >
+                {{ t("alert_templates.body") + " *" }}
+              </div>
+              <template v-if="formData.type === 'email'">
+                <query-editor
+                  data-test="template-body-editor"
+                  ref="queryEditorRef"
+                  editor-id="template-body-editor"
+                  class="monaco-editor q-mb-md"
+                  language="markdown"
+                  v-model:query="formData.body"
+                />
+              </template>
+              <template v-else>
+                <query-editor
+                  data-test="template-body-editor"
+                  ref="queryEditorRef"
+                  editor-id="template-body-editor"
+                  class="monaco-editor q-mb-md"
+                  language="json"
+                  v-model:query="formData.body"
+                />
+              </template>
             </div>
           </div>
           <div
@@ -133,7 +136,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('alerts.cancel')"
               no-caps
               flat
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
               @click="$emit('cancel:hideform')"
               data-test="add-template-cancel-btn"
             />
@@ -142,7 +149,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('alerts.save')"
               no-caps
               flat
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-primary-button-dark'
+                  : 'o2-primary-button-light'
+              "
               @click="saveTemplate"
               data-test="add-template-submit-btn"
             />
@@ -150,9 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template v-slot:after>
-        <div
-          class="q-px-sm q-pt-sm tw:h-full tw:overflow-auto card-container"
-        >
+        <div class="q-px-sm q-pt-sm tw:h-full tw:overflow-auto card-container">
           <div class="text-bold q-py-sm q-px-xs text-subtitle2">
             {{ t("alert_templates.variable_guide_header") }}
           </div>

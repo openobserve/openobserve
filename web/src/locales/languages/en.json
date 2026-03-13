@@ -1154,7 +1154,8 @@
     "invalidCronExpression": "Invalid cron expression",
     "thresholdShouldNotBeEmpty": "Threshold should not be empty",
     "errorGettingResults": "Error while getting results",
-    "save": "Save"
+    "save": "Save",
+    "evalTemplates": "Evaluation Templates"
   },
   "function": {
     "header": "Functions",

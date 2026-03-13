@@ -63,7 +63,10 @@ export const useAnnotationsData = (
   // Handle adding or editing annotation
   const handleAddAnnotation = (start: any, end: any) => {
     annotationToAddEdit.value = {
-      start_time: getUTCTimestampFromZonedTimestamp(start, store.state.timezone),
+      start_time: getUTCTimestampFromZonedTimestamp(
+        start,
+        store.state.timezone,
+      ),
       end_time: getUTCTimestampFromZonedTimestamp(end, store.state.timezone),
       title: "",
       text: "",

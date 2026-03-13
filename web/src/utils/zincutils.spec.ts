@@ -154,7 +154,7 @@ describe("zincutils", () => {
 
     describe("smartDecodeVrlFunction", () => {
       // Test data setup
-      const plainTextVrl = ".field1 = \"value1\"\n.field2 = \"value2\"";
+      const plainTextVrl = '.field1 = "value1"\n.field2 = "value2"';
       const singleEncodedVrl = b64EncodeUnicode(plainTextVrl);
       const doubleEncodedVrl = b64EncodeUnicode(singleEncodedVrl as string);
 
@@ -165,21 +165,22 @@ describe("zincutils", () => {
         });
 
         it("should handle single-encoded VRL with special characters", () => {
-          const specialVrl = ".message = \"Hello @user! Cost: $50.00\"";
+          const specialVrl = '.message = "Hello @user! Cost: $50.00"';
           const encoded = b64EncodeUnicode(specialVrl);
           const result = smartDecodeVrlFunction(encoded);
           expect(result).toBe(specialVrl);
         });
 
         it("should handle single-encoded VRL with newlines", () => {
-          const multilineVrl = ".field1 = \"line1\"\n.field2 = \"line2\"\n.field3 = \"line3\"";
+          const multilineVrl =
+            '.field1 = "line1"\n.field2 = "line2"\n.field3 = "line3"';
           const encoded = b64EncodeUnicode(multilineVrl);
           const result = smartDecodeVrlFunction(encoded);
           expect(result).toBe(multilineVrl);
         });
 
         it("should handle single-encoded VRL with unicode characters", () => {
-          const unicodeVrl = ".message = \"Hello 世界! 🌍\"";
+          const unicodeVrl = '.message = "Hello 世界! 🌍"';
           const encoded = b64EncodeUnicode(unicodeVrl);
           const result = smartDecodeVrlFunction(encoded);
           expect(result).toBe(unicodeVrl);
@@ -193,9 +194,9 @@ describe("zincutils", () => {
         });
 
         it("should handle double-encoded VRL with special characters", () => {
-          const specialVrl = ".msg = \"Test @#$%^&*()\"";
+          const specialVrl = '.msg = "Test @#$%^&*()"';
           const doubleEncoded = b64EncodeUnicode(
-            b64EncodeUnicode(specialVrl) as string
+            b64EncodeUnicode(specialVrl) as string,
           );
           const result = smartDecodeVrlFunction(doubleEncoded);
           expect(result).toBe(specialVrl);
@@ -203,7 +204,7 @@ describe("zincutils", () => {
 
         it("should handle real-world double-encoded VRL scenario", () => {
           // Simulate v0.40 bug: VRL gets encoded in QueryEditorDialog, then encoded again in getAlertPayload
-          const originalVrl = ".severity = \"error\"\n.status_code = 500";
+          const originalVrl = '.severity = "error"\n.status_code = 500';
           const firstEncode = b64EncodeUnicode(originalVrl); // QueryEditorDialog encoding
           const secondEncode = b64EncodeUnicode(firstEncode as string); // getAlertPayload encoding
 
@@ -230,7 +231,7 @@ describe("zincutils", () => {
 
         it("should handle plain text VRL (not encoded) gracefully", () => {
           // If someone manually enters plain VRL in JSON editor
-          const plainVrl = ".field = \"value\"";
+          const plainVrl = '.field = "value"';
           const result = smartDecodeVrlFunction(plainVrl);
           // Should attempt to decode and fail gracefully, returning original
           expect(result).toBe(plainVrl);
@@ -255,7 +256,7 @@ describe("zincutils", () => {
           // Simulate: Backend returns double-encoded VRL from legacy v0.40 alert
           const originalVrl = ".parse_json(.message)";
           const legacyDoubleEncoded = b64EncodeUnicode(
-            b64EncodeUnicode(originalVrl) as string
+            b64EncodeUnicode(originalVrl) as string,
           );
 
           // Smart decoder should detect and fix
@@ -277,7 +278,7 @@ describe("zincutils", () => {
           // Simulate: User loads old double-encoded alert, edits, saves
           const originalVrl = ".status = 200";
           const oldDoubleEncoded = b64EncodeUnicode(
-            b64EncodeUnicode(originalVrl) as string
+            b64EncodeUnicode(originalVrl) as string,
           );
 
           // Load: Smart decoder fixes it
@@ -316,7 +317,8 @@ if .severity == "error" {
         });
 
         it("should handle VRL with regex patterns", () => {
-          const vrlWithRegex = '.is_error = match!(.message, r"error|fail|exception")';
+          const vrlWithRegex =
+            '.is_error = match!(.message, r"error|fail|exception")';
           const encoded = b64EncodeUnicode(vrlWithRegex);
           const result = smartDecodeVrlFunction(encoded);
           expect(result).toBe(vrlWithRegex);
@@ -325,7 +327,7 @@ if .severity == "error" {
 
       describe("Performance and Safety", () => {
         it("should handle very long VRL functions", () => {
-          const longVrl = ".field = \"" + "a".repeat(10000) + "\"";
+          const longVrl = '.field = "' + "a".repeat(10000) + '"';
           const encoded = b64EncodeUnicode(longVrl);
           const result = smartDecodeVrlFunction(encoded);
           expect(result).toBe(longVrl);
@@ -350,9 +352,9 @@ if .severity == "error" {
         });
 
         it("should handle concurrent decode operations", () => {
-          const vrl1 = ".field1 = \"value1\"";
-          const vrl2 = ".field2 = \"value2\"";
-          const vrl3 = ".field3 = \"value3\"";
+          const vrl1 = '.field1 = "value1"';
+          const vrl2 = '.field2 = "value2"';
+          const vrl3 = '.field3 = "value3"';
 
           const encoded1 = b64EncodeUnicode(vrl1);
           const encoded2 = b64EncodeUnicode(vrl2);

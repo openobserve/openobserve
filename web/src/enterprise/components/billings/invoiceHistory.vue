@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-py-md" style="min-height: inherit;">
+  <q-page class="q-py-md" style="min-height: inherit">
     <div class="row q-px-sm q-table__title tw:font-[600]">
       {{ t("billing.invoiceHistory") }}
     </div>
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent } from "@vue/runtime-core";
+import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import InvoiceTable from "./invoiceTable.vue";
 

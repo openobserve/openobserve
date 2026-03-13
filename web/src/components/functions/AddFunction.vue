@@ -17,31 +17,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
     <div class="card-container tw:mb-[0.8rem]">
-      <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:pl-4 tw:pr-2 tw:h-[68px]">
-          <FunctionsToolbar
-            v-model:name="formData.name"
-            v-model:trans-type="formData.transType"
-            ref="functionsToolbarRef"
-            :disable-name="beingUpdated"
-            :transform-type-options="transformTypeOptions"
-            @test="onTestFunction"
-            @save="onSubmit"
-            @back="closeAddFunction"
-            @cancel="cancelAddFunction"
-            @open:chat="openChat"
-            :is-add-function-component="isAddFunctionComponent"
-            class="tw:pr-4"
-          />
+      <div
+        class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:pl-4 tw:pr-2 tw:h-[68px]"
+      >
+        <FunctionsToolbar
+          v-model:name="formData.name"
+          v-model:trans-type="formData.transType"
+          ref="functionsToolbarRef"
+          :disable-name="beingUpdated"
+          :transform-type-options="transformTypeOptions"
+          @test="onTestFunction"
+          @save="onSubmit"
+          @back="closeAddFunction"
+          @cancel="cancelAddFunction"
+          @open:chat="openChat"
+          :is-add-function-component="isAddFunctionComponent"
+          class="tw:pr-4"
+        />
       </div>
     </div>
 
     <div class="tw:flex">
-
-
       <div
-        class="tw:flex tw:overflow-auto "
+        class="tw:flex tw:overflow-auto"
         :style="{
-          width: store.state.isAiChatEnabled && !isAddFunctionComponent ? '75%' : '100%',
+          width:
+            store.state.isAiChatEnabled && !isAddFunctionComponent
+              ? '75%'
+              : '100%',
         }"
       >
         <q-splitter
@@ -51,13 +54,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           reverse
         >
           <template v-slot:before>
-            <div class="q-px-md q-pt-sm q-pb-md tw:h-max card-container tw:h-[calc(100vh-128px)]">
+            <div
+              class="q-px-md q-pt-sm q-pb-md tw:h-max card-container tw:h-[calc(100vh-128px)]"
+            >
               <q-form id="addFunctionForm" ref="addJSTransformForm">
                 <div class="add-function-name-input q-pb-sm o2-input">
                   <FullViewContainer
                     name="function"
                     v-model:is-expanded="expandState.functions"
-                    :label="(formData.transType === '1' ? t('function.jsfunction') : t('function.vrlfunction')) + '*'"
+                    :label="
+                      (formData.transType === '1'
+                        ? t('function.jsfunction')
+                        : t('function.vrlfunction')) + '*'
+                    "
                     class="tw-mt-1"
                   />
                   <div
@@ -70,7 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test-prefix="function-vrl"
                       ref="editorRef"
                       :languages="['vrl', 'javascript']"
-                      :default-language="formData.transType === '1' ? 'javascript' : 'vrl'"
+                      :default-language="
+                        formData.transType === '1' ? 'javascript' : 'vrl'
+                      "
                       :query="formData.function"
                       :hide-nl-toggle="false"
                       :disable-ai="false"
@@ -91,7 +102,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <FullViewContainer
                         name="function"
                         v-model:is-expanded="expandState.functionError"
-                        :label="formData.transType === '1' ? t('function.jsErrorDetails') : t('function.errorDetails')"
+                        :label="
+                          formData.transType === '1'
+                            ? t('function.jsErrorDetails')
+                            : t('function.errorDetails')
+                        "
                         labelClass="tw:text-red-600 tw:font-semibold"
                       />
                       <div
@@ -103,9 +118,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : 'bg-grey-2'
                         "
                       >
-                        <pre class="q-my-none tw:text-red-700" :class="store.state.theme === 'dark' ? 'tw:text-red-400' : 'tw:text-red-700'" style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 13px;">{{
-                          vrlFunctionError
-                        }}</pre>
+                        <pre
+                          class="q-my-none tw:text-red-700"
+                          :class="
+                            store.state.theme === 'dark'
+                              ? 'tw:text-red-400'
+                              : 'tw:text-red-700'
+                          "
+                          style="
+                            white-space: pre-wrap;
+                            font-family: &quot;Courier New&quot;, monospace;
+                            font-size: 13px;
+                          "
+                          >{{ vrlFunctionError }}</pre
+                        >
                       </div>
                     </div>
                   </div>
@@ -114,7 +140,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-slot:after>
-            <div class="q-px-md q-pt-sm q-pb-md tw:h-max q-ml-sm card-container">
+            <div
+              class="q-px-md q-pt-sm q-pb-md tw:h-max q-ml-sm card-container"
+            >
               <TestFunction
                 ref="testFunctionRef"
                 :vrlFunction="formData"
@@ -126,13 +154,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-splitter>
       </div>
-      <div v-if="store.state.isAiChatEnabled && !isAddFunctionComponent" style="width: 25%; max-width: 100%; min-width: 75px;   " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
-        <O2AIChat :style="{
-          height: `calc(100vh - (112px + ${heightOffset}px))`
-        }"  :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" :aiChatInputContext="aiChatInputContext" />
+      <div
+        v-if="store.state.isAiChatEnabled && !isAddFunctionComponent"
+        style="width: 25%; max-width: 100%; min-width: 75px"
+        :class="
+          store.state.theme == 'dark'
+            ? 'dark-mode-chat-container'
+            : 'light-mode-chat-container'
+        "
+      >
+        <O2AIChat
+          :style="{
+            height: `calc(100vh - (112px + ${heightOffset}px))`,
+          }"
+          :is-open="store.state.isAiChatEnabled"
+          @close="store.state.isAiChatEnabled = false"
+          :aiChatInputContext="aiChatInputContext"
+        />
       </div>
     </div>
-  </div>  
+  </div>
   <confirm-dialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
@@ -252,9 +293,7 @@ export default defineComponent({
 
     // Transform type options for radio buttons
     const transformTypeOptions = computed(() => {
-      const options = [
-        { label: t("function.vrl"), value: "0" },
-      ];
+      const options = [{ label: t("function.vrl"), value: "0" }];
 
       // JavaScript functions are only allowed in _meta organization (for SSO claim parsing)
       if (store.state.selectedOrganization.identifier === "_meta") {
@@ -269,8 +308,9 @@ export default defineComponent({
     const streamTypes = ["logs", "metrics", "traces"];
 
     const isFunctionDataChanged = ref(false);
-    const isAddFunctionComponent = computed(() => router.currentRoute.value.path.includes('functions'))
-
+    const isAddFunctionComponent = computed(() =>
+      router.currentRoute.value.path.includes("functions"),
+    );
 
     watch(
       () => formData.value.name + formData.value.function,
@@ -437,7 +477,7 @@ export default defineComponent({
           });
           track("Button Click", {
             button: "Save Function",
-            page: "Add Function"
+            page: "Add Function",
           });
         });
     };
@@ -482,7 +522,7 @@ export default defineComponent({
       }
       track("Button Click", {
         button: "Cancel Function",
-        page: "Add Function"
+        page: "Add Function",
       });
     };
 
@@ -494,14 +534,14 @@ export default defineComponent({
       confirmDialogMeta.value.data = null;
     };
     const openChat = (val: boolean) => {
-        store.dispatch("setIsAiChatEnabled", val);
+      store.dispatch("setIsAiChatEnabled", val);
     };
 
     const sendToAiChat = (value: any) => {
       //this is for when user in pipeline add function page and click on ai chat button
       //here we reset the value befoere setting it because if user clears the input then again click on the same value it wont trigger the watcher that is there in the child component
       //so to force trigger we do this
-      aiChatInputContext.value = '';
+      aiChatInputContext.value = "";
       nextTick(() => {
         aiChatInputContext.value = value;
       });
@@ -516,17 +556,17 @@ export default defineComponent({
     };
 
     // Unified Query Editor: Handle language change
-    const handleLanguageChange = (newLanguage: 'vrl' | 'javascript') => {
-      console.log('[AddFunction] Language changed to:', newLanguage);
+    const handleLanguageChange = (newLanguage: "vrl" | "javascript") => {
+      console.log("[AddFunction] Language changed to:", newLanguage);
       // Update transType: '1' for JavaScript, '0' for VRL
-      formData.value.transType = newLanguage === 'javascript' ? '1' : '0';
+      formData.value.transType = newLanguage === "javascript" ? "1" : "0";
     };
 
     /**
      * Handle NLP mode toggle from AI icon in editor
      */
     const handleToggleNlpMode = () => {
-      console.log('[AddFunction] Toggling NLP mode from AI icon');
+      console.log("[AddFunction] Toggling NLP mode from AI icon");
       // UnifiedQueryEditor manages its own NLP mode state internally
     };
 
@@ -534,7 +574,7 @@ export default defineComponent({
      * Handle generation start event from UnifiedQueryEditor
      */
     const handleGenerationStart = () => {
-      console.log('[AddFunction] AI generation started');
+      console.log("[AddFunction] AI generation started");
       // Can add loading indicators here if needed
     };
 
@@ -542,21 +582,32 @@ export default defineComponent({
      * Handle generation end event from UnifiedQueryEditor
      */
     const handleGenerationEnd = () => {
-      console.log('[AddFunction] AI generation ended');
+      console.log("[AddFunction] AI generation ended");
       // Can remove loading indicators here if needed
     };
 
     /**
      * Handle successful generation from UnifiedQueryEditor
      */
-    const handleGenerationSuccess = (payload: {type: string, message: string}) => {
-      console.log('[AddFunction] AI generation success:', payload.type);
+    const handleGenerationSuccess = (payload: {
+      type: string;
+      message: string;
+    }) => {
+      console.log("[AddFunction] AI generation success:", payload.type);
       // Function code is already updated via @update:query handler
     };
 
     // Unified Query Editor: Handle Ask AI
-    const handleAskAI = async (naturalLanguage: string, language: 'vrl' | 'javascript') => {
-      console.log('[AddFunction] Ask AI for language:', language, 'input:', naturalLanguage);
+    const handleAskAI = async (
+      naturalLanguage: string,
+      language: "vrl" | "javascript",
+    ) => {
+      console.log(
+        "[AddFunction] Ask AI for language:",
+        language,
+        "input:",
+        naturalLanguage,
+      );
 
       // Enable AI chat if not already enabled
       if (!store.state.isAiChatEnabled) {

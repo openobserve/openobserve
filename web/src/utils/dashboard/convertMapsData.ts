@@ -132,7 +132,7 @@ export const convertMapsData = (panelSchema: any, mapData: any) => {
       );
 
     const minValue =
-      numericValues.length === 1 ? 0 : Math.min(...numericValues); 
+      numericValues.length === 1 ? 0 : Math.min(...numericValues);
     const maxValue = Math.max(...numericValues);
 
     options.visualMap.min = minValue;

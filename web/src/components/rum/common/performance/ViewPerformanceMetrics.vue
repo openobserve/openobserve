@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 lg:tw:grid-cols-3 tw:gap-3" data-test="view-performance-metrics">
+  <div
+    class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 lg:tw:grid-cols-3 tw:gap-3"
+    data-test="view-performance-metrics"
+  >
     <!-- Core Web Vitals -->
     <MetricCard
       v-if="metrics?.view?.largest_contentful_paint"

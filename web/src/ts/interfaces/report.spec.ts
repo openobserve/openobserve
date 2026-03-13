@@ -126,15 +126,18 @@ describe("Report Interfaces", () => {
     });
 
     it("should handle sequential report numbers", () => {
-      const reports: ScheduledDashboardReport[] = Array.from({ length: 10 }, (_, i) => ({
-        "#": i + 1,
-        name: `Report ${i + 1}`,
-        frequency: "daily",
-        last_triggered_at: "2024-01-15T00:00:00Z",
-        created_at: "2024-01-01T00:00:00Z",
-        orgId: "org-test",
-        isCached: false,
-      }));
+      const reports: ScheduledDashboardReport[] = Array.from(
+        { length: 10 },
+        (_, i) => ({
+          "#": i + 1,
+          name: `Report ${i + 1}`,
+          frequency: "daily",
+          last_triggered_at: "2024-01-15T00:00:00Z",
+          created_at: "2024-01-01T00:00:00Z",
+          orgId: "org-test",
+          isCached: false,
+        }),
+      );
 
       reports.forEach((report, index) => {
         expect(report["#"]).toBe(index + 1);
@@ -153,7 +156,9 @@ describe("Report Interfaces", () => {
         isCached: true,
       };
 
-      expect(report.last_triggered_at).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+      expect(report.last_triggered_at).toMatch(
+        /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
+      );
       expect(report.created_at).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
     });
 
@@ -186,7 +191,15 @@ describe("Report Interfaces", () => {
     });
 
     it("should accept report with various tab values", () => {
-      const tabs = ["overview", "metrics", "logs", "traces", "alerts", "custom-tab", null];
+      const tabs = [
+        "overview",
+        "metrics",
+        "logs",
+        "traces",
+        "alerts",
+        "custom-tab",
+        null,
+      ];
 
       tabs.forEach((tab, index) => {
         const report: ScheduledDashboardReport = {
@@ -282,7 +295,9 @@ describe("Report Interfaces", () => {
 
     it("should handle report creation and trigger timestamps", () => {
       const now = new Date().toISOString();
-      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const yesterday = new Date(
+        Date.now() - 24 * 60 * 60 * 1000,
+      ).toISOString();
 
       const report: ScheduledDashboardReport = {
         "#": 1,
@@ -295,7 +310,7 @@ describe("Report Interfaces", () => {
       };
 
       expect(new Date(report.last_triggered_at).getTime()).toBeGreaterThan(
-        new Date(report.created_at).getTime()
+        new Date(report.created_at).getTime(),
       );
     });
 

@@ -21,7 +21,6 @@ import { date } from "quasar";
 import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
 import commonService from "../services/common";
 
-
 let moment: any;
 let momentInitialized = false;
 
@@ -176,7 +175,7 @@ export const getFoldersListByType = async (store: any, type: any) => {
     let folders = (
       await commonService.list_Folders(
         store.state.selectedOrganization.identifier,
-        type
+        type,
       )
     ).data.list;
 
@@ -243,7 +242,7 @@ export const addPanel = async (
   panelData: any,
   folderId: any,
   tabId: any,
-  variablesToUpdate?: { variableNames: string[], newPanelId: string },
+  variablesToUpdate?: { variableNames: string[]; newPanelId: string },
   newVariables?: any[],
 ) => {
   try {
@@ -596,7 +595,7 @@ const ensureVariablesStructure = (dashboard: any): void => {
   if (!dashboard.variables) {
     dashboard.variables = {
       showDynamicFilters: false,
-      list: []
+      list: [],
     };
   } else {
     // Ensure showDynamicFilters has a default value
@@ -998,7 +997,11 @@ export const deleteFolderById = async (store: any, folderId: any) => {
   }
 };
 
-export const deleteFolderByIdByType = async (store: any, folderId: any, type: any) => {
+export const deleteFolderByIdByType = async (
+  store: any,
+  folderId: any,
+  type: any,
+) => {
   try {
     await commonService.delete_Folder(
       store.state.selectedOrganization.identifier,
@@ -1031,7 +1034,7 @@ export const createFolderByType = async (store: any, data: any, type: any) => {
       type,
       data,
     );
-    await getFoldersListByType(store,type);
+    await getFoldersListByType(store, type);
     return newFolder;
   } catch (error) {
     throw error;
@@ -1051,7 +1054,12 @@ export const updateFolder = async (store: any, folderId: any, data: any) => {
   }
 };
 
-export const updateFolderByType = async (store: any, folderId: any, data: any, type: any) => {
+export const updateFolderByType = async (
+  store: any,
+  folderId: any,
+  data: any,
+  type: any,
+) => {
   try {
     await commonService.edit_Folder(
       store.state.selectedOrganization.identifier,
@@ -1081,7 +1089,7 @@ export const moveDashboardToAnotherFolder = async (
       store.state.selectedOrganization.identifier,
       dashboardIds,
       from,
-      to
+      to,
     );
 
     //update both folders dashboard
@@ -1096,7 +1104,7 @@ export const moveModuleToAnotherFolder = async (
   store: any,
   data: any,
   type: any,
-  folder_id?: any
+  folder_id?: any,
 ) => {
   try {
     //move alerts
@@ -1104,10 +1112,8 @@ export const moveModuleToAnotherFolder = async (
       store.state.selectedOrganization.identifier,
       type,
       data,
-      folder_id
-
+      folder_id,
     );
-
   } catch (error) {
     throw error;
   }

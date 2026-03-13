@@ -47,14 +47,14 @@ export class RegexPatternCache {
       // Check if expired
       if (now - cached.timestamp > cached.ttl) {
         console.debug(
-          `[RegexPatternCache] Cache expired for org: ${orgId} (age: ${Math.round((now - cached.timestamp) / 1000)}s)`
+          `[RegexPatternCache] Cache expired for org: ${orgId} (age: ${Math.round((now - cached.timestamp) / 1000)}s)`,
         );
         this.clear(orgId);
         return null;
       }
 
       console.debug(
-        `[RegexPatternCache] Cache hit for org: ${orgId} (age: ${Math.round((now - cached.timestamp) / 1000)}s)`
+        `[RegexPatternCache] Cache hit for org: ${orgId} (age: ${Math.round((now - cached.timestamp) / 1000)}s)`,
       );
       return cached.data;
     } catch (error) {
@@ -77,7 +77,7 @@ export class RegexPatternCache {
 
       sessionStorage.setItem(cacheKey, JSON.stringify(cached));
       console.debug(
-        `[RegexPatternCache] Cached data for org: ${orgId} (TTL: ${ttl / 1000}s)`
+        `[RegexPatternCache] Cached data for org: ${orgId} (TTL: ${ttl / 1000}s)`,
       );
     } catch (error) {
       console.error("[RegexPatternCache] Error writing cache:", error);
@@ -118,7 +118,9 @@ export class RegexPatternCache {
   /**
    * Get cache statistics
    */
-  static getStats(orgId: string): { exists: boolean; age: number; ttl: number } | null {
+  static getStats(
+    orgId: string,
+  ): { exists: boolean; age: number; ttl: number } | null {
     try {
       const cacheKey = `${CACHE_KEY_PREFIX}${orgId}`;
       const cachedItem = sessionStorage.getItem(cacheKey);

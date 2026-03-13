@@ -92,7 +92,7 @@ const organizations = {
     return http().put(`/api/${orgIdentifier}/rename`, {
       new_name: newOrgName,
     });
-  }
+  },
 };
 
 export default organizations;

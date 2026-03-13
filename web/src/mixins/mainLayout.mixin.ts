@@ -57,9 +57,10 @@ const MainLayoutOpenSourceMixin = {
                   store.state.userInfo.email == data.UserObj.email) ||
                 res.data.data.length == 1
               ) {
-                selectedOrg.value = localOrg.value && Object.keys(localOrg.value).length > 0
-                  ? localOrg.value
-                  : optiondata;
+                selectedOrg.value =
+                  localOrg.value && Object.keys(localOrg.value).length > 0
+                    ? localOrg.value
+                    : optiondata;
                 useLocalOrganization(selectedOrg.value);
                 store.dispatch("setSelectedOrganization", selectedOrg.value);
               }

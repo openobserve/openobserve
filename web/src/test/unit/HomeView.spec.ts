@@ -27,44 +27,44 @@ import orgService from "../../services/organizations";
 // Mock services
 vi.mock("../../services/organizations", () => ({
   default: {
-    get_organization_summary: vi.fn()
-  }
+    get_organization_summary: vi.fn(),
+  },
 }));
 
 vi.mock("../../aws-exports", () => ({
   default: {
-    isCloud: "false"
-  }
+    isCloud: "false",
+  },
 }));
 
 vi.mock("../../utils/zincutils", () => ({
   formatSizeFromMB: vi.fn((size) => `${size}MB`),
   addCommasToNumber: vi.fn((num) => num?.toLocaleString() || "0"),
-  getImageURL: vi.fn((url) => url)
+  getImageURL: vi.fn((url) => url),
 }));
 
 vi.mock("../../composables/useStreams", () => ({
   default: () => ({
-    setStreams: vi.fn()
-  })
+    setStreams: vi.fn(),
+  }),
 }));
 
 vi.mock("../../enterprise/components/billings/TrialPeriod.vue", () => ({
   default: {
     name: "TrialPeriod",
-    template: "<div>Trial Period</div>"
-  }
+    template: "<div>Trial Period</div>",
+  },
 }));
 
 // Mock router
 const mockRouter = {
   push: vi.fn(),
-  resolve: vi.fn()
+  resolve: vi.fn(),
 };
 
 const mockRoute = {
   name: "home",
-  path: "/home"
+  path: "/home",
 };
 
 // Create i18n instance
@@ -90,10 +90,10 @@ const i18n = createI18n({
         view: "View",
         noData: "No Data",
         ingestionMsg: "Start ingesting data",
-        findIngestion: "Find Ingestion Methods"
-      }
-    }
-  }
+        findIngestion: "Find Ingestion Methods",
+      },
+    },
+  },
 });
 
 describe("HomeView.vue", () => {
@@ -113,16 +113,16 @@ describe("HomeView.vue", () => {
         alerts: {
           num_realtime: 0,
           num_scheduled: 0,
-          trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          trigger_status: { failed: 0, healthy: 0, warning: 0 },
         },
         pipelines: {
           num_realtime: 0,
           num_scheduled: 0,
-          trigger_status: { failed: 0, healthy: 0, warning: 0 }
+          trigger_status: { failed: 0, healthy: 0, warning: 0 },
         },
         total_dashboards: 0,
-        total_functions: 0
-      }
+        total_functions: 0,
+      },
     });
 
     // Setup default store state
@@ -131,7 +131,7 @@ describe("HomeView.vue", () => {
       id: 159,
       identifier: "test-org",
       user_email: "test@example.com",
-      subscription_type: "premium"
+      subscription_type: "premium",
     };
 
     store.state.theme = "dark";
@@ -152,37 +152,38 @@ describe("HomeView.vue", () => {
           [
             Quasar,
             {
-              plugins: [Notify]
-            }
+              plugins: [Notify],
+            },
           ],
           i18n,
-          store
+          store,
         ],
         mocks: {
           $router: mockRouter,
-          $route: mockRoute
+          $route: mockRoute,
         },
         stubs: {
-          'router-link': {
-            template: '<a><slot /></a>',
-            props: ['to']
+          "router-link": {
+            template: "<a><slot /></a>",
+            props: ["to"],
           },
-          'q-page': {
-            template: '<div class="q-page"><slot /></div>'
+          "q-page": {
+            template: '<div class="q-page"><slot /></div>',
           },
-          'q-btn': {
-            template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>'
+          "q-btn": {
+            template:
+              '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>',
           },
-          'q-separator': {
-            template: '<hr class="q-separator" />'
+          "q-separator": {
+            template: '<hr class="q-separator" />',
           },
-          'TrialPeriod': {
+          TrialPeriod: {
             name: "TrialPeriod",
-            template: '<div class="trial-period">Trial Period</div>'
-          }
-        }
+            template: '<div class="trial-period">Trial Period</div>',
+          },
+        },
       },
-      props: propsData
+      props: propsData,
     });
   };
 
@@ -224,29 +225,36 @@ describe("HomeView.vue", () => {
     it("should call orgService.get_organization_summary with correct org_id", async () => {
       const mockResponse = {
         data: {
-          streams: { num_streams: 5, total_storage_size: 100, total_compressed_size: 50, total_records: 1000, total_index_size: 25 },
+          streams: {
+            num_streams: 5,
+            total_storage_size: 100,
+            total_compressed_size: 50,
+            total_records: 1000,
+            total_index_size: 25,
+          },
           pipelines: {
             num_scheduled: 3,
             num_realtime: 2,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           alerts: {
             num_realtime: 4,
             num_scheduled: 6,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           total_dashboards: 8,
-          total_functions: 12
-        }
+          total_functions: 12,
+        },
       };
       orgService.get_organization_summary.mockResolvedValue(mockResponse);
 
       wrapper = createWrapper();
       await wrapper.vm.getSummary("test-org");
-      
-      expect(orgService.get_organization_summary).toHaveBeenCalledWith("test-org");
-    });
 
+      expect(orgService.get_organization_summary).toHaveBeenCalledWith(
+        "test-org",
+      );
+    });
 
     it("should set no_data_ingest to true when all counts are zero", async () => {
       const mockResponse = {
@@ -255,16 +263,16 @@ describe("HomeView.vue", () => {
           alerts: {
             num_realtime: 0,
             num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           pipelines: {
             num_realtime: 0,
             num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           total_dashboards: 0,
-          total_functions: 0
-        }
+          total_functions: 0,
+        },
       };
       orgService.get_organization_summary.mockResolvedValue(mockResponse);
 
@@ -283,16 +291,16 @@ describe("HomeView.vue", () => {
           alerts: {
             num_realtime: 0,
             num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           pipelines: {
             num_realtime: 0,
             num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           total_dashboards: 0,
-          total_functions: 0
-        }
+          total_functions: 0,
+        },
       };
       orgService.get_organization_summary.mockResolvedValue(mockResponse);
 
@@ -306,12 +314,16 @@ describe("HomeView.vue", () => {
     it("should handle null/undefined values in response data", async () => {
       const mockResponse = {
         data: {
-          streams: { num_streams: null, total_storage_size: null, total_records: null },
+          streams: {
+            num_streams: null,
+            total_storage_size: null,
+            total_records: null,
+          },
           pipelines: null,
           alerts: null,
           total_dashboards: null,
-          total_functions: null
-        }
+          total_functions: null,
+        },
       };
       orgService.get_organization_summary.mockResolvedValue(mockResponse);
 
@@ -327,16 +339,15 @@ describe("HomeView.vue", () => {
     it("should handle error response and show notification", async () => {
       const error = new Error("Network error");
       orgService.get_organization_summary.mockRejectedValue(error);
-      
-      const notifySpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      
+
+      const notifySpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
       wrapper = createWrapper();
       await wrapper.vm.getSummary("test-org");
       await flushPromises();
 
       expect(notifySpy).toHaveBeenCalledWith(error);
     });
-
   });
 
   describe("selectedOrg Computed Property", () => {
@@ -360,10 +371,10 @@ describe("HomeView.vue", () => {
     it("should be reactive to store changes", async () => {
       wrapper = createWrapper();
       expect(wrapper.vm.selectedOrg).toBe("test-org");
-      
+
       store.state.selectedOrganization.identifier = "new-org";
       await nextTick();
-      
+
       expect(wrapper.vm.selectedOrg).toBe("new-org");
     });
   });
@@ -376,25 +387,25 @@ describe("HomeView.vue", () => {
           alerts: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           pipelines: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           total_dashboards: 1,
-          total_functions: 1
-        }
+          total_functions: 1,
+        },
       };
       orgService.get_organization_summary.mockResolvedValue(mockResponse);
 
       wrapper = createWrapper();
-      const getSummarySpy = vi.spyOn(wrapper.vm, 'getSummary');
-      
+      const getSummarySpy = vi.spyOn(wrapper.vm, "getSummary");
+
       store.state.selectedOrganization.identifier = "new-org";
       await nextTick();
-      
+
       expect(getSummarySpy).toHaveBeenCalledWith("new-org");
     });
 
@@ -405,37 +416,37 @@ describe("HomeView.vue", () => {
           alerts: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           pipelines: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           total_dashboards: 1,
-          total_functions: 1
-        }
+          total_functions: 1,
+        },
       };
       orgService.get_organization_summary.mockResolvedValue(mockResponse);
 
       wrapper = createWrapper();
-      const getSummarySpy = vi.spyOn(wrapper.vm, 'getSummary');
-      
+      const getSummarySpy = vi.spyOn(wrapper.vm, "getSummary");
+
       store.state.selectedOrganization.identifier = "new-org";
       await nextTick();
-      
+
       expect(getSummarySpy).toHaveBeenCalledWith("new-org");
     });
 
     it("should not call getSummary when selectedOrg is the same", async () => {
       wrapper = createWrapper();
-      const getSummarySpy = vi.spyOn(wrapper.vm, 'getSummary');
-      
+      const getSummarySpy = vi.spyOn(wrapper.vm, "getSummary");
+
       // Trigger watcher with same value
       const currentOrg = store.state.selectedOrganization.identifier;
       store.state.selectedOrganization.identifier = currentOrg;
       await nextTick();
-      
+
       expect(getSummarySpy).not.toHaveBeenCalled();
     });
 
@@ -446,29 +457,29 @@ describe("HomeView.vue", () => {
           alerts: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           pipelines: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           total_dashboards: 1,
-          total_functions: 1
-        }
+          total_functions: 1,
+        },
       };
       orgService.get_organization_summary.mockResolvedValue(mockResponse);
 
       wrapper = createWrapper();
-      const getSummarySpy = vi.spyOn(wrapper.vm, 'getSummary');
-      
+      const getSummarySpy = vi.spyOn(wrapper.vm, "getSummary");
+
       // Clear the existing mock calls from beforeEach
       getSummarySpy.mockClear();
-      
+
       wrapper.vm.summary.value = undefined;
       store.state.selectedOrganization.identifier = "new-org";
       await nextTick();
-      
+
       expect(getSummarySpy).toHaveBeenCalledWith("new-org");
     });
   });
@@ -483,7 +494,7 @@ describe("HomeView.vue", () => {
       store.state.theme = "light";
       wrapper = createWrapper();
       await nextTick();
-      
+
       expect(wrapper.vm.store.state.theme).toBe("light");
     });
 
@@ -491,7 +502,7 @@ describe("HomeView.vue", () => {
       wrapper = createWrapper();
       wrapper.vm.no_data_ingest = true;
       await nextTick();
-      
+
       expect(wrapper.vm.no_data_ingest).toBe(true);
     });
 
@@ -503,28 +514,28 @@ describe("HomeView.vue", () => {
           alerts: {
             num_realtime: 0,
             num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           pipelines: {
             num_realtime: 0,
             num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           total_dashboards: 0,
-          total_functions: 0
-        }
+          total_functions: 0,
+        },
       });
-      
+
       wrapper = createWrapper();
       await flushPromises(); // Wait for getSummary to complete
-      
+
       expect(wrapper.vm.no_data_ingest).toBe(false);
     });
 
     it("should render stream statistics for non-cloud environment", async () => {
       wrapper = createWrapper();
       wrapper.vm.no_data_ingest = false;
-      
+
       expect(wrapper.vm.no_data_ingest).toBe(false);
       expect(wrapper.vm.isCloud).toBe("false");
     });
@@ -537,21 +548,21 @@ describe("HomeView.vue", () => {
           alerts: {
             num_realtime: 0,
             num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           pipelines: {
             num_realtime: 0,
             num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           total_dashboards: 0,
-          total_functions: 0
-        }
+          total_functions: 0,
+        },
       });
-      
+
       wrapper = createWrapper();
       await flushPromises();
-      
+
       expect(wrapper.vm.no_data_ingest).toBe(false);
       expect(wrapper.vm.getSummary).toBeDefined();
     });
@@ -564,21 +575,21 @@ describe("HomeView.vue", () => {
           alerts: {
             num_realtime: 0,
             num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           pipelines: {
             num_realtime: 0,
             num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           total_dashboards: 0,
-          total_functions: 0
-        }
+          total_functions: 0,
+        },
       });
-      
+
       wrapper = createWrapper();
       await flushPromises();
-      
+
       expect(wrapper.vm.no_data_ingest).toBe(false);
       expect(wrapper.vm.summary).toBeDefined();
     });
@@ -591,21 +602,21 @@ describe("HomeView.vue", () => {
           alerts: {
             num_realtime: 0,
             num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           pipelines: {
             num_realtime: 0,
             num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           total_dashboards: 0,
-          total_functions: 0
-        }
+          total_functions: 0,
+        },
       });
-      
+
       wrapper = createWrapper();
       await flushPromises();
-      
+
       expect(wrapper.vm.no_data_ingest).toBe(false);
       expect(wrapper.vm.summary).toBeDefined();
     });
@@ -618,21 +629,21 @@ describe("HomeView.vue", () => {
           alerts: {
             num_realtime: 0,
             num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           pipelines: {
             num_realtime: 0,
             num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           total_dashboards: 0,
-          total_functions: 0
-        }
+          total_functions: 0,
+        },
       });
-      
+
       wrapper = createWrapper();
       await flushPromises();
-      
+
       expect(wrapper.vm.no_data_ingest).toBe(false);
       expect(wrapper.vm.summary).toBeDefined();
     });
@@ -642,7 +653,7 @@ describe("HomeView.vue", () => {
       wrapper.vm.no_data_ingest = false;
       wrapper.vm.summary.value = {};
       await nextTick();
-      
+
       expect(wrapper.exists()).toBe(true);
     });
   });
@@ -660,13 +671,13 @@ describe("HomeView.vue", () => {
             total_storage_size: 100,
             total_compressed_size: 50,
             total_records: 1000,
-            total_index_size: 25
+            total_index_size: 25,
           },
           alerts: { num_realtime: 1, num_scheduled: 1 },
           pipelines: { num_realtime: 1, num_scheduled: 1 },
           total_dashboards: 1,
-          total_functions: 1
-        }
+          total_functions: 1,
+        },
       });
 
       wrapper = createWrapper();
@@ -692,21 +703,21 @@ describe("HomeView.vue", () => {
             total_storage_size: 100,
             total_compressed_size: 75,
             total_records: 1000,
-            total_index_size: 25
+            total_index_size: 25,
           },
           alerts: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           pipelines: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           total_dashboards: 1,
-          total_functions: 1
-        }
+          total_functions: 1,
+        },
       });
 
       // Create a fresh wrapper instance with cloud config
@@ -716,36 +727,37 @@ describe("HomeView.vue", () => {
             [
               Quasar,
               {
-                plugins: [Notify]
-              }
+                plugins: [Notify],
+              },
             ],
             i18n,
-            store
+            store,
           ],
           mocks: {
             $router: mockRouter,
-            $route: mockRoute
+            $route: mockRoute,
           },
           stubs: {
-            'router-link': {
-              template: '<a><slot /></a>',
-              props: ['to']
+            "router-link": {
+              template: "<a><slot /></a>",
+              props: ["to"],
             },
-            'q-page': {
-              template: '<div class="q-page"><slot /></div>'
+            "q-page": {
+              template: '<div class="q-page"><slot /></div>',
             },
-            'q-btn': {
-              template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>'
+            "q-btn": {
+              template:
+                '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>',
             },
-            'q-separator': {
-              template: '<hr class="q-separator" />'
+            "q-separator": {
+              template: '<hr class="q-separator" />',
             },
-            'TrialPeriod': {
+            TrialPeriod: {
               name: "TrialPeriod",
-              template: '<div class="trial-period">Trial Period</div>'
-            }
-          }
-        }
+              template: '<div class="trial-period">Trial Period</div>',
+            },
+          },
+        },
       });
 
       await flushPromises();
@@ -773,21 +785,21 @@ describe("HomeView.vue", () => {
             total_storage_size: 100,
             total_compressed_size: compressedSize,
             total_records: 1000,
-            total_index_size: 25
+            total_index_size: 25,
           },
           alerts: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           pipelines: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           total_dashboards: 1,
-          total_functions: 1
-        }
+          total_functions: 1,
+        },
       });
 
       const cloudWrapper = mount(HomeView, {
@@ -796,36 +808,37 @@ describe("HomeView.vue", () => {
             [
               Quasar,
               {
-                plugins: [Notify]
-              }
+                plugins: [Notify],
+              },
             ],
             i18n,
-            store
+            store,
           ],
           mocks: {
             $router: mockRouter,
-            $route: mockRoute
+            $route: mockRoute,
           },
           stubs: {
-            'router-link': {
-              template: '<a><slot /></a>',
-              props: ['to']
+            "router-link": {
+              template: "<a><slot /></a>",
+              props: ["to"],
             },
-            'q-page': {
-              template: '<div class="q-page"><slot /></div>'
+            "q-page": {
+              template: '<div class="q-page"><slot /></div>',
             },
-            'q-btn': {
-              template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>'
+            "q-btn": {
+              template:
+                '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>',
             },
-            'q-separator': {
-              template: '<hr class="q-separator" />'
+            "q-separator": {
+              template: '<hr class="q-separator" />',
             },
-            'TrialPeriod': {
+            TrialPeriod: {
               name: "TrialPeriod",
-              template: '<div class="trial-period">Trial Period</div>'
-            }
-          }
-        }
+              template: '<div class="trial-period">Trial Period</div>',
+            },
+          },
+        },
       });
 
       await flushPromises();
@@ -838,11 +851,22 @@ describe("HomeView.vue", () => {
     });
 
     it("should only render compressed size tile when isCloud is exactly 'false'", async () => {
-      const testValues = ["false", "False", "TRUE", "1", "0", "", undefined, null, "true"];
+      const testValues = [
+        "false",
+        "False",
+        "TRUE",
+        "1",
+        "0",
+        "",
+        undefined,
+        null,
+        "true",
+      ];
 
       for (const testValue of testValues) {
         // Mock with different isCloud values
-        vi.mocked(await import("../../aws-exports")).default.isCloud = testValue;
+        vi.mocked(await import("../../aws-exports")).default.isCloud =
+          testValue;
 
         orgService.get_organization_summary.mockResolvedValue({
           data: {
@@ -851,21 +875,21 @@ describe("HomeView.vue", () => {
               total_storage_size: 100,
               total_compressed_size: 50,
               total_records: 1000,
-              total_index_size: 25
+              total_index_size: 25,
             },
             alerts: {
               num_realtime: 1,
               num_scheduled: 1,
-              trigger_status: { failed: 0, healthy: 0, warning: 0 }
+              trigger_status: { failed: 0, healthy: 0, warning: 0 },
             },
             pipelines: {
               num_realtime: 1,
               num_scheduled: 1,
-              trigger_status: { failed: 0, healthy: 0, warning: 0 }
+              trigger_status: { failed: 0, healthy: 0, warning: 0 },
             },
             total_dashboards: 1,
-            total_functions: 1
-          }
+            total_functions: 1,
+          },
         });
 
         const testWrapper = createWrapper();
@@ -896,21 +920,21 @@ describe("HomeView.vue", () => {
             total_storage_size: 100,
             total_compressed_size: 75,
             total_records: 1000,
-            total_index_size: 25
+            total_index_size: 25,
           },
           alerts: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           pipelines: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           total_dashboards: 1,
-          total_functions: 1
-        }
+          total_functions: 1,
+        },
       };
 
       // Set up the mock BEFORE creating the wrapper so it's used on mount
@@ -943,21 +967,21 @@ describe("HomeView.vue", () => {
             total_storage_size: 100,
             total_compressed_size: 50,
             total_records: 1000,
-            total_index_size: 25
+            total_index_size: 25,
           },
           alerts: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           pipelines: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           total_dashboards: 1,
-          total_functions: 1
-        }
+          total_functions: 1,
+        },
       });
 
       wrapper = createWrapper();
@@ -983,21 +1007,21 @@ describe("HomeView.vue", () => {
             total_storage_size: 100,
             total_compressed_size: 75,
             total_records: 1000,
-            total_index_size: 30
+            total_index_size: 30,
           },
           alerts: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           pipelines: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           total_dashboards: 1,
-          total_functions: 1
-        }
+          total_functions: 1,
+        },
       });
 
       // Create a fresh wrapper instance with cloud config
@@ -1007,36 +1031,37 @@ describe("HomeView.vue", () => {
             [
               Quasar,
               {
-                plugins: [Notify]
-              }
+                plugins: [Notify],
+              },
             ],
             i18n,
-            store
+            store,
           ],
           mocks: {
             $router: mockRouter,
-            $route: mockRoute
+            $route: mockRoute,
           },
           stubs: {
-            'router-link': {
-              template: '<a><slot /></a>',
-              props: ['to']
+            "router-link": {
+              template: "<a><slot /></a>",
+              props: ["to"],
             },
-            'q-page': {
-              template: '<div class="q-page"><slot /></div>'
+            "q-page": {
+              template: '<div class="q-page"><slot /></div>',
             },
-            'q-btn': {
-              template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>'
+            "q-btn": {
+              template:
+                '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>',
             },
-            'q-separator': {
-              template: '<hr class="q-separator" />'
+            "q-separator": {
+              template: '<hr class="q-separator" />',
             },
-            'TrialPeriod': {
+            TrialPeriod: {
               name: "TrialPeriod",
-              template: '<div class="trial-period">Trial Period</div>'
-            }
-          }
-        }
+              template: '<div class="trial-period">Trial Period</div>',
+            },
+          },
+        },
       });
 
       await flushPromises();
@@ -1064,21 +1089,21 @@ describe("HomeView.vue", () => {
             total_storage_size: 100,
             total_compressed_size: 50,
             total_records: 1000,
-            total_index_size: indexSize
+            total_index_size: indexSize,
           },
           alerts: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           pipelines: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           total_dashboards: 1,
-          total_functions: 1
-        }
+          total_functions: 1,
+        },
       });
 
       wrapper = createWrapper();
@@ -1090,11 +1115,22 @@ describe("HomeView.vue", () => {
     });
 
     it("should only render index size tile when isCloud is exactly 'false'", async () => {
-      const testValues = ["false", "False", "TRUE", "1", "0", "", undefined, null, "true"];
+      const testValues = [
+        "false",
+        "False",
+        "TRUE",
+        "1",
+        "0",
+        "",
+        undefined,
+        null,
+        "true",
+      ];
 
       for (const testValue of testValues) {
         // Mock with different isCloud values
-        vi.mocked(await import("../../aws-exports")).default.isCloud = testValue;
+        vi.mocked(await import("../../aws-exports")).default.isCloud =
+          testValue;
 
         orgService.get_organization_summary.mockResolvedValue({
           data: {
@@ -1103,21 +1139,21 @@ describe("HomeView.vue", () => {
               total_storage_size: 100,
               total_compressed_size: 50,
               total_records: 1000,
-              total_index_size: 25
+              total_index_size: 25,
             },
             alerts: {
               num_realtime: 1,
               num_scheduled: 1,
-              trigger_status: { failed: 0, healthy: 0, warning: 0 }
+              trigger_status: { failed: 0, healthy: 0, warning: 0 },
             },
             pipelines: {
               num_realtime: 1,
               num_scheduled: 1,
-              trigger_status: { failed: 0, healthy: 0, warning: 0 }
+              trigger_status: { failed: 0, healthy: 0, warning: 0 },
             },
             total_dashboards: 1,
-            total_functions: 1
-          }
+            total_functions: 1,
+          },
         });
 
         const testWrapper = createWrapper();
@@ -1148,21 +1184,21 @@ describe("HomeView.vue", () => {
             total_storage_size: 100,
             total_compressed_size: 75,
             total_records: 1000,
-            total_index_size: 35
+            total_index_size: 35,
           },
           alerts: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           pipelines: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           total_dashboards: 1,
-          total_functions: 1
-        }
+          total_functions: 1,
+        },
       };
 
       // Set up the mock BEFORE creating the wrapper so it's used on mount
@@ -1192,21 +1228,21 @@ describe("HomeView.vue", () => {
             total_storage_size: 100,
             total_compressed_size: 75,
             total_records: 1000,
-            total_index_size: 40
+            total_index_size: 40,
           },
           alerts: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           pipelines: {
             num_realtime: 1,
             num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
+            trigger_status: { failed: 0, healthy: 0, warning: 0 },
           },
           total_dashboards: 1,
-          total_functions: 1
-        }
+          total_functions: 1,
+        },
       };
 
       // Set up the mock BEFORE creating the wrapper so it's used on mount
@@ -1218,36 +1254,37 @@ describe("HomeView.vue", () => {
             [
               Quasar,
               {
-                plugins: [Notify]
-              }
+                plugins: [Notify],
+              },
             ],
             i18n,
-            store
+            store,
           ],
           mocks: {
             $router: mockRouter,
-            $route: mockRoute
+            $route: mockRoute,
           },
           stubs: {
-            'router-link': {
-              template: '<a><slot /></a>',
-              props: ['to']
+            "router-link": {
+              template: "<a><slot /></a>",
+              props: ["to"],
             },
-            'q-page': {
-              template: '<div class="q-page"><slot /></div>'
+            "q-page": {
+              template: '<div class="q-page"><slot /></div>',
             },
-            'q-btn': {
-              template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>'
+            "q-btn": {
+              template:
+                '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>',
             },
-            'q-separator': {
-              template: '<hr class="q-separator" />'
+            "q-separator": {
+              template: '<hr class="q-separator" />',
             },
-            'TrialPeriod': {
+            TrialPeriod: {
               name: "TrialPeriod",
-              template: '<div class="trial-period">Trial Period</div>'
-            }
-          }
-        }
+              template: '<div class="trial-period">Trial Period</div>',
+            },
+          },
+        },
       });
 
       await flushPromises();
@@ -1289,12 +1326,14 @@ describe("HomeView.vue", () => {
   describe("Integration Tests", () => {
     it("should call getSummary on mount when organization exists", () => {
       orgService.get_organization_summary.mockResolvedValue({
-        data: { streams: { num_streams: 0 } }
+        data: { streams: { num_streams: 0 } },
       });
-      
+
       wrapper = createWrapper();
-      
-      expect(orgService.get_organization_summary).toHaveBeenCalledWith("test-org");
+
+      expect(orgService.get_organization_summary).toHaveBeenCalledWith(
+        "test-org",
+      );
     });
 
     it("should not call getSummary on mount when no organization", () => {
@@ -1303,7 +1342,7 @@ describe("HomeView.vue", () => {
       vi.clearAllMocks(); // Clear the mock call history after changing the store
 
       orgService.get_organization_summary.mockResolvedValue({
-        data: { streams: { num_streams: 0 } }
+        data: { streams: { num_streams: 0 } },
       });
 
       wrapper = createWrapper();
@@ -1314,33 +1353,37 @@ describe("HomeView.vue", () => {
 
   describe("Edge Cases and Error Handling", () => {
     it("should handle invalid organization identifier", async () => {
-      orgService.get_organization_summary.mockRejectedValue(new Error("Invalid org"));
-      
+      orgService.get_organization_summary.mockRejectedValue(
+        new Error("Invalid org"),
+      );
+
       wrapper = createWrapper();
       await wrapper.vm.getSummary(null);
       await flushPromises();
-      
+
       expect(orgService.get_organization_summary).toHaveBeenCalledWith(null);
     });
 
     it("should handle empty string organization identifier", async () => {
-      orgService.get_organization_summary.mockRejectedValue(new Error("Empty org"));
-      
+      orgService.get_organization_summary.mockRejectedValue(
+        new Error("Empty org"),
+      );
+
       wrapper = createWrapper();
       await wrapper.vm.getSummary("");
       await flushPromises();
-      
+
       expect(orgService.get_organization_summary).toHaveBeenCalledWith("");
     });
 
     it("should handle malformed API response", async () => {
       const malformedResponse = { data: null };
       orgService.get_organization_summary.mockResolvedValue(malformedResponse);
-      
+
       wrapper = createWrapper();
       await wrapper.vm.getSummary("test-org");
       await flushPromises();
-      
+
       // Should not crash and handle gracefully
       expect(wrapper.exists()).toBe(true);
     });
@@ -1348,13 +1391,12 @@ describe("HomeView.vue", () => {
     it("should handle API timeout error", async () => {
       const timeoutError = new Error("Timeout");
       orgService.get_organization_summary.mockRejectedValue(timeoutError);
-      
+
       wrapper = createWrapper();
       await wrapper.vm.getSummary("test-org");
       await flushPromises();
-      
+
       expect(console.log).toHaveBeenCalledWith(timeoutError);
     });
-
   });
 });

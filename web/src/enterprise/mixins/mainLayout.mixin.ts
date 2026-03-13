@@ -3,7 +3,14 @@ import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import { useStore } from "vuex";
 
-import { getUserInfo, getImageURL, useLocalOrganization, invalidateLoginData, useLocalCurrentUser, useLocalUserInfo } from "@/utils/zincutils";
+import {
+  getUserInfo,
+  getImageURL,
+  useLocalOrganization,
+  invalidateLoginData,
+  useLocalCurrentUser,
+  useLocalUserInfo,
+} from "@/utils/zincutils";
 import organizationService from "@/services/organizations";
 import billingService from "@/services/billings";
 import userService from "@/services/users";
@@ -30,7 +37,8 @@ const MainLayoutCloudMixin = {
         name: "pipeline",
       });
 
-      if(!store.state.zoConfig?.custom_hide_menus
+      if (
+        !store.state.zoConfig?.custom_hide_menus
           ?.split(",")
           ?.includes("billings")
       ) {
@@ -74,9 +82,10 @@ const MainLayoutCloudMixin = {
                   store.state.userInfo.email == data.UserObj.email) ||
                 res.data.data.length == 1
               ) {
-                selectedOrg.value = localOrg.value && Object.keys(localOrg.value).length > 0
-                  ? localOrg.value
-                  : optiondata;
+                selectedOrg.value =
+                  localOrg.value && Object.keys(localOrg.value).length > 0
+                    ? localOrg.value
+                    : optiondata;
                 useLocalOrganization(selectedOrg.value);
                 store.dispatch("setSelectedOrganization", selectedOrg.value);
               }
@@ -97,7 +106,7 @@ const MainLayoutCloudMixin = {
         .getRefreshToken()
         .then((res) => {
           const sessionUserInfo: any = getUserInfo(
-            "#id_token=" + res.data.data.id_token
+            "#id_token=" + res.data.data.id_token,
           );
 
           const userInfo = sessionUserInfo !== null ? sessionUserInfo : null;
@@ -114,8 +123,6 @@ const MainLayoutCloudMixin = {
           console.log("Error while fetching refresh token:", e);
         });
     };
-
-
 
     const signout = async () => {
       if (config.isEnterprise == "true") {

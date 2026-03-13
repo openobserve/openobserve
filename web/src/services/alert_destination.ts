@@ -25,7 +25,7 @@ const destination = {
   },
   update: ({ org_identifier, destination_name, data, module }: any) => {
     let url = `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(
-      destination_name
+      destination_name,
     )}`;
     if (module) {
       url += `?module=${module}`;
@@ -51,19 +51,21 @@ const destination = {
   get_by_name: ({ org_identifier, destination_name }: any) => {
     return http().get(
       `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(
-        destination_name
-      )}`
+        destination_name,
+      )}`,
     );
   },
   delete: ({ org_identifier, destination_name }: any) => {
     return http().delete(
       `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(
-        destination_name
-      )}`
+        destination_name,
+      )}`,
     );
   },
   bulkDelete: (org_identifier: string, data: any) => {
-    return http().delete(`/api/${org_identifier}/alerts/destinations/bulk`, { data });
+    return http().delete(`/api/${org_identifier}/alerts/destinations/bulk`, {
+      data,
+    });
   },
   test: ({ org_identifier, data }: any) => {
     return http().post(`/api/${org_identifier}/alerts/destinations/test`, data);

@@ -30,7 +30,7 @@ describe("Auth Service", () => {
     it("should make POST request to login endpoint", async () => {
       const loginData = {
         email: "test@example.com",
-        password: "password123"
+        password: "password123",
       };
 
       const mockResponse = {
@@ -38,13 +38,13 @@ describe("Auth Service", () => {
           token: "mock-token",
           user: {
             id: 1,
-            email: "test@example.com"
-          }
-        }
+            email: "test@example.com",
+          },
+        },
       };
 
       mockHttp.mockReturnValue({
-        post: vi.fn().mockResolvedValue(mockResponse)
+        post: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await auth.sign_in_user(loginData);
@@ -56,16 +56,18 @@ describe("Auth Service", () => {
     it("should handle login errors", async () => {
       const loginData = {
         email: "test@example.com",
-        password: "wrongpassword"
+        password: "wrongpassword",
       };
 
       const mockError = new Error("Invalid credentials");
 
       mockHttp.mockReturnValue({
-        post: vi.fn().mockRejectedValue(mockError)
+        post: vi.fn().mockRejectedValue(mockError),
       } as any);
 
-      await expect(auth.sign_in_user(loginData)).rejects.toThrow("Invalid credentials");
+      await expect(auth.sign_in_user(loginData)).rejects.toThrow(
+        "Invalid credentials",
+      );
       expect(mockHttp().post).toHaveBeenCalledWith("/auth/login", loginData);
     });
   });
@@ -74,15 +76,15 @@ describe("Auth Service", () => {
     it("should fetch dex login configuration", async () => {
       const mockConfig = {
         enabled: true,
-        provider_url: "https://dex.example.com"
+        provider_url: "https://dex.example.com",
       };
 
       const mockResponse = {
-        data: mockConfig
+        data: mockConfig,
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockResponse)
+        get: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await auth.get_dex_login();
@@ -95,7 +97,7 @@ describe("Auth Service", () => {
       const mockError = new Error("Config not found");
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockRejectedValue(mockError)
+        get: vi.fn().mockRejectedValue(mockError),
       } as any);
 
       await expect(auth.get_dex_login()).rejects.toThrow("Config not found");
@@ -107,15 +109,15 @@ describe("Auth Service", () => {
     it("should refresh authentication token", async () => {
       const mockRefreshData = {
         token: "new-token",
-        expires_at: "2024-12-31T23:59:59Z"
+        expires_at: "2024-12-31T23:59:59Z",
       };
 
       const mockResponse = {
-        data: mockRefreshData
+        data: mockRefreshData,
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockResponse)
+        get: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await auth.refresh_token();
@@ -128,7 +130,7 @@ describe("Auth Service", () => {
       const mockError = new Error("Token expired");
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockRejectedValue(mockError)
+        get: vi.fn().mockRejectedValue(mockError),
       } as any);
 
       await expect(auth.refresh_token()).rejects.toThrow("Token expired");
@@ -140,17 +142,18 @@ describe("Auth Service", () => {
     it("should handle network errors", async () => {
       const networkError = {
         code: "NETWORK_ERROR",
-        message: "Network request failed"
+        message: "Network request failed",
       };
 
       mockHttp.mockReturnValue({
         post: vi.fn().mockRejectedValue(networkError),
-        get: vi.fn().mockRejectedValue(networkError)
+        get: vi.fn().mockRejectedValue(networkError),
       } as any);
 
-      await expect(auth.sign_in_user({ email: "test@example.com", password: "test" }))
-        .rejects.toEqual(networkError);
-      
+      await expect(
+        auth.sign_in_user({ email: "test@example.com", password: "test" }),
+      ).rejects.toEqual(networkError);
+
       await expect(auth.get_dex_login()).rejects.toEqual(networkError);
       await expect(auth.refresh_token()).rejects.toEqual(networkError);
     });
@@ -159,34 +162,38 @@ describe("Auth Service", () => {
       const httpError = {
         response: {
           status: 401,
-          data: { message: "Unauthorized" }
-        }
+          data: { message: "Unauthorized" },
+        },
       };
 
       mockHttp.mockReturnValue({
-        post: vi.fn().mockRejectedValue(httpError)
+        post: vi.fn().mockRejectedValue(httpError),
       } as any);
 
-      await expect(auth.sign_in_user({ email: "test@example.com", password: "test" }))
-        .rejects.toEqual(httpError);
+      await expect(
+        auth.sign_in_user({ email: "test@example.com", password: "test" }),
+      ).rejects.toEqual(httpError);
     });
   });
 
   describe("Integration Tests", () => {
     it("should handle successful auth flow", async () => {
       const loginData = { email: "test@example.com", password: "password123" };
-      
+
       const mockLoginResponse = {
-        data: { token: "access-token", user: { id: 1, email: "test@example.com" } }
+        data: {
+          token: "access-token",
+          user: { id: 1, email: "test@example.com" },
+        },
       };
-      
+
       const mockDexConfig = {
-        data: { enabled: false }
+        data: { enabled: false },
       };
 
       mockHttp.mockReturnValue({
         post: vi.fn().mockResolvedValue(mockLoginResponse),
-        get: vi.fn().mockResolvedValue(mockDexConfig)
+        get: vi.fn().mockResolvedValue(mockDexConfig),
       } as any);
 
       const loginResult = await auth.sign_in_user(loginData);

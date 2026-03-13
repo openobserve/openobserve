@@ -29,7 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bordered
     >
       <template #body-cell-alert_name="props">
-        <q-td :props="props" class="cursor-pointer hover:tw:bg-gray-100 dark:hover:tw:bg-gray-700">
+        <q-td
+          :props="props"
+          class="cursor-pointer hover:tw:bg-gray-100 dark:hover:tw:bg-gray-700"
+        >
           <div class="tw:flex tw:items-center" @click="openDrawer(props.row)">
             <span class="tw:font-medium">{{ props.row.alert_name }}</span>
           </div>
@@ -57,7 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #no-data>
         <div class="tw:w-full tw:text-center tw:py-8">
-          <q-icon name="history" size="48px" class="tw:text-gray-400" />
+          <q-icon name="history" size="48px"
+class="tw:text-gray-400" />
           <div class="tw:mt-2 tw:text-gray-600 dark:tw:text-gray-400">
             {{ t("alerts.noHistoryData") }}
           </div>
@@ -285,7 +289,7 @@ watch(
   () => store.state.selectedOrganization.identifier,
   () => {
     fetchHistorySummary();
-  }
+  },
 );
 
 defineExpose({

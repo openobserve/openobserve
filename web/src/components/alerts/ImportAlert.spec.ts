@@ -11,7 +11,7 @@ vi.mock("@/services/alerts", () => ({
   default: {
     create_by_alert_id: vi.fn(),
     listByFolderId: vi.fn().mockResolvedValue({
-      data: { list: [] }
+      data: { list: [] },
     }),
   },
 }));
@@ -38,12 +38,12 @@ vi.mock("vue-router", () => ({
     back: vi.fn(),
     currentRoute: {
       value: {
-        query: { folder: "default" }
-      }
-    }
+        query: { folder: "default" },
+      },
+    },
   })),
   useRoute: vi.fn(() => ({
-    query: { folder: "default" }
+    query: { folder: "default" },
   })),
 }));
 
@@ -51,10 +51,10 @@ vi.mock("@/router", () => ({
   default: {
     currentRoute: {
       value: {
-        query: { folder: "default" }
-      }
-    }
-  }
+        query: { folder: "default" },
+      },
+    },
+  },
 }));
 
 vi.mock("@/services/alert_templates", () => ({ default: {} }));
@@ -63,9 +63,9 @@ vi.mock("axios", () => ({
   default: {
     get: vi.fn().mockResolvedValue({
       data: { test: "data" },
-      headers: { "content-type": "application/json" }
-    })
-  }
+      headers: { "content-type": "application/json" },
+    }),
+  },
 }));
 
 describe("ImportAlert Component - Comprehensive Function Tests", () => {
@@ -79,7 +79,10 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
     mockStore = createStore({
       state: {
         selectedOrganization: { identifier: "test-org" },
-        organizations: [{ identifier: "test-org" }, { identifier: "other-org" }],
+        organizations: [
+          { identifier: "test-org" },
+          { identifier: "other-org" },
+        ],
         userInfo: { email: "test@example.com" },
         timezone: "UTC",
         organizationData: {
@@ -97,8 +100,16 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       messages: {
         en: {
           function: { cancel: "Cancel" },
-          dashboard: { import: "Import", addURL: "Add URL", dropFileMsg: "Drop file message" },
-          alerts: { name: "Name", stream_name: "Stream Name", streamType: "Stream Type" },
+          dashboard: {
+            import: "Import",
+            addURL: "Add URL",
+            dropFileMsg: "Drop file message",
+          },
+          alerts: {
+            name: "Name",
+            stream_name: "Stream Name",
+            streamType: "Stream Type",
+          },
         },
       },
     });
@@ -108,7 +119,7 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         destinations: [
           { name: "test-destination-1" },
           { name: "test-destination-2" },
-          { name: "email-dest" }
+          { name: "email-dest" },
         ],
         templates: [],
         alerts: [],
@@ -116,13 +127,13 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       global: {
         plugins: [Quasar, mockStore, mockI18n],
         stubs: {
-          QueryEditor: { template: '<div></div>' },
-          AppTabs: { template: '<div></div>' },
-          SelectFolderDropDown: { template: '<div></div>' },
+          QueryEditor: { template: "<div></div>" },
+          AppTabs: { template: "<div></div>" },
+          SelectFolderDropDown: { template: "<div></div>" },
           BaseImport: {
             template: '<div><slot name="output-content"></slot></div>',
-            props: ['title', 'testPrefix', 'isImporting', 'editorHeights'],
-            emits: ['back', 'cancel', 'import'],
+            props: ["title", "testPrefix", "isImporting", "editorHeights"],
+            emits: ["back", "cancel", "import"],
             setup(_props: any, { expose }: any) {
               const jsonArrayOfObj = ref([]);
               const jsonStr = ref("");
@@ -178,15 +189,21 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
 
     describe("updateStreams", () => {
       it("should update stream_type to logs", async () => {
-        await expect(wrapper.vm.updateStreams("logs", 0)).resolves.not.toThrow();
+        await expect(
+          wrapper.vm.updateStreams("logs", 0),
+        ).resolves.not.toThrow();
       });
 
       it("should update stream_type to metrics", async () => {
-        await expect(wrapper.vm.updateStreams("metrics", 0)).resolves.not.toThrow();
+        await expect(
+          wrapper.vm.updateStreams("metrics", 0),
+        ).resolves.not.toThrow();
       });
 
       it("should update stream_type to traces", async () => {
-        await expect(wrapper.vm.updateStreams("traces", 0)).resolves.not.toThrow();
+        await expect(
+          wrapper.vm.updateStreams("traces", 0),
+        ).resolves.not.toThrow();
       });
 
       it("should fetch and update streamList", async () => {
@@ -196,7 +213,9 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       });
 
       it("should handle getStreams error gracefully", async () => {
-        const mockGetStreams = vi.fn().mockRejectedValue(new Error("Network error"));
+        const mockGetStreams = vi
+          .fn()
+          .mockRejectedValue(new Error("Network error"));
         wrapper.vm.getStreams = mockGetStreams;
 
         await wrapper.vm.updateStreams("logs", 0);
@@ -232,7 +251,11 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         wrapper.vm.filterDestinations("", mockUpdate);
 
         expect(mockUpdate).toHaveBeenCalled();
-        expect(wrapper.vm.filteredDestinations).toEqual(["test-destination-1", "test-destination-2", "email-dest"]);
+        expect(wrapper.vm.filteredDestinations).toEqual([
+          "test-destination-1",
+          "test-destination-2",
+          "email-dest",
+        ]);
       });
 
       it("should filter destinations by partial match", () => {
@@ -241,7 +264,10 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         wrapper.vm.filterDestinations("test", mockUpdate);
 
         expect(mockUpdate).toHaveBeenCalled();
-        expect(wrapper.vm.filteredDestinations).toEqual(["test-destination-1", "test-destination-2"]);
+        expect(wrapper.vm.filteredDestinations).toEqual([
+          "test-destination-1",
+          "test-destination-2",
+        ]);
       });
 
       it("should be case insensitive", () => {
@@ -279,7 +305,11 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         wrapper.vm.timezoneFilterFn("america", mockUpdate);
 
         expect(mockUpdate).toHaveBeenCalled();
-        expect(wrapper.vm.filteredTimezone.some((tz: string) => tz.toLowerCase().includes("america"))).toBe(true);
+        expect(
+          wrapper.vm.filteredTimezone.some((tz: string) =>
+            tz.toLowerCase().includes("america"),
+          ),
+        ).toBe(true);
       });
 
       it("should be case insensitive for timezone filtering", () => {
@@ -315,7 +345,9 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
 
         wrapper.vm.toggleDestination("test-dest", 0);
 
-        expect(wrapper.vm.userSelectedDestinations[0]).not.toContain("test-dest");
+        expect(wrapper.vm.userSelectedDestinations[0]).not.toContain(
+          "test-dest",
+        );
         expect(wrapper.vm.userSelectedDestinations[0]).toContain("other-dest");
       });
 
@@ -335,7 +367,11 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         wrapper.vm.toggleDestination("dest2", 0);
         wrapper.vm.toggleDestination("dest3", 0);
 
-        expect(wrapper.vm.userSelectedDestinations[0]).toEqual(["dest1", "dest2", "dest3"]);
+        expect(wrapper.vm.userSelectedDestinations[0]).toEqual([
+          "dest1",
+          "dest2",
+          "dest3",
+        ]);
       });
     });
   });
@@ -346,7 +382,10 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         const destinations = [{ name: "dest1" }, { name: "dest2" }];
         const destinationToCheck = "dest1";
 
-        const result = wrapper.vm.checkDestinationInList(destinations, destinationToCheck);
+        const result = wrapper.vm.checkDestinationInList(
+          destinations,
+          destinationToCheck,
+        );
         expect(result).toBe(true);
       });
 
@@ -354,7 +393,10 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         const destinations = [{ name: "dest1" }, { name: "dest2" }];
         const destinationToCheck = "nonexistent";
 
-        const result = wrapper.vm.checkDestinationInList(destinations, destinationToCheck);
+        const result = wrapper.vm.checkDestinationInList(
+          destinations,
+          destinationToCheck,
+        );
         expect(result).toBe(false);
       });
 
@@ -362,7 +404,10 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         const destinations = [{ name: "dest1" }];
         const destinationToCheck = "DEST1";
 
-        const result = wrapper.vm.checkDestinationInList(destinations, destinationToCheck);
+        const result = wrapper.vm.checkDestinationInList(
+          destinations,
+          destinationToCheck,
+        );
         expect(result).toBe(false);
       });
 
@@ -370,7 +415,10 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         const destinations = [];
         const destinationToCheck = "dest1";
 
-        const result = wrapper.vm.checkDestinationInList(destinations, destinationToCheck);
+        const result = wrapper.vm.checkDestinationInList(
+          destinations,
+          destinationToCheck,
+        );
         expect(result).toBe(false);
       });
 
@@ -378,7 +426,10 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         const destinations = [{ name: "dest_with-special@chars" }];
         const destinationToCheck = "dest_with-special@chars";
 
-        const result = wrapper.vm.checkDestinationInList(destinations, destinationToCheck);
+        const result = wrapper.vm.checkDestinationInList(
+          destinations,
+          destinationToCheck,
+        );
         expect(result).toBe(true);
       });
     });
@@ -438,10 +489,13 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
 
       it("should return false for invalid organization using component function", async () => {
         try {
-          const result = await wrapper.vm.validateAlertInputs({
-            name: "test-alert",
-            org_id: "wrong-org"
-          }, 1);
+          const result = await wrapper.vm.validateAlertInputs(
+            {
+              name: "test-alert",
+              org_id: "wrong-org",
+            },
+            1,
+          );
           expect(result).toBe(false);
         } catch (error) {
           expect(error).toBeDefined();
@@ -450,11 +504,14 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
 
       it("should return false for invalid stream type using component function", async () => {
         try {
-          const result = await wrapper.vm.validateAlertInputs({
-            name: "test-alert",
-            org_id: "test-org",
-            stream_type: "invalid"
-          }, 1);
+          const result = await wrapper.vm.validateAlertInputs(
+            {
+              name: "test-alert",
+              org_id: "test-org",
+              stream_type: "invalid",
+            },
+            1,
+          );
           expect(result).toBe(false);
         } catch (error) {
           expect(error).toBeDefined();
@@ -466,7 +523,7 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         const input = {
           name: "test-alert",
           org_id: "test-org",
-          stream_type: "logs"
+          stream_type: "logs",
         };
 
         try {
@@ -527,21 +584,32 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         const mockAlertsService = await import("@/services/alerts");
         const mockResponse = {
           data: {
-            list: [{ name: "alert1" }, { name: "alert2" }]
-          }
+            list: [{ name: "alert1" }, { name: "alert2" }],
+          },
         };
-        vi.mocked(mockAlertsService.default.listByFolderId).mockResolvedValue(mockResponse);
+        vi.mocked(mockAlertsService.default.listByFolderId).mockResolvedValue(
+          mockResponse,
+        );
 
         await wrapper.vm.getActiveFolderAlerts("test-folder");
 
         expect(mockAlertsService.default.listByFolderId).toHaveBeenCalledWith(
-          1, 1000, "name", false, "", "test-org", "test-folder", ""
+          1,
+          1000,
+          "name",
+          false,
+          "",
+          "test-org",
+          "test-folder",
+          "",
         );
       });
 
       it("should use cached alerts if available", async () => {
         // Set up cache in the store
-        wrapper.vm.store.state.organizationData.allAlertsListByNames["cached-folder"] = ["cached-alert"];
+        wrapper.vm.store.state.organizationData.allAlertsListByNames[
+          "cached-folder"
+        ] = ["cached-alert"];
 
         await wrapper.vm.getActiveFolderAlerts("cached-folder");
 
@@ -551,10 +619,14 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
 
       it("should handle API errors gracefully", async () => {
         const mockAlertsService = await import("@/services/alerts");
-        vi.mocked(mockAlertsService.default.listByFolderId).mockRejectedValue(new Error("API Error"));
+        vi.mocked(mockAlertsService.default.listByFolderId).mockRejectedValue(
+          new Error("API Error"),
+        );
 
         // Use expect().rejects to properly handle async rejections
-        await expect(wrapper.vm.getActiveFolderAlerts("error-folder")).rejects.toThrow("API Error");
+        await expect(
+          wrapper.vm.getActiveFolderAlerts("error-folder"),
+        ).rejects.toThrow("API Error");
       });
     });
   });
@@ -564,7 +636,7 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       it("should test createAlert function exists and can be called", async () => {
         const input = {
           name: "test-alert",
-          trigger_condition: {}
+          trigger_condition: {},
         };
 
         try {
@@ -579,12 +651,14 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       it("should handle alert creation process", async () => {
         const input = {
           name: "test-alert",
-          trigger_condition: {}
+          trigger_condition: {},
         };
 
         // Mock the alerts service to avoid actual API calls
         const mockAlertsService = await import("@/services/alerts");
-        vi.mocked(mockAlertsService.default.create_by_alert_id).mockResolvedValue(true);
+        vi.mocked(
+          mockAlertsService.default.create_by_alert_id,
+        ).mockResolvedValue(true);
 
         try {
           const result = await wrapper.vm.createAlert(input, 1, "folder1");
@@ -600,7 +674,7 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       it("should set default properties for alert inputs", () => {
         const input = {
           name: "test-alert",
-          trigger_condition: {}
+          trigger_condition: {},
         };
 
         // Test that properties can be set on the input object
@@ -621,8 +695,11 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
     describe("processJsonObject", () => {
       it("should test processJsonObject indirectly through importJson", async () => {
         const mockPayload = {
-          jsonStr: '{"name": "test-alert", "org_id": "test-org", "stream_type": "logs"}',
-          jsonArray: [{"name": "test-alert", "org_id": "test-org", "stream_type": "logs"}]
+          jsonStr:
+            '{"name": "test-alert", "org_id": "test-org", "stream_type": "logs"}',
+          jsonArray: [
+            { name: "test-alert", org_id: "test-org", stream_type: "logs" },
+          ],
         };
 
         await wrapper.vm.importJson(mockPayload);
@@ -633,7 +710,7 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       it("should handle multiple objects processing", async () => {
         const mockPayload = {
           jsonStr: '[{"name": "alert1"}, {"name": "alert2"}]',
-          jsonArray: [{"name": "alert1"}, {"name": "alert2"}]
+          jsonArray: [{ name: "alert1" }, { name: "alert2" }],
         };
 
         await wrapper.vm.importJson(mockPayload);
@@ -644,7 +721,7 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       it("should reset importing state after processing", async () => {
         const mockPayload = {
           jsonStr: '{"name": "test"}',
-          jsonArray: [{"name": "test"}]
+          jsonArray: [{ name: "test" }],
         };
 
         await wrapper.vm.importJson(mockPayload);
@@ -659,7 +736,7 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       it("should handle empty JSON array", async () => {
         const mockPayload = {
           jsonStr: "",
-          jsonArray: []
+          jsonArray: [],
         };
 
         await wrapper.vm.importJson(mockPayload);
@@ -670,7 +747,7 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       it("should process valid JSON array", async () => {
         const mockPayload = {
           jsonStr: '[{"name": "alert1"}]',
-          jsonArray: [{"name": "alert1"}]
+          jsonArray: [{ name: "alert1" }],
         };
 
         await wrapper.vm.importJson(mockPayload);
@@ -685,7 +762,7 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
 
         const mockPayload = {
           jsonStr: '{"name": "alert1"}',
-          jsonArray: [{"name": "alert1"}]
+          jsonArray: [{ name: "alert1" }],
         };
 
         await wrapper.vm.importJson(mockPayload);
@@ -698,7 +775,7 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       it("should set isAlertImporting to false after processing", async () => {
         const mockPayload = {
           jsonStr: '{"name": "alert1"}',
-          jsonArray: [{"name": "alert1"}]
+          jsonArray: [{ name: "alert1" }],
         };
 
         await wrapper.vm.importJson(mockPayload);
@@ -742,12 +819,14 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       it("should format organizations correctly", () => {
         expect(wrapper.vm.organizationDataList).toEqual([
           { label: "test-org", value: "test-org", disable: false },
-          { label: "other-org", value: "other-org", disable: true }
+          { label: "other-org", value: "other-org", disable: true },
         ]);
       });
 
       it("should disable organizations not matching selected org", () => {
-        const otherOrgItem = wrapper.vm.organizationDataList.find((org: any) => org.value === "other-org");
+        const otherOrgItem = wrapper.vm.organizationDataList.find(
+          (org: any) => org.value === "other-org",
+        );
         expect(otherOrgItem.disable).toBe(true);
       });
     });
@@ -757,7 +836,7 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         expect(wrapper.vm.getFormattedDestinations).toEqual([
           "test-destination-1",
           "test-destination-2",
-          "email-dest"
+          "email-dest",
         ]);
       });
 

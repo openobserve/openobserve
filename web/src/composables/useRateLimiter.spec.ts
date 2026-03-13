@@ -27,7 +27,7 @@ describe("useRateLimiter", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     mockStore = {
       state: {
         allApiLimitsByOrgId: {},
@@ -36,7 +36,7 @@ describe("useRateLimiter", () => {
       },
       dispatch: vi.fn(),
     };
-    
+
     (useStore as any).mockReturnValue(mockStore);
     rateLimiterInstance = useRateLimiter();
   });
@@ -64,17 +64,25 @@ describe("useRateLimiter", () => {
         },
       };
 
-      (rateLimiterService.getApiLimits as any).mockResolvedValue(mockApiResponse);
+      (rateLimiterService.getApiLimits as any).mockResolvedValue(
+        mockApiResponse,
+      );
 
-      const result = await rateLimiterInstance.getApiLimitsByOrganization("test-org");
+      const result =
+        await rateLimiterInstance.getApiLimitsByOrganization("test-org");
 
-      expect(rateLimiterService.getApiLimits).toHaveBeenCalledWith("test-org", "second");
+      expect(rateLimiterService.getApiLimits).toHaveBeenCalledWith(
+        "test-org",
+        "second",
+      );
       expect(result).toBeDefined();
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBe(3);
-      
+
       // Check users module transformation
-      const usersModule = result.find((module: any) => module.module_name === "users");
+      const usersModule = result.find(
+        (module: any) => module.module_name === "users",
+      );
       expect(usersModule).toEqual({
         module_name: "users",
         list: 100,
@@ -84,8 +92,10 @@ describe("useRateLimiter", () => {
         delete: 25,
       });
 
-      // Check dashboards module transformation  
-      const dashboardsModule = result.find((module: any) => module.module_name === "dashboards");
+      // Check dashboards module transformation
+      const dashboardsModule = result.find(
+        (module: any) => module.module_name === "dashboards",
+      );
       expect(dashboardsModule).toEqual({
         module_name: "dashboards",
         list: 150,
@@ -96,7 +106,9 @@ describe("useRateLimiter", () => {
       });
 
       // Check alerts module transformation
-      const alertsModule = result.find((module: any) => module.module_name === "alerts");
+      const alertsModule = result.find(
+        (module: any) => module.module_name === "alerts",
+      );
       expect(alertsModule).toEqual({
         module_name: "alerts",
         list: 80,
@@ -116,9 +128,12 @@ describe("useRateLimiter", () => {
         },
       };
 
-      (rateLimiterService.getApiLimits as any).mockResolvedValue(mockApiResponse);
+      (rateLimiterService.getApiLimits as any).mockResolvedValue(
+        mockApiResponse,
+      );
 
-      const result = await rateLimiterInstance.getApiLimitsByOrganization("test-org");
+      const result =
+        await rateLimiterInstance.getApiLimitsByOrganization("test-org");
 
       expect(result[0].module_name).toBe("alpha");
       expect(result[1].module_name).toBe("beta");
@@ -138,11 +153,16 @@ describe("useRateLimiter", () => {
         },
       };
 
-      (rateLimiterService.getApiLimits as any).mockResolvedValue(mockApiResponse);
+      (rateLimiterService.getApiLimits as any).mockResolvedValue(
+        mockApiResponse,
+      );
 
-      const result = await rateLimiterInstance.getApiLimitsByOrganization("test-org");
+      const result =
+        await rateLimiterInstance.getApiLimitsByOrganization("test-org");
 
-      const incompleteModule = result.find((module: any) => module.module_name === "incomplete");
+      const incompleteModule = result.find(
+        (module: any) => module.module_name === "incomplete",
+      );
       expect(incompleteModule).toEqual({
         module_name: "incomplete",
         list: 50,
@@ -152,7 +172,9 @@ describe("useRateLimiter", () => {
         delete: "-",
       });
 
-      const emptyModule = result.find((module: any) => module.module_name === "empty");
+      const emptyModule = result.find(
+        (module: any) => module.module_name === "empty",
+      );
       expect(emptyModule).toEqual({
         module_name: "empty",
         list: "-",
@@ -170,33 +192,46 @@ describe("useRateLimiter", () => {
         },
       };
 
-      (rateLimiterService.getApiLimits as any).mockResolvedValue(mockApiResponse);
+      (rateLimiterService.getApiLimits as any).mockResolvedValue(
+        mockApiResponse,
+      );
 
       await rateLimiterInstance.getApiLimitsByOrganization("test-org");
 
       expect(mockStore.dispatch).toHaveBeenCalledTimes(2);
-      
+
       // Check first dispatch for API limits
-      expect(mockStore.dispatch).toHaveBeenNthCalledWith(1, "setApiLimitsByOrgId", {
-        "test-org_second": expect.arrayContaining([
-          expect.objectContaining({
-            module_name: "test_module",
-          }),
-        ]),
-      });
+      expect(mockStore.dispatch).toHaveBeenNthCalledWith(
+        1,
+        "setApiLimitsByOrgId",
+        {
+          "test-org_second": expect.arrayContaining([
+            expect.objectContaining({
+              module_name: "test_module",
+            }),
+          ]),
+        },
+      );
 
       // Check second dispatch for role limits reset
-      expect(mockStore.dispatch).toHaveBeenNthCalledWith(2, "setRoleLimitsByOrgIdByRole", {
-        "test-org": [],
-      });
+      expect(mockStore.dispatch).toHaveBeenNthCalledWith(
+        2,
+        "setRoleLimitsByOrgIdByRole",
+        {
+          "test-org": [],
+        },
+      );
     });
 
     it("should handle empty API response", async () => {
       const mockApiResponse = { data: {} };
 
-      (rateLimiterService.getApiLimits as any).mockResolvedValue(mockApiResponse);
+      (rateLimiterService.getApiLimits as any).mockResolvedValue(
+        mockApiResponse,
+      );
 
-      const result = await rateLimiterInstance.getApiLimitsByOrganization("test-org");
+      const result =
+        await rateLimiterInstance.getApiLimitsByOrganization("test-org");
 
       expect(result).toEqual([]);
       expect(Array.isArray(result)).toBe(true);
@@ -208,7 +243,8 @@ describe("useRateLimiter", () => {
 
       console.log = vi.fn();
 
-      const result = await rateLimiterInstance.getApiLimitsByOrganization("test-org");
+      const result =
+        await rateLimiterInstance.getApiLimitsByOrganization("test-org");
 
       expect(console.log).toHaveBeenCalledWith(mockError);
       expect(result).toBeUndefined();
@@ -216,13 +252,18 @@ describe("useRateLimiter", () => {
 
     it("should handle different organization identifiers", async () => {
       const mockApiResponse = { data: { test: { list: 10 } } };
-      (rateLimiterService.getApiLimits as any).mockResolvedValue(mockApiResponse);
+      (rateLimiterService.getApiLimits as any).mockResolvedValue(
+        mockApiResponse,
+      );
 
       const organizations = ["org1", "company-2", "test_org_123", "12345"];
 
       for (const org of organizations) {
         await rateLimiterInstance.getApiLimitsByOrganization(org);
-        expect(rateLimiterService.getApiLimits).toHaveBeenCalledWith(org, "second");
+        expect(rateLimiterService.getApiLimits).toHaveBeenCalledWith(
+          org,
+          "second",
+        );
       }
     });
 
@@ -237,9 +278,12 @@ describe("useRateLimiter", () => {
         },
       };
 
-      (rateLimiterService.getApiLimits as any).mockResolvedValue(mockApiResponse);
+      (rateLimiterService.getApiLimits as any).mockResolvedValue(
+        mockApiResponse,
+      );
 
-      const result = await rateLimiterInstance.getApiLimitsByOrganization("test-org");
+      const result =
+        await rateLimiterInstance.getApiLimitsByOrganization("test-org");
 
       const module = result.find((m: any) => m.module_name === "limits_test");
       expect(module.list).toBe(0);
@@ -264,17 +308,28 @@ describe("useRateLimiter", () => {
         },
       };
 
-      (rateLimiterService.getRoleLimits as any).mockResolvedValue(mockRoleResponse);
+      (rateLimiterService.getRoleLimits as any).mockResolvedValue(
+        mockRoleResponse,
+      );
 
-      const result = await rateLimiterInstance.getRoleLimitsByOrganization("test-org", "admin");
+      const result = await rateLimiterInstance.getRoleLimitsByOrganization(
+        "test-org",
+        "admin",
+      );
 
-      expect(rateLimiterService.getRoleLimits).toHaveBeenCalledWith("test-org", "admin", "second");
+      expect(rateLimiterService.getRoleLimits).toHaveBeenCalledWith(
+        "test-org",
+        "admin",
+        "second",
+      );
       expect(result).toBeDefined();
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBe(2);
 
       // Check users module
-      const usersModule = result.find((module: any) => module.module_name === "users");
+      const usersModule = result.find(
+        (module: any) => module.module_name === "users",
+      );
       expect(usersModule).toEqual({
         module_name: "users",
         list: 50,
@@ -285,7 +340,9 @@ describe("useRateLimiter", () => {
       });
 
       // Check reports module
-      const reportsModule = result.find((module: any) => module.module_name === "reports");
+      const reportsModule = result.find(
+        (module: any) => module.module_name === "reports",
+      );
       expect(reportsModule).toEqual({
         module_name: "reports",
         list: 30,
@@ -305,9 +362,14 @@ describe("useRateLimiter", () => {
         },
       };
 
-      (rateLimiterService.getRoleLimits as any).mockResolvedValue(mockRoleResponse);
+      (rateLimiterService.getRoleLimits as any).mockResolvedValue(
+        mockRoleResponse,
+      );
 
-      const result = await rateLimiterInstance.getRoleLimitsByOrganization("test-org", "user");
+      const result = await rateLimiterInstance.getRoleLimitsByOrganization(
+        "test-org",
+        "user",
+      );
 
       expect(result[0].module_name).toBe("aaa_module");
       expect(result[1].module_name).toBe("mmm_module");
@@ -327,31 +389,45 @@ describe("useRateLimiter", () => {
         },
       };
 
-      (rateLimiterService.getRoleLimits as any).mockResolvedValue(mockRoleResponse);
+      (rateLimiterService.getRoleLimits as any).mockResolvedValue(
+        mockRoleResponse,
+      );
 
-      await rateLimiterInstance.getRoleLimitsByOrganization("test-org", "admin");
+      await rateLimiterInstance.getRoleLimitsByOrganization(
+        "test-org",
+        "admin",
+      );
 
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setRoleLimitsByOrgIdByRole", {
-        "test-org": {
-          "existing-role": [{ module_name: "existing" }],
-          "admin_second": expect.arrayContaining([
-            expect.objectContaining({
-              module_name: "test_module",
-            }),
-          ]),
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "setRoleLimitsByOrgIdByRole",
+        {
+          "test-org": {
+            "existing-role": [{ module_name: "existing" }],
+            admin_second: expect.arrayContaining([
+              expect.objectContaining({
+                module_name: "test_module",
+              }),
+            ]),
+          },
         },
-      });
+      );
     });
 
     it("should handle different role names", async () => {
       const mockRoleResponse = { data: { test: { list: 10 } } };
-      (rateLimiterService.getRoleLimits as any).mockResolvedValue(mockRoleResponse);
+      (rateLimiterService.getRoleLimits as any).mockResolvedValue(
+        mockRoleResponse,
+      );
 
       const roles = ["admin", "user", "manager", "viewer", "editor"];
 
       for (const role of roles) {
         await rateLimiterInstance.getRoleLimitsByOrganization("test-org", role);
-        expect(rateLimiterService.getRoleLimits).toHaveBeenCalledWith("test-org", role, "second");
+        expect(rateLimiterService.getRoleLimits).toHaveBeenCalledWith(
+          "test-org",
+          role,
+          "second",
+        );
       }
     });
 
@@ -361,7 +437,10 @@ describe("useRateLimiter", () => {
 
       console.log = vi.fn();
 
-      const result = await rateLimiterInstance.getRoleLimitsByOrganization("test-org", "admin");
+      const result = await rateLimiterInstance.getRoleLimitsByOrganization(
+        "test-org",
+        "admin",
+      );
 
       expect(console.log).toHaveBeenCalledWith(mockError);
       expect(result).toBeUndefined();
@@ -370,9 +449,14 @@ describe("useRateLimiter", () => {
     it("should handle empty role response", async () => {
       const mockRoleResponse = { data: {} };
 
-      (rateLimiterService.getRoleLimits as any).mockResolvedValue(mockRoleResponse);
+      (rateLimiterService.getRoleLimits as any).mockResolvedValue(
+        mockRoleResponse,
+      );
 
-      const result = await rateLimiterInstance.getRoleLimitsByOrganization("test-org", "admin");
+      const result = await rateLimiterInstance.getRoleLimitsByOrganization(
+        "test-org",
+        "admin",
+      );
 
       expect(result).toEqual([]);
       expect(Array.isArray(result)).toBe(true);
@@ -381,11 +465,11 @@ describe("useRateLimiter", () => {
     it("should preserve existing role data in store", async () => {
       mockStore.state.allRoleLimitsByOrgIdByRole = {
         "test-org": {
-          "role1": [{ module_name: "module1" }],
-          "role2": [{ module_name: "module2" }],
+          role1: [{ module_name: "module1" }],
+          role2: [{ module_name: "module2" }],
         },
         "other-org": {
-          "role3": [{ module_name: "module3" }],
+          role3: [{ module_name: "module3" }],
         },
       };
 
@@ -395,20 +479,28 @@ describe("useRateLimiter", () => {
         },
       };
 
-      (rateLimiterService.getRoleLimits as any).mockResolvedValue(mockRoleResponse);
+      (rateLimiterService.getRoleLimits as any).mockResolvedValue(
+        mockRoleResponse,
+      );
 
-      await rateLimiterInstance.getRoleLimitsByOrganization("test-org", "new-role");
+      await rateLimiterInstance.getRoleLimitsByOrganization(
+        "test-org",
+        "new-role",
+      );
 
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setRoleLimitsByOrgIdByRole", {
-        "test-org": {
-          "role1": [{ module_name: "module1" }],
-          "role2": [{ module_name: "module2" }],
-          "new-role_second": expect.any(Array),
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "setRoleLimitsByOrgIdByRole",
+        {
+          "test-org": {
+            role1: [{ module_name: "module1" }],
+            role2: [{ module_name: "module2" }],
+            "new-role_second": expect.any(Array),
+          },
+          "other-org": {
+            role3: [{ module_name: "module3" }],
+          },
         },
-        "other-org": {
-          "role3": [{ module_name: "module3" }],
-        },
-      });
+      );
     });
   });
 
@@ -418,7 +510,9 @@ describe("useRateLimiter", () => {
         data: ["users", "dashboards", "alerts", "reports"],
       };
 
-      (rateLimiterService.getModules as any).mockResolvedValue(mockModulesResponse);
+      (rateLimiterService.getModules as any).mockResolvedValue(
+        mockModulesResponse,
+      );
 
       const result = await rateLimiterInstance.getModulesToDisplay("test-org");
 
@@ -429,7 +523,10 @@ describe("useRateLimiter", () => {
 
       // Check transformation
       expect(result).toContainEqual({ label: "users", value: "users" });
-      expect(result).toContainEqual({ label: "dashboards", value: "dashboards" });
+      expect(result).toContainEqual({
+        label: "dashboards",
+        value: "dashboards",
+      });
       expect(result).toContainEqual({ label: "alerts", value: "alerts" });
       expect(result).toContainEqual({ label: "reports", value: "reports" });
     });
@@ -439,7 +536,9 @@ describe("useRateLimiter", () => {
         data: ["zebra", "alpha", "beta", "gamma"],
       };
 
-      (rateLimiterService.getModules as any).mockResolvedValue(mockModulesResponse);
+      (rateLimiterService.getModules as any).mockResolvedValue(
+        mockModulesResponse,
+      );
 
       const result = await rateLimiterInstance.getModulesToDisplay("test-org");
 
@@ -458,7 +557,9 @@ describe("useRateLimiter", () => {
         "existing-org": [{ label: "existing", value: "existing" }],
       };
 
-      (rateLimiterService.getModules as any).mockResolvedValue(mockModulesResponse);
+      (rateLimiterService.getModules as any).mockResolvedValue(
+        mockModulesResponse,
+      );
 
       await rateLimiterInstance.getModulesToDisplay("test-org");
 
@@ -474,7 +575,9 @@ describe("useRateLimiter", () => {
     it("should handle empty modules response", async () => {
       const mockModulesResponse = { data: [] };
 
-      (rateLimiterService.getModules as any).mockResolvedValue(mockModulesResponse);
+      (rateLimiterService.getModules as any).mockResolvedValue(
+        mockModulesResponse,
+      );
 
       const result = await rateLimiterInstance.getModulesToDisplay("test-org");
 
@@ -493,7 +596,9 @@ describe("useRateLimiter", () => {
 
     it("should handle different organization identifiers", async () => {
       const mockModulesResponse = { data: ["test-module"] };
-      (rateLimiterService.getModules as any).mockResolvedValue(mockModulesResponse);
+      (rateLimiterService.getModules as any).mockResolvedValue(
+        mockModulesResponse,
+      );
 
       const organizations = ["org-1", "company_2", "test.org", "12345"];
 
@@ -505,16 +610,31 @@ describe("useRateLimiter", () => {
 
     it("should handle modules with special characters", async () => {
       const mockModulesResponse = {
-        data: ["module_with_underscores", "module-with-dashes", "module.with.dots"],
+        data: [
+          "module_with_underscores",
+          "module-with-dashes",
+          "module.with.dots",
+        ],
       };
 
-      (rateLimiterService.getModules as any).mockResolvedValue(mockModulesResponse);
+      (rateLimiterService.getModules as any).mockResolvedValue(
+        mockModulesResponse,
+      );
 
       const result = await rateLimiterInstance.getModulesToDisplay("test-org");
 
-      expect(result).toContainEqual({ label: "module_with_underscores", value: "module_with_underscores" });
-      expect(result).toContainEqual({ label: "module-with-dashes", value: "module-with-dashes" });
-      expect(result).toContainEqual({ label: "module.with.dots", value: "module.with.dots" });
+      expect(result).toContainEqual({
+        label: "module_with_underscores",
+        value: "module_with_underscores",
+      });
+      expect(result).toContainEqual({
+        label: "module-with-dashes",
+        value: "module-with-dashes",
+      });
+      expect(result).toContainEqual({
+        label: "module.with.dots",
+        value: "module.with.dots",
+      });
     });
   });
 
@@ -527,13 +647,23 @@ describe("useRateLimiter", () => {
       const mockRoleResponse = { data: { users: { get: 50 } } };
       const mockModulesResponse = { data: ["users", "alerts"] };
 
-      (rateLimiterService.getApiLimits as any).mockResolvedValue(mockApiResponse);
-      (rateLimiterService.getRoleLimits as any).mockResolvedValue(mockRoleResponse);
-      (rateLimiterService.getModules as any).mockResolvedValue(mockModulesResponse);
+      (rateLimiterService.getApiLimits as any).mockResolvedValue(
+        mockApiResponse,
+      );
+      (rateLimiterService.getRoleLimits as any).mockResolvedValue(
+        mockRoleResponse,
+      );
+      (rateLimiterService.getModules as any).mockResolvedValue(
+        mockModulesResponse,
+      );
 
       // Execute workflow
-      const apiLimits = await rateLimiterInstance.getApiLimitsByOrganization(orgId);
-      const roleLimits = await rateLimiterInstance.getRoleLimitsByOrganization(orgId, "admin");
+      const apiLimits =
+        await rateLimiterInstance.getApiLimitsByOrganization(orgId);
+      const roleLimits = await rateLimiterInstance.getRoleLimitsByOrganization(
+        orgId,
+        "admin",
+      );
       const modules = await rateLimiterInstance.getModulesToDisplay(orgId);
 
       // Verify results
@@ -542,8 +672,15 @@ describe("useRateLimiter", () => {
       expect(modules).toBeDefined();
 
       // Verify service calls
-      expect(rateLimiterService.getApiLimits).toHaveBeenCalledWith(orgId, "second");
-      expect(rateLimiterService.getRoleLimits).toHaveBeenCalledWith(orgId, "admin", "second");
+      expect(rateLimiterService.getApiLimits).toHaveBeenCalledWith(
+        orgId,
+        "second",
+      );
+      expect(rateLimiterService.getRoleLimits).toHaveBeenCalledWith(
+        orgId,
+        "admin",
+        "second",
+      );
       expect(rateLimiterService.getModules).toHaveBeenCalledWith(orgId);
 
       // Verify store dispatches
@@ -554,15 +691,25 @@ describe("useRateLimiter", () => {
       const orgId = "error-org";
 
       // Mock errors
-      (rateLimiterService.getApiLimits as any).mockRejectedValue(new Error("API Error"));
-      (rateLimiterService.getRoleLimits as any).mockRejectedValue(new Error("Role Error"));
-      (rateLimiterService.getModules as any).mockRejectedValue(new Error("Modules Error"));
+      (rateLimiterService.getApiLimits as any).mockRejectedValue(
+        new Error("API Error"),
+      );
+      (rateLimiterService.getRoleLimits as any).mockRejectedValue(
+        new Error("Role Error"),
+      );
+      (rateLimiterService.getModules as any).mockRejectedValue(
+        new Error("Modules Error"),
+      );
 
       console.log = vi.fn();
 
       // Execute calls
-      const apiLimits = await rateLimiterInstance.getApiLimitsByOrganization(orgId);
-      const roleLimits = await rateLimiterInstance.getRoleLimitsByOrganization(orgId, "admin");
+      const apiLimits =
+        await rateLimiterInstance.getApiLimitsByOrganization(orgId);
+      const roleLimits = await rateLimiterInstance.getRoleLimitsByOrganization(
+        orgId,
+        "admin",
+      );
       const modules = await rateLimiterInstance.getModulesToDisplay(orgId);
 
       // Verify error handling
@@ -578,14 +725,24 @@ describe("useRateLimiter", () => {
         alerts: { create: 50, delete: 25 },
       };
 
-      (rateLimiterService.getApiLimits as any).mockResolvedValue({ data: commonData });
-      (rateLimiterService.getRoleLimits as any).mockResolvedValue({ data: commonData });
+      (rateLimiterService.getApiLimits as any).mockResolvedValue({
+        data: commonData,
+      });
+      (rateLimiterService.getRoleLimits as any).mockResolvedValue({
+        data: commonData,
+      });
 
-      const apiResult = await rateLimiterInstance.getApiLimitsByOrganization("test-org");
-      const roleResult = await rateLimiterInstance.getRoleLimitsByOrganization("test-org", "admin");
+      const apiResult =
+        await rateLimiterInstance.getApiLimitsByOrganization("test-org");
+      const roleResult = await rateLimiterInstance.getRoleLimitsByOrganization(
+        "test-org",
+        "admin",
+      );
 
       // Both should have same structure and sorting
-      expect(apiResult.map((m: any) => m.module_name)).toEqual(roleResult.map((m: any) => m.module_name));
+      expect(apiResult.map((m: any) => m.module_name)).toEqual(
+        roleResult.map((m: any) => m.module_name),
+      );
       expect(apiResult[0].module_name).toBe("alerts");
       expect(apiResult[1].module_name).toBe("users");
     });

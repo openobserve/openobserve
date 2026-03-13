@@ -17,24 +17,24 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify, Quasar } from "quasar";
-import { nextTick, ref } from 'vue';
+import { nextTick, ref } from "vue";
 import ReportList from "./ReportList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import reports from "@/services/reports";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
-import * as vueRouter from 'vue-router';
+import * as vueRouter from "vue-router";
 
 // Mock vue-router
-vi.mock('vue-router', async () => {
-  const actual = await vi.importActual('vue-router');
+vi.mock("vue-router", async () => {
+  const actual = await vi.importActual("vue-router");
   return {
     ...actual,
     useRouter: vi.fn(() => ({
       push: vi.fn(),
-      replace: vi.fn()
-    }))
+      replace: vi.fn(),
+    })),
   };
 });
 
@@ -52,24 +52,27 @@ vi.mock("@/composables/useStreams", () => ({
   default: vi.fn(() => ({
     streamList: ref([]),
     loading: ref(false),
-    error: ref(null)
-  }))
+    error: ref(null),
+  })),
 }));
 
 vi.mock("@/composables/useLogs", () => ({
   default: vi.fn(() => ({
-    searchObj: ref({ loading: false, data: { queryResults: [], aggs: { histogram: [] } } }),
+    searchObj: ref({
+      loading: false,
+      data: { queryResults: [], aggs: { histogram: [] } },
+    }),
     searchAggData: ref({ histogram: [], total: 0 }),
-    searchResultData: ref({ list: [] })
-  }))
+    searchResultData: ref({ list: [] }),
+  })),
 }));
 
 vi.mock("@/composables/useDashboard", () => ({
   default: vi.fn(() => ({
     dashboards: ref([]),
     loading: ref(false),
-    error: ref(null)
-  }))
+    error: ref(null),
+  })),
 }));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
@@ -79,17 +82,20 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
     getImageURL: vi.fn(() => ""),
     verifyOrganizationStatus: vi.fn(() => Promise.resolve(true)),
     logsErrorMessage: vi.fn((code) => `Error: ${code}`),
-    mergeRoutes: vi.fn((route1, route2) => [...(route1 || []), ...(route2 || [])]),
+    mergeRoutes: vi.fn((route1, route2) => [
+      ...(route1 || []),
+      ...(route2 || []),
+    ]),
     getPath: vi.fn(() => "/"),
-    useLocalTimezone: vi.fn(() => "UTC")
+    useLocalTimezone: vi.fn(() => "UTC"),
   };
 });
 
 // Mock segment analytics
 vi.mock("@/services/segment_analytics", () => ({
   default: {
-    track: vi.fn()
-  }
+    track: vi.fn(),
+  },
 }));
 
 const node = document.createElement("div");
@@ -111,8 +117,8 @@ const platform = {
 installQuasar({
   plugins: [Dialog, Notify],
   config: {
-    platform
-  }
+    platform,
+  },
 });
 
 describe("ReportList Component", () => {
@@ -155,14 +161,17 @@ describe("ReportList Component", () => {
     });
 
     // Setup store state
-    store.state.selectedOrganization = { identifier: "test-org", name: "Test Org" };
+    store.state.selectedOrganization = {
+      identifier: "test-org",
+      name: "Test Org",
+    };
     store.state.userInfo = { email: "test@example.com" };
-    store.state.theme = 'light';
+    store.state.theme = "light";
 
     // Setup router mock
     mockRouter = {
       push: vi.fn(),
-      replace: vi.fn()
+      replace: vi.fn(),
     };
     vi.mocked(vueRouter.useRouter).mockReturnValue(mockRouter);
 
@@ -173,26 +182,23 @@ describe("ReportList Component", () => {
 
     wrapper = mount(ReportList, {
       global: {
-        plugins: [
-          [Quasar, { platform }],
-          [i18n]
-        ],
-        provide: { 
+        plugins: [[Quasar, { platform }], [i18n]],
+        provide: {
           store,
           platform,
-          router: mockRouter
+          router: mockRouter,
         },
         mocks: {
           $router: mockRouter,
           q: {
             platform,
             notify: notifyMock,
-            dialog: dialogMock
+            dialog: dialogMock,
           },
-          router: mockRouter
-        }
+          router: mockRouter,
+        },
       },
-      attachTo: document.body
+      attachTo: document.body,
     });
 
     // Set up wrapper's $q.notify and dialog after mount
@@ -202,7 +208,7 @@ describe("ReportList Component", () => {
   });
 
   afterEach(() => {
-    if (wrapper && typeof wrapper.unmount === 'function') {
+    if (wrapper && typeof wrapper.unmount === "function") {
       wrapper.unmount();
     }
     vi.clearAllMocks();
@@ -233,13 +239,13 @@ describe("ReportList Component", () => {
       // Find the QTablePagination component
       const paginationComponent = wrapper.findComponent(QTablePagination);
       expect(paginationComponent.exists()).toBe(true);
-      
+
       // Trigger the pagination change event
-      await paginationComponent.vm.$emit('update:changeRecordPerPage', {
+      await paginationComponent.vm.$emit("update:changeRecordPerPage", {
         label: "50 / page",
-        value: 50
+        value: 50,
       });
-      
+
       await nextTick();
 
       // Verify the pagination state was updated
@@ -254,14 +260,14 @@ describe("ReportList Component", () => {
           provide: { store, platform, router: mockRouter },
           mocks: {
             $router: mockRouter,
-            $q: { 
-              platform, 
-              notify: notifyMock, 
-              dialog: dialogMock 
+            $q: {
+              platform,
+              notify: notifyMock,
+              dialog: dialogMock,
             },
-            router: mockRouter
-          }
-        }
+            router: mockRouter,
+          },
+        },
       });
 
       expect(newWrapper.vm.isLoadingReports).toBe(true);
@@ -276,9 +282,9 @@ describe("ReportList Component", () => {
         response: {
           status: 500,
           data: {
-            message: "Internal server error"
-          }
-        }
+            message: "Internal server error",
+          },
+        },
       };
       vi.mocked(reports.list).mockRejectedValue(error);
 
@@ -289,33 +295,32 @@ describe("ReportList Component", () => {
           provide: { store, platform, router: mockRouter },
           mocks: {
             $router: mockRouter,
-            $q: { 
-              platform, 
-              notify: notifyMock, 
-              dialog: dialogMock 
+            $q: {
+              platform,
+              notify: notifyMock,
+              dialog: dialogMock,
             },
-            router: mockRouter
-          }
-        }
+            router: mockRouter,
+          },
+        },
       });
 
       await flushPromises();
 
-      console.log(wrapper,'notify here')
-
-      
+      console.log(wrapper, "notify here");
 
       // Verify loading state is cleared
       expect(newWrapper.vm.isLoadingReports).toBe(false);
       newWrapper.unmount();
     });
-
-
   });
 
   describe("Report Filtering", () => {
     it("filters reports by name", async () => {
-      const filtered = wrapper.vm.filterData(wrapper.vm.reportsTableRows, "Test Report 1");
+      const filtered = wrapper.vm.filterData(
+        wrapper.vm.reportsTableRows,
+        "Test Report 1",
+      );
       expect(filtered.length).toBe(1);
       expect(filtered[0].name).toBe("Test Report 1");
     });
@@ -345,7 +350,11 @@ describe("ReportList Component", () => {
         wrapper.vm.staticReportsList = [...wrapper.vm.reportsTableRows];
         wrapper.vm.activeTab = "shared";
         await wrapper.vm.filterReports();
-        expect(wrapper.vm.reportsTableRows.every(report => report.destinations.length > 0)).toBe(true);
+        expect(
+          wrapper.vm.reportsTableRows.every(
+            (report) => report.destinations.length > 0,
+          ),
+        ).toBe(true);
       });
     });
   });
@@ -354,7 +363,9 @@ describe("ReportList Component", () => {
     it("formats unix timestamp correctly", () => {
       const timestamp = 1234567890000000; // microseconds
       const formatted = wrapper.vm.convertUnixToQuasarFormat(timestamp);
-      expect(formatted).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
+      expect(formatted).toMatch(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/,
+      );
     });
 
     it("handles null timestamp", () => {
@@ -382,7 +393,7 @@ describe("ReportList Component", () => {
       const report = {
         name: "Test Report 1",
         enabled: true,
-        owner: "test-user"
+        owner: "test-user",
       };
 
       vi.mocked(reports.toggleReportState).mockResolvedValue({});
@@ -394,39 +405,42 @@ describe("ReportList Component", () => {
       expect(reports.toggleReportState).toHaveBeenCalledWith(
         "test-org",
         "Test Report 1",
-        false
+        false,
       );
 
       // Verify loading state
       expect(wrapper.vm.reportsStateLoadingMap[report.name]).toBe(false);
 
       // Verify state updates in both lists
-      expect(wrapper.vm.staticReportsList.find(r => r.name === report.name).enabled).toBe(false);
-      expect(wrapper.vm.reportsTableRows.find(r => r.name === report.name).enabled).toBe(false);
+      expect(
+        wrapper.vm.staticReportsList.find((r) => r.name === report.name)
+          .enabled,
+      ).toBe(false);
+      expect(
+        wrapper.vm.reportsTableRows.find((r) => r.name === report.name).enabled,
+      ).toBe(false);
     });
-
 
     it("handles error when toggling report state (non-403)", async () => {
       const report = {
         name: "Test Report 1",
         enabled: true,
-        owner: "test-user"
+        owner: "test-user",
       };
 
       const error = {
         response: {
           status: 500,
           data: {
-            message: "Internal server error"
-          }
-        }
+            message: "Internal server error",
+          },
+        },
       };
 
       vi.mocked(reports.toggleReportState).mockRejectedValue(error);
 
       await wrapper.vm.toggleReportState(report);
       await flushPromises();
-
 
       // Verify loading state is cleared
       expect(wrapper.vm.reportsStateLoadingMap[report.name]).toBe(false);
@@ -436,13 +450,13 @@ describe("ReportList Component", () => {
       const report = {
         name: "Test Report 1",
         enabled: true,
-        owner: "test-user"
+        owner: "test-user",
       };
 
       const error = {
         response: {
-          status: 403
-        }
+          status: 403,
+        },
       };
 
       vi.mocked(reports.toggleReportState).mockRejectedValue(error);
@@ -453,8 +467,8 @@ describe("ReportList Component", () => {
       // Verify no error notification for 403
       expect(notifyMock).not.toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "negative"
-        })
+          type: "negative",
+        }),
       );
 
       // Verify loading state is cleared
@@ -465,11 +479,11 @@ describe("ReportList Component", () => {
       const report = {
         name: "Test Report 1",
         enabled: true,
-        owner: "test-user"
+        owner: "test-user",
       };
 
       let resolvePromise;
-      const togglePromise = new Promise(resolve => {
+      const togglePromise = new Promise((resolve) => {
         resolvePromise = resolve;
       });
 
@@ -495,12 +509,12 @@ describe("ReportList Component", () => {
         name: "Test Report 1",
         enabled: true,
         owner: "test-user",
-        description: "Test Description"
+        description: "Test Description",
       };
 
       // Verify router is properly mocked
       expect(vueRouter.useRouter()).toBeTruthy();
-      expect(typeof vueRouter.useRouter().push).toBe('function');
+      expect(typeof vueRouter.useRouter().push).toBe("function");
 
       await wrapper.vm.editReport(report);
 
@@ -510,8 +524,8 @@ describe("ReportList Component", () => {
         name: "createReport",
         query: {
           name: report.name,
-          org_identifier: "test-org"
-        }
+          org_identifier: "test-org",
+        },
       });
 
       // Verify report is cloned to editingReport
@@ -520,10 +534,12 @@ describe("ReportList Component", () => {
 
     it("handles edit button click in the table", async () => {
       // Find and click the edit button for the first report
-      const editButton = wrapper.find('[data-test="report-list-Test Report 1-edit-report"]');
+      const editButton = wrapper.find(
+        '[data-test="report-list-Test Report 1-edit-report"]',
+      );
       expect(editButton.exists()).toBe(true);
-      
-      await editButton.trigger('click');
+
+      await editButton.trigger("click");
 
       // Verify router navigation
       expect(mockRouter.push).toHaveBeenCalledTimes(1);
@@ -531,8 +547,8 @@ describe("ReportList Component", () => {
         name: "createReport",
         query: {
           name: "Test Report 1",
-          org_identifier: "test-org"
-        }
+          org_identifier: "test-org",
+        },
       });
     });
   });
@@ -540,7 +556,7 @@ describe("ReportList Component", () => {
   describe("Delete Report", () => {
     it("confirms and deletes report successfully", async () => {
       const reportName = "Test Report 1";
-      
+
       // Setup successful delete response
       vi.mocked(reports.deleteReport).mockResolvedValue({});
 
@@ -553,7 +569,9 @@ describe("ReportList Component", () => {
 
       // Verify dialog is shown with correct message
       expect(wrapper.vm.deleteDialog.show).toBe(true);
-      expect(wrapper.vm.deleteDialog.message).toBe(`Are you sure you want to delete report "${reportName}"`);
+      expect(wrapper.vm.deleteDialog.message).toBe(
+        `Are you sure you want to delete report "${reportName}"`,
+      );
       expect(wrapper.vm.deleteDialog.data).toBe(reportName);
 
       // Trigger delete action
@@ -561,16 +579,21 @@ describe("ReportList Component", () => {
       await flushPromises();
 
       // Verify API call
-      expect(reports.deleteReport).toHaveBeenCalledWith(
-        "test-org",
-        reportName
-      );
+      expect(reports.deleteReport).toHaveBeenCalledWith("test-org", reportName);
 
       // Verify report is removed from lists
-      expect(wrapper.vm.staticReportsList.length).toBe(initialStaticListCount - 1);
-      expect(wrapper.vm.reportsTableRows.length).toBe(initialTableRowsCount - 1);
-      expect(wrapper.vm.staticReportsList.find(r => r.name === reportName)).toBeUndefined();
-      expect(wrapper.vm.reportsTableRows.find(r => r.name === reportName)).toBeUndefined();
+      expect(wrapper.vm.staticReportsList.length).toBe(
+        initialStaticListCount - 1,
+      );
+      expect(wrapper.vm.reportsTableRows.length).toBe(
+        initialTableRowsCount - 1,
+      );
+      expect(
+        wrapper.vm.staticReportsList.find((r) => r.name === reportName),
+      ).toBeUndefined();
+      expect(
+        wrapper.vm.reportsTableRows.find((r) => r.name === reportName),
+      ).toBeUndefined();
 
       // Manually close dialog as component would do
       wrapper.vm.deleteDialog.show = false;
@@ -586,9 +609,9 @@ describe("ReportList Component", () => {
         response: {
           status: 500,
           data: {
-            message: "Internal server error"
-          }
-        }
+            message: "Internal server error",
+          },
+        },
       };
 
       // Setup error response
@@ -600,29 +623,30 @@ describe("ReportList Component", () => {
 
       // Trigger delete confirmation
       await wrapper.vm.confirmDeleteReport({ name: reportName });
-      
+
       // Trigger delete action
       await wrapper.vm.deleteReport();
 
       // Verify API call was made
-      expect(reports.deleteReport).toHaveBeenCalledWith(
-        "test-org",
-        reportName
-      );
+      expect(reports.deleteReport).toHaveBeenCalledWith("test-org", reportName);
 
       // Verify lists remain unchanged
       expect(wrapper.vm.staticReportsList.length).toBe(initialStaticListCount);
       expect(wrapper.vm.reportsTableRows.length).toBe(initialTableRowsCount);
-      expect(wrapper.vm.staticReportsList.find(r => r.name === reportName)).toBeTruthy();
-      expect(wrapper.vm.reportsTableRows.find(r => r.name === reportName)).toBeTruthy();
+      expect(
+        wrapper.vm.staticReportsList.find((r) => r.name === reportName),
+      ).toBeTruthy();
+      expect(
+        wrapper.vm.reportsTableRows.find((r) => r.name === reportName),
+      ).toBeTruthy();
     });
 
     it("handles 403 error silently when deleting report", async () => {
       const reportName = "Test Report 1";
       const error = {
         response: {
-          status: 403
-        }
+          status: 403,
+        },
       };
 
       // Setup error response
@@ -633,49 +657,53 @@ describe("ReportList Component", () => {
 
       // Trigger delete confirmation
       await wrapper.vm.confirmDeleteReport({ name: reportName });
-      
+
       // Trigger delete action
       await wrapper.vm.deleteReport();
 
       // Verify API call was made
-      expect(reports.deleteReport).toHaveBeenCalledWith(
-        "test-org",
-        reportName
-      );
+      expect(reports.deleteReport).toHaveBeenCalledWith("test-org", reportName);
 
       // Verify lists remain unchanged
       expect(wrapper.vm.staticReportsList.length).toBe(initialStaticListCount);
-      expect(wrapper.vm.staticReportsList.find(r => r.name === reportName)).toBeTruthy();
+      expect(
+        wrapper.vm.staticReportsList.find((r) => r.name === reportName),
+      ).toBeTruthy();
     });
 
     it("handles delete button click in the table", async () => {
       // Find and click the delete button for the first report
-      const deleteButton = wrapper.find('[data-test="report-list-Test Report 1-delete-report"]');
+      const deleteButton = wrapper.find(
+        '[data-test="report-list-Test Report 1-delete-report"]',
+      );
       expect(deleteButton.exists()).toBe(true);
-      
-      await deleteButton.trigger('click');
+
+      await deleteButton.trigger("click");
 
       // Verify confirmation dialog is shown with correct data
       expect(wrapper.vm.deleteDialog.show).toBe(true);
-      expect(wrapper.vm.deleteDialog.message).toBe('Are you sure you want to delete report "Test Report 1"');
-      expect(wrapper.vm.deleteDialog.data).toBe('Test Report 1');
+      expect(wrapper.vm.deleteDialog.message).toBe(
+        'Are you sure you want to delete report "Test Report 1"',
+      );
+      expect(wrapper.vm.deleteDialog.data).toBe("Test Report 1");
     });
   });
 
   describe("Create New Report", () => {
     it("navigates to create report page when add report button is clicked", async () => {
-      const addButton = wrapper.find('[data-test="report-list-add-report-btn"]');
+      const addButton = wrapper.find(
+        '[data-test="report-list-add-report-btn"]',
+      );
       expect(addButton.exists()).toBe(true);
 
-      await addButton.trigger('click');
+      await addButton.trigger("click");
 
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "createReport",
         query: {
-          org_identifier: store.state.selectedOrganization.identifier
-        }
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
       });
     });
   });
-
 });

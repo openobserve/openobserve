@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <q-tooltip
                   v-if="variable.name.length > 30"
-                  style="word-wrap: break-word; white-space: normal;"
+                  style="word-wrap: break-word; white-space: normal"
                   class="variable-name-tooltip"
                 >
                   {{ variable.name }}
@@ -207,7 +207,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-toolbar>
               <q-toolbar-title>Variables Dependency Graph</q-toolbar-title>
-              <q-btn flat round dense icon="close" v-close-popup="true" />
+              <q-btn flat
+round dense
+icon="close" v-close-popup="true" />
             </q-toolbar>
             <q-card-section style="width: 100%; height: calc(100% - 50px)">
               <VariablesDependenciesGraph
@@ -226,7 +228,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onActivated, reactive, nextTick } from "vue";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  onActivated,
+  reactive,
+  nextTick,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";

@@ -214,7 +214,9 @@ describe("dashboardAutoQueryBuilder", () => {
         ],
       };
       const result = buildSQLQueryFromInput(fields, defaultStream);
-      expect(result).toBe("approx_percentile_cont(test_stream.response_time, 0.95)");
+      expect(result).toBe(
+        "approx_percentile_cont(test_stream.response_time, 0.95)",
+      );
     });
 
     it("should handle nested function argument", () => {
@@ -395,7 +397,9 @@ describe("dashboardAutoQueryBuilder", () => {
         ],
       };
       const result = buildSQLQueryFromInput(fields, defaultStream);
-      expect(result).toBe("approx_percentile_cont(test_stream.response_time, 0.5)");
+      expect(result).toBe(
+        "approx_percentile_cont(test_stream.response_time, 0.5)",
+      );
     });
 
     it("should handle p90 percentile function", () => {
@@ -411,7 +415,9 @@ describe("dashboardAutoQueryBuilder", () => {
         ],
       };
       const result = buildSQLQueryFromInput(fields, defaultStream);
-      expect(result).toBe("approx_percentile_cont(test_stream.response_time, 0.9)");
+      expect(result).toBe(
+        "approx_percentile_cont(test_stream.response_time, 0.9)",
+      );
     });
 
     it("should handle p95 percentile function", () => {
@@ -427,7 +433,9 @@ describe("dashboardAutoQueryBuilder", () => {
         ],
       };
       const result = buildSQLQueryFromInput(fields, defaultStream);
-      expect(result).toBe("approx_percentile_cont(test_stream.response_time, 0.95)");
+      expect(result).toBe(
+        "approx_percentile_cont(test_stream.response_time, 0.95)",
+      );
     });
 
     it("should handle p99 percentile function", () => {
@@ -443,7 +451,9 @@ describe("dashboardAutoQueryBuilder", () => {
         ],
       };
       const result = buildSQLQueryFromInput(fields, defaultStream);
-      expect(result).toBe("approx_percentile_cont(test_stream.response_time, 0.99)");
+      expect(result).toBe(
+        "approx_percentile_cont(test_stream.response_time, 0.99)",
+      );
     });
 
     it("should handle null functionName with single argument", () => {
@@ -572,7 +582,7 @@ describe("dashboardAutoQueryBuilder", () => {
       };
       const result = buildSQLChartQuery(config);
       expect(result).toContain("SELECT");
-      expect(result).toContain("FROM \"logs\"");
+      expect(result).toContain('FROM "logs"');
       expect(result).toContain("GROUP BY status_alias");
     });
 
@@ -1128,7 +1138,7 @@ describe("dashboardAutoQueryBuilder", () => {
         dashboardPanelData: mockDashboardPanelData,
       };
       const result = buildSQLChartQuery(config);
-      expect(result).toContain("FROM \"logs\"");
+      expect(result).toContain('FROM "logs"');
       expect(result).toContain("INNER JOIN");
     });
 
@@ -1965,7 +1975,7 @@ describe("dashboardAutoQueryBuilder", () => {
     it("should build map chart query", () => {
       const result = mapChart(mockDashboardPanelData);
       expect(result).toContain("SELECT");
-      expect(result).toContain("FROM \"logs\"");
+      expect(result).toContain('FROM "logs"');
       expect(result).toContain("GROUP BY name_alias");
       expect(result).toContain("LIMIT 100");
     });
@@ -2080,7 +2090,7 @@ describe("dashboardAutoQueryBuilder", () => {
     it("should build geo map chart query", () => {
       const result = geoMapChart(mockDashboardPanelData);
       expect(result).toContain("SELECT");
-      expect(result).toContain("FROM \"locations\"");
+      expect(result).toContain('FROM "locations"');
       expect(result).toContain("GROUP BY lat_alias, lon_alias");
     });
 
@@ -2194,7 +2204,7 @@ describe("dashboardAutoQueryBuilder", () => {
     it("should build sankey chart query", () => {
       const result = sankeyChartQuery(mockDashboardPanelData);
       expect(result).toContain("SELECT");
-      expect(result).toContain("FROM \"flows\"");
+      expect(result).toContain('FROM "flows"');
       expect(result).toContain("GROUP BY source_alias, target_alias");
     });
 

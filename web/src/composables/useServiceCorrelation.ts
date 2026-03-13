@@ -22,7 +22,11 @@ import type {
   CorrelationResponse,
   StreamInfo,
 } from "@/services/service_streams";
-import type { TelemetryContext, TelemetryType, CorrelationResult } from "@/utils/telemetryCorrelation";
+import type {
+  TelemetryContext,
+  TelemetryType,
+  CorrelationResult,
+} from "@/utils/telemetryCorrelation";
 import {
   extractSemanticDimensions,
   generateCorrelationQueries,
@@ -42,7 +46,9 @@ const isLoadingSemanticGroupsGlobal = new Map<string, boolean>();
  */
 export function useServiceCorrelation() {
   const store = useStore();
-  const orgIdentifier = computed(() => store.state.selectedOrganization.identifier);
+  const orgIdentifier = computed(
+    () => store.state.selectedOrganization.identifier,
+  );
 
   const error = ref<string | null>(null);
 
@@ -57,16 +63,20 @@ export function useServiceCorrelation() {
     if (semanticGroupsGlobalCache.has(org)) {
       const cached = semanticGroupsGlobalCache.get(org)!;
       if (cached.length > 0) {
-        console.log(`[useServiceCorrelation] Using cached semantic groups for org '${org}' (${cached.length} groups)`);
+        console.log(
+          `[useServiceCorrelation] Using cached semantic groups for org '${org}' (${cached.length} groups)`,
+        );
         return cached;
       }
     }
 
     // Check if already loading for this org (prevent duplicate requests)
     if (isLoadingSemanticGroupsGlobal.get(org)) {
-      console.log(`[useServiceCorrelation] Already loading semantic groups for org '${org}', waiting...`);
+      console.log(
+        `[useServiceCorrelation] Already loading semantic groups for org '${org}', waiting...`,
+      );
       // Wait for the existing request to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       return loadSemanticGroups(); // Retry (will hit cache)
     }
 
@@ -102,7 +112,7 @@ export function useServiceCorrelation() {
     context: TelemetryContext,
     sourceType: TelemetryType,
     timeWindowMinutes: number = 5,
-    currentStream?: string
+    currentStream?: string,
   ): Promise<CorrelationResult | null> {
     error.value = null;
 
@@ -124,11 +134,18 @@ export function useServiceCorrelation() {
       // Extract ALL semantic dimensions from context (stable + unstable)
       // Backend will categorize them into matched_dimensions (stable) and additional_dimensions (unstable)
       // UI will use matched_dimensions with actual values, additional_dimensions with _o2_all wildcard
-      const dimensions = extractSemanticDimensions(context, semanticGroups, false);
+      const dimensions = extractSemanticDimensions(
+        context,
+        semanticGroups,
+        false,
+      );
 
       if (Object.keys(dimensions).length === 0) {
-        error.value = "No recognizable dimensions found in context for correlation";
-        console.error("[useServiceCorrelation] No dimensions extracted. Check semantic groups configuration.");
+        error.value =
+          "No recognizable dimensions found in context for correlation";
+        console.error(
+          "[useServiceCorrelation] No dimensions extracted. Check semantic groups configuration.",
+        );
         return null;
       }
 
@@ -139,14 +156,20 @@ export function useServiceCorrelation() {
         available_dimensions: dimensions,
       };
 
-      const response = await serviceStreamsApi.correlate(orgIdentifier.value, correlationRequest);
+      const response = await serviceStreamsApi.correlate(
+        orgIdentifier.value,
+        correlationRequest,
+      );
 
       const correlationData: CorrelationResponse | null = response.data;
 
       // Check if API returned null (no matching service found)
       if (!correlationData) {
-        error.value = "No matching service found for this stream with the provided dimensions.";
-        console.warn("[useServiceCorrelation] Correlation API returned null - no matching service found");
+        error.value =
+          "No matching service found for this stream with the provided dimensions.";
+        console.warn(
+          "[useServiceCorrelation] Correlation API returned null - no matching service found",
+        );
         return null;
       }
 
@@ -166,9 +189,15 @@ export function useServiceCorrelation() {
         service_name: correlationData.service_name,
         dimensions: correlationData.matched_dimensions, // Only stable dimensions for SQL WHERE clause
         streams: {
-          logs: correlationData.related_streams.logs.map((s: StreamInfo) => s.stream_name),
-          traces: correlationData.related_streams.traces.map((s: StreamInfo) => s.stream_name),
-          metrics: correlationData.related_streams.metrics.map((s: StreamInfo) => s.stream_name),
+          logs: correlationData.related_streams.logs.map(
+            (s: StreamInfo) => s.stream_name,
+          ),
+          traces: correlationData.related_streams.traces.map(
+            (s: StreamInfo) => s.stream_name,
+          ),
+          metrics: correlationData.related_streams.metrics.map(
+            (s: StreamInfo) => s.stream_name,
+          ),
         },
         first_seen: 0,
         last_seen: 0,
@@ -182,7 +211,7 @@ export function useServiceCorrelation() {
         sourceType,
         semanticGroups,
         timeWindowMinutes,
-        correlationData
+        correlationData,
       );
 
       return {
@@ -194,11 +223,14 @@ export function useServiceCorrelation() {
     } catch (err: any) {
       // Provide user-friendly error messages
       if (err.response?.status === 403) {
-        error.value = "Service Discovery is not enabled. This is an enterprise feature.";
+        error.value =
+          "Service Discovery is not enabled. This is an enterprise feature.";
       } else if (err.response?.status === 404) {
-        error.value = "No matching service found for this stream with the provided dimensions.";
+        error.value =
+          "No matching service found for this stream with the provided dimensions.";
       } else if (err.message?.includes("host") || err.code === "ERR_NETWORK") {
-        error.value = "Unable to connect to server. Please check if the application is running.";
+        error.value =
+          "Unable to connect to server. Please check if the application is running.";
       } else if (!error.value) {
         error.value = `Correlation failed: ${err.message || err}`;
       }
@@ -214,7 +246,9 @@ export function useServiceCorrelation() {
   function clearCache() {
     const org = orgIdentifier.value;
     semanticGroupsGlobalCache.delete(org);
-    console.log(`[useServiceCorrelation] Cleared semantic groups cache for org '${org}'`);
+    console.log(
+      `[useServiceCorrelation] Cleared semantic groups cache for org '${org}'`,
+    );
   }
 
   /**
@@ -242,7 +276,9 @@ export function useServiceCorrelation() {
   return {
     // State
     error,
-    semanticGroups: computed(() => semanticGroupsGlobalCache.get(orgIdentifier.value) || []),
+    semanticGroups: computed(
+      () => semanticGroupsGlobalCache.get(orgIdentifier.value) || [],
+    ),
 
     // Methods
     findRelatedTelemetry,

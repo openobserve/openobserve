@@ -103,13 +103,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import {
-  defineComponent,
-  ref,
-  onMounted,
-  computed,
-  watch,
-} from "vue";
+import { defineComponent, ref, onMounted, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";

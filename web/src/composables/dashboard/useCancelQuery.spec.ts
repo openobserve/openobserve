@@ -40,7 +40,9 @@ describe("useCancelQuery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    windowDispatchEventSpy = vi.spyOn(window, "dispatchEvent").mockImplementation(() => true);
+    windowDispatchEventSpy = vi
+      .spyOn(window, "dispatchEvent")
+      .mockImplementation(() => true);
   });
 
   afterEach(() => {
@@ -141,7 +143,9 @@ describe("useCancelQuery", () => {
 
       composable.cancelQuery();
 
-      expect(windowDispatchEventSpy).toHaveBeenCalledWith(new Event("cancelQuery"));
+      expect(windowDispatchEventSpy).toHaveBeenCalledWith(
+        new Event("cancelQuery"),
+      );
     });
 
     it("should return early when no trace IDs are set", () => {
@@ -149,7 +153,9 @@ describe("useCancelQuery", () => {
 
       composable.cancelQuery();
 
-      expect(windowDispatchEventSpy).toHaveBeenCalledWith(new Event("cancelQuery"));
+      expect(windowDispatchEventSpy).toHaveBeenCalledWith(
+        new Event("cancelQuery"),
+      );
       expect(mockQueryService.delete_running_queries).not.toHaveBeenCalled();
     });
 
@@ -159,7 +165,9 @@ describe("useCancelQuery", () => {
 
       composable.cancelQuery();
 
-      expect(windowDispatchEventSpy).toHaveBeenCalledWith(new Event("cancelQuery"));
+      expect(windowDispatchEventSpy).toHaveBeenCalledWith(
+        new Event("cancelQuery"),
+      );
       expect(mockQueryService.delete_running_queries).not.toHaveBeenCalled();
     });
 
@@ -170,7 +178,9 @@ describe("useCancelQuery", () => {
 
       composable.cancelQuery();
 
-      expect(windowDispatchEventSpy).toHaveBeenCalledWith(new Event("cancelQuery"));
+      expect(windowDispatchEventSpy).toHaveBeenCalledWith(
+        new Event("cancelQuery"),
+      );
       expect(mockQueryService.delete_running_queries).not.toHaveBeenCalled();
     });
 
@@ -185,12 +195,14 @@ describe("useCancelQuery", () => {
 
       expect(mockQueryService.delete_running_queries).toHaveBeenCalledWith(
         "test-org",
-        ["trace1", "trace2"]
+        ["trace1", "trace2"],
       );
     });
 
     it("should show positive notification on successful cancellation", async () => {
-      const mockResponse = { data: [{ is_success: true }, { is_success: false }] };
+      const mockResponse = {
+        data: [{ is_success: true }, { is_success: false }],
+      };
       mockQueryService.delete_running_queries.mockResolvedValue(mockResponse);
 
       const composable = useCancelQuery();
@@ -199,16 +211,18 @@ describe("useCancelQuery", () => {
       composable.cancelQuery();
 
       // Wait for promise to resolve
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(mockShowPositiveNotification).toHaveBeenCalledWith(
         "Running query canceled successfully",
-        { timeout: 3000 }
+        { timeout: 3000 },
       );
     });
 
     it("should not show notification when no queries were successfully cancelled", async () => {
-      const mockResponse = { data: [{ is_success: false }, { is_success: false }] };
+      const mockResponse = {
+        data: [{ is_success: false }, { is_success: false }],
+      };
       mockQueryService.delete_running_queries.mockResolvedValue(mockResponse);
 
       const composable = useCancelQuery();
@@ -217,13 +231,15 @@ describe("useCancelQuery", () => {
       composable.cancelQuery();
 
       // Wait for promise to resolve
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(mockShowPositiveNotification).not.toHaveBeenCalled();
     });
 
     it("should show notification when at least one query is successfully cancelled", async () => {
-      const mockResponse = { data: [{ is_success: false }, { is_success: true }] };
+      const mockResponse = {
+        data: [{ is_success: false }, { is_success: true }],
+      };
       mockQueryService.delete_running_queries.mockResolvedValue(mockResponse);
 
       const composable = useCancelQuery();
@@ -232,11 +248,11 @@ describe("useCancelQuery", () => {
       composable.cancelQuery();
 
       // Wait for promise to resolve
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(mockShowPositiveNotification).toHaveBeenCalledWith(
         "Running query canceled successfully",
-        { timeout: 3000 }
+        { timeout: 3000 },
       );
     });
 
@@ -244,9 +260,9 @@ describe("useCancelQuery", () => {
       const mockError = {
         response: {
           data: {
-            message: "Custom error message"
-          }
-        }
+            message: "Custom error message",
+          },
+        },
       };
       mockQueryService.delete_running_queries.mockRejectedValue(mockError);
 
@@ -256,20 +272,23 @@ describe("useCancelQuery", () => {
       composable.cancelQuery();
 
       // Wait for promise to reject
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith("delete running queries error", mockError);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "delete running queries error",
+        mockError,
+      );
       expect(mockShowErrorNotification).toHaveBeenCalledWith(
         "Custom error message",
-        { timeout: 3000 }
+        { timeout: 3000 },
       );
     });
 
     it("should handle error response without message", async () => {
       const mockError = {
         response: {
-          data: {}
-        }
+          data: {},
+        },
       };
       mockQueryService.delete_running_queries.mockRejectedValue(mockError);
 
@@ -279,12 +298,15 @@ describe("useCancelQuery", () => {
       composable.cancelQuery();
 
       // Wait for promise to reject
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith("delete running queries error", mockError);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "delete running queries error",
+        mockError,
+      );
       expect(mockShowErrorNotification).toHaveBeenCalledWith(
         "Failed to cancel running query",
-        { timeout: 3000 }
+        { timeout: 3000 },
       );
     });
 
@@ -298,12 +320,15 @@ describe("useCancelQuery", () => {
       composable.cancelQuery();
 
       // Wait for promise to reject
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith("delete running queries error", mockError);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "delete running queries error",
+        mockError,
+      );
       expect(mockShowErrorNotification).toHaveBeenCalledWith(
         "Failed to cancel running query",
-        { timeout: 3000 }
+        { timeout: 3000 },
       );
     });
 
@@ -317,7 +342,7 @@ describe("useCancelQuery", () => {
       composable.cancelQuery();
 
       // Wait for promise to resolve
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       // The processed trace IDs should be removed
       expect(composable.traceIdRef.value).toEqual([]);
@@ -333,7 +358,7 @@ describe("useCancelQuery", () => {
       composable.cancelQuery();
 
       // Wait for promise to reject
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       // The processed trace IDs should still be removed
       expect(composable.traceIdRef.value).toEqual([]);
@@ -350,10 +375,14 @@ describe("useCancelQuery", () => {
       composable.cancelQuery();
 
       // Add more trace IDs while the cancel operation is in progress
-      composable.searchRequestTraceIds([...composable.traceIdRef.value, "trace4", "trace5"]);
+      composable.searchRequestTraceIds([
+        ...composable.traceIdRef.value,
+        "trace4",
+        "trace5",
+      ]);
 
       // Wait for the original promise to resolve
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       // Only the original trace IDs should be removed, new ones should remain
       expect(composable.traceIdRef.value).toEqual(["trace4", "trace5"]);
@@ -364,7 +393,7 @@ describe("useCancelQuery", () => {
       mockQueryService.delete_running_queries.mockResolvedValue(mockResponse);
 
       const composable = useCancelQuery();
-      
+
       composable.searchRequestTraceIds(["trace1", "trace2"]);
       composable.cancelQuery();
 
@@ -372,8 +401,16 @@ describe("useCancelQuery", () => {
       composable.cancelQuery();
 
       expect(mockQueryService.delete_running_queries).toHaveBeenCalledTimes(2);
-      expect(mockQueryService.delete_running_queries).toHaveBeenNthCalledWith(1, "test-org", ["trace1", "trace2"]);
-      expect(mockQueryService.delete_running_queries).toHaveBeenNthCalledWith(2, "test-org", ["trace3", "trace4"]);
+      expect(mockQueryService.delete_running_queries).toHaveBeenNthCalledWith(
+        1,
+        "test-org",
+        ["trace1", "trace2"],
+      );
+      expect(mockQueryService.delete_running_queries).toHaveBeenNthCalledWith(
+        2,
+        "test-org",
+        ["trace3", "trace4"],
+      );
     });
 
     it("should handle empty response data", async () => {
@@ -386,14 +423,16 @@ describe("useCancelQuery", () => {
       composable.cancelQuery();
 
       // Wait for promise to resolve
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(mockShowPositiveNotification).not.toHaveBeenCalled();
       expect(composable.traceIdRef.value).toEqual([]);
     });
 
     it("should handle response with no is_success properties", async () => {
-      const mockResponse = { data: [{ status: "completed" }, { status: "failed" }] };
+      const mockResponse = {
+        data: [{ status: "completed" }, { status: "failed" }],
+      };
       mockQueryService.delete_running_queries.mockResolvedValue(mockResponse);
 
       const composable = useCancelQuery();
@@ -402,7 +441,7 @@ describe("useCancelQuery", () => {
       composable.cancelQuery();
 
       // Wait for promise to resolve
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(mockShowPositiveNotification).not.toHaveBeenCalled();
       expect(composable.traceIdRef.value).toEqual([]);
@@ -424,7 +463,7 @@ describe("useCancelQuery", () => {
 
       expect(mockQueryService.delete_running_queries).toHaveBeenCalledWith(
         "different-org",
-        ["trace1"]
+        ["trace1"],
       );
 
       // Reset for other tests
@@ -440,10 +479,10 @@ describe("useCancelQuery", () => {
       // Set trace IDs and cancel multiple times rapidly
       composable.searchRequestTraceIds(["trace1"]);
       composable.cancelQuery();
-      
+
       composable.searchRequestTraceIds(["trace2"]);
       composable.cancelQuery();
-      
+
       composable.searchRequestTraceIds(["trace3"]);
       composable.cancelQuery();
 
@@ -471,7 +510,7 @@ describe("useCancelQuery", () => {
 
       expect(mockQueryService.delete_running_queries).toHaveBeenCalledWith(
         "test-org",
-        complexTraceIds
+        complexTraceIds,
       );
     });
   });
@@ -536,7 +575,10 @@ describe("useCancelQuery", () => {
       expect(composable.traceIdRef.value).toEqual(["direct-trace"]);
 
       composable.traceIdRef.value.push("another-trace");
-      expect(composable.traceIdRef.value).toEqual(["direct-trace", "another-trace"]);
+      expect(composable.traceIdRef.value).toEqual([
+        "direct-trace",
+        "another-trace",
+      ]);
     });
   });
 });

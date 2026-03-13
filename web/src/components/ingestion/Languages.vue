@@ -15,10 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-splitter
-    v-model="splitterModel"
-    unit="px"
-  >
+  <q-splitter v-model="splitterModel" unit="px">
     <template v-slot:before>
       <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
         <div class="card-container tw:h-[calc(100vh-140px)] el-border-radius">
@@ -62,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-slot:after>
       <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-        <div class=" card-container tw:h-[calc(100vh-140px)]">
+        <div class="card-container tw:h-[calc(100vh-140px)]">
           <div class="tw:overflow-auto tw:h-full">
             <router-view
               :title="tabs"

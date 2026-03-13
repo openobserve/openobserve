@@ -209,15 +209,15 @@
           </q-icon>
         </template>
         <template #right>
-           <!-- o2 ai context add button in the test function -->
-           <O2AIContextAddBtn
+          <!-- o2 ai context add button in the test function -->
+          <O2AIContextAddBtn
             @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
             :size="'6px'"
             :imageHeight="'16px'"
             :imageWidth="'16px'"
             :class="'tw:px-2 tw:mr-4'"
-           />
-          </template>
+          />
+        </template>
       </FullViewContainer>
       <div
         v-show="expandState.events"
@@ -347,7 +347,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["function-error","sendToAiChat"]);
+const emit = defineEmits(["function-error", "sendToAiChat"]);
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -629,7 +629,7 @@ const processTestResults = async (results: any) => {
 
 const handleTestError = (err: any) => {
   const rawErrMsg = err.response?.data?.message || "Error in testing function";
-  const isJSFunction = String(props.vrlFunction.transType) === '1';
+  const isJSFunction = String(props.vrlFunction.transType) === "1";
 
   // Display the raw error message from the backend without modification
   // The backend now extracts detailed error information from rquickjs
@@ -660,7 +660,9 @@ const testFunction = async () => {
   const payload = {
     function: props.vrlFunction.function,
     events: JSON.parse(inputEvents.value),
-    trans_type: props.vrlFunction.transType ? parseInt(props.vrlFunction.transType) : undefined,
+    trans_type: props.vrlFunction.transType
+      ? parseInt(props.vrlFunction.transType)
+      : undefined,
   };
   jstransform
     .test(store.state.selectedOrganization.identifier, payload)
@@ -764,7 +766,7 @@ const sendToAiChat = (value: any) => {
 defineExpose({
   testFunction,
   sendToAiChat,
-  store
+  store,
 });
 </script>
 

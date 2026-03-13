@@ -1,7 +1,6 @@
 import { ref, watch, type Ref } from "vue";
 
 export const useSelectAutoComplete = (options: Ref<any>, searchKey: string) => {
-
   const filteredOptions = ref(options.value);
 
   watch(options, () => {

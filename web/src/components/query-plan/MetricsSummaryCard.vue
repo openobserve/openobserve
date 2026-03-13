@@ -15,13 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card flat bordered class="metrics-summary-card">
+  <q-card flat bordered
+class="metrics-summary-card">
     <q-card-section class="q-pa-md">
-      <div class="text-subtitle2 text-weight-bold q-mb-md">{{ t("search.executionSummary") }}</div>
+      <div class="text-subtitle2 text-weight-bold q-mb-md">
+        {{ t("search.executionSummary") }}
+      </div>
       <div class="metrics-grid">
         <div class="metric-item">
           <div class="metric-icon">
-            <q-icon name="schedule" size="24px" color="primary" />
+            <q-icon name="schedule" size="24px"
+color="primary" />
           </div>
           <div class="metric-content">
             <div class="metric-label">{{ t("search.totalTime") }}</div>
@@ -31,7 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="metric-item">
           <div class="metric-icon">
-            <q-icon name="format_list_numbered" size="24px" color="primary" />
+            <q-icon name="format_list_numbered" size="24px"
+color="primary" />
           </div>
           <div class="metric-content">
             <div class="metric-label">{{ t("search.totalRows") }}</div>
@@ -41,7 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="metric-item">
           <div class="metric-icon">
-            <q-icon name="memory" size="24px" color="primary" />
+            <q-icon name="memory" size="24px"
+color="primary" />
           </div>
           <div class="metric-content">
             <div class="metric-label">{{ t("search.peakMemory") }}</div>
@@ -75,7 +81,11 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .metrics-summary-card {
-  background: linear-gradient(135deg, rgba(var(--q-primary-rgb), 0.05) 0%, rgba(var(--q-primary-rgb), 0.02) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(var(--q-primary-rgb), 0.05) 0%,
+    rgba(var(--q-primary-rgb), 0.02) 100%
+  );
 
   .metrics-grid {
     display: grid;
@@ -131,7 +141,11 @@ export default defineComponent({
 // Dark theme support
 .body--dark {
   .metrics-summary-card {
-    background: linear-gradient(135deg, rgba(var(--q-primary-rgb), 0.15) 0%, rgba(var(--q-primary-rgb), 0.08) 100%);
+    background: linear-gradient(
+      135deg,
+      rgba(var(--q-primary-rgb), 0.15) 0%,
+      rgba(var(--q-primary-rgb), 0.08) 100%
+    );
 
     .metric-item {
       background-color: rgba(255, 255, 255, 0.05);

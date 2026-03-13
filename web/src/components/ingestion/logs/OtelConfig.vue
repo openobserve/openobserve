@@ -2,11 +2,17 @@
   <div>
     <div class="q-pa-sm">
       <div class="text-subtitle1 text-bold q-pl-xs">OTLP HTTP</div>
-      <ContentCopy class="q-mt-sm copy-content-container-cls" :content="getOtelHttpConfig" />
+      <ContentCopy
+        class="q-mt-sm copy-content-container-cls"
+        :content="getOtelHttpConfig"
+      />
     </div>
     <div class="q-pa-sm">
       <div class="text-subtitle1 text-bold q-mt-sm q-pl-xs">OTLP gRPC</div>
-      <ContentCopy class="q-mt-sm copy-content-container-cls" :content="getOtelGrpcConfig" />
+      <ContentCopy
+        class="q-mt-sm copy-content-container-cls"
+        :content="getOtelGrpcConfig"
+      />
     </div>
   </div>
 </template>
@@ -16,7 +22,11 @@ import { computed, ref, type Ref } from "vue";
 import type { Endpoint } from "@/ts/interfaces";
 import ContentCopy from "@/components/CopyContent.vue";
 import { useStore } from "vuex";
-import { b64EncodeStandard, getEndPoint, getIngestionURL } from "../../../utils/zincutils";
+import {
+  b64EncodeStandard,
+  getEndPoint,
+  getIngestionURL,
+} from "../../../utils/zincutils";
 
 const store = useStore();
 
@@ -42,7 +52,7 @@ endpoint.value = getEndPoint(ingestionURL);
 
 const accessKey = computed(() => {
   return b64EncodeStandard(
-    `${props.currUserEmail}:${store.state.organizationData.organizationPasscode}`
+    `${props.currUserEmail}:${store.state.organizationData.organizationPasscode}`,
   );
 });
 
@@ -72,7 +82,7 @@ defineExpose({
   ingestionURL,
   accessKey,
   getOtelGrpcConfig,
-  getOtelHttpConfig
+  getOtelHttpConfig,
 });
 </script>
 

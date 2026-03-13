@@ -15,32 +15,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="col-12 q-py-sm variables-input "
-  :class="{
-    'flex tw:gap-2 items-center tw:w-full': variables.length == 0,
-  }"
+  <div
+    class="col-12 q-py-sm variables-input"
+    :class="{
+      'flex tw:gap-2 items-center tw:w-full': variables.length == 0,
+    }"
   >
     <div class="q-pb-xs custom-input-label text-bold">
-      <span>
-        Variable
-      </span>
-          <q-btn
-          style="color: #A0A0A0;"
-              no-caps
-              padding="xs"
-              class=""
-              size="sm"
-              flat
-              icon="info_outline"
-            >
-              <q-tooltip>
-              Variables are used to pass data from the alert to the destination.
-            </q-tooltip>
-          </q-btn>
-        </div>
+      <span> Variable </span>
+      <q-btn
+        style="color: #a0a0a0"
+        no-caps
+        padding="xs"
+        class=""
+        size="sm"
+        flat
+        icon="info_outline"
+      >
+        <q-tooltip>
+          Variables are used to pass data from the alert to the destination.
+        </q-tooltip>
+      </q-btn>
+    </div>
     <template v-if="!variables.length">
       <div class="flex justify-between items-center tw:ml-auto">
-
         <q-btn
           data-test="alert-variables-add-btn"
           size="sm"
@@ -49,9 +47,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           no-caps
           @click="addVariable"
         >
-        <q-icon name="add" />
-        <span>Add Variable</span>
-      </q-btn>
+          <q-icon name="add" />
+          <span>Add Variable</span>
+        </q-btn>
       </div>
     </template>
     <template v-else>
@@ -162,10 +160,10 @@ const addVariable = () => {
   }
 }
 
-.input-bg-dark .q-field__control{
+.input-bg-dark .q-field__control {
   background-color: #181a1b !important;
 }
-.input-bg-light .q-field__control{
+.input-bg-light .q-field__control {
   background-color: #ffffff !important;
 }
 </style>

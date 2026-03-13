@@ -35,7 +35,9 @@ describe("chartDimensionUtils", () => {
     mockSpan.remove.mockClear();
 
     vi.spyOn(document, "createElement").mockReturnValue(mockSpan as any);
-    vi.spyOn(document.body, "appendChild").mockImplementation(() => mockSpan as any);
+    vi.spyOn(document.body, "appendChild").mockImplementation(
+      () => mockSpan as any,
+    );
   });
 
   describe("calculateWidthText", () => {

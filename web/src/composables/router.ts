@@ -20,7 +20,20 @@ const useOSRoutes = () => {
 
   const homeChildRoutes: any[] = [...useIngestionRoutes()];
 
-  return { parentRoutes, homeChildRoutes };
+  const pipelineChildren: any[] = [
+    {
+      path: "eval-templates",
+      name: "evalTemplates",
+      component: () =>
+        import("../enterprise/components/EvalTemplateManager.vue"),
+      meta: {
+        title: "Evaluation Templates",
+        keepAlive: false,
+      },
+    },
+  ];
+
+  return { parentRoutes, homeChildRoutes, pipelineChildren };
 };
 
 export default useOSRoutes;

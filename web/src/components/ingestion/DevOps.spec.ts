@@ -10,13 +10,13 @@ installQuasar();
 // Mock services
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path) => `mock-${path}`),
-  verifyOrganizationStatus: vi.fn()
+  verifyOrganizationStatus: vi.fn(),
 }));
 
 vi.mock("@/aws-exports", () => ({
   default: {
-    API_ENDPOINT: "http://localhost:5080"
-  }
+    API_ENDPOINT: "http://localhost:5080",
+  },
 }));
 
 // Mock router
@@ -24,26 +24,26 @@ const mockRouter = {
   currentRoute: {
     value: {
       name: "devops",
-      query: {}
-    }
+      query: {},
+    },
   },
-  push: vi.fn()
+  push: vi.fn(),
 };
 
 vi.mock("vue-router", () => ({
-  useRouter: () => mockRouter
+  useRouter: () => mockRouter,
 }));
 
 // Mock Quasar
 const mockQuasar = {
-  notify: vi.fn()
+  notify: vi.fn(),
 };
 
 vi.mock("quasar", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
-    useQuasar: () => mockQuasar
+    useQuasar: () => mockQuasar,
   };
 });
 
@@ -53,14 +53,14 @@ describe("DevOps Component", () => {
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
-    
+
     // Reset router state
     mockRouter.currentRoute.value.name = "devops";
     mockRouter.currentRoute.value.query = {};
 
     wrapper = mount(DevOps, {
       props: {
-        currOrgIdentifier: "test-org"
+        currOrgIdentifier: "test-org",
       },
       global: {
         plugins: [i18n],
@@ -68,15 +68,16 @@ describe("DevOps Component", () => {
           store,
         },
         stubs: {
-          'q-splitter': {
-            template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+          "q-splitter": {
+            template:
+              '<div><slot name="before"></slot><slot name="after"></slot></div>',
           },
-          'q-input': true,
-          'q-icon': true,
-          'q-tabs': true,
-          'q-route-tab': true,
-          'router-view': true
-        }
+          "q-input": true,
+          "q-icon": true,
+          "q-tabs": true,
+          "q-route-tab": true,
+          "router-view": true,
+        },
       },
     });
   });
@@ -93,7 +94,7 @@ describe("DevOps Component", () => {
     });
 
     it("should have correct props", () => {
-      expect(wrapper.props('currOrgIdentifier')).toBe("test-org");
+      expect(wrapper.props("currOrgIdentifier")).toBe("test-org");
     });
 
     it("should initialize with correct data", () => {
@@ -106,7 +107,9 @@ describe("DevOps Component", () => {
 
     it("should have correct computed values", () => {
       expect(wrapper.vm.currentUserEmail).toBe(store.state.userInfo.email);
-      expect(wrapper.vm.currentOrgIdentifier).toBe(store.state.selectedOrganization.identifier);
+      expect(wrapper.vm.currentOrgIdentifier).toBe(
+        store.state.selectedOrganization.identifier,
+      );
     });
   });
 
@@ -122,25 +125,26 @@ describe("DevOps Component", () => {
 
     it("should not redirect when not on devops route", () => {
       mockRouter.currentRoute.value.name = "jenkins";
-      
+
       const testWrapper = mount(DevOps, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            "q-splitter": {
+              template:
+                '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'q-input': true,
-            'q-icon': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true
-          }
+            "q-input": true,
+            "q-icon": true,
+            "q-tabs": true,
+            "q-route-tab": true,
+            "router-view": true,
+          },
         },
       });
-      
+
       // Only the initial call from the previous test should exist
       expect(mockRouter.push).toHaveBeenCalledTimes(1);
       testWrapper.unmount();
@@ -150,10 +154,10 @@ describe("DevOps Component", () => {
   describe("DevOps Tools Configuration", () => {
     it("should have correct DevOps tabs structure", () => {
       const filteredList = wrapper.vm.filteredList;
-      
+
       expect(Array.isArray(filteredList)).toBe(true);
       expect(filteredList.length).toBe(4);
-      
+
       // Check if key DevOps tools are present
       const tabNames = filteredList.map((tab: any) => tab.name);
       expect(tabNames).toContain("jenkins");
@@ -165,36 +169,49 @@ describe("DevOps Component", () => {
     it("should have correct tab structure for each tool", () => {
       const filteredList = wrapper.vm.filteredList;
       const firstTab = filteredList[0];
-      
+
       expect(firstTab).toHaveProperty("name");
       expect(firstTab).toHaveProperty("to");
       expect(firstTab).toHaveProperty("icon");
       expect(firstTab).toHaveProperty("label");
       expect(firstTab).toHaveProperty("contentClass", "tab_content");
-      
+
       // Check icon URL structure
       expect(firstTab.icon).toMatch(/^img:mock-images\/ingestion\//);
-      
+
       // Check to object structure
       expect(firstTab.to).toHaveProperty("name");
       expect(firstTab.to).toHaveProperty("query");
-      expect(firstTab.to.query).toHaveProperty("org_identifier", store.state.selectedOrganization.identifier);
+      expect(firstTab.to.query).toHaveProperty(
+        "org_identifier",
+        store.state.selectedOrganization.identifier,
+      );
     });
 
     it("should generate correct icons for each tool", () => {
       const filteredList = wrapper.vm.filteredList;
-      
-      const jenkinsTab = filteredList.find((tab: any) => tab.name === "jenkins");
+
+      const jenkinsTab = filteredList.find(
+        (tab: any) => tab.name === "jenkins",
+      );
       expect(jenkinsTab.icon).toBe("img:mock-images/ingestion/jenkins.svg");
-      
-      const ansibleTab = filteredList.find((tab: any) => tab.name === "ansible");
+
+      const ansibleTab = filteredList.find(
+        (tab: any) => tab.name === "ansible",
+      );
       expect(ansibleTab.icon).toBe("img:mock-images/ingestion/ansible.svg");
-      
-      const terraformTab = filteredList.find((tab: any) => tab.name === "terraform");
+
+      const terraformTab = filteredList.find(
+        (tab: any) => tab.name === "terraform",
+      );
       expect(terraformTab.icon).toBe("img:mock-images/ingestion/terraform.svg");
 
-      const githubTab = filteredList.find((tab: any) => tab.name === "github-actions");
-      expect(githubTab.icon).toBe("img:mock-images/ingestion/github-actions.svg");
+      const githubTab = filteredList.find(
+        (tab: any) => tab.name === "github-actions",
+      );
+      expect(githubTab.icon).toBe(
+        "img:mock-images/ingestion/github-actions.svg",
+      );
     });
   });
 
@@ -202,11 +219,11 @@ describe("DevOps Component", () => {
     it("should filter DevOps tabs based on search input", async () => {
       // Initially should show all tabs
       expect(wrapper.vm.filteredList.length).toBe(4);
-      
+
       // Filter by "jenkins"
       wrapper.vm.tabsFilter = "jenkins";
       await wrapper.vm.$nextTick();
-      
+
       const filteredList = wrapper.vm.filteredList;
       filteredList.forEach((tab: any) => {
         expect(tab.label.toLowerCase()).toContain("jenkins");
@@ -217,10 +234,10 @@ describe("DevOps Component", () => {
       // Set filter then clear it
       wrapper.vm.tabsFilter = "terraform";
       await wrapper.vm.$nextTick();
-      
+
       wrapper.vm.tabsFilter = "";
       await wrapper.vm.$nextTick();
-      
+
       // Should show all tabs again
       expect(wrapper.vm.filteredList.length).toBe(4); // Total number of DevOps tabs
     });
@@ -228,25 +245,29 @@ describe("DevOps Component", () => {
     it("should be case insensitive", async () => {
       wrapper.vm.tabsFilter = "ANSIBLE";
       await wrapper.vm.$nextTick();
-      
+
       const filteredList = wrapper.vm.filteredList;
-      const hasAnsible = filteredList.some((tab: any) => tab.name === "ansible");
+      const hasAnsible = filteredList.some(
+        (tab: any) => tab.name === "ansible",
+      );
       expect(hasAnsible).toBe(true);
     });
 
     it("should handle no matches", async () => {
       wrapper.vm.tabsFilter = "nonexistenttool";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.filteredList.length).toBe(0);
     });
 
     it("should filter by partial matches", async () => {
       wrapper.vm.tabsFilter = "git";
       await wrapper.vm.$nextTick();
-      
+
       const filteredList = wrapper.vm.filteredList;
-      const hasGithub = filteredList.some((tab: any) => tab.name === "github-actions");
+      const hasGithub = filteredList.some(
+        (tab: any) => tab.name === "github-actions",
+      );
       expect(hasGithub).toBe(true);
     });
   });
@@ -275,8 +296,8 @@ describe("DevOps Component", () => {
     it("should include CI/CD tools", () => {
       const filteredList = wrapper.vm.filteredList;
       const cicdTools = ["jenkins", "github-actions"];
-      
-      cicdTools.forEach(toolName => {
+
+      cicdTools.forEach((toolName) => {
         const hasTool = filteredList.some((tab: any) => tab.name === toolName);
         expect(hasTool).toBe(true);
       });
@@ -285,8 +306,8 @@ describe("DevOps Component", () => {
     it("should include Infrastructure as Code tools", () => {
       const filteredList = wrapper.vm.filteredList;
       const iacTools = ["terraform", "ansible"];
-      
-      iacTools.forEach(toolName => {
+
+      iacTools.forEach((toolName) => {
         const hasTool = filteredList.some((tab: any) => tab.name === toolName);
         expect(hasTool).toBe(true);
       });
@@ -300,7 +321,7 @@ describe("DevOps Component", () => {
   describe("Localization", () => {
     it("should use translation keys for tool labels", () => {
       const filteredList = wrapper.vm.filteredList;
-      
+
       // The labels should be translated strings
       filteredList.forEach((tab: any) => {
         expect(typeof tab.label).toBe("string");
@@ -312,7 +333,7 @@ describe("DevOps Component", () => {
   describe("Tab Configuration Details", () => {
     it("should have correct route configuration for each tool", () => {
       const filteredList = wrapper.vm.filteredList;
-      
+
       filteredList.forEach((tab: any) => {
         expect(tab.to.name).toBe(tab.name);
         expect(tab.to.query).toHaveProperty("org_identifier");
@@ -322,7 +343,7 @@ describe("DevOps Component", () => {
 
     it("should maintain consistent icon path structure", () => {
       const filteredList = wrapper.vm.filteredList;
-      
+
       filteredList.forEach((tab: any) => {
         expect(tab.icon).toMatch(/^img:mock-images\/ingestion\/.*\.svg$/);
       });

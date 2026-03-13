@@ -31,7 +31,7 @@ describe("Metrics Service", () => {
       await metrics.formatPromqlQuery(queryParams);
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/test-org/prometheus/api/v1/format_query?query=up"
+        "/api/test-org/prometheus/api/v1/format_query?query=up",
       );
     });
 
@@ -51,7 +51,7 @@ describe("Metrics Service", () => {
           query: "cpu_usage",
         });
         expect(mockHttp.get).toHaveBeenCalledWith(
-          `/api/${org}/prometheus/api/v1/format_query?query=cpu_usage`
+          `/api/${org}/prometheus/api/v1/format_query?query=cpu_usage`,
         );
       }
     });
@@ -72,17 +72,17 @@ describe("Metrics Service", () => {
           query: query,
         });
         expect(mockHttp.get).toHaveBeenCalledWith(
-          `/api/test-org/prometheus/api/v1/format_query?query=${query}`
+          `/api/test-org/prometheus/api/v1/format_query?query=${query}`,
         );
       }
     });
 
     it("should handle queries with special characters", async () => {
       const specialQueries = [
-        "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
-        "up{job=\"prometheus\",instance=\"localhost:9090\"}",
-        "rate(http_requests_total{method=\"GET\",status=\"200\"}[5m])",
-        "cpu_usage{host=\"server-1\",environment=\"production\"}",
+        'sum(rate(http_requests_total{status=~"5.."}[5m]))',
+        'up{job="prometheus",instance="localhost:9090"}',
+        'rate(http_requests_total{method="GET",status="200"}[5m])',
+        'cpu_usage{host="server-1",environment="production"}',
       ];
 
       for (const query of specialQueries) {
@@ -91,7 +91,7 @@ describe("Metrics Service", () => {
           query: query,
         });
         expect(mockHttp.get).toHaveBeenCalledWith(
-          `/api/test-org/prometheus/api/v1/format_query?query=${query}`
+          `/api/test-org/prometheus/api/v1/format_query?query=${query}`,
         );
       }
     });
@@ -103,7 +103,7 @@ describe("Metrics Service", () => {
       });
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/test-org/prometheus/api/v1/format_query?query="
+        "/api/test-org/prometheus/api/v1/format_query?query=",
       );
     });
 
@@ -114,7 +114,7 @@ describe("Metrics Service", () => {
       });
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api//prometheus/api/v1/format_query?query=up"
+        "/api//prometheus/api/v1/format_query?query=up",
       );
     });
 
@@ -122,7 +122,7 @@ describe("Metrics Service", () => {
       await metrics.formatPromqlQuery({});
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api//prometheus/api/v1/format_query?query="
+        "/api//prometheus/api/v1/format_query?query=",
       );
     });
 
@@ -142,21 +142,21 @@ describe("Metrics Service", () => {
       });
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        `/api/production/prometheus/api/v1/format_query?query=${complexQuery}`
+        `/api/production/prometheus/api/v1/format_query?query=${complexQuery}`,
       );
     });
 
     it("should preserve query parameters exactly as provided", async () => {
       const queryWithSpaces = "sum by (job) (up)";
       const queryWithTabs = "rate(cpu_usage\t[5m])";
-      const queryWithNewlines = "up\n{job=\"test\"}";
+      const queryWithNewlines = 'up\n{job="test"}';
 
       await metrics.formatPromqlQuery({
         org_identifier: "test",
         query: queryWithSpaces,
       });
       expect(mockHttp.get).toHaveBeenCalledWith(
-        `/api/test/prometheus/api/v1/format_query?query=${queryWithSpaces}`
+        `/api/test/prometheus/api/v1/format_query?query=${queryWithSpaces}`,
       );
 
       await metrics.formatPromqlQuery({
@@ -164,7 +164,7 @@ describe("Metrics Service", () => {
         query: queryWithTabs,
       });
       expect(mockHttp.get).toHaveBeenCalledWith(
-        `/api/test/prometheus/api/v1/format_query?query=${queryWithTabs}`
+        `/api/test/prometheus/api/v1/format_query?query=${queryWithTabs}`,
       );
 
       await metrics.formatPromqlQuery({
@@ -172,7 +172,7 @@ describe("Metrics Service", () => {
         query: queryWithNewlines,
       });
       expect(mockHttp.get).toHaveBeenCalledWith(
-        `/api/test/prometheus/api/v1/format_query?query=${queryWithNewlines}`
+        `/api/test/prometheus/api/v1/format_query?query=${queryWithNewlines}`,
       );
     });
   });
@@ -189,7 +189,7 @@ describe("Metrics Service", () => {
       await metrics.get_promql_series(params);
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/test-org/prometheus/api/v1/series?match[]=up&start=1640995200&end=1641081600"
+        "/api/test-org/prometheus/api/v1/series?match[]=up&start=1640995200&end=1641081600",
       );
     });
 
@@ -215,7 +215,7 @@ describe("Metrics Service", () => {
           ...baseParams,
         });
         expect(mockHttp.get).toHaveBeenCalledWith(
-          `/api/${org}/prometheus/api/v1/series?match[]=cpu_usage&start=1640995200&end=1641081600`
+          `/api/${org}/prometheus/api/v1/series?match[]=cpu_usage&start=1640995200&end=1641081600`,
         );
       }
     });
@@ -224,11 +224,11 @@ describe("Metrics Service", () => {
       const labelPatterns = [
         "up",
         "cpu_usage_percent",
-        "{job=\"prometheus\"}",
-        "{__name__=\"up\"}",
-        "{job=\"api\",instance=\"localhost:8080\"}",
-        "{status=~\"5..\"}",
-        "{environment=\"production\",service=~\"api.*\"}",
+        '{job="prometheus"}',
+        '{__name__="up"}',
+        '{job="api",instance="localhost:8080"}',
+        '{status=~"5.."}',
+        '{environment="production",service=~"api.*"}',
       ];
 
       const baseParams = {
@@ -243,7 +243,7 @@ describe("Metrics Service", () => {
           labels: labels,
         });
         expect(mockHttp.get).toHaveBeenCalledWith(
-          `/api/test-org/prometheus/api/v1/series?match[]=${labels}&start=1640995200&end=1641081600`
+          `/api/test-org/prometheus/api/v1/series?match[]=${labels}&start=1640995200&end=1641081600`,
         );
       }
     });
@@ -268,7 +268,7 @@ describe("Metrics Service", () => {
           ...timeRange,
         });
         expect(mockHttp.get).toHaveBeenCalledWith(
-          `/api/test-org/prometheus/api/v1/series?match[]=up&start=${timeRange.start_time}&end=${timeRange.end_time}`
+          `/api/test-org/prometheus/api/v1/series?match[]=up&start=${timeRange.start_time}&end=${timeRange.end_time}`,
         );
       }
     });
@@ -278,7 +278,10 @@ describe("Metrics Service", () => {
         { start_time: 0, end_time: 0 },
         { start_time: -1, end_time: 1 },
         { start_time: 1640995200, end_time: 1640995200 }, // Same start and end
-        { start_time: Number.MAX_SAFE_INTEGER, end_time: Number.MAX_SAFE_INTEGER },
+        {
+          start_time: Number.MAX_SAFE_INTEGER,
+          end_time: Number.MAX_SAFE_INTEGER,
+        },
       ];
 
       const baseParams = {
@@ -292,18 +295,18 @@ describe("Metrics Service", () => {
           ...timeRange,
         });
         expect(mockHttp.get).toHaveBeenCalledWith(
-          `/api/test-org/prometheus/api/v1/series?match[]=up&start=${timeRange.start_time}&end=${timeRange.end_time}`
+          `/api/test-org/prometheus/api/v1/series?match[]=up&start=${timeRange.start_time}&end=${timeRange.end_time}`,
         );
       }
     });
 
     it("should handle complex label selectors", async () => {
       const complexLabels = [
-        "{job=\"prometheus\",instance=\"localhost:9090\"}",
-        "{__name__=~\"http_.*\",method=\"GET\"}",
-        "{service=\"api\",status=~\"[45]..\",environment!=\"test\"}",
-        "{instance=~\"web.*\",job!=\"blackbox\"}",
-        "node_cpu_seconds_total{cpu=\"0\",mode!=\"idle\"}",
+        '{job="prometheus",instance="localhost:9090"}',
+        '{__name__=~"http_.*",method="GET"}',
+        '{service="api",status=~"[45]..",environment!="test"}',
+        '{instance=~"web.*",job!="blackbox"}',
+        'node_cpu_seconds_total{cpu="0",mode!="idle"}',
       ];
 
       const baseParams = {
@@ -318,7 +321,7 @@ describe("Metrics Service", () => {
           labels: labels,
         });
         expect(mockHttp.get).toHaveBeenCalledWith(
-          `/api/production/prometheus/api/v1/series?match[]=${labels}&start=1640995200&end=1641081600`
+          `/api/production/prometheus/api/v1/series?match[]=${labels}&start=1640995200&end=1641081600`,
         );
       }
     });
@@ -332,17 +335,17 @@ describe("Metrics Service", () => {
       });
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/test-org/prometheus/api/v1/series?match[]=&start=1640995200&end=1641081600"
+        "/api/test-org/prometheus/api/v1/series?match[]=&start=1640995200&end=1641081600",
       );
     });
 
     it("should handle labels with special URL characters", async () => {
       const specialLabels = [
-        "{job=\"test job with spaces\"}",
-        "{message=\"error: something failed\"}",
-        "{query=\"value with & ampersand\"}",
-        "{path=\"/api/v1?param=value\"}",
-        "{description=\"100% CPU usage\"}",
+        '{job="test job with spaces"}',
+        '{message="error: something failed"}',
+        '{query="value with & ampersand"}',
+        '{path="/api/v1?param=value"}',
+        '{description="100% CPU usage"}',
       ];
 
       const baseParams = {
@@ -357,7 +360,7 @@ describe("Metrics Service", () => {
           labels: labels,
         });
         expect(mockHttp.get).toHaveBeenCalledWith(
-          `/api/test-org/prometheus/api/v1/series?match[]=${labels}&start=1640995200&end=1641081600`
+          `/api/test-org/prometheus/api/v1/series?match[]=${labels}&start=1640995200&end=1641081600`,
         );
       }
     });
@@ -366,7 +369,7 @@ describe("Metrics Service", () => {
   describe("Integration tests", () => {
     it("should handle both functions with same organization", async () => {
       const org = "integration-org";
-      
+
       await metrics.formatPromqlQuery({
         org_identifier: org,
         query: "up",
@@ -380,10 +383,10 @@ describe("Metrics Service", () => {
       });
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/integration-org/prometheus/api/v1/format_query?query=up"
+        "/api/integration-org/prometheus/api/v1/format_query?query=up",
       );
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/integration-org/prometheus/api/v1/series?match[]=up&start=1640995200&end=1641081600"
+        "/api/integration-org/prometheus/api/v1/series?match[]=up&start=1640995200&end=1641081600",
       );
     });
 
@@ -402,10 +405,10 @@ describe("Metrics Service", () => {
 
       // Both should use the same base path structure
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/consistent-org/prometheus/api/v1/format_query?query=test_metric"
+        "/api/consistent-org/prometheus/api/v1/format_query?query=test_metric",
       );
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/consistent-org/prometheus/api/v1/series?match[]=test_metric&start=1000&end=2000"
+        "/api/consistent-org/prometheus/api/v1/series?match[]=test_metric&start=1000&end=2000",
       );
     });
 
@@ -433,11 +436,13 @@ describe("Metrics Service", () => {
       });
 
       expect(mockHttp.get).toHaveBeenCalledTimes(2);
-      expect(mockHttp.get).toHaveBeenNthCalledWith(1,
-        "/api/workflow-org/prometheus/api/v1/format_query?query=rate(http_requests_total[5m])"
+      expect(mockHttp.get).toHaveBeenNthCalledWith(
+        1,
+        "/api/workflow-org/prometheus/api/v1/format_query?query=rate(http_requests_total[5m])",
       );
-      expect(mockHttp.get).toHaveBeenNthCalledWith(2,
-        "/api/workflow-org/prometheus/api/v1/series?match[]=rate(http_requests_total[5m])&start=1640995200&end=1641081600"
+      expect(mockHttp.get).toHaveBeenNthCalledWith(
+        2,
+        "/api/workflow-org/prometheus/api/v1/series?match[]=rate(http_requests_total[5m])&start=1640995200&end=1641081600",
       );
     });
   });

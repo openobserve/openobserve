@@ -90,7 +90,7 @@ describe("Query Component", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Reset mock pipeline object
     mockPipelineObj.isEditNode = false;
     mockPipelineObj.currentSelectedNodeData = null;
@@ -105,7 +105,7 @@ describe("Query Component", () => {
         },
         stubs: {
           ScheduledPipeline: {
-            template: '<div></div>',
+            template: "<div></div>",
             methods: {
               validateInputs: vi.fn().mockReturnValue(true),
             },
@@ -209,7 +209,7 @@ describe("Query Component", () => {
           provide: { store },
           stubs: {
             ScheduledPipeline: {
-              template: '<div></div>',
+              template: "<div></div>",
               methods: { validateInputs: vi.fn().mockReturnValue(true) },
             },
             ConfirmDialog: true,
@@ -230,9 +230,9 @@ describe("Query Component", () => {
 
   describe("onMounted Lifecycle", () => {
     it("should call updateStreamFields on mount", async () => {
-      const updateStreamFieldsSpy = vi.spyOn(wrapper.vm, 'updateStreamFields');
+      const updateStreamFieldsSpy = vi.spyOn(wrapper.vm, "updateStreamFields");
       await wrapper.vm.$nextTick();
-      
+
       // The function should be called during mount
       expect(wrapper.vm.filteredColumns).toBeDefined();
     });
@@ -241,7 +241,6 @@ describe("Query Component", () => {
       expect(wrapper.vm.originalStreamRouting).toBeDefined();
       expect(typeof wrapper.vm.originalStreamRouting).toBe("object");
     });
-
   });
 
   describe("Stream Type Management", () => {
@@ -263,7 +262,7 @@ describe("Query Component", () => {
     it("should update query type and clear SQL when switching to promql", () => {
       wrapper.vm.streamRoute.query_condition.sql = "SELECT * FROM logs";
       wrapper.vm.updateQueryType("promql");
-      
+
       expect(wrapper.vm.streamRoute.query_condition.type).toBe("promql");
       expect(wrapper.vm.streamRoute.query_condition.sql).toBe("");
     });
@@ -271,9 +270,11 @@ describe("Query Component", () => {
     it("should update query type to sql without clearing", () => {
       wrapper.vm.streamRoute.query_condition.sql = "SELECT * FROM logs";
       wrapper.vm.updateQueryType("sql");
-      
+
       expect(wrapper.vm.streamRoute.query_condition.type).toBe("sql");
-      expect(wrapper.vm.streamRoute.query_condition.sql).toBe("SELECT * FROM logs");
+      expect(wrapper.vm.streamRoute.query_condition.sql).toBe(
+        "SELECT * FROM logs",
+      );
     });
 
     it("should handle undefined query type", () => {
@@ -313,27 +314,27 @@ describe("Query Component", () => {
     it("should filter columns with search term", () => {
       const options = ["timestamp", "message", "level"];
       const mockUpdate = vi.fn();
-      
+
       wrapper.vm.filterColumns(options, "time", mockUpdate);
-      
+
       expect(mockUpdate).toHaveBeenCalled();
     });
 
     it("should handle case insensitive filtering", () => {
       const options = ["TimeStamp", "MESSAGE", "Level"];
       const mockUpdate = vi.fn();
-      
+
       wrapper.vm.filterColumns(options, "time", mockUpdate);
-      
+
       expect(mockUpdate).toHaveBeenCalled();
     });
 
     it("should handle empty options array", () => {
       const options: any[] = [];
       const mockUpdate = vi.fn();
-      
+
       const result = wrapper.vm.filterColumns(options, "test", mockUpdate);
-      
+
       expect(mockUpdate).toHaveBeenCalled();
       expect(result).toEqual([]);
     });
@@ -343,18 +344,18 @@ describe("Query Component", () => {
     it("should filter streams using filterColumns", () => {
       wrapper.vm.indexOptions = ["stream1", "stream2", "test-stream"];
       const mockUpdate = vi.fn();
-      
+
       wrapper.vm.filterStreams("test", mockUpdate);
-      
+
       expect(mockUpdate).toHaveBeenCalled();
     });
 
     it("should handle empty stream filter", () => {
       wrapper.vm.indexOptions = ["stream1", "stream2"];
       const mockUpdate = vi.fn();
-      
+
       wrapper.vm.filterStreams("", mockUpdate);
-      
+
       expect(mockUpdate).toHaveBeenCalled();
     });
   });
@@ -362,7 +363,7 @@ describe("Query Component", () => {
   describe("Stream Fields Update", () => {
     it("should update stream fields successfully", async () => {
       await wrapper.vm.updateStreamFields();
-      
+
       expect(wrapper.vm.filteredColumns).toHaveLength(4);
       expect(wrapper.vm.originalStreamFields).toHaveLength(4);
       expect(wrapper.vm.filteredColumns[0]).toEqual({
@@ -371,37 +372,40 @@ describe("Query Component", () => {
         type: "datetime",
       });
     });
-
   });
 
   describe("Dialog Management", () => {
     it("should open cancel dialog when form has changes", () => {
       wrapper.vm.streamRoute.name = "modified";
       wrapper.vm.openCancelDialog();
-      
+
       expect(wrapper.vm.dialog.show).toBe(true);
       expect(wrapper.vm.dialog.title).toBe("Discard Changes");
-      expect(wrapper.vm.dialog.message).toBe("Are you sure you want to cancel routing changes?");
+      expect(wrapper.vm.dialog.message).toBe(
+        "Are you sure you want to cancel routing changes?",
+      );
     });
 
     it("should close form directly when no changes made", () => {
       wrapper.vm.openCancelDialog();
-      
+
       expect(wrapper.vm.dialog.show).toBe(false);
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
 
     it("should open delete dialog with correct content", () => {
       wrapper.vm.openDeleteDialog();
-      
+
       expect(wrapper.vm.dialog.show).toBe(true);
       expect(wrapper.vm.dialog.title).toBe("Delete Node");
-      expect(wrapper.vm.dialog.message).toBe("Are you sure you want to delete stream routing?");
+      expect(wrapper.vm.dialog.message).toBe(
+        "Are you sure you want to delete stream routing?",
+      );
     });
 
     it("should close dialog and emit cancel", () => {
       wrapper.vm.closeDialog();
-      
+
       expect(mockPipelineObj.userClickedNode).toEqual({});
       expect(mockPipelineObj.userSelectedNode).toEqual({});
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
@@ -411,7 +415,7 @@ describe("Query Component", () => {
       const mockCallback = vi.fn();
       wrapper.vm.dialog.okCallback = mockCallback;
       wrapper.vm.dialog.okCallback();
-      
+
       expect(mockCallback).toHaveBeenCalled();
     });
   });
@@ -419,7 +423,7 @@ describe("Query Component", () => {
   describe("Default PromQL Condition", () => {
     it("should return correct default PromQL condition", () => {
       const condition = wrapper.vm.getDefaultPromqlCondition();
-      
+
       expect(condition).toEqual({
         column: "value",
         operator: ">=",
@@ -432,9 +436,9 @@ describe("Query Component", () => {
     it("should validate SQL query successfully", async () => {
       vi.mocked(searchService.search).mockResolvedValueOnce({ hits: [] });
       wrapper.vm.streamRoute.query_condition.type = "sql";
-      
+
       await wrapper.vm.validateSqlQuery();
-      
+
       expect(wrapper.vm.isValidSqlQuery).toBe(true);
       expect(wrapper.vm.validatingSqlQuery).toBe(false);
     });
@@ -444,13 +448,13 @@ describe("Query Component", () => {
       vi.mocked(searchService.search).mockRejectedValueOnce({
         response: { data: { message: errorMessage } },
       });
-      
+
       wrapper.vm.streamRoute.query_condition.type = "sql";
       wrapper.vm.streamRoute.query_condition.sql = "INVALID SQL";
-      
+
       await wrapper.vm.validateSqlQuery();
       await flushPromises();
-      
+
       expect(wrapper.vm.isValidSqlQuery).toBe(false);
       expect(wrapper.vm.validatingSqlQuery).toBe(false);
       expect(mockQuasar.notify).toHaveBeenCalledWith({
@@ -464,12 +468,12 @@ describe("Query Component", () => {
       vi.mocked(searchService.search).mockRejectedValueOnce({
         response: { data: {} },
       });
-      
+
       wrapper.vm.streamRoute.query_condition.type = "sql";
-      
+
       await wrapper.vm.validateSqlQuery();
       await flushPromises();
-      
+
       expect(wrapper.vm.isValidSqlQuery).toBe(false);
       expect(mockQuasar.notify).toHaveBeenCalledWith({
         type: "negative",
@@ -480,9 +484,9 @@ describe("Query Component", () => {
 
     it("should skip validation for promql query type", async () => {
       wrapper.vm.streamRoute.query_condition.type = "promql";
-      
+
       await wrapper.vm.validateSqlQuery();
-      
+
       expect(wrapper.vm.isValidSqlQuery).toBe(true);
       expect(wrapper.vm.validatingSqlQuery).toBe(false);
       expect(searchService.search).not.toHaveBeenCalled();
@@ -492,19 +496,19 @@ describe("Query Component", () => {
       vi.mocked(searchService.search).mockImplementationOnce(() => {
         return Promise.reject();
       });
-      
+
       wrapper.vm.streamRoute.query_condition.type = "sql";
-      
+
       await wrapper.vm.validateSqlQuery();
       await flushPromises();
-      
+
       expect(wrapper.vm.isValidSqlQuery).toBe(true);
     });
 
     it("should set validating state during validation", () => {
       wrapper.vm.streamRoute.query_condition.type = "sql";
       wrapper.vm.validateSqlQuery();
-      
+
       expect(wrapper.vm.validatingSqlQuery).toBe(true);
     });
   });
@@ -521,20 +525,20 @@ describe("Query Component", () => {
 
     it("should save query data with valid inputs", async () => {
       vi.mocked(searchService.search).mockResolvedValueOnce({ hits: [] });
-      
+
       const result = await wrapper.vm.saveQueryData();
-      
+
       expect(mockAddNode).toHaveBeenCalled();
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
 
     it("should not save when pipeline validation fails", async () => {
       wrapper.vm.scheduledPipelineRef = {
-        validateInputs: vi.fn().mockReturnValue(false)
+        validateInputs: vi.fn().mockReturnValue(false),
       };
-      
+
       const result = await wrapper.vm.saveQueryData();
-      
+
       expect(result).toBe(false);
       expect(mockAddNode).not.toHaveBeenCalled();
     });
@@ -546,12 +550,12 @@ describe("Query Component", () => {
       // Mock search to reject with an error to trigger validation failure
       vi.mocked(searchService.search).mockImplementationOnce(() =>
         Promise.reject({
-          response: { data: { message: "Invalid SQL syntax" } }
-        })
+          response: { data: { message: "Invalid SQL syntax" } },
+        }),
       );
 
       wrapper.vm.scheduledPipelineRef = {
-        validateInputs: vi.fn().mockReturnValue(true)
+        validateInputs: vi.fn().mockReturnValue(true),
       };
       wrapper.vm.streamRoute.query_condition.type = "sql";
       wrapper.vm.streamRoute.query_condition.sql = "INVALID SQL";
@@ -566,17 +570,17 @@ describe("Query Component", () => {
     it("should convert period to integer", async () => {
       vi.mocked(searchService.search).mockResolvedValueOnce({ hits: [] });
       wrapper.vm.streamRoute.trigger_condition.period = "30";
-      
+
       await wrapper.vm.saveQueryData();
-      
+
       expect(wrapper.vm.streamRoute.trigger_condition.period).toBe(30);
     });
 
     it("should handle promql query type in save", async () => {
       wrapper.vm.streamRoute.query_condition.type = "promql";
-      
+
       await wrapper.vm.saveQueryData();
-      
+
       const payload = mockAddNode.mock.calls[0][0];
       expect(payload.query_condition.sql).toBe("");
       expect(payload.query_condition.promql_condition).toEqual({
@@ -590,9 +594,9 @@ describe("Query Component", () => {
       vi.mocked(searchService.search).mockResolvedValueOnce({ hits: [] });
       wrapper.vm.streamRoute.trigger_condition.frequency_type = "cron";
       wrapper.vm.streamRoute.trigger_condition.timezone = "America/New_York";
-      
+
       await wrapper.vm.saveQueryData();
-      
+
       const payload = mockAddNode.mock.calls[0][0];
       expect(payload.tz_offset).toBe(-300);
     });
@@ -600,9 +604,9 @@ describe("Query Component", () => {
     it("should create correct query payload structure", async () => {
       vi.mocked(searchService.search).mockResolvedValueOnce({ hits: [] });
       wrapper.vm.streamRoute.trigger_condition.frequency = "60";
-      
+
       await wrapper.vm.saveQueryData();
-      
+
       const payload = mockAddNode.mock.calls[0][0];
       expect(payload.node_type).toBe("query");
       expect(payload.stream_type).toBe("logs");
@@ -614,16 +618,16 @@ describe("Query Component", () => {
   describe("Route Deletion", () => {
     it("should delete route and close form", () => {
       wrapper.vm.deleteRoute();
-      
+
       expect(mockDeletePipelineNode).toHaveBeenCalledWith("node-123");
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
 
     it("should call deletePipelineNode with correct node ID", () => {
       mockPipelineObj.currentSelectedNodeID = "custom-node-id";
-      
+
       wrapper.vm.deleteRoute();
-      
+
       expect(mockDeletePipelineNode).toHaveBeenCalledWith("custom-node-id");
     });
   });
@@ -631,10 +635,12 @@ describe("Query Component", () => {
   describe("Variables Management", () => {
     it("should add new variable", () => {
       const initialLength = wrapper.vm.streamRoute.context_attributes.length;
-      
+
       wrapper.vm.addVariable();
-      
-      expect(wrapper.vm.streamRoute.context_attributes).toHaveLength(initialLength + 1);
+
+      expect(wrapper.vm.streamRoute.context_attributes).toHaveLength(
+        initialLength + 1,
+      );
       expect(wrapper.vm.streamRoute.context_attributes[1]).toEqual({
         key: "",
         value: "",
@@ -647,9 +653,9 @@ describe("Query Component", () => {
         { key: "key1", value: "value1", id: "id1" },
         { key: "key2", value: "value2", id: "id2" },
       ];
-      
+
       wrapper.vm.removeVariable({ id: "id1" });
-      
+
       expect(wrapper.vm.streamRoute.context_attributes).toHaveLength(1);
       expect(wrapper.vm.streamRoute.context_attributes[0].id).toBe("id2");
     });
@@ -658,17 +664,17 @@ describe("Query Component", () => {
       wrapper.vm.streamRoute.context_attributes = [
         { key: "key1", value: "value1", id: "id1" },
       ];
-      
+
       wrapper.vm.removeVariable({ id: "non-existent" });
-      
+
       expect(wrapper.vm.streamRoute.context_attributes).toHaveLength(1);
     });
 
     it("should handle removing from empty context attributes", () => {
       wrapper.vm.streamRoute.context_attributes = [];
-      
+
       wrapper.vm.removeVariable({ id: "any-id" });
-      
+
       expect(wrapper.vm.streamRoute.context_attributes).toHaveLength(0);
     });
   });
@@ -730,25 +736,25 @@ describe("Query Component", () => {
   describe("Log Expansion", () => {
     it("should toggle expand log and clear expanded logs", () => {
       wrapper.vm.expandedLogs = [1, 2, 3];
-      
+
       wrapper.vm.toggleExpandLog(0);
-      
+
       expect(wrapper.vm.expandedLogs).toEqual([]);
     });
 
     it("should clear expanded logs regardless of index", () => {
       wrapper.vm.expandedLogs = [1, 2, 3];
-      
+
       wrapper.vm.toggleExpandLog(5);
-      
+
       expect(wrapper.vm.expandedLogs).toEqual([]);
     });
 
     it("should work with empty expanded logs array", () => {
       wrapper.vm.expandedLogs = [];
-      
+
       wrapper.vm.toggleExpandLog(0);
-      
+
       expect(wrapper.vm.expandedLogs).toEqual([]);
     });
   });
@@ -762,9 +768,9 @@ describe("Query Component", () => {
           stream_type: "metrics",
         },
       };
-      
+
       const result = wrapper.vm.getDefaultStreamRoute();
-      
+
       expect(result).toEqual({
         name: "edit-stream",
         stream_type: "metrics",
@@ -779,7 +785,7 @@ describe("Query Component", () => {
           },
         },
       };
-      
+
       // Need to mount a new wrapper with this specific store config
       const testWrapper = mount(Query, {
         global: {
@@ -787,7 +793,7 @@ describe("Query Component", () => {
           provide: { store: mockStore },
           stubs: {
             ScheduledPipeline: {
-              template: '<div></div>',
+              template: "<div></div>",
               methods: { validateInputs: vi.fn().mockReturnValue(true) },
             },
             ConfirmDialog: true,
@@ -813,7 +819,7 @@ describe("Query Component", () => {
 
     it("should include all required default fields", () => {
       const result = wrapper.vm.getDefaultStreamRoute();
-      
+
       expect(result.name).toBe("");
       expect(result.stream_type).toBe("logs");
       expect(result.enabled).toBe(true);
@@ -829,7 +835,7 @@ describe("Query Component", () => {
   describe("Error Handling", () => {
     it("should handle missing scheduledPipelineRef", async () => {
       wrapper.vm.scheduledPipelineRef = null;
-      
+
       try {
         await wrapper.vm.saveQueryData();
       } catch (error) {
@@ -843,12 +849,14 @@ describe("Query Component", () => {
     });
 
     it("should handle network errors in validateSqlQuery", async () => {
-      vi.mocked(searchService.search).mockRejectedValueOnce(new Error("Network error"));
+      vi.mocked(searchService.search).mockRejectedValueOnce(
+        new Error("Network error"),
+      );
       wrapper.vm.streamRoute.query_condition.type = "sql";
-      
+
       await wrapper.vm.validateSqlQuery();
       await flushPromises();
-      
+
       expect(wrapper.vm.isValidSqlQuery).toBe(false);
     });
   });
@@ -856,25 +864,27 @@ describe("Query Component", () => {
   describe("Component State Management", () => {
     it("should maintain consistent state during operations", () => {
       const initialState = JSON.parse(JSON.stringify(wrapper.vm.streamRoute));
-      
+
       wrapper.vm.updateStreamType("metrics");
       wrapper.vm.updateQueryType("promql");
       wrapper.vm.updateDelay("30");
-      
+
       expect(wrapper.vm.streamRoute.stream_type).toBe("metrics");
       expect(wrapper.vm.streamRoute.query_condition.type).toBe("promql");
       expect(wrapper.vm.streamRoute.delay).toBe(30);
-      
+
       // Other fields should remain unchanged
       expect(wrapper.vm.streamRoute.enabled).toBe(initialState.enabled);
-      expect(wrapper.vm.streamRoute.trigger_condition.timezone).toBe(initialState.trigger_condition.timezone);
+      expect(wrapper.vm.streamRoute.trigger_condition.timezone).toBe(
+        initialState.trigger_condition.timezone,
+      );
     });
 
     it("should handle complex state changes", () => {
       wrapper.vm.addVariable();
       wrapper.vm.updateFullscreenMode(true);
       wrapper.vm.streamRoute.name = "complex-stream";
-      
+
       expect(wrapper.vm.streamRoute.context_attributes).toHaveLength(2);
       expect(wrapper.vm.isFullscreenMode).toBe(true);
       expect(wrapper.vm.streamRoute.name).toBe("complex-stream");
@@ -915,7 +925,8 @@ describe("Query Component", () => {
 
       // Setup the component state
       wrapper.vm.streamRoute.name = "integration-test";
-      wrapper.vm.streamRoute.query_condition.sql = "SELECT * FROM logs WHERE level = 'ERROR'";
+      wrapper.vm.streamRoute.query_condition.sql =
+        "SELECT * FROM logs WHERE level = 'ERROR'";
       wrapper.vm.streamRoute.query_condition.type = "sql";
       wrapper.vm.scheduledPipelineRef = {
         validateInputs: vi.fn().mockReturnValue(true),
@@ -962,7 +973,7 @@ describe("Query Component", () => {
       expect(searchService.search).toHaveBeenCalledWith(
         expect.objectContaining({
           page_type: "logs",
-        })
+        }),
       );
     });
 
@@ -978,7 +989,7 @@ describe("Query Component", () => {
       expect(searchService.search).toHaveBeenCalledWith(
         expect.objectContaining({
           page_type: "metrics",
-        })
+        }),
       );
     });
 
@@ -994,7 +1005,7 @@ describe("Query Component", () => {
       expect(searchService.search).toHaveBeenCalledWith(
         expect.objectContaining({
           page_type: "traces",
-        })
+        }),
       );
     });
 
@@ -1010,7 +1021,7 @@ describe("Query Component", () => {
       expect(searchService.search).not.toHaveBeenCalledWith(
         expect.objectContaining({
           page_type: "logs",
-        })
+        }),
       );
     });
   });

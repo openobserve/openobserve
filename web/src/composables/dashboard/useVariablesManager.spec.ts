@@ -11,7 +11,11 @@
 // GNU Affero General Public License for more details.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { useVariablesManager, getVariableKey, type VariableConfig } from "./useVariablesManager";
+import {
+  useVariablesManager,
+  getVariableKey,
+  type VariableConfig,
+} from "./useVariablesManager";
 
 describe("useVariablesManager", () => {
   describe("getVariableKey", () => {
@@ -93,8 +97,12 @@ describe("useVariablesManager", () => {
       expect(manager.variablesData.panels["panel-1"]).toHaveLength(1);
       expect(manager.variablesData.panels["panel-2"]).toHaveLength(1);
 
-      expect(manager.variablesData.panels["panel-1"][0].panelId).toBe("panel-1");
-      expect(manager.variablesData.panels["panel-2"][0].panelId).toBe("panel-2");
+      expect(manager.variablesData.panels["panel-1"][0].panelId).toBe(
+        "panel-1",
+      );
+      expect(manager.variablesData.panels["panel-2"][0].panelId).toBe(
+        "panel-2",
+      );
     });
 
     it("should migrate legacy variables to global scope", () => {
@@ -267,8 +275,12 @@ describe("useVariablesManager", () => {
 
       await manager.initialize(config, {});
 
-      expect(manager.variablesData.global[0].isVariablePartialLoaded).toBe(true);
-      expect(manager.variablesData.global[1].isVariablePartialLoaded).toBe(true);
+      expect(manager.variablesData.global[0].isVariablePartialLoaded).toBe(
+        true,
+      );
+      expect(manager.variablesData.global[1].isVariablePartialLoaded).toBe(
+        true,
+      );
     });
 
     it("should load dependent variables after parent completes", async () => {
@@ -295,13 +307,21 @@ describe("useVariablesManager", () => {
       await manager.initialize(config, {});
 
       // Parent (constant type) should be immediately ready and marked as pending to load
-      expect(manager.variablesData.global[0].isVariablePartialLoaded).toBe(true);
-      expect(manager.variablesData.global[0].isVariableLoadingPending).toBe(true);
+      expect(manager.variablesData.global[0].isVariablePartialLoaded).toBe(
+        true,
+      );
+      expect(manager.variablesData.global[0].isVariableLoadingPending).toBe(
+        true,
+      );
 
       // Child (query_values type) depends on a non-API type parent (constant)
       // With the fix, children of non-API parents are now marked as pending during initialization
-      expect(manager.variablesData.global[1].isVariableLoadingPending).toBe(true);
-      expect(manager.variablesData.global[1].isVariablePartialLoaded).toBe(false);
+      expect(manager.variablesData.global[1].isVariableLoadingPending).toBe(
+        true,
+      );
+      expect(manager.variablesData.global[1].isVariablePartialLoaded).toBe(
+        false,
+      );
 
       // Verify dependency graph is correct
       const graph = manager.dependencyGraph.value;
@@ -313,7 +333,9 @@ describe("useVariablesManager", () => {
       manager.variablesData.global[1].isVariablePartialLoaded = true;
       manager.variablesData.global[1].value = ["value1", "value2"];
 
-      expect(manager.variablesData.global[1].isVariablePartialLoaded).toBe(true);
+      expect(manager.variablesData.global[1].isVariablePartialLoaded).toBe(
+        true,
+      );
     });
 
     it("should only load tab variables when tab is visible", async () => {
@@ -332,8 +354,12 @@ describe("useVariablesManager", () => {
 
       // Tab not visible yet - constant types are already loaded but not pending
       // Constant variables are immediately ready regardless of visibility
-      expect(manager.variablesData.tabs["tab-1"][0].isVariablePartialLoaded).toBe(true);
-      expect(manager.variablesData.tabs["tab-1"][0].isVariableLoadingPending).toBe(false);
+      expect(
+        manager.variablesData.tabs["tab-1"][0].isVariablePartialLoaded,
+      ).toBe(true);
+      expect(
+        manager.variablesData.tabs["tab-1"][0].isVariableLoadingPending,
+      ).toBe(false);
 
       // Mark tab as visible
       manager.setTabVisibility("tab-1", true);
@@ -341,7 +367,9 @@ describe("useVariablesManager", () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       // Variable should still be loaded (it was already ready)
-      expect(manager.variablesData.tabs["tab-1"][0].isVariablePartialLoaded).toBe(true);
+      expect(
+        manager.variablesData.tabs["tab-1"][0].isVariablePartialLoaded,
+      ).toBe(true);
     });
 
     it("should only load panel variables when panel is visible", async () => {
@@ -360,8 +388,12 @@ describe("useVariablesManager", () => {
 
       // Panel not visible yet - constant types are already loaded but not pending
       // Constant variables are immediately ready regardless of visibility
-      expect(manager.variablesData.panels["panel-1"][0].isVariablePartialLoaded).toBe(true);
-      expect(manager.variablesData.panels["panel-1"][0].isVariableLoadingPending).toBe(false);
+      expect(
+        manager.variablesData.panels["panel-1"][0].isVariablePartialLoaded,
+      ).toBe(true);
+      expect(
+        manager.variablesData.panels["panel-1"][0].isVariableLoadingPending,
+      ).toBe(false);
 
       // Mark panel as visible
       manager.setPanelVisibility("panel-1", true);
@@ -369,7 +401,9 @@ describe("useVariablesManager", () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       // Variable should still be loaded (it was already ready)
-      expect(manager.variablesData.panels["panel-1"][0].isVariablePartialLoaded).toBe(true);
+      expect(
+        manager.variablesData.panels["panel-1"][0].isVariablePartialLoaded,
+      ).toBe(true);
     });
   });
 
@@ -382,7 +416,10 @@ describe("useVariablesManager", () => {
           type: "custom",
           scope: "global",
           value: "value1",
-          options: [{ label: "value1", value: "value1" }, { label: "value2", value: "value2" }],
+          options: [
+            { label: "value1", value: "value1" },
+            { label: "value2", value: "value2" },
+          ],
         },
         {
           name: "child",
@@ -399,7 +436,13 @@ describe("useVariablesManager", () => {
       await manager.initialize(config, {});
 
       // Update parent value
-      await manager.updateVariableValue("parent", "global", undefined, undefined, "value2");
+      await manager.updateVariableValue(
+        "parent",
+        "global",
+        undefined,
+        undefined,
+        "value2",
+      );
 
       expect(manager.variablesData.global[0].value).toBe("value2");
       // Child should be triggered to reload
@@ -428,7 +471,7 @@ describe("useVariablesManager", () => {
       expect(urlParams).toEqual(
         expect.objectContaining({
           "var-country": "USA",
-        })
+        }),
       );
     });
 
@@ -455,7 +498,7 @@ describe("useVariablesManager", () => {
       expect(urlParams).toEqual(
         expect.objectContaining({
           "var-region.t.tab-1": "CA",
-        })
+        }),
       );
     });
 
@@ -482,7 +525,7 @@ describe("useVariablesManager", () => {
       expect(urlParams).toEqual(
         expect.objectContaining({
           "var-status.p.panel-123": "200",
-        })
+        }),
       );
     });
 
@@ -602,7 +645,11 @@ describe("useVariablesManager", () => {
       const panelVars = manager.getVariablesForPanel("panel-1", "tab-1");
 
       expect(panelVars).toHaveLength(3);
-      expect(panelVars.map((v) => v.name)).toEqual(["globalVar", "tabVar", "panelVar"]);
+      expect(panelVars.map((v) => v.name)).toEqual([
+        "globalVar",
+        "tabVar",
+        "panelVar",
+      ]);
     });
 
     it("should get variables for tab (merged: global + tab)", () => {

@@ -251,7 +251,8 @@ FileSink`;
 
   describe("calculateSummaryMetrics", () => {
     it("should calculate summary for single operator", () => {
-      const planText = "SortExec: elapsed_compute=100ms, output_rows=1000, memory=5MB";
+      const planText =
+        "SortExec: elapsed_compute=100ms, output_rows=1000, memory=5MB";
       const result = calculateSummaryMetrics(planText);
 
       expect(result.totalTime).toBe("100.00ms");
@@ -422,14 +423,11 @@ FileSink`;
         "Projection: [field1, field2, field3, field4, field5, field6, field7]";
       const result = collapseProjections(planText, 5);
 
-      expect(result).toBe(
-        "Projection: [field1, field2, field3, ... 4 more]"
-      );
+      expect(result).toBe("Projection: [field1, field2, field3, ... 4 more]");
     });
 
     it("should use default threshold of 5", () => {
-      const planText =
-        "Projection: [f1, f2, f3, f4, f5, f6, f7, f8]";
+      const planText = "Projection: [f1, f2, f3, f4, f5, f6, f7, f8]";
       const result = collapseProjections(planText);
 
       expect(result).toBe("Projection: [f1, f2, f3, ... 5 more]");
@@ -452,7 +450,7 @@ FileSink`;
       const result = collapseProjections(planText, 5);
 
       expect(result).toBe(
-        'Projection: ["field1", "field, with, comma", "field3", ... 3 more]'
+        'Projection: ["field1", "field, with, comma", "field3", ... 3 more]',
       );
     });
 
@@ -462,7 +460,7 @@ FileSink`;
       const result = collapseProjections(planText, 5);
 
       expect(result).toBe(
-        "Projection: [field1, CASE WHEN x > 0 THEN (a + b) ELSE (c - d) END, field3, ... 4 more]"
+        "Projection: [field1, CASE WHEN x > 0 THEN (a + b) ELSE (c - d) END, field3, ... 4 more]",
       );
     });
 
@@ -516,7 +514,7 @@ FilterExec: output_rows=100`;
       const result = collapseProjections(planText, 5);
 
       expect(result).toBe(
-        "Projection: [f1, f2, f3, ... 4 more], output_rows=100"
+        "Projection: [f1, f2, f3, ... 4 more], output_rows=100",
       );
     });
 
@@ -534,7 +532,9 @@ TableScan`;
         "Projection: [field 1, field 2, field 3, field 4, field 5, field 6]";
       const result = collapseProjections(planText, 5);
 
-      expect(result).toBe("Projection: [field 1, field 2, field 3, ... 3 more]");
+      expect(result).toBe(
+        "Projection: [field 1, field 2, field 3, ... 3 more]",
+      );
     });
   });
 
@@ -551,7 +551,7 @@ TableScan`;
       const tree = parseQueryPlanTree(planText);
 
       expect(tree.children[0].metrics.memory_bytes).toBe(
-        2 * 1024 * 1024 * 1024 * 1024
+        2 * 1024 * 1024 * 1024 * 1024,
       );
     });
 
@@ -560,7 +560,9 @@ TableScan`;
       const tree = parseQueryPlanTree(planText);
 
       expect(tree.children[0].metrics.elapsed_compute_ms).toBe(1500);
-      expect(tree.children[0].metrics.memory_bytes).toBe(2.5 * 1024 * 1024 * 1024);
+      expect(tree.children[0].metrics.memory_bytes).toBe(
+        2.5 * 1024 * 1024 * 1024,
+      );
     });
 
     it("should handle malformed time string", () => {

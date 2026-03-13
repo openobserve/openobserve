@@ -27,7 +27,7 @@ vi.mock("quasar", () => ({
 
 // Mock window.location.reload
 const mockReload = vi.fn();
-Object.defineProperty(window, 'location', {
+Object.defineProperty(window, "location", {
   value: {
     reload: mockReload,
   },
@@ -45,7 +45,7 @@ describe("useNotifications composable", () => {
   describe("showErrorNotification", () => {
     it("should call quasar notify with correct error configuration", () => {
       const message = "Test error message";
-      
+
       notifications.showErrorNotification(message);
 
       expect(mockNotify).toHaveBeenCalledWith({
@@ -90,7 +90,7 @@ describe("useNotifications composable", () => {
 
     it("should handle empty custom options", () => {
       const message = "Test error message";
-      
+
       notifications.showErrorNotification(message, {});
 
       expect(mockNotify).toHaveBeenCalledWith({
@@ -110,7 +110,7 @@ describe("useNotifications composable", () => {
 
     it("should handle undefined custom options", () => {
       const message = "Test error message";
-      
+
       notifications.showErrorNotification(message, undefined);
 
       expect(mockNotify).toHaveBeenCalledWith({
@@ -142,7 +142,7 @@ describe("useNotifications composable", () => {
   describe("showConfictErrorNotificationWithRefreshBtn", () => {
     it("should call quasar notify with refresh button configuration", () => {
       const message = "Conflict error occurred";
-      
+
       notifications.showConfictErrorNotificationWithRefreshBtn(message);
 
       expect(mockNotify).toHaveBeenCalledWith({
@@ -171,7 +171,7 @@ describe("useNotifications composable", () => {
 
     it("should call window.location.reload when refresh button is clicked", () => {
       const message = "Conflict error occurred";
-      
+
       notifications.showConfictErrorNotificationWithRefreshBtn(message);
 
       // Get the handler function from the refresh button (first action)
@@ -191,7 +191,10 @@ describe("useNotifications composable", () => {
         classes: "custom-notification",
       };
 
-      notifications.showConfictErrorNotificationWithRefreshBtn(message, customOptions);
+      notifications.showConfictErrorNotificationWithRefreshBtn(
+        message,
+        customOptions,
+      );
 
       expect(mockNotify).toHaveBeenCalledWith({
         type: "negative",
@@ -223,7 +226,7 @@ describe("useNotifications composable", () => {
   describe("showAliasErrorForVisualization", () => {
     it("should call quasar notify with alias error configuration", () => {
       const message = "Alias error in visualization";
-      
+
       notifications.showAliasErrorForVisualization(message);
 
       expect(mockNotify).toHaveBeenCalledWith({
@@ -275,7 +278,7 @@ describe("useNotifications composable", () => {
   describe("showPositiveNotification", () => {
     it("should call quasar notify with positive configuration", () => {
       const message = "Operation completed successfully";
-      
+
       notifications.showPositiveNotification(message);
 
       expect(mockNotify).toHaveBeenCalledWith({
@@ -332,7 +335,7 @@ describe("useNotifications composable", () => {
   describe("showInfoNotification", () => {
     it("should call quasar notify with info configuration", () => {
       const message = "Information message";
-      
+
       notifications.showInfoNotification(message);
 
       expect(mockNotify).toHaveBeenCalledWith({
@@ -393,7 +396,9 @@ describe("useNotifications composable", () => {
       expect(composable.showErrorNotification).toBeTypeOf("function");
       expect(composable.showPositiveNotification).toBeTypeOf("function");
       expect(composable.showInfoNotification).toBeTypeOf("function");
-      expect(composable.showConfictErrorNotificationWithRefreshBtn).toBeTypeOf("function");
+      expect(composable.showConfictErrorNotificationWithRefreshBtn).toBeTypeOf(
+        "function",
+      );
       expect(composable.showAliasErrorForVisualization).toBeTypeOf("function");
     });
 
@@ -411,49 +416,50 @@ describe("useNotifications composable", () => {
   describe("edge cases", () => {
     it("should handle long messages gracefully", () => {
       const longMessage = "A".repeat(1000);
-      
+
       notifications.showErrorNotification(longMessage);
 
       expect(mockNotify).toHaveBeenCalledWith(
         expect.objectContaining({
           message: longMessage,
-        })
+        }),
       );
     });
 
     it("should handle special characters in messages", () => {
-      const messageWithSpecialChars = "Error: <script>alert('test')</script> & other symbols 🚨";
-      
+      const messageWithSpecialChars =
+        "Error: <script>alert('test')</script> & other symbols 🚨";
+
       notifications.showInfoNotification(messageWithSpecialChars);
 
       expect(mockNotify).toHaveBeenCalledWith(
         expect.objectContaining({
           message: messageWithSpecialChars,
-        })
+        }),
       );
     });
 
     it("should handle null message gracefully", () => {
       const nullMessage = null as any;
-      
+
       notifications.showErrorNotification(nullMessage);
 
       expect(mockNotify).toHaveBeenCalledWith(
         expect.objectContaining({
           message: nullMessage,
-        })
+        }),
       );
     });
 
     it("should handle undefined message gracefully", () => {
       const undefinedMessage = undefined as any;
-      
+
       notifications.showPositiveNotification(undefinedMessage);
 
       expect(mockNotify).toHaveBeenCalledWith(
         expect.objectContaining({
           message: undefinedMessage,
-        })
+        }),
       );
     });
   });
@@ -470,9 +476,15 @@ describe("useNotifications composable", () => {
 
       // Each call should have actions with handlers
       expect(mockNotify).toHaveBeenCalledTimes(4);
-      
+
       mockNotify.mock.calls.forEach(([config]) => {
-        expect(config.actions).toHaveLength(config.type === "negative" && config.timeout === 0 && config.actions.length === 2 ? 2 : 1);
+        expect(config.actions).toHaveLength(
+          config.type === "negative" &&
+            config.timeout === 0 &&
+            config.actions.length === 2
+            ? 2
+            : 1,
+        );
         config.actions.forEach((action: any) => {
           expect(action.handler).toBeTypeOf("function");
         });

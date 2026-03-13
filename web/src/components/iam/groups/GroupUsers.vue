@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="11px"
                 class="q-px-md visual-selection-btn"
                 @click="updateUserTable(visual.value)"
-                style="height: 30px;"
+                style="height: 30px"
               >
                 {{ visual.label }}</q-btn
               >
@@ -70,19 +70,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           placeholder="Search User"
         >
           <template #prepend>
-            <q-icon name="search" class="cursor-pointer o2-search-input-icon"/>
+            <q-icon name="search" class="cursor-pointer o2-search-input-icon" />
           </template>
         </q-input>
       </div>
 
-      <div
-          class="q-mx-sm current-organization"
-        >
+      <div class="q-mx-sm current-organization">
         <q-select
           v-if="
             store.state.selectedOrganization.identifier ===
-              store.state.zoConfig.meta_org &&
-            usersDisplay == 'all'
+              store.state.zoConfig.meta_org && usersDisplay == 'all'
           "
           v-model="selectedOrg"
           borderless
@@ -97,10 +94,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           placeholder="Select Organization"
           virtual-scroll
         />
-
-        </div>
+      </div>
     </div>
-    <div data-test="iam-users-selection-table" style="height: calc(100vh - 250px);" class="card-container">
+    <div
+      data-test="iam-users-selection-table"
+      style="height: calc(100vh - 250px)"
+      class="card-container"
+    >
       <template v-if="rows.length">
         <app-table
           :rows="visibleRows"
@@ -114,7 +114,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           :title="t('iam.users')"
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          :tableStyle="hasVisibleRows ? 'height: calc(100vh - 250px); overflow-y: auto;' : ''"
+          :tableStyle="
+            hasVisibleRows
+              ? 'height: calc(100vh - 250px); overflow-y: auto;'
+              : ''
+          "
           :hideTopPagination="true"
           :showBottomPaginationWithTitle="true"
         >
@@ -144,9 +148,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :offset="[10, 0]"
                   max-width="300px"
                 >
-                  <div style="font-size: 12px; line-height: 1.5;">
+                  <div style="font-size: 12px; line-height: 1.5">
                     <strong>{{ t("iam.externalUserWarningTitle") }}</strong>
-                    <div class="q-mt-xs">{{ t("iam.externalUserWarningMessage") }}</div>
+                    <div class="q-mt-xs">
+                      {{ t("iam.externalUserWarningMessage") }}
+                    </div>
                   </div>
                 </q-tooltip>
               </q-icon>
@@ -224,7 +230,7 @@ const filterOrganizations = (val: string, update: (fn: () => void) => void) => {
   update(() => {
     const needle = val.toLowerCase();
     orgList.value = orgOptions.value.filter((org) =>
-      org.label.toLowerCase().includes(needle)
+      org.label.toLowerCase().includes(needle),
     );
   });
 };
@@ -238,8 +244,6 @@ const groupUsersMap = ref(new Set());
 
 const { usersState } = usePermissions();
 
-
-
 const columns = computed(() => {
   const baseColumns = [
     {
@@ -250,7 +254,7 @@ const columns = computed(() => {
       sortable: false,
       slot: true,
       slotName: "select",
-      style: "width: 67px"
+      style: "width: 67px",
     },
     {
       name: "email",
@@ -264,7 +268,10 @@ const columns = computed(() => {
   ];
 
   // Add "Organizations" column only if the selected organization is "meta"
-  if (store.state.selectedOrganization.identifier === store.state.zoConfig.meta_org) {
+  if (
+    store.state.selectedOrganization.identifier ===
+    store.state.zoConfig.meta_org
+  ) {
     baseColumns.push({
       name: "organization",
       field: "org",
@@ -277,8 +284,7 @@ const columns = computed(() => {
   return baseColumns;
 });
 
-
-onBeforeMount(async () => {  
+onBeforeMount(async () => {
   groupUsersMap.value = new Set(props.groupUsers);
   await getchOrgUsers();
   updateUserTable(usersDisplay.value);
@@ -297,14 +303,13 @@ onBeforeMount(async () => {
     }));
 
     // Sort the organization options alphabetically by label
-    otherOrgOptions.sort((a:any, b:any) => a.label.localeCompare(b.label));
+    otherOrgOptions.sort((a: any, b: any) => a.label.localeCompare(b.label));
 
     // Prepend "All" option to the sorted list
     orgOptions.value = [{ label: "All", value: "all" }, ...otherOrgOptions];
   }
   selectedOrg.value = orgOptions.value[0]; // Default to "All"
 });
-
 
 watch(
   () => props.groupUsers,
@@ -317,7 +322,7 @@ watch(
   },
   {
     deep: true,
-  }
+  },
 );
 
 const updateUserTable = async (value: string) => {
@@ -356,7 +361,8 @@ const getchOrgUsers = async () => {
   hasFetchedOrgUsers.value = true;
   return new Promise(async (resolve) => {
     const data: any = await usersState.getOrgUsers(
-      store.state.selectedOrganization.identifier , { list_all: true }
+      store.state.selectedOrganization.identifier,
+      { list_all: true },
     );
 
     usersState.users = cloneDeep(
@@ -365,11 +371,16 @@ const getchOrgUsers = async () => {
           email: user.email,
           "#": index + 1,
           isInGroup: groupUsersMap.value.has(user.email),
-          org: user.orgs?.length > 0 ? user.orgs.map((org:{ org_name: string }) => org.org_name).join(", ") : "", // Set default "N/A" for users with no orgs
+          org:
+            user.orgs?.length > 0
+              ? user.orgs
+                  .map((org: { org_name: string }) => org.org_name)
+                  .join(", ")
+              : "", // Set default "N/A" for users with no orgs
           role: user.role,
-          is_external: user.is_external || false
+          is_external: user.is_external || false,
         };
-      })
+      }),
     );
 
     users.value = cloneDeep(usersState.users).map(
@@ -380,9 +391,9 @@ const getchOrgUsers = async () => {
           isInGroup: groupUsersMap.value.has(user.email),
           org: user.org,
           role: user.role,
-          is_external: user.is_external || false
+          is_external: user.is_external || false,
         };
-      }
+      },
     );
     resolve(true);
   });

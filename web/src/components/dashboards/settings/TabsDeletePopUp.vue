@@ -38,7 +38,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- only show if there are panels in the tab -->
       <div
-        v-if="dashboardData.tabs.find((tab: any) => tab.tabId === tabId)?.panels?.length"
+        v-if="
+          dashboardData.tabs.find((tab: any) => tab.tabId === tabId)?.panels
+            ?.length
+        "
         style="padding: 10px"
         data-test="dashboard-tab-delete-tab-panels-container"
       >
@@ -57,7 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="selectedTabToMovePanels"
                 :options="moveTabOptions"
                 data-test="dashboard-tab-delete-tab-panels-move-select"
-               borderless hide-bottom-space/>
+                borderless
+                hide-bottom-space
+              />
             </div>
           </div>
           <q-radio

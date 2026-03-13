@@ -114,9 +114,9 @@ describe("AlertHistory.vue", () => {
       expect(wrapper.find('[data-test="alert-history-page"]').exists()).toBe(
         true,
       );
-      expect(wrapper.find('[data-test="alert-history-back-btn"]').exists()).toBe(
-        true,
-      );
+      expect(
+        wrapper.find('[data-test="alert-history-back-btn"]').exists(),
+      ).toBe(true);
       expect(wrapper.find('[data-test="alerts-history-title"]').exists()).toBe(
         true,
       );
@@ -178,9 +178,9 @@ describe("AlertHistory.vue", () => {
   describe("Date Time Picker", () => {
     it("should have date time picker component", async () => {
       await mountComponent();
-      expect(wrapper.find('[data-test="alert-history-date-picker"]').exists()).toBe(
-        true,
-      );
+      expect(
+        wrapper.find('[data-test="alert-history-date-picker"]').exists(),
+      ).toBe(true);
     });
 
     it("should call fetchAlertHistory when date changes", async () => {
@@ -202,9 +202,9 @@ describe("AlertHistory.vue", () => {
   describe("Search Functionality", () => {
     it("should have search select dropdown", async () => {
       await mountComponent();
-      expect(wrapper.find('[data-test="alert-history-search-select"]').exists()).toBe(
-        true,
-      );
+      expect(
+        wrapper.find('[data-test="alert-history-search-select"]').exists(),
+      ).toBe(true);
     });
 
     it("should filter alerts when typing in search", async () => {
@@ -217,16 +217,18 @@ describe("AlertHistory.vue", () => {
 
     it("should have manual search button", async () => {
       await mountComponent();
-      expect(wrapper.find('[data-test="alert-history-manual-search-btn"]').exists()).toBe(
-        true,
-      );
+      expect(
+        wrapper.find('[data-test="alert-history-manual-search-btn"]').exists(),
+      ).toBe(true);
     });
 
     it("should trigger search when manual search button is clicked", async () => {
       await mountComponent();
       const getHistorySpy = vi.spyOn(alertsService, "getHistory");
 
-      const searchBtn = wrapper.find('[data-test="alert-history-manual-search-btn"]');
+      const searchBtn = wrapper.find(
+        '[data-test="alert-history-manual-search-btn"]',
+      );
       await searchBtn.trigger("click");
       await flushPromises();
 
@@ -237,16 +239,18 @@ describe("AlertHistory.vue", () => {
   describe("Refresh Functionality", () => {
     it("should have refresh button", async () => {
       await mountComponent();
-      expect(wrapper.find('[data-test="alert-history-refresh-btn"]').exists()).toBe(
-        true,
-      );
+      expect(
+        wrapper.find('[data-test="alert-history-refresh-btn"]').exists(),
+      ).toBe(true);
     });
 
     it("should refresh data when refresh button is clicked", async () => {
       await mountComponent();
       const getHistorySpy = vi.spyOn(alertsService, "getHistory");
 
-      const refreshBtn = wrapper.find('[data-test="alert-history-refresh-btn"]');
+      const refreshBtn = wrapper.find(
+        '[data-test="alert-history-refresh-btn"]',
+      );
       await refreshBtn.trigger("click");
       await flushPromises();
 
@@ -259,7 +263,9 @@ describe("AlertHistory.vue", () => {
       await mountComponent();
       await flushPromises();
 
-      const viewDetailsButtons = wrapper.findAll('[data-test="alert-history-view-details"]');
+      const viewDetailsButtons = wrapper.findAll(
+        '[data-test="alert-history-view-details"]',
+      );
       expect(viewDetailsButtons.length).toBeGreaterThan(0);
     });
 
@@ -267,7 +273,9 @@ describe("AlertHistory.vue", () => {
       await mountComponent();
       await flushPromises();
 
-      const viewDetailsBtn = wrapper.find('[data-test="alert-history-view-details"]');
+      const viewDetailsBtn = wrapper.find(
+        '[data-test="alert-history-view-details"]',
+      );
       await viewDetailsBtn.trigger("click");
       await flushPromises();
 

@@ -6,7 +6,7 @@ import "./usePanelCache";
 // Simple mock implementation for IndexedDB
 const mockData = new Map<string, any>();
 let shouldThrowError = false;
-let errorType = '';
+let errorType = "";
 
 const createMockRequest = (result: any = null) => ({
   result,
@@ -31,7 +31,7 @@ const mockObjectStore = {
     });
     return request;
   },
-  
+
   get: (key: string) => {
     const value = shouldThrowError ? undefined : mockData.get(key);
     const request = createMockRequest(value);
@@ -44,7 +44,7 @@ const mockObjectStore = {
     });
     return request;
   },
-  
+
   getAll: () => {
     const values = shouldThrowError ? [] : Array.from(mockData.values());
     const request = createMockRequest(values);
@@ -57,7 +57,7 @@ const mockObjectStore = {
     });
     return request;
   },
-  
+
   clear: () => {
     const request = createMockRequest();
     if (!shouldThrowError) {
@@ -72,7 +72,7 @@ const mockObjectStore = {
     });
     return request;
   },
-  
+
   createIndex: () => ({}),
 };
 
@@ -89,7 +89,7 @@ const mockDatabase = {
 };
 
 // Mock global indexedDB
-Object.defineProperty(global, 'indexedDB', {
+Object.defineProperty(global, "indexedDB", {
   value: {
     open: () => {
       const request = createMockRequest(mockDatabase);
@@ -104,7 +104,7 @@ Object.defineProperty(global, 'indexedDB', {
     },
   },
   writable: true,
-  configurable: true
+  configurable: true,
 });
 
 describe("usePanelCache", () => {
@@ -114,7 +114,7 @@ describe("usePanelCache", () => {
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     mockData.clear();
     shouldThrowError = false;
-    errorType = '';
+    errorType = "";
     vi.clearAllMocks();
   });
 
@@ -127,7 +127,7 @@ describe("usePanelCache", () => {
   describe("when required parameters are missing", () => {
     it("should return no-op functions when folderId is missing", () => {
       const cache = usePanelCache("", "dashboard1", "panel1");
-      
+
       expect(cache.savePanelCache).toBeDefined();
       expect(cache.getPanelCache).toBeDefined();
       expect(typeof cache.savePanelCache).toBe("function");
@@ -136,14 +136,14 @@ describe("usePanelCache", () => {
 
     it("should return no-op functions when dashboardId is missing", () => {
       const cache = usePanelCache("folder1", "", "panel1");
-      
+
       expect(cache.savePanelCache).toBeDefined();
       expect(cache.getPanelCache).toBeDefined();
     });
 
     it("should return no-op functions when panelId is missing", () => {
       const cache = usePanelCache("folder1", "dashboard1", "");
-      
+
       expect(cache.savePanelCache).toBeDefined();
       expect(cache.getPanelCache).toBeDefined();
     });
@@ -151,15 +151,17 @@ describe("usePanelCache", () => {
     it("should return null from getPanelCache when parameters are missing", async () => {
       const cache = usePanelCache("", "dashboard1", "panel1");
       const result = await cache.getPanelCache();
-      
+
       expect(result).toBeNull();
     });
 
     it("should do nothing when calling savePanelCache with missing parameters", async () => {
       const cache = usePanelCache("", "dashboard1", "panel1");
-      
+
       // Should not throw
-      await expect(cache.savePanelCache("key", "data", "range")).resolves.toBeUndefined();
+      await expect(
+        cache.savePanelCache("key", "data", "range"),
+      ).resolves.toBeUndefined();
     });
 
     it("should handle all combinations of missing parameters", async () => {
@@ -177,8 +179,10 @@ describe("usePanelCache", () => {
         const cache = usePanelCache(f, d, p);
         const result = await cache.getPanelCache();
         expect(result).toBeNull();
-        
-        await expect(cache.savePanelCache("key", "data", "range")).resolves.toBeUndefined();
+
+        await expect(
+          cache.savePanelCache("key", "data", "range"),
+        ).resolves.toBeUndefined();
       }
     });
   });
@@ -186,7 +190,7 @@ describe("usePanelCache", () => {
   describe("when all parameters are provided", () => {
     it("should create usePanelCache with correct functions", () => {
       const cache = usePanelCache("folder1", "dashboard1", "panel1");
-      
+
       expect(cache.savePanelCache).toBeDefined();
       expect(cache.getPanelCache).toBeDefined();
       expect(typeof cache.savePanelCache).toBe("function");
@@ -214,7 +218,7 @@ describe("usePanelCache", () => {
     it("should return null when no cache data exists", async () => {
       const cache = usePanelCache("folder1", "dashboard1", "panel1");
       const result = await cache.getPanelCache();
-      
+
       expect(result).toBeNull();
     });
 
@@ -262,7 +266,7 @@ describe("usePanelCache", () => {
 
     it("should overwrite existing cache data", async () => {
       const cache = usePanelCache("folder1", "dashboard1", "panel1");
-      
+
       await cache.savePanelCache("key1", { value: 1 }, {});
       await cache.savePanelCache("key2", { value: 2 }, {});
 
@@ -275,7 +279,7 @@ describe("usePanelCache", () => {
   describe("error handling", () => {
     it("should handle IndexedDB initialization errors", async () => {
       shouldThrowError = true;
-      errorType = 'init';
+      errorType = "init";
 
       const cache = usePanelCache("folder1", "dashboard1", "panel1");
       const result = await cache.getPanelCache();
@@ -283,36 +287,36 @@ describe("usePanelCache", () => {
       expect(result).toBeNull();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         "Error getting panel cache:",
-        expect.any(Error)
+        expect.any(Error),
       );
     });
 
     it("should handle save errors gracefully", async () => {
       const cache = usePanelCache("folder1", "dashboard1", "panel1");
-      
+
       shouldThrowError = true;
-      errorType = 'save';
-      
+      errorType = "save";
+
       await cache.savePanelCache("key", "data", "range");
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         "Error saving panel cache:",
-        expect.any(Error)
+        expect.any(Error),
       );
     });
 
     it("should handle get errors gracefully", async () => {
       const cache = usePanelCache("folder1", "dashboard1", "panel1");
-      
+
       shouldThrowError = true;
-      errorType = 'get';
-      
+      errorType = "get";
+
       const result = await cache.getPanelCache();
 
       expect(result).toBeNull();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         "Error getting panel cache:",
-        expect.any(Error)
+        expect.any(Error),
       );
     });
   });
@@ -343,12 +347,13 @@ describe("usePanelCache", () => {
             request.onsuccess = () => resolve(request.result);
             request.onerror = () => reject(request.error);
           });
-          
+
           const cache: any = {};
           (allRecords as any[]).forEach((record: any) => {
             const [folderId, dashboardId, panelId] = record.id.split(":");
             if (!cache[folderId]) cache[folderId] = {};
-            if (!cache[folderId][dashboardId]) cache[folderId][dashboardId] = {};
+            if (!cache[folderId][dashboardId])
+              cache[folderId][dashboardId] = {};
             cache[folderId][dashboardId][panelId] = {
               key: record.key,
               value: record.value,
@@ -400,31 +405,31 @@ describe("usePanelCache", () => {
 
     it("should handle clear cache errors", async () => {
       shouldThrowError = true;
-      errorType = 'clear';
+      errorType = "clear";
 
       // The global function should catch and log the error, not rethrow
       await window._o2_removeDashboardCache();
-      
+
       // The function should have logged the error
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         "Error clearing dashboard cache:",
-        expect.any(Error)
+        expect.any(Error),
       );
     });
 
     it("should handle get all cache errors", async () => {
       shouldThrowError = true;
-      errorType = 'getAll';
+      errorType = "getAll";
 
       const result = await window._o2_getDashboardCache();
 
       // Function should return empty object on error
       expect(result).toEqual({});
-      
+
       // Function should have logged the error
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         "Error getting dashboard cache:",
-        expect.any(Error)
+        expect.any(Error),
       );
     });
   });
@@ -447,7 +452,7 @@ describe("usePanelCache", () => {
 
     it("should handle special characters in IDs", async () => {
       const cache = usePanelCache("folder:1", "dashboard:1", "panel:1");
-      
+
       await cache.savePanelCache("key", "data", {});
       const result = await cache.getPanelCache();
 
@@ -465,7 +470,7 @@ describe("usePanelCache", () => {
         object: {
           deep: {
             value: "test",
-            array: [null, null, true, false],  // undefined becomes null after JSON serialization
+            array: [null, null, true, false], // undefined becomes null after JSON serialization
           },
         },
       };
@@ -480,14 +485,14 @@ describe("usePanelCache", () => {
 
     it("should handle edge cases", async () => {
       const cache = usePanelCache("folder1", "dashboard1", "panel1");
-      
+
       // Test with undefined/null values
       await cache.savePanelCache(undefined, null, undefined);
       const result = await cache.getPanelCache();
 
       // When result is successful, it should have the stored data
       if (result) {
-        expect(result.key).toBe(null);  // JSON.parse(JSON.stringify(undefined)) = null
+        expect(result.key).toBe(null); // JSON.parse(JSON.stringify(undefined)) = null
         expect(result.value).toBe(null);
         expect(result.cacheTimeRange).toBe(null);
       } else {
@@ -503,14 +508,14 @@ describe("usePanelCache", () => {
       // The mock will exercise the database creation code
       const cache = usePanelCache("folder1", "dashboard1", "panel1");
       await cache.savePanelCache("test", "data", {});
-      
+
       expect(mockData.has("folder1:dashboard1:panel1")).toBe(true);
     });
 
     it("should handle database upgrade path", () => {
       // Test that the database upgrade handler is defined and works correctly
       const cache = usePanelCache("folder1", "dashboard1", "panel1");
-      
+
       // The upgrade path is automatically covered when the database is initialized
       // This test ensures the function is created and accessible
       expect(cache.savePanelCache).toBeDefined();

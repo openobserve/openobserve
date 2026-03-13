@@ -12,106 +12,140 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { describe, it, expect } from 'vitest';
-import { servicenowTemplate, servicenowConfig, servicenowDestinationType } from '@/utils/prebuilt-templates/servicenow';
+import { describe, it, expect } from "vitest";
+import {
+  servicenowTemplate,
+  servicenowConfig,
+  servicenowDestinationType,
+} from "@/utils/prebuilt-templates/servicenow";
 
-describe('servicenow template', () => {
-  describe('servicenowTemplate', () => {
-    it('has correct name', () => {
-      expect(servicenowTemplate.name).toBe('prebuilt_servicenow');
+describe("servicenow template", () => {
+  describe("servicenowTemplate", () => {
+    it("has correct name", () => {
+      expect(servicenowTemplate.name).toBe("prebuilt_servicenow");
     });
 
-    it('has type as http', () => {
-      expect(servicenowTemplate.type).toBe('http');
+    it("has type as http", () => {
+      expect(servicenowTemplate.type).toBe("http");
     });
 
-    it('is not default', () => {
+    it("is not default", () => {
       expect(servicenowTemplate.isDefault).toBe(false);
     });
 
-    it('has valid JSON body', () => {
+    it("has valid JSON body", () => {
       expect(() => JSON.parse(servicenowTemplate.body)).not.toThrow();
     });
 
-    it('body contains incident fields', () => {
+    it("body contains incident fields", () => {
       const body = JSON.parse(servicenowTemplate.body);
-      expect(body).toHaveProperty('short_description');
-      expect(body).toHaveProperty('description');
+      expect(body).toHaveProperty("short_description");
+      expect(body).toHaveProperty("description");
     });
   });
 
-  describe('servicenowConfig', () => {
-    it('references correct template name', () => {
-      expect(servicenowConfig.templateName).toBe('prebuilt_servicenow');
+  describe("servicenowConfig", () => {
+    it("references correct template name", () => {
+      expect(servicenowConfig.templateName).toBe("prebuilt_servicenow");
     });
 
-    it('has correct headers', () => {
-      expect(servicenowConfig.headers).toHaveProperty('Content-Type');
-      expect(servicenowConfig.headers['Content-Type']).toBe('application/json');
+    it("has correct headers", () => {
+      expect(servicenowConfig.headers).toHaveProperty("Content-Type");
+      expect(servicenowConfig.headers["Content-Type"]).toBe("application/json");
     });
 
-    it('uses POST method', () => {
-      expect(servicenowConfig.method).toBe('post');
+    it("uses POST method", () => {
+      expect(servicenowConfig.method).toBe("post");
     });
 
-    it('has URL validator', () => {
-      expect(typeof servicenowConfig.urlValidator).toBe('function');
+    it("has URL validator", () => {
+      expect(typeof servicenowConfig.urlValidator).toBe("function");
     });
 
-    it('validates ServiceNow URLs', () => {
-      expect(servicenowConfig.urlValidator('https://dev.service-now.com/api/now/table/incident')).toBe(true);
-      expect(servicenowConfig.urlValidator('https://example.com')).toBe(false);
-      expect(servicenowConfig.urlValidator('https://evil.service-now.com.attacker.com/api/now/table/incident')).toBe(false);
+    it("validates ServiceNow URLs", () => {
+      expect(
+        servicenowConfig.urlValidator(
+          "https://dev.service-now.com/api/now/table/incident",
+        ),
+      ).toBe(true);
+      expect(servicenowConfig.urlValidator("https://example.com")).toBe(false);
+      expect(
+        servicenowConfig.urlValidator(
+          "https://evil.service-now.com.attacker.com/api/now/table/incident",
+        ),
+      ).toBe(false);
     });
 
-    it('validates instanceUrl credential field', () => {
-      const instanceField = servicenowConfig.credentialFields.find(f => f.key === 'instanceUrl');
+    it("validates instanceUrl credential field", () => {
+      const instanceField = servicenowConfig.credentialFields.find(
+        (f) => f.key === "instanceUrl",
+      );
       expect(instanceField?.validator).toBeDefined();
 
       if (instanceField?.validator) {
         // Valid URLs
-        expect(instanceField.validator('https://dev.service-now.com/api/now/table/incident')).toBe(true);
-        expect(instanceField.validator('https://company.service-now.com/api/now/table/incident')).toBe(true);
+        expect(
+          instanceField.validator(
+            "https://dev.service-now.com/api/now/table/incident",
+          ),
+        ).toBe(true);
+        expect(
+          instanceField.validator(
+            "https://company.service-now.com/api/now/table/incident",
+          ),
+        ).toBe(true);
 
         // Invalid URLs
-        expect(instanceField.validator('https://example.com')).not.toBe(true);
-        expect(instanceField.validator('https://evil.service-now.com.attacker.com/api/now/table/incident')).not.toBe(true);
-        expect(instanceField.validator('https://service-now.com/wrong/path')).not.toBe(true);
+        expect(instanceField.validator("https://example.com")).not.toBe(true);
+        expect(
+          instanceField.validator(
+            "https://evil.service-now.com.attacker.com/api/now/table/incident",
+          ),
+        ).not.toBe(true);
+        expect(
+          instanceField.validator("https://service-now.com/wrong/path"),
+        ).not.toBe(true);
       }
     });
 
-    it('has instance URL field', () => {
-      const instanceField = servicenowConfig.credentialFields.find(f => f.key === 'instanceUrl');
+    it("has instance URL field", () => {
+      const instanceField = servicenowConfig.credentialFields.find(
+        (f) => f.key === "instanceUrl",
+      );
       expect(instanceField).toBeDefined();
       expect(instanceField?.required).toBe(true);
     });
 
-    it('has username field', () => {
-      const usernameField = servicenowConfig.credentialFields.find(f => f.key === 'username');
+    it("has username field", () => {
+      const usernameField = servicenowConfig.credentialFields.find(
+        (f) => f.key === "username",
+      );
       expect(usernameField).toBeDefined();
       expect(usernameField?.required).toBe(true);
-      expect(usernameField?.type).toBe('text');
+      expect(usernameField?.type).toBe("text");
     });
 
-    it('has password field', () => {
-      const passwordField = servicenowConfig.credentialFields.find(f => f.key === 'password');
+    it("has password field", () => {
+      const passwordField = servicenowConfig.credentialFields.find(
+        (f) => f.key === "password",
+      );
       expect(passwordField).toBeDefined();
       expect(passwordField?.required).toBe(true);
-      expect(passwordField?.type).toBe('password');
+      expect(passwordField?.type).toBe("password");
     });
   });
 
-  describe('servicenowDestinationType', () => {
-    it('has correct ID', () => {
-      expect(servicenowDestinationType.id).toBe('servicenow');
+  describe("servicenowDestinationType", () => {
+    it("has correct ID", () => {
+      expect(servicenowDestinationType.id).toBe("servicenow");
     });
 
-    it('has display name', () => {
-      expect(servicenowDestinationType.name).toBe('ServiceNow');
+    it("has display name", () => {
+      expect(servicenowDestinationType.name).toBe("ServiceNow");
     });
 
-    it('has correct category', () => {
-      expect(servicenowDestinationType.category).toBe('incident');
+    it("has correct category", () => {
+      expect(servicenowDestinationType.category).toBe("incident");
     });
   });
 });

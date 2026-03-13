@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { vrlLanguageDefinition, vrlThemeDefinition } from "./vrlLanguageDefinition";
+import {
+  vrlLanguageDefinition,
+  vrlThemeDefinition,
+} from "./vrlLanguageDefinition";
 import store from "../../test/unit/helpers/store";
 
 describe("vrlLanguageDefinition.ts", () => {
@@ -44,17 +47,17 @@ describe("vrlLanguageDefinition.ts", () => {
     it("should have all required top-level properties", () => {
       const requiredProps = [
         "defaultToken",
-        "ignoreCase", 
+        "ignoreCase",
         "tokenPostfix",
         "brackets",
         "regEx",
         "keywords",
         "symbols",
         "escapes",
-        "tokenizer"
+        "tokenizer",
       ];
-      
-      requiredProps.forEach(prop => {
+
+      requiredProps.forEach((prop) => {
         expect(vrlLanguageDefinition).toHaveProperty(prop);
       });
     });
@@ -71,7 +74,7 @@ describe("vrlLanguageDefinition.ts", () => {
 
     it("should have curly bracket definition", () => {
       const curlyBracket = vrlLanguageDefinition.brackets.find(
-        (b: any) => b.open === "{" && b.close === "}"
+        (b: any) => b.open === "{" && b.close === "}",
       );
       expect(curlyBracket).toBeDefined();
       expect(curlyBracket.token).toBe("delimiter.curly");
@@ -79,7 +82,7 @@ describe("vrlLanguageDefinition.ts", () => {
 
     it("should have square bracket definition", () => {
       const squareBracket = vrlLanguageDefinition.brackets.find(
-        (b: any) => b.open === "[" && b.close === "]"
+        (b: any) => b.open === "[" && b.close === "]",
       );
       expect(squareBracket).toBeDefined();
       expect(squareBracket.token).toBe("delimiter.square");
@@ -87,7 +90,7 @@ describe("vrlLanguageDefinition.ts", () => {
 
     it("should have parenthesis definition", () => {
       const parenthesis = vrlLanguageDefinition.brackets.find(
-        (b: any) => b.open === "(" && b.close === ")"
+        (b: any) => b.open === "(" && b.close === ")",
       );
       expect(parenthesis).toBeDefined();
       expect(parenthesis.token).toBe("delimiter.parenthesis");
@@ -112,19 +115,21 @@ describe("vrlLanguageDefinition.ts", () => {
 
     it("should have correct regEx pattern", () => {
       const expectedPattern = /\/(?!\/\/)(?:[^\/\\]|\\.)*\/[igm]*/;
-      expect(vrlLanguageDefinition.regEx.toString()).toBe(expectedPattern.toString());
+      expect(vrlLanguageDefinition.regEx.toString()).toBe(
+        expectedPattern.toString(),
+      );
     });
 
     it("should match valid regex patterns", () => {
       const testCases = ["/test/", "/test/g", "/test/ig", "/test/igm"];
-      testCases.forEach(testCase => {
+      testCases.forEach((testCase) => {
         expect(vrlLanguageDefinition.regEx.test(testCase)).toBe(true);
       });
     });
 
     it("should not match invalid regex patterns", () => {
       const testCases = ["test", "abc123"];
-      testCases.forEach(testCase => {
+      testCases.forEach((testCase) => {
         expect(vrlLanguageDefinition.regEx.test(testCase)).toBe(false);
       });
     });
@@ -141,13 +146,32 @@ describe("vrlLanguageDefinition.ts", () => {
 
     it("should contain essential VRL keywords", () => {
       const expectedKeywords = [
-        "abort", "as", "break", "continue", "else", "false", 
-        "for", "if", "impl", "in", "let", "loop", "null", 
-        "return", "self", "std", "then", "this", "true", 
-        "type", "until", "use", "while"
+        "abort",
+        "as",
+        "break",
+        "continue",
+        "else",
+        "false",
+        "for",
+        "if",
+        "impl",
+        "in",
+        "let",
+        "loop",
+        "null",
+        "return",
+        "self",
+        "std",
+        "then",
+        "this",
+        "true",
+        "type",
+        "until",
+        "use",
+        "while",
       ];
-      
-      expectedKeywords.forEach(keyword => {
+
+      expectedKeywords.forEach((keyword) => {
         expect(vrlLanguageDefinition.keywords).toContain(keyword);
       });
     });
@@ -177,7 +201,9 @@ describe("vrlLanguageDefinition.ts", () => {
 
     it("should have correct symbols pattern", () => {
       const expectedSymbols = /[=><!~?&%|+\-*\/\^\.,\:]+/;
-      expect(vrlLanguageDefinition.symbols.toString()).toBe(expectedSymbols.toString());
+      expect(vrlLanguageDefinition.symbols.toString()).toBe(
+        expectedSymbols.toString(),
+      );
     });
 
     it("should have escapes regex defined", () => {
@@ -185,15 +211,15 @@ describe("vrlLanguageDefinition.ts", () => {
     });
 
     it("should match valid escape sequences", () => {
-      const testCases = ["\\n", "\\t", "\\r", "\\\"", "\\'", "\\x1A", "\\u1234"];
-      testCases.forEach(testCase => {
+      const testCases = ["\\n", "\\t", "\\r", '\\"', "\\'", "\\x1A", "\\u1234"];
+      testCases.forEach((testCase) => {
         expect(vrlLanguageDefinition.escapes.test(testCase)).toBe(true);
       });
     });
 
     it("should match symbol patterns", () => {
       const testCases = ["=>", "!=", "<=", ">=", "&&", "||", "++", "--"];
-      testCases.forEach(testCase => {
+      testCases.forEach((testCase) => {
         expect(vrlLanguageDefinition.symbols.test(testCase)).toBe(true);
       });
     });
@@ -207,20 +233,36 @@ describe("vrlLanguageDefinition.ts", () => {
 
     it("should have all required tokenizer states", () => {
       const requiredStates = [
-        "root", "string", "herestring", "comment", "hereregexp", "function_arg"
+        "root",
+        "string",
+        "herestring",
+        "comment",
+        "hereregexp",
+        "function_arg",
       ];
-      
-      requiredStates.forEach(state => {
+
+      requiredStates.forEach((state) => {
         expect(vrlLanguageDefinition.tokenizer).toHaveProperty(state);
-        expect(Array.isArray(vrlLanguageDefinition.tokenizer[state])).toBe(true);
+        expect(Array.isArray(vrlLanguageDefinition.tokenizer[state])).toBe(
+          true,
+        );
       });
     });
 
     it("should have non-empty rule arrays for all states", () => {
-      const states = ["root", "string", "herestring", "comment", "hereregexp", "function_arg"];
-      
-      states.forEach(state => {
-        expect(vrlLanguageDefinition.tokenizer[state].length).toBeGreaterThan(0);
+      const states = [
+        "root",
+        "string",
+        "herestring",
+        "comment",
+        "hereregexp",
+        "function_arg",
+      ];
+
+      states.forEach((state) => {
+        expect(vrlLanguageDefinition.tokenizer[state].length).toBeGreaterThan(
+          0,
+        );
       });
     });
   });
@@ -228,40 +270,47 @@ describe("vrlLanguageDefinition.ts", () => {
   describe("vrlLanguageDefinition - Root Tokenizer Rules", () => {
     it("should have function invoke rules", () => {
       const rootRules = vrlLanguageDefinition.tokenizer.root;
-      const functionInvokeRule = rootRules.find((rule: any) => 
-        rule[0] instanceof RegExp && rule[0].toString().includes("([a-zA-Z_!]+)(\\!)(\\()")
+      const functionInvokeRule = rootRules.find(
+        (rule: any) =>
+          rule[0] instanceof RegExp &&
+          rule[0].toString().includes("([a-zA-Z_!]+)(\\!)(\\()"),
       );
       expect(functionInvokeRule).toBeDefined();
     });
 
     it("should have string literal rules", () => {
       const rootRules = vrlLanguageDefinition.tokenizer.root;
-      const stringRules = rootRules.filter((rule: any) => 
-        typeof rule[1] === "object" && rule[1].token === "string"
+      const stringRules = rootRules.filter(
+        (rule: any) =>
+          typeof rule[1] === "object" && rule[1].token === "string",
       );
       expect(stringRules.length).toBeGreaterThan(0);
     });
 
     it("should have comment rules", () => {
       const rootRules = vrlLanguageDefinition.tokenizer.root;
-      const commentRule = rootRules.find((rule: any) => 
-        rule[0] instanceof RegExp && rule[0].toString().includes("###")
+      const commentRule = rootRules.find(
+        (rule: any) =>
+          rule[0] instanceof RegExp && rule[0].toString().includes("###"),
       );
       expect(commentRule).toBeDefined();
     });
 
     it("should have number matching rules", () => {
       const rootRules = vrlLanguageDefinition.tokenizer.root;
-      const numberRules = rootRules.filter((rule: any) => 
-        typeof rule[1] === "string" && rule[1].startsWith("number")
+      const numberRules = rootRules.filter(
+        (rule: any) =>
+          typeof rule[1] === "string" && rule[1].startsWith("number"),
       );
       expect(numberRules.length).toBeGreaterThan(0);
     });
 
     it("should have field access rules", () => {
       const rootRules = vrlLanguageDefinition.tokenizer.root;
-      const fieldAccessRule = rootRules.find((rule: any) => 
-        rule[0] instanceof RegExp && rule[0].toString().includes("(\\.[^\\ \\=]+)")
+      const fieldAccessRule = rootRules.find(
+        (rule: any) =>
+          rule[0] instanceof RegExp &&
+          rule[0].toString().includes("(\\.[^\\ \\=]+)"),
       );
       expect(fieldAccessRule).toBeDefined();
     });
@@ -270,24 +319,28 @@ describe("vrlLanguageDefinition.ts", () => {
   describe("vrlLanguageDefinition - String Tokenizer Rules", () => {
     it("should have string content rule", () => {
       const stringRules = vrlLanguageDefinition.tokenizer.string;
-      const contentRule = stringRules.find((rule: any) => 
-        rule[0] instanceof RegExp && rule[1] === "string"
+      const contentRule = stringRules.find(
+        (rule: any) => rule[0] instanceof RegExp && rule[1] === "string",
       );
       expect(contentRule).toBeDefined();
     });
 
     it("should have escape sequence rule", () => {
       const stringRules = vrlLanguageDefinition.tokenizer.string;
-      const escapeRule = stringRules.find((rule: any) => 
-        rule[0] instanceof RegExp && rule[0].source === "@escapes" && rule[1] === "string.escape"
+      const escapeRule = stringRules.find(
+        (rule: any) =>
+          rule[0] instanceof RegExp &&
+          rule[0].source === "@escapes" &&
+          rule[1] === "string.escape",
       );
       expect(escapeRule).toBeDefined();
     });
 
     it("should have string interpolation rule", () => {
       const stringRules = vrlLanguageDefinition.tokenizer.string;
-      const interpolationRule = stringRules.find((rule: any) => 
-        rule[0] instanceof RegExp && rule[0].toString().includes("#{")
+      const interpolationRule = stringRules.find(
+        (rule: any) =>
+          rule[0] instanceof RegExp && rule[0].toString().includes("#{"),
       );
       expect(interpolationRule).toBeDefined();
     });
@@ -302,8 +355,11 @@ describe("vrlLanguageDefinition.ts", () => {
 
     it("should have comment end rule", () => {
       const commentRules = vrlLanguageDefinition.tokenizer.comment;
-      const endRule = commentRules.find((rule: any) => 
-        rule[0] instanceof RegExp && rule[0].source === "###" && rule[2] === "@pop"
+      const endRule = commentRules.find(
+        (rule: any) =>
+          rule[0] instanceof RegExp &&
+          rule[0].source === "###" &&
+          rule[2] === "@pop",
       );
       expect(endRule).toBeDefined();
     });
@@ -318,16 +374,19 @@ describe("vrlLanguageDefinition.ts", () => {
 
     it("should have nested function call rule", () => {
       const funcArgRules = vrlLanguageDefinition.tokenizer.function_arg;
-      const nestedRule = funcArgRules.find((rule: any) => 
-        rule[0] instanceof RegExp && rule[0].toString().includes("([a-zA-Z_!]+)\\(")
+      const nestedRule = funcArgRules.find(
+        (rule: any) =>
+          rule[0] instanceof RegExp &&
+          rule[0].toString().includes("([a-zA-Z_!]+)\\("),
       );
       expect(nestedRule).toBeDefined();
     });
 
     it("should have function end rule", () => {
       const funcArgRules = vrlLanguageDefinition.tokenizer.function_arg;
-      const endRule = funcArgRules.find((rule: any) => 
-        rule[0] instanceof RegExp && rule[0].toString().includes("\\)")
+      const endRule = funcArgRules.find(
+        (rule: any) =>
+          rule[0] instanceof RegExp && rule[0].toString().includes("\\)"),
       );
       expect(endRule).toBeDefined();
     });
@@ -349,7 +408,7 @@ describe("vrlLanguageDefinition.ts", () => {
 
     it("should have all required top-level properties", () => {
       const requiredProps = ["base", "inherit", "rules", "colors"];
-      requiredProps.forEach(prop => {
+      requiredProps.forEach((prop) => {
         expect(vrlThemeDefinition).toHaveProperty(prop);
       });
     });
@@ -365,46 +424,46 @@ describe("vrlLanguageDefinition.ts", () => {
     });
 
     it("should have background rule", () => {
-      const backgroundRule = vrlThemeDefinition.rules.find((rule: any) => 
-        rule.token === "" && rule.background === "ffffff"
+      const backgroundRule = vrlThemeDefinition.rules.find(
+        (rule: any) => rule.token === "" && rule.background === "ffffff",
       );
       expect(backgroundRule).toBeDefined();
     });
 
     it("should have comment styling rules", () => {
-      const commentRules = vrlThemeDefinition.rules.filter((rule: any) => 
-        rule.token.includes("comment")
+      const commentRules = vrlThemeDefinition.rules.filter((rule: any) =>
+        rule.token.includes("comment"),
       );
       expect(commentRules.length).toBeGreaterThan(0);
     });
 
     it("should have keyword styling rules", () => {
-      const keywordRule = vrlThemeDefinition.rules.find((rule: any) => 
-        rule.token === "keyword"
+      const keywordRule = vrlThemeDefinition.rules.find(
+        (rule: any) => rule.token === "keyword",
       );
       expect(keywordRule).toBeDefined();
       expect(keywordRule.foreground).toBe("d73a49");
     });
 
     it("should have string styling rules", () => {
-      const stringRule = vrlThemeDefinition.rules.find((rule: any) => 
-        rule.token === "string"
+      const stringRule = vrlThemeDefinition.rules.find(
+        (rule: any) => rule.token === "string",
       );
       expect(stringRule).toBeDefined();
       expect(stringRule.foreground).toBe("032f62");
     });
 
     it("should have entity styling rules", () => {
-      const entityRule = vrlThemeDefinition.rules.find((rule: any) => 
-        rule.token === "entity"
+      const entityRule = vrlThemeDefinition.rules.find(
+        (rule: any) => rule.token === "entity",
       );
       expect(entityRule).toBeDefined();
       expect(entityRule.foreground).toBe("6f42c1");
     });
 
     it("should have function invoke styling rules", () => {
-      const functionRules = vrlThemeDefinition.rules.filter((rule: any) => 
-        rule.token.includes("vrl-function-invokes")
+      const functionRules = vrlThemeDefinition.rules.filter((rule: any) =>
+        rule.token.includes("vrl-function-invokes"),
       );
       expect(functionRules.length).toBeGreaterThan(0);
     });
@@ -413,12 +472,12 @@ describe("vrlLanguageDefinition.ts", () => {
       vrlThemeDefinition.rules.forEach((rule: any) => {
         expect(rule).toHaveProperty("token");
         expect(typeof rule.token).toBe("string");
-        
+
         if (rule.foreground) {
           expect(typeof rule.foreground).toBe("string");
           expect(rule.foreground).toMatch(/^[0-9a-f]{6}$/i);
         }
-        
+
         if (rule.background) {
           expect(typeof rule.background).toBe("string");
           expect(rule.background).toMatch(/^[0-9a-f]{6}$/i);
@@ -444,23 +503,39 @@ describe("vrlLanguageDefinition.ts", () => {
     });
 
     it("should have selection colors", () => {
-      expect(vrlThemeDefinition.colors).toHaveProperty("editor.selectionBackground");
-      expect(vrlThemeDefinition.colors).toHaveProperty("editor.inactiveSelectionBackground");
+      expect(vrlThemeDefinition.colors).toHaveProperty(
+        "editor.selectionBackground",
+      );
+      expect(vrlThemeDefinition.colors).toHaveProperty(
+        "editor.inactiveSelectionBackground",
+      );
     });
 
     it("should have cursor color", () => {
-      expect(vrlThemeDefinition.colors).toHaveProperty("editorCursor.foreground");
-      expect(vrlThemeDefinition.colors["editorCursor.foreground"]).toBe("#24292e");
+      expect(vrlThemeDefinition.colors).toHaveProperty(
+        "editorCursor.foreground",
+      );
+      expect(vrlThemeDefinition.colors["editorCursor.foreground"]).toBe(
+        "#24292e",
+      );
     });
 
     it("should have whitespace color", () => {
-      expect(vrlThemeDefinition.colors).toHaveProperty("editorWhitespace.foreground");
-      expect(vrlThemeDefinition.colors["editorWhitespace.foreground"]).toBe("#959da5");
+      expect(vrlThemeDefinition.colors).toHaveProperty(
+        "editorWhitespace.foreground",
+      );
+      expect(vrlThemeDefinition.colors["editorWhitespace.foreground"]).toBe(
+        "#959da5",
+      );
     });
 
     it("should have indent guide colors", () => {
-      expect(vrlThemeDefinition.colors).toHaveProperty("editorIndentGuide.background");
-      expect(vrlThemeDefinition.colors).toHaveProperty("editorIndentGuide.activeBackground");
+      expect(vrlThemeDefinition.colors).toHaveProperty(
+        "editorIndentGuide.background",
+      );
+      expect(vrlThemeDefinition.colors).toHaveProperty(
+        "editorIndentGuide.activeBackground",
+      );
     });
 
     it("should have all color values in valid hex format", () => {
@@ -474,25 +549,34 @@ describe("vrlLanguageDefinition.ts", () => {
   describe("vrlLanguageDefinition - Advanced Tokenizer Features", () => {
     it("should handle regex patterns in different contexts", () => {
       const rootRules = vrlLanguageDefinition.tokenizer.root;
-      const regexRules = rootRules.filter((rule: any) => 
-        Array.isArray(rule) && rule.length >= 2 && 
-        (rule[1] === "regexp" || (typeof rule[1] === "object" && rule[1].token === "regexp"))
+      const regexRules = rootRules.filter(
+        (rule: any) =>
+          Array.isArray(rule) &&
+          rule.length >= 2 &&
+          (rule[1] === "regexp" ||
+            (typeof rule[1] === "object" && rule[1].token === "regexp")),
       );
       expect(regexRules.length).toBeGreaterThan(0);
     });
 
     it("should have proper bracket handling", () => {
       const rootRules = vrlLanguageDefinition.tokenizer.root;
-      const bracketRule = rootRules.find((rule: any) => 
-        rule[0] instanceof RegExp && rule[0].toString().includes("{}()") && rule[1] === "@brackets"
+      const bracketRule = rootRules.find(
+        (rule: any) =>
+          rule[0] instanceof RegExp &&
+          rule[0].toString().includes("{}()") &&
+          rule[1] === "@brackets",
       );
       expect(bracketRule).toBeDefined();
     });
 
     it("should have symbol delimiter handling", () => {
       const rootRules = vrlLanguageDefinition.tokenizer.root;
-      const symbolRule = rootRules.find((rule: any) => 
-        rule[0] instanceof RegExp && rule[0].source === "@symbols" && rule[1] === "delimiter"
+      const symbolRule = rootRules.find(
+        (rule: any) =>
+          rule[0] instanceof RegExp &&
+          rule[0].source === "@symbols" &&
+          rule[1] === "delimiter",
       );
       expect(symbolRule).toBeDefined();
     });
@@ -500,10 +584,13 @@ describe("vrlLanguageDefinition.ts", () => {
     it("should handle different number formats", () => {
       const rootRules = vrlLanguageDefinition.tokenizer.root;
       const numberFormats = [
-        "number.float", "number.hex", "number.octal", "number"
+        "number.float",
+        "number.hex",
+        "number.octal",
+        "number",
       ];
-      
-      numberFormats.forEach(format => {
+
+      numberFormats.forEach((format) => {
         const rule = rootRules.find((rule: any) => rule[1] === format);
         expect(rule).toBeDefined();
       });
@@ -513,32 +600,38 @@ describe("vrlLanguageDefinition.ts", () => {
   describe("vrlLanguageDefinition - String Handling", () => {
     it("should handle r-strings (raw strings)", () => {
       const rootRules = vrlLanguageDefinition.tokenizer.root;
-      const rstringRule = rootRules.find((rule: any) => 
-        rule[0] instanceof RegExp && rule[0].toString().includes("r'[^']+")
+      const rstringRule = rootRules.find(
+        (rule: any) =>
+          rule[0] instanceof RegExp && rule[0].toString().includes("r'[^']+"),
       );
       expect(rstringRule).toBeDefined();
     });
 
     it("should handle s-strings", () => {
       const rootRules = vrlLanguageDefinition.tokenizer.root;
-      const sstringRule = rootRules.find((rule: any) => 
-        rule[0] instanceof RegExp && rule[0].toString().includes("s'[^']+")
+      const sstringRule = rootRules.find(
+        (rule: any) =>
+          rule[0] instanceof RegExp && rule[0].toString().includes("s'[^']+"),
       );
       expect(sstringRule).toBeDefined();
     });
 
     it("should handle timestamp strings", () => {
       const rootRules = vrlLanguageDefinition.tokenizer.root;
-      const timestampRule = rootRules.find((rule: any) => 
-        rule[0] instanceof RegExp && rule[0].toString().includes("t'[^']+")
+      const timestampRule = rootRules.find(
+        (rule: any) =>
+          rule[0] instanceof RegExp && rule[0].toString().includes("t'[^']+"),
       );
       expect(timestampRule).toBeDefined();
     });
 
     it("should handle multiline strings", () => {
       const rootRules = vrlLanguageDefinition.tokenizer.root;
-      const multilineRules = rootRules.filter((rule: any) => 
-        rule[0] instanceof RegExp && (rule[0].source === '"""' || rule[0].source === "'''") && rule[1] === "string"
+      const multilineRules = rootRules.filter(
+        (rule: any) =>
+          rule[0] instanceof RegExp &&
+          (rule[0].source === '"""' || rule[0].source === "'''") &&
+          rule[1] === "string",
       );
       expect(multilineRules.length).toBe(2);
     });
@@ -546,29 +639,29 @@ describe("vrlLanguageDefinition.ts", () => {
 
   describe("vrlThemeDefinition - Markup and Special Tokens", () => {
     it("should have markup styling rules", () => {
-      const markupRules = vrlThemeDefinition.rules.filter((rule: any) => 
-        rule.token.startsWith("markup.")
+      const markupRules = vrlThemeDefinition.rules.filter((rule: any) =>
+        rule.token.startsWith("markup."),
       );
       expect(markupRules.length).toBeGreaterThan(5);
     });
 
     it("should have invalid token styling", () => {
-      const invalidRules = vrlThemeDefinition.rules.filter((rule: any) => 
-        rule.token.includes("invalid")
+      const invalidRules = vrlThemeDefinition.rules.filter((rule: any) =>
+        rule.token.includes("invalid"),
       );
       expect(invalidRules.length).toBeGreaterThan(0);
     });
 
     it("should have bracket highlighter rules", () => {
-      const bracketRules = vrlThemeDefinition.rules.filter((rule: any) => 
-        rule.token.includes("brackethighlighter")
+      const bracketRules = vrlThemeDefinition.rules.filter((rule: any) =>
+        rule.token.includes("brackethighlighter"),
       );
       expect(bracketRules.length).toBeGreaterThan(5);
     });
 
     it("should have support token styling", () => {
-      const supportRules = vrlThemeDefinition.rules.filter((rule: any) => 
-        rule.token.includes("support")
+      const supportRules = vrlThemeDefinition.rules.filter((rule: any) =>
+        rule.token.includes("support"),
       );
       expect(supportRules.length).toBeGreaterThan(0);
     });
@@ -589,11 +682,11 @@ describe("vrlLanguageDefinition.ts", () => {
 
     it("should maintain structure regardless of store state", () => {
       const originalTheme = store.state.theme;
-      
+
       store.state.theme = "custom";
       expect(vrlLanguageDefinition.keywords.length).toBeGreaterThan(0);
       expect(vrlThemeDefinition.rules.length).toBeGreaterThan(0);
-      
+
       store.state.theme = originalTheme;
     });
   });
@@ -608,7 +701,7 @@ describe("vrlLanguageDefinition.ts", () => {
 
     it("should have valid regex patterns in tokenizer", () => {
       const validateRegexInRules = (rules: any[]) => {
-        rules.forEach(rule => {
+        rules.forEach((rule) => {
           if (rule[0] instanceof RegExp) {
             expect(() => rule[0].test("")).not.toThrow();
           }
@@ -622,13 +715,13 @@ describe("vrlLanguageDefinition.ts", () => {
 
     it("should have consistent color format in theme", () => {
       const hexColorRegex = /^#[0-9a-f]{6}$/i;
-      Object.values(vrlThemeDefinition.colors).forEach(color => {
+      Object.values(vrlThemeDefinition.colors).forEach((color) => {
         expect(color).toMatch(hexColorRegex);
       });
     });
 
     it("should handle special characters in keywords", () => {
-      vrlLanguageDefinition.keywords.forEach(keyword => {
+      vrlLanguageDefinition.keywords.forEach((keyword) => {
         expect(typeof keyword).toBe("string");
         expect(keyword.length).toBeGreaterThan(0);
       });
@@ -636,7 +729,7 @@ describe("vrlLanguageDefinition.ts", () => {
 
     it("should have proper tokenizer state transitions", () => {
       const hasValidTransitions = (rules: any[]) => {
-        return rules.some(rule => {
+        return rules.some((rule) => {
           if (typeof rule[1] === "object" && rule[1].next) {
             return typeof rule[1].next === "string";
           }
@@ -644,8 +737,12 @@ describe("vrlLanguageDefinition.ts", () => {
         });
       };
 
-      expect(hasValidTransitions(vrlLanguageDefinition.tokenizer.root)).toBe(true);
-      expect(hasValidTransitions(vrlLanguageDefinition.tokenizer.string)).toBe(true);
+      expect(hasValidTransitions(vrlLanguageDefinition.tokenizer.root)).toBe(
+        true,
+      );
+      expect(hasValidTransitions(vrlLanguageDefinition.tokenizer.string)).toBe(
+        true,
+      );
     });
   });
 });

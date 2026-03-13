@@ -16,7 +16,7 @@
 import router from "src/router";
 import * as acorn from "acorn";
 import * as walk from "acorn-walk";
-import { ref } from 'vue';
+import { ref } from "vue";
 
 // Add at the top of the file
 export const panelIdToBeRefreshed = ref<string | null>(null);
@@ -30,11 +30,13 @@ export const panelIdToBeRefreshed = ref<string | null>(null);
  * @return {Object} - the options object for rendering the chart
  */
 
-
 export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
   return new Promise((resolve, reject) => {
     // Skip if this panel is not the one to be refreshed
-    if (panelIdToBeRefreshed.value && panelIdToBeRefreshed.value !== panelSchema.id) {
+    if (
+      panelIdToBeRefreshed.value &&
+      panelIdToBeRefreshed.value !== panelSchema.id
+    ) {
       return;
     }
 
@@ -153,15 +155,16 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
   </script>
     `;
 
-
-
     iframe.srcdoc = scriptContent;
 
     window.addEventListener("message", function handler(event) {
       if (event.source !== iframe.contentWindow) return;
 
       // Double check if this is still the panel to be refreshed
-      if (panelIdToBeRefreshed.value && panelIdToBeRefreshed.value !== panelSchema.id) {
+      if (
+        panelIdToBeRefreshed.value &&
+        panelIdToBeRefreshed.value !== panelSchema.id
+      ) {
         window.removeEventListener("message", handler);
         document.body.removeChild(iframe);
         return;
@@ -188,16 +191,14 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
       iframe?.contentWindow?.postMessage(
         {
           type: "execute",
-          code: userCode, 
+          code: userCode,
           data: JSON.stringify(searchQueryData),
         },
-        "*"
+        "*",
       );
     };
   });
 };
-
-
 
 const validateUserCode = (code: string): string | null => {
   try {
@@ -249,7 +250,8 @@ const validateUserCode = (code: string): string | null => {
           ) {
             const delay = node.arguments[1].value;
             if (delay < 100) {
-              errorMessage = "Use of 'setTimeout()' with delay < 100ms is not allowed.";
+              errorMessage =
+                "Use of 'setTimeout()' with delay < 100ms is not allowed.";
             }
           } else {
             errorMessage = "Invalid usage of 'setTimeout()'.";
@@ -260,7 +262,8 @@ const validateUserCode = (code: string): string | null => {
             node.arguments.length > 0 &&
             node.arguments[0].type === "CallExpression" &&
             node.arguments[0].callee.type === "Identifier" &&
-           ( node.arguments[0].callee.name === "eval" || node.arguments[0].callee.name === "Function")
+            (node.arguments[0].callee.name === "eval" ||
+              node.arguments[0].callee.name === "Function")
           ) {
             errorMessage = `Use of ${node.arguments[0].callee.name} inside 'setTimeout()' is not allowed.`;
           }
@@ -312,7 +315,10 @@ const validateUserCode = (code: string): string | null => {
         }
       },
       NewExpression(node: acorn.Node & { callee: any }) {
-        if (node.callee.type === "Identifier" && node.callee.name === "Function") {
+        if (
+          node.callee.type === "Identifier" &&
+          node.callee.name === "Function"
+        ) {
           errorMessage = "Use of 'new Function()' is not allowed.";
         }
       },
@@ -322,4 +328,4 @@ const validateUserCode = (code: string): string | null => {
   } catch (error) {
     return "Invalid JavaScript syntax.";
   }
-};
+};

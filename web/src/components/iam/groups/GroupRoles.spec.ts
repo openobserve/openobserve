@@ -26,7 +26,9 @@ installQuasar({
 });
 
 vi.mock("@/services/iam", () => ({
-  getRoles: vi.fn(() => Promise.resolve({ data: ["admin", "user", "developer"] })),
+  getRoles: vi.fn(() =>
+    Promise.resolve({ data: ["admin", "user", "developer"] }),
+  ),
 }));
 
 vi.mock("@/composables/iam/usePermissions", () => ({
@@ -57,7 +59,9 @@ describe("GroupRoles Component", () => {
       groupsState: {},
     };
 
-    vi.mocked(await import("@/composables/iam/usePermissions")).default.mockReturnValue(mockPermissions);
+    vi.mocked(
+      await import("@/composables/iam/usePermissions"),
+    ).default.mockReturnValue(mockPermissions);
 
     wrapper = mount(GroupRoles, {
       global: {
@@ -78,19 +82,27 @@ describe("GroupRoles Component", () => {
   describe("Component Mounting", () => {
     it("renders the component correctly", () => {
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="iam-roles-selection-section"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="iam-roles-selection-section"]').exists(),
+      ).toBe(true);
     });
 
     it("renders filter options", () => {
-      const showToggle = wrapper.find('[data-test="iam-roles-selection-show-toggle"]');
-      const showText = wrapper.find('[data-test="iam-roles-selection-show-text"]');
-      
+      const showToggle = wrapper.find(
+        '[data-test="iam-roles-selection-show-toggle"]',
+      );
+      const showText = wrapper.find(
+        '[data-test="iam-roles-selection-show-text"]',
+      );
+
       expect(showToggle.exists()).toBe(true);
       expect(showText.text()).toBe("Show");
     });
 
     it("renders search input", () => {
-      const searchInput = wrapper.find('[data-test="iam-roles-selection-search-input"]');
+      const searchInput = wrapper.find(
+        '[data-test="iam-roles-selection-search-input"]',
+      );
       expect(searchInput.exists()).toBe(true);
     });
 
@@ -113,17 +125,23 @@ describe("GroupRoles Component", () => {
     });
 
     it("renders filter buttons for each option", () => {
-      const allButton = wrapper.find('[data-test="iam-roles-selection-show-all-btn"]');
-      const selectedButton = wrapper.find('[data-test="iam-roles-selection-show-selected-btn"]');
-      
+      const allButton = wrapper.find(
+        '[data-test="iam-roles-selection-show-all-btn"]',
+      );
+      const selectedButton = wrapper.find(
+        '[data-test="iam-roles-selection-show-selected-btn"]',
+      );
+
       expect(allButton.exists()).toBe(true);
       expect(selectedButton.exists()).toBe(true);
     });
 
     it("switches display option when button is clicked", async () => {
-      const allButton = wrapper.find('[data-test="iam-roles-selection-show-all-btn"]');
+      const allButton = wrapper.find(
+        '[data-test="iam-roles-selection-show-all-btn"]',
+      );
       await allButton.trigger("click");
-      
+
       expect(wrapper.vm.usersDisplay).toBe("all");
     });
   });
@@ -132,7 +150,7 @@ describe("GroupRoles Component", () => {
     it("updates search key when typing", async () => {
       const searchInput = wrapper.find('input[type="text"]');
       await searchInput.setValue("admin");
-      
+
       expect(wrapper.vm.userSearchKey).toBe("admin");
     });
 
@@ -154,10 +172,7 @@ describe("GroupRoles Component", () => {
     });
 
     it("filters roles case-insensitively", () => {
-      const testRoles = [
-        { role_name: "Admin" },
-        { role_name: "User" },
-      ];
+      const testRoles = [{ role_name: "Admin" }, { role_name: "User" }];
 
       const filteredResults = wrapper.vm.filterRoles(testRoles, "ADMIN");
       expect(filteredResults).toHaveLength(1);
@@ -165,10 +180,7 @@ describe("GroupRoles Component", () => {
     });
 
     it("returns all roles when search term is empty", () => {
-      const testRoles = [
-        { role_name: "admin" },
-        { role_name: "user" },
-      ];
+      const testRoles = [{ role_name: "admin" }, { role_name: "user" }];
 
       const filteredResults = wrapper.vm.filterRoles(testRoles, "");
       expect(filteredResults).toEqual(testRoles);
@@ -183,7 +195,9 @@ describe("GroupRoles Component", () => {
 
       await wrapper.vm.getchOrgUsers();
 
-      expect(getRoles).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);
+      expect(getRoles).toHaveBeenCalledWith(
+        store.state.selectedOrganization.identifier,
+      );
     });
 
     it("transforms roles data correctly", async () => {
@@ -214,9 +228,15 @@ describe("GroupRoles Component", () => {
       // groupRoles prop contains ["admin", "user"]
       await wrapper.vm.getchOrgUsers();
 
-      const adminRole = wrapper.vm.users.find((user: any) => user.role_name === "admin");
-      const userRole = wrapper.vm.users.find((user: any) => user.role_name === "user");
-      const developerRole = wrapper.vm.users.find((user: any) => user.role_name === "developer");
+      const adminRole = wrapper.vm.users.find(
+        (user: any) => user.role_name === "admin",
+      );
+      const userRole = wrapper.vm.users.find(
+        (user: any) => user.role_name === "user",
+      );
+      const developerRole = wrapper.vm.users.find(
+        (user: any) => user.role_name === "developer",
+      );
 
       expect(adminRole.isInGroup).toBe(true);
       expect(userRole.isInGroup).toBe(true);
@@ -227,7 +247,7 @@ describe("GroupRoles Component", () => {
   describe("Table Structure", () => {
     it("has correct column structure", () => {
       expect(wrapper.vm.columns).toHaveLength(2);
-      
+
       const selectColumn = wrapper.vm.columns[0];
       expect(selectColumn.name).toBe("select");
       expect(selectColumn.slot).toBe(true);
@@ -256,7 +276,9 @@ describe("GroupRoles Component", () => {
       wrapper.vm.rows = [];
       await wrapper.vm.$nextTick();
 
-      const noUsersText = wrapper.find('[data-test="iam-roles-selection-table-no-users-text"]');
+      const noUsersText = wrapper.find(
+        '[data-test="iam-roles-selection-table-no-users-text"]',
+      );
       expect(noUsersText.exists()).toBe(true);
       expect(noUsersText.text()).toBe("No users added");
     });
@@ -264,14 +286,16 @@ describe("GroupRoles Component", () => {
 
   describe("Role Selection", () => {
     it("renders checkboxes for role selection", () => {
-      const checkbox = wrapper.find('[data-test="iam-roles-selection-table-body-row-test-role-checkbox"]');
+      const checkbox = wrapper.find(
+        '[data-test="iam-roles-selection-table-body-row-test-role-checkbox"]',
+      );
       expect(checkbox.exists()).toBe(true);
     });
 
     it("handles role selection toggle", async () => {
       const addedRoles = new Set();
       const removedRoles = new Set();
-      
+
       await wrapper.setProps({
         groupRoles: ["admin"],
         activeTab: "roles",
@@ -280,18 +304,18 @@ describe("GroupRoles Component", () => {
       });
 
       const testRole = { role_name: "user", isInGroup: false };
-      
+
       // Simulate checking the checkbox (selecting the role)
       testRole.isInGroup = true;
       wrapper.vm.toggleUserSelection(testRole);
-      
+
       expect(addedRoles.has("user")).toBe(true);
     });
 
     it("adds role to addedRoles when selecting unassigned role", async () => {
       const addedRoles = new Set();
       const removedRoles = new Set();
-      
+
       await wrapper.setProps({
         groupRoles: [],
         activeTab: "roles",
@@ -301,16 +325,16 @@ describe("GroupRoles Component", () => {
 
       wrapper.vm.groupUsersMap = new Set([]);
       const testRole = { role_name: "admin", isInGroup: true };
-      
+
       wrapper.vm.toggleUserSelection(testRole);
-      
+
       expect(addedRoles.has("admin")).toBe(true);
     });
 
     it("adds role to removedRoles when deselecting assigned role", async () => {
       const addedRoles = new Set();
       const removedRoles = new Set();
-      
+
       await wrapper.setProps({
         groupRoles: ["admin"],
         activeTab: "roles",
@@ -320,16 +344,16 @@ describe("GroupRoles Component", () => {
 
       wrapper.vm.groupUsersMap = new Set(["admin"]);
       const testRole = { role_name: "admin", isInGroup: false };
-      
+
       wrapper.vm.toggleUserSelection(testRole);
-      
+
       expect(removedRoles.has("admin")).toBe(true);
     });
 
     it("removes role from addedRoles when deselecting newly added role", async () => {
       const addedRoles = new Set(["user"]);
       const removedRoles = new Set();
-      
+
       await wrapper.setProps({
         groupRoles: [],
         activeTab: "roles",
@@ -339,16 +363,16 @@ describe("GroupRoles Component", () => {
 
       wrapper.vm.groupUsersMap = new Set([]);
       const testRole = { role_name: "user", isInGroup: false };
-      
+
       wrapper.vm.toggleUserSelection(testRole);
-      
+
       expect(addedRoles.has("user")).toBe(false);
     });
 
     it("removes role from removedRoles when reselecting removed role", async () => {
       const addedRoles = new Set();
       const removedRoles = new Set(["admin"]);
-      
+
       await wrapper.setProps({
         groupRoles: ["admin"],
         activeTab: "roles",
@@ -358,9 +382,9 @@ describe("GroupRoles Component", () => {
 
       wrapper.vm.groupUsersMap = new Set(["admin"]);
       const testRole = { role_name: "admin", isInGroup: true };
-      
+
       wrapper.vm.toggleUserSelection(testRole);
-      
+
       expect(removedRoles.has("admin")).toBe(false);
     });
   });
@@ -383,17 +407,19 @@ describe("GroupRoles Component", () => {
     it("shows only selected roles when display is 'selected'", async () => {
       await wrapper.vm.getchOrgUsers(); // This will mark admin and user as selected
       await wrapper.vm.updateUserTable("selected");
-      
-      const selectedRoles = wrapper.vm.rows.filter((role: any) => role.isInGroup);
+
+      const selectedRoles = wrapper.vm.rows.filter(
+        (role: any) => role.isInGroup,
+      );
       expect(wrapper.vm.rows).toEqual(selectedRoles);
     });
 
     it("fetches data when switching to 'all' for first time", async () => {
       wrapper.vm.hasFetchedOrgUsers = false;
       const initialLength = wrapper.vm.users.length;
-      
+
       await wrapper.vm.updateUserTable("all");
-      
+
       // Test behavior: hasFetchedOrgUsers should be set to true after fetch
       expect(wrapper.vm.hasFetchedOrgUsers).toBe(true);
     });
@@ -401,9 +427,9 @@ describe("GroupRoles Component", () => {
     it("does not refetch data when switching to 'all' after first fetch", async () => {
       const getchOrgUsersSpy = vi.spyOn(wrapper.vm, "getchOrgUsers");
       wrapper.vm.hasFetchedOrgUsers = true;
-      
+
       await wrapper.vm.updateUserTable("all");
-      
+
       expect(getchOrgUsersSpy).not.toHaveBeenCalled();
     });
   });
@@ -411,10 +437,10 @@ describe("GroupRoles Component", () => {
   describe("Props Watching", () => {
     it("updates when groupRoles prop changes", async () => {
       const initialGroupUsersMapSize = wrapper.vm.groupUsersMap.size;
-      
+
       await wrapper.setProps({ groupRoles: ["admin", "user", "developer"] });
       await flushPromises();
-      
+
       // Test behavior: groupUsersMap should be updated with new prop values
       expect(wrapper.vm.groupUsersMap.size).toBe(3);
       expect(wrapper.vm.groupUsersMap.has("admin")).toBe(true);
@@ -424,10 +450,10 @@ describe("GroupRoles Component", () => {
 
     it("resets hasFetchedOrgUsers when groupRoles changes", async () => {
       wrapper.vm.hasFetchedOrgUsers = true;
-      
+
       await wrapper.setProps({ groupRoles: ["new-role"] });
       await flushPromises();
-      
+
       expect(wrapper.vm.hasFetchedOrgUsers).toBe(true); // Gets set back to true after fetch
     });
   });
@@ -483,7 +509,7 @@ describe("GroupRoles Component", () => {
         "iam-roles-selection-table",
       ];
 
-      sections.forEach(selector => {
+      sections.forEach((selector) => {
         expect(wrapper.find(`[data-test="${selector}"]`).exists()).toBe(true);
       });
     });
@@ -494,7 +520,7 @@ describe("GroupRoles Component", () => {
     });
 
     it("has proper button styling", () => {
-      const filterButtons = wrapper.findAll('.visual-selection-btn');
+      const filterButtons = wrapper.findAll(".visual-selection-btn");
       expect(filterButtons.length).toBeGreaterThan(0);
     });
   });

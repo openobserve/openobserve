@@ -18,7 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="feature-comparison-wrapper">
     <div class="feature-comparison-header tw:mb-6">
       <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
-        <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
+        <div
+          class="icon-wrapper"
+          :class="
+            store.state.theme === 'dark'
+              ? 'icon-wrapper-dark'
+              : 'icon-wrapper-light'
+          "
+        >
           <q-icon name="compare_arrows" size="24px" />
         </div>
         <h3 class="feature-title">{{ t("about.feature_comparison_lbl") }}</h3>
@@ -36,10 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("about.feature_comparision_ent_msg") }}
         </p>
-        <p
-          v-else
-          class="feature-subtitle"
-        >
+        <p v-else class="feature-subtitle">
           {{ t("about.feature_comparision_subtitle") }}
         </p>
         <p
@@ -71,7 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-slot:body="props">
           <q-tr :props="props">
-            <q-td key="name" :props="props" class="feature-name-cell">
+            <q-td key="name" :props="props"
+class="feature-name-cell">
               {{ props.row.name }}
             </q-td>
             <q-td
@@ -83,10 +88,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   store.state.zoConfig.build_type === 'opensource',
               }"
             >
-              <span v-if="props.row.values.opensource === true" class="status-icon status-available">
+              <span
+                v-if="props.row.values.opensource === true"
+                class="status-icon status-available"
+              >
                 ✅
               </span>
-              <span v-else-if="props.row.values.opensource === false" class="status-icon status-unavailable">
+              <span
+                v-else-if="props.row.values.opensource === false"
+                class="status-icon status-unavailable"
+              >
                 ❌
               </span>
               <span v-else class="status-text">
@@ -102,21 +113,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   store.state.zoConfig.build_type === 'enterprise',
               }"
             >
-              <span v-if="props.row.values.enterprise === true" class="status-icon status-available">
+              <span
+                v-if="props.row.values.enterprise === true"
+                class="status-icon status-available"
+              >
                 ✅
               </span>
-              <span v-else-if="props.row.values.enterprise === false" class="status-icon status-unavailable">
+              <span
+                v-else-if="props.row.values.enterprise === false"
+                class="status-icon status-unavailable"
+              >
                 ❌
               </span>
               <span v-else class="status-text">
                 {{ props.row.values.enterprise }}
               </span>
             </q-td>
-            <q-td key="cloud" :props="props" class="feature-value-cell">
-              <span v-if="props.row.values.cloud === true" class="status-icon status-available">
+            <q-td key="cloud" :props="props"
+class="feature-value-cell">
+              <span
+                v-if="props.row.values.cloud === true"
+                class="status-icon status-available"
+              >
                 ✅
               </span>
-              <span v-else-if="props.row.values.cloud === false" class="status-icon status-unavailable">
+              <span
+                v-else-if="props.row.values.cloud === false"
+                class="status-icon status-unavailable"
+              >
                 ❌
               </span>
               <span v-else class="status-text">
@@ -135,7 +159,11 @@ import { ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import type { QTableColumn } from "quasar";
-import { FEATURE_REGISTRY, getFeatureNameKey, type FeatureDefinition } from "@/constants/features";
+import {
+  FEATURE_REGISTRY,
+  getFeatureNameKey,
+  type FeatureDefinition,
+} from "@/constants/features";
 
 interface FeatureValue {
   opensource: boolean | string;
@@ -149,7 +177,7 @@ interface Feature {
 }
 
 interface Edition {
-  id: 'opensource' | 'enterprise' | 'cloud';
+  id: "opensource" | "enterprise" | "cloud";
   name: string;
 }
 
@@ -163,41 +191,41 @@ const { t } = useI18n();
 
 const columns = ref<QTableColumn[]>([
   {
-    name: 'name',
-    label: t('about.feature_column_name'),
-    field: 'name',
-    align: 'left',
+    name: "name",
+    label: t("about.feature_column_name"),
+    field: "name",
+    align: "left",
     sortable: false,
-    style: 'width: 250px; min-width: 200px;'
+    style: "width: 250px; min-width: 200px;",
   },
   {
-    name: 'opensource',
-    label: t('about.edition_opensource'),
-    field: 'opensource',
-    align: 'center',
+    name: "opensource",
+    label: t("about.edition_opensource"),
+    field: "opensource",
+    align: "center",
     sortable: false,
-    style: 'width: 150px; max-width: 150px;'
+    style: "width: 150px; max-width: 150px;",
   },
   {
-    name: 'enterprise',
-    label: t('about.edition_enterprise'),
-    field: 'enterprise',
-    align: 'center',
+    name: "enterprise",
+    label: t("about.edition_enterprise"),
+    field: "enterprise",
+    align: "center",
     sortable: false,
-    style: 'width: 150px; max-width: 150px;'
+    style: "width: 150px; max-width: 150px;",
   },
   {
-    name: 'cloud',
-    label: t('about.edition_cloud'),
-    field: 'cloud',
-    align: 'center',
+    name: "cloud",
+    label: t("about.edition_cloud"),
+    field: "cloud",
+    align: "center",
     sortable: false,
-    style: 'width: 150px; max-width: 150px;'
-  }
+    style: "width: 150px; max-width: 150px;",
+  },
 ]);
 
 const pagination = ref({
-  rowsPerPage: 0 // 0 means show all rows
+  rowsPerPage: 0, // 0 means show all rows
 });
 
 /**
@@ -211,31 +239,34 @@ const loadFeaturesFromRegistry = (): Feature[] => {
 
     // Resolve string values to their translations
     const values: FeatureValue = {
-      opensource: typeof featureValue.opensource === 'string'
-        ? t(featureValue.opensource)
-        : featureValue.opensource,
-      enterprise: typeof featureValue.enterprise === 'string'
-        ? t(featureValue.enterprise)
-        : featureValue.enterprise,
-      cloud: typeof featureValue.cloud === 'string'
-        ? t(featureValue.cloud)
-        : featureValue.cloud,
+      opensource:
+        typeof featureValue.opensource === "string"
+          ? t(featureValue.opensource)
+          : featureValue.opensource,
+      enterprise:
+        typeof featureValue.enterprise === "string"
+          ? t(featureValue.enterprise)
+          : featureValue.enterprise,
+      cloud:
+        typeof featureValue.cloud === "string"
+          ? t(featureValue.cloud)
+          : featureValue.cloud,
     };
 
     return {
       name: t(nameKey),
-      values
+      values,
     };
   });
 };
 
 const featureData = ref<FeatureData>({
   editions: [
-    { id: 'opensource', name: t('about.edition_opensource') },
-    { id: 'enterprise', name: t('about.edition_enterprise') },
-    { id: 'cloud', name: t('about.edition_cloud') }
+    { id: "opensource", name: t("about.edition_opensource") },
+    { id: "enterprise", name: t("about.edition_enterprise") },
+    { id: "cloud", name: t("about.edition_cloud") },
   ],
-  features: loadFeaturesFromRegistry()
+  features: loadFeaturesFromRegistry(),
 });
 
 const currentPlanName = computed(() => {
@@ -262,12 +293,12 @@ const currentPlanName = computed(() => {
 
     .icon-wrapper-dark {
       background: rgba(33, 150, 243, 0.18);
-      color: #64B5F6;
+      color: #64b5f6;
     }
 
     .icon-wrapper-light {
       background: rgba(33, 150, 243, 0.12);
-      color: #1565C0;
+      color: #1565c0;
     }
 
     .feature-title {
@@ -328,7 +359,7 @@ const currentPlanName = computed(() => {
     width: auto;
     margin: auto;
     max-width: 800px;
-    
+
     .feature-name-cell {
       font-weight: 500;
       color: var(--q-text-color);
@@ -364,7 +395,11 @@ const currentPlanName = computed(() => {
       }
 
       &.highlighted-column {
-        background-color: color-mix(in srgb, var(--o2-theme-color) 15%, var(--o2-theme-mode) 85%);
+        background-color: color-mix(
+          in srgb,
+          var(--o2-theme-color) 15%,
+          var(--o2-theme-mode) 85%
+        );
         font-weight: 500;
         position: relative;
 

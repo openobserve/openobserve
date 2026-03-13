@@ -25,7 +25,7 @@ limitations under the License. -->
       </div>
       <div class="result-content">
         <div data-test="test-success-message" class="result-title">
-          {{ t('alerts.testSuccessMessage') }}
+          {{ t("alerts.testSuccessMessage") }}
         </div>
         <div data-test="test-success-timestamp" class="result-meta">
           {{ formatTimestamp(result.timestamp) }}
@@ -52,7 +52,11 @@ limitations under the License. -->
         <div data-test="test-failure-message" class="result-title">
           {{ getFailureMessage(result) }}
         </div>
-        <div v-if="result.timestamp" data-test="test-failure-timestamp" class="result-meta">
+        <div
+          v-if="result.timestamp"
+          data-test="test-failure-timestamp"
+          class="result-meta"
+        >
           {{ formatTimestamp(result.timestamp) }}
           <span v-if="result.statusCode" class="status-badge error-badge">
             {{ result.statusCode }}
@@ -78,25 +82,42 @@ limitations under the License. -->
         >
           <template #header>
             <div class="expansion-header">
-              <q-icon name="info" size="14px" class="q-mr-xs" />
-              <span class="text-caption">{{ t('alerts.viewDetails') }}</span>
+              <q-icon name="info"
+size="14px" class="q-mr-xs" />
+              <span class="text-caption">{{ t("alerts.viewDetails") }}</span>
             </div>
           </template>
 
           <div data-test="test-failure-details" class="error-details-content">
-            <div v-if="result.error" data-test="test-error-message" class="error-item">
-              <div class="error-label">{{ t('alerts.error') }}</div>
+            <div
+              v-if="result.error"
+              data-test="test-error-message"
+              class="error-item"
+            >
+              <div class="error-label">{{ t("alerts.error") }}</div>
               <div class="error-value">{{ result.error }}</div>
             </div>
 
-            <div v-if="result.statusCode" data-test="test-http-status" class="error-item">
-              <div class="error-label">{{ t('alerts.httpStatus') }}</div>
-              <div class="error-value">{{ result.statusCode }} {{ getStatusText(result.statusCode) }}</div>
+            <div
+              v-if="result.statusCode"
+              data-test="test-http-status"
+              class="error-item"
+            >
+              <div class="error-label">{{ t("alerts.httpStatus") }}</div>
+              <div class="error-value">
+                {{ result.statusCode }} {{ getStatusText(result.statusCode) }}
+              </div>
             </div>
 
-            <div v-if="result.responseBody" data-test="test-response-body" class="error-item">
-              <div class="error-label">{{ t('alerts.responseBody') }}</div>
-              <pre class="error-code">{{ formatResponseBody(result.responseBody) }}</pre>
+            <div
+              v-if="result.responseBody"
+              data-test="test-response-body"
+              class="error-item"
+            >
+              <div class="error-label">{{ t("alerts.responseBody") }}</div>
+              <pre class="error-code">{{
+                formatResponseBody(result.responseBody)
+              }}</pre>
             </div>
           </div>
         </q-expansion-item>
@@ -129,33 +150,30 @@ limitations under the License. -->
       </div>
       <div class="result-content">
         <div class="result-title">
-          {{ t('alerts.testInProgress') }}
+          {{ t("alerts.testInProgress") }}
         </div>
         <div class="result-meta">
-          {{ t('alerts.sendingNotification') }}
+          {{ t("alerts.sendingNotification") }}
         </div>
       </div>
     </div>
 
     <!-- Idle State -->
-    <div
-      v-else
-      data-test="test-result-idle"
-      class="o2-test-idle"
-    >
+    <div v-else data-test="test-result-idle"
+class="o2-test-idle">
       <q-icon name="info" size="16px" />
       <span class="idle-text">
-        {{ t('alerts.testIdleMessage') }}
+        {{ t("alerts.testIdleMessage") }}
       </span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { date } from 'quasar';
-import type { TestResult } from '@/utils/prebuilt-templates/types';
+import { computed } from "vue";
+import { useI18n } from "vue-i18n";
+import { date } from "quasar";
+import type { TestResult } from "@/utils/prebuilt-templates/types";
 
 // Define component props
 interface Props {
@@ -165,12 +183,12 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   result: null,
-  isLoading: false
+  isLoading: false,
 });
 
 // Define component emits
 interface Emits {
-  (e: 'retry'): void;
+  (e: "retry"): void;
 }
 
 const emit = defineEmits<Emits>();
@@ -180,10 +198,11 @@ const { t } = useI18n();
 
 // Methods
 function formatTimestamp(timestamp?: number | string): string {
-  if (!timestamp) return '';
+  if (!timestamp) return "";
 
-  const ts = typeof timestamp === 'string' ? new Date(timestamp) : new Date(timestamp);
-  return date.formatDate(ts, 'MMM DD, HH:mm:ss');
+  const ts =
+    typeof timestamp === "string" ? new Date(timestamp) : new Date(timestamp);
+  return date.formatDate(ts, "MMM DD, HH:mm:ss");
 }
 
 function getFailureMessage(result: TestResult): string {
@@ -192,15 +211,16 @@ function getFailureMessage(result: TestResult): string {
     try {
       const parsed = JSON.parse(result.responseBody);
       // Common error message fields from various APIs
-      const errorMessage = parsed.error || parsed.message || parsed.errors || parsed.detail;
+      const errorMessage =
+        parsed.error || parsed.message || parsed.errors || parsed.detail;
       if (errorMessage) {
         // If it's a string, return it directly
-        if (typeof errorMessage === 'string') {
+        if (typeof errorMessage === "string") {
           return `Test failed: ${errorMessage}`;
         }
         // If it's an array, join the messages
         if (Array.isArray(errorMessage)) {
-          return `Test failed: ${errorMessage.join(', ')}`;
+          return `Test failed: ${errorMessage.join(", ")}`;
         }
       }
     } catch {
@@ -214,17 +234,20 @@ function getFailureMessage(result: TestResult): string {
   // If we have an error message, show it directly
   if (result.error) {
     // Check for common error patterns that need specific guidance
-    if (result.error.includes('ENOTFOUND') || result.error.includes('DNS')) {
-      return t('alerts.testErrorDNS');
+    if (result.error.includes("ENOTFOUND") || result.error.includes("DNS")) {
+      return t("alerts.testErrorDNS");
     }
-    if (result.error.includes('ECONNREFUSED') || result.error.includes('connection')) {
-      return t('alerts.testErrorConnection');
+    if (
+      result.error.includes("ECONNREFUSED") ||
+      result.error.includes("connection")
+    ) {
+      return t("alerts.testErrorConnection");
     }
-    if (result.error.includes('timeout')) {
-      return t('alerts.testErrorTimeout');
+    if (result.error.includes("timeout")) {
+      return t("alerts.testErrorTimeout");
     }
-    if (result.error.includes('certificate') || result.error.includes('SSL')) {
-      return t('alerts.testErrorSSL');
+    if (result.error.includes("certificate") || result.error.includes("SSL")) {
+      return t("alerts.testErrorSSL");
     }
 
     // For other errors, show the actual error message
@@ -234,34 +257,34 @@ function getFailureMessage(result: TestResult): string {
   // Fall back to generic messages based on status code
   if (result.statusCode) {
     if (result.statusCode >= 400 && result.statusCode < 500) {
-      return t('alerts.testErrorClientError');
+      return t("alerts.testErrorClientError");
     }
     if (result.statusCode >= 500) {
-      return t('alerts.testErrorServerError');
+      return t("alerts.testErrorServerError");
     }
   }
 
-  return t('alerts.testFailedMessage');
+  return t("alerts.testFailedMessage");
 }
 
 function getStatusText(statusCode: number): string {
   const statusMessages: Record<number, string> = {
-    200: 'OK',
-    201: 'Created',
-    204: 'No Content',
-    400: 'Bad Request',
-    401: 'Unauthorized',
-    403: 'Forbidden',
-    404: 'Not Found',
-    422: 'Unprocessable Entity',
-    429: 'Too Many Requests',
-    500: 'Internal Server Error',
-    502: 'Bad Gateway',
-    503: 'Service Unavailable',
-    504: 'Gateway Timeout'
+    200: "OK",
+    201: "Created",
+    204: "No Content",
+    400: "Bad Request",
+    401: "Unauthorized",
+    403: "Forbidden",
+    404: "Not Found",
+    422: "Unprocessable Entity",
+    429: "Too Many Requests",
+    500: "Internal Server Error",
+    502: "Bad Gateway",
+    503: "Service Unavailable",
+    504: "Gateway Timeout",
   };
 
-  return statusMessages[statusCode] || 'Unknown';
+  return statusMessages[statusCode] || "Unknown";
 }
 
 function formatResponseBody(body: string): string {
@@ -279,33 +302,33 @@ function getSuggestedFix(result: TestResult): string | null {
   if (!result.error && !result.statusCode) return null;
 
   // DNS/Connection errors
-  if (result.error?.includes('ENOTFOUND')) {
-    return t('alerts.suggestCheckUrl');
+  if (result.error?.includes("ENOTFOUND")) {
+    return t("alerts.suggestCheckUrl");
   }
 
-  if (result.error?.includes('ECONNREFUSED')) {
-    return t('alerts.suggestCheckFirewall');
+  if (result.error?.includes("ECONNREFUSED")) {
+    return t("alerts.suggestCheckFirewall");
   }
 
   // HTTP status code suggestions
   if (result.statusCode === 401) {
-    return t('alerts.suggestCheckCredentials');
+    return t("alerts.suggestCheckCredentials");
   }
 
   if (result.statusCode === 403) {
-    return t('alerts.suggestCheckPermissions');
+    return t("alerts.suggestCheckPermissions");
   }
 
   if (result.statusCode === 404) {
-    return t('alerts.suggestCheckEndpoint');
+    return t("alerts.suggestCheckEndpoint");
   }
 
   if (result.statusCode === 429) {
-    return t('alerts.suggestRateLimit');
+    return t("alerts.suggestRateLimit");
   }
 
   if (result.statusCode && result.statusCode >= 500) {
-    return t('alerts.suggestServerIssue');
+    return t("alerts.suggestServerIssue");
   }
 
   return null;
@@ -384,7 +407,7 @@ function getSuggestedFix(result: TestResult): string | null {
         border-radius: 3px;
         font-size: 10px;
         font-weight: 600;
-        font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+        font-family: "Monaco", "Consolas", "Courier New", monospace;
         letter-spacing: 0.3px;
 
         &.success-badge {
@@ -399,7 +422,7 @@ function getSuggestedFix(result: TestResult): string | null {
       }
 
       .response-time {
-        font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+        font-family: "Monaco", "Consolas", "Courier New", monospace;
         color: var(--q-text-secondary);
       }
     }
@@ -466,7 +489,7 @@ function getSuggestedFix(result: TestResult): string | null {
           border: 1px solid rgba(0, 0, 0, 0.1);
           border-radius: 3px;
           padding: 8px;
-          font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+          font-family: "Monaco", "Consolas", "Courier New", monospace;
           font-size: 10px;
           line-height: 1.5;
           max-height: 150px;

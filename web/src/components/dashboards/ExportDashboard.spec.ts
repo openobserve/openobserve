@@ -116,9 +116,9 @@ describe("ExportDashboard", () => {
 
     const downloadSpy = vi.spyOn(wrapper.vm, "downloadDashboard");
     const exportButton = wrapper.find('[data-test="export-dashboard"]');
-    
+
     await exportButton.trigger("click");
-    
+
     expect(downloadSpy).toHaveBeenCalled();
   });
 
@@ -129,12 +129,14 @@ describe("ExportDashboard", () => {
       click: vi.fn(),
     };
     const originalCreateElement = document.createElement.bind(document);
-    const createElementSpy = vi.spyOn(document, "createElement").mockImplementation((tagName: string) => {
-      if (tagName === "a") {
-        return mockAnchor as any;
-      }
-      return originalCreateElement(tagName);
-    });
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockImplementation((tagName: string) => {
+        if (tagName === "a") {
+          return mockAnchor as any;
+        }
+        return originalCreateElement(tagName);
+      });
 
     const wrapper = mount(ExportDashboard, {
       props: {
@@ -149,8 +151,14 @@ describe("ExportDashboard", () => {
     await flushPromises();
 
     expect(createElementSpy).toHaveBeenCalledWith("a");
-    expect(mockAnchor.setAttribute).toHaveBeenCalledWith("href", expect.stringContaining("data:text/json"));
-    expect(mockAnchor.setAttribute).toHaveBeenCalledWith("download", expect.stringContaining(".dashboard.json"));
+    expect(mockAnchor.setAttribute).toHaveBeenCalledWith(
+      "href",
+      expect.stringContaining("data:text/json"),
+    );
+    expect(mockAnchor.setAttribute).toHaveBeenCalledWith(
+      "download",
+      expect.stringContaining(".dashboard.json"),
+    );
     expect(mockAnchor.click).toHaveBeenCalled();
 
     createElementSpy.mockRestore();
@@ -162,12 +170,14 @@ describe("ExportDashboard", () => {
       click: vi.fn(),
     };
     const originalCreateElement = document.createElement.bind(document);
-    const createElementSpy = vi.spyOn(document, "createElement").mockImplementation((tagName: string) => {
-      if (tagName === "a") {
-        return mockAnchor as any;
-      }
-      return originalCreateElement(tagName);
-    });
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockImplementation((tagName: string) => {
+        if (tagName === "a") {
+          return mockAnchor as any;
+        }
+        return originalCreateElement(tagName);
+      });
 
     const wrapper = mount(ExportDashboard, {
       props: {
@@ -183,7 +193,7 @@ describe("ExportDashboard", () => {
 
     expect(mockAnchor.setAttribute).toHaveBeenCalledWith(
       "download",
-      "Test Dashboard.dashboard.json"
+      "Test Dashboard.dashboard.json",
     );
 
     createElementSpy.mockRestore();
@@ -197,12 +207,14 @@ describe("ExportDashboard", () => {
       click: vi.fn(),
     };
     const originalCreateElement = document.createElement.bind(document);
-    const createElementSpy = vi.spyOn(document, "createElement").mockImplementation((tagName: string) => {
-      if (tagName === "a") {
-        return mockAnchor as any;
-      }
-      return originalCreateElement(tagName);
-    });
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockImplementation((tagName: string) => {
+        if (tagName === "a") {
+          return mockAnchor as any;
+        }
+        return originalCreateElement(tagName);
+      });
 
     const wrapper = mount(ExportDashboard, {
       props: {
@@ -216,11 +228,7 @@ describe("ExportDashboard", () => {
     await wrapper.vm.downloadDashboard();
     await flushPromises();
 
-    expect(getDashboard).toHaveBeenCalledWith(
-      store,
-      "dash123",
-      "default"
-    );
+    expect(getDashboard).toHaveBeenCalledWith(store, "dash123", "default");
 
     createElementSpy.mockRestore();
   });

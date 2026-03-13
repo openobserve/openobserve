@@ -14,8 +14,8 @@ import { nextTick, ref } from "vue";
 // Mock config
 vi.mock("@/aws-exports", () => ({
   default: {
-    isEnterprise: "true"
-  }
+    isEnterprise: "true",
+  },
 }));
 
 // Mock the search service with proper error handling
@@ -24,8 +24,8 @@ vi.mock("@/services/search", () => ({
     get_scheduled_search_list: vi.fn(),
     cancel_scheduled_search: vi.fn(),
     retry_scheduled_search: vi.fn(),
-    delete_scheduled_search: vi.fn()
-  }
+    delete_scheduled_search: vi.fn(),
+  },
 }));
 
 // Mock useLogs composable
@@ -35,41 +35,41 @@ vi.mock("@/composables/useLogs", () => ({
       meta: {},
       data: {
         datetime: {
-          type: 'relative'
-        }
-      }
+          type: "relative",
+        },
+      },
     },
-    extractTimestamps: vi.fn().mockReturnValue({ from: 1000, to: 2000 })
-  })
+    extractTimestamps: vi.fn().mockReturnValue({ from: 1000, to: 2000 }),
+  }),
 }));
 
 // Mock vue-router
-vi.mock('vue-router', () => ({
+vi.mock("vue-router", () => ({
   useRouter: vi.fn(() => ({
     push: vi.fn(),
     currentRoute: {
       value: {
         query: {
-          org_identifier: 'test-org'
-        }
-      }
-    }
+          org_identifier: "test-org",
+        },
+      },
+    },
   })),
   useRoute: vi.fn(() => ({
     query: {},
     params: {},
-    path: '/search-schedulers'
-  }))
+    path: "/search-schedulers",
+  })),
 }));
 
 // Mock vue-i18n
-vi.mock('vue-i18n', async (importOriginal) => {
+vi.mock("vue-i18n", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
     useI18n: () => ({
-      t: (key) => key
-    })
+      t: (key) => key,
+    }),
   };
 });
 
@@ -89,34 +89,34 @@ describe("SearchSchedulersList Component", () => {
     mockStore = {
       state: {
         selectedOrganization: {
-          identifier: "test-org"
+          identifier: "test-org",
         },
         userInfo: {
-          email: "test@example.com"
+          email: "test@example.com",
         },
         zoConfig: {
           usage_publish_interval: 60,
-          timestamp_column: "_timestamp"
+          timestamp_column: "_timestamp",
         },
         timezone: "UTC",
-        theme: 'light'
-      }
+        theme: "light",
+      },
     };
 
     // Setup notify mock
     notifyMock = vi.fn();
     dialogMock = {
       create: vi.fn().mockReturnValue({
-        onOk: vi.fn(callback => {
+        onOk: vi.fn((callback) => {
           callback();
           return { onCancel: vi.fn() };
         }),
-        onCancel: vi.fn()
-      })
+        onCancel: vi.fn(),
+      }),
     };
     const $q = {
       notify: notifyMock,
-      dialog: dialogMock
+      dialog: dialogMock,
     };
 
     // Setup router mock
@@ -126,10 +126,10 @@ describe("SearchSchedulersList Component", () => {
       currentRoute: {
         value: {
           query: {
-            org_identifier: 'test-org'
-          }
-        }
-      }
+            org_identifier: "test-org",
+          },
+        },
+      },
     }));
 
     // Clear all mocks before each test
@@ -153,32 +153,32 @@ describe("SearchSchedulersList Component", () => {
           DateTime: {
             template: '<div class="mock-datetime"></div>',
             methods: {
-              setAbsoluteTime: vi.fn()
-            }
+              setAbsoluteTime: vi.fn(),
+            },
           },
           AppTabs: true,
           QueryEditor: true,
           QSpinnerHourglass: true,
           ConfirmDialog: true,
-          NoData: true
+          NoData: true,
         },
         mocks: {
           $q,
-          $router: { push: routerPushMock }
-        }
+          $router: { push: routerPushMock },
+        },
       },
       props: {
-        isClicked: false
-      }
+        isClicked: false,
+      },
     });
 
     // Mock component methods
-    wrapper.vm.formatTime = vi.fn(took => `${took.toFixed(2)} sec`);
+    wrapper.vm.formatTime = vi.fn((took) => `${took.toFixed(2)} sec`);
     wrapper.vm.calculateDuration = vi.fn((startTime, endTime) => ({
       formatted: "1 second",
-      raw: 1.0
+      raw: 1.0,
     }));
-    wrapper.vm.convertUnixToQuasarFormat = vi.fn(timestamp => {
+    wrapper.vm.convertUnixToQuasarFormat = vi.fn((timestamp) => {
       const date = new Date(timestamp);
       return date.toISOString().slice(0, 19) + "+00:00";
     });
@@ -212,28 +212,30 @@ describe("SearchSchedulersList Component", () => {
             payload: JSON.stringify({
               query: {
                 sql: "SELECT * FROM logs",
-                stream_names: JSON.stringify(["test-stream"])
-              }
+                stream_names: JSON.stringify(["test-stream"]),
+              },
             }),
             stream_type: "logs",
-            duration: "1 second"
-          }
-        ]
+            duration: "1 second",
+          },
+        ],
       };
 
-      searchService.get_scheduled_search_list.mockImplementation(() => Promise.resolve(mockResponse));
-      
+      searchService.get_scheduled_search_list.mockImplementation(() =>
+        Promise.resolve(mockResponse),
+      );
+
       // First ensure isLoading is false
       wrapper.vm.isLoading = false;
       await nextTick();
-      
+
       // Then trigger the watcher
       await wrapper.setProps({ isClicked: true });
       await nextTick();
       await flushPromises();
 
       expect(searchService.get_scheduled_search_list).toHaveBeenCalledWith({
-        org_identifier: "test-org"
+        org_identifier: "test-org",
       });
       expect(wrapper.vm.dataToBeLoaded).toHaveLength(1);
     });
@@ -241,28 +243,28 @@ describe("SearchSchedulersList Component", () => {
     it("sets loading state correctly during fetch", async () => {
       const mockResponse = { data: [] };
       let resolvePromise;
-      const promise = new Promise(resolve => {
+      const promise = new Promise((resolve) => {
         resolvePromise = resolve;
       });
-      
+
       searchService.get_scheduled_search_list.mockImplementation(() => promise);
-      
+
       // First ensure isLoading is false
       wrapper.vm.isLoading = false;
       await nextTick();
-      
+
       // Then trigger the watcher
       await wrapper.setProps({ isClicked: true });
       await nextTick();
-      
+
       // Check loading state is true during fetch
       expect(wrapper.vm.isLoading).toBe(true);
-      
+
       // Resolve the API call
       resolvePromise(mockResponse);
       await flushPromises();
       await nextTick();
-      
+
       // Check loading state is false after fetch
       expect(wrapper.vm.isLoading).toBe(false);
     });
@@ -274,12 +276,14 @@ describe("SearchSchedulersList Component", () => {
       status: 1,
       stream_names: JSON.stringify(["test-stream"]),
       sql: "SELECT * FROM logs",
-      duration: "1 second"
+      duration: "1 second",
     };
 
     it("deletes job successfully", async () => {
-      searchService.delete_scheduled_search.mockImplementation(() => Promise.resolve({}));
-      
+      searchService.delete_scheduled_search.mockImplementation(() =>
+        Promise.resolve({}),
+      );
+
       await wrapper.vm.confirmDeleteJob(mockJob);
       await nextTick();
       expect(wrapper.vm.confirmDelete).toBe(true);
@@ -291,7 +295,7 @@ describe("SearchSchedulersList Component", () => {
 
       expect(searchService.delete_scheduled_search).toHaveBeenCalledWith({
         org_identifier: "test-org",
-        jobId: "123"
+        jobId: "123",
       });
     });
   });
@@ -300,18 +304,26 @@ describe("SearchSchedulersList Component", () => {
     it("shows expanded row details correctly", async () => {
       const testRow = {
         trace_id: "test-uuid",
-        sql: "SELECT * FROM logs"
+        sql: "SELECT * FROM logs",
       };
-      
+
       await wrapper.vm.triggerExpand({ row: testRow });
       expect(wrapper.vm.expandedRow).toBe(testRow.trace_id);
     });
 
     it("shows correct status text and icons", () => {
-      expect(wrapper.vm.getStatusText(0)).toBe("search_scheduler_job.status_pending");
-      expect(wrapper.vm.getStatusText(1)).toBe("search_scheduler_job.status_running");
-      expect(wrapper.vm.getStatusText(2)).toBe("search_scheduler_job.status_finished");
-      expect(wrapper.vm.getStatusText(3)).toBe("search_scheduler_job.status_cancelled");
+      expect(wrapper.vm.getStatusText(0)).toBe(
+        "search_scheduler_job.status_pending",
+      );
+      expect(wrapper.vm.getStatusText(1)).toBe(
+        "search_scheduler_job.status_running",
+      );
+      expect(wrapper.vm.getStatusText(2)).toBe(
+        "search_scheduler_job.status_finished",
+      );
+      expect(wrapper.vm.getStatusText(3)).toBe(
+        "search_scheduler_job.status_cancelled",
+      );
 
       expect(wrapper.vm.getStatusIcon(0)).toBe("hourglass_empty");
       expect(wrapper.vm.getStatusIcon(1)).toBe("pause_circle");
@@ -335,21 +347,21 @@ describe("SearchSchedulersList Component", () => {
         toBeStoredStartTime: 1000,
         toBeStoredEndTime: 2000,
         id: "123",
-        duration: "1 second"
+        duration: "1 second",
       };
 
       await wrapper.vm.fetchSearchResults(mockRow);
       await flushPromises();
       await nextTick();
-      
+
       expect(routerPushMock).toHaveBeenCalledWith({
         path: "/logs",
         query: expect.objectContaining({
           stream_type: "logs",
           stream: "test-stream",
           sql_mode: "true",
-          type: "search_scheduler"
-        })
+          type: "search_scheduler",
+        }),
       });
     });
 
@@ -365,14 +377,19 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("calculates duration correctly", () => {
-      const { formatted, raw } = wrapper.vm.calculateDuration(1000000000, 1000060000);
+      const { formatted, raw } = wrapper.vm.calculateDuration(
+        1000000000,
+        1000060000,
+      );
       expect(formatted).toContain("second");
       expect(raw).toBeGreaterThan(0);
     });
 
     it("converts unix timestamp to quasar format", () => {
       const result = wrapper.vm.convertUnixToQuasarFormat(1000000000000);
-      expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
+      expect(result).toMatch(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/,
+      );
     });
   });
 });

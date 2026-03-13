@@ -123,33 +123,33 @@ describe("AlertSetup.vue", () => {
       });
 
       expect(darkWrapper.find(".step-alert-setup.dark-mode").exists()).toBe(
-        true
+        true,
       );
       darkWrapper.unmount();
     });
 
     it("should render all form fields", () => {
+      expect(wrapper.find('[data-test="add-alert-name-input"]').exists()).toBe(
+        true,
+      );
       expect(
-        wrapper.find('[data-test="add-alert-name-input"]').exists()
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="mock-select-folder-dropdown"]').exists()
+        wrapper.find('[data-test="mock-select-folder-dropdown"]').exists(),
       ).toBe(true);
       expect(
         wrapper
           .find('[data-test="add-alert-stream-type-select-dropdown"]')
-          .exists()
+          .exists(),
       ).toBe(true);
       expect(
         wrapper
           .find('[data-test="add-alert-stream-name-select-dropdown"]')
-          .exists()
+          .exists(),
       ).toBe(true);
       expect(
-        wrapper.find('[data-test="add-alert-scheduled-alert-radio"]').exists()
+        wrapper.find('[data-test="add-alert-scheduled-alert-radio"]').exists(),
       ).toBe(true);
       expect(
-        wrapper.find('[data-test="add-alert-realtime-alert-radio"]').exists()
+        wrapper.find('[data-test="add-alert-realtime-alert-radio"]').exists(),
       ).toBe(true);
     });
 
@@ -368,7 +368,7 @@ describe("AlertSetup.vue", () => {
 
     it("should not show loading state when not fetching streams", () => {
       const streamNameSelect = wrapper.find(
-        '[data-test="add-alert-stream-name-select-dropdown"]'
+        '[data-test="add-alert-stream-name-select-dropdown"]',
       );
       expect(streamNameSelect.attributes("loading")).toBeUndefined();
     });
@@ -377,7 +377,7 @@ describe("AlertSetup.vue", () => {
       await wrapper.setProps({ beingUpdated: true });
       await nextTick();
       const streamNameSelect = wrapper.find(
-        '[data-test="add-alert-stream-name-select-dropdown"]'
+        '[data-test="add-alert-stream-name-select-dropdown"]',
       );
       expect(streamNameSelect.attributes("readonly")).toBe("");
       expect(streamNameSelect.attributes("disabled")).toBe("");
@@ -428,7 +428,7 @@ describe("AlertSetup.vue", () => {
       await wrapper.setProps({ beingUpdated: true });
       await nextTick();
       const scheduledRadio = wrapper.find(
-        '[data-test="add-alert-scheduled-alert-radio"]'
+        '[data-test="add-alert-scheduled-alert-radio"]',
       );
       // Verify radio button exists
       expect(scheduledRadio.exists()).toBe(true);
@@ -440,7 +440,7 @@ describe("AlertSetup.vue", () => {
       await wrapper.setProps({ beingUpdated: true });
       await nextTick();
       const realtimeRadio = wrapper.find(
-        '[data-test="add-alert-realtime-alert-radio"]'
+        '[data-test="add-alert-realtime-alert-radio"]',
       );
       // Verify radio button exists
       expect(realtimeRadio.exists()).toBe(true);
@@ -692,9 +692,9 @@ describe("AlertSetup.vue", () => {
       const longStreamName = "stream_".repeat(100);
       await wrapper.vm.handleStreamNameChange(longStreamName);
 
-      expect(wrapper.emitted("update:stream-name")![0][0].length).toBeGreaterThan(
-        100
-      );
+      expect(
+        wrapper.emitted("update:stream-name")![0][0].length,
+      ).toBeGreaterThan(100);
     });
 
     it("should handle rapid successive updates", async () => {
@@ -759,10 +759,10 @@ describe("AlertSetup.vue", () => {
     it("should have proper labels for all inputs", () => {
       const nameInput = wrapper.find('[data-test="add-alert-name-input"]');
       const streamTypeSelect = wrapper.find(
-        '[data-test="add-alert-stream-type-select-dropdown"]'
+        '[data-test="add-alert-stream-type-select-dropdown"]',
       );
       const streamNameSelect = wrapper.find(
-        '[data-test="add-alert-stream-name-select-dropdown"]'
+        '[data-test="add-alert-stream-name-select-dropdown"]',
       );
 
       // Verify inputs exist with their test IDs
@@ -772,24 +772,24 @@ describe("AlertSetup.vue", () => {
     });
 
     it("should have data-test attributes for all interactive elements", () => {
-      expect(
-        wrapper.find('[data-test="add-alert-name-input"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-alert-name-input"]').exists()).toBe(
+        true,
+      );
       expect(
         wrapper
           .find('[data-test="add-alert-stream-type-select-dropdown"]')
-          .exists()
+          .exists(),
       ).toBe(true);
       expect(
         wrapper
           .find('[data-test="add-alert-stream-name-select-dropdown"]')
-          .exists()
+          .exists(),
       ).toBe(true);
       expect(
-        wrapper.find('[data-test="add-alert-scheduled-alert-radio"]').exists()
+        wrapper.find('[data-test="add-alert-scheduled-alert-radio"]').exists(),
       ).toBe(true);
       expect(
-        wrapper.find('[data-test="add-alert-realtime-alert-radio"]').exists()
+        wrapper.find('[data-test="add-alert-realtime-alert-radio"]').exists(),
       ).toBe(true);
     });
 

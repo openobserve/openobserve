@@ -933,7 +933,8 @@ describe("configUtils", () => {
       };
 
       const widthResult = shouldShowLegendWidth(dashboardPanelData);
-      const widthUnitResult = shouldShowLegendWidthUnitContainer(dashboardPanelData);
+      const widthUnitResult =
+        shouldShowLegendWidthUnitContainer(dashboardPanelData);
 
       expect(widthResult).toBe(widthUnitResult);
       expect(widthUnitResult).toBe(true);
@@ -953,7 +954,8 @@ describe("configUtils", () => {
       };
 
       const widthResult = shouldShowLegendWidth(dashboardPanelData);
-      const widthUnitResult = shouldShowLegendWidthUnitContainer(dashboardPanelData);
+      const widthUnitResult =
+        shouldShowLegendWidthUnitContainer(dashboardPanelData);
 
       expect(widthResult).toBe(widthUnitResult);
       expect(widthUnitResult).toBe(false);
@@ -975,7 +977,8 @@ describe("configUtils", () => {
       };
 
       const heightResult = shouldShowLegendHeight(dashboardPanelData);
-      const heightUnitResult = shouldShowLegendHeightUnitContainer(dashboardPanelData);
+      const heightUnitResult =
+        shouldShowLegendHeightUnitContainer(dashboardPanelData);
 
       expect(heightResult).toBe(heightUnitResult);
       expect(heightUnitResult).toBe(true);
@@ -995,7 +998,8 @@ describe("configUtils", () => {
       };
 
       const heightResult = shouldShowLegendHeight(dashboardPanelData);
-      const heightUnitResult = shouldShowLegendHeightUnitContainer(dashboardPanelData);
+      const heightUnitResult =
+        shouldShowLegendHeightUnitContainer(dashboardPanelData);
 
       expect(heightResult).toBe(heightUnitResult);
       expect(heightUnitResult).toBe(false);
@@ -1058,7 +1062,9 @@ describe("configUtils", () => {
         // Should not throw for any chart type
         expect(() => shouldShowGridlines(dashboardPanelData)).not.toThrow();
         expect(() => shouldShowLegendsToggle(dashboardPanelData)).not.toThrow();
-        expect(() => shouldShowLegendPosition(dashboardPanelData)).not.toThrow();
+        expect(() =>
+          shouldShowLegendPosition(dashboardPanelData),
+        ).not.toThrow();
         expect(() => shouldShowLegendType(dashboardPanelData)).not.toThrow();
         expect(() => shouldShowLegendWidth(dashboardPanelData)).not.toThrow();
         expect(() => shouldShowLegendHeight(dashboardPanelData)).not.toThrow();
@@ -1178,65 +1184,95 @@ describe("configUtils", () => {
 
   describe("shouldShowAreaLineStyleConfig", () => {
     it("should return true for area chart", () => {
-      expect(shouldShowAreaLineStyleConfig({ data: { type: "area" } })).toBe(true);
+      expect(shouldShowAreaLineStyleConfig({ data: { type: "area" } })).toBe(
+        true,
+      );
     });
 
     it("should return true for line chart", () => {
-      expect(shouldShowAreaLineStyleConfig({ data: { type: "line" } })).toBe(true);
+      expect(shouldShowAreaLineStyleConfig({ data: { type: "line" } })).toBe(
+        true,
+      );
     });
 
     it("should return true for area-stacked chart", () => {
-      expect(shouldShowAreaLineStyleConfig({ data: { type: "area-stacked" } })).toBe(true);
+      expect(
+        shouldShowAreaLineStyleConfig({ data: { type: "area-stacked" } }),
+      ).toBe(true);
     });
 
     it("should return false for bar chart", () => {
-      expect(shouldShowAreaLineStyleConfig({ data: { type: "bar" } })).toBe(false);
+      expect(shouldShowAreaLineStyleConfig({ data: { type: "bar" } })).toBe(
+        false,
+      );
     });
 
     it("should return false for pie chart", () => {
-      expect(shouldShowAreaLineStyleConfig({ data: { type: "pie" } })).toBe(false);
+      expect(shouldShowAreaLineStyleConfig({ data: { type: "pie" } })).toBe(
+        false,
+      );
     });
 
     it("should return false for scatter chart", () => {
-      expect(shouldShowAreaLineStyleConfig({ data: { type: "scatter" } })).toBe(false);
+      expect(shouldShowAreaLineStyleConfig({ data: { type: "scatter" } })).toBe(
+        false,
+      );
     });
   });
 
   describe("shouldShowTopResultsConfig", () => {
     it("should return true for area chart in non-promql mode", () => {
-      expect(shouldShowTopResultsConfig({ data: { type: "area" } }, false)).toBe(true);
+      expect(
+        shouldShowTopResultsConfig({ data: { type: "area" } }, false),
+      ).toBe(true);
     });
 
     it("should return true for bar chart in non-promql mode", () => {
-      expect(shouldShowTopResultsConfig({ data: { type: "bar" } }, false)).toBe(true);
+      expect(shouldShowTopResultsConfig({ data: { type: "bar" } }, false)).toBe(
+        true,
+      );
     });
 
     it("should return true for h-bar chart in non-promql mode", () => {
-      expect(shouldShowTopResultsConfig({ data: { type: "h-bar" } }, false)).toBe(true);
+      expect(
+        shouldShowTopResultsConfig({ data: { type: "h-bar" } }, false),
+      ).toBe(true);
     });
 
     it("should return true for scatter chart in non-promql mode", () => {
-      expect(shouldShowTopResultsConfig({ data: { type: "scatter" } }, false)).toBe(true);
+      expect(
+        shouldShowTopResultsConfig({ data: { type: "scatter" } }, false),
+      ).toBe(true);
     });
 
     it("should return true for stacked chart in non-promql mode", () => {
-      expect(shouldShowTopResultsConfig({ data: { type: "stacked" } }, false)).toBe(true);
+      expect(
+        shouldShowTopResultsConfig({ data: { type: "stacked" } }, false),
+      ).toBe(true);
     });
 
     it("should return true for h-stacked chart in non-promql mode", () => {
-      expect(shouldShowTopResultsConfig({ data: { type: "h-stacked" } }, false)).toBe(true);
+      expect(
+        shouldShowTopResultsConfig({ data: { type: "h-stacked" } }, false),
+      ).toBe(true);
     });
 
     it("should return false when promqlMode is true", () => {
-      expect(shouldShowTopResultsConfig({ data: { type: "area" } }, true)).toBe(false);
+      expect(shouldShowTopResultsConfig({ data: { type: "area" } }, true)).toBe(
+        false,
+      );
     });
 
     it("should return false for pie chart", () => {
-      expect(shouldShowTopResultsConfig({ data: { type: "pie" } }, false)).toBe(false);
+      expect(shouldShowTopResultsConfig({ data: { type: "pie" } }, false)).toBe(
+        false,
+      );
     });
 
     it("should return false for table chart", () => {
-      expect(shouldShowTopResultsConfig({ data: { type: "table" } }, false)).toBe(false);
+      expect(
+        shouldShowTopResultsConfig({ data: { type: "table" } }, false),
+      ).toBe(false);
     });
   });
 
@@ -1291,8 +1327,27 @@ describe("configUtils", () => {
   });
 
   describe("shouldShowCartesianAxisConfig", () => {
-    const cartesianTypes = ["area", "area-stacked", "bar", "h-bar", "line", "scatter", "stacked", "h-stacked"];
-    const nonCartesianTypes = ["pie", "donut", "table", "heatmap", "metric", "gauge", "geomap", "sankey", "maps"];
+    const cartesianTypes = [
+      "area",
+      "area-stacked",
+      "bar",
+      "h-bar",
+      "line",
+      "scatter",
+      "stacked",
+      "h-stacked",
+    ];
+    const nonCartesianTypes = [
+      "pie",
+      "donut",
+      "table",
+      "heatmap",
+      "metric",
+      "gauge",
+      "geomap",
+      "sankey",
+      "maps",
+    ];
 
     cartesianTypes.forEach((type) => {
       it(`should return true for ${type} chart`, () => {
@@ -1308,8 +1363,24 @@ describe("configUtils", () => {
   });
 
   describe("shouldShowAxisLabelConfig", () => {
-    const supportedTypes = ["area", "area-stacked", "bar", "line", "scatter", "stacked"];
-    const unsupportedTypes = ["h-bar", "h-stacked", "pie", "donut", "table", "heatmap", "gauge", "metric"];
+    const supportedTypes = [
+      "area",
+      "area-stacked",
+      "bar",
+      "line",
+      "scatter",
+      "stacked",
+    ];
+    const unsupportedTypes = [
+      "h-bar",
+      "h-stacked",
+      "pie",
+      "donut",
+      "table",
+      "heatmap",
+      "gauge",
+      "metric",
+    ];
 
     supportedTypes.forEach((type) => {
       it(`should return true for ${type} chart`, () => {
@@ -1338,7 +1409,9 @@ describe("configUtils", () => {
     });
 
     it("should return true for area-stacked chart in non-promql mode without customQuery", () => {
-      expect(shouldShowLineThickness(makeData("area-stacked"), false)).toBe(true);
+      expect(shouldShowLineThickness(makeData("area-stacked"), false)).toBe(
+        true,
+      );
     });
 
     it("should return true for line chart in non-promql mode without customQuery", () => {
@@ -1350,7 +1423,9 @@ describe("configUtils", () => {
     });
 
     it("should return false when customQuery is true", () => {
-      expect(shouldShowLineThickness(makeData("area", true), false)).toBe(false);
+      expect(shouldShowLineThickness(makeData("area", true), false)).toBe(
+        false,
+      );
     });
 
     it("should return false for bar chart", () => {
@@ -1364,60 +1439,93 @@ describe("configUtils", () => {
 
   describe("shouldShowDrilldown", () => {
     it("should return true for line chart in non-logs context", () => {
-      expect(shouldShowDrilldown({ data: { type: "line" } }, "dashboards")).toBe(true);
+      expect(
+        shouldShowDrilldown({ data: { type: "line" } }, "dashboards"),
+      ).toBe(true);
     });
 
     it("should return true for bar chart in non-logs context", () => {
-      expect(shouldShowDrilldown({ data: { type: "bar" } }, "dashboards")).toBe(true);
+      expect(shouldShowDrilldown({ data: { type: "bar" } }, "dashboards")).toBe(
+        true,
+      );
     });
 
     it("should return true for pie chart in non-logs context", () => {
-      expect(shouldShowDrilldown({ data: { type: "pie" } }, "dashboards")).toBe(true);
+      expect(shouldShowDrilldown({ data: { type: "pie" } }, "dashboards")).toBe(
+        true,
+      );
     });
 
     it("should return false for html panel", () => {
-      expect(shouldShowDrilldown({ data: { type: "html" } }, "dashboards")).toBe(false);
+      expect(
+        shouldShowDrilldown({ data: { type: "html" } }, "dashboards"),
+      ).toBe(false);
     });
 
     it("should return false for markdown panel", () => {
-      expect(shouldShowDrilldown({ data: { type: "markdown" } }, "dashboards")).toBe(false);
+      expect(
+        shouldShowDrilldown({ data: { type: "markdown" } }, "dashboards"),
+      ).toBe(false);
     });
 
     it("should return false for geomap panel", () => {
-      expect(shouldShowDrilldown({ data: { type: "geomap" } }, "dashboards")).toBe(false);
+      expect(
+        shouldShowDrilldown({ data: { type: "geomap" } }, "dashboards"),
+      ).toBe(false);
     });
 
     it("should return false for maps panel", () => {
-      expect(shouldShowDrilldown({ data: { type: "maps" } }, "dashboards")).toBe(false);
+      expect(
+        shouldShowDrilldown({ data: { type: "maps" } }, "dashboards"),
+      ).toBe(false);
     });
 
     it("should return false when pageKey is logs", () => {
-      expect(shouldShowDrilldown({ data: { type: "line" } }, "logs")).toBe(false);
+      expect(shouldShowDrilldown({ data: { type: "line" } }, "logs")).toBe(
+        false,
+      );
     });
   });
 
   describe("shouldShowTimeShift", () => {
-    const timeShiftTypes = ["area", "bar", "line", "h-bar", "h-stacked", "scatter", "area-stacked", "stacked"];
+    const timeShiftTypes = [
+      "area",
+      "bar",
+      "line",
+      "h-bar",
+      "h-stacked",
+      "scatter",
+      "area-stacked",
+      "stacked",
+    ];
     const nonTimeShiftTypes = ["pie", "donut", "table", "metric", "gauge"];
 
     timeShiftTypes.forEach((type) => {
       it(`should return true for ${type} in non-promql mode with non-logs pageKey`, () => {
-        expect(shouldShowTimeShift({ data: { type } }, false, "dashboards")).toBe(true);
+        expect(
+          shouldShowTimeShift({ data: { type } }, false, "dashboards"),
+        ).toBe(true);
       });
     });
 
     nonTimeShiftTypes.forEach((type) => {
       it(`should return false for ${type}`, () => {
-        expect(shouldShowTimeShift({ data: { type } }, false, "dashboards")).toBe(false);
+        expect(
+          shouldShowTimeShift({ data: { type } }, false, "dashboards"),
+        ).toBe(false);
       });
     });
 
     it("should return false when promqlMode is true", () => {
-      expect(shouldShowTimeShift({ data: { type: "area" } }, true, "dashboards")).toBe(false);
+      expect(
+        shouldShowTimeShift({ data: { type: "area" } }, true, "dashboards"),
+      ).toBe(false);
     });
 
     it("should return false when pageKey is logs", () => {
-      expect(shouldShowTimeShift({ data: { type: "area" } }, false, "logs")).toBe(false);
+      expect(
+        shouldShowTimeShift({ data: { type: "area" } }, false, "logs"),
+      ).toBe(false);
     });
   });
 });

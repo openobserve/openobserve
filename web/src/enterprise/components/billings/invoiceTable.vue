@@ -21,10 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :columns="columns"
     row-key="id"
     :pagination="pagination"
-    :style="invoiceHistory.length > 0
+    :style="
+      invoiceHistory.length > 0
         ? 'width: 100%; height: calc(100vh - 150px); overflow-y: auto;'
-        : 'width: 100%'"
-     class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+        : 'width: 100%'
+    "
+    class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
   >
     <template #no-data><NoData /></template>
     <template #body-cell-actions="props">
@@ -43,20 +45,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </q-td>
     </template>
-            <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- render the table headers -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
+    <template v-slot:header="props">
+      <q-tr :props="props">
+        <!-- render the table headers -->
+        <q-th
+          v-for="col in props.cols"
+          :key="col.name"
+          :props="props"
+          :class="col.classes"
+          :style="col.style"
+        >
+          {{ col.label }}
+        </q-th>
+      </q-tr>
+    </template>
     <template #bottom="scope">
       <QTablePagination
         :scope="scope"
@@ -141,7 +143,7 @@ export default defineComponent({
         field: "actions",
         label: t("billing.action"),
         align: "center",
-        classes:"actions-column"
+        classes: "actions-column",
       },
     ]);
     const resultTotal = ref<number>(0);
@@ -150,13 +152,13 @@ export default defineComponent({
       rowsPerPage: 20,
     });
     // const selectedPerPage = ref<number>(20);
-   const perPageOptions = [
-  { label: "5", value: 5 },
-  { label: "10", value: 10 },
-  { label: "20", value: 20 },
-  { label: "50", value: 50 },
-  { label: "100", value: 100 }
-];
+    const perPageOptions = [
+      { label: "5", value: 5 },
+      { label: "10", value: 10 },
+      { label: "20", value: 20 },
+      { label: "50", value: 50 },
+      { label: "100", value: 100 },
+    ];
 
     onMounted(() => {
       getInvoiceHistory();
@@ -169,7 +171,7 @@ export default defineComponent({
       });
 
       BillingService.list_invoice_history(
-        store.state.selectedOrganization.identifier
+        store.state.selectedOrganization.identifier,
       )
         .then((res) => {
           dismiss();

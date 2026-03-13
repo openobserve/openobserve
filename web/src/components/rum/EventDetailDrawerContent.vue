@@ -68,30 +68,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="row items-center tw:flex-wrap tw:gap-x-3 tw:gap-y-1 event-metadata"
             >
               <div class="text-caption ellipsis tw:flex tw:items-center">
-                <q-icon name="language" size="0.75rem" class="q-pr-xs" />
+                <q-icon name="language" size="0.75rem"
+class="q-pr-xs" />
                 {{ sessionDetails.ip }}
               </div>
               <div class="text-caption tw:flex tw:items-center">
-                <q-icon :name="outlinedCode" size="1rem" class="q-pr-xs" />
+                <q-icon :name="outlinedCode" size="1rem"
+class="q-pr-xs" />
                 {{ rawEvent.service || "Unknown User" }}
               </div>
               <div class="text-caption tw:flex tw:items-center">
                 V {{ rawEvent.version || "Unknown User" }}
               </div>
               <div class="text-caption tw:flex tw:items-center">
-                <q-icon name="mail" size="0.75rem" class="q-pr-xs" />
+                <q-icon name="mail" size="0.75rem"
+class="q-pr-xs" />
                 {{ sessionDetails.user_email || "Unknown User" }}
               </div>
               <div class="text-caption ellipsis tw:flex tw:items-center">
-                <q-icon name="settings" size="0.75rem" class="q-pr-xs" />
+                <q-icon name="settings" size="0.75rem"
+class="q-pr-xs" />
                 {{ sessionDetails.browser }}, {{ sessionDetails.os }}
               </div>
               <div class="text-caption ellipsis tw:flex tw:items-center">
-                <q-icon name="location_on" size="0.75rem" class="q-pr-xs" />
+                <q-icon name="location_on" size="0.75rem"
+class="q-pr-xs" />
                 {{ sessionDetails.city }}, {{ sessionDetails.country }}
               </div>
               <div class="text-caption ellipsis tw:flex tw:items-center">
-                <q-icon name="schedule" size="0.75rem" class="q-pr-xs" />
+                <q-icon name="schedule" size="0.75rem"
+class="q-pr-xs" />
                 {{ sessionDetails.date }}
               </div>
             </div>
@@ -104,7 +110,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
     <div class="row q-pt-sm q-px-sm">
       <div class="col-12">
-        <q-tabs v-model="activeTab" shrink align="left">
+        <q-tabs v-model="activeTab" shrink
+align="left">
           <q-tab
             data-test="event-detail-overview-tab"
             name="overview"
@@ -135,7 +142,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="tab-content-container"
     >
       <!-- Overview Tab -->
-      <q-tab-panel name="overview" class="q-pa-sm" data-test="overview-tab">
+      <q-tab-panel name="overview" class="q-pa-sm"
+data-test="overview-tab">
         <template v-if="event && Object.keys(event).length">
           <!-- Error Details -->
           <div
@@ -363,7 +371,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Event Details Row -->
                   <div class="tw:flex items-center text-grey-7 tw:text-[10px]">
-                    <q-icon name="schedule" size="0.75rem" class="tw:mr-1" />
+                    <q-icon name="schedule" size="0.75rem"
+class="tw:mr-1" />
                     <span class="tw:mr-2">{{
                       formatTimestamp(item.date)
                     }}</span>
@@ -415,7 +424,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-tab-panel>
 
       <!-- Network Tab -->
-      <q-tab-panel name="network" class="q-pa-sm" data-test="network-tab">
+      <q-tab-panel name="network" class="q-pa-sm"
+data-test="network-tab">
         <template v-if="networkResources.length > 0">
           <div class="tw:font-bold tw:mb-2 tw:text-sm">
             Network Requests ({{ networkResources.length }})
@@ -441,7 +451,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="row items-center tw:gap-x-3 tw:text-[10px] text-grey-7"
               >
                 <div class="tw:flex tw:items-center">
-                  <q-icon name="access_time" size="0.75rem" class="tw:mr-1" />
+                  <q-icon name="access_time" size="0.75rem"
+class="tw:mr-1" />
                   {{ formatDuration(resource.resource_duration / 1000000) }}
                 </div>
                 <div class="tw:flex tw:items-center">
@@ -454,7 +465,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ resource.resource_status_code }}
                 </div>
                 <div class="tw:flex tw:items-center">
-                  <q-icon name="schedule" size="0.75rem" class="tw:mr-1" />
+                  <q-icon name="schedule" size="0.75rem"
+class="tw:mr-1" />
                   {{ formatTimestamp(resource.date) }}
                 </div>
               </div>
@@ -471,7 +483,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-tab-panel>
 
       <!-- Console Tab -->
-      <q-tab-panel name="console" class="q-pa-sm" data-test="console-tab">
+      <q-tab-panel name="console" class="q-pa-sm"
+data-test="console-tab">
         <div class="tw:text-center tw:py-8 tw:text-grey-6 tw:text-sm">
           Console logs coming soon
         </div>
@@ -489,7 +502,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-tab-panel>
 
       <!-- Attributes Tab -->
-      <q-tab-panel name="attributes" class="q-pa-sm" data-test="attributes-tab">
+      <q-tab-panel name="attributes" class="q-pa-sm"
+data-test="attributes-tab">
         <div class="tw:flex tw:justify-start">
           <q-btn
             :label="t('common.copyToClipboard')"

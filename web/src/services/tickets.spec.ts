@@ -37,7 +37,7 @@ describe("Tickets Service", () => {
               description: "Application crashes on login",
               status: "open",
               priority: "high",
-              created_at: "2024-01-01T00:00:00Z"
+              created_at: "2024-01-01T00:00:00Z",
             },
             {
               id: 2,
@@ -45,21 +45,21 @@ describe("Tickets Service", () => {
               description: "Add dark mode support",
               status: "in_progress",
               priority: "medium",
-              created_at: "2024-01-02T00:00:00Z"
-            }
+              created_at: "2024-01-02T00:00:00Z",
+            },
           ],
-          total: 2
-        }
+          total: 2,
+        },
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockTickets)
+        get: vi.fn().mockResolvedValue(mockTickets),
       } as any);
 
       const result = await tickets.list(1, 10, "created_at", false, "bug");
 
       expect(mockHttp().get).toHaveBeenCalledWith(
-        "/api/tickets?page_num=1&page_size=10&sort_by=created_at&desc=false&name=bug"
+        "/api/tickets?page_num=1&page_size=10&sort_by=created_at&desc=false&name=bug",
       );
       expect(result).toEqual(mockTickets);
     });
@@ -68,13 +68,13 @@ describe("Tickets Service", () => {
       const mockTickets = { data: { list: [], total: 0 } };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockTickets)
+        get: vi.fn().mockResolvedValue(mockTickets),
       } as any);
 
       await tickets.list(1, 20, "title", true, "");
 
       expect(mockHttp().get).toHaveBeenCalledWith(
-        "/api/tickets?page_num=1&page_size=20&sort_by=title&desc=true&name="
+        "/api/tickets?page_num=1&page_size=20&sort_by=title&desc=true&name=",
       );
     });
 
@@ -83,18 +83,18 @@ describe("Tickets Service", () => {
         { sortBy: "title", desc: false },
         { sortBy: "status", desc: true },
         { sortBy: "priority", desc: false },
-        { sortBy: "created_at", desc: true }
+        { sortBy: "created_at", desc: true },
       ];
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue({ data: { list: [], total: 0 } })
+        get: vi.fn().mockResolvedValue({ data: { list: [], total: 0 } }),
       } as any);
 
       for (const option of sortingOptions) {
         await tickets.list(1, 10, option.sortBy, option.desc, "test");
-        
+
         expect(mockHttp().get).toHaveBeenCalledWith(
-          `/api/tickets?page_num=1&page_size=10&sort_by=${option.sortBy}&desc=${option.desc}&name=test`
+          `/api/tickets?page_num=1&page_size=10&sort_by=${option.sortBy}&desc=${option.desc}&name=test`,
         );
       }
     });
@@ -103,11 +103,11 @@ describe("Tickets Service", () => {
       const mockError = new Error("Failed to fetch tickets");
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockRejectedValue(mockError)
+        get: vi.fn().mockRejectedValue(mockError),
       } as any);
 
       await expect(tickets.list(1, 10, "title", false, "test")).rejects.toThrow(
-        "Failed to fetch tickets"
+        "Failed to fetch tickets",
       );
     });
   });
@@ -119,26 +119,26 @@ describe("Tickets Service", () => {
         title: "Updated Bug Report",
         description: "Updated description",
         status: "resolved",
-        priority: "low"
+        priority: "low",
       };
 
       const mockResponse = {
         data: {
           id: ticketId,
           ...updateData,
-          updated_at: "2024-01-15T10:30:00Z"
-        }
+          updated_at: "2024-01-15T10:30:00Z",
+        },
       };
 
       mockHttp.mockReturnValue({
-        put: vi.fn().mockResolvedValue(mockResponse)
+        put: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await tickets.update(ticketId, updateData);
 
       expect(mockHttp().put).toHaveBeenCalledWith(
         `/api/tickets/${ticketId}`,
-        updateData
+        updateData,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -146,26 +146,26 @@ describe("Tickets Service", () => {
     it("should handle partial updates", async () => {
       const ticketId = 456;
       const partialUpdate = {
-        status: "closed"
+        status: "closed",
       };
 
       const mockResponse = {
         data: {
           id: ticketId,
           status: "closed",
-          updated_at: "2024-01-15T10:30:00Z"
-        }
+          updated_at: "2024-01-15T10:30:00Z",
+        },
       };
 
       mockHttp.mockReturnValue({
-        put: vi.fn().mockResolvedValue(mockResponse)
+        put: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await tickets.update(ticketId, partialUpdate);
 
       expect(mockHttp().put).toHaveBeenCalledWith(
         `/api/tickets/${ticketId}`,
-        partialUpdate
+        partialUpdate,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -176,10 +176,12 @@ describe("Tickets Service", () => {
       const mockError = new Error("Ticket not found");
 
       mockHttp.mockReturnValue({
-        put: vi.fn().mockRejectedValue(mockError)
+        put: vi.fn().mockRejectedValue(mockError),
       } as any);
 
-      await expect(tickets.update(ticketId, updateData)).rejects.toThrow("Ticket not found");
+      await expect(tickets.update(ticketId, updateData)).rejects.toThrow(
+        "Ticket not found",
+      );
     });
 
     it("should handle invalid ticket ID", async () => {
@@ -188,15 +190,17 @@ describe("Tickets Service", () => {
       const mockError = {
         response: {
           status: 400,
-          data: { message: "Invalid ticket ID" }
-        }
+          data: { message: "Invalid ticket ID" },
+        },
       };
 
       mockHttp.mockReturnValue({
-        put: vi.fn().mockRejectedValue(mockError)
+        put: vi.fn().mockRejectedValue(mockError),
       } as any);
 
-      await expect(tickets.update(invalidTicketId, updateData)).rejects.toEqual(mockError);
+      await expect(tickets.update(invalidTicketId, updateData)).rejects.toEqual(
+        mockError,
+      );
     });
   });
 
@@ -207,7 +211,7 @@ describe("Tickets Service", () => {
         description: "Need help with configuration",
         priority: "medium",
         category: "support",
-        reporter_email: "`user@example.com`"
+        reporter_email: "`user@example.com`",
       };
 
       const mockResponse = {
@@ -215,12 +219,12 @@ describe("Tickets Service", () => {
           id: 789,
           ...ticketData,
           status: "open",
-          created_at: "2024-01-15T10:30:00Z"
-        }
+          created_at: "2024-01-15T10:30:00Z",
+        },
       };
 
       mockHttp.mockReturnValue({
-        post: vi.fn().mockResolvedValue(mockResponse)
+        post: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await tickets.create(ticketData);
@@ -232,7 +236,7 @@ describe("Tickets Service", () => {
     it("should handle minimum required fields", async () => {
       const minimalTicketData = {
         title: "Minimal Ticket",
-        description: "Basic description"
+        description: "Basic description",
       };
 
       const mockResponse = {
@@ -241,24 +245,27 @@ describe("Tickets Service", () => {
           ...minimalTicketData,
           status: "open",
           priority: "normal",
-          created_at: "2024-01-15T10:30:00Z"
-        }
+          created_at: "2024-01-15T10:30:00Z",
+        },
       };
 
       mockHttp.mockReturnValue({
-        post: vi.fn().mockResolvedValue(mockResponse)
+        post: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await tickets.create(minimalTicketData);
 
-      expect(mockHttp().post).toHaveBeenCalledWith("/api/tickets", minimalTicketData);
+      expect(mockHttp().post).toHaveBeenCalledWith(
+        "/api/tickets",
+        minimalTicketData,
+      );
       expect(result.data.status).toBe("open");
     });
 
     it("should handle creation validation errors", async () => {
       const invalidTicketData = {
         title: "", // Empty title
-        description: "Test description"
+        description: "Test description",
       };
 
       const mockError = {
@@ -266,33 +273,35 @@ describe("Tickets Service", () => {
           status: 400,
           data: {
             message: "Validation failed",
-            errors: ["Title is required"]
-          }
-        }
+            errors: ["Title is required"],
+          },
+        },
       };
 
       mockHttp.mockReturnValue({
-        post: vi.fn().mockRejectedValue(mockError)
+        post: vi.fn().mockRejectedValue(mockError),
       } as any);
 
-      await expect(tickets.create(invalidTicketData)).rejects.toEqual(mockError);
+      await expect(tickets.create(invalidTicketData)).rejects.toEqual(
+        mockError,
+      );
     });
 
     it("should handle server errors during creation", async () => {
       const ticketData = {
         title: "Test Ticket",
-        description: "Test description"
+        description: "Test description",
       };
 
       const mockError = {
         response: {
           status: 500,
-          data: { message: "Internal server error" }
-        }
+          data: { message: "Internal server error" },
+        },
       };
 
       mockHttp.mockReturnValue({
-        post: vi.fn().mockRejectedValue(mockError)
+        post: vi.fn().mockRejectedValue(mockError),
       } as any);
 
       await expect(tickets.create(ticketData)).rejects.toEqual(mockError);
@@ -305,17 +314,19 @@ describe("Tickets Service", () => {
       const mockResponse = {
         data: {
           message: "Ticket deleted successfully",
-          deleted_count: 1
-        }
+          deleted_count: 1,
+        },
       };
 
       mockHttp.mockReturnValue({
-        delete: vi.fn().mockResolvedValue(mockResponse)
+        delete: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await tickets.delete(ticketName);
 
-      expect(mockHttp().delete).toHaveBeenCalledWith(`/api/tickets/${ticketName}`);
+      expect(mockHttp().delete).toHaveBeenCalledWith(
+        `/api/tickets/${ticketName}`,
+      );
       expect(result).toEqual(mockResponse);
     });
 
@@ -324,17 +335,19 @@ describe("Tickets Service", () => {
       const mockResponse = {
         data: {
           message: "Tickets deleted successfully",
-          deleted_count: 3
-        }
+          deleted_count: 3,
+        },
       };
 
       mockHttp.mockReturnValue({
-        delete: vi.fn().mockResolvedValue(mockResponse)
+        delete: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await tickets.delete(ticketNames);
 
-      expect(mockHttp().delete).toHaveBeenCalledWith(`/api/tickets/${ticketNames}`);
+      expect(mockHttp().delete).toHaveBeenCalledWith(
+        `/api/tickets/${ticketNames}`,
+      );
       expect(result).toEqual(mockResponse);
     });
 
@@ -343,15 +356,17 @@ describe("Tickets Service", () => {
       const mockError = {
         response: {
           status: 404,
-          data: { message: "Ticket not found" }
-        }
+          data: { message: "Ticket not found" },
+        },
       };
 
       mockHttp.mockReturnValue({
-        delete: vi.fn().mockRejectedValue(mockError)
+        delete: vi.fn().mockRejectedValue(mockError),
       } as any);
 
-      await expect(tickets.delete(nonExistentTicket)).rejects.toEqual(mockError);
+      await expect(tickets.delete(nonExistentTicket)).rejects.toEqual(
+        mockError,
+      );
     });
 
     it("should handle permission errors during deletion", async () => {
@@ -359,12 +374,12 @@ describe("Tickets Service", () => {
       const mockError = {
         response: {
           status: 403,
-          data: { message: "Insufficient permissions to delete ticket" }
-        }
+          data: { message: "Insufficient permissions to delete ticket" },
+        },
       };
 
       mockHttp.mockReturnValue({
-        delete: vi.fn().mockRejectedValue(mockError)
+        delete: vi.fn().mockRejectedValue(mockError),
       } as any);
 
       await expect(tickets.delete(ticketName)).rejects.toEqual(mockError);
@@ -375,12 +390,12 @@ describe("Tickets Service", () => {
       const mockError = {
         response: {
           status: 400,
-          data: { message: "Ticket name is required" }
-        }
+          data: { message: "Ticket name is required" },
+        },
       };
 
       mockHttp.mockReturnValue({
-        delete: vi.fn().mockRejectedValue(mockError)
+        delete: vi.fn().mockRejectedValue(mockError),
       } as any);
 
       await expect(tickets.delete(emptyName)).rejects.toEqual(mockError);
@@ -390,34 +405,44 @@ describe("Tickets Service", () => {
   describe("Error Handling", () => {
     it("should handle network errors across all methods", async () => {
       const networkError = new Error("Network connection failed");
-      
+
       mockHttp.mockReturnValue({
         get: vi.fn().mockRejectedValue(networkError),
         post: vi.fn().mockRejectedValue(networkError),
         put: vi.fn().mockRejectedValue(networkError),
-        delete: vi.fn().mockRejectedValue(networkError)
+        delete: vi.fn().mockRejectedValue(networkError),
       } as any);
 
-      await expect(tickets.list(1, 10, "title", false, "")).rejects.toThrow("Network connection failed");
-      await expect(tickets.create({})).rejects.toThrow("Network connection failed");
-      await expect(tickets.update(1, {})).rejects.toThrow("Network connection failed");
-      await expect(tickets.delete("test")).rejects.toThrow("Network connection failed");
+      await expect(tickets.list(1, 10, "title", false, "")).rejects.toThrow(
+        "Network connection failed",
+      );
+      await expect(tickets.create({})).rejects.toThrow(
+        "Network connection failed",
+      );
+      await expect(tickets.update(1, {})).rejects.toThrow(
+        "Network connection failed",
+      );
+      await expect(tickets.delete("test")).rejects.toThrow(
+        "Network connection failed",
+      );
     });
 
     it("should handle timeout errors", async () => {
       const timeoutError = {
         code: "ECONNABORTED",
-        message: "Request timeout"
+        message: "Request timeout",
       };
 
       mockHttp.mockReturnValue({
         get: vi.fn().mockRejectedValue(timeoutError),
         post: vi.fn().mockRejectedValue(timeoutError),
         put: vi.fn().mockRejectedValue(timeoutError),
-        delete: vi.fn().mockRejectedValue(timeoutError)
+        delete: vi.fn().mockRejectedValue(timeoutError),
       } as any);
 
-      await expect(tickets.list(1, 10, "title", false, "")).rejects.toEqual(timeoutError);
+      await expect(tickets.list(1, 10, "title", false, "")).rejects.toEqual(
+        timeoutError,
+      );
       await expect(tickets.create({})).rejects.toEqual(timeoutError);
       await expect(tickets.update(1, {})).rejects.toEqual(timeoutError);
       await expect(tickets.delete("test")).rejects.toEqual(timeoutError);
@@ -427,15 +452,17 @@ describe("Tickets Service", () => {
       const authError = {
         response: {
           status: 401,
-          data: { message: "Authentication required" }
-        }
+          data: { message: "Authentication required" },
+        },
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockRejectedValue(authError)
+        get: vi.fn().mockRejectedValue(authError),
       } as any);
 
-      await expect(tickets.list(1, 10, "title", false, "")).rejects.toEqual(authError);
+      await expect(tickets.list(1, 10, "title", false, "")).rejects.toEqual(
+        authError,
+      );
     });
   });
 
@@ -444,31 +471,31 @@ describe("Tickets Service", () => {
       const ticketData = {
         title: "Integration Test Ticket",
         description: "Testing complete workflow",
-        priority: "high"
+        priority: "high",
       };
 
       const createdTicketId = 999;
       const updateData = {
         status: "in_progress",
-        assignee: "developer@example.com"
+        assignee: "developer@example.com",
       };
 
       mockHttp.mockReturnValue({
         get: vi.fn().mockResolvedValue({
           data: {
             list: [{ id: createdTicketId, ...ticketData }],
-            total: 1
-          }
+            total: 1,
+          },
         }),
         post: vi.fn().mockResolvedValue({
-          data: { id: createdTicketId, ...ticketData, status: "open" }
+          data: { id: createdTicketId, ...ticketData, status: "open" },
         }),
         put: vi.fn().mockResolvedValue({
-          data: { id: createdTicketId, ...ticketData, ...updateData }
+          data: { id: createdTicketId, ...ticketData, ...updateData },
         }),
         delete: vi.fn().mockResolvedValue({
-          data: { message: "Ticket deleted", deleted_count: 1 }
-        })
+          data: { message: "Ticket deleted", deleted_count: 1 },
+        }),
       } as any);
 
       // Create ticket
@@ -477,7 +504,13 @@ describe("Tickets Service", () => {
       expect(createdTicket.data.status).toBe("open");
 
       // List tickets to verify creation
-      const ticketsList = await tickets.list(1, 10, "created_at", false, "integration");
+      const ticketsList = await tickets.list(
+        1,
+        10,
+        "created_at",
+        false,
+        "integration",
+      );
       expect(ticketsList.data.list).toHaveLength(1);
       expect(ticketsList.data.list[0].title).toBe(ticketData.title);
 
@@ -495,23 +528,27 @@ describe("Tickets Service", () => {
       const multipleTickets = [
         { title: "Ticket 1", description: "Description 1" },
         { title: "Ticket 2", description: "Description 2" },
-        { title: "Ticket 3", description: "Description 3" }
+        { title: "Ticket 3", description: "Description 3" },
       ];
 
       mockHttp.mockReturnValue({
-        post: vi.fn()
+        post: vi
+          .fn()
           .mockResolvedValueOnce({ data: { id: 1, ...multipleTickets[0] } })
           .mockResolvedValueOnce({ data: { id: 2, ...multipleTickets[1] } })
           .mockResolvedValueOnce({ data: { id: 3, ...multipleTickets[2] } }),
         delete: vi.fn().mockResolvedValue({
-          data: { message: "Multiple tickets deleted", deleted_count: 3 }
+          data: { message: "Multiple tickets deleted", deleted_count: 3 },
         }),
         get: vi.fn().mockResolvedValue({
           data: {
-            list: multipleTickets.map((ticket, index) => ({ id: index + 1, ...ticket })),
-            total: 3
-          }
-        })
+            list: multipleTickets.map((ticket, index) => ({
+              id: index + 1,
+              ...ticket,
+            })),
+            total: 3,
+          },
+        }),
       } as any);
 
       // Create multiple tickets
@@ -540,26 +577,28 @@ describe("Tickets Service", () => {
         data: {
           list: [
             { id: 1, title: "Bug: Login Issue", priority: "high" },
-            { id: 2, title: "Bug: UI Problem", priority: "medium" }
+            { id: 2, title: "Bug: UI Problem", priority: "medium" },
           ],
-          total: 2
-        }
+          total: 2,
+        },
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockFilteredTickets)
+        get: vi.fn().mockResolvedValue(mockFilteredTickets),
       } as any);
 
       // Test filtering by name
       const filteredResults = await tickets.list(1, 5, "priority", true, "bug");
-      
+
       expect(mockHttp().get).toHaveBeenCalledWith(
-        "/api/tickets?page_num=1&page_size=5&sort_by=priority&desc=true&name=bug"
+        "/api/tickets?page_num=1&page_size=5&sort_by=priority&desc=true&name=bug",
       );
       expect(filteredResults.data.list).toHaveLength(2);
-      expect(filteredResults.data.list.every((ticket: any) => 
-        ticket.title.toLowerCase().includes("bug")
-      )).toBe(true);
+      expect(
+        filteredResults.data.list.every((ticket: any) =>
+          ticket.title.toLowerCase().includes("bug"),
+        ),
+      ).toBe(true);
     });
   });
 });

@@ -13,14 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  describe,
-  expect,
-  it,
-  beforeEach,
-  afterEach,
-  vi,
-} from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
@@ -154,7 +147,8 @@ const globalOptions = {
     "q-resize-observer": true,
     TracesSearchResultList: {
       name: "TracesSearchResultList",
-      template: '<div data-test="traces-search-result-list" class="search-list tw:w-full"></div>',
+      template:
+        '<div data-test="traces-search-result-list" class="search-list tw:w-full"></div>',
       props: ["hits", "loading", "searchPerformed", "showHeader"],
       emits: ["row-click", "load-more"],
     },
@@ -201,7 +195,9 @@ describe("SearchResult", () => {
   });
 
   it("should render TracesMetricsDashboard component", () => {
-    const metricsDashboard = wrapper.find('[data-test="traces-metrics-dashboard"]');
+    const metricsDashboard = wrapper.find(
+      '[data-test="traces-metrics-dashboard"]',
+    );
     expect(metricsDashboard.exists()).toBe(true);
   });
 
@@ -248,7 +244,6 @@ describe("SearchResult", () => {
       expect(wrapper.emitted("update:scroll")).toBeTruthy();
 
       expect(mockSearchObj.data.resultGrid.currentPage).toBe(2);
-
     });
 
     it("should not emit update:scroll when loading is true", async () => {
@@ -322,12 +317,17 @@ describe("SearchResult", () => {
     it("should handle closeColumn method", () => {
       const column = { name: "service_name" };
       const initialColumnsLength = mockSearchObj.data.resultGrid.columns.length;
-      const initialFieldsLength = mockSearchObj.data.stream.selectedFields.length;
+      const initialFieldsLength =
+        mockSearchObj.data.stream.selectedFields.length;
 
       wrapper.vm.closeColumn(column);
 
-      expect(mockSearchObj.data.resultGrid.columns.length).toBe(initialColumnsLength - 1);
-      expect(mockSearchObj.data.stream.selectedFields.length).toBe(initialFieldsLength - 1);
+      expect(mockSearchObj.data.resultGrid.columns.length).toBe(
+        initialColumnsLength - 1,
+      );
+      expect(mockSearchObj.data.stream.selectedFields.length).toBe(
+        initialFieldsLength - 1,
+      );
     });
   });
 
@@ -349,11 +349,15 @@ describe("SearchResult", () => {
 
   describe("Component components", () => {
     it("should include TracesMetricsDashboard component", () => {
-      expect(wrapper.vm.$options.components).toHaveProperty("TracesMetricsDashboard");
+      expect(wrapper.vm.$options.components).toHaveProperty(
+        "TracesMetricsDashboard",
+      );
     });
 
     it("should include TracesSearchResultList component", () => {
-      expect(wrapper.vm.$options.components).toHaveProperty("TracesSearchResultList");
+      expect(wrapper.vm.$options.components).toHaveProperty(
+        "TracesSearchResultList",
+      );
     });
   });
 });

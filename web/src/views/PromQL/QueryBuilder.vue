@@ -26,9 +26,7 @@
           />
 
           <!-- Operations List -->
-          <OperationsList
-            v-model:operations="visualQuery.operations"
-          />
+          <OperationsList v-model:operations="visualQuery.operations" />
         </div>
       </q-card-section>
 
@@ -37,9 +35,12 @@
       <!-- Generated Query Display -->
       <q-card-section>
         <div class="text-subtitle1 q-mb-sm">Generated PromQL Query:</div>
-        <q-card flat bordered class="bg-grey-1">
+        <q-card flat bordered
+class="bg-grey-1">
           <q-card-section>
-            <pre class="query-output">{{ generatedQuery || "No query built yet" }}</pre>
+            <pre class="query-output">{{
+              generatedQuery || "No query built yet"
+            }}</pre>
           </q-card-section>
         </q-card>
 
@@ -70,7 +71,8 @@
       <!-- Query Result Preview -->
       <q-card-section v-if="queryResult">
         <div class="text-subtitle1 q-mb-sm">Query Result Preview:</div>
-        <q-card flat bordered class="bg-grey-1">
+        <q-card flat bordered
+class="bg-grey-1">
           <q-card-section>
             <pre class="result-output">{{ queryResult }}</pre>
           </q-card-section>
@@ -156,7 +158,7 @@ const testQuery = () => {
       message: "Query execution will be implemented in the next phase",
     },
     null,
-    2
+    2,
   );
 };
 </script>

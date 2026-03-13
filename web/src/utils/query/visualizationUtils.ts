@@ -8,11 +8,11 @@ function isSimpleField(column: any): boolean {
   // If column has an 'expr' property, check its type
   if (column?.expr) {
     // Simple column reference will have type 'column_ref'
-    return column?.expr?.type === 'column_ref';
+    return column?.expr?.type === "column_ref";
   }
-  
+
   // Direct column reference (sometimes the structure is different)
-  return column?.type === 'column_ref';
+  return column?.type === "column_ref";
 }
 
 /**
@@ -29,7 +29,7 @@ function columnsHaveAlias(columns: any[] | undefined): boolean {
     if (isSimpleField(c)) {
       return true;
     }
-    
+
     // For complex expressions (functions, aggregations, etc.), require an alias
     return typeof c?.as === "string" && c?.as?.trim()?.length > 0;
   });

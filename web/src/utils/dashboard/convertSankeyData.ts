@@ -91,8 +91,8 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
               value,
               panelSchema.config?.unit,
               panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals
-            )
+              panelSchema.config?.decimals,
+            ),
           );
         }
 

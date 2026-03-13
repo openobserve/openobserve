@@ -57,10 +57,7 @@ const useNotifications = () => {
     });
   };
 
-  const showAliasErrorForVisualization = (
-    message: string,
-    options?: any,
-  ) => {
+  const showAliasErrorForVisualization = (message: string, options?: any) => {
     return quasar.notify({
       type: "negative",
       message: message,
@@ -117,7 +114,7 @@ const useNotifications = () => {
       ],
       ...(options || {}),
     });
-  }
+  };
 
   return {
     showErrorNotification,

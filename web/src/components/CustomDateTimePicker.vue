@@ -101,8 +101,8 @@ const props = defineProps({
   changeStyle: {
     default: false,
     required: false,
-    type: Boolean
-  }
+    type: Boolean,
+  },
 });
 
 const emit = defineEmits(["update:modelValue"]);
@@ -201,8 +201,8 @@ const getDisplayValue = () => {
 };
 
 const getTrimmedDisplayValue = () => {
-return `Past ${picker.data.selectedDate.relative.value} ${picker.data.selectedDate.relative.label}`;
-}
+  return `Past ${picker.data.selectedDate.relative.value} ${picker.data.selectedDate.relative.label}`;
+};
 
 // Check if the current selection matches the modelValue
 const isSelected = (value, period) => {
@@ -221,8 +221,12 @@ const getPeriodLabel = () => {
 };
 
 const computedClass = computed(() => {
-  return props.changeStyle ? store.state.theme === 'dark' ? 'dark-mode-date-time-picker' : 'light-mode-date-time-picker' : ''
-})
+  return props.changeStyle
+    ? store.state.theme === "dark"
+      ? "dark-mode-date-time-picker"
+      : "light-mode-date-time-picker"
+    : "";
+});
 </script>
 
 <style scoped>
@@ -462,11 +466,11 @@ const computedClass = computed(() => {
   background: #f2f2f2 !important;
   color: #000 !important;
 }
-.dark-mode-date-time-picker{
-  background-color: #2A2828 !important;
+.dark-mode-date-time-picker {
+  background-color: #2a2828 !important;
   color: #ffffff !important;
 }
-.light-mode-date-time-picker{
+.light-mode-date-time-picker {
   background-color: #ffffff !important;
 }
 </style>

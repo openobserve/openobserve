@@ -75,7 +75,7 @@ describe("QueryModeller", () => {
     });
 
     it("should escape backslashes in values", () => {
-      const labels = [{ label: "path", op: "=", value: 'C:\\Users\\test' }];
+      const labels = [{ label: "path", op: "=", value: "C:\\Users\\test" }];
 
       const result = promQueryModeller.renderLabels(labels);
 
@@ -83,7 +83,9 @@ describe("QueryModeller", () => {
     });
 
     it("should escape both backslashes and quotes", () => {
-      const labels = [{ label: "path", op: "=", value: 'C:\\path\\"with\\"quotes' }];
+      const labels = [
+        { label: "path", op: "=", value: 'C:\\path\\"with\\"quotes' },
+      ];
 
       const result = promQueryModeller.renderLabels(labels);
 
@@ -613,7 +615,9 @@ describe("QueryModeller", () => {
       const query: PromVisualQuery = {
         metric: "http_requests_total",
         labels: [],
-        operations: [{ id: PromOperationId.Sum, params: [["method", "", " "]] }],
+        operations: [
+          { id: PromOperationId.Sum, params: [["method", "", " "]] },
+        ],
       };
 
       const result = promQueryModeller.renderQuery(query);

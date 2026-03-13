@@ -17,7 +17,7 @@
       <thead class="thead-sticky text-left">
         <tr>
           <th
-            v-for="(col, index) in (columns as any[])"
+            v-for="(col, index) in columns as any[]"
             :key="col.label + index"
             class="table-header"
           >
@@ -36,7 +36,7 @@
         class="pointer"
       >
         <q-td
-          v-for="column in (columns as any[])"
+          v-for="column in columns as any[]"
           :key="row[column.name] || 'null' + index + column.name"
           class="field_list"
           style="cursor: pointer"
@@ -47,8 +47,8 @@
               !row[column.name]
                 ? "null"
                 : row[column.name].toString().length > 50
-                ? row[column.name].substring(0, 47) + "..."
-                : row[column.name]
+                  ? row[column.name].substring(0, 47) + "..."
+                  : row[column.name]
             }}
           </div>
         </q-td>

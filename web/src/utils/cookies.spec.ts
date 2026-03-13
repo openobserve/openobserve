@@ -81,11 +81,9 @@ describe("Cookie Utilities", () => {
 
       setSidebarStatus(status);
 
-      expect(Cookies.set).toHaveBeenCalledWith(
-        Keys.sidebarStatusKey,
-        status,
-        { path: "/" }
-      );
+      expect(Cookies.set).toHaveBeenCalledWith(Keys.sidebarStatusKey, status, {
+        path: "/",
+      });
     });
 
     it("should set sidebar status with collapsed value", () => {
@@ -93,11 +91,9 @@ describe("Cookie Utilities", () => {
 
       setSidebarStatus(status);
 
-      expect(Cookies.set).toHaveBeenCalledWith(
-        Keys.sidebarStatusKey,
-        status,
-        { path: "/" }
-      );
+      expect(Cookies.set).toHaveBeenCalledWith(Keys.sidebarStatusKey, status, {
+        path: "/",
+      });
     });
 
     it("should handle empty string status", () => {
@@ -105,11 +101,9 @@ describe("Cookie Utilities", () => {
 
       setSidebarStatus(status);
 
-      expect(Cookies.set).toHaveBeenCalledWith(
-        Keys.sidebarStatusKey,
-        status,
-        { path: "/" }
-      );
+      expect(Cookies.set).toHaveBeenCalledWith(Keys.sidebarStatusKey, status, {
+        path: "/",
+      });
     });
   });
 
@@ -136,7 +130,7 @@ describe("Cookie Utilities", () => {
     it("should handle different language codes", () => {
       const languages = ["en", "es", "fr", "de", "zh"];
 
-      languages.forEach(lang => {
+      languages.forEach((lang) => {
         (Cookies.get as any).mockReturnValue(lang);
         const result = getLanguage();
         expect(result).toBe(lang);
@@ -152,23 +146,21 @@ describe("Cookie Utilities", () => {
 
       setLanguage(language);
 
-      expect(Cookies.set).toHaveBeenCalledWith(
-        Keys.languageKey,
-        language,
-        { path: "/", expires: 400 }
-      );
+      expect(Cookies.set).toHaveBeenCalledWith(Keys.languageKey, language, {
+        path: "/",
+        expires: 400,
+      });
     });
 
     it("should handle different language codes", () => {
       const languages = ["en", "es", "fr", "de", "zh"];
 
-      languages.forEach(lang => {
+      languages.forEach((lang) => {
         setLanguage(lang);
-        expect(Cookies.set).toHaveBeenCalledWith(
-          Keys.languageKey,
-          lang,
-          { path: "/", expires: 400 }
-        );
+        expect(Cookies.set).toHaveBeenCalledWith(Keys.languageKey, lang, {
+          path: "/",
+          expires: 400,
+        });
       });
 
       expect(Cookies.set).toHaveBeenCalledTimes(languages.length);
@@ -179,11 +171,10 @@ describe("Cookie Utilities", () => {
 
       setLanguage(language);
 
-      expect(Cookies.set).toHaveBeenCalledWith(
-        Keys.languageKey,
-        language,
-        { path: "/", expires: 400 }
-      );
+      expect(Cookies.set).toHaveBeenCalledWith(Keys.languageKey, language, {
+        path: "/",
+        expires: 400,
+      });
     });
   });
 
@@ -210,7 +201,7 @@ describe("Cookie Utilities", () => {
     it("should handle different size values", () => {
       const sizes = ["small", "medium", "large", "xl"];
 
-      sizes.forEach(size => {
+      sizes.forEach((size) => {
         (Cookies.get as any).mockReturnValue(size);
         const result = getSize();
         expect(result).toBe(size);
@@ -226,23 +217,19 @@ describe("Cookie Utilities", () => {
 
       setSize(size);
 
-      expect(Cookies.set).toHaveBeenCalledWith(
-        Keys.sizeKey,
-        size,
-        { path: "/" }
-      );
+      expect(Cookies.set).toHaveBeenCalledWith(Keys.sizeKey, size, {
+        path: "/",
+      });
     });
 
     it("should handle different size values", () => {
       const sizes = ["small", "medium", "large", "xl"];
 
-      sizes.forEach(size => {
+      sizes.forEach((size) => {
         setSize(size);
-        expect(Cookies.set).toHaveBeenCalledWith(
-          Keys.sizeKey,
-          size,
-          { path: "/" }
-        );
+        expect(Cookies.set).toHaveBeenCalledWith(Keys.sizeKey, size, {
+          path: "/",
+        });
       });
 
       expect(Cookies.set).toHaveBeenCalledTimes(sizes.length);
@@ -253,11 +240,9 @@ describe("Cookie Utilities", () => {
 
       setSize(size);
 
-      expect(Cookies.set).toHaveBeenCalledWith(
-        Keys.sizeKey,
-        size,
-        { path: "/" }
-      );
+      expect(Cookies.set).toHaveBeenCalledWith(Keys.sizeKey, size, {
+        path: "/",
+      });
     });
   });
 
@@ -282,7 +267,8 @@ describe("Cookie Utilities", () => {
     });
 
     it("should handle long token strings", () => {
-      const longToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
+      const longToken =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
       (Cookies.get as any).mockReturnValue(longToken);
 
       const result = getToken();
@@ -298,23 +284,20 @@ describe("Cookie Utilities", () => {
 
       setToken(token);
 
-      expect(Cookies.set).toHaveBeenCalledWith(
-        Keys.tokenKey,
-        token,
-        { path: "/" }
-      );
+      expect(Cookies.set).toHaveBeenCalledWith(Keys.tokenKey, token, {
+        path: "/",
+      });
     });
 
     it("should handle long token strings", () => {
-      const longToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
+      const longToken =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
 
       setToken(longToken);
 
-      expect(Cookies.set).toHaveBeenCalledWith(
-        Keys.tokenKey,
-        longToken,
-        { path: "/" }
-      );
+      expect(Cookies.set).toHaveBeenCalledWith(Keys.tokenKey, longToken, {
+        path: "/",
+      });
     });
 
     it("should handle empty string token", () => {
@@ -322,11 +305,9 @@ describe("Cookie Utilities", () => {
 
       setToken(token);
 
-      expect(Cookies.set).toHaveBeenCalledWith(
-        Keys.tokenKey,
-        token,
-        { path: "/" }
-      );
+      expect(Cookies.set).toHaveBeenCalledWith(Keys.tokenKey, token, {
+        path: "/",
+      });
     });
 
     it("should set token with correct path", () => {
@@ -334,11 +315,9 @@ describe("Cookie Utilities", () => {
 
       setToken(token);
 
-      expect(Cookies.set).toHaveBeenCalledWith(
-        Keys.tokenKey,
-        token,
-        { path: "/" }
-      );
+      expect(Cookies.set).toHaveBeenCalledWith(Keys.tokenKey, token, {
+        path: "/",
+      });
     });
   });
 
@@ -353,7 +332,9 @@ describe("Cookie Utilities", () => {
       removeToken();
 
       expect(Cookies.remove).toHaveBeenCalledTimes(1);
-      expect(Cookies.remove).toHaveBeenCalledWith("vue3-typescript-admin-access-token");
+      expect(Cookies.remove).toHaveBeenCalledWith(
+        "vue3-typescript-admin-access-token",
+      );
     });
 
     it("should handle multiple remove calls", () => {
@@ -374,7 +355,9 @@ describe("Cookie Utilities", () => {
       setSidebarStatus(status);
       const result = getSidebarStatus();
 
-      expect(Cookies.set).toHaveBeenCalledWith(Keys.sidebarStatusKey, status, { path: "/" });
+      expect(Cookies.set).toHaveBeenCalledWith(Keys.sidebarStatusKey, status, {
+        path: "/",
+      });
       expect(Cookies.get).toHaveBeenCalledWith(Keys.sidebarStatusKey);
       expect(result).toBe(status);
     });
@@ -386,7 +369,10 @@ describe("Cookie Utilities", () => {
       setLanguage(language);
       const result = getLanguage();
 
-      expect(Cookies.set).toHaveBeenCalledWith(Keys.languageKey, language, { path: "/", expires: 400 });
+      expect(Cookies.set).toHaveBeenCalledWith(Keys.languageKey, language, {
+        path: "/",
+        expires: 400,
+      });
       expect(Cookies.get).toHaveBeenCalledWith(Keys.languageKey);
       expect(result).toBe(language);
     });
@@ -398,7 +384,9 @@ describe("Cookie Utilities", () => {
       setSize(size);
       const result = getSize();
 
-      expect(Cookies.set).toHaveBeenCalledWith(Keys.sizeKey, size, { path: "/" });
+      expect(Cookies.set).toHaveBeenCalledWith(Keys.sizeKey, size, {
+        path: "/",
+      });
       expect(Cookies.get).toHaveBeenCalledWith(Keys.sizeKey);
       expect(result).toBe(size);
     });
@@ -409,7 +397,9 @@ describe("Cookie Utilities", () => {
 
       // Set token
       setToken(token);
-      expect(Cookies.set).toHaveBeenCalledWith(Keys.tokenKey, token, { path: "/" });
+      expect(Cookies.set).toHaveBeenCalledWith(Keys.tokenKey, token, {
+        path: "/",
+      });
 
       // Get token
       const result = getToken();

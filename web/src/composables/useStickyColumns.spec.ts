@@ -24,9 +24,11 @@ describe("useStickyColumns", () => {
 
   beforeEach(() => {
     // Clean up any existing style elements from previous tests
-    document.querySelectorAll('style[data-sticky-styles="true"]').forEach((el) => {
-      el.parentNode?.removeChild(el);
-    });
+    document
+      .querySelectorAll('style[data-sticky-styles="true"]')
+      .forEach((el) => {
+        el.parentNode?.removeChild(el);
+      });
 
     mockProps = {
       data: {
@@ -43,9 +45,11 @@ describe("useStickyColumns", () => {
 
   afterEach(() => {
     // Clean up style elements after each test
-    document.querySelectorAll('style[data-sticky-styles="true"]').forEach((el) => {
-      el.parentNode?.removeChild(el);
-    });
+    document
+      .querySelectorAll('style[data-sticky-styles="true"]')
+      .forEach((el) => {
+        el.parentNode?.removeChild(el);
+      });
   });
 
   describe("Initialization", () => {
@@ -214,7 +218,10 @@ describe("useStickyColumns", () => {
       composable = useStickyColumns(mockProps, mockStore);
       await nextTick();
 
-      const style = composable.getStickyColumnStyle({ sticky: true, name: "col1" });
+      const style = composable.getStickyColumnStyle({
+        sticky: true,
+        name: "col1",
+      });
 
       expect(style).toEqual({
         position: "sticky",
@@ -234,8 +241,14 @@ describe("useStickyColumns", () => {
       composable = useStickyColumns(mockProps, mockStore);
       await nextTick();
 
-      const style1 = composable.getStickyColumnStyle({ sticky: true, name: "col1" });
-      const style2 = composable.getStickyColumnStyle({ sticky: true, name: "col2" });
+      const style1 = composable.getStickyColumnStyle({
+        sticky: true,
+        name: "col1",
+      });
+      const style2 = composable.getStickyColumnStyle({
+        sticky: true,
+        name: "col2",
+      });
 
       expect(style1.left).toBe("0px");
       expect(style2.left).toBe("100px");
@@ -256,7 +269,10 @@ describe("useStickyColumns", () => {
       mockStore.state.theme = "dark";
       composable = useStickyColumns(mockProps, mockStore);
 
-      const style = composable.getStickyColumnStyle({ sticky: true, name: "col1" });
+      const style = composable.getStickyColumnStyle({
+        sticky: true,
+        name: "col1",
+      });
 
       expect(style["background-color"]).toBe("#1a1a1a");
     });
@@ -265,7 +281,10 @@ describe("useStickyColumns", () => {
       mockStore.state.theme = "light";
       composable = useStickyColumns(mockProps, mockStore);
 
-      const style = composable.getStickyColumnStyle({ sticky: true, name: "col1" });
+      const style = composable.getStickyColumnStyle({
+        sticky: true,
+        name: "col1",
+      });
 
       expect(style["background-color"]).toBe("#fff");
     });
@@ -314,7 +333,10 @@ describe("useStickyColumns", () => {
 
       composable = useStickyColumns(mockProps, mockStore);
 
-      const style = composable.getStickyColumnStyle({ sticky: true, name: "col1" });
+      const style = composable.getStickyColumnStyle({
+        sticky: true,
+        name: "col1",
+      });
 
       // Theme determines background color
       expect(style["background-color"]).toBe("#1a1a1a");
@@ -547,13 +569,19 @@ describe("useStickyColumns", () => {
       mockStore.state.theme = "light";
       composable = useStickyColumns(mockProps, mockStore);
 
-      const style1 = composable.getStickyColumnStyle({ sticky: true, name: "col1" });
+      const style1 = composable.getStickyColumnStyle({
+        sticky: true,
+        name: "col1",
+      });
       expect(style1["background-color"]).toBe("#fff");
 
       // After theme change, getStickyColumnStyle should return new color
       mockStore.state.theme = "dark";
 
-      const style2 = composable.getStickyColumnStyle({ sticky: true, name: "col1" });
+      const style2 = composable.getStickyColumnStyle({
+        sticky: true,
+        name: "col1",
+      });
       expect(style2["background-color"]).toBe("#1a1a1a");
     });
 

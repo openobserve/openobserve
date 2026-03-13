@@ -15,25 +15,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog :model-value="modelValue" @update:model-value="$emit('update:modelValue', $event)" persistent>
+  <q-dialog
+    :model-value="modelValue"
+    @update:model-value="$emit('update:modelValue', $event)"
+    persistent
+  >
     <q-card style="min-width: 500px; max-width: 650px">
       <q-card-section class="row items-center q-pb-sm q-pt-md q-px-md">
-        <div class="text-subtitle1 text-weight-medium">Index Fields Detected</div>
+        <div class="text-subtitle1 text-weight-medium">
+          Index Fields Detected
+        </div>
         <q-space />
       </q-card-section>
 
       <q-card-section class="q-pt-none q-pb-sm q-px-md">
         <div class="text-body2 q-mb-sm performance-fields-description">
-          We found some fields with full-text search or secondary indexes that are not included in your schema.
-          These fields affects search performance and indexing behavior.
-          Do you want to add them?
+          We found some fields with full-text search or secondary indexes that
+          are not included in your schema. These fields affects search
+          performance and indexing behavior. Do you want to add them?
         </div>
 
         <div v-if="fieldsByType.fts.length > 0" class="q-mb-sm">
           <div class="text-caption text-weight-medium q-mb-xs">
             Full Text Search ({{ fieldsByType.fts.length }})
           </div>
-          <div class="performance-fields-container bordered-scroll-area" :class="store.state.theme === 'dark' ? 'bordered-scroll-area-dark' : 'bordered-scroll-area-light'">
+          <div
+            class="performance-fields-container bordered-scroll-area"
+            :class="
+              store.state.theme === 'dark'
+                ? 'bordered-scroll-area-dark'
+                : 'bordered-scroll-area-light'
+            "
+          >
             <q-chip
               v-for="field in fieldsByType.fts"
               :key="field.name"
@@ -53,7 +66,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-caption text-weight-medium q-mb-xs">
             Secondary Index ({{ fieldsByType.secondaryIndex.length }})
           </div>
-          <div class="performance-fields-container bordered-scroll-area" :class="store.state.theme === 'dark' ? 'bordered-scroll-area-dark' : 'bordered-scroll-area-light'">
+          <div
+            class="performance-fields-container bordered-scroll-area"
+            :class="
+              store.state.theme === 'dark'
+                ? 'bordered-scroll-area-dark'
+                : 'bordered-scroll-area-light'
+            "
+          >
             <q-chip
               v-for="field in fieldsByType.secondaryIndex"
               :key="field.name"
@@ -71,8 +91,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions align="right" class="q-pt-none q-pb-md q-px-md">
-        <q-btn flat label="Skip" class="o2-secondary-button" @click="$emit('skip')" />
-        <q-btn unelevated label="Add Fields" class="o2-primary-button" @click="$emit('add-fields')" />
+        <q-btn
+          flat
+          label="Skip"
+          class="o2-secondary-button"
+          @click="$emit('skip')"
+        />
+        <q-btn
+          unelevated
+          label="Add Fields"
+          class="o2-primary-button"
+          @click="$emit('add-fields')"
+        />
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -109,7 +139,7 @@ export default defineComponent({
       return {
         fts: props.missingFields.filter((f) => f.type === "Full Text Search"),
         secondaryIndex: props.missingFields.filter(
-          (f) => f.type === "Secondary Index"
+          (f) => f.type === "Secondary Index",
         ),
       };
     });

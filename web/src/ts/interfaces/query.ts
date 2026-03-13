@@ -43,7 +43,14 @@ export interface HistogramQueryPayload {
 }
 
 export interface WebSocketSearchResponse {
-  type: "search_response" | "cancel_response" | "error" | "end" | "progress" | "search_response_metadata" | "search_response_hits";
+  type:
+    | "search_response"
+    | "cancel_response"
+    | "error"
+    | "end"
+    | "progress"
+    | "search_response_metadata"
+    | "search_response_hits";
   content: {
     results: {
       hits: any[];

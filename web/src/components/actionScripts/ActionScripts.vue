@@ -18,34 +18,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div data-test="action-scripts-list-page">
-    <div v-if="!showAddActionScriptDialog" class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
+    <div
+      v-if="!showAddActionScriptDialog"
+      class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
+    >
       <div class="card-container tw:mb-[0.625rem]">
-        <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:w-full tw:h-[68px]">
-          <div class="tw:font-[600] tw:text-[20px]" data-test="alerts-list-title">
-                  {{ t("actions.header") }}
-                </div>
-                <div class="tw:full-width tw:flex tw:items-center tw:justify-end">
-                  <q-input
-                    v-model="filterQuery"
-                    borderless
-                    dense
-                    class="q-ml-auto no-border o2-search-input"
-                    :placeholder="t('actions.search')"
-                    data-test="action-list-search-input"
-                  >
-                    <template #prepend>
-                      <q-icon class="o2-search-input-icon" name="search" />
-                    </template>
-                  </q-input>
-                <q-btn
-                  data-test="action-list-add-btn"
-                  class="q-ml-sm o2-primary-button tw:h-[36px]"
-                  flat
-                  no-caps
-                  :label="t(`actions.add`)"
-                  @click="showAddUpdateFn({})"
-                />
-                </div>
+        <div
+          class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:w-full tw:h-[68px]"
+        >
+          <div
+            class="tw:font-[600] tw:text-[20px]"
+            data-test="alerts-list-title"
+          >
+            {{ t("actions.header") }}
+          </div>
+          <div class="tw:full-width tw:flex tw:items-center tw:justify-end">
+            <q-input
+              v-model="filterQuery"
+              borderless
+              dense
+              class="q-ml-auto no-border o2-search-input"
+              :placeholder="t('actions.search')"
+              data-test="action-list-search-input"
+            >
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" name="search" />
+              </template>
+            </q-input>
+            <q-btn
+              data-test="action-list-add-btn"
+              class="q-ml-sm o2-primary-button tw:h-[36px]"
+              flat
+              no-caps
+              :label="t(`actions.add`)"
+              @click="showAddUpdateFn({})"
+            />
+          </div>
         </div>
       </div>
       <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
@@ -57,17 +65,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             row-key="id"
             :pagination="pagination"
-            style="width: 100%;"
+            style="width: 100%"
             :style="{ height: hasVisibleRows ? 'calc(100vh - 124px)' : '' }"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky o2-last-row-border"
             selection="multiple"
             v-model:selected="selectedActionScripts"
-            >
+          >
             <template #no-data>
               <NoData />
             </template>
             <template v-slot:body-selection="scope">
-              <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+              <q-checkbox
+                v-model="scope.selected"
+                size="sm"
+                class="o2-table-checkbox"
+              />
             </template>
             <template v-slot:body-cell-actions="props">
               <q-td :props="props">
@@ -97,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('alerts.edit')"
                   @click="showAddUpdateFn(props)"
                 >
-              </q-btn>
+                </q-btn>
                 <q-btn
                   :data-test="`alert-list-${props.row.name}-delete-alert`"
                   padding="sm"
@@ -109,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('alerts.delete')"
                   @click="showDeleteDialogFn(props)"
                 >
-              </q-btn>
+                </q-btn>
               </q-td>
             </template>
 
@@ -123,10 +135,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #bottom="scope">
-              <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+              <div
+                class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+              >
                 <div class="tw:flex tw:items-center tw:gap-2">
-                  <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[80px] tw:mr-md">
-                    {{ resultTotal }} {{ t('actions.header') }}
+                  <div
+                    class="o2-table-footer-title tw:flex tw:items-center tw:w-[80px] tw:mr-md"
+                  >
+                    {{ resultTotal }} {{ t("actions.header") }}
                   </div>
                   <q-btn
                     v-if="selectedActionScripts.length > 0"
@@ -146,40 +162,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-btn>
                 </div>
                 <QTablePagination
-                :scope="scope"
-                :position="'bottom'"
-                :resultTotal="resultTotal"
-                :perPageOptions="perPageOptions"
-                @update:changeRecordPerPage="changePagination"
-              />
+                  :scope="scope"
+                  :position="'bottom'"
+                  :resultTotal="resultTotal"
+                  :perPageOptions="perPageOptions"
+                  @update:changeRecordPerPage="changePagination"
+                />
               </div>
             </template>
 
             <template v-slot:header="props">
-                <q-tr :props="props">
-                  <!-- Adding this block to render the select-all checkbox -->
-                  <q-th v-if="columns.length > 0" auto-width>
-                    <q-checkbox
-                      v-model="props.selected"
-                      size="sm"
-                      :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                      class="o2-table-checkbox"
-                    />
-                  </q-th>
+              <q-tr :props="props">
+                <!-- Adding this block to render the select-all checkbox -->
+                <q-th v-if="columns.length > 0" auto-width>
+                  <q-checkbox
+                    v-model="props.selected"
+                    size="sm"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-table-checkbox-dark'
+                        : 'o2-table-checkbox-light'
+                    "
+                    class="o2-table-checkbox"
+                  />
+                </q-th>
 
-                  <!-- Rendering the rest of the columns -->
-                  <!-- here we can add the classes class so that the head will be sticky -->
-                  <q-th
-                    v-for="col in props.cols"
-                    :key="col.name"
-                    :props="props"
-                    :class="col.classes"
-                    :style="col.style"
-                  >
-                    {{ col.label }}
-                  </q-th>
-                </q-tr>
-              </template>
+                <!-- Rendering the rest of the columns -->
+                <!-- here we can add the classes class so that the head will be sticky -->
+                <q-th
+                  v-for="col in props.cols"
+                  :key="col.name"
+                  :props="props"
+                  :class="col.classes"
+                  :style="col.style"
+                >
+                  {{ col.label }}
+                </q-th>
+              </q-tr>
+            </template>
           </q-table>
         </div>
       </div>
@@ -209,7 +229,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmBulkDelete"
     />
     <template>
-      <q-dialog class="q-pa-md" v-model="showForm" persistent>
+      <q-dialog class="q-pa-md" v-model="showForm"
+persistent>
         <q-card class="clone-alert-popup">
           <div class="row items-center no-wrap q-mx-md q-my-sm">
             <div class="flex items-center">
@@ -468,7 +489,7 @@ export default defineComponent({
         align: "center",
         sortable: false,
         classes: "actions-column",
-        style: "width: 100px"
+        style: "width: 100px",
       },
     ]);
     const activeTab: any = ref("alerts");
@@ -581,7 +602,7 @@ export default defineComponent({
     const addAlert = () => {
       track("Button Click", {
         button: "Add Action Scripts",
-        page: "Action Scripts"
+        page: "Action Scripts",
       });
       showAddActionScriptDialog.value = true;
     };
@@ -709,7 +730,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           {
             ids: selectedActionScripts.value.map((script: any) => script.id),
-          }
+          },
         );
 
         const { successful = [], unsuccessful = [], err } = response.data || {};
@@ -745,7 +766,10 @@ export default defineComponent({
         if (error.response?.status != 403 || error?.status != 403) {
           $q.notify({
             type: "negative",
-            message: error.response?.data?.message || error?.message || "Error while deleting action scripts",
+            message:
+              error.response?.data?.message ||
+              error?.message ||
+              "Error while deleting action scripts",
             timeout: 2000,
           });
         }
@@ -845,33 +869,37 @@ export default defineComponent({
     // };
 
     const filterData = (rows: any, terms: any) => {
-        var filtered = [];
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (
-            rows[i]["name"].toLowerCase().includes(terms) ||
-            (rows[i]["owner"] != null &&
-              rows[i]["owner"].toLowerCase().includes(terms)) ||
-            (rows[i]["description"] != null &&
-              rows[i]["description"].toString().toLowerCase().includes(terms))
-          ) {
-            filtered.push(rows[i]);
-          }
+      var filtered = [];
+      terms = terms.toLowerCase();
+      for (var i = 0; i < rows.length; i++) {
+        if (
+          rows[i]["name"].toLowerCase().includes(terms) ||
+          (rows[i]["owner"] != null &&
+            rows[i]["owner"].toLowerCase().includes(terms)) ||
+          (rows[i]["description"] != null &&
+            rows[i]["description"].toString().toLowerCase().includes(terms))
+        ) {
+          filtered.push(rows[i]);
         }
-        return filtered;
-      };
+      }
+      return filtered;
+    };
 
-      const visibleRows = computed(() => {
-      if (!filterQuery.value) return actionsScriptRows.value || []
-      return filterData(actionsScriptRows.value || [], filterQuery.value)
+    const visibleRows = computed(() => {
+      if (!filterQuery.value) return actionsScriptRows.value || [];
+      return filterData(actionsScriptRows.value || [], filterQuery.value);
     });
 
     const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
     // Watch visibleRows to sync resultTotal with search filter
-    watch(visibleRows, (newVisibleRows) => {
-      resultTotal.value = newVisibleRows.length;
-    }, { immediate: true });
+    watch(
+      visibleRows,
+      (newVisibleRows) => {
+        resultTotal.value = newVisibleRows.length;
+      },
+      { immediate: true },
+    );
 
     return {
       t,

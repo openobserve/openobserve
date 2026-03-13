@@ -33,8 +33,15 @@ vi.mock("echarts/core", () => ({
     showLoading: vi.fn(),
     hideLoading: vi.fn(),
     getOption: vi.fn().mockReturnValue({
-      series: [{ data: [[1609459200000, 10], [1609462800000, 20]] }],
-      legend: [{}]
+      series: [
+        {
+          data: [
+            [1609459200000, 10],
+            [1609462800000, 20],
+          ],
+        },
+      ],
+      legend: [{}],
     }),
     dispatchAction: vi.fn(),
     convertFromPixel: vi.fn(),
@@ -115,20 +122,20 @@ describe("ChartRenderer", () => {
       series: [{ name: "Series 1", type: "line", data: [[1609459200000, 10]] }],
       xAxis: { type: "time" },
       yAxis: { type: "value" },
-      tooltip: { 
+      tooltip: {
         textStyle: { color: "#000" },
-        backgroundColor: "rgba(255,255,255,1)"
-      }
+        backgroundColor: "rgba(255,255,255,1)",
+      },
     },
-    extras: { 
+    extras: {
       panelId: "panel-1",
-      isTimeSeries: true
-    }
+      isTimeSeries: true,
+    },
   };
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    
+
     // Mock hoveredSeriesState - needs to be a reactive ref-like object
     mockHoveredSeriesState = {
       value: {
@@ -143,7 +150,7 @@ describe("ChartRenderer", () => {
     };
 
     // Mock intersection observer
-    global.IntersectionObserver = vi.fn(function(callback) {
+    global.IntersectionObserver = vi.fn(function (callback) {
       return {
         observe: vi.fn(),
         unobserve: vi.fn(),
@@ -156,12 +163,12 @@ describe("ChartRenderer", () => {
     global.removeEventListener = vi.fn();
 
     store.state.theme = "light";
-    
+
     wrapper = mount(ChartRenderer, {
       props: {
         data: mockChartData,
         renderType: "canvas",
-        height: "100%"
+        height: "100%",
       },
       global: {
         plugins: [i18n],
@@ -198,7 +205,7 @@ describe("ChartRenderer", () => {
     it("should handle different renderType props", async () => {
       await wrapper.setProps({ renderType: "svg" });
       await flushPromises();
-      
+
       expect(wrapper.props("renderType")).toBe("svg");
     });
 
@@ -214,10 +221,10 @@ describe("ChartRenderer", () => {
     it("should respond to theme changes", async () => {
       const initialTheme = store.state.theme;
       expect(initialTheme).toBe("light");
-      
+
       store.state.theme = "dark";
       await wrapper.vm.$nextTick();
-      
+
       expect(store.state.theme).toBe("dark");
     });
 
@@ -229,12 +236,14 @@ describe("ChartRenderer", () => {
     it("should cleanup chart on theme change", async () => {
       const echarts = await import("echarts/core");
       const initialCallCount = vi.mocked(echarts.init).mock.calls.length;
-      
+
       store.state.theme = "dark";
       await wrapper.vm.$nextTick();
       await flushPromises();
-      
-      expect(vi.mocked(echarts.init).mock.calls.length).toBeGreaterThan(initialCallCount);
+
+      expect(vi.mocked(echarts.init).mock.calls.length).toBeGreaterThan(
+        initialCallCount,
+      );
     });
   });
 
@@ -243,15 +252,17 @@ describe("ChartRenderer", () => {
       const newData = {
         ...mockChartData,
         chartType: "bar",
-        options: { 
+        options: {
           ...mockChartData.options,
-          series: [{ name: "Bar Series", type: "bar", data: [[1609459200000, 15]] }]
-        }
+          series: [
+            { name: "Bar Series", type: "bar", data: [[1609459200000, 15]] },
+          ],
+        },
       };
-      
+
       await wrapper.setProps({ data: newData });
       await flushPromises();
-      
+
       expect(wrapper.props("data")).toEqual(newData);
     });
 
@@ -261,27 +272,27 @@ describe("ChartRenderer", () => {
     });
 
     it("should handle empty data gracefully", async () => {
-      const emptyData = { 
-        chartType: "line", 
+      const emptyData = {
+        chartType: "line",
         options: { series: [], xAxis: {}, yAxis: {} },
-        extras: {}
+        extras: {},
       };
-      
+
       await wrapper.setProps({ data: emptyData });
       await flushPromises();
-      
+
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.props("data")).toEqual(emptyData);
     });
 
     it("should handle different chart types", async () => {
       const chartTypes = ["line", "bar", "pie", "scatter", "heatmap"];
-      
+
       for (const chartType of chartTypes) {
         const chartData = { ...mockChartData, chartType };
         await wrapper.setProps({ data: chartData });
         await flushPromises();
-        
+
         expect(wrapper.props("data").chartType).toBe(chartType);
       }
     });
@@ -295,32 +306,37 @@ describe("ChartRenderer", () => {
   describe("Event Handling", () => {
     it("should handle mouse events on container", async () => {
       const container = wrapper.find('[data-test="chart-renderer"]');
-      
+
       await container.trigger("mouseover");
       await container.trigger("mouseleave");
-      
-      expect(mockHoveredSeriesState.setIndex).toHaveBeenCalledWith(-1, -1, -1, null);
+
+      expect(mockHoveredSeriesState.setIndex).toHaveBeenCalledWith(
+        -1,
+        -1,
+        -1,
+        null,
+      );
     });
 
     it("should set panelId on mouseover", async () => {
       const container = wrapper.find('[data-test="chart-renderer"]');
-      
+
       await container.trigger("mouseover");
-      
+
       expect(mockHoveredSeriesState.panelId).toBe("panel-1");
     });
 
     it("should emit error events when needed", async () => {
       // Test error event emission by causing an error in data update
       const badData = { ...mockChartData, options: null };
-      
+
       try {
         await wrapper.setProps({ data: badData });
         await flushPromises();
       } catch (e) {
         // Expected to potentially throw
       }
-      
+
       // Component should still exist even with bad data
       expect(wrapper.exists()).toBe(true);
     });
@@ -342,8 +358,10 @@ describe("ChartRenderer", () => {
     it("should respond to hover state changes", async () => {
       mockHoveredSeriesState.value.hoveredSeriesName = "Test Series";
       await wrapper.vm.$nextTick();
-      
-      expect(mockHoveredSeriesState.value.hoveredSeriesName).toBe("Test Series");
+
+      expect(mockHoveredSeriesState.value.hoveredSeriesName).toBe(
+        "Test Series",
+      );
     });
   });
 
@@ -354,13 +372,19 @@ describe("ChartRenderer", () => {
         chartType: "pie",
         options: {
           ...mockChartData.options,
-          series: [{ name: "Pie Series", type: "pie", data: [{ name: "A", value: 10 }] }]
-        }
+          series: [
+            {
+              name: "Pie Series",
+              type: "pie",
+              data: [{ name: "A", value: 10 }],
+            },
+          ],
+        },
       };
-      
+
       await wrapper.setProps({ data: pieData });
       await flushPromises();
-      
+
       expect(wrapper.props("data").chartType).toBe("pie");
     });
 
@@ -370,27 +394,27 @@ describe("ChartRenderer", () => {
         chartType: "sankey",
         options: {
           ...mockChartData.options,
-          series: [{ type: "sankey", data: [], links: [] }]
-        }
+          series: [{ type: "sankey", data: [], links: [] }],
+        },
       };
-      
+
       await wrapper.setProps({ data: sankeyData });
       await flushPromises();
-      
+
       expect(wrapper.props("data").chartType).toBe("sankey");
     });
 
     it("should handle time series specific properties", async () => {
       expect(wrapper.props("data").extras.isTimeSeries).toBe(true);
-      
+
       const timeSeriesData = {
         ...mockChartData,
-        extras: { ...mockChartData.extras, isTimeSeries: false }
+        extras: { ...mockChartData.extras, isTimeSeries: false },
       };
-      
+
       await wrapper.setProps({ data: timeSeriesData });
       await flushPromises();
-      
+
       expect(wrapper.props("data").extras.isTimeSeries).toBe(false);
     });
   });
@@ -398,14 +422,14 @@ describe("ChartRenderer", () => {
   describe("Performance & Lifecycle", () => {
     it("should set up window resize listener", () => {
       expect(global.addEventListener).toHaveBeenCalledWith(
-        "resize", 
-        expect.any(Function)
+        "resize",
+        expect.any(Function),
       );
     });
 
     it("should set up intersection observer", () => {
       expect(global.IntersectionObserver).toHaveBeenCalledWith(
-        expect.any(Function)
+        expect.any(Function),
       );
     });
 
@@ -413,7 +437,7 @@ describe("ChartRenderer", () => {
       const unmountWrapper = mount(ChartRenderer, {
         props: {
           data: mockChartData,
-          renderType: "canvas"
+          renderType: "canvas",
         },
         global: {
           plugins: [i18n],
@@ -423,12 +447,12 @@ describe("ChartRenderer", () => {
           },
         },
       });
-      
+
       unmountWrapper.unmount();
-      
+
       expect(global.removeEventListener).toHaveBeenCalledWith(
-        "resize", 
-        expect.any(Function)
+        "resize",
+        expect.any(Function),
       );
     });
   });
@@ -444,16 +468,16 @@ describe("ChartRenderer", () => {
       }
 
       // Get the contextmenu handler that was registered
-      const contextMenuHandler = vi.mocked(mockChart.on).mock.calls.find(
-        call => call[0] === "contextmenu"
-      )?.[1];
+      const contextMenuHandler = vi
+        .mocked(mockChart.on)
+        .mock.calls.find((call) => call[0] === "contextmenu")?.[1];
 
       expect(contextMenuHandler).toBeDefined();
 
       if (contextMenuHandler) {
         // Mock getOption to return bar chart type
         vi.mocked(mockChart.getOption).mockReturnValue({
-          series: [{ type: "bar" }]
+          series: [{ type: "bar" }],
         });
 
         // Simulate contextmenu event on chart element
@@ -468,8 +492,8 @@ describe("ChartRenderer", () => {
               clientY: 200,
               preventDefault: vi.fn(),
               stopPropagation: vi.fn(),
-            }
-          }
+            },
+          },
         };
 
         contextMenuHandler(mockParams);
@@ -490,7 +514,7 @@ describe("ChartRenderer", () => {
 
       // Mock chart methods
       vi.mocked(mockChart.getOption).mockReturnValue({
-        series: [{ type: "line" }]
+        series: [{ type: "line" }],
       });
       vi.mocked(mockChart.convertFromPixel).mockReturnValue([100, 75.5]);
 
@@ -503,7 +527,9 @@ describe("ChartRenderer", () => {
       await flushPromises();
 
       // domcontextmenu should be emitted for alert creation
-      expect(wrapper.emitted("domcontextmenu") || wrapper.emitted("contextmenu")).toBeTruthy();
+      expect(
+        wrapper.emitted("domcontextmenu") || wrapper.emitted("contextmenu"),
+      ).toBeTruthy();
     });
 
     it("should prevent default context menu on right-click", async () => {
@@ -532,12 +558,12 @@ describe("ChartRenderer", () => {
 
       // Mock chart to return bar type
       vi.mocked(mockChart.getOption).mockReturnValue({
-        series: [{ type: "bar", data: [[1609459200000, 42]] }]
+        series: [{ type: "bar", data: [[1609459200000, 42]] }],
       });
 
-      const contextMenuHandler = vi.mocked(mockChart.on).mock.calls.find(
-        call => call[0] === "contextmenu"
-      )?.[1];
+      const contextMenuHandler = vi
+        .mocked(mockChart.on)
+        .mock.calls.find((call) => call[0] === "contextmenu")?.[1];
 
       if (contextMenuHandler) {
         const mockParams = {
@@ -551,8 +577,8 @@ describe("ChartRenderer", () => {
               clientY: 200,
               preventDefault: vi.fn(),
               stopPropagation: vi.fn(),
-            }
-          }
+            },
+          },
         };
 
         contextMenuHandler(mockParams);
@@ -582,7 +608,7 @@ describe("ChartRenderer", () => {
 
       // Mock chart to return pie type
       vi.mocked(mockChart.getOption).mockReturnValue({
-        series: [{ type: "pie" }]
+        series: [{ type: "pie" }],
       });
 
       const container = wrapper.find('[data-test="chart-renderer"]');
@@ -607,7 +633,7 @@ describe("ChartRenderer", () => {
       }
 
       vi.mocked(mockChart.getOption).mockReturnValue({
-        series: [{ type: "line" }]
+        series: [{ type: "line" }],
       });
       // Mock convertFromPixel to return null (conversion failed)
       vi.mocked(mockChart.convertFromPixel).mockReturnValue(null);
@@ -634,12 +660,12 @@ describe("ChartRenderer", () => {
       }
 
       vi.mocked(mockChart.getOption).mockReturnValue({
-        series: [{ type: "line" }]
+        series: [{ type: "line" }],
       });
 
-      const contextMenuHandler = vi.mocked(mockChart.on).mock.calls.find(
-        call => call[0] === "contextmenu"
-      )?.[1];
+      const contextMenuHandler = vi
+        .mocked(mockChart.on)
+        .mock.calls.find((call) => call[0] === "contextmenu")?.[1];
 
       if (contextMenuHandler) {
         const mockParams = {
@@ -653,8 +679,8 @@ describe("ChartRenderer", () => {
               clientY: 200,
               preventDefault: vi.fn(),
               stopPropagation: vi.fn(),
-            }
-          }
+            },
+          },
         };
 
         contextMenuHandler(mockParams);
@@ -677,10 +703,12 @@ describe("ChartRenderer", () => {
       }
 
       vi.mocked(mockChart.getOption).mockReturnValue({
-        series: [{ type: "bar" }]
+        series: [{ type: "bar" }],
       });
       // Mock Y-axis value at position
-      vi.mocked(mockChart.convertFromPixel).mockReturnValue([1609459200000, 85.7]);
+      vi.mocked(mockChart.convertFromPixel).mockReturnValue([
+        1609459200000, 85.7,
+      ]);
 
       const container = wrapper.find('[data-test="chart-renderer"]');
 
@@ -709,12 +737,12 @@ describe("ChartRenderer", () => {
     it("should handle missing data options", async () => {
       const dataWithoutOptions = {
         chartType: "line",
-        extras: { panelId: "test" }
+        extras: { panelId: "test" },
       };
-      
+
       await wrapper.setProps({ data: dataWithoutOptions });
       await flushPromises();
-      
+
       expect(wrapper.exists()).toBe(true);
     });
 
@@ -722,12 +750,12 @@ describe("ChartRenderer", () => {
       const malformedData = {
         chartType: "invalid-type",
         options: { series: "not-an-array" },
-        extras: null
+        extras: null,
       };
-      
+
       await wrapper.setProps({ data: malformedData });
       await flushPromises();
-      
+
       expect(wrapper.exists()).toBe(true);
     });
   });

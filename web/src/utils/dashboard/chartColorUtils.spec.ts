@@ -100,7 +100,11 @@ describe("chartColorUtils", () => {
 
     it("does nothing when series is not an array", () => {
       const series = null as any;
-      applySeriesColorMappings(series, [{ value: "A", color: "#FF0000" }], "light");
+      applySeriesColorMappings(
+        series,
+        [{ value: "A", color: "#FF0000" }],
+        "light",
+      );
       // no error thrown
     });
 
@@ -133,9 +137,7 @@ describe("chartColorUtils", () => {
     });
 
     it("enforces configured colors for mapped series (itemStyle.color)", () => {
-      const series = [
-        { name: "A", itemStyle: { color: "#OLD111" } },
-      ];
+      const series = [{ name: "A", itemStyle: { color: "#OLD111" } }];
       const colorBySeries = [{ value: "A", color: "#FF0000" }];
       applySeriesColorMappings(series, colorBySeries, "light");
       expect(series[0].itemStyle.color).toBe("#FF0000");
@@ -199,7 +201,8 @@ describe("chartColorUtils", () => {
     });
 
     it("uses HSL fallback when palette is exhausted", async () => {
-      const { getColorPalette } = await import("@/utils/dashboard/colorPalette") as any;
+      const { getColorPalette } =
+        (await import("@/utils/dashboard/colorPalette")) as any;
       getColorPalette.mockReturnValueOnce([]); // empty palette to force HSL fallback
 
       const series = [

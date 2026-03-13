@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 lg:tw:grid-cols-3 tw:gap-3" data-test="resource-performance-metrics">
+  <div
+    class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 lg:tw:grid-cols-3 tw:gap-3"
+    data-test="resource-performance-metrics"
+  >
     <MetricCard
       v-if="metrics?.resource?.duration"
       label="Total Duration"
@@ -112,7 +115,9 @@ defineProps<Props>();
 const DURATION_GOOD = 500000000; // 500ms
 const DURATION_NEEDS_IMPROVEMENT = 1000000000; // 1s
 
-const getDurationStatus = (value: number): "good" | "needs-improvement" | "poor" => {
+const getDurationStatus = (
+  value: number,
+): "good" | "needs-improvement" | "poor" => {
   if (value <= DURATION_GOOD) return "good";
   if (value <= DURATION_NEEDS_IMPROVEMENT) return "needs-improvement";
   return "poor";

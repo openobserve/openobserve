@@ -15,7 +15,12 @@
 
 import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
-import { buildCategoryXAxis, buildCategoryYAxis, buildValueAxis, buildTooltip } from "./shared/axisBuilder";
+import {
+  buildCategoryXAxis,
+  buildCategoryYAxis,
+  buildValueAxis,
+  buildTooltip,
+} from "./shared/axisBuilder";
 import { buildLegendConfig } from "./shared/gridBuilder";
 import { getSeriesColor } from "../colorPalette";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
@@ -31,7 +36,7 @@ export class BarConverter implements PromQLChartConverter {
     panelSchema: any,
     store: any,
     extras: any,
-    chartPanelRef?: any
+    chartPanelRef?: any,
   ) {
     const chartType = panelSchema.type;
     const config = panelSchema.config || {};
@@ -55,8 +60,10 @@ export class BarConverter implements PromQLChartConverter {
       // First pass: calculate min/max
       processedData.forEach((queryData) => {
         queryData.series.forEach((seriesData) => {
-          const numericValues = seriesData.values.map(([_, val]) => parseFloat(val));
-          numericValues.forEach(val => {
+          const numericValues = seriesData.values.map(([_, val]) =>
+            parseFloat(val),
+          );
+          numericValues.forEach((val) => {
             if (val < chartMin) chartMin = val;
             if (val > chartMax) chartMax = val;
           });
@@ -73,9 +80,9 @@ export class BarConverter implements PromQLChartConverter {
             let timeString: string;
             if (formatted instanceof Date) {
               // Format as HH:MM:SS
-              const hours = String(formatted.getHours()).padStart(2, '0');
-              const minutes = String(formatted.getMinutes()).padStart(2, '0');
-              const seconds = String(formatted.getSeconds()).padStart(2, '0');
+              const hours = String(formatted.getHours()).padStart(2, "0");
+              const minutes = String(formatted.getMinutes()).padStart(2, "0");
+              const seconds = String(formatted.getSeconds()).padStart(2, "0");
               timeString = `${hours}:${minutes}:${seconds}`;
             } else {
               // ISO string - extract time portion
@@ -92,11 +99,13 @@ export class BarConverter implements PromQLChartConverter {
           const data = queryData.timestamps.map(([ts]) => {
             const dataValue = seriesData.data[ts];
             // Return '-' for missing values instead of 0 to show blank in stacked charts
-            return dataValue != null ? parseFloat(dataValue) : '-';
+            return dataValue != null ? parseFloat(dataValue) : "-";
           });
 
           // Get numeric values for color calculation
-          const numericValues = seriesData.values.map(([_, val]) => parseFloat(val));
+          const numericValues = seriesData.values.map(([_, val]) =>
+            parseFloat(val),
+          );
 
           const color = getSeriesColor(
             config.color || null,
@@ -105,7 +114,7 @@ export class BarConverter implements PromQLChartConverter {
             chartMin,
             chartMax,
             store.state.theme,
-            config.color?.colorBySeries
+            config.color?.colorBySeries,
           );
 
           series.push({
@@ -126,8 +135,8 @@ export class BarConverter implements PromQLChartConverter {
                     params.value,
                     config?.unit,
                     config?.unit_custom,
-                    config?.decimals
-                  )
+                    config?.decimals,
+                  ),
                 );
               },
             },
@@ -143,10 +152,15 @@ export class BarConverter implements PromQLChartConverter {
     } else {
       // For non-stacked h-bar: use instant/aggregated values
       // Categories are series names
-      const dataItems: Array<{ value: number; itemStyle?: { color: string } }> = [];
+      const dataItems: Array<{ value: number; itemStyle?: { color: string } }> =
+        [];
 
       // First pass: calculate min/max and collect data
-      const seriesDataCollection: Array<{ name: string; value: number; rawValues: Array<[number, string]> }> = [];
+      const seriesDataCollection: Array<{
+        name: string;
+        value: number;
+        rawValues: Array<[number, string]>;
+      }> = [];
 
       processedData.forEach((queryData) => {
         queryData.series.forEach((seriesData) => {
@@ -167,7 +181,9 @@ export class BarConverter implements PromQLChartConverter {
 
       // Second pass: apply colors
       seriesDataCollection.forEach((seriesData) => {
-        const numericValues = seriesData.rawValues.map(([_, val]) => parseFloat(val));
+        const numericValues = seriesData.rawValues.map(([_, val]) =>
+          parseFloat(val),
+        );
 
         const color = getSeriesColor(
           config.color || null,
@@ -176,13 +192,13 @@ export class BarConverter implements PromQLChartConverter {
           chartMin,
           chartMax,
           store.state.theme,
-          config.color?.colorBySeries
+          config.color?.colorBySeries,
         );
 
         dataItems.push(
           color
             ? { value: seriesData.value, itemStyle: { color } }
-            : { value: seriesData.value }
+            : { value: seriesData.value },
         );
       });
 
@@ -201,8 +217,8 @@ export class BarConverter implements PromQLChartConverter {
                 params.value,
                 config?.unit,
                 config?.unit_custom,
-                config?.decimals
-              )
+                config?.decimals,
+              ),
             );
           },
         },

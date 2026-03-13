@@ -52,7 +52,12 @@ describe("JSON Utilities", () => {
 
     it("should convert nested arrays to string format", () => {
       expect(ToString([1, [2, 3], 4])).toBe("[1, [2, 3], 4]");
-      expect(ToString([[1, 2], [3, 4]])).toBe("[[1, 2], [3, 4]]");
+      expect(
+        ToString([
+          [1, 2],
+          [3, 4],
+        ]),
+      ).toBe("[[1, 2], [3, 4]]");
     });
 
     it("should convert mixed type arrays to string format", () => {
@@ -87,27 +92,29 @@ describe("JSON Utilities", () => {
       const complex = {
         users: [
           { id: 1, name: "John" },
-          { id: 2, name: "Jane" }
+          { id: 2, name: "Jane" },
         ],
-        settings: { theme: "dark", enabled: true }
+        settings: { theme: "dark", enabled: true },
       };
-      expect(ToString(complex)).toBe('{"users":[{"id":1, "name":John}, {"id":2, "name":Jane}], "settings":{"theme":dark, "enabled":true}}');
+      expect(ToString(complex)).toBe(
+        '{"users":[{"id":1, "name":John}, {"id":2, "name":Jane}], "settings":{"theme":dark, "enabled":true}}',
+      );
     });
   });
 
   describe("byString", () => {
     const testObject = {
-      "a1": {
-        "b1": "1234",
-        "b2": "1",
-        "b3": {
-          "c1": "12",
-          "c2": "22"
-        }
+      a1: {
+        b1: "1234",
+        b2: "1",
+        b3: {
+          c1: "12",
+          c2: "22",
+        },
       },
-      "a2": "334",
+      a2: "334",
       "a1.b1": "direct_key",
-      "a1.b1.nested": { "c1": "123" }
+      "a1.b1.nested": { c1: "123" },
     };
 
     it("should return empty string for undefined key", () => {
@@ -134,7 +141,7 @@ describe("JSON Utilities", () => {
     it("should handle array bracket notation", () => {
       const arrayObj = {
         items: ["first", "second", "third"],
-        "items[1]": "direct_access"
+        "items[1]": "direct_access",
       };
       expect(byString(arrayObj, "items[0]")).toBe("first");
       expect(byString(arrayObj, "items[1]")).toBe("direct_access"); // Priority to direct key
@@ -143,7 +150,7 @@ describe("JSON Utilities", () => {
     it("should handle mixed bracket and dot notation", () => {
       const mixedObj = {
         "users[0].name": "John",
-        users: [{ name: "Jane" }]
+        users: [{ name: "Jane" }],
       };
       expect(byString(mixedObj, "users[0].name")).toBe("John");
     });
@@ -156,23 +163,25 @@ describe("JSON Utilities", () => {
 
     it("should handle array values", () => {
       const arrayValueObj = {
-        "a1": ["item1", "item2", "item3"]
+        a1: ["item1", "item2", "item3"],
       };
       expect(byString(arrayValueObj, "a1")).toBe("[item1, item2, item3]");
     });
 
     it("should handle object values", () => {
       const objectValueObj = {
-        "settings": { theme: "dark", lang: "en" }
+        settings: { theme: "dark", lang: "en" },
       };
-      expect(byString(objectValueObj, "settings")).toBe('{"theme":dark, "lang":en}');
+      expect(byString(objectValueObj, "settings")).toBe(
+        '{"theme":dark, "lang":en}',
+      );
     });
 
     it("should handle null and undefined values in object", () => {
       const nullObj = {
         nullValue: null,
         undefinedValue: undefined,
-        emptyString: ""
+        emptyString: "",
       };
       expect(byString(nullObj, "nullValue")).toBe("");
       expect(byString(nullObj, "undefinedValue")).toBe("");
@@ -207,10 +216,10 @@ describe("JSON Utilities", () => {
       const nested = {
         a: {
           b: {
-            c: "value"
-          }
+            c: "value",
+          },
         },
-        d: "direct"
+        d: "direct",
       };
       const keys = deepKeys(nested);
       expect(keys).toContain("a.b.c");
@@ -221,8 +230,8 @@ describe("JSON Utilities", () => {
       const withArray = {
         items: ["a", "b", "c"],
         settings: {
-          theme: "dark"
-        }
+          theme: "dark",
+        },
       };
       const keys = deepKeys(withArray);
       expect(keys).toContain("items");
@@ -239,8 +248,8 @@ describe("JSON Utilities", () => {
         a: {},
         b: "value",
         c: {
-          d: {}
-        }
+          d: {},
+        },
       };
       const keys = deepKeys(withEmpty);
       expect(keys).toContain("a");
@@ -254,8 +263,8 @@ describe("JSON Utilities", () => {
         b: undefined,
         c: {
           d: null,
-          e: "value"
-        }
+          e: "value",
+        },
       };
       const keys = deepKeys(withNulls);
       expect(keys).toContain("a");
@@ -269,11 +278,11 @@ describe("JSON Utilities", () => {
           level2: {
             level3: {
               level4: {
-                value: "deep"
-              }
-            }
-          }
-        }
+                value: "deep",
+              },
+            },
+          },
+        },
       };
       const keys = deepKeys(deepNested);
       expect(keys).toContain("level1.level2.level3.level4.value");
@@ -286,9 +295,9 @@ describe("JSON Utilities", () => {
         boolean: true,
         array: [1, 2, 3],
         object: {
-          nested: "value"
+          nested: "value",
         },
-        nullValue: null
+        nullValue: null,
       };
       const keys = deepKeys(mixed);
       expect(keys).toContain("string");
@@ -305,8 +314,8 @@ describe("JSON Utilities", () => {
         length: 4,
         nested: {
           length: 0,
-          value: "nested"
-        }
+          value: "nested",
+        },
       };
       const keys = deepKeys(withLength);
       expect(keys).toContain("data");

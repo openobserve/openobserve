@@ -28,7 +28,7 @@ describe("HistogramIntervalDropDown", () => {
   let wrapper: any;
 
   const defaultProps = {
-    modelValue: null // Auto is the default when modelValue is null
+    modelValue: null, // Auto is the default when modelValue is null
   };
 
   beforeEach(() => {
@@ -45,14 +45,14 @@ describe("HistogramIntervalDropDown", () => {
     return mount(HistogramIntervalDropDown, {
       props: {
         ...defaultProps,
-        ...props
+        ...props,
       },
       global: {
         plugins: [i18n],
         mocks: {
-          $t: (key: string) => key
-        }
-      }
+          $t: (key: string) => key,
+        },
+      },
     });
   };
 
@@ -60,28 +60,30 @@ describe("HistogramIntervalDropDown", () => {
     it("should render histogram interval dropdown", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('[data-test="histogram-interval-dropdown"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="histogram-interval-dropdown"]').exists(),
+      ).toBe(true);
     });
 
     it("should have correct component structure with q-select", () => {
       wrapper = createWrapper();
 
-      const qSelect = wrapper.findComponent({ name: 'QSelect' });
+      const qSelect = wrapper.findComponent({ name: "QSelect" });
       expect(qSelect.exists()).toBe(true);
-      expect(qSelect.classes()).toContain('q-select');
+      expect(qSelect.classes()).toContain("q-select");
     });
 
     it("should display Auto as default value when modelValue is null", () => {
       wrapper = createWrapper({ modelValue: null });
 
-      expect(wrapper.vm.histogramIntervalModel.label).toBe('Auto');
+      expect(wrapper.vm.histogramIntervalModel.label).toBe("Auto");
       expect(wrapper.vm.histogramIntervalModel.value).toBe(null);
     });
 
     it("should display Auto as default value when modelValue is undefined", () => {
       wrapper = createWrapper({ modelValue: undefined });
 
-      expect(wrapper.vm.histogramIntervalModel.label).toBe('Auto');
+      expect(wrapper.vm.histogramIntervalModel.label).toBe("Auto");
       expect(wrapper.vm.histogramIntervalModel.value).toBe(null);
     });
   });
@@ -90,50 +92,50 @@ describe("HistogramIntervalDropDown", () => {
     it("should accept and display 1 minute interval", () => {
       wrapper = createWrapper({ modelValue: "1 minute" });
 
-      expect(wrapper.vm.histogramIntervalModel.label).toBe('1 minute');
-      expect(wrapper.vm.histogramIntervalModel.value).toBe('1 minute');
+      expect(wrapper.vm.histogramIntervalModel.label).toBe("1 minute");
+      expect(wrapper.vm.histogramIntervalModel.value).toBe("1 minute");
     });
 
     it("should accept and display 5 minutes interval", () => {
       wrapper = createWrapper({ modelValue: "5 minutes" });
 
-      expect(wrapper.vm.histogramIntervalModel.label).toBe('5 minutes');
-      expect(wrapper.vm.histogramIntervalModel.value).toBe('5 minutes');
+      expect(wrapper.vm.histogramIntervalModel.label).toBe("5 minutes");
+      expect(wrapper.vm.histogramIntervalModel.value).toBe("5 minutes");
     });
 
     it("should accept and display 1 hour interval", () => {
       wrapper = createWrapper({ modelValue: "1 hour" });
 
-      expect(wrapper.vm.histogramIntervalModel.label).toBe('1 hour');
-      expect(wrapper.vm.histogramIntervalModel.value).toBe('1 hour');
+      expect(wrapper.vm.histogramIntervalModel.label).toBe("1 hour");
+      expect(wrapper.vm.histogramIntervalModel.value).toBe("1 hour");
     });
 
     it("should react to model value changes from null to specific interval", async () => {
       wrapper = createWrapper({ modelValue: null });
 
-      expect(wrapper.vm.histogramIntervalModel.label).toBe('Auto');
+      expect(wrapper.vm.histogramIntervalModel.label).toBe("Auto");
 
       await wrapper.setProps({ modelValue: "5 minutes" });
 
-      expect(wrapper.vm.histogramIntervalModel.label).toBe('5 minutes');
-      expect(wrapper.vm.histogramIntervalModel.value).toBe('5 minutes');
+      expect(wrapper.vm.histogramIntervalModel.label).toBe("5 minutes");
+      expect(wrapper.vm.histogramIntervalModel.value).toBe("5 minutes");
     });
 
     it("should react to model value changes between intervals", async () => {
       wrapper = createWrapper({ modelValue: "1 minute" });
 
-      expect(wrapper.vm.histogramIntervalModel.label).toBe('1 minute');
+      expect(wrapper.vm.histogramIntervalModel.label).toBe("1 minute");
 
       await wrapper.setProps({ modelValue: "1 hour" });
 
-      expect(wrapper.vm.histogramIntervalModel.label).toBe('1 hour');
-      expect(wrapper.vm.histogramIntervalModel.value).toBe('1 hour');
+      expect(wrapper.vm.histogramIntervalModel.label).toBe("1 hour");
+      expect(wrapper.vm.histogramIntervalModel.value).toBe("1 hour");
     });
 
     it("should handle null model value", () => {
       wrapper = createWrapper({ modelValue: null });
 
-      expect(wrapper.vm.histogramIntervalModel.label).toBe('Auto');
+      expect(wrapper.vm.histogramIntervalModel.label).toBe("Auto");
       expect(wrapper.vm.histogramIntervalModel.value).toBe(null);
     });
   });
@@ -165,7 +167,7 @@ describe("HistogramIntervalDropDown", () => {
         { label: "3 days", value: "3 days" },
         { label: "5 days", value: "5 days" },
         { label: "7 days", value: "7 days" },
-        { label: "30 days", value: "30 days" }
+        { label: "30 days", value: "30 days" },
       ];
 
       expect(wrapper.vm.histogramIntervalOptions).toEqual(expectedOptions);
@@ -198,11 +200,11 @@ describe("HistogramIntervalDropDown", () => {
     it("should emit update:modelValue when QSelect value changes", async () => {
       wrapper = createWrapper({ modelValue: null });
 
-      const qSelect = wrapper.findComponent({ name: 'QSelect' });
+      const qSelect = wrapper.findComponent({ name: "QSelect" });
       const newInterval = { label: "1 hour", value: "1 hour" };
 
       // Trigger the update:model-value event on QSelect
-      await qSelect.vm.$emit('update:model-value', newInterval);
+      await qSelect.vm.$emit("update:model-value", newInterval);
 
       const emitted = wrapper.emitted("update:modelValue");
       expect(emitted).toBeDefined();
@@ -214,10 +216,10 @@ describe("HistogramIntervalDropDown", () => {
 
       expect(wrapper.vm.histogramIntervalModel.label).toBe("Auto");
 
-      const qSelect = wrapper.findComponent({ name: 'QSelect' });
+      const qSelect = wrapper.findComponent({ name: "QSelect" });
       const minuteInterval = { label: "1 minute", value: "1 minute" };
 
-      await qSelect.vm.$emit('update:model-value', minuteInterval);
+      await qSelect.vm.$emit("update:model-value", minuteInterval);
 
       const emitted = wrapper.emitted("update:modelValue");
       expect(emitted).toBeDefined();
@@ -227,10 +229,10 @@ describe("HistogramIntervalDropDown", () => {
     it("should emit update:modelValue with null when changing to Auto", async () => {
       wrapper = createWrapper({ modelValue: "1 hour" });
 
-      const qSelect = wrapper.findComponent({ name: 'QSelect' });
+      const qSelect = wrapper.findComponent({ name: "QSelect" });
       const autoInterval = { label: "Auto", value: null };
 
-      await qSelect.vm.$emit('update:model-value', autoInterval);
+      await qSelect.vm.$emit("update:model-value", autoInterval);
 
       const emitted = wrapper.emitted("update:modelValue");
       expect(emitted).toBeDefined();
@@ -242,25 +244,25 @@ describe("HistogramIntervalDropDown", () => {
     it("should display 'Auto' for null modelValue", () => {
       wrapper = createWrapper({ modelValue: null });
 
-      const qSelect = wrapper.findComponent({ name: 'QSelect' });
+      const qSelect = wrapper.findComponent({ name: "QSelect" });
       expect(qSelect.exists()).toBe(true);
-      expect(wrapper.vm.histogramIntervalModel.label).toBe('Auto');
+      expect(wrapper.vm.histogramIntervalModel.label).toBe("Auto");
     });
 
     it("should display correct label for specific interval", () => {
       wrapper = createWrapper({ modelValue: "5 minutes" });
 
-      const qSelect = wrapper.findComponent({ name: 'QSelect' });
+      const qSelect = wrapper.findComponent({ name: "QSelect" });
       expect(qSelect.exists()).toBe(true);
-      expect(wrapper.vm.histogramIntervalModel.label).toBe('5 minutes');
+      expect(wrapper.vm.histogramIntervalModel.label).toBe("5 minutes");
     });
 
     it("should display 'Auto' for undefined modelValue", () => {
       wrapper = createWrapper({ modelValue: undefined });
 
-      const qSelect = wrapper.findComponent({ name: 'QSelect' });
+      const qSelect = wrapper.findComponent({ name: "QSelect" });
       expect(qSelect.exists()).toBe(true);
-      expect(wrapper.vm.histogramIntervalModel.label).toBe('Auto');
+      expect(wrapper.vm.histogramIntervalModel.label).toBe("Auto");
     });
   });
 
@@ -268,19 +270,21 @@ describe("HistogramIntervalDropDown", () => {
     it("should have dropdown element accessible via data-test attribute", () => {
       wrapper = createWrapper();
 
-      const dropdown = wrapper.find('[data-test="histogram-interval-dropdown"]');
+      const dropdown = wrapper.find(
+        '[data-test="histogram-interval-dropdown"]',
+      );
       expect(dropdown.exists()).toBe(true);
     });
 
     it("should have QSelect component with correct props", () => {
       wrapper = createWrapper();
 
-      const qSelect = wrapper.findComponent({ name: 'QSelect' });
+      const qSelect = wrapper.findComponent({ name: "QSelect" });
       expect(qSelect.exists()).toBe(true);
-      expect(qSelect.props('label')).toBe('Histogram interval');
-      expect(qSelect.props('behavior')).toBe('menu');
-      expect(qSelect.props('dense')).toBe(true);
-      expect(qSelect.props('borderless')).toBe(true);
+      expect(qSelect.props("label")).toBe("Histogram interval");
+      expect(qSelect.props("behavior")).toBe("menu");
+      expect(qSelect.props("dense")).toBe(true);
+      expect(qSelect.props("borderless")).toBe(true);
     });
 
     it("should have correct component structure", () => {
@@ -294,8 +298,8 @@ describe("HistogramIntervalDropDown", () => {
     it("should have QSelect with o2-custom-select-dashboard class", () => {
       wrapper = createWrapper();
 
-      const qSelect = wrapper.findComponent({ name: 'QSelect' });
-      expect(qSelect.classes()).toContain('o2-custom-select-dashboard');
+      const qSelect = wrapper.findComponent({ name: "QSelect" });
+      expect(qSelect.classes()).toContain("o2-custom-select-dashboard");
     });
   });
 
@@ -304,7 +308,7 @@ describe("HistogramIntervalDropDown", () => {
       wrapper = createWrapper({ modelValue: "invalid_interval" });
 
       // When invalid value is provided, component should default to Auto
-      expect(wrapper.vm.histogramIntervalModel.label).toBe('Auto');
+      expect(wrapper.vm.histogramIntervalModel.label).toBe("Auto");
       expect(wrapper.vm.histogramIntervalModel.value).toBe(null);
     });
 
@@ -312,7 +316,7 @@ describe("HistogramIntervalDropDown", () => {
       wrapper = createWrapper({ modelValue: "" });
 
       // Empty string should be treated as Auto
-      expect(wrapper.vm.histogramIntervalModel.label).toBe('Auto');
+      expect(wrapper.vm.histogramIntervalModel.label).toBe("Auto");
       expect(wrapper.vm.histogramIntervalModel.value).toBe(null);
     });
 
@@ -328,22 +332,28 @@ describe("HistogramIntervalDropDown", () => {
     it("should update internal model when props change", async () => {
       wrapper = createWrapper({ modelValue: null });
 
-      expect(wrapper.vm.histogramIntervalModel.label).toBe('Auto');
+      expect(wrapper.vm.histogramIntervalModel.label).toBe("Auto");
 
       await wrapper.setProps({ modelValue: "30 minutes" });
 
-      expect(wrapper.vm.histogramIntervalModel.label).toBe('30 minutes');
-      expect(wrapper.vm.histogramIntervalModel.value).toBe('30 minutes');
+      expect(wrapper.vm.histogramIntervalModel.label).toBe("30 minutes");
+      expect(wrapper.vm.histogramIntervalModel.value).toBe("30 minutes");
     });
 
     it("should maintain reactivity with multiple prop changes", async () => {
       wrapper = createWrapper({ modelValue: null });
 
       const values = [
-        { modelValue: "1 minute", expected: { label: "1 minute", value: "1 minute" } },
-        { modelValue: "1 hour", expected: { label: "1 hour", value: "1 hour" } },
+        {
+          modelValue: "1 minute",
+          expected: { label: "1 minute", value: "1 minute" },
+        },
+        {
+          modelValue: "1 hour",
+          expected: { label: "1 hour", value: "1 hour" },
+        },
         { modelValue: "1 day", expected: { label: "1 day", value: "1 day" } },
-        { modelValue: null, expected: { label: "Auto", value: null } }
+        { modelValue: null, expected: { label: "Auto", value: null } },
       ];
 
       for (const { modelValue, expected } of values) {
@@ -369,12 +379,15 @@ describe("HistogramIntervalDropDown", () => {
       wrapper = createWrapper();
 
       const secondIntervals = wrapper.vm.histogramIntervalOptions.filter(
-        (opt: any) => opt.label.includes('second')
+        (opt: any) => opt.label.includes("second"),
       );
 
       expect(secondIntervals.length).toBe(4);
       expect(secondIntervals.map((opt: any) => opt.label)).toEqual([
-        '1 second', '5 seconds', '10 seconds', '30 seconds'
+        "1 second",
+        "5 seconds",
+        "10 seconds",
+        "30 seconds",
       ]);
     });
 
@@ -382,12 +395,17 @@ describe("HistogramIntervalDropDown", () => {
       wrapper = createWrapper();
 
       const minuteIntervals = wrapper.vm.histogramIntervalOptions.filter(
-        (opt: any) => opt.label.includes('minute')
+        (opt: any) => opt.label.includes("minute"),
       );
 
       expect(minuteIntervals.length).toBe(6);
       expect(minuteIntervals.map((opt: any) => opt.label)).toEqual([
-        '1 minute', '5 minutes', '10 minutes', '15 minutes', '30 minutes', '45 minutes'
+        "1 minute",
+        "5 minutes",
+        "10 minutes",
+        "15 minutes",
+        "30 minutes",
+        "45 minutes",
       ]);
     });
 
@@ -395,12 +413,17 @@ describe("HistogramIntervalDropDown", () => {
       wrapper = createWrapper();
 
       const hourIntervals = wrapper.vm.histogramIntervalOptions.filter(
-        (opt: any) => opt.label.includes('hour')
+        (opt: any) => opt.label.includes("hour"),
       );
 
       expect(hourIntervals.length).toBe(6);
       expect(hourIntervals.map((opt: any) => opt.label)).toEqual([
-        '1 hour', '2 hours', '3 hours', '6 hours', '8 hours', '12 hours'
+        "1 hour",
+        "2 hours",
+        "3 hours",
+        "6 hours",
+        "8 hours",
+        "12 hours",
       ]);
     });
 
@@ -408,12 +431,17 @@ describe("HistogramIntervalDropDown", () => {
       wrapper = createWrapper();
 
       const dayIntervals = wrapper.vm.histogramIntervalOptions.filter(
-        (opt: any) => opt.label.includes('day')
+        (opt: any) => opt.label.includes("day"),
       );
 
       expect(dayIntervals.length).toBe(6);
       expect(dayIntervals.map((opt: any) => opt.label)).toEqual([
-        '1 day', '2 days', '3 days', '5 days', '7 days', '30 days'
+        "1 day",
+        "2 days",
+        "3 days",
+        "5 days",
+        "7 days",
+        "30 days",
       ]);
     });
   });

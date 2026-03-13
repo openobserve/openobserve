@@ -47,19 +47,21 @@ describe("Header Component", () => {
   let defaultProps: any;
   let defaultGlobalConfig: any;
 
-  const createWrapper = (options: {
-    mountType?: 'shallow' | 'mount';
-    storeOverrides?: any;
-    configOverrides?: any;
-    propsOverrides?: any;
-    stubsOverrides?: any;
-  } = {}) => {
+  const createWrapper = (
+    options: {
+      mountType?: "shallow" | "mount";
+      storeOverrides?: any;
+      configOverrides?: any;
+      propsOverrides?: any;
+      stubsOverrides?: any;
+    } = {},
+  ) => {
     const {
-      mountType = 'shallow',
+      mountType = "shallow",
       storeOverrides = {},
       configOverrides = {},
       propsOverrides = {},
-      stubsOverrides = {}
+      stubsOverrides = {},
     } = options;
 
     const store = {
@@ -94,7 +96,7 @@ describe("Header Component", () => {
       },
     };
 
-    if (mountType === 'mount') {
+    if (mountType === "mount") {
       return mount(Header, {
         global: globalConfig,
         props,
@@ -195,7 +197,7 @@ describe("Header Component", () => {
   describe("Logo Rendering", () => {
     it("should display OpenObserve logo by default", async () => {
       const logoWrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         stubsOverrides: {
           QToolbar: false,
         },
@@ -204,7 +206,7 @@ describe("Header Component", () => {
       await logoWrapper.vm.$nextTick();
 
       // Verify the OpenObserve logo is rendered
-      const openobserveLogo = logoWrapper.find('.openobserve-logo');
+      const openobserveLogo = logoWrapper.find(".openobserve-logo");
       expect(openobserveLogo.exists()).toBe(true);
 
       logoWrapper.unmount();
@@ -212,7 +214,7 @@ describe("Header Component", () => {
 
     it("should display custom logo text when configured in enterprise mode", async () => {
       const customWrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         storeOverrides: {
           state: {
             zoConfig: {
@@ -250,7 +252,7 @@ describe("Header Component", () => {
 
     it("should use dark theme logo when theme is dark", async () => {
       const darkWrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         storeOverrides: {
           state: {
             theme: "dark",
@@ -264,19 +266,19 @@ describe("Header Component", () => {
       await darkWrapper.vm.$nextTick();
 
       // Verify the logo exists and check that dark theme is applied
-      const openobserveLogo = darkWrapper.find('.openobserve-logo');
+      const openobserveLogo = darkWrapper.find(".openobserve-logo");
       expect(openobserveLogo.exists()).toBe(true);
 
       // The logo src should contain 'dark' in the path
-      const logoSrc = openobserveLogo.attributes('src');
-      expect(logoSrc).toContain('dark');
+      const logoSrc = openobserveLogo.attributes("src");
+      expect(logoSrc).toContain("dark");
 
       darkWrapper.unmount();
     });
 
     it("should not display OpenObserve logo when custom_hide_self_logo is true", async () => {
       const customWrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         storeOverrides: {
           state: {
             zoConfig: {
@@ -296,7 +298,7 @@ describe("Header Component", () => {
       await customWrapper.vm.$nextTick();
 
       // Check that the OpenObserve logo is NOT in the HTML
-      const openobserveLogo = customWrapper.find('.openobserve-logo');
+      const openobserveLogo = customWrapper.find(".openobserve-logo");
       expect(openobserveLogo.exists()).toBe(false);
 
       // Verify the custom logo text IS displayed
@@ -308,7 +310,7 @@ describe("Header Component", () => {
 
     it("should display OpenObserve logo when custom_hide_self_logo is false", async () => {
       const customWrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         storeOverrides: {
           state: {
             zoConfig: {
@@ -328,7 +330,7 @@ describe("Header Component", () => {
       await customWrapper.vm.$nextTick();
 
       // Check that the OpenObserve logo IS in the HTML
-      const openobserveLogo = customWrapper.find('.openobserve-logo');
+      const openobserveLogo = customWrapper.find(".openobserve-logo");
       expect(openobserveLogo.exists()).toBe(true);
 
       // Verify the custom logo text is also displayed
@@ -342,7 +344,7 @@ describe("Header Component", () => {
   describe("Quota Warning", () => {
     it("should display quota threshold message when present", async () => {
       const quotaWrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         storeOverrides: {
           state: {
             organizationData: {
@@ -372,7 +374,7 @@ describe("Header Component", () => {
   describe("Ingestion Quota Icon", () => {
     it("should display ingestion quota icon when quota >= 85%", async () => {
       const quotaWrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         storeOverrides: {
           state: {
             zoConfig: {
@@ -391,7 +393,9 @@ describe("Header Component", () => {
       await quotaWrapper.vm.$nextTick();
 
       // Verify the quota warning icon is displayed
-      const quotaWarning = quotaWrapper.find('[data-test="ingestion-quota-warning-icon"]');
+      const quotaWarning = quotaWrapper.find(
+        '[data-test="ingestion-quota-warning-icon"]',
+      );
       expect(quotaWarning.exists()).toBe(true);
 
       quotaWrapper.unmount();
@@ -427,7 +431,7 @@ describe("Header Component", () => {
 
     it("should not display quota icon when quota < 85%", async () => {
       const quotaWrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         storeOverrides: {
           state: {
             zoConfig: {
@@ -446,7 +450,9 @@ describe("Header Component", () => {
       await quotaWrapper.vm.$nextTick();
 
       // Verify the quota warning icon is NOT displayed
-      const quotaWarning = quotaWrapper.find('[data-test="ingestion-quota-warning-icon"]');
+      const quotaWarning = quotaWrapper.find(
+        '[data-test="ingestion-quota-warning-icon"]',
+      );
       expect(quotaWarning.exists()).toBe(false);
 
       quotaWrapper.unmount();
@@ -456,7 +462,7 @@ describe("Header Component", () => {
   describe("AI Chat Button", () => {
     it("should display AI chat button in enterprise mode with ai_enabled", async () => {
       const aiWrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         storeOverrides: {
           state: {
             zoConfig: {
@@ -483,7 +489,7 @@ describe("Header Component", () => {
 
     it("should not display AI button if not enterprise", async () => {
       const aiWrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         storeOverrides: {
           state: {
             zoConfig: {
@@ -510,7 +516,7 @@ describe("Header Component", () => {
 
     it("should not display AI button if ai_enabled is false", async () => {
       const aiWrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         storeOverrides: {
           state: {
             zoConfig: {
@@ -537,7 +543,7 @@ describe("Header Component", () => {
 
     it("should apply active class when AI chat is enabled", async () => {
       const aiWrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         storeOverrides: {
           state: {
             zoConfig: {
@@ -559,14 +565,14 @@ describe("Header Component", () => {
       // Verify AI button has active class
       const aiButton = aiWrapper.find('[data-test="menu-link-ai-item"]');
       expect(aiButton.exists()).toBe(true);
-      expect(aiButton.classes()).toContain('ai-btn-active');
+      expect(aiButton.classes()).toContain("ai-btn-active");
 
       aiWrapper.unmount();
     });
 
     it("should not have active class when AI chat is disabled", async () => {
       const aiWrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         storeOverrides: {
           state: {
             zoConfig: {
@@ -588,14 +594,14 @@ describe("Header Component", () => {
       // Verify AI button does NOT have active class
       const aiButton = aiWrapper.find('[data-test="menu-link-ai-item"]');
       expect(aiButton.exists()).toBe(true);
-      expect(aiButton.classes()).not.toContain('ai-btn-active');
+      expect(aiButton.classes()).not.toContain("ai-btn-active");
 
       aiWrapper.unmount();
     });
 
     it("should emit toggleAIChat when AI button is clicked", async () => {
       const aiWrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         storeOverrides: {
           state: {
             zoConfig: {
@@ -617,18 +623,18 @@ describe("Header Component", () => {
       const aiButton = aiWrapper.find('[data-test="menu-link-ai-item"]');
       expect(aiButton.exists()).toBe(true);
 
-      await aiButton.trigger('click');
+      await aiButton.trigger("click");
 
       // Verify toggleAIChat event was emitted
-      expect(aiWrapper.emitted('toggleAIChat')).toBeTruthy();
-      expect(aiWrapper.emitted('toggleAIChat')).toHaveLength(1);
+      expect(aiWrapper.emitted("toggleAIChat")).toBeTruthy();
+      expect(aiWrapper.emitted("toggleAIChat")).toHaveLength(1);
 
       aiWrapper.unmount();
     });
 
     it("should emit update:isHovered true on mouse enter", async () => {
       const aiWrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         storeOverrides: {
           state: {
             zoConfig: {
@@ -650,18 +656,18 @@ describe("Header Component", () => {
       const aiButton = aiWrapper.find('[data-test="menu-link-ai-item"]');
       expect(aiButton.exists()).toBe(true);
 
-      await aiButton.trigger('mouseenter');
+      await aiButton.trigger("mouseenter");
 
       // Verify update:isHovered event was emitted with true
-      expect(aiWrapper.emitted('update:isHovered')).toBeTruthy();
-      expect(aiWrapper.emitted('update:isHovered')[0]).toEqual([true]);
+      expect(aiWrapper.emitted("update:isHovered")).toBeTruthy();
+      expect(aiWrapper.emitted("update:isHovered")[0]).toEqual([true]);
 
       aiWrapper.unmount();
     });
 
     it("should emit update:isHovered false on mouse leave", async () => {
       const aiWrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         storeOverrides: {
           state: {
             zoConfig: {
@@ -683,11 +689,11 @@ describe("Header Component", () => {
       const aiButton = aiWrapper.find('[data-test="menu-link-ai-item"]');
       expect(aiButton.exists()).toBe(true);
 
-      await aiButton.trigger('mouseleave');
+      await aiButton.trigger("mouseleave");
 
       // Verify update:isHovered event was emitted with false
-      expect(aiWrapper.emitted('update:isHovered')).toBeTruthy();
-      expect(aiWrapper.emitted('update:isHovered')[0]).toEqual([false]);
+      expect(aiWrapper.emitted("update:isHovered")).toBeTruthy();
+      expect(aiWrapper.emitted("update:isHovered")[0]).toEqual([false]);
 
       aiWrapper.unmount();
     });
@@ -711,13 +717,15 @@ describe("Header Component", () => {
       });
 
       // Verify the getBtnLogo prop is passed correctly
-      expect(aiWrapper.props('getBtnLogo')).toBe(customLogoPath);
+      expect(aiWrapper.props("getBtnLogo")).toBe(customLogoPath);
     });
   });
 
   describe("Organization Selector", () => {
     it("should display selected organization", () => {
-      const orgButton = wrapper.find('[data-test="organization-select-button"]');
+      const orgButton = wrapper.find(
+        '[data-test="organization-select-button"]',
+      );
       expect(orgButton.exists()).toBe(false); // Using stub, check implementation
     });
 
@@ -847,7 +855,9 @@ describe("Header Component", () => {
       // Verify that router and store are available for navigation
       expect(wrapper.props("router")).toBeDefined();
       expect(wrapper.props("store").state.selectedOrganization).toBeDefined();
-      expect(wrapper.props("store").state.selectedOrganization.identifier).toBe("test-org");
+      expect(wrapper.props("store").state.selectedOrganization.identifier).toBe(
+        "test-org",
+      );
     });
 
     it("should not display OpenAPI link in cloud deployment", () => {
@@ -901,7 +911,11 @@ describe("Header Component", () => {
     });
 
     it("should emit changeLanguage event with correct language data", () => {
-      const newLang = { code: "fr", label: "Français", icon: "flag-icon flag-icon-fr" };
+      const newLang = {
+        code: "fr",
+        label: "Français",
+        icon: "flag-icon flag-icon-fr",
+      };
       wrapper.vm.changeLanguage(newLang);
 
       // Verify the event was emitted with the correct language object
@@ -910,8 +924,8 @@ describe("Header Component", () => {
 
       // Verify the emitted object has all required properties
       const emittedLang = wrapper.emitted("changeLanguage")[0][0];
-      expect(emittedLang).toHaveProperty('code');
-      expect(emittedLang).toHaveProperty('label');
+      expect(emittedLang).toHaveProperty("code");
+      expect(emittedLang).toHaveProperty("label");
       expect(emittedLang.code).toBe("fr");
       expect(emittedLang.label).toBe("Français");
 
@@ -946,7 +960,11 @@ describe("Header Component", () => {
       // Clear previous mock calls
       vi.clearAllMocks();
 
-      const frenchLang = { code: "fr", label: "Français", icon: "flag-icon flag-icon-fr" };
+      const frenchLang = {
+        code: "fr",
+        label: "Français",
+        icon: "flag-icon flag-icon-fr",
+      };
 
       // User changes language in Header component
       wrapper.vm.changeLanguage(frenchLang);
@@ -976,7 +994,11 @@ describe("Header Component", () => {
       // Clear previous mock calls
       vi.clearAllMocks();
 
-      const germanLang = { code: "de", label: "Deutsch", icon: "flag-icon flag-icon-de" };
+      const germanLang = {
+        code: "de",
+        label: "Deutsch",
+        icon: "flag-icon flag-icon-de",
+      };
 
       // User changes language
       wrapper.vm.changeLanguage(germanLang);
@@ -1001,7 +1023,7 @@ describe("Header Component", () => {
   describe("Theme Management", () => {
     it("should render with light theme logo", async () => {
       const lightWrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         stubsOverrides: {
           QToolbar: false,
         },
@@ -1010,18 +1032,18 @@ describe("Header Component", () => {
       await lightWrapper.vm.$nextTick();
 
       // Verify light theme logo is used
-      const logo = lightWrapper.find('.openobserve-logo');
+      const logo = lightWrapper.find(".openobserve-logo");
       expect(logo.exists()).toBe(true);
 
-      const logoSrc = logo.attributes('src');
-      expect(logoSrc).toContain('light');
+      const logoSrc = logo.attributes("src");
+      expect(logoSrc).toContain("light");
 
       lightWrapper.unmount();
     });
 
     it("should render with dark theme logo", async () => {
       const darkWrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         storeOverrides: {
           state: {
             theme: "dark",
@@ -1035,11 +1057,11 @@ describe("Header Component", () => {
       await darkWrapper.vm.$nextTick();
 
       // Verify dark theme logo is used
-      const logo = darkWrapper.find('.openobserve-logo');
+      const logo = darkWrapper.find(".openobserve-logo");
       expect(logo.exists()).toBe(true);
 
-      const logoSrc = logo.attributes('src');
-      expect(logoSrc).toContain('dark');
+      const logoSrc = logo.attributes("src");
+      expect(logoSrc).toContain("dark");
 
       darkWrapper.unmount();
     });
@@ -1100,61 +1122,61 @@ describe("Header Component", () => {
 
     it("should not show organization dropdown when organization list is empty", () => {
       const wrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         propsOverrides: {
           filteredOrganizations: [],
         },
         stubsOverrides: {
-          QSelect: false
-        }
+          QSelect: false,
+        },
       });
 
       // Verify the organization selector doesn't show options when list is empty
-      const orgSelect = wrapper.findComponent({ name: 'QSelect' });
+      const orgSelect = wrapper.findComponent({ name: "QSelect" });
       if (orgSelect.exists()) {
-        expect(orgSelect.props('options')).toHaveLength(0);
+        expect(orgSelect.props("options")).toHaveLength(0);
       }
     });
 
     it("should render default OpenObserve logo when both custom logos are null", () => {
       const wrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         storeOverrides: {
           state: {
             zoConfig: {
               custom_logo_img: null,
               custom_logo_dark_img: null,
-              custom_logo_text: ""
-            }
-          }
+              custom_logo_text: "",
+            },
+          },
         },
         stubsOverrides: {
           QToolbar: false,
-          QToolbarTitle: false
-        }
+          QToolbarTitle: false,
+        },
       });
 
       const html = wrapper.html();
       // Verify no custom logo images are rendered
-      expect(html).not.toContain('data:image; base64,');
+      expect(html).not.toContain("data:image; base64,");
 
       // Verify default OpenObserve logo is rendered instead
-      expect(html).toContain('openobserve-logo');
-      const imgs = wrapper.findAll('img');
+      expect(html).toContain("openobserve-logo");
+      const imgs = wrapper.findAll("img");
       expect(imgs.length).toBeGreaterThan(0);
-      expect(imgs[0].attributes('src')).toContain('openobserve');
+      expect(imgs[0].attributes("src")).toContain("openobserve");
     });
 
     it("should display red warning icon when quota is exactly 95%", () => {
       const wrapper = createWrapper({
-        mountType: 'shallow',
+        mountType: "shallow",
         storeOverrides: {
           state: {
             zoConfig: {
               ingestion_quota_used: 95.0,
-            }
-          }
-        }
+            },
+          },
+        },
       });
 
       // Verify the computed property returns red color
@@ -1169,23 +1191,23 @@ describe("Header Component", () => {
       const orgWithLongName = { identifier: "long", label: longName };
 
       const wrapper = createWrapper({
-        mountType: 'shallow',
+        mountType: "shallow",
         propsOverrides: {
           selectedOrg: orgWithLongName,
-        }
+        },
       });
 
       // Verify the component accepts and stores the long organization name
-      expect(wrapper.props('selectedOrg')).toEqual(orgWithLongName);
-      expect(wrapper.props('selectedOrg').label).toBe(longName);
-      expect(wrapper.props('selectedOrg').label.length).toBe(100);
+      expect(wrapper.props("selectedOrg")).toEqual(orgWithLongName);
+      expect(wrapper.props("selectedOrg").label).toBe(longName);
+      expect(wrapper.props("selectedOrg").label.length).toBe(100);
     });
   });
 
   describe("Conditional Rendering Logic", () => {
     it("should show custom logo section only in enterprise mode with custom logo", async () => {
       const customWrapper = createWrapper({
-        mountType: 'mount',
+        mountType: "mount",
         storeOverrides: {
           state: {
             zoConfig: {
@@ -1211,7 +1233,10 @@ describe("Header Component", () => {
     });
 
     it("should apply active class to selected organization", () => {
-      const selectedOrg = { identifier: "test-org", label: "Test Organization" };
+      const selectedOrg = {
+        identifier: "test-org",
+        label: "Test Organization",
+      };
 
       wrapper = shallowMount(Header, {
         global: { plugins: [i18n] },
@@ -1223,7 +1248,7 @@ describe("Header Component", () => {
       });
 
       expect(wrapper.props("userClickedOrg").identifier).toBe(
-        wrapper.props("selectedOrg").identifier
+        wrapper.props("selectedOrg").identifier,
       );
     });
   });

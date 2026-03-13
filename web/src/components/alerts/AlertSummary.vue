@@ -16,16 +16,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="alert-summary">
-    <div class="summary-content" ref="summaryContainer" @scroll="checkIfShouldShowScrollButton">
-      <p v-if="summaryText" class="summary-text" v-html="summaryText" @click="handleSummaryClick"></p>
-      <p v-else class="summary-placeholder">{{ t('alerts.summary.configureAlert') }}</p>
+    <div
+      class="summary-content"
+      ref="summaryContainer"
+      @scroll="checkIfShouldShowScrollButton"
+    >
+      <p
+        v-if="summaryText"
+        class="summary-text"
+        v-html="summaryText"
+        @click="handleSummaryClick"
+      ></p>
+      <p v-else class="summary-placeholder">
+        {{ t("alerts.summary.configureAlert") }}
+      </p>
     </div>
 
     <!-- Scroll to bottom button -->
-    <div
-      v-show="showScrollToBottom"
-      class="scroll-to-bottom-container"
-    >
+    <div v-show="showScrollToBottom" class="scroll-to-bottom-container">
       <q-btn
         round
         flat
@@ -43,50 +51,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, nextTick, watch, onMounted } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { generateAlertSummary } from '@/utils/alerts/alertSummaryGenerator';
+import { computed, ref, nextTick, watch, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
+import { generateAlertSummary } from "@/utils/alerts/alertSummaryGenerator";
 
 const { t } = useI18n();
 
 const props = defineProps({
   formData: {
     type: Object,
-    required: true
+    required: true,
   },
   destinations: {
     type: Array,
-    default: () => []
+    default: () => [],
   },
   focusManager: {
     type: Object,
-    required: false
+    required: false,
   },
   wizardStep: {
     type: Number,
     required: false,
-    default: 1
+    default: 1,
   },
   previewQuery: {
     type: String,
-    default: ''
+    default: "",
   },
   generatedSqlQuery: {
     type: String,
-    default: ''
-  }
+    default: "",
+  },
 });
 
 const summaryContainer = ref<HTMLElement | null>(null);
 const showScrollToBottom = ref(false);
 
 const summaryText = computed(() => {
-  return generateAlertSummary(props.formData, props.destinations, t, props.wizardStep, props.previewQuery, props.generatedSqlQuery);
+  return generateAlertSummary(
+    props.formData,
+    props.destinations,
+    t,
+    props.wizardStep,
+    props.previewQuery,
+    props.generatedSqlQuery,
+  );
 });
 
 const handleSummaryClick = (event: MouseEvent) => {
   const target = event.target as HTMLElement;
-  const focusTarget = target.getAttribute('data-focus-target');
+  const focusTarget = target.getAttribute("data-focus-target");
 
   if (focusTarget && props.focusManager) {
     props.focusManager.focusField(focusTarget);
@@ -111,7 +126,7 @@ const scrollToBottomSmooth = async () => {
   if (summaryContainer.value) {
     summaryContainer.value.scrollTo({
       top: summaryContainer.value.scrollHeight,
-      behavior: 'smooth'
+      behavior: "smooth",
     });
     // Hide the button immediately when user clicks it
     showScrollToBottom.value = false;
@@ -175,7 +190,8 @@ onMounted(async () => {
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     display: inline;
     position: relative;
-    box-shadow: 0 0 0 0.0625rem color-mix(in srgb, var(--q-primary) 15%, transparent);
+    box-shadow: 0 0 0 0.0625rem
+      color-mix(in srgb, var(--q-primary) 15%, transparent);
     line-height: 1.6;
     vertical-align: baseline;
     white-space: nowrap;
@@ -281,5 +297,4 @@ onMounted(async () => {
     font-weight: bold;
   }
 }
-
 </style>

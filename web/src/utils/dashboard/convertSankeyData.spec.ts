@@ -19,7 +19,7 @@ import { convertSankeyData } from "./convertSankeyData";
 // Mock the convertDataIntoUnitValue module
 vi.mock("./convertDataIntoUnitValue", () => ({
   formatUnitValue: vi.fn((value) => `formatted_${value}`),
-  getUnitValue: vi.fn((value, unit, unitCustom, decimals) => `unit_${value}`)
+  getUnitValue: vi.fn((value, unit, unitCustom, decimals) => `unit_${value}`),
 }));
 
 describe("convertSankeyData", () => {
@@ -34,13 +34,15 @@ describe("convertSankeyData", () => {
   describe("Input validation", () => {
     it("should return null options when searchQueryData is not an array", () => {
       const panelSchema = {
-        queries: [{
-          fields: {
-            source: { alias: "source" },
-            target: { alias: "target" },
-            value: { alias: "value" }
-          }
-        }]
+        queries: [
+          {
+            fields: {
+              source: { alias: "source" },
+              target: { alias: "target" },
+              value: { alias: "value" },
+            },
+          },
+        ],
       };
       const searchQueryData = null;
 
@@ -51,13 +53,15 @@ describe("convertSankeyData", () => {
 
     it("should return null options when searchQueryData is empty array", () => {
       const panelSchema = {
-        queries: [{
-          fields: {
-            source: { alias: "source" },
-            target: { alias: "target" },
-            value: { alias: "value" }
-          }
-        }]
+        queries: [
+          {
+            fields: {
+              source: { alias: "source" },
+              target: { alias: "target" },
+              value: { alias: "value" },
+            },
+          },
+        ],
       };
       const searchQueryData: any[] = [];
 
@@ -68,13 +72,15 @@ describe("convertSankeyData", () => {
 
     it("should return null options when first element of searchQueryData is falsy", () => {
       const panelSchema = {
-        queries: [{
-          fields: {
-            source: { alias: "source" },
-            target: { alias: "target" },
-            value: { alias: "value" }
-          }
-        }]
+        queries: [
+          {
+            fields: {
+              source: { alias: "source" },
+              target: { alias: "target" },
+              value: { alias: "value" },
+            },
+          },
+        ],
       };
       const searchQueryData = [null];
 
@@ -85,12 +91,14 @@ describe("convertSankeyData", () => {
 
     it("should return null options when source field is missing", () => {
       const panelSchema = {
-        queries: [{
-          fields: {
-            target: { alias: "target" },
-            value: { alias: "value" }
-          }
-        }]
+        queries: [
+          {
+            fields: {
+              target: { alias: "target" },
+              value: { alias: "value" },
+            },
+          },
+        ],
       };
       const searchQueryData = [{}];
 
@@ -101,12 +109,14 @@ describe("convertSankeyData", () => {
 
     it("should return null options when target field is missing", () => {
       const panelSchema = {
-        queries: [{
-          fields: {
-            source: { alias: "source" },
-            value: { alias: "value" }
-          }
-        }]
+        queries: [
+          {
+            fields: {
+              source: { alias: "source" },
+              value: { alias: "value" },
+            },
+          },
+        ],
       };
       const searchQueryData = [{}];
 
@@ -117,12 +127,14 @@ describe("convertSankeyData", () => {
 
     it("should return null options when value field is missing", () => {
       const panelSchema = {
-        queries: [{
-          fields: {
-            source: { alias: "source" },
-            target: { alias: "target" }
-          }
-        }]
+        queries: [
+          {
+            fields: {
+              source: { alias: "source" },
+              target: { alias: "target" },
+            },
+          },
+        ],
       };
       const searchQueryData = [{}];
 
@@ -135,31 +147,35 @@ describe("convertSankeyData", () => {
   describe("Data processing", () => {
     it("should process valid sankey data successfully", () => {
       const panelSchema = {
-        queries: [{
-          fields: {
-            source: { alias: "source_field" },
-            target: { alias: "target_field" },
-            value: { alias: "value_field" }
-          }
-        }],
+        queries: [
+          {
+            fields: {
+              source: { alias: "source_field" },
+              target: { alias: "target_field" },
+              value: { alias: "value_field" },
+            },
+          },
+        ],
         config: {
           unit: "bytes",
           unit_custom: null,
-          decimals: 2
-        }
-      };
-      const searchQueryData = [[
-        {
-          source_field: "A",
-          target_field: "B",
-          value_field: 100
+          decimals: 2,
         },
-        {
-          source_field: "B",
-          target_field: "C",
-          value_field: 200
-        }
-      ]];
+      };
+      const searchQueryData = [
+        [
+          {
+            source_field: "A",
+            target_field: "B",
+            value_field: 100,
+          },
+          {
+            source_field: "B",
+            target_field: "C",
+            value_field: 200,
+          },
+        ],
+      ];
 
       const result = convertSankeyData(panelSchema, searchQueryData);
 
@@ -168,9 +184,11 @@ describe("convertSankeyData", () => {
       expect(result.options.series[0].type).toBe("sankey");
       expect(result.options.series[0].data).toHaveLength(3); // A, B, C nodes
       expect(result.options.series[0].links).toHaveLength(2);
-      
+
       // Check nodes
-      const nodeNames = result.options.series[0].data.map((node: any) => node.name);
+      const nodeNames = result.options.series[0].data.map(
+        (node: any) => node.name,
+      );
       expect(nodeNames).toContain("A");
       expect(nodeNames).toContain("B");
       expect(nodeNames).toContain("C");
@@ -181,39 +199,43 @@ describe("convertSankeyData", () => {
           source: "A",
           target: "B",
           value: 100,
-          lineStyle: { curveness: 0.5 }
+          lineStyle: { curveness: 0.5 },
         },
         {
           source: "B",
-          target: "C", 
+          target: "C",
           value: 200,
-          lineStyle: { curveness: 0.5 }
-        }
+          lineStyle: { curveness: 0.5 },
+        },
       ]);
     });
 
     it("should filter out items with null source values", () => {
       const panelSchema = {
-        queries: [{
-          fields: {
-            source: { alias: "source_field" },
-            target: { alias: "target_field" },
-            value: { alias: "value_field" }
-          }
-        }]
+        queries: [
+          {
+            fields: {
+              source: { alias: "source_field" },
+              target: { alias: "target_field" },
+              value: { alias: "value_field" },
+            },
+          },
+        ],
       };
-      const searchQueryData = [[
-        {
-          source_field: null,
-          target_field: "B",
-          value_field: 100
-        },
-        {
-          source_field: "A",
-          target_field: "B",
-          value_field: 200
-        }
-      ]];
+      const searchQueryData = [
+        [
+          {
+            source_field: null,
+            target_field: "B",
+            value_field: 100,
+          },
+          {
+            source_field: "A",
+            target_field: "B",
+            value_field: 200,
+          },
+        ],
+      ];
 
       const result = convertSankeyData(panelSchema, searchQueryData);
 
@@ -223,26 +245,30 @@ describe("convertSankeyData", () => {
 
     it("should filter out items with null target values", () => {
       const panelSchema = {
-        queries: [{
-          fields: {
-            source: { alias: "source_field" },
-            target: { alias: "target_field" },
-            value: { alias: "value_field" }
-          }
-        }]
+        queries: [
+          {
+            fields: {
+              source: { alias: "source_field" },
+              target: { alias: "target_field" },
+              value: { alias: "value_field" },
+            },
+          },
+        ],
       };
-      const searchQueryData = [[
-        {
-          source_field: "A",
-          target_field: null,
-          value_field: 100
-        },
-        {
-          source_field: "A",
-          target_field: "B",
-          value_field: 200
-        }
-      ]];
+      const searchQueryData = [
+        [
+          {
+            source_field: "A",
+            target_field: null,
+            value_field: 100,
+          },
+          {
+            source_field: "A",
+            target_field: "B",
+            value_field: 200,
+          },
+        ],
+      ];
 
       const result = convertSankeyData(panelSchema, searchQueryData);
 
@@ -252,26 +278,30 @@ describe("convertSankeyData", () => {
 
     it("should filter out items with null value values", () => {
       const panelSchema = {
-        queries: [{
-          fields: {
-            source: { alias: "source_field" },
-            target: { alias: "target_field" },
-            value: { alias: "value_field" }
-          }
-        }]
+        queries: [
+          {
+            fields: {
+              source: { alias: "source_field" },
+              target: { alias: "target_field" },
+              value: { alias: "value_field" },
+            },
+          },
+        ],
       };
-      const searchQueryData = [[
-        {
-          source_field: "A",
-          target_field: "B",
-          value_field: null
-        },
-        {
-          source_field: "A",
-          target_field: "C",
-          value_field: 200
-        }
-      ]];
+      const searchQueryData = [
+        [
+          {
+            source_field: "A",
+            target_field: "B",
+            value_field: null,
+          },
+          {
+            source_field: "A",
+            target_field: "C",
+            value_field: 200,
+          },
+        ],
+      ];
 
       const result = convertSankeyData(panelSchema, searchQueryData);
 
@@ -281,26 +311,30 @@ describe("convertSankeyData", () => {
 
     it("should skip items with falsy source in inner condition", () => {
       const panelSchema = {
-        queries: [{
-          fields: {
-            source: { alias: "source_field" },
-            target: { alias: "target_field" },
-            value: { alias: "value_field" }
-          }
-        }]
+        queries: [
+          {
+            fields: {
+              source: { alias: "source_field" },
+              target: { alias: "target_field" },
+              value: { alias: "value_field" },
+            },
+          },
+        ],
       };
-      const searchQueryData = [[
-        {
-          source_field: "",  // Falsy but not null
-          target_field: "B",
-          value_field: 100
-        },
-        {
-          source_field: "A",
-          target_field: "B",
-          value_field: 200
-        }
-      ]];
+      const searchQueryData = [
+        [
+          {
+            source_field: "", // Falsy but not null
+            target_field: "B",
+            value_field: 100,
+          },
+          {
+            source_field: "A",
+            target_field: "B",
+            value_field: 200,
+          },
+        ],
+      ];
 
       const result = convertSankeyData(panelSchema, searchQueryData);
 
@@ -310,26 +344,30 @@ describe("convertSankeyData", () => {
 
     it("should skip items with falsy target in inner condition", () => {
       const panelSchema = {
-        queries: [{
-          fields: {
-            source: { alias: "source_field" },
-            target: { alias: "target_field" },
-            value: { alias: "value_field" }
-          }
-        }]
+        queries: [
+          {
+            fields: {
+              source: { alias: "source_field" },
+              target: { alias: "target_field" },
+              value: { alias: "value_field" },
+            },
+          },
+        ],
       };
-      const searchQueryData = [[
-        {
-          source_field: "A",
-          target_field: "",  // Falsy but not null
-          value_field: 100
-        },
-        {
-          source_field: "A",
-          target_field: "B",
-          value_field: 200
-        }
-      ]];
+      const searchQueryData = [
+        [
+          {
+            source_field: "A",
+            target_field: "", // Falsy but not null
+            value_field: 100,
+          },
+          {
+            source_field: "A",
+            target_field: "B",
+            value_field: 200,
+          },
+        ],
+      ];
 
       const result = convertSankeyData(panelSchema, searchQueryData);
 
@@ -339,26 +377,30 @@ describe("convertSankeyData", () => {
 
     it("should skip items with falsy value in inner condition", () => {
       const panelSchema = {
-        queries: [{
-          fields: {
-            source: { alias: "source_field" },
-            target: { alias: "target_field" },
-            value: { alias: "value_field" }
-          }
-        }]
+        queries: [
+          {
+            fields: {
+              source: { alias: "source_field" },
+              target: { alias: "target_field" },
+              value: { alias: "value_field" },
+            },
+          },
+        ],
       };
-      const searchQueryData = [[
-        {
-          source_field: "A",
-          target_field: "B",
-          value_field: 0  // Falsy but not null
-        },
-        {
-          source_field: "A",
-          target_field: "C",
-          value_field: 200
-        }
-      ]];
+      const searchQueryData = [
+        [
+          {
+            source_field: "A",
+            target_field: "B",
+            value_field: 0, // Falsy but not null
+          },
+          {
+            source_field: "A",
+            target_field: "C",
+            value_field: 200,
+          },
+        ],
+      ];
 
       const result = convertSankeyData(panelSchema, searchQueryData);
 
@@ -370,62 +412,70 @@ describe("convertSankeyData", () => {
   describe("Tooltip formatter", () => {
     it("should format tooltip with unit value when functions are available", () => {
       const panelSchema = {
-        queries: [{
-          fields: {
-            source: { alias: "source_field" },
-            target: { alias: "target_field" },
-            value: { alias: "value_field" }
-          }
-        }],
+        queries: [
+          {
+            fields: {
+              source: { alias: "source_field" },
+              target: { alias: "target_field" },
+              value: { alias: "value_field" },
+            },
+          },
+        ],
         config: {
           unit: "bytes",
           unit_custom: null,
-          decimals: 2
-        }
+          decimals: 2,
+        },
       };
-      const searchQueryData = [[
-        {
-          source_field: "A",
-          target_field: "B",
-          value_field: 1024
-        }
-      ]];
+      const searchQueryData = [
+        [
+          {
+            source_field: "A",
+            target_field: "B",
+            value_field: 1024,
+          },
+        ],
+      ];
 
       const result = convertSankeyData(panelSchema, searchQueryData);
-      
+
       // Test the tooltip formatter
       const tooltipFormatter = result.options.tooltip.formatter;
       const mockParams = {
         name: "TestNode",
-        value: 1024
+        value: 1024,
       };
-      
+
       const formattedTooltip = tooltipFormatter(mockParams);
-      
+
       // Since we have mocked functions at the top, they will be available
       expect(formattedTooltip).toBe("TestNode : formatted_unit_1024");
     });
 
     it("should handle basic tooltip structure", () => {
       const panelSchema = {
-        queries: [{
-          fields: {
-            source: { alias: "source_field" },
-            target: { alias: "target_field" },
-            value: { alias: "value_field" }
-          }
-        }]
+        queries: [
+          {
+            fields: {
+              source: { alias: "source_field" },
+              target: { alias: "target_field" },
+              value: { alias: "value_field" },
+            },
+          },
+        ],
       };
-      const searchQueryData = [[
-        {
-          source_field: "A",
-          target_field: "B",
-          value_field: 1024
-        }
-      ]];
+      const searchQueryData = [
+        [
+          {
+            source_field: "A",
+            target_field: "B",
+            value_field: 1024,
+          },
+        ],
+      ];
 
       const result = convertSankeyData(panelSchema, searchQueryData);
-      
+
       expect(result.options.tooltip).toBeDefined();
       expect(result.options.tooltip.trigger).toBe("item");
       expect(typeof result.options.tooltip.formatter).toBe("function");
@@ -440,41 +490,43 @@ describe("convertSankeyData", () => {
             fields: {
               source: { alias: "source_field" },
               target: { alias: "target_field" },
-              value: { alias: "value_field" }
-            }
+              value: { alias: "value_field" },
+            },
           },
           {
             fields: {
               source: { alias: "source_field" },
               target: { alias: "target_field" },
-              value: { alias: "value_field" }
-            }
-          }
-        ]
+              value: { alias: "value_field" },
+            },
+          },
+        ],
       };
       const searchQueryData = [
         [
           {
             source_field: "A",
             target_field: "B",
-            value_field: 100
-          }
+            value_field: 100,
+          },
         ],
         [
           {
             source_field: "C",
             target_field: "D",
-            value_field: 200
-          }
-        ]
+            value_field: 200,
+          },
+        ],
       ];
 
       const result = convertSankeyData(panelSchema, searchQueryData);
 
       expect(result.options.series[0].data).toHaveLength(4); // A, B, C, D nodes
       expect(result.options.series[0].links).toHaveLength(2);
-      
-      const nodeNames = result.options.series[0].data.map((node: any) => node.name);
+
+      const nodeNames = result.options.series[0].data.map(
+        (node: any) => node.name,
+      );
       expect(nodeNames).toContain("A");
       expect(nodeNames).toContain("B");
       expect(nodeNames).toContain("C");
@@ -488,27 +540,27 @@ describe("convertSankeyData", () => {
             fields: {
               source: { alias: "source_field" },
               target: { alias: "target_field" },
-              value: { alias: "value_field" }
-            }
+              value: { alias: "value_field" },
+            },
           },
           {
             fields: {
               source: { alias: "source_field" },
               target: { alias: "target_field" },
-              value: { alias: "value_field" }
-            }
-          }
-        ]
+              value: { alias: "value_field" },
+            },
+          },
+        ],
       };
       const searchQueryData = [
         [
           {
             source_field: "A",
             target_field: "B",
-            value_field: 100
-          }
+            value_field: 100,
+          },
         ],
-        [] // Empty second query
+        [], // Empty second query
       ];
 
       const result = convertSankeyData(panelSchema, searchQueryData);
@@ -521,39 +573,45 @@ describe("convertSankeyData", () => {
   describe("Edge cases", () => {
     it("should handle duplicate nodes correctly", () => {
       const panelSchema = {
-        queries: [{
-          fields: {
-            source: { alias: "source_field" },
-            target: { alias: "target_field" },
-            value: { alias: "value_field" }
-          }
-        }]
+        queries: [
+          {
+            fields: {
+              source: { alias: "source_field" },
+              target: { alias: "target_field" },
+              value: { alias: "value_field" },
+            },
+          },
+        ],
       };
-      const searchQueryData = [[
-        {
-          source_field: "A",
-          target_field: "B",
-          value_field: 100
-        },
-        {
-          source_field: "A", // Duplicate source
-          target_field: "C",
-          value_field: 200
-        },
-        {
-          source_field: "B", // B appears as both source and target
-          target_field: "C",
-          value_field: 150
-        }
-      ]];
+      const searchQueryData = [
+        [
+          {
+            source_field: "A",
+            target_field: "B",
+            value_field: 100,
+          },
+          {
+            source_field: "A", // Duplicate source
+            target_field: "C",
+            value_field: 200,
+          },
+          {
+            source_field: "B", // B appears as both source and target
+            target_field: "C",
+            value_field: 150,
+          },
+        ],
+      ];
 
       const result = convertSankeyData(panelSchema, searchQueryData);
 
       // Should have unique nodes only
       expect(result.options.series[0].data).toHaveLength(3); // A, B, C (unique)
       expect(result.options.series[0].links).toHaveLength(3);
-      
-      const nodeNames = result.options.series[0].data.map((node: any) => node.name);
+
+      const nodeNames = result.options.series[0].data.map(
+        (node: any) => node.name,
+      );
       expect(nodeNames).toContain("A");
       expect(nodeNames).toContain("B");
       expect(nodeNames).toContain("C");
@@ -561,21 +619,25 @@ describe("convertSankeyData", () => {
 
     it("should verify series configuration properties", () => {
       const panelSchema = {
-        queries: [{
-          fields: {
-            source: { alias: "source_field" },
-            target: { alias: "target_field" },
-            value: { alias: "value_field" }
-          }
-        }]
+        queries: [
+          {
+            fields: {
+              source: { alias: "source_field" },
+              target: { alias: "target_field" },
+              value: { alias: "value_field" },
+            },
+          },
+        ],
       };
-      const searchQueryData = [[
-        {
-          source_field: "A",
-          target_field: "B",
-          value_field: 100
-        }
-      ]];
+      const searchQueryData = [
+        [
+          {
+            source_field: "A",
+            target_field: "B",
+            value_field: 100,
+          },
+        ],
+      ];
 
       const result = convertSankeyData(panelSchema, searchQueryData);
 

@@ -46,9 +46,9 @@ describe("PatternStatistics", () => {
 
   it("should mount PatternStatistics component", () => {
     expect(wrapper.exists()).toBe(true);
-    expect(
-      wrapper.find('[data-test="pattern-statistics"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="pattern-statistics"]').exists()).toBe(
+      true,
+    );
   });
 
   describe("Summary Text", () => {

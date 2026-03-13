@@ -15,10 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full" :class="containerClass" :style="containerStyle">
+  <div class="tw:w-full" :class="containerClass"
+:style="containerStyle">
     <!-- Header Section -->
     <div class="card-container tw:mb-[0.625rem]" :class="headerContainerClass">
-      <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]" :class="headerClass">
+      <div
+        class="flex tw:px-4 items-center no-wrap tw:h-[68px]"
+        :class="headerClass"
+      >
         <div class="col">
           <div class="flex">
             <q-btn
@@ -76,7 +80,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #before>
             <div class="tw:w-full tw:h-full">
               <!-- Tabs Section -->
-              <div class="card-container tw:py-[0.625rem] tw:px-[0.625rem] tw:mb-[0.625rem]">
+              <div
+                class="card-container tw:py-[0.625rem] tw:px-[0.625rem] tw:mb-[0.625rem]"
+              >
                 <div class="app-tabs-container tw:h-[36px] tw:w-fit">
                   <app-tabs
                     :data-test="`${testPrefix}-import-tabs`"
@@ -95,7 +101,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-form class="tw:mx-2 tw:pb-2" @submit.prevent>
                   <!-- Slot for custom URL input section -->
-                  <slot name="url-input-section" :url="url" :updateUrl="updateUrl">
+                  <slot
+                    name="url-input-section"
+                    :url="url"
+                    :updateUrl="updateUrl"
+                  >
                     <div class="flex tw:mt-[0.725rem] tw:h-[64px]">
                       <div style="width: 100%" class="q-pr-sm">
                         <q-input
@@ -103,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-model="url"
                           :placeholder="t('dashboard.addURL')"
                           borderless
-                          style="padding: 10px 0px;"
+                          style="padding: 10px 0px"
                         />
                       </div>
                     </div>
@@ -136,7 +146,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-form class="tw:mx-2 q-mt-md tw:pb-2" @submit.prevent>
                   <!-- Slot for custom file input section -->
-                  <slot name="file-input-section" :jsonFiles="jsonFiles" :updateFiles="updateFiles">
+                  <slot
+                    name="file-input-section"
+                    :jsonFiles="jsonFiles"
+                    :updateFiles="updateFiles"
+                  >
                     <div style="width: calc(100% - 10px)" class="q-mb-xs flex">
                       <div style="width: 100%" class="q-pr-sm">
                         <q-file
@@ -365,7 +379,9 @@ export default defineComponent({
 
     // Computed styles
     const contentStyle = computed(() => {
-      return props.showSplitter ? "width: calc(100vw - 100px);" : "width: 100%;";
+      return props.showSplitter
+        ? "width: calc(100vw - 100px);"
+        : "width: 100%;";
     });
 
     const splitterStyle = computed(() => {
@@ -522,7 +538,7 @@ export default defineComponent({
           emit("update:jsonArray", newVal);
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     // Cleanup before component unmounts to prevent Monaco editor errors
@@ -569,7 +585,7 @@ export default defineComponent({
 
 .editor-container-url {
   .monaco-editor {
-    height: v-bind('editorHeights.urlEditor') !important;
+    height: v-bind("editorHeights.urlEditor") !important;
     overflow: auto;
     resize: none;
     border: 1px solid var(--o2-border-color);
@@ -580,7 +596,7 @@ export default defineComponent({
 
 .editor-container-json {
   .monaco-editor {
-    height: v-bind('editorHeights.fileEditor') !important;
+    height: v-bind("editorHeights.fileEditor") !important;
     overflow: auto;
     resize: none;
     border: 1px solid var(--o2-border-color);
@@ -590,7 +606,7 @@ export default defineComponent({
 }
 
 .monaco-editor {
-  height: v-bind('editorHeights.fileEditor') !important;
+  height: v-bind("editorHeights.fileEditor") !important;
   overflow: auto;
   resize: none;
   border: 1px solid var(--o2-border-color);
@@ -599,7 +615,7 @@ export default defineComponent({
 }
 
 .error-report-container {
-  height: v-bind('editorHeights.errorReport') !important;
+  height: v-bind("editorHeights.errorReport") !important;
   overflow: auto;
   resize: none;
 }

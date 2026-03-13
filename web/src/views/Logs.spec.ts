@@ -37,7 +37,6 @@ installQuasar({
 describe.skip("Alert List", async () => {
   let wrapper: any;
   beforeEach(async () => {
-    
     wrapper = mount(Logs, {
       attachTo: "#app",
       global: {

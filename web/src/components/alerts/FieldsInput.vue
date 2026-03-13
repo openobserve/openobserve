@@ -168,11 +168,10 @@ const props = defineProps({
     required: true,
   },
   enableNewValueMode: {
-      type: Boolean,
-      default: false,
-      required: false,
-    }
-  
+    type: Boolean,
+    default: false,
+    required: false,
+  },
 });
 var triggerOperators: any = ref([
   "=",
@@ -210,14 +209,13 @@ const filterColumns = (val: string, update: Function) => {
   update(() => {
     const value = val.toLowerCase();
     filteredFields.value = props.streamFields.filter(
-      (column: any) => column.value.toLowerCase().indexOf(value) > -1
+      (column: any) => column.value.toLowerCase().indexOf(value) > -1,
     );
   });
 };
 const newValueMode = computed(() => {
-      return props.enableNewValueMode ? { 'new-value-mode': 'unique' } : {};
-    });
-
+  return props.enableNewValueMode ? { "new-value-mode": "unique" } : {};
+});
 </script>
 
 <style lang="scss">

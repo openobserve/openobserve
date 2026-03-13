@@ -44,7 +44,9 @@ describe("TraceStatusCell", () => {
 
     it("renders the status pill container", () => {
       wrapper = mount_({ errors: 0 });
-      expect(wrapper.find('[data-test="trace-row-status-pill"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="trace-row-status-pill"]').exists()).toBe(
+        true,
+      );
     });
   });
 

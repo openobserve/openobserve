@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="frustration-badge-container" data-test="frustration-badge-container">
+  <div
+    class="frustration-badge-container"
+    data-test="frustration-badge-container"
+  >
     <q-badge
       v-if="count > 0"
       :class="badgeClass"
@@ -34,7 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ tooltipText }}
       </q-tooltip>
     </q-badge>
-    <span v-else class="text-grey-6" data-test="frustration-badge-none">—</span>
+    <span v-else class="text-grey-6"
+data-test="frustration-badge-none">—</span>
   </div>
 </template>
 
@@ -46,7 +50,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-
 
 // Standard Severity levels
 // 0: None (green)

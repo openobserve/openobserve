@@ -56,7 +56,11 @@ export interface PromVisualQueryBinary {
 /**
  * Operation parameter value types
  */
-export type QueryBuilderOperationParamValue = string | number | boolean | string[];
+export type QueryBuilderOperationParamValue =
+  | string
+  | number
+  | boolean
+  | string[];
 
 /**
  * Parameter definition for an operation

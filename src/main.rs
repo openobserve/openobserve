@@ -1529,6 +1529,16 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         log::info!("Initialized AI, MCP, and Agent components");
     }
 
+    // Initialize evaluation templates for the REST API
+    #[cfg(feature = "enterprise")]
+    {
+        if let Err(e) = o2_enterprise::enterprise::ai::init_evaluation_templates().await {
+            log::error!("Failed to init evaluation templates: {e}");
+        } else {
+            log::info!("Initialized evaluation templates");
+        }
+    }
+
     // check ratelimit config
     let cfg = config::get_config();
     let o2cfg = o2_enterprise::enterprise::common::config::get_config();

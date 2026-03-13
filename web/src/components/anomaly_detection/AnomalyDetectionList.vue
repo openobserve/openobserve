@@ -17,7 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:w-full tw:h-full">
     <!-- Toolbar: search + refresh -->
-    <div class="tw:flex tw:items-center tw:justify-end tw:px-2 tw:py-2 tw:gap-2">
+    <div
+      class="tw:flex tw:items-center tw:justify-end tw:px-2 tw:py-2 tw:gap-2"
+    >
       <q-btn
         flat
         round
@@ -76,7 +78,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Last Triggered At column -->
       <template #body-cell-last_triggered_at="props">
         <q-td :props="props">
-          <span v-if="props.row.last_detection_run && props.row.last_detection_run > 0">
+          <span
+            v-if="
+              props.row.last_detection_run && props.row.last_detection_run > 0
+            "
+          >
             {{ formatTimestamp(props.row.last_detection_run) }}
           </span>
           <span v-else class="text-grey-5">—</span>
@@ -118,7 +124,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <!-- Pause / Resume — hidden while training or failed -->
           <q-btn
-            v-if="props.row.status !== 'training' && props.row.status !== 'failed'"
+            v-if="
+              props.row.status !== 'training' && props.row.status !== 'failed'
+            "
             flat
             round
             dense
@@ -149,7 +157,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             icon="model_training"
             :color="props.row.status === 'failed' ? 'negative' : undefined"
-            :title="props.row.status === 'failed' ? 'Retry Training' : t('alerts.triggerTraining')"
+            :title="
+              props.row.status === 'failed'
+                ? 'Retry Training'
+                : t('alerts.triggerTraining')
+            "
             :loading="retrainingId === props.row.anomaly_id"
             @click="confirmRetrain(props.row)"
           />
@@ -183,11 +195,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
         <q-card-section>
           Are you sure you want to delete
-          <strong>{{ pendingDeleteRow?.name }}</strong>?
-          This will also delete the trained model.
+          <strong>{{ pendingDeleteRow?.name }}</strong
+          >? This will also delete the trained model.
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat :label="t('alerts.cancel')" v-close-popup />
+          <q-btn flat :label="t('alerts.cancel')"
+v-close-popup />
           <q-btn
             flat
             color="negative"
@@ -206,11 +219,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-h6">Stop Training</div>
         </q-card-section>
         <q-card-section>
-          Stop the ongoing training for <strong>{{ pendingCancelRow?.name }}</strong>?
-          The model will not be updated. You can retrigger training afterwards.
+          Stop the ongoing training for
+          <strong>{{ pendingCancelRow?.name }}</strong
+          >? The model will not be updated. You can retrigger training
+          afterwards.
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat :label="t('alerts.cancel')" v-close-popup />
+          <q-btn flat :label="t('alerts.cancel')"
+v-close-popup />
           <q-btn
             flat
             color="warning"
@@ -227,39 +243,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card style="min-width: 380px; max-width: 480px">
         <q-card-section>
           <div class="text-h6">
-            {{ pendingRetrainRow?.status === 'failed' ? 'Retry Training' : t("alerts.triggerTraining") }}
+            {{
+              pendingRetrainRow?.status === "failed"
+                ? "Retry Training"
+                : t("alerts.triggerTraining")
+            }}
           </div>
         </q-card-section>
         <q-card-section>
           <!-- Error detail for failed state -->
-          <template v-if="pendingRetrainRow?.status === 'failed' && pendingRetrainRow?.last_error">
+          <template
+            v-if="
+              pendingRetrainRow?.status === 'failed' &&
+              pendingRetrainRow?.last_error
+            "
+          >
             <div class="text-body2 q-mb-sm">
-              Training failed for <strong>{{ pendingRetrainRow?.name }}</strong> with the following error:
+              Training failed for
+              <strong>{{ pendingRetrainRow?.name }}</strong> with the following
+              error:
             </div>
             <pre
               class="tw:text-xs tw:whitespace-pre-wrap tw:break-all tw:rounded tw:p-2 q-mb-sm"
-              style="background: rgba(0,0,0,0.06); max-height: 120px; overflow-y: auto"
-            >{{ pendingRetrainRow.last_error }}</pre>
-            <div class="text-body2">Fix the issue above, then retry training.</div>
+              style="
+                background: rgba(0, 0, 0, 0.06);
+                max-height: 120px;
+                overflow-y: auto;
+              "
+              >{{ pendingRetrainRow.last_error }}</pre
+            >
+            <div class="text-body2">
+              Fix the issue above, then retry training.
+            </div>
           </template>
           <template v-else-if="pendingRetrainRow?.status === 'failed'">
-            Training failed for <strong>{{ pendingRetrainRow?.name }}</strong>. Retry training now?
+            Training failed for <strong>{{ pendingRetrainRow?.name }}</strong
+            >. Retry training now?
           </template>
           <template v-else>
             Trigger retraining for
-            <strong>{{ pendingRetrainRow?.name }}</strong>?
-            The existing model will be replaced once training completes.
-            <div v-if="pendingRetrainRow?.training_completed_at" class="text-caption text-grey-6 q-mt-xs">
-              Last trained: {{ formatTimestamp(pendingRetrainRow.training_completed_at) }}
+            <strong>{{ pendingRetrainRow?.name }}</strong
+            >? The existing model will be replaced once training completes.
+            <div
+              v-if="pendingRetrainRow?.training_completed_at"
+              class="text-caption text-grey-6 q-mt-xs"
+            >
+              Last trained:
+              {{ formatTimestamp(pendingRetrainRow.training_completed_at) }}
             </div>
           </template>
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat :label="t('alerts.cancel')" v-close-popup />
+          <q-btn flat :label="t('alerts.cancel')"
+v-close-popup />
           <q-btn
             flat
-            :color="pendingRetrainRow?.status === 'failed' ? 'negative' : 'primary'"
-            :label="pendingRetrainRow?.status === 'failed' ? 'Retry Training' : t('alerts.triggerTraining')"
+            :color="
+              pendingRetrainRow?.status === 'failed' ? 'negative' : 'primary'
+            "
+            :label="
+              pendingRetrainRow?.status === 'failed'
+                ? 'Retry Training'
+                : t('alerts.triggerTraining')
+            "
             :loading="retrainingId === pendingRetrainRow?.anomaly_id"
             @click="retrain"
           />
@@ -308,26 +354,91 @@ export default defineComponent({
     const cancellingId = ref<string | null>(null);
 
     const columns: any[] = [
-      { name: "rownum",         label: "#",                        field: "rownum",              align: "left",   style: "width: 50px" },
-      { name: "name",           label: t("alerts.name"),           field: "name",               sortable: true, align: "left" },
-      { name: "stream",         label: "Stream",                   field: "stream_name",         sortable: true, align: "left" },
-      { name: "status",         label: "Status",                   field: "status",              sortable: true, align: "left" },
-      { name: "detection_window",         label: "Look back window",         field: "detection_window_seconds", sortable: true, align: "left" },
-      { name: "check_every",              label: t("alerts.frequency"),      field: "schedule_interval",       sortable: true, align: "left" },
-      { name: "last_triggered_at",        label: t("alerts.lastTriggered"),  field: "last_detection_run",      sortable: true, align: "left" },
-      { name: "last_anomaly_detected_at", label: t("alerts.lastSatisfied"),  field: "last_anomaly_detected_at", sortable: true, align: "left" },
-      { name: "last_trained_at",          label: "Last Trained At",          field: "training_completed_at",   sortable: true, align: "left" },
-      { name: "actions",        label: t("alerts.actions"),        field: "actions",             align: "center", style: "width: 140px" },
+      {
+        name: "rownum",
+        label: "#",
+        field: "rownum",
+        align: "left",
+        style: "width: 50px",
+      },
+      {
+        name: "name",
+        label: t("alerts.name"),
+        field: "name",
+        sortable: true,
+        align: "left",
+      },
+      {
+        name: "stream",
+        label: "Stream",
+        field: "stream_name",
+        sortable: true,
+        align: "left",
+      },
+      {
+        name: "status",
+        label: "Status",
+        field: "status",
+        sortable: true,
+        align: "left",
+      },
+      {
+        name: "detection_window",
+        label: "Look back window",
+        field: "detection_window_seconds",
+        sortable: true,
+        align: "left",
+      },
+      {
+        name: "check_every",
+        label: t("alerts.frequency"),
+        field: "schedule_interval",
+        sortable: true,
+        align: "left",
+      },
+      {
+        name: "last_triggered_at",
+        label: t("alerts.lastTriggered"),
+        field: "last_detection_run",
+        sortable: true,
+        align: "left",
+      },
+      {
+        name: "last_anomaly_detected_at",
+        label: t("alerts.lastSatisfied"),
+        field: "last_anomaly_detected_at",
+        sortable: true,
+        align: "left",
+      },
+      {
+        name: "last_trained_at",
+        label: "Last Trained At",
+        field: "training_completed_at",
+        sortable: true,
+        align: "left",
+      },
+      {
+        name: "actions",
+        label: t("alerts.actions"),
+        field: "actions",
+        align: "center",
+        style: "width: 140px",
+      },
     ];
 
     const statusColor = (row: any) => {
       if (!row.enabled) return "grey";
       switch (row.status) {
-        case "active":    return "positive";
-        case "training":  return "info";
-        case "failed":    return "negative";
-        case "waiting":   return "grey";
-        default:          return "grey";
+        case "active":
+          return "positive";
+        case "training":
+          return "info";
+        case "failed":
+          return "negative";
+        case "waiting":
+          return "grey";
+        default:
+          return "grey";
       }
     };
 
@@ -352,7 +463,10 @@ export default defineComponent({
         const res = await anomalyDetectionService.list(props.org_identifier);
         configs.value = res.data?.configs ?? res.data ?? [];
       } catch {
-        $q.notify({ type: "negative", message: "Failed to load anomaly detection configs." });
+        $q.notify({
+          type: "negative",
+          message: "Failed to load anomaly detection configs.",
+        });
       } finally {
         loading.value = false;
       }
@@ -397,7 +511,10 @@ export default defineComponent({
           (c) => c.anomaly_id !== pendingDeleteRow.value.anomaly_id,
         );
         showDeleteDialog.value = false;
-        $q.notify({ type: "positive", message: "Anomaly detection config deleted." });
+        $q.notify({
+          type: "positive",
+          message: "Anomaly detection config deleted.",
+        });
       } catch {
         $q.notify({ type: "negative", message: "Failed to delete config." });
       } finally {
@@ -419,7 +536,10 @@ export default defineComponent({
           pendingCancelRow.value.anomaly_id,
         );
         showCancelTrainingDialog.value = false;
-        $q.notify({ type: "positive", message: "Training cancelled. You can now retrigger it." });
+        $q.notify({
+          type: "positive",
+          message: "Training cancelled. You can now retrigger it.",
+        });
         await loadConfigs();
       } catch {
         $q.notify({ type: "negative", message: "Failed to cancel training." });
@@ -442,7 +562,10 @@ export default defineComponent({
           pendingRetrainRow.value.anomaly_id,
         );
         showRetrainDialog.value = false;
-        $q.notify({ type: "positive", message: "Training started. Status will update shortly." });
+        $q.notify({
+          type: "positive",
+          message: "Training started. Status will update shortly.",
+        });
         // Refresh list to pick up status change
         await loadConfigs();
       } catch {

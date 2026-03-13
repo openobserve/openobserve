@@ -54,7 +54,7 @@ describe("AddAnnotation", () => {
 
   beforeEach(async () => {
     store.state.selectedOrganization = { identifier: "test-org" };
-    
+
     wrapper = mount(AddAnnotation, {
       attachTo: "#app",
       props: defaultProps,
@@ -114,7 +114,7 @@ describe("AddAnnotation", () => {
 
   it("should call create_timed_annotations when saving", async () => {
     annotationService.create_timed_annotations.mockResolvedValueOnce({});
-    
+
     const inputs = wrapper.findAllComponents({ name: "QInput" });
     if (inputs.length > 0) {
       await inputs[0].vm.$emit("update:modelValue", "New Annotation");
@@ -122,10 +122,11 @@ describe("AddAnnotation", () => {
     await flushPromises();
 
     const buttons = wrapper.findAllComponents({ name: "QBtn" });
-    const saveButton = buttons.find((btn: any) => 
-      btn.props("label") === "Save" || btn.text().includes("Save")
+    const saveButton = buttons.find(
+      (btn: any) =>
+        btn.props("label") === "Save" || btn.text().includes("Save"),
     );
-    
+
     if (saveButton) {
       await saveButton.vm.$emit("click");
       await flushPromises();
@@ -163,10 +164,11 @@ describe("AddAnnotation", () => {
     annotationService.update_timed_annotations.mockResolvedValueOnce({});
 
     const buttons = wrapper.findAllComponents({ name: "QBtn" });
-    const updateButton = buttons.find((btn: any) => 
-      btn.props("label") === "Update" || btn.text().includes("Update")
+    const updateButton = buttons.find(
+      (btn: any) =>
+        btn.props("label") === "Update" || btn.text().includes("Update"),
     );
-    
+
     if (updateButton) {
       await updateButton.vm.$emit("click");
       await flushPromises();
@@ -202,8 +204,9 @@ describe("AddAnnotation", () => {
     await flushPromises();
 
     const buttons = wrapper.findAllComponents({ name: "QBtn" });
-    const deleteButton = buttons.find((btn: any) => 
-      btn.props("label") === "Delete" || btn.text().includes("Delete")
+    const deleteButton = buttons.find(
+      (btn: any) =>
+        btn.props("label") === "Delete" || btn.text().includes("Delete"),
     );
     expect(deleteButton).toBeTruthy();
   });

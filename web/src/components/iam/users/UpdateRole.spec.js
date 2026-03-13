@@ -15,13 +15,13 @@ vi.mock("@/services/organizations", () => ({
 }));
 
 // Mock vue-i18n
-vi.mock('vue-i18n', async (importOriginal) => {
+vi.mock("vue-i18n", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
     useI18n: () => ({
-      t: (key) => key
-    })
+      t: (key) => key,
+    }),
   };
 });
 
@@ -41,12 +41,12 @@ describe("UpdateRole Component", () => {
       state: {
         selectedOrganization: {
           id: "123",
-          identifier: "test-org"
+          identifier: "test-org",
         },
         userInfo: {
-          email: "test@example.com"
-        }
-      }
+          email: "test@example.com",
+        },
+      },
     };
 
     // Setup notify mock with dismiss function
@@ -68,22 +68,22 @@ describe("UpdateRole Component", () => {
           QInput: false,
           QSelect: false,
           QBtn: false,
-        }
+        },
       },
       props: {
         modelValue: {
           org_member_id: "456",
           role: "admin",
           first_name: "John",
-          email: "john@example.com"
-        }
-      }
+          email: "john@example.com",
+        },
+      },
     });
 
     // Attach notify mock to wrapper
     wrapper.vm.$q = {
       ...wrapper.vm.$q,
-      notify: notifyMock
+      notify: notifyMock,
     };
   });
 
@@ -101,7 +101,7 @@ describe("UpdateRole Component", () => {
         org_member_id: "456",
         role: "admin",
         first_name: "John",
-        email: "john@example.com"
+        email: "john@example.com",
       });
     });
 
@@ -114,13 +114,13 @@ describe("UpdateRole Component", () => {
     it("submits form with valid data", async () => {
       // Mock successful API response
       vi.mocked(organizationsService.update_member_role).mockResolvedValue({
-        data: { success: true }
+        data: { success: true },
       });
 
       // Mock form validation
       wrapper.vm.updateUserForm = {
         validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn()
+        resetValidation: vi.fn(),
       };
 
       await wrapper.vm.onSubmit();
@@ -130,16 +130,16 @@ describe("UpdateRole Component", () => {
         {
           id: 456,
           role: "admin",
-          organization_id: 123
+          organization_id: 123,
         },
-        "test-org"
+        "test-org",
       );
 
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "positive",
-          message: "Organization member updated successfully."
-        })
+          message: "Organization member updated successfully.",
+        }),
       );
       expect(dismissMock).toHaveBeenCalled();
     });
@@ -147,24 +147,24 @@ describe("UpdateRole Component", () => {
     it("handles form validation failure", async () => {
       // Mock form validation failure
       wrapper.vm.updateUserForm = {
-        validate: vi.fn().mockResolvedValue(false)
+        validate: vi.fn().mockResolvedValue(false),
       };
 
       await wrapper.vm.onSubmit();
-      
+
       expect(organizationsService.update_member_role).not.toHaveBeenCalled();
     });
 
     it("handles API error response", async () => {
       // Mock API error response
       vi.mocked(organizationsService.update_member_role).mockResolvedValue({
-        data: { error_members: ["Some error"] }
+        data: { error_members: ["Some error"] },
       });
 
       // Mock form validation
       wrapper.vm.updateUserForm = {
         validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn()
+        resetValidation: vi.fn(),
       };
 
       await wrapper.vm.onSubmit();
@@ -173,8 +173,8 @@ describe("UpdateRole Component", () => {
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "negative",
-          message: "Error while updating organization member"
-        })
+          message: "Error while updating organization member",
+        }),
       );
       expect(dismissMock).toHaveBeenCalled();
     });
@@ -182,21 +182,21 @@ describe("UpdateRole Component", () => {
     it("shows loading notification during form submission", async () => {
       wrapper.vm.updateUserForm = {
         validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn()
+        resetValidation: vi.fn(),
       };
 
-      vi.mocked(organizationsService.update_member_role).mockImplementation(() => 
-        new Promise(resolve => setTimeout(resolve, 100))
+      vi.mocked(organizationsService.update_member_role).mockImplementation(
+        () => new Promise((resolve) => setTimeout(resolve, 100)),
       );
 
       wrapper.vm.onSubmit();
-      
+
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           spinner: true,
           message: "Please wait...",
-          timeout: 2000
-        })
+          timeout: 2000,
+        }),
       );
     });
 
@@ -204,11 +204,11 @@ describe("UpdateRole Component", () => {
       const resetValidationMock = vi.fn();
       wrapper.vm.updateUserForm = {
         validate: vi.fn().mockResolvedValue(true),
-        resetValidation: resetValidationMock
+        resetValidation: resetValidationMock,
       };
 
       vi.mocked(organizationsService.update_member_role).mockResolvedValue({
-        data: { success: true }
+        data: { success: true },
       });
 
       await wrapper.vm.onSubmit();
@@ -220,12 +220,12 @@ describe("UpdateRole Component", () => {
     it("handles network error during submission", async () => {
       wrapper.vm.updateUserForm = {
         validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn()
+        resetValidation: vi.fn(),
       };
 
       // Mock the API call to return error_members
       vi.mocked(organizationsService.update_member_role).mockResolvedValue({
-        data: { error_members: ["Some error"] }
+        data: { error_members: ["Some error"] },
       });
 
       await wrapper.vm.onSubmit();
@@ -236,20 +236,20 @@ describe("UpdateRole Component", () => {
         expect.objectContaining({
           type: "negative",
           message: "Error while updating organization member",
-          timeout: 15000
-        })
+          timeout: 15000,
+        }),
       );
     });
 
     it("handles undefined response data gracefully", async () => {
       wrapper.vm.updateUserForm = {
         validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn()
+        resetValidation: vi.fn(),
       };
 
       // Mock API to return a response with data but no error_members
       vi.mocked(organizationsService.update_member_role).mockResolvedValue({
-        data: {}
+        data: {},
       });
 
       await wrapper.vm.onSubmit();
@@ -260,19 +260,19 @@ describe("UpdateRole Component", () => {
         expect.objectContaining({
           type: "positive",
           message: "Organization member updated successfully.",
-          timeout: 3000
-        })
+          timeout: 3000,
+        }),
       );
     });
 
     it("handles malformed API response", async () => {
       wrapper.vm.updateUserForm = {
         validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn()
+        resetValidation: vi.fn(),
       };
 
       vi.mocked(organizationsService.update_member_role).mockResolvedValue({
-        data: { unexpected: "format" }
+        data: { unexpected: "format" },
       });
 
       await wrapper.vm.onSubmit();
@@ -283,8 +283,8 @@ describe("UpdateRole Component", () => {
         expect.objectContaining({
           type: "positive",
           message: "Organization member updated successfully.",
-          timeout: 3000
-        })
+          timeout: 3000,
+        }),
       );
     });
   });
@@ -293,12 +293,12 @@ describe("UpdateRole Component", () => {
     it("emits updated event on successful form submission", async () => {
       const responseData = { success: true };
       vi.mocked(organizationsService.update_member_role).mockResolvedValue({
-        data: responseData
+        data: responseData,
       });
 
       wrapper.vm.updateUserForm = {
         validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn()
+        resetValidation: vi.fn(),
       };
 
       await wrapper.vm.onSubmit();
@@ -313,17 +313,17 @@ describe("UpdateRole Component", () => {
         org_member_id: "789",
         role: "admin",
         first_name: "Jane",
-        email: "jane@example.com"
+        email: "jane@example.com",
       };
 
       wrapper.vm.orgMemberData = newModelValue;
-      await wrapper.vm.$nextTick(); 
+      await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.orgMemberData).toEqual({
         org_member_id: newModelValue.org_member_id,
         role: newModelValue.role,
         first_name: newModelValue.first_name,
-        email: newModelValue.email
+        email: newModelValue.email,
       });
     });
   });
@@ -336,8 +336,8 @@ describe("UpdateRole Component", () => {
     it("updates role when selected", async () => {
       wrapper.vm.orgMemberData.role = "admin";
       await wrapper.vm.$nextTick();
-      
-      const roleSelect = wrapper.find('.q-select');
+
+      const roleSelect = wrapper.find(".q-select");
       expect(roleSelect.exists()).toBe(true);
       expect(wrapper.vm.orgMemberData.role).toBe("admin");
     });
@@ -349,13 +349,13 @@ describe("UpdateRole Component", () => {
         org_member_id: "456",
         role: "admin",
         first_name: "John",
-        email: "john@example.com"
+        email: "john@example.com",
       };
 
       wrapper.vm.orgMemberData = { ...initialData };
       wrapper.vm.updateUserForm = {
         validate: vi.fn().mockResolvedValue(false),
-        resetValidation: vi.fn()
+        resetValidation: vi.fn(),
       };
 
       await wrapper.vm.onSubmit();
@@ -367,7 +367,7 @@ describe("UpdateRole Component", () => {
     it("properly formats organization ID for API call", async () => {
       wrapper.vm.updateUserForm = {
         validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn()
+        resetValidation: vi.fn(),
       };
 
       await wrapper.vm.onSubmit();
@@ -375,9 +375,9 @@ describe("UpdateRole Component", () => {
 
       expect(organizationsService.update_member_role).toHaveBeenCalledWith(
         expect.objectContaining({
-          organization_id: expect.any(Number)
+          organization_id: expect.any(Number),
         }),
-        expect.any(String)
+        expect.any(String),
       );
     });
   });
@@ -390,7 +390,7 @@ describe("UpdateRole Component", () => {
     });
 
     it("shows role selector with correct options", () => {
-      const roleSelect = wrapper.find('.q-select');
+      const roleSelect = wrapper.find(".q-select");
       expect(roleSelect.exists()).toBe(true);
     });
 
@@ -402,30 +402,30 @@ describe("UpdateRole Component", () => {
 
   describe("UI Interactions", () => {
     it("displays first name in read-only mode", () => {
-      const input = wrapper.find('input[readonly]');
+      const input = wrapper.find("input[readonly]");
       expect(input.exists()).toBe(true);
     });
 
     it("shows form title correctly", () => {
-      const title = wrapper.find('.text-body1');
+      const title = wrapper.find(".text-body1");
       expect(title.exists()).toBe(true);
-      expect(title.text()).toBe('user.editUser');
+      expect(title.text()).toBe("user.editUser");
     });
 
     it("has proper form layout structure", () => {
-      const form = wrapper.find('form');
+      const form = wrapper.find("form");
       expect(form.exists()).toBe(true);
-      expect(form.classes()).toContain('q-form');
+      expect(form.classes()).toContain("q-form");
     });
 
     it("prevents form submission on validation failure", async () => {
       wrapper.vm.updateUserForm = {
         validate: vi.fn().mockResolvedValue(false),
-        resetValidation: vi.fn()
+        resetValidation: vi.fn(),
       };
 
-      const form = wrapper.find('form');
-      await form.trigger('submit.prevent');
+      const form = wrapper.find("form");
+      await form.trigger("submit.prevent");
 
       expect(organizationsService.update_member_role).not.toHaveBeenCalled();
     });
@@ -435,11 +435,11 @@ describe("UpdateRole Component", () => {
     it("handles undefined response data gracefully", async () => {
       wrapper.vm.updateUserForm = {
         validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn()
+        resetValidation: vi.fn(),
       };
 
       vi.mocked(organizationsService.update_member_role).mockResolvedValue({
-        data: undefined
+        data: undefined,
       });
 
       await wrapper.vm.onSubmit();
@@ -451,11 +451,11 @@ describe("UpdateRole Component", () => {
     it("handles malformed API response", async () => {
       wrapper.vm.updateUserForm = {
         validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn()
+        resetValidation: vi.fn(),
       };
 
       vi.mocked(organizationsService.update_member_role).mockResolvedValue({
-        data: { unexpected: "format" }
+        data: { unexpected: "format" },
       });
 
       await wrapper.vm.onSubmit();
@@ -473,15 +473,15 @@ describe("UpdateRole Component", () => {
       // Mock validation method
       wrapper.vm.updateUserForm = {
         validate: vi.fn().mockResolvedValue(false),
-        resetValidation: vi.fn()
+        resetValidation: vi.fn(),
       };
 
-      const roleSelect = wrapper.findComponent({ name: 'QSelect' });
+      const roleSelect = wrapper.findComponent({ name: "QSelect" });
       expect(roleSelect.exists()).toBe(true);
-      
+
       await wrapper.vm.onSubmit();
       await wrapper.vm.$nextTick();
-      
+
       // For Quasar components, we should verify the validation was called
       expect(wrapper.vm.updateUserForm.validate).toHaveBeenCalled();
     });
@@ -490,7 +490,7 @@ describe("UpdateRole Component", () => {
       wrapper.vm.orgMemberData.role = "";
       wrapper.vm.updateUserForm = {
         validate: vi.fn().mockResolvedValue(false),
-        resetValidation: vi.fn()
+        resetValidation: vi.fn(),
       };
 
       await wrapper.vm.onSubmit();
@@ -506,7 +506,7 @@ describe("UpdateRole Component", () => {
         org_member_id: "789",
         role: "admin",
         first_name: "Jane",
-        email: "jane@example.com"
+        email: "jane@example.com",
       };
 
       // We need to trigger the created hook again
@@ -524,11 +524,11 @@ describe("UpdateRole Component", () => {
             QInput: false,
             QSelect: false,
             QBtn: false,
-          }
+          },
         },
         props: {
-          modelValue: newData
-        }
+          modelValue: newData,
+        },
       });
 
       expect(wrapper.vm.orgMemberData).toEqual(newData);
@@ -543,49 +543,58 @@ describe("UpdateRole Component", () => {
 
   describe("Close Button Functionality", () => {
     it("has close button in header", () => {
-      const closeButton = wrapper.findComponent({ name: 'QBtn', props: { icon: 'cancel' } });
+      const closeButton = wrapper.findComponent({
+        name: "QBtn",
+        props: { icon: "cancel" },
+      });
       expect(closeButton.exists()).toBe(true);
     });
 
     it("has cancel button in form", () => {
-      const cancelButton = wrapper.findComponent({ name: 'QBtn', props: { 'text-color': 'light-text' } });
+      const cancelButton = wrapper.findComponent({
+        name: "QBtn",
+        props: { "text-color": "light-text" },
+      });
       expect(cancelButton.exists()).toBe(true);
     });
   });
 
   describe("Form Layout and Styling", () => {
     it("has proper card structure", () => {
-      const card = wrapper.findComponent({ name: 'QCard' });
+      const card = wrapper.findComponent({ name: "QCard" });
       expect(card.exists()).toBe(true);
-      expect(card.classes()).toContain('full-height');
+      expect(card.classes()).toContain("full-height");
     });
 
     it("has form section with proper spacing", () => {
-      const formSection = wrapper.findComponent({ name: 'QCardSection' });
+      const formSection = wrapper.findComponent({ name: "QCardSection" });
       expect(formSection.exists()).toBe(true);
-      expect(formSection.classes()).toContain('q-px-md');
-      expect(formSection.classes()).toContain('q-py-md');
+      expect(formSection.classes()).toContain("q-px-md");
+      expect(formSection.classes()).toContain("q-py-md");
     });
 
     it("has separator between header and form", () => {
-      const separator = wrapper.findComponent({ name: 'QSeparator' });
+      const separator = wrapper.findComponent({ name: "QSeparator" });
       expect(separator.exists()).toBe(true);
     });
   });
 
   describe("Input Field Properties", () => {
     it("has read-only name input with correct attributes", () => {
-      const nameInput = wrapper.findComponent({ name: 'QInput', props: { label: 'user.name' } });
+      const nameInput = wrapper.findComponent({
+        name: "QInput",
+        props: { label: "user.name" },
+      });
       expect(nameInput.exists()).toBe(true);
-      expect(nameInput.props('readonly')).toBe(true);
-      expect(nameInput.props('dense')).toBe(true);
+      expect(nameInput.props("readonly")).toBe(true);
+      expect(nameInput.props("dense")).toBe(true);
     });
 
     it("has role select with correct attributes", () => {
-      const roleSelect = wrapper.findComponent({ name: 'QSelect' });
+      const roleSelect = wrapper.findComponent({ name: "QSelect" });
       expect(roleSelect.exists()).toBe(true);
-      expect(roleSelect.props('dense')).toBe(true);
-      expect(roleSelect.props('outlined')).toBe(true);
+      expect(roleSelect.props("dense")).toBe(true);
+      expect(roleSelect.props("outlined")).toBe(true);
     });
   });
 });

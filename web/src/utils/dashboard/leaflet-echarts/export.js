@@ -1,1 +1,1 @@
-export { LeafletComponent } from './lmap'
+export { LeafletComponent } from "./lmap";

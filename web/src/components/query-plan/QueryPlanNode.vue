@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="expand-icon"
         @click="toggleChildrenExpanded"
       >
-        {{ childrenExpanded ? '▼' : '▶' }}
+        {{ childrenExpanded ? "▼" : "▶" }}
       </span>
       <span v-else class="expand-icon-spacer"></span>
 
@@ -41,18 +41,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span
         v-if="inlineDetails"
         class="inline-details"
-        :class="{ truncated: !detailsExpanded && hasLongDetails, clickable: hasLongDetails }"
+        :class="{
+          truncated: !detailsExpanded && hasLongDetails,
+          clickable: hasLongDetails,
+        }"
         @click="hasLongDetails ? toggleDetailsExpanded() : null"
       >
         : {{ inlineDetails }}
       </span>
 
       <!-- Separator between details and metrics -->
-      <span v-if="inlineDetails && (isAnalyze && hasMetrics)" class="separator">·</span>
+      <span v-if="inlineDetails && isAnalyze && hasMetrics" class="separator"
+        >·</span
+      >
 
       <!-- Metrics (for ANALYZE mode) -->
       <span v-if="isAnalyze && hasMetrics" class="metrics-inline">
-        <span v-if="node.metrics.output_rows !== undefined" class="metric-badge">
+        <span
+          v-if="node.metrics.output_rows !== undefined"
+          class="metric-badge"
+        >
           <q-icon name="format_list_numbered" size="12px" />
           {{ formatNumber(node.metrics.output_rows) }} rows
         </span>
@@ -65,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Expanded full details (shown when details are expanded) -->
     <div v-if="detailsExpanded && hasLongDetails" class="node-details">
-      <span class="tree-indent">{{ childPrefix }}  </span>
+      <span class="tree-indent">{{ childPrefix }} </span>
       <span>{{ inlineDetails }}</span>
     </div>
 
@@ -104,7 +112,7 @@ export default defineComponent({
     },
     parentPrefix: {
       type: String,
-      default: '',
+      default: "",
     },
   },
   setup(props) {
@@ -112,18 +120,19 @@ export default defineComponent({
     const detailsExpanded = ref(false);
 
     const connector = computed(() => {
-      return props.isLast ? '└─' : '├─';
+      return props.isLast ? "└─" : "├─";
     });
 
     const childPrefix = computed(() => {
-      const addition = props.isLast ? '  ' : '│ ';
+      const addition = props.isLast ? "  " : "│ ";
       return props.parentPrefix + addition;
     });
 
     const hasMetrics = computed(() => {
-      return props.isAnalyze && (
-        props.node.metrics.output_rows !== undefined ||
-        props.node.metrics.elapsed_compute !== undefined
+      return (
+        props.isAnalyze &&
+        (props.node.metrics.output_rows !== undefined ||
+          props.node.metrics.elapsed_compute !== undefined)
       );
     });
 
@@ -131,14 +140,14 @@ export default defineComponent({
      * Get inline details - everything after the colon, excluding metrics
      */
     const parseInlineDetails = (fullText: string): string => {
-      const colonIndex = fullText.indexOf(':');
-      if (colonIndex === -1) return '';
+      const colonIndex = fullText.indexOf(":");
+      if (colonIndex === -1) return "";
 
       let details = fullText.substring(colonIndex + 1).trim();
 
       // Remove metrics section if in analyze mode (we show them separately)
-      if (props.isAnalyze && details.includes('metrics=')) {
-        const metricsIndex = details.indexOf(', metrics=');
+      if (props.isAnalyze && details.includes("metrics=")) {
+        const metricsIndex = details.indexOf(", metrics=");
         if (metricsIndex !== -1) {
           details = details.substring(0, metricsIndex).trim();
         }

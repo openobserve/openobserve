@@ -38,10 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="ellipsis tw:max-w-[calc(100%-1.5rem)]!"
             style="display: inline-block"
           >
-            <span
-              v-if="field.dataType"
-              class="field-type-container"
-            >
+            <span v-if="field.dataType" class="field-type-container">
               <q-icon
                 class="field-expand-icon"
                 :name="isExpanded ? 'expand_more' : 'chevron_right'"

@@ -66,7 +66,11 @@ export interface IncidentAlert {
   alert_id: string;
   alert_name: string;
   alert_fired_at: number;
-  correlation_reason: "service_discovery" | "scope_match" | "workload_match" | "alert_id";
+  correlation_reason:
+    | "service_discovery"
+    | "scope_match"
+    | "workload_match"
+    | "alert_id";
   created_at: number;
 }
 
@@ -114,7 +118,7 @@ const incidents = {
     status?: string,
     limit: number = 50,
     offset: number = 0,
-    keyword?: string
+    keyword?: string,
   ) => {
     let url = `/api/v2/${org_identifier}/alerts/incidents?limit=${limit}&offset=${offset}`;
     if (status) {
@@ -131,7 +135,7 @@ const incidents = {
    */
   get: (org_identifier: string, incident_id: string) => {
     return http().get<IncidentWithAlerts>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}`
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}`,
     );
   },
 
@@ -141,11 +145,11 @@ const incidents = {
   updateStatus: (
     org_identifier: string,
     incident_id: string,
-    status: "open" | "acknowledged" | "resolved"
+    status: "open" | "acknowledged" | "resolved",
   ) => {
     return http().patch<Incident>(
       `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/update`,
-      { status }
+      { status },
     );
   },
 
@@ -155,11 +159,11 @@ const incidents = {
   updateIncident: (
     org_identifier: string,
     incident_id: string,
-    updates: { title?: string; severity?: string }
+    updates: { title?: string; severity?: string },
   ) => {
     return http().patch<Incident | UpdateSeverityResponse>(
       `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/update`,
-      updates
+      updates,
     );
   },
 
@@ -168,7 +172,7 @@ const incidents = {
    */
   getStats: (org_identifier: string) => {
     return http().get<IncidentStats>(
-      `/api/v2/${org_identifier}/alerts/incidents/stats`
+      `/api/v2/${org_identifier}/alerts/incidents/stats`,
     );
   },
 
@@ -178,12 +182,12 @@ const incidents = {
   triggerRca: (
     org_identifier: string,
     incident_id: string,
-    params: { reanalysis?: boolean } = {}
+    params: { reanalysis?: boolean } = {},
   ) => {
     return http().post<{ rca_content: string }>(
       `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca`,
       null,
-      { params }
+      { params },
     );
   },
 
@@ -199,7 +203,7 @@ const incidents = {
    */
   getCorrelatedStreams: async (
     org_identifier: string,
-    incident: Incident
+    incident: Incident,
   ): Promise<IncidentCorrelatedStreams> => {
     const dimensions = incident.stable_dimensions;
 
@@ -246,17 +250,21 @@ const incidents = {
    */
   getEvents: (org_identifier: string, incident_id: string) => {
     return http().get(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/events`
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/events`,
     );
   },
 
   /**
    * Post a comment on an incident
    */
-  postComment: (org_identifier: string, incident_id: string, comment: string) => {
+  postComment: (
+    org_identifier: string,
+    incident_id: string,
+    comment: string,
+  ) => {
     return http().post(
       `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/events/comment`,
-      { comment }
+      { comment },
     );
   },
 };

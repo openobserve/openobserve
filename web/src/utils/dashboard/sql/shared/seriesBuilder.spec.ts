@@ -73,7 +73,11 @@ describe("seriesBuilder", () => {
     it("keeps FIRST occurrence when duplicate keys exist", () => {
       const first = { category: "A", time: "2024-01", value: 10 };
       const second = { category: "A", time: "2024-01", value: 99 };
-      const result = buildDataLookupMap([first, second], ["category"], ["time"]);
+      const result = buildDataLookupMap(
+        [first, second],
+        ["category"],
+        ["time"],
+      );
       expect(result.get("A||2024-01")).toBe(first);
       expect(result.get("A||2024-01")).not.toBe(second);
     });
@@ -104,7 +108,9 @@ describe("seriesBuilder", () => {
     });
 
     it("uses only first x-axis key", () => {
-      const data = [{ category: "A", time: "2024-01", month: "Jan", value: 10 }];
+      const data = [
+        { category: "A", time: "2024-01", month: "Jan", value: 10 },
+      ];
       const result = buildDataLookupMap(data, ["category"], ["time", "month"]);
       // Only first x-axis key "time" is used
       expect(result.has("A||2024-01")).toBe(true);

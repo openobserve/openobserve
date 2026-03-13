@@ -15,38 +15,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div>
-      <fields-input
-        class="q-mt-md"
-        :stream-fields="columns"
-        :fields="conditions"
-        @add="addField"
-        @remove="removeField"
-        @input:update="
-          (name: string, field: any) => emits('input:update', name, field)
-        "
-        :enableNewValueMode="enableNewValueMode"
-      />
-    </div>
-  </template>
-  
-  <script lang="ts" setup>
-  import FieldsInput from "@/components/alerts/FieldsInput.vue";
-  
-  defineProps(["columns", "conditions","enableNewValueMode"]);
-  
-  const emits = defineEmits(["field:add", "field:remove", "input:update"]);
-  
-  const addField = (field: any) => {
-    emits("field:add", field);
-    emits("input:update", "conditions", field);
-  };
-  
-  const removeField = (field: any) => {
-    emits("field:remove", field);
-    emits("input:update", "conditions", field);
-  };
-  </script>
-  
-  <style lang="scss" scoped></style>
-  
+  <div>
+    <fields-input
+      class="q-mt-md"
+      :stream-fields="columns"
+      :fields="conditions"
+      @add="addField"
+      @remove="removeField"
+      @input:update="
+        (name: string, field: any) => emits('input:update', name, field)
+      "
+      :enableNewValueMode="enableNewValueMode"
+    />
+  </div>
+</template>
+
+<script lang="ts" setup>
+import FieldsInput from "@/components/alerts/FieldsInput.vue";
+
+defineProps(["columns", "conditions", "enableNewValueMode"]);
+
+const emits = defineEmits(["field:add", "field:remove", "input:update"]);
+
+const addField = (field: any) => {
+  emits("field:add", field);
+  emits("input:update", "conditions", field);
+};
+
+const removeField = (field: any) => {
+  emits("field:remove", field);
+  emits("input:update", "conditions", field);
+};
+</script>
+
+<style lang="scss" scoped></style>

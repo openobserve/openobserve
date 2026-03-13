@@ -281,7 +281,9 @@ describe("PromQLTableChart", () => {
       await wrapper.vm.$nextTick();
 
       const filteredRows = wrapper.vm.filteredTableRows;
-      expect(filteredRows.every((row: any) => row.__legend__ === "series1")).toBe(true);
+      expect(
+        filteredRows.every((row: any) => row.__legend__ === "series1"),
+      ).toBe(true);
     });
 
     it("should show all rows when __all__ is selected", async () => {
@@ -364,7 +366,11 @@ describe("PromQLTableChart", () => {
 
     it("should pass table_pagination_rows_per_page to TableRenderer", () => {
       wrapper = createWrapper({
-        config: { ...mockConfig, table_pagination: true, table_pagination_rows_per_page: 25 },
+        config: {
+          ...mockConfig,
+          table_pagination: true,
+          table_pagination_rows_per_page: 25,
+        },
       });
 
       const tableRenderer = wrapper.findComponent({ name: "TableRenderer" });
@@ -495,7 +501,11 @@ describe("PromQLTableChart", () => {
 
     it("should show pagination controls when pagination is enabled", async () => {
       wrapper = createWrapper({
-        config: { ...mockConfig, table_pagination: true, promql_table_mode: "single" },
+        config: {
+          ...mockConfig,
+          table_pagination: true,
+          promql_table_mode: "single",
+        },
       });
       await flushPromises();
 

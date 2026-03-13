@@ -14,11 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { 
-  formatInterval, 
-  getTimeInSecondsBasedOnUnit, 
-  formatRateInterval, 
-  processVariableContent 
+import {
+  formatInterval,
+  getTimeInSecondsBasedOnUnit,
+  formatRateInterval,
+  processVariableContent,
 } from "./variablesUtils";
 
 describe("Variables Utils", () => {
@@ -194,62 +194,69 @@ describe("Variables Utils", () => {
         { name: "env", value: "production" },
         { name: "empty", value: "" },
         { name: "null", value: null },
-      ]
+      ],
     };
 
     it("should replace simple variable placeholders", () => {
-      const content = "SELECT * FROM logs WHERE region = '${region}' AND env = '${env}'";
-      const expected = "SELECT * FROM logs WHERE region = 'us-east-1' AND env = 'production'";
-      
+      const content =
+        "SELECT * FROM logs WHERE region = '${region}' AND env = '${env}'";
+      const expected =
+        "SELECT * FROM logs WHERE region = 'us-east-1' AND env = 'production'";
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
     it("should replace alternative syntax variable placeholders", () => {
-      const content = "SELECT * FROM logs WHERE region = '$region' AND env = '$env'";
-      const expected = "SELECT * FROM logs WHERE region = 'us-east-1' AND env = 'production'";
-      
+      const content =
+        "SELECT * FROM logs WHERE region = '$region' AND env = '$env'";
+      const expected =
+        "SELECT * FROM logs WHERE region = 'us-east-1' AND env = 'production'";
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
     it("should handle array values with default comma separation", () => {
       const content = "SELECT * FROM logs WHERE service IN (${service})";
       const expected = "SELECT * FROM logs WHERE service IN (api,web,db)";
-      
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
     it("should handle array values with CSV formatting", () => {
       const content = "SELECT * FROM logs WHERE service IN (${service:csv})";
       const expected = "SELECT * FROM logs WHERE service IN (api,web,db)";
-      
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
     it("should handle array values with pipe formatting", () => {
-      const content = "SELECT * FROM logs WHERE service REGEXP '${service:pipe}'";
+      const content =
+        "SELECT * FROM logs WHERE service REGEXP '${service:pipe}'";
       const expected = "SELECT * FROM logs WHERE service REGEXP 'api|web|db'";
-      
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
     it("should handle array values with double quote formatting", () => {
-      const content = "SELECT * FROM logs WHERE service IN (${service:doublequote})";
+      const content =
+        "SELECT * FROM logs WHERE service IN (${service:doublequote})";
       const expected = 'SELECT * FROM logs WHERE service IN ("api","web","db")';
-      
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
     it("should handle array values with single quote formatting", () => {
-      const content = "SELECT * FROM logs WHERE service IN (${service:singlequote})";
+      const content =
+        "SELECT * FROM logs WHERE service IN (${service:singlequote})";
       const expected = "SELECT * FROM logs WHERE service IN ('api','web','db')";
-      
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
     it("should handle empty values", () => {
       const content = "SELECT * FROM logs WHERE field = '${empty}'";
       const expected = "SELECT * FROM logs WHERE field = ''";
-      
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
@@ -264,19 +271,19 @@ describe("Variables Utils", () => {
     it("should handle multiple occurrences of the same variable", () => {
       const content = "${region}-${region}-${region}";
       const expected = "us-east-1-us-east-1-us-east-1";
-      
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
     it("should handle content with no variables", () => {
       const content = "SELECT * FROM logs WHERE timestamp > '2023-01-01'";
-      
+
       expect(processVariableContent(content, mockVariablesData)).toBe(content);
     });
 
     it("should handle undefined variables data", () => {
       const content = "SELECT * FROM logs WHERE region = '${region}'";
-      
+
       expect(processVariableContent(content, null)).toBe(content);
       expect(processVariableContent(content, undefined)).toBe(content);
     });
@@ -284,19 +291,19 @@ describe("Variables Utils", () => {
     it("should handle empty variables data", () => {
       const content = "SELECT * FROM logs WHERE region = '${region}'";
       const emptyData = { values: [] };
-      
+
       expect(processVariableContent(content, emptyData)).toBe(content);
     });
 
     it("should handle variables without names", () => {
       const content = "SELECT * FROM logs WHERE region = '${region}'";
-      const invalidData = { 
+      const invalidData = {
         values: [
           { value: "us-east-1" }, // missing name
           { name: "", value: "test" }, // empty name
-        ]
+        ],
       };
-      
+
       expect(processVariableContent(content, invalidData)).toBe(content);
     });
 
@@ -308,7 +315,7 @@ describe("Variables Utils", () => {
         AND env = '\$env'
         AND query REGEXP '\${service:pipe}'
       `;
-      
+
       const expected = `
         SELECT * FROM logs 
         WHERE region = 'us-east-1' 
@@ -316,13 +323,16 @@ describe("Variables Utils", () => {
         AND env = 'production'
         AND query REGEXP 'api|web|db'
       `;
-      
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
     it("should escape special regex characters in placeholders", () => {
       const specialCharContent = "test ${region} test";
-      const result = processVariableContent(specialCharContent, mockVariablesData);
+      const result = processVariableContent(
+        specialCharContent,
+        mockVariablesData,
+      );
       expect(result).toBe("test us-east-1 test");
     });
   });
@@ -338,7 +348,10 @@ describe("Variables Utils", () => {
       });
 
       it("should handle very large numbers", () => {
-        expect(formatInterval(Number.MAX_SAFE_INTEGER)).toEqual({ value: 1, unit: "y" });
+        expect(formatInterval(Number.MAX_SAFE_INTEGER)).toEqual({
+          value: 1,
+          unit: "y",
+        });
         expect(formatInterval(999999999999)).toEqual({ value: 1, unit: "y" });
       });
 
@@ -379,7 +392,7 @@ describe("Variables Utils", () => {
       });
 
       it("should handle null and undefined inputs", () => {
-        expect(getTimeInSecondsBasedOnUnit(null, "s")).toBe(null); // null * 1 = null  
+        expect(getTimeInSecondsBasedOnUnit(null, "s")).toBe(null); // null * 1 = null
         expect(getTimeInSecondsBasedOnUnit(undefined, "s")).toBe(undefined); // undefined * 1 = undefined
         expect(getTimeInSecondsBasedOnUnit(5, null)).toBe(5);
         expect(getTimeInSecondsBasedOnUnit(5, undefined)).toBe(5);
@@ -421,55 +434,77 @@ describe("Variables Utils", () => {
           { name: "mixed", value: ["string", 123, true] },
           { name: "special_chars", value: "test@#$%^&*()_+" },
           { name: "unicode", value: "测试数据" },
-        ]
+        ],
       };
 
       it("should handle numeric array values", () => {
         const content = "SELECT * WHERE id IN (${numbers})";
         const expected = "SELECT * WHERE id IN (1,2,3,4,5)";
-        expect(processVariableContent(content, extendedMockData)).toBe(expected);
+        expect(processVariableContent(content, extendedMockData)).toBe(
+          expected,
+        );
       });
 
       it("should handle boolean array values", () => {
         const content = "SELECT * WHERE active IN (${booleans:csv})";
         const expected = "SELECT * WHERE active IN (true,false)";
-        expect(processVariableContent(content, extendedMockData)).toBe(expected);
+        expect(processVariableContent(content, extendedMockData)).toBe(
+          expected,
+        );
       });
 
       it("should handle mixed type array values", () => {
         const content = "SELECT * WHERE field IN (${mixed})";
         const expected = "SELECT * WHERE field IN (string,123,true)";
-        expect(processVariableContent(content, extendedMockData)).toBe(expected);
+        expect(processVariableContent(content, extendedMockData)).toBe(
+          expected,
+        );
       });
 
       it("should handle special characters in variable values", () => {
         const content = "SELECT * WHERE field = '${special_chars}'";
         const expected = "SELECT * WHERE field = 'test@#$%^&*()_+'";
-        expect(processVariableContent(content, extendedMockData)).toBe(expected);
+        expect(processVariableContent(content, extendedMockData)).toBe(
+          expected,
+        );
       });
 
       it("should handle unicode characters", () => {
         const content = "SELECT * WHERE field = '${unicode}'";
         const expected = "SELECT * WHERE field = '测试数据'";
-        expect(processVariableContent(content, extendedMockData)).toBe(expected);
+        expect(processVariableContent(content, extendedMockData)).toBe(
+          expected,
+        );
       });
 
       it("should handle larger arrays with formatting", () => {
-        const content = "SELECT * FROM logs WHERE service IN (${service:doublequote})";
-        const expected = 'SELECT * FROM logs WHERE service IN ("api","web","db","cache")';
-        expect(processVariableContent(content, extendedMockData)).toBe(expected);
+        const content =
+          "SELECT * FROM logs WHERE service IN (${service:doublequote})";
+        const expected =
+          'SELECT * FROM logs WHERE service IN ("api","web","db","cache")';
+        expect(processVariableContent(content, extendedMockData)).toBe(
+          expected,
+        );
       });
 
       it("should handle nested variable-like patterns that aren't variables", () => {
-        const content = "SELECT * FROM logs WHERE field LIKE '${region}' AND other = '$not_a_variable'";
-        const expected = "SELECT * FROM logs WHERE field LIKE 'us-east-1' AND other = '$not_a_variable'";
-        expect(processVariableContent(content, extendedMockData)).toBe(expected);
+        const content =
+          "SELECT * FROM logs WHERE field LIKE '${region}' AND other = '$not_a_variable'";
+        const expected =
+          "SELECT * FROM logs WHERE field LIKE 'us-east-1' AND other = '$not_a_variable'";
+        expect(processVariableContent(content, extendedMockData)).toBe(
+          expected,
+        );
       });
 
       it("should handle malformed variable patterns", () => {
-        const content = "SELECT * FROM logs WHERE field = '${' AND other = '}' AND valid = '${region}'";
-        const expected = "SELECT * FROM logs WHERE field = '${' AND other = '}' AND valid = 'us-east-1'";
-        expect(processVariableContent(content, extendedMockData)).toBe(expected);
+        const content =
+          "SELECT * FROM logs WHERE field = '${' AND other = '}' AND valid = '${region}'";
+        const expected =
+          "SELECT * FROM logs WHERE field = '${' AND other = '}' AND valid = 'us-east-1'";
+        expect(processVariableContent(content, extendedMockData)).toBe(
+          expected,
+        );
       });
 
       it("should handle variables in different contexts", () => {
@@ -491,7 +526,9 @@ describe("Variables Utils", () => {
             ]
           }
         `;
-        expect(processVariableContent(content, extendedMockData)).toBe(expected);
+        expect(processVariableContent(content, extendedMockData)).toBe(
+          expected,
+        );
       });
 
       it("should handle variables with very long content", () => {
@@ -509,9 +546,12 @@ describe("Variables Utils", () => {
     it("should work together for time-based variable processing", () => {
       const interval = 3600000; // 1 hour in ms
       const formatted = formatInterval(interval);
-      const seconds = getTimeInSecondsBasedOnUnit(formatted.value, formatted.unit);
+      const seconds = getTimeInSecondsBasedOnUnit(
+        formatted.value,
+        formatted.unit,
+      );
       const rateFormatted = formatRateInterval(seconds);
-      
+
       expect(formatted).toEqual({ value: 1, unit: "h" });
       expect(seconds).toBe(3600);
       expect(rateFormatted).toBe("1h");
@@ -521,14 +561,17 @@ describe("Variables Utils", () => {
       const variablesData = {
         values: [
           { name: "interval", value: "1h" },
-          { name: "services", value: ["api", "web"] }
-        ]
+          { name: "services", value: ["api", "web"] },
+        ],
       };
-      
-      const query = "rate(requests[${interval}]) by (service) where service in (${services:singlequote})";
+
+      const query =
+        "rate(requests[${interval}]) by (service) where service in (${services:singlequote})";
       const processed = processVariableContent(query, variablesData);
-      
-      expect(processed).toBe("rate(requests[1h]) by (service) where service in ('api','web')");
+
+      expect(processed).toBe(
+        "rate(requests[1h]) by (service) where service in ('api','web')",
+      );
     });
   });
 });

@@ -15,39 +15,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div ref="multiWindowContainerRef" class="step-compare-with-past" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content card-container tw:px-3 tw:py-4" :class="store.state.theme === 'dark' ? 'dark-mode-multi-window' : 'light-mode-multi-window'">
+  <div
+    ref="multiWindowContainerRef"
+    class="step-compare-with-past"
+    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
+  >
+    <div
+      class="step-content card-container tw:px-3 tw:py-4"
+      :class="
+        store.state.theme === 'dark'
+          ? 'dark-mode-multi-window'
+          : 'light-mode-multi-window'
+      "
+    >
       <!-- Alert set for header -->
-      <div class="multi-window-text tw:flex tw:items-center tw:gap-2 q-py-sm q-mt-md">
-        <span>{{ t('alerts.compareWithPast.alertSetFor') }}</span>
+      <div
+        class="multi-window-text tw:flex tw:items-center tw:gap-2 q-py-sm q-mt-md"
+      >
+        <span>{{ t("alerts.compareWithPast.alertSetFor") }}</span>
         <div class="tw:h-px border-line tw:flex-1"></div>
       </div>
 
       <!-- Current Window -->
-      <div class="tw:flex tw:flex-row tw:justify-between tw:items-start multi-window-container q-px-md q-py-sm">
+      <div
+        class="tw:flex tw:flex-row tw:justify-between tw:items-start multi-window-container q-px-md q-py-sm"
+      >
         <div class="multi-window-text tw:w-auto tw:text-left">
-          {{ t('alerts.compareWithPast.currentWindow') }}
+          {{ t("alerts.compareWithPast.currentWindow") }}
         </div>
 
         <div class="tw:flex tw:flex-col tw:items-start tw:gap-2">
           <div class="multi-window-text tw:w-auto tw:text-left">
-            {{ t('alerts.compareWithPast.cycle') }}
+            {{ t("alerts.compareWithPast.cycle") }}
             <span class="tw:cursor-pointer">
               <q-icon
                 name="info"
                 size="17px"
                 class="q-ml-xs cursor-pointer"
-                :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+                :class="
+                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                "
               >
-                <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px">
-                  {{ t('alerts.compareWithPast.cycleTooltip') }}
+                <q-tooltip
+                  anchor="center right"
+                  self="center left"
+                  max-width="300px"
+                  style="font-size: 12px"
+                >
+                  {{ t("alerts.compareWithPast.cycleTooltip") }}
                 </q-tooltip>
               </q-icon>
             </span>
           </div>
           <div class="tw:flex tw:justify-between tw:items-start tw:gap-4">
             <div class="tw:w-[300px] running-text">
-              {{ t('alerts.compareWithPast.runningFor', { period: convertMinutesToDisplayValue(period), frequency: convertMinutesToDisplayValue(frequency) }) }}
+              {{
+                t("alerts.compareWithPast.runningFor", {
+                  period: convertMinutesToDisplayValue(period),
+                  frequency: convertMinutesToDisplayValue(frequency),
+                })
+              }}
             </div>
             <div>
               <span class="tw:inline-block">
@@ -61,14 +88,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   round
                   flat
                   disable
-                  style="min-width: auto; opacity: 0.3; pointer-events: none;"
+                  style="min-width: auto; opacity: 0.3; pointer-events: none"
                 />
                 <q-tooltip
                   anchor="top middle"
                   self="bottom middle"
                   :offset="[0, 8]"
                 >
-                  {{ t('alerts.compareWithPast.currentWindowCannotBeDeleted') }}
+                  {{ t("alerts.compareWithPast.currentWindowCannotBeDeleted") }}
                 </q-tooltip>
               </span>
             </div>
@@ -77,8 +104,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Comparing with header -->
-      <div v-if="localMultiTimeRange.length > 0" class="multi-window-text tw:flex tw:items-center tw:gap-2 q-py-sm q-mt-sm">
-        <span>{{ t('alerts.compareWithPast.comparingWith') }}</span>
+      <div
+        v-if="localMultiTimeRange.length > 0"
+        class="multi-window-text tw:flex tw:items-center tw:gap-2 q-py-sm q-mt-sm"
+      >
+        <span>{{ t("alerts.compareWithPast.comparingWith") }}</span>
         <div class="tw:h-px border-line tw:flex-1"></div>
       </div>
 
@@ -89,23 +119,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:flex tw:flex-row tw:justify-between tw:items-start reference-window-container tw:mt-2 q-px-md q-py-sm"
       >
         <div class="multi-window-text tw:w-auto tw:text-left">
-          {{ t('alerts.compareWithPast.referenceWindow') }} {{ index + 1 }}
+          {{ t("alerts.compareWithPast.referenceWindow") }} {{ index + 1 }}
         </div>
 
         <!-- Time Frame -->
         <div class="tw:flex tw:flex-col tw:gap-2 tw:items-start">
           <div class="tw:flex tw:items-center">
             <span class="tw:mr-1"><q-icon name="schedule" size="16px" /></span>
-            {{ t('alerts.compareWithPast.timeFrame') }}
+            {{ t("alerts.compareWithPast.timeFrame") }}
             <span class="tw:ml-2 tw:cursor-pointer">
               <q-icon
                 name="info"
                 size="17px"
                 class="q-ml-xs cursor-pointer"
-                :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+                :class="
+                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                "
               >
-                <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px">
-                  {{ t('alerts.compareWithPast.timeFrameTooltip') }}
+                <q-tooltip
+                  anchor="center right"
+                  self="center left"
+                  max-width="300px"
+                  style="font-size: 12px"
+                >
+                  {{ t("alerts.compareWithPast.timeFrameTooltip") }}
                 </q-tooltip>
               </q-icon>
             </span>
@@ -124,23 +161,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Cycle Info -->
         <div class="tw:flex tw:flex-col tw:items-start tw:gap-2">
           <div class="multi-window-text tw:w-auto tw:text-left">
-            {{ t('alerts.compareWithPast.cycle') }}
+            {{ t("alerts.compareWithPast.cycle") }}
             <span class="tw:cursor-pointer">
               <q-icon
                 name="info"
                 size="17px"
                 class="q-ml-xs cursor-pointer"
-                :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+                :class="
+                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                "
               >
-                <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px">
-                  {{ t('alerts.compareWithPast.cycleTooltip') }}
+                <q-tooltip
+                  anchor="center right"
+                  self="center left"
+                  max-width="300px"
+                  style="font-size: 12px"
+                >
+                  {{ t("alerts.compareWithPast.cycleTooltip") }}
                 </q-tooltip>
               </q-icon>
             </span>
           </div>
           <div class="tw:flex tw:justify-between tw:items-start tw:gap-4">
             <div class="tw:w-[300px] reference-text">
-              {{ t('alerts.compareWithPast.comparingText', { offset: getDisplayValue(picker.offSet) }) }}
+              {{
+                t("alerts.compareWithPast.comparingText", {
+                  offset: getDisplayValue(picker.offSet),
+                })
+              }}
             </div>
             <div>
               <q-btn
@@ -162,13 +210,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Action Buttons Section -->
-      <div class="tw:w-full tw:flex tw:justify-center tw:items-center tw:gap-3 q-mt-sm">
+      <div
+        class="tw:w-full tw:flex tw:justify-center tw:items-center tw:gap-3 q-mt-sm"
+      >
         <q-btn
           data-test="multi-time-range-alerts-add-btn"
           :label="t('alerts.compareWithPast.addComparisonWindow')"
           size="md"
           class="o2-secondary-button"
-          style="font-size: 14px;"
+          style="font-size: 14px"
           no-caps
           :disable="isComparisonDisabled"
           @click="addTimeShift"
@@ -184,26 +234,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn>
 
         <!-- Go to View Editor Button with Info Icon - shows when comparison windows are added -->
-        <div v-if="localMultiTimeRange.length > 0" class="tw:flex tw:items-center tw:gap-2">
+        <div
+          v-if="localMultiTimeRange.length > 0"
+          class="tw:flex tw:items-center tw:gap-2"
+        >
           <q-btn
             data-test="go-to-view-editor-btn"
             :label="t('alerts.compareWithPast.goToConditions')"
             size="md"
             class="o2-secondary-button"
-            style="font-size: 14px;"
+            style="font-size: 14px"
             no-caps
             @click="handleGoToSqlEditor"
           >
-          <q-tooltip
+            <q-tooltip
               ref="goToConditionsTooltipRef"
               anchor="top middle"
               self="bottom middle"
               max-width="300px"
               :offset="[0, 8]"
             >
-              {{ t('alerts.compareWithPast.goToConditionsTooltip') }}
+              {{ t("alerts.compareWithPast.goToConditionsTooltip") }}
             </q-tooltip>
-        </q-btn>
+          </q-btn>
         </div>
       </div>
     </div>
@@ -260,7 +313,9 @@ export default defineComponent({
 
     const multiWindowContainerRef = ref<HTMLElement | null>(null);
     const goToConditionsTooltipRef = ref<any>(null);
-    const localMultiTimeRange = ref<TimeShiftPicker[]>([...(props.multiTimeRange || [])]);
+    const localMultiTimeRange = ref<TimeShiftPicker[]>([
+      ...(props.multiTimeRange || []),
+    ]);
 
     // Watch for prop changes
     watch(
@@ -268,7 +323,7 @@ export default defineComponent({
       (newVal) => {
         localMultiTimeRange.value = [...(newVal || [])];
       },
-      { deep: true }
+      { deep: true },
     );
 
     // Check if comparison window should be disabled (only SQL mode supports comparison)
@@ -313,7 +368,7 @@ export default defineComponent({
         { label: "Month(s)", value: "M" },
       ];
 
-      if (typeof value !== 'string') return value;
+      if (typeof value !== "string") return value;
 
       const match = value.match(/^(\d+)([smhdwM])$/);
       if (!match) return value;
@@ -330,19 +385,19 @@ export default defineComponent({
 
     const convertMinutesToDisplayValue = (minutes: number) => {
       if (minutes < 60) {
-        return `${minutes} Minute${minutes !== 1 ? 's' : ''}`;
+        return `${minutes} Minute${minutes !== 1 ? "s" : ""}`;
       } else if (minutes < 1440) {
         const hours = Math.floor(minutes / 60);
-        return `${hours} Hour${hours !== 1 ? 's' : ''}`;
+        return `${hours} Hour${hours !== 1 ? "s" : ""}`;
       } else if (minutes < 10080) {
         const days = Math.floor(minutes / 1440);
-        return `${days} Day${days !== 1 ? 's' : ''}`;
+        return `${days} Day${days !== 1 ? "s" : ""}`;
       } else if (minutes < 43200) {
         const weeks = Math.floor(minutes / 10080);
-        return `${weeks} Week${weeks !== 1 ? 's' : ''}`;
+        return `${weeks} Week${weeks !== 1 ? "s" : ""}`;
       } else {
         const months = Math.floor(minutes / 43200);
-        return `${months} Month${months !== 1 ? 's' : ''}`;
+        return `${months} Month${months !== 1 ? "s" : ""}`;
       }
     };
 
@@ -409,7 +464,7 @@ export default defineComponent({
 }
 
 .dark-mode-multi-window .multi-window-text {
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .light-mode-multi-window .multi-window-text {
@@ -440,7 +495,7 @@ export default defineComponent({
 
 .reference-window-container {
   min-height: 110px;
-  border-left: 6px solid #6832CC !important;
+  border-left: 6px solid #6832cc !important;
 }
 
 .dark-mode-multi-window .multi-window-container {
@@ -455,7 +510,7 @@ export default defineComponent({
 
 .multi-window-container {
   min-height: 110px;
-  border-left: 6px solid #32CCCC !important;
+  border-left: 6px solid #32cccc !important;
 }
 
 .running-text {
@@ -475,15 +530,15 @@ export default defineComponent({
 }
 
 .datetime-picker-wrapper {
-    border: 1px solid;
-    border-radius: 4px;
+  border: 1px solid;
+  border-radius: 4px;
 }
 
 .dark-mode-multi-window .datetime-picker-wrapper {
-    border-color: #4a4a4a !important;
+  border-color: #4a4a4a !important;
 }
 
 .light-mode-multi-window .datetime-picker-wrapper {
-    border-color: #d0d0d0 !important;
+  border-color: #d0d0d0 !important;
 }
 </style>

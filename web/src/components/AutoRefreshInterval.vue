@@ -23,27 +23,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       flat
       dense
       no-caps
-      :class="[
-        'compact-refresh-btn',
-        isAnimating ? 'active-refresh-btn' : ''
-      ]"
+      :class="['compact-refresh-btn', isAnimating ? 'active-refresh-btn' : '']"
     >
       <q-icon
         name="update"
         :class="[
           isAnimating ? 'rotating-icon' : '',
-          isAnimating ? 'text-white' : ''
+          isAnimating ? 'text-white' : '',
         ]"
         size="18px"
       />
       <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
-        {{ t('search.autoRefresh') }}: {{ selectedLabel }}
+        {{ t("search.autoRefresh") }}: {{ selectedLabel }}
       </q-tooltip>
 
       <!-- Dropdown menu for interval selection -->
       <q-menu content-style="z-index: 10001">
         <div class="row">
-          <div class="col col-12 q-pa-sm" style="text-align: center; width: 300px">
+          <div
+            class="col col-12 q-pa-sm"
+            style="text-align: center; width: 300px"
+          >
             <q-btn
               data-test="logs-search-off-refresh-interval"
               no-caps
@@ -61,7 +61,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <q-separator />
-        <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="row">
+        <div v-for="(items, i) in refreshTimes" :key="'row_' + i"
+class="row">
           <div
             v-for="(item, j) in items"
             :key="'col_' + i + '_' + j"
@@ -113,14 +114,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="update"
             :class="[
               isAnimating ? 'rotating-icon' : '',
-              isAnimating ? 'text-primary' : ''
+              isAnimating ? 'text-primary' : '',
             ]"
           />
           <div class="text-center">{{ selectedLabel }}</div>
         </div>
       </template>
       <div class="row">
-        <div class="col col-12 q-pa-sm" style="text-align: center; width: 300px">
+        <div
+          class="col col-12 q-pa-sm"
+          style="text-align: center; width: 300px"
+        >
           <q-btn
             data-test="logs-search-off-refresh-interval"
             no-caps
@@ -138,7 +142,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <q-separator />
-      <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="row">
+      <div v-for="(items, i) in refreshTimes" :key="'row_' + i"
+class="row">
         <div
           v-for="(item, j) in items"
           :key="'col_' + i + '_' + j"
@@ -267,7 +272,9 @@ export default defineComponent({
       }
 
       // Find the label from refreshTimes
-      const found = refreshTimes.value.flat().find((it: any) => it.value == selectedValue.value);
+      const found = refreshTimes.value
+        .flat()
+        .find((it: any) => it.value == selectedValue.value);
       return found?.label || generateDurationLabel(selectedValue.value);
     });
 
@@ -344,7 +351,10 @@ export default defineComponent({
           item.disabled = isDisabled(item.value);
         });
       });
-      minRangeRestrictionMessageVal.value = t("common.minRefreshIntervalMessage", { interval: props.minRefreshInterval });
+      minRangeRestrictionMessageVal.value = t(
+        "common.minRefreshIntervalMessage",
+        { interval: props.minRefreshInterval },
+      );
     };
 
     onMounted(() => {
@@ -393,7 +403,9 @@ export default defineComponent({
   padding: 2px 4px !important;
   border: 1px solid var(--o2-border-color) !important;
   border-radius: 4px !important;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
 }
 
 .active-refresh-btn {

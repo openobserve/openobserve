@@ -12,7 +12,8 @@
 
 <template>
   <div style="padding: 5px; height: 100%; width: 100%">
-    <div ref="chartRef" id="chart-map" style="height: 100%; width: 100%"></div>
+    <div ref="chartRef" id="chart-map"
+style="height: 100%; width: 100%"></div>
   </div>
 </template>
 
@@ -62,7 +63,7 @@ export default defineComponent({
         echarts.registerMap("world", worldMap as any);
 
         // Default empty chart configuration to ensure map is visible
-    
+
         chart.setOption(DEFAULT_MAP_OPTIONS, true);
       }
     };
@@ -92,7 +93,7 @@ export default defineComponent({
             chart?.setOption(newOptions, true);
           } else {
             // If no data provided, set a default empty map
-            
+
             chart?.setOption(DEFAULT_MAP_OPTIONS, true);
           }
         }

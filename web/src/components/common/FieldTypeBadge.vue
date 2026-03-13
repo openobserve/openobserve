@@ -20,7 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="field-type-badge"
     :style="{ backgroundColor: info.color, color: info.textColor }"
     :title="dataType"
-  >{{ info.label }}</span>
+    >{{ info.label }}</span
+  >
 </template>
 
 <script setup lang="ts">

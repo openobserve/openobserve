@@ -52,7 +52,8 @@ function createMockRcaContent(overrides = {}) {
         <li>Database connection pooling issues</li>
       </ul>
     `,
-    streaming: "<p>Analyzing incident...</p><p>Checking service dependencies...</p>",
+    streaming:
+      "<p>Analyzing incident...</p><p>Checking service dependencies...</p>",
   };
   return { ...defaults, ...overrides };
 }
@@ -194,7 +195,9 @@ describe("IncidentRCAAnalysis", () => {
       wrapper = mountComponent({ rcaLoading: true });
 
       const container = findByTestId(wrapper, "rca-inflight-container");
-      expect(container.text()).toContain("AI SRE Agent is analyzing this incident");
+      expect(container.text()).toContain(
+        "AI SRE Agent is analyzing this incident",
+      );
     });
 
     it("should show streaming content while loading", () => {
@@ -508,7 +511,10 @@ describe("IncidentRCAAnalysis", () => {
       expect(wrapper.emitted("trigger-rca")).toBeTruthy();
 
       // Simulate loading state
-      await wrapper.setProps({ rcaLoading: true, rcaStreamContent: "Analyzing..." });
+      await wrapper.setProps({
+        rcaLoading: true,
+        rcaStreamContent: "Analyzing...",
+      });
       expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(true);
 
       // Complete analysis
@@ -521,7 +527,7 @@ describe("IncidentRCAAnalysis", () => {
 
       expect(existsByTestId(wrapper, "rca-existing-container")).toBe(true);
       expect(findByTestId(wrapper, "rca-existing-content").html()).toContain(
-        "Root Cause Analysis"
+        "Root Cause Analysis",
       );
     });
   });

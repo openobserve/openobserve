@@ -24,7 +24,9 @@
       <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
         <!-- NL Mode Toggle (always visible when AI enabled and enterprise) -->
         <div
-          v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+          v-if="
+            config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
+          "
           class="toolbar-toggle-container element-box-shadow"
         >
           <q-toggle
@@ -38,8 +40,9 @@
                 : 'o2-toggle-button-xs-light'
             "
           />
-          <img :src="nlpIcon" alt="NL Mode" class="toolbar-icon" />
-          <q-tooltip>{{ t('nlMode.toggle') }}</q-tooltip>
+          <img :src="nlpIcon" alt="NL Mode"
+class="toolbar-icon" />
+          <q-tooltip>{{ t("nlMode.toggle") }}</q-tooltip>
         </div>
 
         <!-- Action Buttons (always present) -->
@@ -87,7 +90,7 @@
                   :disable="disabled"
                 >
                   <q-icon name="refresh" class="q-mr-xs" />
-                  {{ t('search.refreshCacheAndRunQuery') }}
+                  {{ t("search.refreshCacheAndRunQuery") }}
                 </q-btn>
               </template>
 
@@ -95,8 +98,10 @@
               <template v-else>
                 <slot name="dropdown-actions">
                   <q-list class="tw:min-w-[140px] tw:p-2">
-                    <q-item-label class="tw:text-xs tw:text-gray-500 tw:text-center">
-                      {{ t('nlMode.noAdditionalOptions') }}
+                    <q-item-label
+                      class="tw:text-xs tw:text-gray-500 tw:text-center"
+                    >
+                      {{ t("nlMode.noAdditionalOptions") }}
                     </q-item-label>
                   </q-list>
                 </slot>
@@ -109,15 +114,18 @@
       <!-- Query Editor with AI Input Bar -->
       <div class="tw:w-full">
         <!-- AI Input Bar (shown in NL Mode) -->
-        <div
-          v-if="isAIMode"
-          class="ai-input-bar tw:p-3"
-        >
+        <div v-if="isAIMode" class="ai-input-bar tw:p-3">
           <!-- Show streaming status with spinner -->
-          <div v-if="isGenerating" class="ai-bar-streaming tw:flex tw:items-center tw:gap-2">
-            <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
+          <div
+            v-if="isGenerating"
+            class="ai-bar-streaming tw:flex tw:items-center tw:gap-2"
+          >
+            <img :src="nlpIcon" alt="AI"
+class="tw:w-[20px] tw:h-[20px]" />
             <q-spinner-dots color="primary" size="1.2em" />
-            <span class="tw:text-sm">{{ aiStatusText || t('search.analyzingQuery') }}</span>
+            <span class="tw:text-sm">{{
+              aiStatusText || t("search.analyzingQuery")
+            }}</span>
           </div>
           <!-- Normal input when not generating -->
           <q-input
@@ -131,7 +139,8 @@
             @keydown.enter="handleAIInputEnter"
           >
             <template v-slot:prepend>
-              <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
+              <img :src="nlpIcon" alt="AI"
+class="tw:w-[20px] tw:h-[20px]" />
             </template>
           </q-input>
         </div>
@@ -157,23 +166,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { useStore } from 'vuex';
-import { useI18n } from 'vue-i18n';
-import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
-import { getImageURL } from '@/utils/zincutils';
-import config from '@/aws-exports';
+import { ref, computed } from "vue";
+import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
+import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
+import { getImageURL } from "@/utils/zincutils";
+import config from "@/aws-exports";
 
 interface Props {
   // Query props
-  language: 'sql' | 'promql' | 'vrl' | 'javascript';
+  language: "sql" | "promql" | "vrl" | "javascript";
   query: string;
   readOnly?: boolean;
   showAutoComplete?: boolean;
 
   // Context-aware button labels (ONLY thing that changes per page)
-  normalButtonLabel?: string;     // "Run Query", "Test Query", "Apply Query", "Validate VRL"
-  aiButtonLabel?: string;        // Always "Ask AI" (default)
+  normalButtonLabel?: string; // "Run Query", "Test Query", "Apply Query", "Validate VRL"
+  aiButtonLabel?: string; // Always "Ask AI" (default)
   normalButtonTooltip?: string;
   aiButtonTooltip?: string;
 
@@ -182,10 +191,10 @@ interface Props {
   disabled?: boolean;
 
   // UI customization
-  layout?: 'full' | 'editor-only';  // full: toggle + editor + button, editor-only: just editor
+  layout?: "full" | "editor-only"; // full: toggle + editor + button, editor-only: just editor
   showIcon?: boolean;
   showDropdown?: boolean;
-  borderRadius?: 'normal' | 'enterprise';
+  borderRadius?: "normal" | "enterprise";
   height?: string;
 
   // Testing
@@ -195,23 +204,23 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   readOnly: false,
   showAutoComplete: true,
-  normalButtonLabel: 'Run Query',
-  aiButtonLabel: 'Ask AI',
-  normalButtonTooltip: 'Execute action',
-  aiButtonTooltip: 'Generate query from natural language using AI',
-  layout: 'full',
+  normalButtonLabel: "Run Query",
+  aiButtonLabel: "Ask AI",
+  normalButtonTooltip: "Execute action",
+  aiButtonTooltip: "Generate query from natural language using AI",
+  layout: "full",
   showIcon: true,
   showDropdown: false,
-  borderRadius: 'normal',
-  height: '30px',
-  dataTestPrefix: 'nl-mode',
+  borderRadius: "normal",
+  height: "30px",
+  dataTestPrefix: "nl-mode",
 });
 
 const emit = defineEmits<{
-  'update:query': [query: string];
-  'run-query': [];               // Normal mode action
-  'ask-ai': [naturalLanguage: string];  // AI mode action
-  refresh: [];                   // Refresh cache action
+  "update:query": [query: string];
+  "run-query": []; // Normal mode action
+  "ask-ai": [naturalLanguage: string]; // AI mode action
+  refresh: []; // Refresh cache action
 }>();
 
 const store = useStore();
@@ -223,36 +232,34 @@ const isGenerating = ref(false);
 const editorRef = ref<any>(null);
 
 // AI Input Bar state
-const aiInputText = ref('');
-const aiStatusText = ref('');
+const aiInputText = ref("");
+const aiStatusText = ref("");
 
 const nlpIcon = computed(() => {
-  return store.state.theme === 'dark'
-    ? getImageURL('images/common/ai_icon_dark.svg')
-    : getImageURL('images/common/ai_icon.svg');
+  return store.state.theme === "dark"
+    ? getImageURL("images/common/ai_icon_dark.svg")
+    : getImageURL("images/common/ai_icon.svg");
 });
 
 // Computed: Is in AI mode?
-const isAIMode = computed(() => nlpMode.value || isNaturalLanguageDetected.value);
+const isAIMode = computed(
+  () => nlpMode.value || isNaturalLanguageDetected.value,
+);
 
 // Computed: Button classes
 const buttonClasses = computed(() => {
-  const classes = [
-    'q-pa-none',
-    `tw:h-[${props.height}]`,
-    'element-box-shadow',
-  ];
+  const classes = ["q-pa-none", `tw:h-[${props.height}]`, "element-box-shadow"];
 
   if (isAIMode.value) {
-    classes.push('o2-ai-generate-button');
+    classes.push("o2-ai-generate-button");
   } else {
-    classes.push('o2-run-query-button', 'o2-color-primary');
+    classes.push("o2-run-query-button", "o2-color-primary");
   }
 
-  if (props.borderRadius === 'enterprise') {
-    classes.push('search-button-enterprise-border-radius');
+  if (props.borderRadius === "enterprise") {
+    classes.push("search-button-enterprise-border-radius");
   } else {
-    classes.push('search-button-normal-border-radius');
+    classes.push("search-button-normal-border-radius");
   }
 
   return classes;
@@ -263,15 +270,15 @@ const dropdownClasses = computed(() => {
   const classes = [];
 
   if (isAIMode.value) {
-    classes.push('o2-ai-dropdown-button');
+    classes.push("o2-ai-dropdown-button");
   } else {
-    classes.push('o2-color-primary');
+    classes.push("o2-color-primary");
   }
 
-  if (props.borderRadius === 'enterprise') {
-    classes.push('search-button-dropdown-enterprise-border-radius');
+  if (props.borderRadius === "enterprise") {
+    classes.push("search-button-dropdown-enterprise-border-radius");
   } else {
-    classes.push('search-button-normal-border-radius');
+    classes.push("search-button-normal-border-radius");
   }
 
   return classes;
@@ -279,7 +286,7 @@ const dropdownClasses = computed(() => {
 
 // Handle query update from editor
 const handleQueryUpdate = (newQuery: string) => {
-  emit('update:query', newQuery);
+  emit("update:query", newQuery);
 };
 
 // Handle auto-detection from editor
@@ -291,9 +298,22 @@ const handleNlpModeDetected = (isNL: boolean) => {
 const isExecutionIntent = (input: string): boolean => {
   const normalized = input.toLowerCase().trim();
   const executionKeywords = [
-    'run', 'run query', 'execute', 'execute query', 'search', 'go',
-    'submit', 'apply', 'show results', 'get results', 'fetch',
-    'run it', 'execute it', 'do it', 'run this', 'execute this'
+    "run",
+    "run query",
+    "execute",
+    "execute query",
+    "search",
+    "go",
+    "submit",
+    "apply",
+    "show results",
+    "get results",
+    "fetch",
+    "run it",
+    "execute it",
+    "do it",
+    "run this",
+    "execute this",
   ];
   return executionKeywords.includes(normalized);
 };
@@ -305,33 +325,49 @@ const handleAIInputEnter = async () => {
   }
 
   const naturalLanguage = aiInputText.value.trim();
-  const currentQuery = editorRef.value?.getValue ? editorRef.value.getValue() : props.query;
+  const currentQuery = editorRef.value?.getValue
+    ? editorRef.value.getValue()
+    : props.query;
 
   // Check if user wants to execute the query instead of generating a new one
-  if (currentQuery && currentQuery.trim() && isExecutionIntent(naturalLanguage)) {
-    console.log('[NLModeQueryBar] Execution intent detected, running query instead of generating');
-    aiInputText.value = ''; // Clear input
-    emit('run-query'); // Trigger query execution
+  if (
+    currentQuery &&
+    currentQuery.trim() &&
+    isExecutionIntent(naturalLanguage)
+  ) {
+    console.log(
+      "[NLModeQueryBar] Execution intent detected, running query instead of generating",
+    );
+    aiInputText.value = ""; // Clear input
+    emit("run-query"); // Trigger query execution
     return;
   }
 
   // Call the CodeQueryEditor's handleGenerateSQL method directly
-  if (editorRef.value && typeof editorRef.value.handleGenerateSQL === 'function') {
-    console.log('[NLModeQueryBar] Generating query from natural language:', naturalLanguage);
+  if (
+    editorRef.value &&
+    typeof editorRef.value.handleGenerateSQL === "function"
+  ) {
+    console.log(
+      "[NLModeQueryBar] Generating query from natural language:",
+      naturalLanguage,
+    );
     try {
-      aiStatusText.value = t('search.generatingQuery');
+      aiStatusText.value = t("search.generatingQuery");
       await editorRef.value.handleGenerateSQL(naturalLanguage);
       // Success is handled by handleGenerationSuccess event
     } catch (error) {
-      console.error('[NLModeQueryBar] Query generation failed:', error);
-      aiStatusText.value = '';
+      console.error("[NLModeQueryBar] Query generation failed:", error);
+      aiStatusText.value = "";
     }
   } else {
-    console.error('[NLModeQueryBar] Editor ref not found or handleGenerateSQL not available');
+    console.error(
+      "[NLModeQueryBar] Editor ref not found or handleGenerateSQL not available",
+    );
   }
 
   // Still emit event for parent components that may need to react
-  emit('ask-ai', naturalLanguage);
+  emit("ask-ai", naturalLanguage);
 };
 
 // Handle button click
@@ -342,17 +378,25 @@ const handleButtonClick = async () => {
     const naturalLanguage = aiInputText.value.trim() || props.query;
 
     if (!naturalLanguage) {
-      console.warn('[NLModeQueryBar] No input provided for AI generation');
+      console.warn("[NLModeQueryBar] No input provided for AI generation");
       return;
     }
 
-    const currentQuery = editorRef.value?.getValue ? editorRef.value.getValue() : props.query;
+    const currentQuery = editorRef.value?.getValue
+      ? editorRef.value.getValue()
+      : props.query;
 
     // Check if user wants to execute the query instead of generating a new one
-    if (currentQuery && currentQuery.trim() && isExecutionIntent(naturalLanguage)) {
-      console.log('[NLModeQueryBar] Execution intent detected, running query instead of generating');
-      aiInputText.value = ''; // Clear input
-      emit('run-query'); // Trigger query execution
+    if (
+      currentQuery &&
+      currentQuery.trim() &&
+      isExecutionIntent(naturalLanguage)
+    ) {
+      console.log(
+        "[NLModeQueryBar] Execution intent detected, running query instead of generating",
+      );
+      aiInputText.value = ""; // Clear input
+      emit("run-query"); // Trigger query execution
       return;
     }
 
@@ -362,25 +406,33 @@ const handleButtonClick = async () => {
     }
 
     // Call the CodeQueryEditor's handleGenerateSQL method directly
-    if (editorRef.value && typeof editorRef.value.handleGenerateSQL === 'function') {
-      console.log('[NLModeQueryBar] Generating query from natural language:', naturalLanguage);
+    if (
+      editorRef.value &&
+      typeof editorRef.value.handleGenerateSQL === "function"
+    ) {
+      console.log(
+        "[NLModeQueryBar] Generating query from natural language:",
+        naturalLanguage,
+      );
       try {
-        aiStatusText.value = t('search.generatingQuery');
+        aiStatusText.value = t("search.generatingQuery");
         await editorRef.value.handleGenerateSQL(naturalLanguage);
         // Success is handled by handleGenerationSuccess event
       } catch (error) {
-        console.error('[NLModeQueryBar] Query generation failed:', error);
-        aiStatusText.value = '';
+        console.error("[NLModeQueryBar] Query generation failed:", error);
+        aiStatusText.value = "";
       }
     } else {
-      console.error('[NLModeQueryBar] Editor ref not found or handleGenerateSQL not available');
+      console.error(
+        "[NLModeQueryBar] Editor ref not found or handleGenerateSQL not available",
+      );
     }
 
     // Still emit event for parent components that may need to react
-    emit('ask-ai', naturalLanguage);
+    emit("ask-ai", naturalLanguage);
   } else {
     // Normal mode - run query
-    emit('run-query');
+    emit("run-query");
   }
 };
 
@@ -394,19 +446,19 @@ const handleGenerationEnd = () => {
 };
 
 const handleGenerationSuccess = ({ type, message }: any) => {
-  console.log('[NLModeQueryBar] Generation success:', { type, message });
+  console.log("[NLModeQueryBar] Generation success:", { type, message });
 
   // Show success message in AI status
-  aiStatusText.value = '✓ ' + t('search.queryGeneratedSuccess');
+  aiStatusText.value = "✓ " + t("search.queryGeneratedSuccess");
 
   // Clear AI input text after successful generation
   setTimeout(() => {
-    aiInputText.value = '';
-    aiStatusText.value = '';
+    aiInputText.value = "";
+    aiStatusText.value = "";
   }, 2000);
 
   // After successful generation, turn off NLP mode
-  if (type === 'sql' || type === 'promql' || type === 'vrl') {
+  if (type === "sql" || type === "promql" || type === "vrl") {
     nlpMode.value = false;
     isNaturalLanguageDetected.value = false;
   }
@@ -484,7 +536,11 @@ defineExpose({
 
 /* AI Input Bar Styling (matches logs page) */
 .ai-input-bar {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(102, 126, 234, 0.05) 0%,
+    rgba(118, 75, 162, 0.05) 100%
+  );
   border-bottom: 1px solid var(--o2-border-color);
 }
 

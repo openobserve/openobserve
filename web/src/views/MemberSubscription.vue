@@ -97,15 +97,20 @@ export default defineComponent({
             res.data.data.label = res.data.data.name;
             useLocalOrganization(res.data.data);
 
-            window.location.href = redirectURI + "?org_identifier=" + invited_org_id;
+            window.location.href =
+              redirectURI + "?org_identifier=" + invited_org_id;
           } else {
-            window.location.href = redirectURI + "?org_identifier=" + invited_org_id;
+            window.location.href =
+              redirectURI + "?org_identifier=" + invited_org_id;
           }
           return res;
         })
         .catch((e) => {
           this.status = "error";
-          this.error = e.response.data.message.replaceAll("[BASE_URL]", baseURL);
+          this.error = e.response.data.message.replaceAll(
+            "[BASE_URL]",
+            baseURL,
+          );
         });
     },
   },

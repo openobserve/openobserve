@@ -54,7 +54,15 @@ function makeMockContext(overrides: Partial<any> = {}): any {
 
   return {
     options: {
-      xAxis: [{ data: ["Jan", "Feb", "Mar"], axisLabel: { rotate: 0, width: 120, margin: 5 }, axisTick: {}, nameGap: 25, name: "" }],
+      xAxis: [
+        {
+          data: ["Jan", "Feb", "Mar"],
+          axisLabel: { rotate: 0, width: 120, margin: 5 },
+          axisTick: {},
+          nameGap: 25,
+          name: "",
+        },
+      ],
       yAxis: [{ data: [], axisLabel: { width: 80 }, name: "" }],
       series: [],
       tooltip: { axisPointer: {}, textStyle: {} },
@@ -71,9 +79,16 @@ function makeMockContext(overrides: Partial<any> = {}): any {
         trellis: { layout: null },
         background: { value: { color: "#FFFFFF" } },
       },
-      queries: [{ fields: { y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+      queries: [
+        {
+          fields: { y: [{ label: "Value" }], breakdown: [] },
+          customQuery: false,
+        },
+      ],
     },
-    store: { state: { theme: "light", zoConfig: { timestamp_column: "_timestamp" } } },
+    store: {
+      state: { theme: "light", zoConfig: { timestamp_column: "_timestamp" } },
+    },
     chartPanelRef: { value: { offsetWidth: 800, offsetHeight: 400 } },
     hoveredSeriesState: { value: null },
     xAxisKeys: ["x1"],
@@ -150,7 +165,9 @@ describe("applyMetricChart", () => {
   });
 
   it("series[0] includes defaultSeriesProps", () => {
-    const ctx = makeMockContext({ defaultSeriesProps: { type: "custom", color: "red" } });
+    const ctx = makeMockContext({
+      defaultSeriesProps: { type: "custom", color: "red" },
+    });
     applyMetricChart(ctx);
     expect(ctx.options.series[0].type).toBe("custom");
     expect(ctx.options.series[0].color).toBe("red");
@@ -175,7 +192,12 @@ describe("applyMetricChart", () => {
           trellis: { layout: null },
           // background intentionally omitted
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [] },
+            customQuery: false,
+          },
+        ],
       },
     });
     applyMetricChart(ctx);

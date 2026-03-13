@@ -67,8 +67,18 @@ function createNestedToc(): TocItem[] {
       text: "Parent Section 1",
       level: 1,
       children: [
-        createMockTocItem({ id: "child1-1", text: "Child 1.1", level: 2, children: [] }),
-        createMockTocItem({ id: "child1-2", text: "Child 1.2", level: 2, children: [] }),
+        createMockTocItem({
+          id: "child1-1",
+          text: "Child 1.1",
+          level: 2,
+          children: [],
+        }),
+        createMockTocItem({
+          id: "child1-2",
+          text: "Child 1.2",
+          level: 2,
+          children: [],
+        }),
       ],
     }),
     createMockTocItem({
@@ -95,8 +105,18 @@ function createDeeplyNestedToc(): TocItem[] {
           text: "Level 2",
           level: 2,
           children: [
-            createMockTocItem({ id: "l3-1", text: "Level 3.1", level: 3, children: [] }),
-            createMockTocItem({ id: "l3-2", text: "Level 3.2", level: 3, children: [] }),
+            createMockTocItem({
+              id: "l3-1",
+              text: "Level 3.1",
+              level: 3,
+              children: [],
+            }),
+            createMockTocItem({
+              id: "l3-2",
+              text: "Level 3.2",
+              level: 3,
+              children: [],
+            }),
           ],
         }),
       ],
@@ -108,10 +128,13 @@ function createDeeplyNestedToc(): TocItem[] {
  * Creates mock expanded sections object
  */
 function createExpandedSections(itemIds: string[]): Record<string, boolean> {
-  return itemIds.reduce((acc, id) => {
-    acc[id] = true;
-    return acc;
-  }, {} as Record<string, boolean>);
+  return itemIds.reduce(
+    (acc, id) => {
+      acc[id] = true;
+      return acc;
+    },
+    {} as Record<string, boolean>,
+  );
 }
 
 // ==================== HELPER FUNCTIONS ====================
@@ -133,7 +156,11 @@ function existsByTestId(wrapper: VueWrapper, testId: string): boolean {
 /**
  * Clicks on an item's text to trigger scroll
  */
-async function clickItemText(wrapper: VueWrapper, level: number, itemId: string) {
+async function clickItemText(
+  wrapper: VueWrapper,
+  level: number,
+  itemId: string,
+) {
   const textElement = findByTestId(wrapper, `toc-level${level}-text-${itemId}`);
   await textElement.trigger("click");
   await flushPromises();
@@ -142,8 +169,15 @@ async function clickItemText(wrapper: VueWrapper, level: number, itemId: string)
 /**
  * Clicks on an expand button
  */
-async function clickExpandButton(wrapper: VueWrapper, level: number, itemId: string) {
-  const button = findByTestId(wrapper, `toc-level${level}-expand-btn-${itemId}`);
+async function clickExpandButton(
+  wrapper: VueWrapper,
+  level: number,
+  itemId: string,
+) {
+  const button = findByTestId(
+    wrapper,
+    `toc-level${level}-expand-btn-${itemId}`,
+  );
   await button.trigger("click");
   await flushPromises();
 }
@@ -154,7 +188,7 @@ async function clickExpandButton(wrapper: VueWrapper, level: number, itemId: str
 function mountComponent(
   tableOfContents: TocItem[] = [],
   expandedSections: Record<string, boolean> = {},
-  isDarkMode = false
+  isDarkMode = false,
 ) {
   return mount(IncidentTableOfContents, {
     props: {
@@ -303,8 +337,12 @@ describe("IncidentTableOfContents", () => {
       const toc = createNestedToc();
       wrapper = mountComponent(toc);
 
-      expect(existsByTestId(wrapper, "toc-level1-expand-btn-parent1")).toBe(true);
-      expect(existsByTestId(wrapper, "toc-level1-expand-btn-parent2")).toBe(false);
+      expect(existsByTestId(wrapper, "toc-level1-expand-btn-parent1")).toBe(
+        true,
+      );
+      expect(existsByTestId(wrapper, "toc-level1-expand-btn-parent2")).toBe(
+        false,
+      );
     });
 
     it("should emit scroll-to-section when clicking level 1 text", async () => {
@@ -339,7 +377,9 @@ describe("IncidentTableOfContents", () => {
       const toc = createNestedToc();
       wrapper = mountComponent(toc, {});
 
-      expect(existsByTestId(wrapper, "toc-level2-container-parent1")).toBe(false);
+      expect(existsByTestId(wrapper, "toc-level2-container-parent1")).toBe(
+        false,
+      );
       expect(existsByTestId(wrapper, "toc-level2-item-child1-1")).toBe(false);
     });
 
@@ -347,7 +387,9 @@ describe("IncidentTableOfContents", () => {
       const toc = createNestedToc();
       wrapper = mountComponent(toc, createExpandedSections(["parent1"]));
 
-      expect(existsByTestId(wrapper, "toc-level2-container-parent1")).toBe(true);
+      expect(existsByTestId(wrapper, "toc-level2-container-parent1")).toBe(
+        true,
+      );
       expect(existsByTestId(wrapper, "toc-level2-item-child1-1")).toBe(true);
       expect(existsByTestId(wrapper, "toc-level2-item-child1-2")).toBe(true);
     });
@@ -460,7 +502,11 @@ describe("IncidentTableOfContents", () => {
 
     it("should apply light mode hover styles to level 3 items", () => {
       const toc = createDeeplyNestedToc();
-      wrapper = mountComponent(toc, createExpandedSections(["l1", "l2"]), false);
+      wrapper = mountComponent(
+        toc,
+        createExpandedSections(["l1", "l2"]),
+        false,
+      );
 
       const item = findByTestId(wrapper, "toc-level3-item-l3-1");
       expect(item.classes()).toContain("hover:tw:bg-blue-50");
@@ -495,7 +541,7 @@ describe("IncidentTableOfContents", () => {
 
       expect(wrapper.emitted("toggle-section")).toBeTruthy();
       expect(wrapper.emitted("toggle-section")?.[0][0]).toEqual(
-        expect.objectContaining({ id: "parent1" })
+        expect.objectContaining({ id: "parent1" }),
       );
     });
 
@@ -507,7 +553,7 @@ describe("IncidentTableOfContents", () => {
 
       expect(wrapper.emitted("toggle-section")).toBeTruthy();
       expect(wrapper.emitted("toggle-section")?.[0][0]).toEqual(
-        expect.objectContaining({ id: "l2" })
+        expect.objectContaining({ id: "l2" }),
       );
     });
   });
@@ -573,12 +619,14 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc);
 
       expect(existsByTestId(wrapper, "toc-level1-item-empty")).toBe(true);
-      expect(existsByTestId(wrapper, "toc-level1-expand-btn-empty")).toBe(false);
+      expect(existsByTestId(wrapper, "toc-level1-expand-btn-empty")).toBe(
+        false,
+      );
     });
 
     it("should handle many level 1 items", () => {
       const toc = Array.from({ length: 20 }, (_, i) =>
-        createMockTocItem({ id: `item-${i}`, text: `Item ${i}` })
+        createMockTocItem({ id: `item-${i}`, text: `Item ${i}` }),
       );
       wrapper = mountComponent(toc);
 
@@ -620,7 +668,9 @@ describe("IncidentTableOfContents", () => {
 
       expect(existsByTestId(wrapper, "toc-level2-item-child1-1")).toBe(false);
 
-      await wrapper.setProps({ expandedSections: createExpandedSections(["parent1"]) });
+      await wrapper.setProps({
+        expandedSections: createExpandedSections(["parent1"]),
+      });
       await flushPromises();
 
       expect(existsByTestId(wrapper, "toc-level2-item-child1-1")).toBe(true);
@@ -637,13 +687,17 @@ describe("IncidentTableOfContents", () => {
       expect(existsByTestId(wrapper, "toc-level3-item-l3-1")).toBe(false);
 
       // Expand level 1
-      await wrapper.setProps({ expandedSections: createExpandedSections(["l1"]) });
+      await wrapper.setProps({
+        expandedSections: createExpandedSections(["l1"]),
+      });
       await flushPromises();
       expect(existsByTestId(wrapper, "toc-level2-item-l2")).toBe(true);
       expect(existsByTestId(wrapper, "toc-level3-item-l3-1")).toBe(false);
 
       // Expand level 2
-      await wrapper.setProps({ expandedSections: createExpandedSections(["l1", "l2"]) });
+      await wrapper.setProps({
+        expandedSections: createExpandedSections(["l1", "l2"]),
+      });
       await flushPromises();
       expect(existsByTestId(wrapper, "toc-level3-item-l3-1")).toBe(true);
     });
@@ -701,7 +755,9 @@ describe("IncidentTableOfContents", () => {
             createMockTocItem({
               id: "branch1-2",
               text: "Branch 1.2",
-              children: [createMockTocItem({ id: "leaf1-2-1", text: "Leaf 1.2.1" })],
+              children: [
+                createMockTocItem({ id: "leaf1-2-1", text: "Leaf 1.2.1" }),
+              ],
             }),
           ],
         }),
@@ -712,7 +768,9 @@ describe("IncidentTableOfContents", () => {
             createMockTocItem({
               id: "branch2-1",
               text: "Branch 2.1",
-              children: [createMockTocItem({ id: "leaf2-1-1", text: "Leaf 2.1.1" })],
+              children: [
+                createMockTocItem({ id: "leaf2-1-1", text: "Leaf 2.1.1" }),
+              ],
             }),
           ],
         }),
@@ -720,7 +778,13 @@ describe("IncidentTableOfContents", () => {
 
       wrapper = mountComponent(
         toc,
-        createExpandedSections(["root1", "branch1-1", "branch1-2", "root2", "branch2-1"])
+        createExpandedSections([
+          "root1",
+          "branch1-1",
+          "branch1-2",
+          "root2",
+          "branch2-1",
+        ]),
       );
 
       // Verify all branches are rendered

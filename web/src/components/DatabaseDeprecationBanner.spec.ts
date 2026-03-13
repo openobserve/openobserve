@@ -201,7 +201,7 @@ describe("DatabaseDeprecationBanner", () => {
 
     localStorage.setItem(
       DISMISS_KEY,
-      JSON.stringify({ timestamp: recentDate.toISOString() })
+      JSON.stringify({ timestamp: recentDate.toISOString() }),
     );
 
     store = createStore({
@@ -230,7 +230,7 @@ describe("DatabaseDeprecationBanner", () => {
 
     localStorage.setItem(
       DISMISS_KEY,
-      JSON.stringify({ timestamp: oldDate.toISOString() })
+      JSON.stringify({ timestamp: oldDate.toISOString() }),
     );
 
     store = createStore({

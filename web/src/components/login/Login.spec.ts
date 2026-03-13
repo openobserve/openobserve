@@ -45,7 +45,7 @@ vi.mock("@/services/auth", () => ({
 vi.mock("@/services/organizations", () => ({
   default: {
     os_list: vi.fn().mockResolvedValue({
-      data: { data: [] }
+      data: { data: [] },
     }),
   },
 }));
@@ -89,12 +89,12 @@ describe("Login", () => {
   let wrapper: any = null;
   let store: any;
   let router: any;
-  
+
   // Helper function to mount component with mocks
   const mountComponentWithMocks = (options: any = {}) => {
     const mockNotify = options.mockNotify || vi.fn();
     const mockResetValidation = options.mockResetValidation || vi.fn();
-    
+
     wrapper = mount(Login, {
       global: {
         plugins: [i18n, options.customStore || store, router],
@@ -105,18 +105,18 @@ describe("Login", () => {
       },
       ...options.mountOptions,
     });
-    
+
     // Set up component mocks after mounting
-    Object.defineProperty(wrapper.vm, '$q', {
+    Object.defineProperty(wrapper.vm, "$q", {
       value: { notify: mockNotify },
       writable: true,
     });
-    
-    Object.defineProperty(wrapper.vm, 'loginform', {
+
+    Object.defineProperty(wrapper.vm, "loginform", {
       value: { value: { resetValidation: mockResetValidation } },
       writable: true,
     });
-    
+
     return { mockNotify, mockResetValidation };
   };
 
@@ -124,14 +124,16 @@ describe("Login", () => {
     // Reset all mocks
     vi.clearAllMocks();
     mockNotify.mockClear();
-    
+
     // Set default mock implementations
     const authService = await import("@/services/auth");
     (authService.default.sign_in_user as any).mockResolvedValue({
-      data: { status: true, role: "admin" }
+      data: { status: true, role: "admin" },
     });
-    (authService.default.get_dex_login as any).mockResolvedValue("https://sso.example.com");
-    
+    (authService.default.get_dex_login as any).mockResolvedValue(
+      "https://sso.example.com",
+    );
+
     // Create mock store
     store = createStore({
       state: {
@@ -221,7 +223,7 @@ describe("Login", () => {
         plugins: [i18n, store, router],
       },
     });
-    
+
     expect(wrapper.vm.name).toBe("");
     expect(wrapper.vm.password).toBe("");
     expect(wrapper.vm.confirmpassword).toBe("");
@@ -312,10 +314,10 @@ describe("Login", () => {
   // Test 8: onSignIn with empty username shows warning notification
   it("should call notify when username is empty", async () => {
     mountComponentWithMocks();
-    
+
     wrapper.vm.name = "";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
 
     expect(mockNotify).toHaveBeenCalled();
@@ -324,10 +326,10 @@ describe("Login", () => {
   // Test 9: onSignIn with empty password shows warning notification
   it("should call notify when password is empty", async () => {
     mountComponentWithMocks();
-    
+
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "";
-    
+
     await wrapper.vm.onSignIn();
 
     expect(mockNotify).toHaveBeenCalled();
@@ -336,10 +338,10 @@ describe("Login", () => {
   // Test 10: onSignIn with both empty username and password shows warning notification
   it("should call notify when both username and password are empty", async () => {
     mountComponentWithMocks();
-    
+
     wrapper.vm.name = "";
     wrapper.vm.password = "";
-    
+
     await wrapper.vm.onSignIn();
 
     expect(mockNotify).toHaveBeenCalled();
@@ -355,7 +357,7 @@ describe("Login", () => {
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     const onSignInPromise = wrapper.vm.onSignIn();
     expect(wrapper.vm.submitting).toBe(true);
     await onSignInPromise;
@@ -389,9 +391,11 @@ describe("Login", () => {
   // Test 14: loginWithSSo handles errors gracefully
   it("should handle errors gracefully when get_dex_login fails", async () => {
     const authService = await import("@/services/auth");
-    
+
     // Mock the service to reject
-    (authService.default.get_dex_login as any).mockRejectedValueOnce(new Error("Network error"));
+    (authService.default.get_dex_login as any).mockRejectedValueOnce(
+      new Error("Network error"),
+    );
 
     mountComponentWithMocks();
 
@@ -432,9 +436,12 @@ describe("Login", () => {
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
-    expect(zincUtils.getBasicAuth).toHaveBeenCalledWith("testuser", "password123");
+    expect(zincUtils.getBasicAuth).toHaveBeenCalledWith(
+      "testuser",
+      "password123",
+    );
   });
 
   // Test 17: successful sign in calls b64EncodeStandard
@@ -448,7 +455,7 @@ describe("Login", () => {
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
     expect(zincUtils.b64EncodeStandard).toHaveBeenCalled();
   });
@@ -464,7 +471,7 @@ describe("Login", () => {
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
     expect(zincUtils.useLocalUserInfo).toHaveBeenCalledWith("encoded-data");
   });
@@ -480,7 +487,7 @@ describe("Login", () => {
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
     expect(zincUtils.useLocalCurrentUser).toHaveBeenCalled();
   });
@@ -515,7 +522,7 @@ describe("Login", () => {
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
     expect(mockDispatch).toHaveBeenCalledWith("setUserInfo", "encoded-data");
   });
@@ -550,14 +557,17 @@ describe("Login", () => {
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
-    expect(mockDispatch).toHaveBeenCalledWith("setCurrentUser", expect.objectContaining({
-      given_name: "testuser",
-      name: "testuser",
-      email: "testuser",
-      role: "admin",
-    }));
+    expect(mockDispatch).toHaveBeenCalledWith(
+      "setCurrentUser",
+      expect.objectContaining({
+        given_name: "testuser",
+        name: "testuser",
+        email: "testuser",
+        role: "admin",
+      }),
+    );
   });
 
   // Test 22: successful sign in handles RUM when enabled
@@ -590,15 +600,17 @@ describe("Login", () => {
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
     expect(rum.openobserveRum.setUser).toHaveBeenCalledWith({
       name: "testuser ",
       email: "testuser",
     });
-    expect(rum.openobserveRum.startSessionReplayRecording).toHaveBeenCalledWith({
-      force: true,
-    });
+    expect(rum.openobserveRum.startSessionReplayRecording).toHaveBeenCalledWith(
+      {
+        force: true,
+      },
+    );
   });
 
   // Test 23: successful sign in handles session storage
@@ -661,7 +673,7 @@ describe("Login", () => {
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     // Test that onSignIn completes without throwing an error
     await expect(() => wrapper.vm.onSignIn()).not.toThrow();
   });
@@ -669,7 +681,7 @@ describe("Login", () => {
   // Test 25: failed sign in behavior verification
   it("should handle authentication failure appropriately", async () => {
     const authService = await import("@/services/auth");
-    
+
     // Setup the mock for authentication failure
     (authService.default.sign_in_user as any).mockResolvedValueOnce({
       data: {
@@ -680,21 +692,21 @@ describe("Login", () => {
 
     mountComponentWithMocks();
 
-    // Set up component data 
+    // Set up component data
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "wrongpassword";
-    
+
     const initialSubmittingState = wrapper.vm.submitting;
-    
+
     await wrapper.vm.onSignIn();
     await flushPromises();
-    
+
     // The sign in should have been attempted
     expect(authService.default.sign_in_user).toHaveBeenCalledWith({
       name: "testuser",
       password: "wrongpassword",
     });
-    
+
     // Initial state should have been false
     expect(initialSubmittingState).toBe(false);
   });
@@ -702,18 +714,20 @@ describe("Login", () => {
   // Test 26: sign in error resets form validation
   it("should handle form validation on sign in error", async () => {
     const authService = await import("@/services/auth");
-    
+
     // Setup the mock to reject
-    (authService.default.sign_in_user as any).mockRejectedValueOnce(new Error("Network error"));
+    (authService.default.sign_in_user as any).mockRejectedValueOnce(
+      new Error("Network error"),
+    );
 
     mountComponentWithMocks();
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
     await flushPromises();
-    
+
     // Should set submitting to false after error
     expect(wrapper.vm.submitting).toBe(false);
   });
@@ -721,18 +735,20 @@ describe("Login", () => {
   // Test 27: sign in exception handles errors gracefully
   it("should handle sign in exceptions gracefully", async () => {
     const authService = await import("@/services/auth");
-    
+
     // Setup the mock to reject
-    (authService.default.sign_in_user as any).mockRejectedValueOnce(new Error("Network error"));
+    (authService.default.sign_in_user as any).mockRejectedValueOnce(
+      new Error("Network error"),
+    );
 
     mountComponentWithMocks();
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
     await flushPromises();
-    
+
     // Should handle the error gracefully and set submitting to false
     expect(wrapper.vm.submitting).toBe(false);
   });
@@ -773,9 +789,7 @@ describe("Login", () => {
   it("should set loginAsInternalUser when login_as_internal_user query param is true", async () => {
     const mockRouter = createRouter({
       history: createWebHistory(),
-      routes: [
-        { path: "/", component: { template: "<div>Home</div>" } },
-      ],
+      routes: [{ path: "/", component: { template: "<div>Home</div>" } }],
     });
 
     await mockRouter.push("/?login_as_internal_user=true");
@@ -798,13 +812,27 @@ describe("Login", () => {
     });
 
     const expectedProperties = [
-      't', 'name', 'password', 'confirmpassword', 'email', 'loginform',
-      'submitting', 'onSignIn', 'tab', 'innerTab', 'store', 'getImageURL',
-      'loginAsInternalUser', 'showSSO', 'showInternalLogin', 'loginWithSSo',
-      'config', 'autoRedirectDexLogin'
+      "t",
+      "name",
+      "password",
+      "confirmpassword",
+      "email",
+      "loginform",
+      "submitting",
+      "onSignIn",
+      "tab",
+      "innerTab",
+      "store",
+      "getImageURL",
+      "loginAsInternalUser",
+      "showSSO",
+      "showInternalLogin",
+      "loginWithSSo",
+      "config",
+      "autoRedirectDexLogin",
     ];
 
-    expectedProperties.forEach(prop => {
+    expectedProperties.forEach((prop) => {
       expect(wrapper.vm).toHaveProperty(prop);
     });
   });
@@ -819,18 +847,20 @@ describe("Login", () => {
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
     expect(mockB64Encode).toHaveBeenCalled();
     const callArg = mockB64Encode.mock.calls[0][0];
     const userInfo = JSON.parse(callArg);
-    expect(userInfo).toEqual(expect.objectContaining({
-      given_name: "testuser",
-      name: "testuser",
-      family_name: "",
-      email: "testuser",
-      role: "admin",
-    }));
+    expect(userInfo).toEqual(
+      expect.objectContaining({
+        given_name: "testuser",
+        name: "testuser",
+        family_name: "",
+        email: "testuser",
+        role: "admin",
+      }),
+    );
   });
 
   // Test 33: user info object contains correct expiration time
@@ -844,11 +874,11 @@ describe("Login", () => {
     const now = Date.now();
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
     const userInfo = JSON.parse(mockB64Encode.mock.calls[0][0]);
     const expectedExp = Math.floor((now + 1000 * 60 * 60 * 24 * 30) / 1000);
-    
+
     expect(userInfo.exp).toBeCloseTo(expectedExp, -2);
   });
 
@@ -860,7 +890,7 @@ describe("Login", () => {
         id: "1",
         label: "Existing Org",
         user_email: "testuser",
-      }
+      },
     };
     (zincUtils.useLocalOrganization as any).mockReturnValue(mockLocalOrg);
 
@@ -888,9 +918,12 @@ describe("Login", () => {
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
-    expect(mockDispatch).toHaveBeenCalledWith("setSelectedOrganization", expect.any(Object));
+    expect(mockDispatch).toHaveBeenCalledWith(
+      "setSelectedOrganization",
+      expect.any(Object),
+    );
   });
 
   // Test 35: organization selection clears mismatched email
@@ -902,7 +935,7 @@ describe("Login", () => {
         id: "1",
         label: "Existing Org",
         user_email: "different@example.com",
-      }
+      },
     };
 
     (zincUtils.useLocalOrganization as any).mockImplementation((arg?: any) => {
@@ -965,11 +998,11 @@ describe("Login", () => {
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     // Test that onSignIn method exists and can be called
     expect(wrapper.vm.onSignIn).toBeDefined();
     expect(typeof wrapper.vm.onSignIn).toBe("function");
-    
+
     // Test that calling onSignIn doesn't throw an error
     let threwError = false;
     try {
@@ -1012,18 +1045,18 @@ describe("Login", () => {
     const now = Date.now();
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
     const userInfo = JSON.parse(mockB64Encode.mock.calls[0][0]);
     const expectedAuthTime = Math.floor(now / 1000);
-    
+
     expect(userInfo.auth_time).toBeCloseTo(expectedAuthTime, -2);
   });
 
   it("should handle failed sign in form validation reset", async () => {
     const authService = await import("@/services/auth");
     const mockResetValidation = vi.fn();
-    
+
     (authService.default.sign_in_user as any).mockResolvedValueOnce({
       data: {
         status: false,
@@ -1040,7 +1073,7 @@ describe("Login", () => {
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "wrongpassword";
     wrapper.vm.loginform = { resetValidation: mockResetValidation };
-    
+
     await wrapper.vm.onSignIn();
     expect(mockResetValidation).toHaveBeenCalled();
   });
@@ -1064,7 +1097,7 @@ describe("Login", () => {
   it("should handle user with different role on successful sign in", async () => {
     const authService = await import("@/services/auth");
     (authService.default.sign_in_user as any).mockResolvedValueOnce({
-      data: { status: true, role: "user" }
+      data: { status: true, role: "user" },
     });
 
     const mockDispatch = vi.fn();
@@ -1095,17 +1128,22 @@ describe("Login", () => {
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
-    expect(mockDispatch).toHaveBeenCalledWith("setCurrentUser", expect.objectContaining({
-      role: "user",
-    }));
+    expect(mockDispatch).toHaveBeenCalledWith(
+      "setCurrentUser",
+      expect.objectContaining({
+        role: "user",
+      }),
+    );
   });
 
   // Test 44: onSignIn handles organization service error
   it("should handle organization service error gracefully", async () => {
     const orgService = await import("@/services/organizations");
-    (orgService.default.os_list as any).mockRejectedValueOnce(new Error("Org service error"));
+    (orgService.default.os_list as any).mockRejectedValueOnce(
+      new Error("Org service error"),
+    );
 
     const zincUtils = await import("@/utils/zincutils");
     (zincUtils.useLocalOrganization as any).mockReturnValue({ value: null });
@@ -1118,7 +1156,7 @@ describe("Login", () => {
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     // Test that onSignIn doesn't throw when organization service fails
     let threwError = false;
     try {
@@ -1135,16 +1173,14 @@ describe("Login", () => {
       isCloud: "true",
       isEnterprise: "true",
     };
-    
+
     vi.doMock("@/aws-exports", () => ({
       default: mockConfig,
     }));
 
     const mockRouter = createRouter({
       history: createWebHistory(),
-      routes: [
-        { path: "/", component: { template: "<div>Home</div>" } },
-      ],
+      routes: [{ path: "/", component: { template: "<div>Home</div>" } }],
     });
 
     await mockRouter.push("/");
@@ -1161,7 +1197,9 @@ describe("Login", () => {
   // Test 48: onSignIn handles undefined loginform gracefully
   it("should handle undefined loginform in onSignIn", async () => {
     const authService = await import("@/services/auth");
-    (authService.default.sign_in_user as any).mockRejectedValueOnce(new Error("Network error"));
+    (authService.default.sign_in_user as any).mockRejectedValueOnce(
+      new Error("Network error"),
+    );
 
     wrapper = mount(Login, {
       global: {
@@ -1172,14 +1210,14 @@ describe("Login", () => {
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
     wrapper.vm.loginform = undefined;
-    
+
     // Ensure initial state
     expect(wrapper.vm.submitting).toBe(false);
-    
+
     // Test that the method runs and handles undefined loginform gracefully
     await wrapper.vm.onSignIn();
     await flushPromises();
-    
+
     // After the error and catch block, submitting should be set back to false
     expect(wrapper.vm.submitting).toBe(false);
   });
@@ -1218,7 +1256,7 @@ describe("Login", () => {
     expect(wrapper.vm.showInternalLogin).toBe(false);
 
     // Update store state
-    reactiveStore.commit('UPDATE_CONFIG', {
+    reactiveStore.commit("UPDATE_CONFIG", {
       sso_enabled: true,
       native_login_enabled: true,
     });
@@ -1264,11 +1302,11 @@ describe("Login", () => {
 
     expect(wrapper.vm.tab).toBe("signin");
     expect(wrapper.vm.innerTab).toBe("signup");
-    
+
     // Test if they can be modified
     wrapper.vm.tab = "signup";
     wrapper.vm.innerTab = "signin";
-    
+
     expect(wrapper.vm.tab).toBe("signup");
     expect(wrapper.vm.innerTab).toBe("signin");
   });

@@ -25,7 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card class="tw-w-full" style="width: 700px">
       <q-card-section class="q-pa-md">
         <div class="flex items-center justify-between">
-          <div class="text-h6" data-test="dialog-title">Backfill Job Details</div>
+          <div class="text-h6" data-test="dialog-title">
+            Backfill Job Details
+          </div>
           <q-btn
             icon="close"
             flat
@@ -39,7 +41,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-separator />
 
-      <q-card-section class="q-pa-md" style="max-height: calc(100vh - 100px); overflow-y: auto">
+      <q-card-section
+        class="q-pa-md"
+        style="max-height: calc(100vh - 100px); overflow-y: auto"
+      >
         <div v-if="loading" class="flex justify-center q-pa-lg">
           <q-spinner color="primary" size="50px" />
         </div>
@@ -72,15 +77,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div>
                 <div class="text-caption text-grey-6">Pipeline</div>
-                <div class="tw-font-medium">{{ job.pipeline_name || job.pipeline_id }}</div>
+                <div class="tw-font-medium">
+                  {{ job.pipeline_name || job.pipeline_id }}
+                </div>
               </div>
               <div>
                 <div class="text-caption text-grey-6">Time Range</div>
-                <div class="text-sm">{{ formatTimestamp(job.start_time) }} - {{ formatTimestamp(job.end_time) }}</div>
+                <div class="text-sm">
+                  {{ formatTimestamp(job.start_time) }} -
+                  {{ formatTimestamp(job.end_time) }}
+                </div>
               </div>
               <div>
                 <div class="text-caption text-grey-6">Created</div>
-                <div class="text-sm">{{ formatTimestampFull(job.created_at) }}</div>
+                <div class="text-sm">
+                  {{ formatTimestampFull(job.created_at) }}
+                </div>
               </div>
             </div>
           </div>
@@ -88,7 +100,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Progress -->
           <div class="tw-space-y-3">
             <div class="text-subtitle1 tw-font-semibold">Progress</div>
-            <q-card flat bordered class="q-pa-md">
+            <q-card flat bordered
+class="q-pa-md">
               <div class="flex items-center justify-between q-mb-sm">
                 <div class="tw-font-medium">Overall Progress</div>
                 <div class="text-h6">{{ job.progress_percent }}%</div>
@@ -108,14 +121,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div v-if="job.chunks_total">
                   <div class="text-caption text-grey-6">Chunks</div>
-                  <div>{{ job.chunks_completed || 0 }} / {{ job.chunks_total }}</div>
+                  <div>
+                    {{ job.chunks_completed || 0 }} / {{ job.chunks_total }}
+                  </div>
                 </div>
                 <div>
                   <div class="text-caption text-grey-6">Current Position</div>
                   <div>{{ formatTimestamp(job.current_position) }}</div>
                 </div>
                 <div v-if="estimatedCompletion">
-                  <div class="text-caption text-grey-6">Estimated Completion</div>
+                  <div class="text-caption text-grey-6">
+                    Estimated Completion
+                  </div>
                   <div>{{ estimatedCompletion }}</div>
                 </div>
               </div>
@@ -123,9 +140,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Deletion Details (if applicable) -->
-          <div v-if="job.delete_before_backfill || job.deletion_status" class="tw-space-y-3">
+          <div
+            v-if="job.delete_before_backfill || job.deletion_status"
+            class="tw-space-y-3"
+          >
             <div class="text-subtitle1 tw-font-semibold">Deletion Details</div>
-            <q-card flat bordered class="q-pa-md">
+            <q-card flat bordered
+class="q-pa-md">
               <div class="tw-grid tw-grid-cols-2 tw-gap-4 text-sm">
                 <div>
                   <div class="text-caption text-grey-6">Status</div>
@@ -136,16 +157,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                 </div>
-                <div v-if="job.deletion_job_ids && job.deletion_job_ids.length > 0">
-                  <div class="text-caption text-grey-6">Deletion Job IDs ({{ job.deletion_job_ids.length }})</div>
-                  <div v-for="(jobId, idx) in job.deletion_job_ids" :key="idx" class="tw-font-mono text-xs">
+                <div
+                  v-if="job.deletion_job_ids && job.deletion_job_ids.length > 0"
+                >
+                  <div class="text-caption text-grey-6">
+                    Deletion Job IDs ({{ job.deletion_job_ids.length }})
+                  </div>
+                  <div
+                    v-for="(jobId, idx) in job.deletion_job_ids"
+                    :key="idx"
+                    class="tw-font-mono text-xs"
+                  >
                     {{ jobId }}
                   </div>
                 </div>
               </div>
-              <div v-if="typeof job.deletion_status === 'object' && job.deletion_status.failed" class="tw-mt-3">
+              <div
+                v-if="
+                  typeof job.deletion_status === 'object' &&
+                  job.deletion_status.failed
+                "
+                class="tw-mt-3"
+              >
                 <div class="text-caption text-grey-6">Error</div>
-                <div class="text-sm text-negative">{{ job.deletion_status.failed }}</div>
+                <div class="text-sm text-negative">
+                  {{ job.deletion_status.failed }}
+                </div>
               </div>
             </q-card>
           </div>
@@ -153,12 +190,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Error Details (if present) -->
           <div v-if="job.error" class="tw-space-y-3">
             <div class="text-subtitle1 tw-font-semibold">Error Details</div>
-            <q-card flat bordered class="q-pa-md tw-bg-red-50 tw-border-red-200">
+            <q-card
+              flat
+              bordered
+              class="q-pa-md tw-bg-red-50 tw-border-red-200"
+            >
               <div class="flex items-start">
-                <q-icon name="error" color="negative" size="24px" class="q-mr-sm tw-mt-1" />
+                <q-icon
+                  name="error"
+                  color="negative"
+                  size="24px"
+                  class="q-mr-sm tw-mt-1"
+                />
                 <div class="tw-flex-1">
-                  <div class="text-caption text-grey-6 q-mb-xs">Error Message</div>
-                  <div class="text-sm tw-text-red-800 tw-whitespace-pre-wrap tw-break-words">
+                  <div class="text-caption text-grey-6 q-mb-xs">
+                    Error Message
+                  </div>
+                  <div
+                    class="text-sm tw-text-red-800 tw-whitespace-pre-wrap tw-break-words"
+                  >
                     {{ job.error }}
                   </div>
                 </div>
@@ -176,14 +226,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon="add_circle"
               />
               <q-timeline-entry
-                v-if="job.deletion_status && job.deletion_status !== 'not_required'"
+                v-if="
+                  job.deletion_status && job.deletion_status !== 'not_required'
+                "
                 :title="getDeletionTimelineTitle"
                 :subtitle="getDeletionTimelineSubtitle"
                 :icon="getDeletionTimelineIcon"
                 :color="getDeletionTimelineColor"
               />
               <q-timeline-entry
-                v-if="job.progress_percent > 20 || (job.deletion_status === 'completed')"
+                v-if="
+                  job.progress_percent > 20 ||
+                  job.deletion_status === 'completed'
+                "
                 title="Backfill Started"
                 :subtitle="getBackfillStartTime"
                 icon="play_arrow"
@@ -220,8 +275,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div v-else class="flex flex-column items-center justify-center q-pa-lg">
-          <q-icon name="error_outline" size="64px" color="grey-5" />
+        <div
+          v-else
+          class="flex flex-column items-center justify-center q-pa-lg"
+        >
+          <q-icon name="error_outline" size="64px"
+color="grey-5" />
           <div class="text-h6 q-mt-md text-grey-7">Job not found</div>
         </div>
       </q-card-section>
@@ -269,7 +328,7 @@ watch(
       loadJobDetails();
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 watch(
@@ -278,7 +337,7 @@ watch(
     if (newValue && props.jobId) {
       loadJobDetails();
     }
-  }
+  },
 );
 
 const loadJobDetails = async () => {
@@ -355,7 +414,10 @@ const getCurrentPhase = computed(() => {
 
   if (job.value.deletion_status) {
     const status = job.value.deletion_status;
-    if (typeof status === "string" && ["pending", "in_progress"].includes(status)) {
+    if (
+      typeof status === "string" &&
+      ["pending", "in_progress"].includes(status)
+    ) {
       return "Deleting Data";
     }
     if (status === "completed") {
@@ -394,7 +456,10 @@ const getDeletionTimelineTitle = computed(() => {
   if (job.value.deletion_status === "completed") return "Deletion Completed";
   if (job.value.deletion_status === "in_progress") return "Deleting Data";
   if (job.value.deletion_status === "pending") return "Deletion Pending";
-  if (typeof job.value.deletion_status === "object" && "failed" in job.value.deletion_status) {
+  if (
+    typeof job.value.deletion_status === "object" &&
+    "failed" in job.value.deletion_status
+  ) {
     return "Deletion Failed";
   }
   return "";
@@ -403,10 +468,16 @@ const getDeletionTimelineTitle = computed(() => {
 const getDeletionTimelineSubtitle = computed(() => {
   if (!job.value?.deletion_status) return "";
 
-  if (job.value.deletion_status === "completed") return "All existing data deleted";
-  if (job.value.deletion_status === "in_progress") return "Deletion in progress";
-  if (job.value.deletion_status === "pending") return "Waiting to start deletion";
-  if (typeof job.value.deletion_status === "object" && "failed" in job.value.deletion_status) {
+  if (job.value.deletion_status === "completed")
+    return "All existing data deleted";
+  if (job.value.deletion_status === "in_progress")
+    return "Deletion in progress";
+  if (job.value.deletion_status === "pending")
+    return "Waiting to start deletion";
+  if (
+    typeof job.value.deletion_status === "object" &&
+    "failed" in job.value.deletion_status
+  ) {
     return job.value.deletion_status.failed;
   }
   return "";
@@ -437,7 +508,11 @@ const getBackfillStartTime = computed(() => {
 
 // Helper functions
 const getStatusColor = (status: string, deletionStatus?: any) => {
-  if (deletionStatus && typeof deletionStatus === "object" && "failed" in deletionStatus) {
+  if (
+    deletionStatus &&
+    typeof deletionStatus === "object" &&
+    "failed" in deletionStatus
+  ) {
     return "negative";
   }
 
@@ -458,7 +533,11 @@ const getStatusColor = (status: string, deletionStatus?: any) => {
 };
 
 const getStatusLabel = (status: string, deletionStatus?: any) => {
-  if (deletionStatus && typeof deletionStatus === "object" && "failed" in deletionStatus) {
+  if (
+    deletionStatus &&
+    typeof deletionStatus === "object" &&
+    "failed" in deletionStatus
+  ) {
     return "Deletion Failed";
   }
 
@@ -466,7 +545,11 @@ const getStatusLabel = (status: string, deletionStatus?: any) => {
 };
 
 const getProgressColor = (deletionStatus?: any) => {
-  if (deletionStatus && typeof deletionStatus === "string" && ["pending", "in_progress"].includes(deletionStatus)) {
+  if (
+    deletionStatus &&
+    typeof deletionStatus === "string" &&
+    ["pending", "in_progress"].includes(deletionStatus)
+  ) {
     return "blue";
   }
   return "positive";
@@ -492,16 +575,26 @@ const getDeletionStatusLabel = (status?: any) => {
 
 const formatTimestamp = (timestamp?: number) => {
   if (!timestamp) return "N/A";
-  const userTimezone = store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const userTimezone =
+    store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   // Convert from microseconds to milliseconds
-  return timestampToTimezoneDate(timestamp / 1000, userTimezone, "MMM dd, yyyy HH:mm");
+  return timestampToTimezoneDate(
+    timestamp / 1000,
+    userTimezone,
+    "MMM dd, yyyy HH:mm",
+  );
 };
 
 const formatTimestampFull = (timestamp?: number) => {
   if (!timestamp) return "N/A";
-  const userTimezone = store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const userTimezone =
+    store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const date = new Date(timestamp / 1000); // Convert from microseconds
-  const formattedDate = timestampToTimezoneDate(timestamp / 1000, userTimezone, "MMM dd, yyyy HH:mm:ss");
+  const formattedDate = timestampToTimezoneDate(
+    timestamp / 1000,
+    userTimezone,
+    "MMM dd, yyyy HH:mm:ss",
+  );
   const timezoneName = userTimezone === "UTC" ? "UTC" : userTimezone;
   return `${formattedDate} ${timezoneName} (${formatDistanceToNow(date, { addSuffix: true })})`;
 };

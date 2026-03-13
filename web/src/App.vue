@@ -50,11 +50,13 @@ export default {
       () => {
         // Check if user is actively previewing colors in General Settings
         // Skip reinitialization if temp colors exist to preserve the preview
-        const hasTempColors = store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
+        const hasTempColors =
+          store.state.tempThemeColors?.light ||
+          store.state.tempThemeColors?.dark;
         if (!hasTempColors) {
           initializeThemeColors();
         }
-      }
+      },
     );
 
     // Watch for organization settings changes (loaded asynchronously from backend)
@@ -64,14 +66,19 @@ export default {
       (newSettings) => {
         // Only reinitialize if settings actually changed (not just initial undefined -> object)
         // Check if theme colors were loaded from backend
-        if (newSettings?.light_mode_theme_color || newSettings?.dark_mode_theme_color) {
-          const hasTempColors = store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
+        if (
+          newSettings?.light_mode_theme_color ||
+          newSettings?.dark_mode_theme_color
+        ) {
+          const hasTempColors =
+            store.state.tempThemeColors?.light ||
+            store.state.tempThemeColors?.dark;
           if (!hasTempColors) {
             initializeThemeColors();
           }
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     /**
@@ -90,54 +97,72 @@ export default {
       const currentMode = store.state.theme === "dark" ? "dark" : "light";
 
       // Light mode color priority
-      const storeLight = store.state.tempThemeColors?.light;          // 1. Temp preview (highest priority)
-      const localLight = localStorage.getItem('customLightColor');    // 2. Saved custom color
-      const orgLight = store.state?.organizationData?.organizationSettings?.light_mode_theme_color; // 3. Org default
-      const customLightColor = storeLight || localLight || orgLight || DEFAULT_LIGHT_COLOR;         // 4. App default
+      const storeLight = store.state.tempThemeColors?.light; // 1. Temp preview (highest priority)
+      const localLight = localStorage.getItem("customLightColor"); // 2. Saved custom color
+      const orgLight =
+        store.state?.organizationData?.organizationSettings
+          ?.light_mode_theme_color; // 3. Org default
+      const customLightColor =
+        storeLight || localLight || orgLight || DEFAULT_LIGHT_COLOR; // 4. App default
 
       // Dark mode color priority
-      const storeDark = store.state.tempThemeColors?.dark;            // 1. Temp preview (highest priority)
-      const localDark = localStorage.getItem('customDarkColor');      // 2. Saved custom color
-      const orgDark = store.state?.organizationData?.organizationSettings?.dark_mode_theme_color;   // 3. Org default
-      const customDarkColor = storeDark || localDark || orgDark || DEFAULT_DARK_COLOR;              // 4. App default
+      const storeDark = store.state.tempThemeColors?.dark; // 1. Temp preview (highest priority)
+      const localDark = localStorage.getItem("customDarkColor"); // 2. Saved custom color
+      const orgDark =
+        store.state?.organizationData?.organizationSettings
+          ?.dark_mode_theme_color; // 3. Org default
+      const customDarkColor =
+        storeDark || localDark || orgDark || DEFAULT_DARK_COLOR; // 4. App default
 
       // Check if user has explicitly applied a theme from PredefinedThemes dialog
       // appliedTheme stores the theme ID (-1 for custom, or predefined theme ID)
-      const appliedLightTheme = localStorage.getItem('appliedLightTheme');
-      const appliedDarkTheme = localStorage.getItem('appliedDarkTheme');
-      const appliedTheme = currentMode === 'light' ? appliedLightTheme : appliedDarkTheme;
+      const appliedLightTheme = localStorage.getItem("appliedLightTheme");
+      const appliedDarkTheme = localStorage.getItem("appliedDarkTheme");
+      const appliedTheme =
+        currentMode === "light" ? appliedLightTheme : appliedDarkTheme;
 
       // Check if there's a temporary preview color (from General Settings color picker)
-      const hasTempPreview = currentMode === "light"
-        ? !!store.state.tempThemeColors?.light
-        : !!store.state.tempThemeColors?.dark;
+      const hasTempPreview =
+        currentMode === "light"
+          ? !!store.state.tempThemeColors?.light
+          : !!store.state.tempThemeColors?.dark;
 
       // Check if user has saved a custom color in localStorage (from PredefinedThemes or General Settings)
-      const hasSavedColor = currentMode === 'light'
-        ? !!localStorage.getItem('customLightColor')
-        : !!localStorage.getItem('customDarkColor');
+      const hasSavedColor =
+        currentMode === "light"
+          ? !!localStorage.getItem("customLightColor")
+          : !!localStorage.getItem("customDarkColor");
 
       if (hasTempPreview || hasSavedColor) {
         // User has either a temp preview or saved custom color - apply it
-        const color = currentMode === 'light' ? customLightColor : customDarkColor;
+        const color =
+          currentMode === "light" ? customLightColor : customDarkColor;
 
         // Determine if this color is from org settings (backend) or custom/default
-        const isFromOrgSettings = currentMode === "light"
-          ? (store.state?.organizationData?.organizationSettings?.light_mode_theme_color === customLightColor)
-          : (store.state?.organizationData?.organizationSettings?.dark_mode_theme_color === customDarkColor);
+        const isFromOrgSettings =
+          currentMode === "light"
+            ? store.state?.organizationData?.organizationSettings
+                ?.light_mode_theme_color === customLightColor
+            : store.state?.organizationData?.organizationSettings
+                ?.dark_mode_theme_color === customDarkColor;
 
         const DEFAULT_LIGHT_COLOR = "#3F7994";
         const DEFAULT_DARK_COLOR = "#5B9FBE";
-        const isDefaultColor = (currentMode === 'light' && color === DEFAULT_LIGHT_COLOR) ||
-                               (currentMode === 'dark' && color === DEFAULT_DARK_COLOR);
+        const isDefaultColor =
+          (currentMode === "light" && color === DEFAULT_LIGHT_COLOR) ||
+          (currentMode === "dark" && color === DEFAULT_DARK_COLOR);
 
         applyThemeColors(color, currentMode, isDefaultColor);
       } else {
         // No theme explicitly selected, apply available colors
-        const color = currentMode === 'light' ? customLightColor : customDarkColor;
-        const isFromOrgSettings = currentMode === "light"
-          ? store.state?.organizationData?.organizationSettings?.light_mode_theme_color
-          : store.state?.organizationData?.organizationSettings?.dark_mode_theme_color;
+        const color =
+          currentMode === "light" ? customLightColor : customDarkColor;
+        const isFromOrgSettings =
+          currentMode === "light"
+            ? store.state?.organizationData?.organizationSettings
+                ?.light_mode_theme_color
+            : store.state?.organizationData?.organizationSettings
+                ?.dark_mode_theme_color;
         const isDefault = !isFromOrgSettings && !hasTempPreview;
         applyThemeColors(color, currentMode, isDefault);
       }
@@ -145,7 +170,7 @@ export default {
 
     return {
       store,
-    }
+    };
   },
 };
 </script>

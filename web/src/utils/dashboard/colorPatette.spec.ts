@@ -33,7 +33,9 @@ vi.mock("d3-scale", () => ({
 describe("Color Palette Utils", () => {
   describe("ColorModeWithoutMinMax enum", () => {
     it("should have correct enum values", () => {
-      expect(ColorModeWithoutMinMax.PALETTE_CLASSIC_BY_SERIES).toBe("palette-classic-by-series");
+      expect(ColorModeWithoutMinMax.PALETTE_CLASSIC_BY_SERIES).toBe(
+        "palette-classic-by-series",
+      );
       expect(ColorModeWithoutMinMax.PALETTE_CLASSIC).toBe("palette-classic");
       expect(ColorModeWithoutMinMax.FIXED).toBe("fixed");
     });
@@ -44,8 +46,8 @@ describe("Color Palette Utils", () => {
       expect(classicColorPaletteLightTheme).toBeDefined();
       expect(Array.isArray(classicColorPaletteLightTheme)).toBe(true);
       expect(classicColorPaletteLightTheme.length).toBeGreaterThan(0);
-      
-      classicColorPaletteLightTheme.forEach(color => {
+
+      classicColorPaletteLightTheme.forEach((color) => {
         expect(color).toMatch(/^#[0-9A-Fa-f]{6}$/);
       });
     });
@@ -54,14 +56,16 @@ describe("Color Palette Utils", () => {
       expect(classicColorPaletteDarkTheme).toBeDefined();
       expect(Array.isArray(classicColorPaletteDarkTheme)).toBe(true);
       expect(classicColorPaletteDarkTheme.length).toBeGreaterThan(0);
-      
-      classicColorPaletteDarkTheme.forEach(color => {
+
+      classicColorPaletteDarkTheme.forEach((color) => {
         expect(color).toMatch(/^#[0-9A-Fa-f]{6}$/);
       });
     });
 
     it("should have different colors for light and dark themes", () => {
-      expect(classicColorPaletteLightTheme).not.toEqual(classicColorPaletteDarkTheme);
+      expect(classicColorPaletteLightTheme).not.toEqual(
+        classicColorPaletteDarkTheme,
+      );
     });
   });
 
@@ -119,7 +123,7 @@ describe("Color Palette Utils", () => {
     it("should handle values outside min-max range", () => {
       const result1 = shadeColor("#ff0000", -10, 0, 100);
       const result2 = shadeColor("#ff0000", 150, 0, 100);
-      
+
       expect(result1).toMatch(/^#[0-9A-Fa-f]{6}$/);
       expect(result2).toMatch(/^#[0-9A-Fa-f]{6}$/);
     });
@@ -127,7 +131,7 @@ describe("Color Palette Utils", () => {
     it("should produce different shades for different values", () => {
       const shade1 = shadeColor("#ff0000", 25, 0, 100);
       const shade2 = shadeColor("#ff0000", 75, 0, 100);
-      
+
       expect(shade1).not.toBe(shade2);
     });
   });
@@ -137,15 +141,33 @@ describe("Color Palette Utils", () => {
       const data = [
         {
           result: [
-            { values: [[1, 10], [2, 20], [3, 30]] },
-            { values: [[4, 5], [5, 15], [6, 25]] }
-          ]
+            {
+              values: [
+                [1, 10],
+                [2, 20],
+                [3, 30],
+              ],
+            },
+            {
+              values: [
+                [4, 5],
+                [5, 15],
+                [6, 25],
+              ],
+            },
+          ],
         },
         {
           result: [
-            { values: [[7, 35], [8, 2], [9, 40]] }
-          ]
-        }
+            {
+              values: [
+                [7, 35],
+                [8, 2],
+                [9, 40],
+              ],
+            },
+          ],
+        },
       ];
 
       const [min, max] = getMetricMinMaxValue(data);
@@ -170,9 +192,15 @@ describe("Color Palette Utils", () => {
       const data = [
         {
           result: [
-            { values: [[1, 10], [2, NaN], [3, 30]] }
-          ]
-        }
+            {
+              values: [
+                [1, 10],
+                [2, NaN],
+                [3, 30],
+              ],
+            },
+          ],
+        },
       ];
 
       const [min, max] = getMetricMinMaxValue(data);
@@ -185,9 +213,14 @@ describe("Color Palette Utils", () => {
         { result: undefined },
         {
           result: [
-            { values: [[1, 10], [2, 20]] }
-          ]
-        }
+            {
+              values: [
+                [1, 10],
+                [2, 20],
+              ],
+            },
+          ],
+        },
       ];
 
       const [min, max] = getMetricMinMaxValue(data);
@@ -197,13 +230,13 @@ describe("Color Palette Utils", () => {
   });
 
   describe("getSQLMinMaxValue", () => {
-    const yaxisKeys = ['value1', 'value2'];
-    
+    const yaxisKeys = ["value1", "value2"];
+
     it("should return correct min and max from SQL data", () => {
       const data = [
         { value1: 10, value2: 20, other: 100 },
         { value1: 5, value2: 30, other: 200 },
-        { value1: 15, value2: 10, other: 300 }
+        { value1: 15, value2: 10, other: 300 },
       ];
 
       const [min, max] = getSQLMinMaxValue(yaxisKeys, data);
@@ -229,7 +262,7 @@ describe("Color Palette Utils", () => {
         { value1: 10, value2: null },
         { value1: undefined, value2: 20 },
         { value1: NaN, value2: 30 },
-        { value1: 5, value2: 15 }
+        { value1: 5, value2: 15 },
       ];
 
       const [min, max] = getSQLMinMaxValue(yaxisKeys, data);
@@ -241,7 +274,7 @@ describe("Color Palette Utils", () => {
       const data = [
         { value1: "10", value2: 20 },
         { value1: true, value2: 30 },
-        { value1: 5, value2: "invalid" }
+        { value1: 5, value2: "invalid" },
       ];
 
       const [min, max] = getSQLMinMaxValue(yaxisKeys, data);
@@ -250,10 +283,7 @@ describe("Color Palette Utils", () => {
     });
 
     it("should handle data without specified keys", () => {
-      const data = [
-        { other1: 10, other2: 20 },
-        { different: 30 }
-      ];
+      const data = [{ other1: 10, other2: 20 }, { different: 30 }];
 
       const [min, max] = getSQLMinMaxValue(yaxisKeys, data);
       expect(min).toBe(Infinity);
@@ -269,9 +299,7 @@ describe("Color Palette Utils", () => {
     const chartMax = 100;
 
     it("should return custom color from colorBySeries mapping", () => {
-      const colorBySeries = [
-        { value: "test-series", color: "#custom" }
-      ];
+      const colorBySeries = [{ value: "test-series", color: "#custom" }];
 
       const result = getSeriesColor(
         null,
@@ -280,7 +308,7 @@ describe("Color Palette Utils", () => {
         chartMin,
         chartMax,
         mockTheme,
-        colorBySeries
+        colorBySeries,
       );
 
       expect(result).toBe("#custom");
@@ -293,7 +321,7 @@ describe("Color Palette Utils", () => {
         mockValue,
         chartMin,
         chartMax,
-        mockTheme
+        mockTheme,
       );
 
       expect(result).toMatch(/^#[0-9A-Fa-f]{6}$/);
@@ -302,7 +330,7 @@ describe("Color Palette Utils", () => {
     it("should return fixed color for fixed mode", () => {
       const colorCfg = {
         mode: "fixed" as const,
-        fixedColor: ["#123456"]
+        fixedColor: ["#123456"],
       };
 
       const result = getSeriesColor(
@@ -311,7 +339,7 @@ describe("Color Palette Utils", () => {
         mockValue,
         chartMin,
         chartMax,
-        mockTheme
+        mockTheme,
       );
 
       expect(result).toBe("#123456");
@@ -319,7 +347,7 @@ describe("Color Palette Utils", () => {
 
     it("should return default fixed color when fixedColor is not provided", () => {
       const colorCfg = {
-        mode: "fixed" as const
+        mode: "fixed" as const,
       };
 
       const result = getSeriesColor(
@@ -328,7 +356,7 @@ describe("Color Palette Utils", () => {
         mockValue,
         chartMin,
         chartMax,
-        mockTheme
+        mockTheme,
       );
 
       expect(result).toBe("#53ca53");
@@ -337,7 +365,7 @@ describe("Color Palette Utils", () => {
     it("should return shaded color for shades mode", () => {
       const colorCfg = {
         mode: "shades" as const,
-        fixedColor: ["#ff0000"]
+        fixedColor: ["#ff0000"],
       };
 
       const result = getSeriesColor(
@@ -346,7 +374,7 @@ describe("Color Palette Utils", () => {
         mockValue,
         chartMin,
         chartMax,
-        mockTheme
+        mockTheme,
       );
 
       expect(result).toMatch(/^#[0-9A-Fa-f]{6}$/);
@@ -355,7 +383,7 @@ describe("Color Palette Utils", () => {
 
     it("should return palette color for palette-classic-by-series mode", () => {
       const colorCfg = {
-        mode: "palette-classic-by-series" as const
+        mode: "palette-classic-by-series" as const,
       };
 
       const result = getSeriesColor(
@@ -364,7 +392,7 @@ describe("Color Palette Utils", () => {
         mockValue,
         chartMin,
         chartMax,
-        mockTheme
+        mockTheme,
       );
 
       expect(result).toMatch(/^#[0-9A-Fa-f]{6}$/);
@@ -372,7 +400,7 @@ describe("Color Palette Utils", () => {
 
     it("should return null for palette-classic mode", () => {
       const colorCfg = {
-        mode: "palette-classic" as const
+        mode: "palette-classic" as const,
       };
 
       const result = getSeriesColor(
@@ -381,7 +409,7 @@ describe("Color Palette Utils", () => {
         mockValue,
         chartMin,
         chartMax,
-        mockTheme
+        mockTheme,
       );
 
       expect(result).toBeNull();
@@ -390,7 +418,7 @@ describe("Color Palette Utils", () => {
     it("should use d3 scale for continuous color modes", () => {
       const colorCfg = {
         mode: "continuous-green-yellow-red" as const,
-        fixedColor: ["#00ff00", "#ffff00", "#ff0000"]
+        fixedColor: ["#00ff00", "#ffff00", "#ff0000"],
       };
 
       const result = getSeriesColor(
@@ -399,7 +427,7 @@ describe("Color Palette Utils", () => {
         mockValue,
         chartMin,
         chartMax,
-        mockTheme
+        mockTheme,
       );
 
       expect(result).toBe("#ff0000"); // Mocked d3 scale result
@@ -412,7 +440,7 @@ describe("Color Palette Utils", () => {
         mockValue,
         chartMin,
         chartMax,
-        mockTheme
+        mockTheme,
       );
 
       expect(result).toMatch(/^#[0-9A-Fa-f]{6}$/);
@@ -425,7 +453,7 @@ describe("Color Palette Utils", () => {
         mockValue,
         chartMin,
         chartMax,
-        mockTheme
+        mockTheme,
       );
 
       expect(result).toMatch(/^#[0-9A-Fa-f]{6}$/);
@@ -434,11 +462,9 @@ describe("Color Palette Utils", () => {
     it("should prioritize custom color mapping over config", () => {
       const colorCfg = {
         mode: "fixed" as const,
-        fixedColor: ["#ffffff"]
+        fixedColor: ["#ffffff"],
       };
-      const colorBySeries = [
-        { value: mockSeriesName, color: "#000000" }
-      ];
+      const colorBySeries = [{ value: mockSeriesName, color: "#000000" }];
 
       const result = getSeriesColor(
         colorCfg,
@@ -447,7 +473,7 @@ describe("Color Palette Utils", () => {
         chartMin,
         chartMax,
         mockTheme,
-        colorBySeries
+        colorBySeries,
       );
 
       expect(result).toBe("#000000");
@@ -461,7 +487,7 @@ describe("Color Palette Utils", () => {
         chartMin,
         chartMax,
         mockTheme,
-        []
+        [],
       );
 
       expect(result).toMatch(/^#[0-9A-Fa-f]{6}$/);
@@ -474,7 +500,7 @@ describe("Color Palette Utils", () => {
         mockValue,
         chartMin,
         chartMax,
-        "dark"
+        "dark",
       );
 
       expect(result).toMatch(/^#[0-9A-Fa-f]{6}$/);
@@ -486,16 +512,16 @@ describe("Color Palette Utils", () => {
       const mockData = [
         { metric1: 10, metric2: 20 },
         { metric1: 30, metric2: 5 },
-        { metric1: 15, metric2: 25 }
+        { metric1: 15, metric2: 25 },
       ];
-      
-      const [min, max] = getSQLMinMaxValue(['metric1', 'metric2'], mockData);
+
+      const [min, max] = getSQLMinMaxValue(["metric1", "metric2"], mockData);
       expect(min).toBe(5);
       expect(max).toBe(30);
 
       const colorCfg = {
         mode: "shades" as const,
-        fixedColor: ["#ff0000"]
+        fixedColor: ["#ff0000"],
       };
 
       const color = getSeriesColor(
@@ -504,7 +530,7 @@ describe("Color Palette Utils", () => {
         [20],
         min,
         max,
-        "light"
+        "light",
       );
 
       expect(color).toMatch(/^#[0-9A-Fa-f]{6}$/);
@@ -514,9 +540,15 @@ describe("Color Palette Utils", () => {
       const metricData = [
         {
           result: [
-            { values: [[1, 10], [2, 20], [3, 30]] }
-          ]
-        }
+            {
+              values: [
+                [1, 10],
+                [2, 20],
+                [3, 30],
+              ],
+            },
+          ],
+        },
       ];
 
       const [min, max] = getMetricMinMaxValue(metricData);
@@ -529,7 +561,7 @@ describe("Color Palette Utils", () => {
         [25],
         min,
         max,
-        "dark"
+        "dark",
       );
 
       expect(color).toMatch(/^#[0-9A-Fa-f]{6}$/);
@@ -538,9 +570,19 @@ describe("Color Palette Utils", () => {
 
   describe("Edge Cases", () => {
     it("should handle extreme values in shadeColor", () => {
-      const result1 = shadeColor("#ffffff", Number.MAX_SAFE_INTEGER, 0, Number.MAX_SAFE_INTEGER);
-      const result2 = shadeColor("#000000", Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER, 0);
-      
+      const result1 = shadeColor(
+        "#ffffff",
+        Number.MAX_SAFE_INTEGER,
+        0,
+        Number.MAX_SAFE_INTEGER,
+      );
+      const result2 = shadeColor(
+        "#000000",
+        Number.MIN_SAFE_INTEGER,
+        Number.MIN_SAFE_INTEGER,
+        0,
+      );
+
       expect(result1).toMatch(/^#[0-9A-Fa-f]{6}$/);
       expect(result2).toMatch(/^#[0-9A-Fa-f]{6}$/);
     });
@@ -553,7 +595,7 @@ describe("Color Palette Utils", () => {
         [10],
         0,
         100,
-        "light"
+        "light",
       );
 
       expect(result).toMatch(/^#[0-9A-Fa-f]{6}$/);
@@ -567,7 +609,7 @@ describe("Color Palette Utils", () => {
         [10],
         0,
         100,
-        "light"
+        "light",
       );
 
       expect(result).toMatch(/^#[0-9A-Fa-f]{6}$/);

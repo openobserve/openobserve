@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             target="_blank"
             rel="noopener noreferrer"
           >
-          {{ t("ingestion.pubsub") }}
+            {{ t("ingestion.pubsub") }}
           </a>
         </li>
         <li class="tw:py-1">
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             target="_blank"
             rel="noopener noreferrer"
           >
-          {{ t("ingestion.gworkspace") }}
+            {{ t("ingestion.gworkspace") }}
           </a>
         </li>
       </ol>
@@ -51,7 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
-import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
+import {
+  getEndPoint,
+  getImageURL,
+  getIngestionURL,
+} from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
 import { useI18n } from "vue-i18n";
 
@@ -76,7 +80,7 @@ export default defineComponent({
       protocol: "",
       tls: "",
     });
-    
+
     const ingestionURL = getIngestionURL();
     endpoint.value = getEndPoint(ingestionURL);
 

@@ -11,13 +11,13 @@ installQuasar();
 // Mock services
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path) => `mock-image-url-${path}`),
-  verifyOrganizationStatus: vi.fn(() => true)
+  verifyOrganizationStatus: vi.fn(() => true),
 }));
 
 vi.mock("@/aws-exports", () => ({
   default: {
-    API_ENDPOINT: "http://localhost:5080"
-  }
+    API_ENDPOINT: "http://localhost:5080",
+  },
 }));
 
 // Mock router
@@ -25,19 +25,19 @@ const mockRouter = {
   currentRoute: {
     value: {
       name: "languages",
-      query: {}
-    }
+      query: {},
+    },
   },
-  push: vi.fn()
+  push: vi.fn(),
 };
 
 vi.mock("vue-router", () => ({
-  useRouter: () => mockRouter
+  useRouter: () => mockRouter,
 }));
 
 // Mock Quasar
 const mockQuasar = {
-  notify: vi.fn()
+  notify: vi.fn(),
 };
 
 vi.mock("quasar", async (importOriginal) => {
@@ -45,7 +45,7 @@ vi.mock("quasar", async (importOriginal) => {
   return {
     ...actual,
     useQuasar: () => mockQuasar,
-    copyToClipboard: vi.fn()
+    copyToClipboard: vi.fn(),
   };
 });
 
@@ -55,14 +55,14 @@ describe("Languages Component", () => {
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
-    
+
     // Reset router state
     mockRouter.currentRoute.value.name = "languages";
     mockRouter.currentRoute.value.query = {};
 
     wrapper = mount(Languages, {
       props: {
-        currOrgIdentifier: "test-org"
+        currOrgIdentifier: "test-org",
       },
       global: {
         plugins: [i18n],
@@ -70,15 +70,16 @@ describe("Languages Component", () => {
           store,
         },
         stubs: {
-          'q-splitter': {
-            template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+          "q-splitter": {
+            template:
+              '<div><slot name="before"></slot><slot name="after"></slot></div>',
           },
-          'q-input': true,
-          'q-tabs': true,
-          'q-route-tab': true,
-          'router-view': true,
-          'q-icon': true
-        }
+          "q-input": true,
+          "q-tabs": true,
+          "q-route-tab": true,
+          "router-view": true,
+          "q-icon": true,
+        },
       },
     });
   });
@@ -99,7 +100,7 @@ describe("Languages Component", () => {
     });
 
     it("should have correct props", () => {
-      expect(wrapper.props('currOrgIdentifier')).toBe("test-org");
+      expect(wrapper.props("currOrgIdentifier")).toBe("test-org");
     });
 
     it("should initialize with correct data", () => {
@@ -116,19 +117,20 @@ describe("Languages Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            "q-splitter": {
+              template:
+                '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-icon': true
-          }
+            "q-input": true,
+            "q-tabs": true,
+            "q-route-tab": true,
+            "router-view": true,
+            "q-icon": true,
+          },
         },
       });
-      
-      expect(testWrapper.props('currOrgIdentifier')).toBe("");
+
+      expect(testWrapper.props("currOrgIdentifier")).toBe("");
       testWrapper.unmount();
     });
   });
@@ -147,25 +149,26 @@ describe("Languages Component", () => {
     it("should not redirect when not on languages route", () => {
       mockRouter.currentRoute.value.name = "python";
       mockRouter.push.mockClear();
-      
+
       const testWrapper = mount(Languages, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            "q-splitter": {
+              template:
+                '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-icon': true
-          }
+            "q-input": true,
+            "q-tabs": true,
+            "q-route-tab": true,
+            "router-view": true,
+            "q-icon": true,
+          },
         },
       });
-      
+
       expect(mockRouter.push).not.toHaveBeenCalled();
       testWrapper.unmount();
     });
@@ -174,25 +177,26 @@ describe("Languages Component", () => {
       mockRouter.currentRoute.value.name = "languages";
       mockRouter.currentRoute.value.query = { someParam: "value" };
       mockRouter.push.mockClear();
-      
+
       const testWrapper = mount(Languages, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            "q-splitter": {
+              template:
+                '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-icon': true
-          }
+            "q-input": true,
+            "q-tabs": true,
+            "q-route-tab": true,
+            "router-view": true,
+            "q-icon": true,
+          },
         },
       });
-      
+
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "python",
         query: {
@@ -207,70 +211,72 @@ describe("Languages Component", () => {
     it("should redirect to python route when updated to languages route", async () => {
       // First mount with different route
       mockRouter.currentRoute.value.name = "python";
-      
+
       const testWrapper = mount(Languages, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            "q-splitter": {
+              template:
+                '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-icon': true
-          }
+            "q-input": true,
+            "q-tabs": true,
+            "q-route-tab": true,
+            "router-view": true,
+            "q-icon": true,
+          },
         },
       });
 
       // Reset mock call count
       mockRouter.push.mockClear();
-      
+
       // Change route to languages to trigger onUpdated
       mockRouter.currentRoute.value.name = "languages";
-      
+
       // Force update
       testWrapper.vm.$forceUpdate();
       await testWrapper.vm.$nextTick();
-      
+
       testWrapper.unmount();
     });
 
     it("should not redirect when updated to non-languages route", async () => {
       // First mount with languages route
       mockRouter.currentRoute.value.name = "languages";
-      
+
       const testWrapper = mount(Languages, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            "q-splitter": {
+              template:
+                '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-icon': true
-          }
+            "q-input": true,
+            "q-tabs": true,
+            "q-route-tab": true,
+            "router-view": true,
+            "q-icon": true,
+          },
         },
       });
 
       // Reset mock call count
       mockRouter.push.mockClear();
-      
+
       // Change route to python - should not trigger redirect in onUpdated
       mockRouter.currentRoute.value.name = "python";
-      
+
       // Force update
       testWrapper.vm.$forceUpdate();
       await testWrapper.vm.$nextTick();
-      
+
       testWrapper.unmount();
     });
   });
@@ -283,7 +289,9 @@ describe("Languages Component", () => {
     });
 
     it("should have python tab configuration", () => {
-      const pythonTab = wrapper.vm.languagesTabs.find((tab: any) => tab.name === "python");
+      const pythonTab = wrapper.vm.languagesTabs.find(
+        (tab: any) => tab.name === "python",
+      );
       expect(pythonTab).toBeDefined();
       expect(pythonTab.name).toBe("python");
       expect(pythonTab.label).toBe("Python");
@@ -293,12 +301,16 @@ describe("Languages Component", () => {
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
-      expect(pythonTab.icon).toBe("img:mock-image-url-images/ingestion/python.svg");
+      expect(pythonTab.icon).toBe(
+        "img:mock-image-url-images/ingestion/python.svg",
+      );
       expect(pythonTab.contentClass).toBe("tab_content");
     });
 
     it("should have dotnettracing tab configuration", () => {
-      const dotnetTracingTab = wrapper.vm.languagesTabs.find((tab: any) => tab.name === "dotnettracing");
+      const dotnetTracingTab = wrapper.vm.languagesTabs.find(
+        (tab: any) => tab.name === "dotnettracing",
+      );
       expect(dotnetTracingTab).toBeDefined();
       expect(dotnetTracingTab.name).toBe("dotnettracing");
       expect(dotnetTracingTab.to).toEqual({
@@ -307,12 +319,16 @@ describe("Languages Component", () => {
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
-      expect(dotnetTracingTab.icon).toBe("img:mock-image-url-images/ingestion/dotnet.svg");
+      expect(dotnetTracingTab.icon).toBe(
+        "img:mock-image-url-images/ingestion/dotnet.svg",
+      );
       expect(dotnetTracingTab.contentClass).toBe("tab_content");
     });
 
     it("should have dotnetlogs tab configuration", () => {
-      const dotnetLogsTab = wrapper.vm.languagesTabs.find((tab: any) => tab.name === "dotnetlogs");
+      const dotnetLogsTab = wrapper.vm.languagesTabs.find(
+        (tab: any) => tab.name === "dotnetlogs",
+      );
       expect(dotnetLogsTab).toBeDefined();
       expect(dotnetLogsTab.name).toBe("dotnetlogs");
       expect(dotnetLogsTab.to).toEqual({
@@ -321,12 +337,16 @@ describe("Languages Component", () => {
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
-      expect(dotnetLogsTab.icon).toBe("img:mock-image-url-images/ingestion/dotnet.svg");
+      expect(dotnetLogsTab.icon).toBe(
+        "img:mock-image-url-images/ingestion/dotnet.svg",
+      );
       expect(dotnetLogsTab.contentClass).toBe("tab_content");
     });
 
     it("should have nodejs tab configuration", () => {
-      const nodejsTab = wrapper.vm.languagesTabs.find((tab: any) => tab.name === "nodejs");
+      const nodejsTab = wrapper.vm.languagesTabs.find(
+        (tab: any) => tab.name === "nodejs",
+      );
       expect(nodejsTab).toBeDefined();
       expect(nodejsTab.name).toBe("nodejs");
       expect(nodejsTab.to).toEqual({
@@ -335,12 +355,16 @@ describe("Languages Component", () => {
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
-      expect(nodejsTab.icon).toBe("img:mock-image-url-images/ingestion/nodejs.svg");
+      expect(nodejsTab.icon).toBe(
+        "img:mock-image-url-images/ingestion/nodejs.svg",
+      );
       expect(nodejsTab.contentClass).toBe("tab_content");
     });
 
     it("should have go tab configuration", () => {
-      const goTab = wrapper.vm.languagesTabs.find((tab: any) => tab.name === "go");
+      const goTab = wrapper.vm.languagesTabs.find(
+        (tab: any) => tab.name === "go",
+      );
       expect(goTab).toBeDefined();
       expect(goTab.name).toBe("go");
       expect(goTab.to).toEqual({
@@ -354,8 +378,12 @@ describe("Languages Component", () => {
     });
 
     it("should not have rust or java tabs (commented out)", () => {
-      const rustTab = wrapper.vm.languagesTabs.find((tab: any) => tab.name === "rust");
-      const javaTab = wrapper.vm.languagesTabs.find((tab: any) => tab.name === "java");
+      const rustTab = wrapper.vm.languagesTabs.find(
+        (tab: any) => tab.name === "rust",
+      );
+      const javaTab = wrapper.vm.languagesTabs.find(
+        (tab: any) => tab.name === "java",
+      );
       expect(rustTab).toBeUndefined();
       expect(javaTab).toBeUndefined();
     });
@@ -382,8 +410,14 @@ describe("Languages Component", () => {
     it("should filter tabs by partial label match", () => {
       wrapper.vm.tabsFilter = ".net";
       expect(wrapper.vm.filteredList).toHaveLength(2);
-      expect(wrapper.vm.filteredList.some((tab: any) => tab.name === "dotnettracing")).toBe(true);
-      expect(wrapper.vm.filteredList.some((tab: any) => tab.name === "dotnetlogs")).toBe(true);
+      expect(
+        wrapper.vm.filteredList.some(
+          (tab: any) => tab.name === "dotnettracing",
+        ),
+      ).toBe(true);
+      expect(
+        wrapper.vm.filteredList.some((tab: any) => tab.name === "dotnetlogs"),
+      ).toBe(true);
     });
 
     it("should return empty array when no match found", () => {
@@ -428,7 +462,9 @@ describe("Languages Component", () => {
 
     it("should have correct computed values", () => {
       expect(wrapper.vm.currentUserEmail).toBe(store.state.userInfo.email);
-      expect(wrapper.vm.currentOrgIdentifier).toBe(store.state.selectedOrganization.identifier);
+      expect(wrapper.vm.currentOrgIdentifier).toBe(
+        store.state.selectedOrganization.identifier,
+      );
     });
 
     it("should have correct initial state", () => {
@@ -462,7 +498,9 @@ describe("Languages Component", () => {
       expect(wrapper.vm.store.state.selectedOrganization).toBeDefined();
       expect(wrapper.vm.store.state.userInfo).toBeDefined();
       expect(wrapper.vm.store.state.userInfo.email).toBeDefined();
-      expect(wrapper.vm.store.state.selectedOrganization.identifier).toBeDefined();
+      expect(
+        wrapper.vm.store.state.selectedOrganization.identifier,
+      ).toBeDefined();
     });
 
     it("should use store state in router navigation", () => {
@@ -517,19 +555,20 @@ describe("Languages Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            "q-splitter": {
+              template:
+                '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-icon': true
-          }
+            "q-input": true,
+            "q-tabs": true,
+            "q-route-tab": true,
+            "router-view": true,
+            "q-icon": true,
+          },
         },
       });
-      
-      expect(testWrapper.props('currOrgIdentifier')).toBe("string-value");
+
+      expect(testWrapper.props("currOrgIdentifier")).toBe("string-value");
       testWrapper.unmount();
     });
   });
@@ -545,7 +584,7 @@ describe("Languages Component", () => {
     });
 
     it("should render router-view with correct props", () => {
-      const routerView = wrapper.findComponent({ name: 'router-view' });
+      const routerView = wrapper.findComponent({ name: "router-view" });
       expect(routerView.exists()).toBe(true);
     });
   });
@@ -555,7 +594,7 @@ describe("Languages Component", () => {
       // Test multiple redirects
       mockRouter.currentRoute.value.name = "languages";
       mockRouter.push.mockClear();
-      
+
       // First redirect
       const testWrapper = mount(Languages, {
         props: { currOrgIdentifier: "test-org" },
@@ -563,47 +602,55 @@ describe("Languages Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            "q-splitter": {
+              template:
+                '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-icon': true
-          }
+            "q-input": true,
+            "q-tabs": true,
+            "q-route-tab": true,
+            "router-view": true,
+            "q-icon": true,
+          },
         },
       });
-      
+
       expect(mockRouter.push).toHaveBeenCalledTimes(1);
       testWrapper.unmount();
     });
 
     it("should not interfere with other route names", () => {
-      const routeNames = ["python", "dotnettracing", "dotnetlogs", "nodejs", "go"];
-      
-      routeNames.forEach(routeName => {
+      const routeNames = [
+        "python",
+        "dotnettracing",
+        "dotnetlogs",
+        "nodejs",
+        "go",
+      ];
+
+      routeNames.forEach((routeName) => {
         mockRouter.currentRoute.value.name = routeName;
         mockRouter.push.mockClear();
-        
+
         const testWrapper = mount(Languages, {
           props: { currOrgIdentifier: "test-org" },
           global: {
             plugins: [i18n],
             provide: { store },
             stubs: {
-              'q-splitter': {
-                template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+              "q-splitter": {
+                template:
+                  '<div><slot name="before"></slot><slot name="after"></slot></div>',
               },
-              'q-input': true,
-              'q-tabs': true,
-              'q-route-tab': true,
-              'router-view': true,
-              'q-icon': true
-            }
+              "q-input": true,
+              "q-tabs": true,
+              "q-route-tab": true,
+              "router-view": true,
+              "q-icon": true,
+            },
           },
         });
-        
+
         expect(mockRouter.push).not.toHaveBeenCalled();
         testWrapper.unmount();
       });
@@ -615,28 +662,29 @@ describe("Languages Component", () => {
       const emptyStore = {
         state: {
           selectedOrganization: { identifier: "" },
-          userInfo: { email: "" }
-        }
+          userInfo: { email: "" },
+        },
       };
-      
+
       const testWrapper = mount(Languages, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store: emptyStore },
           stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            "q-splitter": {
+              template:
+                '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-icon': true
-          }
+            "q-input": true,
+            "q-tabs": true,
+            "q-route-tab": true,
+            "router-view": true,
+            "q-icon": true,
+          },
         },
       });
-      
+
       expect(testWrapper.vm.currentUserEmail).toBe("");
       expect(testWrapper.vm.currentOrgIdentifier).toBe("");
       testWrapper.unmount();
@@ -645,13 +693,13 @@ describe("Languages Component", () => {
     it("should handle null router current route", () => {
       const nullRouter = {
         currentRoute: { value: null },
-        push: vi.fn()
+        push: vi.fn(),
       };
-      
+
       vi.doMock("vue-router", () => ({
-        useRouter: () => nullRouter
+        useRouter: () => nullRouter,
       }));
-      
+
       // This should not throw an error
       expect(() => {
         const testWrapper = mount(Languages, {
@@ -660,15 +708,16 @@ describe("Languages Component", () => {
             plugins: [i18n],
             provide: { store },
             stubs: {
-              'q-splitter': {
-                template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+              "q-splitter": {
+                template:
+                  '<div><slot name="before"></slot><slot name="after"></slot></div>',
               },
-              'q-input': true,
-              'q-tabs': true,
-              'q-route-tab': true,
-              'router-view': true,
-              'q-icon': true
-            }
+              "q-input": true,
+              "q-tabs": true,
+              "q-route-tab": true,
+              "router-view": true,
+              "q-icon": true,
+            },
           },
         });
       }).not.toThrow();
@@ -685,15 +734,15 @@ describe("Languages Component", () => {
       wrapper.vm.tabsFilter = "p";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.filteredList).toHaveLength(1);
-      
+
       wrapper.vm.tabsFilter = "py";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.filteredList).toHaveLength(1);
-      
+
       wrapper.vm.tabsFilter = "python";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.filteredList).toHaveLength(1);
-      
+
       wrapper.vm.tabsFilter = "";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.filteredList).toHaveLength(5);
@@ -703,11 +752,11 @@ describe("Languages Component", () => {
   describe("Computed Property Reactivity", () => {
     it("should update filteredList when tabsFilter changes", async () => {
       expect(wrapper.vm.filteredList).toHaveLength(5);
-      
+
       wrapper.vm.tabsFilter = "nodejs";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.filteredList).toHaveLength(1);
-      
+
       wrapper.vm.tabsFilter = ".net";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.filteredList).toHaveLength(2);
@@ -718,7 +767,7 @@ describe("Languages Component", () => {
       wrapper.vm.tabsFilter = "PyThOn";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.filteredList).toHaveLength(1);
-      
+
       // Test with partial match
       wrapper.vm.tabsFilter = "nodejs";
       await wrapper.vm.$nextTick();
@@ -741,10 +790,10 @@ describe("Languages Component", () => {
         "images/ingestion/python.svg",
         "images/ingestion/dotnet.svg",
         "images/ingestion/nodejs.svg",
-        "images/ingestion/golang.svg"
+        "images/ingestion/golang.svg",
       ];
-      
-      paths.forEach(path => {
+
+      paths.forEach((path) => {
         const result = wrapper.vm.getImageURL(path);
         expect(result).toBe(`mock-image-url-${path}`);
       });

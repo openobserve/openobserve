@@ -28,17 +28,23 @@ describe("sqlQueryParser", () => {
       });
 
       it("should return parseable for SELECT with WHERE", () => {
-        const result = isQueryParseable("SELECT * FROM logs WHERE level = 'ERROR'");
+        const result = isQueryParseable(
+          "SELECT * FROM logs WHERE level = 'ERROR'",
+        );
         expect(result.isParseable).toBe(true);
       });
 
       it("should return parseable for SELECT with GROUP BY", () => {
-        const result = isQueryParseable("SELECT level, COUNT(*) FROM logs GROUP BY level");
+        const result = isQueryParseable(
+          "SELECT level, COUNT(*) FROM logs GROUP BY level",
+        );
         expect(result.isParseable).toBe(true);
       });
 
       it("should return parseable for SELECT with ORDER BY", () => {
-        const result = isQueryParseable("SELECT * FROM logs ORDER BY timestamp DESC");
+        const result = isQueryParseable(
+          "SELECT * FROM logs ORDER BY timestamp DESC",
+        );
         expect(result.isParseable).toBe(true);
       });
 
@@ -48,7 +54,9 @@ describe("sqlQueryParser", () => {
       });
 
       it("should return parseable for simple JOIN", () => {
-        const result = isQueryParseable("SELECT * FROM logs JOIN users ON logs.user_id = users.id");
+        const result = isQueryParseable(
+          "SELECT * FROM logs JOIN users ON logs.user_id = users.id",
+        );
         expect(result.isParseable).toBe(true);
       });
     });
@@ -62,21 +70,27 @@ describe("sqlQueryParser", () => {
 
       it("should return not parseable for derived tables in JOINs", () => {
         // Derived table / subquery in JOIN - not supported
-        const result = isQueryParseable("SELECT * FROM users INNER JOIN (SELECT user_id, SUM(amount) FROM orders GROUP BY user_id) AS order_summary ON users.id = order_summary.user_id");
+        const result = isQueryParseable(
+          "SELECT * FROM users INNER JOIN (SELECT user_id, SUM(amount) FROM orders GROUP BY user_id) AS order_summary ON users.id = order_summary.user_id",
+        );
         expect(result.isParseable).toBe(false);
         expect(result.reason).toBe("Contains subqueries or derived tables");
       });
 
       it("should return not parseable for parenthesized/nested JOINs", () => {
         // Nested JOIN grouping like a JOIN (b JOIN c) - not supported
-        const result = isQueryParseable("SELECT * FROM a JOIN (b JOIN c ON b.id = c.b_id) ON a.id = b.a_id");
+        const result = isQueryParseable(
+          "SELECT * FROM a JOIN (b JOIN c ON b.id = c.b_id) ON a.id = b.a_id",
+        );
         expect(result.isParseable).toBe(false);
         expect(result.reason).toBe("Contains parenthesized/nested JOINs");
       });
 
       it("should return not parseable for CTEs", () => {
         // Note: This query also contains a subquery, which is matched first
-        const result = isQueryParseable("WITH temp AS (SELECT * FROM logs) SELECT * FROM temp");
+        const result = isQueryParseable(
+          "WITH temp AS (SELECT * FROM logs) SELECT * FROM temp",
+        );
         expect(result.isParseable).toBe(false);
         // The subquery pattern matches first since (SELECT is detected
         expect(result.reason).toBe("Contains subqueries or derived tables");
@@ -84,32 +98,42 @@ describe("sqlQueryParser", () => {
 
       it("should return not parseable for CTE pattern", () => {
         // Test the CTE pattern directly - WITH name AS (
-        const result = isQueryParseable("WITH temp AS (\nVALUES (1)\n) SELECT * FROM temp");
+        const result = isQueryParseable(
+          "WITH temp AS (\nVALUES (1)\n) SELECT * FROM temp",
+        );
         expect(result.isParseable).toBe(false);
         // Pattern matches "WITH temp AS ("
         expect(result.reason).toBe("Contains WITH clause (CTE)");
       });
 
       it("should return not parseable for UNION", () => {
-        const result = isQueryParseable("SELECT * FROM logs UNION SELECT * FROM errors");
+        const result = isQueryParseable(
+          "SELECT * FROM logs UNION SELECT * FROM errors",
+        );
         expect(result.isParseable).toBe(false);
         expect(result.reason).toBe("Contains UNION/INTERSECT/EXCEPT");
       });
 
       it("should return not parseable for INTERSECT", () => {
-        const result = isQueryParseable("SELECT * FROM logs INTERSECT SELECT * FROM errors");
+        const result = isQueryParseable(
+          "SELECT * FROM logs INTERSECT SELECT * FROM errors",
+        );
         expect(result.isParseable).toBe(false);
         expect(result.reason).toBe("Contains UNION/INTERSECT/EXCEPT");
       });
 
       it("should return not parseable for window functions", () => {
-        const result = isQueryParseable("SELECT *, ROW_NUMBER() OVER (PARTITION BY level) FROM logs");
+        const result = isQueryParseable(
+          "SELECT *, ROW_NUMBER() OVER (PARTITION BY level) FROM logs",
+        );
         expect(result.isParseable).toBe(false);
         expect(result.reason).toBe("Contains window functions");
       });
 
       it("should return not parseable for DISTINCT ON", () => {
-        const result = isQueryParseable("SELECT DISTINCT ON (user_id) * FROM logs");
+        const result = isQueryParseable(
+          "SELECT DISTINCT ON (user_id) * FROM logs",
+        );
         expect(result.isParseable).toBe(false);
         expect(result.reason).toBe("Contains DISTINCT ON");
       });
@@ -130,19 +154,25 @@ describe("sqlQueryParser", () => {
     describe("should return parseable for supported features", () => {
       it("should return parseable for CASE/WHEN statements", () => {
         // CASE/WHEN is supported via field type "raw" with rawQuery
-        const result = isQueryParseable("SELECT CASE WHEN level = 'ERROR' THEN 1 ELSE 0 END FROM logs");
+        const result = isQueryParseable(
+          "SELECT CASE WHEN level = 'ERROR' THEN 1 ELSE 0 END FROM logs",
+        );
         expect(result.isParseable).toBe(true);
       });
 
       it("should return parseable for multiple JOINs", () => {
         // Multiple JOINs are supported in panel schema
-        const result = isQueryParseable("SELECT * FROM logs JOIN users ON logs.user_id = users.id JOIN sessions ON users.id = sessions.user_id");
+        const result = isQueryParseable(
+          "SELECT * FROM logs JOIN users ON logs.user_id = users.id JOIN sessions ON users.id = sessions.user_id",
+        );
         expect(result.isParseable).toBe(true);
       });
 
       it("should return parseable for HAVING clause", () => {
         // HAVING is supported via havingConditions on y-axis fields
-        const result = isQueryParseable("SELECT level, COUNT(*) FROM logs GROUP BY level HAVING COUNT(*) > 10");
+        const result = isQueryParseable(
+          "SELECT level, COUNT(*) FROM logs GROUP BY level HAVING COUNT(*) > 10",
+        );
         expect(result.isParseable).toBe(true);
       });
     });
@@ -184,21 +214,33 @@ describe("sqlQueryParser", () => {
     });
 
     it("should return true for complex query with subquery", () => {
-      expect(shouldUseCustomMode("SELECT * FROM (SELECT * FROM logs)")).toBe(true);
+      expect(shouldUseCustomMode("SELECT * FROM (SELECT * FROM logs)")).toBe(
+        true,
+      );
     });
 
     it("should return true for query with CTE", () => {
       // This query contains both CTE and subquery pattern, but returns true for custom mode
-      expect(shouldUseCustomMode("WITH temp AS (SELECT * FROM logs) SELECT * FROM temp")).toBe(true);
+      expect(
+        shouldUseCustomMode(
+          "WITH temp AS (SELECT * FROM logs) SELECT * FROM temp",
+        ),
+      ).toBe(true);
     });
 
     it("should return false for query with HAVING (supported)", () => {
       // HAVING is supported via havingConditions on y-axis fields
-      expect(shouldUseCustomMode("SELECT level, COUNT(*) FROM logs GROUP BY level HAVING COUNT(*) > 10")).toBe(false);
+      expect(
+        shouldUseCustomMode(
+          "SELECT level, COUNT(*) FROM logs GROUP BY level HAVING COUNT(*) > 10",
+        ),
+      ).toBe(false);
     });
 
     it("should return true for query with UNION", () => {
-      expect(shouldUseCustomMode("SELECT * FROM logs UNION SELECT * FROM errors")).toBe(true);
+      expect(
+        shouldUseCustomMode("SELECT * FROM logs UNION SELECT * FROM errors"),
+      ).toBe(true);
     });
   });
 
@@ -209,7 +251,10 @@ describe("sqlQueryParser", () => {
     });
 
     it("should return customQuery: true for complex query", async () => {
-      const result = await parseSQL("SELECT * FROM (SELECT * FROM logs)", "logs");
+      const result = await parseSQL(
+        "SELECT * FROM (SELECT * FROM logs)",
+        "logs",
+      );
       expect(result.customQuery).toBe(true);
       expect(result.parseError).toBe("Contains subqueries or derived tables");
     });
@@ -236,12 +281,27 @@ describe("sqlQueryParser", () => {
       const parsed = {
         stream: "logs",
         streamType: "logs",
-        xFields: [{ column: "timestamp", alias: "time", aggregationFunction: "histogram" }],
-        yFields: [{ column: "count", alias: "count", aggregationFunction: "count" }],
-        breakdownFields: [{ column: "level", alias: "level", aggregationFunction: null }],
-        filters: { filterType: "group" as const, logicalOperator: "AND", conditions: [] },
+        xFields: [
+          {
+            column: "timestamp",
+            alias: "time",
+            aggregationFunction: "histogram",
+          },
+        ],
+        yFields: [
+          { column: "count", alias: "count", aggregationFunction: "count" },
+        ],
+        breakdownFields: [
+          { column: "level", alias: "level", aggregationFunction: null },
+        ],
+        filters: {
+          filterType: "group" as const,
+          logicalOperator: "AND",
+          conditions: [],
+        },
         customQuery: false,
-        rawQuery: "SELECT histogram(timestamp), COUNT(*) FROM logs GROUP BY level",
+        rawQuery:
+          "SELECT histogram(timestamp), COUNT(*) FROM logs GROUP BY level",
       };
 
       const result = parsedQueryToPanelFields(parsed);
@@ -257,10 +317,20 @@ describe("sqlQueryParser", () => {
       const parsed = {
         stream: "logs",
         streamType: "logs",
-        xFields: [{ column: "timestamp", alias: "time", aggregationFunction: "histogram" }],
+        xFields: [
+          {
+            column: "timestamp",
+            alias: "time",
+            aggregationFunction: "histogram",
+          },
+        ],
         yFields: [],
         breakdownFields: [],
-        filters: { filterType: "group" as const, logicalOperator: "AND", conditions: [] },
+        filters: {
+          filterType: "group" as const,
+          logicalOperator: "AND",
+          conditions: [],
+        },
         customQuery: false,
         rawQuery: "SELECT * FROM logs",
       };
@@ -285,7 +355,11 @@ describe("sqlQueryParser", () => {
         xFields: [],
         yFields: [],
         breakdownFields: [],
-        filters: { filterType: "group" as const, logicalOperator: "AND", conditions: [] },
+        filters: {
+          filterType: "group" as const,
+          logicalOperator: "AND",
+          conditions: [],
+        },
         customQuery: false,
         rawQuery: "",
       };
@@ -304,14 +378,33 @@ describe("sqlQueryParser", () => {
         stream: "default",
         streamType: "logs",
         xFields: [], // No histogram/timeseries field
-        yFields: [{ column: "_timestamp", alias: "y_axis_1", aggregationFunction: "count" }],
-        breakdownFields: [
-          { column: "k8s_namespace_name", alias: "x_axis_1", aggregationFunction: null },
-          { column: "k8s_pod_name", alias: "x_axis_2", aggregationFunction: null },
+        yFields: [
+          {
+            column: "_timestamp",
+            alias: "y_axis_1",
+            aggregationFunction: "count",
+          },
         ],
-        filters: { filterType: "group" as const, logicalOperator: "AND", conditions: [] },
+        breakdownFields: [
+          {
+            column: "k8s_namespace_name",
+            alias: "x_axis_1",
+            aggregationFunction: null,
+          },
+          {
+            column: "k8s_pod_name",
+            alias: "x_axis_2",
+            aggregationFunction: null,
+          },
+        ],
+        filters: {
+          filterType: "group" as const,
+          logicalOperator: "AND",
+          conditions: [],
+        },
         customQuery: false,
-        rawQuery: 'SELECT count(_timestamp) as "y_axis_1", k8s_namespace_name as "x_axis_1", k8s_pod_name as "x_axis_2" FROM "default"',
+        rawQuery:
+          'SELECT count(_timestamp) as "y_axis_1", k8s_namespace_name as "x_axis_1", k8s_pod_name as "x_axis_2" FROM "default"',
       };
 
       const result = parsedQueryToPanelFields(parsed);
@@ -334,12 +427,27 @@ describe("sqlQueryParser", () => {
       const parsed = {
         stream: "logs",
         streamType: "logs",
-        xFields: [{ column: "_timestamp", alias: "time", aggregationFunction: "histogram" }],
-        yFields: [{ column: "count", alias: "count", aggregationFunction: "count" }],
-        breakdownFields: [{ column: "level", alias: "level", aggregationFunction: null }],
-        filters: { filterType: "group" as const, logicalOperator: "AND", conditions: [] },
+        xFields: [
+          {
+            column: "_timestamp",
+            alias: "time",
+            aggregationFunction: "histogram",
+          },
+        ],
+        yFields: [
+          { column: "count", alias: "count", aggregationFunction: "count" },
+        ],
+        breakdownFields: [
+          { column: "level", alias: "level", aggregationFunction: null },
+        ],
+        filters: {
+          filterType: "group" as const,
+          logicalOperator: "AND",
+          conditions: [],
+        },
         customQuery: false,
-        rawQuery: "SELECT histogram(_timestamp), COUNT(*) FROM logs GROUP BY level",
+        rawQuery:
+          "SELECT histogram(_timestamp), COUNT(*) FROM logs GROUP BY level",
       };
 
       const result = parsedQueryToPanelFields(parsed);
@@ -359,16 +467,33 @@ describe("sqlQueryParser", () => {
       const parsed = {
         stream: "logs",
         streamType: "logs",
-        xFields: [{ column: "_timestamp", alias: "x_axis_1", aggregationFunction: "histogram" }],
-        yFields: [{ column: "amount", alias: "y_axis_1", aggregationFunction: "sum" }],
+        xFields: [
+          {
+            column: "_timestamp",
+            alias: "x_axis_1",
+            aggregationFunction: "histogram",
+          },
+        ],
+        yFields: [
+          { column: "amount", alias: "y_axis_1", aggregationFunction: "sum" },
+        ],
         breakdownFields: [
           { column: "country", alias: "x_axis_2", aggregationFunction: null },
-          { column: "subscription_type", alias: "x_axis_3", aggregationFunction: null },
+          {
+            column: "subscription_type",
+            alias: "x_axis_3",
+            aggregationFunction: null,
+          },
         ],
-        filters: { filterType: "group" as const, logicalOperator: "AND", conditions: [] },
+        filters: {
+          filterType: "group" as const,
+          logicalOperator: "AND",
+          conditions: [],
+        },
         joins: [],
         customQuery: false,
-        rawQuery: "SELECT histogram(_timestamp), country, subscription_type, sum(amount) FROM logs GROUP BY x_axis_1, x_axis_2, x_axis_3",
+        rawQuery:
+          "SELECT histogram(_timestamp), country, subscription_type, sum(amount) FROM logs GROUP BY x_axis_1, x_axis_2, x_axis_3",
       };
 
       const result = parsedQueryToPanelFields(parsed);
@@ -392,16 +517,31 @@ describe("sqlQueryParser", () => {
         stream: "logs",
         streamType: "logs",
         xFields: [], // No histogram field
-        yFields: [{ column: "amount", alias: "y_axis_1", aggregationFunction: "sum" }],
-        breakdownFields: [
-          { column: "order_date", alias: "x_axis_1", aggregationFunction: null },
-          { column: "country", alias: "x_axis_2", aggregationFunction: null },
-          { column: "subscription_type", alias: "x_axis_3", aggregationFunction: null },
+        yFields: [
+          { column: "amount", alias: "y_axis_1", aggregationFunction: "sum" },
         ],
-        filters: { filterType: "group" as const, logicalOperator: "AND", conditions: [] },
+        breakdownFields: [
+          {
+            column: "order_date",
+            alias: "x_axis_1",
+            aggregationFunction: null,
+          },
+          { column: "country", alias: "x_axis_2", aggregationFunction: null },
+          {
+            column: "subscription_type",
+            alias: "x_axis_3",
+            aggregationFunction: null,
+          },
+        ],
+        filters: {
+          filterType: "group" as const,
+          logicalOperator: "AND",
+          conditions: [],
+        },
         joins: [],
         customQuery: false,
-        rawQuery: "SELECT order_date, country, subscription_type, sum(amount) FROM logs GROUP BY x_axis_1, x_axis_2, x_axis_3",
+        rawQuery:
+          "SELECT order_date, country, subscription_type, sum(amount) FROM logs GROUP BY x_axis_1, x_axis_2, x_axis_3",
       };
 
       const result = parsedQueryToPanelFields(parsed);
@@ -424,13 +564,28 @@ describe("sqlQueryParser", () => {
       const parsed = {
         stream: "logs",
         streamType: "logs",
-        xFields: [{ column: "_timestamp", alias: "x_axis_1", aggregationFunction: "histogram" }],
-        yFields: [{ column: "count", alias: "y_axis_1", aggregationFunction: "count" }],
-        breakdownFields: [{ column: "level", alias: "breakdown_1", aggregationFunction: null }],
-        filters: { filterType: "group" as const, logicalOperator: "AND", conditions: [] },
+        xFields: [
+          {
+            column: "_timestamp",
+            alias: "x_axis_1",
+            aggregationFunction: "histogram",
+          },
+        ],
+        yFields: [
+          { column: "count", alias: "y_axis_1", aggregationFunction: "count" },
+        ],
+        breakdownFields: [
+          { column: "level", alias: "breakdown_1", aggregationFunction: null },
+        ],
+        filters: {
+          filterType: "group" as const,
+          logicalOperator: "AND",
+          conditions: [],
+        },
         joins: [],
         customQuery: false,
-        rawQuery: "SELECT histogram(_timestamp), level, count(*) FROM logs GROUP BY x_axis_1, breakdown_1",
+        rawQuery:
+          "SELECT histogram(_timestamp), level, count(*) FROM logs GROUP BY x_axis_1, breakdown_1",
       };
 
       const result = parsedQueryToPanelFields(parsed);
@@ -448,8 +603,20 @@ describe("sqlQueryParser", () => {
       const parsed = {
         stream: "logs",
         streamType: "logs",
-        xFields: [{ column: "_timestamp", alias: "x_axis_1", aggregationFunction: "histogram" }],
-        yFields: [{ column: "_timestamp", alias: "y_axis_1", aggregationFunction: "count" }],
+        xFields: [
+          {
+            column: "_timestamp",
+            alias: "x_axis_1",
+            aggregationFunction: "histogram",
+          },
+        ],
+        yFields: [
+          {
+            column: "_timestamp",
+            alias: "y_axis_1",
+            aggregationFunction: "count",
+          },
+        ],
         breakdownFields: [
           {
             column: "",
@@ -459,10 +626,15 @@ describe("sqlQueryParser", () => {
             rawQuery: "CASE WHEN level = 'ERROR' THEN 'Bad' ELSE 'Good' END",
           },
         ],
-        filters: { filterType: "group" as const, logicalOperator: "AND", conditions: [] },
+        filters: {
+          filterType: "group" as const,
+          logicalOperator: "AND",
+          conditions: [],
+        },
         joins: [],
         customQuery: false,
-        rawQuery: "SELECT histogram(_timestamp), count(_timestamp), CASE WHEN level = 'ERROR' THEN 'Bad' ELSE 'Good' END as breakdown_1 FROM logs",
+        rawQuery:
+          "SELECT histogram(_timestamp), count(_timestamp), CASE WHEN level = 'ERROR' THEN 'Bad' ELSE 'Good' END as breakdown_1 FROM logs",
       };
 
       const result = parsedQueryToPanelFields(parsed);
@@ -470,7 +642,9 @@ describe("sqlQueryParser", () => {
       // Raw field should be converted to panel format with type: "raw" and rawQuery
       expect(result.breakdown.length).toBe(1);
       expect(result.breakdown[0].type).toBe("raw");
-      expect(result.breakdown[0].rawQuery).toBe("CASE WHEN level = 'ERROR' THEN 'Bad' ELSE 'Good' END");
+      expect(result.breakdown[0].rawQuery).toBe(
+        "CASE WHEN level = 'ERROR' THEN 'Bad' ELSE 'Good' END",
+      );
       expect(result.breakdown[0].alias).toBe("z_axis_1");
       expect(result.breakdown[0].column).toBe("");
     });
@@ -480,7 +654,13 @@ describe("sqlQueryParser", () => {
       const parsed = {
         stream: "logs",
         streamType: "logs",
-        xFields: [{ column: "_timestamp", alias: "x_axis_1", aggregationFunction: "histogram" }],
+        xFields: [
+          {
+            column: "_timestamp",
+            alias: "x_axis_1",
+            aggregationFunction: "histogram",
+          },
+        ],
         yFields: [
           {
             column: "",
@@ -491,10 +671,15 @@ describe("sqlQueryParser", () => {
           },
         ],
         breakdownFields: [],
-        filters: { filterType: "group" as const, logicalOperator: "AND", conditions: [] },
+        filters: {
+          filterType: "group" as const,
+          logicalOperator: "AND",
+          conditions: [],
+        },
         joins: [],
         customQuery: false,
-        rawQuery: "SELECT histogram(_timestamp), CASE WHEN status = 'success' THEN 1 ELSE 0 END as y_axis_1 FROM logs",
+        rawQuery:
+          "SELECT histogram(_timestamp), CASE WHEN status = 'success' THEN 1 ELSE 0 END as y_axis_1 FROM logs",
       };
 
       const result = parsedQueryToPanelFields(parsed);
@@ -502,7 +687,9 @@ describe("sqlQueryParser", () => {
       // Raw field should be converted to panel format with type: "raw" and rawQuery
       expect(result.y.length).toBe(1);
       expect(result.y[0].type).toBe("raw");
-      expect(result.y[0].rawQuery).toBe("CASE WHEN status = 'success' THEN 1 ELSE 0 END");
+      expect(result.y[0].rawQuery).toBe(
+        "CASE WHEN status = 'success' THEN 1 ELSE 0 END",
+      );
       expect(result.y[0].alias).toBe("y_axis_1");
     });
   });

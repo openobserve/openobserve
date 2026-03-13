@@ -166,7 +166,7 @@ global.console = {
   ...console,
   error: vi.fn(),
   warn: vi.fn(),
-  log: vi.fn()
+  log: vi.fn(),
 };
 
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
@@ -239,13 +239,21 @@ describe("PanelSchemaRenderer", () => {
         stubs: {
           ChartRenderer: { template: '<div data-test="chart-renderer"></div>' },
           TableRenderer: { template: '<div data-test="table-renderer"></div>' },
-          GeoMapRenderer: { template: '<div data-test="geomap-renderer"></div>' },
+          GeoMapRenderer: {
+            template: '<div data-test="geomap-renderer"></div>',
+          },
           MapsRenderer: { template: '<div data-test="maps-renderer"></div>' },
           HTMLRenderer: { template: '<div data-test="html-renderer"></div>' },
-          MarkdownRenderer: { template: '<div data-test="markdown-renderer"></div>' },
-          CustomChartRenderer: { template: '<div data-test="custom-chart-renderer"></div>' },
+          MarkdownRenderer: {
+            template: '<div data-test="markdown-renderer"></div>',
+          },
+          CustomChartRenderer: {
+            template: '<div data-test="custom-chart-renderer"></div>',
+          },
           AddAnnotation: { template: '<div data-test="add-annotation"></div>' },
-          LoadingProgress: { template: '<div data-test="loading-progress"></div>' },
+          LoadingProgress: {
+            template: '<div data-test="loading-progress"></div>',
+          },
         },
       },
     });
@@ -262,9 +270,13 @@ describe("PanelSchemaRenderer", () => {
     it("should initialize with required props", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.$props.selectedTimeObj).toEqual(defaultProps.selectedTimeObj);
+      expect(wrapper.vm.$props.selectedTimeObj).toEqual(
+        defaultProps.selectedTimeObj,
+      );
       expect(wrapper.vm.$props.panelSchema).toEqual(defaultProps.panelSchema);
-      expect(wrapper.vm.$props.variablesData).toEqual(defaultProps.variablesData);
+      expect(wrapper.vm.$props.variablesData).toEqual(
+        defaultProps.variablesData,
+      );
     });
 
     it("should initialize reactive data", () => {
@@ -341,7 +353,9 @@ describe("PanelSchemaRenderer", () => {
         },
       });
 
-      expect(wrapper.find('[data-test="markdown-renderer"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="markdown-renderer"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should render CustomChartRenderer for custom_chart type", () => {
@@ -349,7 +363,9 @@ describe("PanelSchemaRenderer", () => {
         panelSchema: { ...defaultProps.panelSchema, type: "custom_chart" },
       });
 
-      expect(wrapper.find('[data-test="custom-chart-renderer"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="custom-chart-renderer"]').exists()).toBe(
+        true,
+      );
     });
   });
 
@@ -357,7 +373,9 @@ describe("PanelSchemaRenderer", () => {
     it("should render LoadingProgress component", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('[data-test="loading-progress"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="loading-progress"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should emit loading-state-change when loading state changes", async () => {
@@ -398,8 +416,12 @@ describe("PanelSchemaRenderer", () => {
 
       // Test the custom error config is properly set
       expect(wrapper.vm.panelSchema.error_config).toBeDefined();
-      expect(wrapper.vm.panelSchema.error_config.custom_error_handeling).toBe(true);
-      expect(wrapper.vm.panelSchema.error_config.custom_error_message).toBe("Custom error message");
+      expect(wrapper.vm.panelSchema.error_config.custom_error_handeling).toBe(
+        true,
+      );
+      expect(wrapper.vm.panelSchema.error_config.custom_error_message).toBe(
+        "Custom error message",
+      );
       expect(wrapper.exists()).toBe(true);
     });
 
@@ -418,8 +440,10 @@ describe("PanelSchemaRenderer", () => {
     });
 
     it("should use default data on error when custom error handling is enabled", () => {
-      const defaultErrorData = JSON.stringify([{ timestamp: "2024-01-01", value: 0 }]);
-      
+      const defaultErrorData = JSON.stringify([
+        { timestamp: "2024-01-01", value: 0 },
+      ]);
+
       wrapper = createWrapper({
         panelSchema: {
           ...defaultProps.panelSchema,
@@ -430,8 +454,12 @@ describe("PanelSchemaRenderer", () => {
         },
       });
 
-      expect(wrapper.vm.panelSchema.error_config.default_data_on_error).toBe(defaultErrorData);
-      expect(wrapper.vm.panelSchema.error_config.custom_error_handeling).toBe(true);
+      expect(wrapper.vm.panelSchema.error_config.default_data_on_error).toBe(
+        defaultErrorData,
+      );
+      expect(wrapper.vm.panelSchema.error_config.custom_error_handeling).toBe(
+        true,
+      );
     });
 
     it("should display different error messages based on error code", () => {
@@ -440,18 +468,18 @@ describe("PanelSchemaRenderer", () => {
       // Test 4xx error (client error)
       const clientErrorDetail = {
         message: "Bad request",
-        code: "400"
+        code: "400",
       };
-      
-      // Test 5xx error (server error)  
+
+      // Test 5xx error (server error)
       const serverErrorDetail = {
         message: "Internal server error",
-        code: "500"
+        code: "500",
       };
 
       // Verify error code handling logic exists
       expect(wrapper.vm.errorDetail).toBeDefined();
-      
+
       // Test that component handles different error codes appropriately
       // In the template, 4xx errors show the actual message, 5xx show generic "Error Loading Data"
       expect(typeof wrapper.vm.errorDetail).toBe("object");
@@ -459,7 +487,7 @@ describe("PanelSchemaRenderer", () => {
 
     it("should handle custom error configuration with default data fallback", () => {
       const mockDefaultData = JSON.stringify([{ fallback: "data" }]);
-      
+
       wrapper = createWrapper({
         panelSchema: {
           ...defaultProps.panelSchema,
@@ -471,9 +499,15 @@ describe("PanelSchemaRenderer", () => {
         },
       });
 
-      expect(wrapper.vm.panelSchema.error_config.custom_error_handeling).toBe(true);
-      expect(wrapper.vm.panelSchema.error_config.default_data_on_error).toBe(mockDefaultData);
-      expect(wrapper.vm.panelSchema.error_config.custom_error_message).toBe("Something went wrong");
+      expect(wrapper.vm.panelSchema.error_config.custom_error_handeling).toBe(
+        true,
+      );
+      expect(wrapper.vm.panelSchema.error_config.default_data_on_error).toBe(
+        mockDefaultData,
+      );
+      expect(wrapper.vm.panelSchema.error_config.custom_error_message).toBe(
+        "Something went wrong",
+      );
     });
 
     it("should show custom error message when custom handling is enabled and no default data", () => {
@@ -491,13 +525,17 @@ describe("PanelSchemaRenderer", () => {
       // Mock error state
       wrapper.vm.errorDetail = { value: { message: "API Error", code: "404" } };
 
-      expect(wrapper.vm.panelSchema.error_config.custom_error_message).toBe("Custom error occurred");
-      expect(wrapper.vm.panelSchema.error_config.default_data_on_error).toBe(false);
+      expect(wrapper.vm.panelSchema.error_config.custom_error_message).toBe(
+        "Custom error occurred",
+      );
+      expect(wrapper.vm.panelSchema.error_config.default_data_on_error).toBe(
+        false,
+      );
     });
 
     it("should support clearing error state when data is successfully processed", () => {
       wrapper = createWrapper();
-      
+
       // Test that the component has error handling capabilities
       expect(wrapper.vm.errorDetail).toBeDefined();
       expect(wrapper.vm.validatePanelData).toBeDefined();
@@ -648,7 +686,9 @@ describe("PanelSchemaRenderer", () => {
 
       wrapper.vm.downloadDataAsCSV("test-title");
 
-      expect(wrapper.vm.tableRendererRef.downloadTableAsCSV).toHaveBeenCalledWith("test-title");
+      expect(
+        wrapper.vm.tableRendererRef.downloadTableAsCSV,
+      ).toHaveBeenCalledWith("test-title");
     });
 
     it("should handle JSON download for table panels", () => {
@@ -662,7 +702,9 @@ describe("PanelSchemaRenderer", () => {
 
       wrapper.vm.downloadDataAsJSON("test-title");
 
-      expect(wrapper.vm.tableRendererRef.downloadTableAsJSON).toHaveBeenCalledWith("test-title");
+      expect(
+        wrapper.vm.tableRendererRef.downloadTableAsJSON,
+      ).toHaveBeenCalledWith("test-title");
     });
 
     it("should handle CSV download for PromQL panels with metric data", () => {
@@ -673,11 +715,11 @@ describe("PanelSchemaRenderer", () => {
               metric: { __name__: "cpu_usage", instance: "server1" },
               values: [
                 [1640995200, "75.5"],
-                [1640995260, "80.2"]
-              ]
-            }
-          ]
-        }
+                [1640995260, "80.2"],
+              ],
+            },
+          ],
+        },
       ];
 
       wrapper = createWrapper({
@@ -705,11 +747,9 @@ describe("PanelSchemaRenderer", () => {
       const mockSQLData = [
         [
           { timestamp: "2024-01-01T10:00:00Z", count: 100, service: "web" },
-          { timestamp: "2024-01-01T11:00:00Z", count: 150, service: "api" }
+          { timestamp: "2024-01-01T11:00:00Z", count: 150, service: "api" },
         ],
-        [
-          { timestamp: "2024-01-01T12:00:00Z", count: 120, service: "db" }
-        ]
+        [{ timestamp: "2024-01-01T12:00:00Z", count: 120, service: "db" }],
       ];
 
       wrapper = createWrapper();
@@ -799,18 +839,18 @@ describe("PanelSchemaRenderer", () => {
       const complexData = [
         [
           {
-            "timestamp": "2024-01-01T10:00:00Z",
+            timestamp: "2024-01-01T10:00:00Z",
             "service,name": "web-server",
-            "count": 100,
-            "message": 'Log "entry" with quotes'
+            count: 100,
+            message: 'Log "entry" with quotes',
           },
           {
-            "timestamp": "2024-01-01T11:00:00Z",
+            timestamp: "2024-01-01T11:00:00Z",
             "service,name": "api-server",
-            "count": 150,
-            "message": "Normal log entry"
-          }
-        ]
+            count: 150,
+            message: "Normal log entry",
+          },
+        ],
       ];
 
       wrapper.vm.data = { value: complexData };
@@ -1092,10 +1132,10 @@ describe("PanelSchemaRenderer", () => {
 
       // Mock refs with actual style objects
       wrapper.vm.drilldownPopUpRef = {
-        style: { display: "block" }
+        style: { display: "block" },
       };
       wrapper.vm.annotationPopupRef = {
-        style: { display: "block" }
+        style: { display: "block" },
       };
 
       wrapper.vm.hidePopupsAndOverlays();
@@ -1138,21 +1178,21 @@ describe("PanelSchemaRenderer", () => {
 
     it("should emit is-partial-data-update when partial data state changes", async () => {
       wrapper = createWrapper();
-      
+
       // Mock the isPartialData reactive value
       wrapper.vm.isPartialData = { value: true };
-      
+
       // Trigger the watcher by changing the value
       wrapper.vm.isPartialData.value = false;
       await nextTick();
-      
+
       // Check that the component is set up to handle partial data
       expect(wrapper.vm.isPartialData).toBeDefined();
     });
 
     it("should properly initialize with isPartialData from composable", () => {
       wrapper = createWrapper();
-      
+
       // The usePanelDataLoader composable should provide isPartialData
       expect(wrapper.vm.isPartialData).toBeDefined();
       expect(wrapper.vm.isPartialData.value).toBe(false); // Default mock value
@@ -1162,92 +1202,92 @@ describe("PanelSchemaRenderer", () => {
   describe("Advanced Event Emissions", () => {
     it("should emit series-data-update when panel data changes", async () => {
       wrapper = createWrapper();
-      
+
       const mockPanelData = {
         chartType: "line",
         options: { series: [{ name: "test" }] },
-        extras: { isTimeSeries: true }
+        extras: { isTimeSeries: true },
       };
-      
+
       // Set panel data and trigger watcher
       wrapper.vm.panelData = mockPanelData;
       await nextTick();
-      
+
       // Verify the component structure supports series data updates
       expect(wrapper.vm.panelData).toBeDefined();
     });
 
     it("should emit limit-number-of-series-warning-message-update", async () => {
       wrapper = createWrapper();
-      
+
       const warningMessage = "Too many series, showing only first 100";
-      
+
       // Mock limit warning message
       wrapper.vm.limitNumberOfSeriesWarningMessage = { value: warningMessage };
       await nextTick();
-      
+
       expect(wrapper.vm.limitNumberOfSeriesWarningMessage).toBeDefined();
     });
 
     it("should emit last-triggered-at-update when lastTriggeredAt changes", async () => {
       wrapper = createWrapper();
-      
+
       const timestamp = new Date().getTime();
-      
+
       // Mock lastTriggeredAt change
       wrapper.vm.lastTriggeredAt = { value: timestamp };
       await nextTick();
-      
+
       expect(wrapper.vm.lastTriggeredAt).toBeDefined();
     });
 
     it("should emit is-cached-data-differ-with-current-time-range-update", async () => {
       wrapper = createWrapper();
-      
+
       // Mock cached data difference state
       wrapper.vm.isCachedDataDifferWithCurrentTimeRange = { value: true };
       await nextTick();
-      
+
       expect(wrapper.vm.isCachedDataDifferWithCurrentTimeRange).toBeDefined();
     });
 
     it("should emit updated:vrlFunctionFieldList when data has fields", async () => {
       wrapper = createWrapper();
-      
+
       const mockDataWithFields = [
         [
-          { 
-            timestamp: "2024-01-01T10:00:00Z", 
-            count: 100, 
+          {
+            timestamp: "2024-01-01T10:00:00Z",
+            count: 100,
             service: "web",
             method: "GET",
-            status: "200"
+            status: "200",
           },
-          { 
-            timestamp: "2024-01-01T11:00:00Z", 
-            count: 150, 
+          {
+            timestamp: "2024-01-01T11:00:00Z",
+            count: 150,
             service: "api",
             method: "POST",
-            status: "201"
-          }
-        ]
+            status: "201",
+          },
+        ],
       ];
-      
+
       // Set data with multiple fields
       wrapper.vm.data = { value: mockDataWithFields };
       await nextTick();
-      
+
       expect(wrapper.vm.data).toBeDefined();
     });
 
     it("should emit update:initialVariableValues during drilldown navigation", () => {
       wrapper = createWrapper();
-      
+
       const mockInitialValues = {
         service: "web",
-        environment: "production"
+        environment: "production",
       };
-      
+
       // Test that the component can emit initial variable values
       expect(wrapper.vm.openDrilldown).toBeTypeOf("function");
     });
@@ -1256,44 +1296,44 @@ describe("PanelSchemaRenderer", () => {
   describe("Resize Handling and Layout Changes", () => {
     it("should handle window resize events", () => {
       wrapper = createWrapper();
-      
+
       // Test that the component can handle resize events
       expect(wrapper.vm.chartPanelRef).toBeDefined();
-      
+
       // Simulate resize event
-      const resizeEvent = new Event('resize');
+      const resizeEvent = new Event("resize");
       window.dispatchEvent(resizeEvent);
-      
+
       // Should not throw error
       expect(wrapper.exists()).toBe(true);
     });
 
     it("should debounce resize events to prevent excessive re-renders", async () => {
       wrapper = createWrapper();
-      
+
       // Mock chartPanelRef
-      wrapper.vm.chartPanelRef = { 
-        value: { 
-          offsetWidth: 800, 
-          offsetHeight: 400 
-        } 
+      wrapper.vm.chartPanelRef = {
+        value: {
+          offsetWidth: 800,
+          offsetHeight: 400,
+        },
       };
-      
+
       // The component should handle rapid resize events gracefully
       expect(wrapper.vm.chartPanelRef).toBeDefined();
     });
 
     it("should recalculate chart dimensions after layout changes", async () => {
       wrapper = createWrapper();
-      
+
       // Mock chart panel style
-      wrapper.vm.chartPanelStyle = { 
-        value: { 
-          height: "400px", 
-          width: "100%" 
-        } 
+      wrapper.vm.chartPanelStyle = {
+        value: {
+          height: "400px",
+          width: "100%",
+        },
       };
-      
+
       // Test that layout recalculation is supported
       expect(wrapper.vm.chartPanelStyle).toBeDefined();
     });
@@ -1306,7 +1346,10 @@ describe("PanelSchemaRenderer", () => {
       const mockObserve = vi.fn();
 
       // Create a mock ResizeObserver
-      const MockResizeObserver = vi.fn(function(this: any, callback: ResizeObserverCallback) {
+      const MockResizeObserver = vi.fn(function (
+        this: any,
+        callback: ResizeObserverCallback,
+      ) {
         this.observe = mockObserve;
         this.disconnect = mockDisconnect;
         this.unobserve = vi.fn();
@@ -1336,18 +1379,20 @@ describe("PanelSchemaRenderer", () => {
           {
             "@timestamp": "2024-01-01T10:00:00Z",
             "service.name": "web-server",
-            "nested": {
-              "field": "value",
-              "count": 100
+            nested: {
+              field: "value",
+              count: 100,
             },
-            "array": [1, 2, 3]
-          }
-        ]
+            array: [1, 2, 3],
+          },
+        ],
       ];
 
       wrapper.vm.data = { value: complexData };
 
-      expect(wrapper.vm.data.value[0][0]["@timestamp"]).toBe("2024-01-01T10:00:00Z");
+      expect(wrapper.vm.data.value[0][0]["@timestamp"]).toBe(
+        "2024-01-01T10:00:00Z",
+      );
       expect(wrapper.vm.data.value[0][0]["service.name"]).toBe("web-server");
       expect(wrapper.vm.data.value[0][0].nested.count).toBe(100);
       expect(wrapper.vm.data.value[0][0].array).toEqual([1, 2, 3]);
@@ -1357,49 +1402,53 @@ describe("PanelSchemaRenderer", () => {
       wrapper = createWrapper({
         panelSchema: {
           ...defaultProps.panelSchema,
-          queries: [{
-            ...defaultProps.panelSchema.queries[0],
-            fields: {
-              ...defaultProps.panelSchema.queries[0].fields,
-              breakdown: [
-                { field: "service", alias: "service" },
-                { field: "environment", alias: "env" }
-              ]
-            }
-          }],
+          queries: [
+            {
+              ...defaultProps.panelSchema.queries[0],
+              fields: {
+                ...defaultProps.panelSchema.queries[0].fields,
+                breakdown: [
+                  { field: "service", alias: "service" },
+                  { field: "environment", alias: "env" },
+                ],
+              },
+            },
+          ],
           config: {
             trellis: {
               layout: "grid",
-              columns: 2
-            }
-          }
-        }
+              columns: 2,
+            },
+          },
+        },
       });
-      
-      expect(wrapper.vm.panelSchema.queries[0].fields.breakdown).toHaveLength(2);
+
+      expect(wrapper.vm.panelSchema.queries[0].fields.breakdown).toHaveLength(
+        2,
+      );
       expect(wrapper.vm.panelSchema.config.trellis.layout).toBe("grid");
     });
 
     it("should handle VRL function field extraction from complex data", async () => {
       wrapper = createWrapper();
-      
+
       const complexRecord = {
         "@timestamp": "2024-01-01T10:00:00Z",
         "log.level": "INFO",
         "service.name": "web-server",
         "trace.id": "abc123",
-        "nested": {
-          "field": "value",
-          "array": [1, 2, 3]
+        nested: {
+          field: "value",
+          array: [1, 2, 3],
         },
-        "message": "Request processed successfully"
+        message: "Request processed successfully",
       };
-      
+
       const mockData = [[complexRecord]];
       wrapper.vm.data = { value: mockData };
-      
+
       await nextTick();
-      
+
       // Should handle complex nested field extraction
       expect(wrapper.vm.data.value[0][0]).toHaveProperty("@timestamp");
       expect(wrapper.vm.data.value[0][0]).toHaveProperty("nested");
@@ -1411,14 +1460,14 @@ describe("PanelSchemaRenderer", () => {
           {
             name: "service",
             value: ["web", "api"],
-            escapeSingleQuotes: false
+            escapeSingleQuotes: false,
           },
           {
             name: "environment",
             value: "production",
-            escapeSingleQuotes: true
-          }
-        ]
+            escapeSingleQuotes: true,
+          },
+        ],
       };
 
       wrapper = createWrapper({ variablesData });
@@ -1430,11 +1479,11 @@ describe("PanelSchemaRenderer", () => {
 
     it("should handle store state changes affecting theme and data processing", async () => {
       wrapper = createWrapper();
-      
+
       // Change theme
       wrapper.vm.store.state.theme = "dark";
       await nextTick();
-      
+
       expect(wrapper.vm.store.state.theme).toBe("dark");
     });
 
@@ -1443,37 +1492,37 @@ describe("PanelSchemaRenderer", () => {
         {
           result: [
             {
-              metric: { 
+              metric: {
                 __name__: "http_requests_total",
                 job: "prometheus",
                 instance: "localhost:9090",
                 method: "GET",
                 status: "200",
-                handler: "/api/v1/query"
+                handler: "/api/v1/query",
               },
               values: [
                 [1640995200, "1500"],
                 [1640995260, "1520"],
-                [1640995320, "1580"]
-              ]
+                [1640995320, "1580"],
+              ],
             },
             {
-              metric: { 
+              metric: {
                 __name__: "http_requests_total",
                 job: "prometheus",
                 instance: "localhost:9090",
                 method: "POST",
                 status: "400",
-                handler: "/api/v1/query"
+                handler: "/api/v1/query",
               },
               values: [
                 [1640995200, "25"],
                 [1640995260, "30"],
-                [1640995320, "28"]
-              ]
-            }
-          ]
-        }
+                [1640995320, "28"],
+              ],
+            },
+          ],
+        },
       ];
 
       wrapper = createWrapper({
@@ -1481,7 +1530,7 @@ describe("PanelSchemaRenderer", () => {
       });
 
       wrapper.vm.data = complexPromQLData;
-      
+
       // Should handle complex PromQL data structure
       expect(wrapper.vm.data[0].result).toHaveLength(2);
       expect(wrapper.vm.data[0].result[0].metric.method).toBe("GET");
@@ -1495,16 +1544,18 @@ describe("PanelSchemaRenderer", () => {
         panelSchema: {
           ...defaultProps.panelSchema,
           config: {
-            drilldown: [{
-              name: "View Logs",
-              type: "byUrl",
-              targetBlank: true,
-              data: {
-                url: "https://logs.example.com/search?query=${series.__name}&start=${start_time}&end=${end_time}"
-              }
-            }]
-          }
-        }
+            drilldown: [
+              {
+                name: "View Logs",
+                type: "byUrl",
+                targetBlank: true,
+                data: {
+                  url: "https://logs.example.com/search?query=${series.__name}&start=${start_time}&end=${end_time}",
+                },
+              },
+            ],
+          },
+        },
       });
 
       // Test that drilldown configuration is properly set
@@ -1518,24 +1569,26 @@ describe("PanelSchemaRenderer", () => {
         panelSchema: {
           ...defaultProps.panelSchema,
           config: {
-            drilldown: [{
-              name: "Auto Logs",
-              type: "logs", 
-              data: {
-                logsMode: "auto"
-              }
-            }]
-          }
-        }
+            drilldown: [
+              {
+                name: "Auto Logs",
+                type: "logs",
+                data: {
+                  logsMode: "auto",
+                },
+              },
+            ],
+          },
+        },
       });
 
       // Mock SQL parser
       wrapper.vm.parser = {
         astify: vi.fn().mockReturnValue({
           from: [{ table: "test_stream", as: "t" }],
-          where: { type: "binary_expr" }
+          where: { type: "binary_expr" },
         }),
-        sqlify: vi.fn().mockReturnValue("SELECT * WHERE condition")
+        sqlify: vi.fn().mockReturnValue("SELECT * WHERE condition"),
       };
 
       expect(wrapper.vm.openDrilldown).toBeTypeOf("function");
@@ -1546,27 +1599,33 @@ describe("PanelSchemaRenderer", () => {
         panelSchema: {
           ...defaultProps.panelSchema,
           config: {
-            drilldown: [{
-              name: "Related Dashboard",
-              type: "byDashboard",
-              targetBlank: false,
-              data: {
-                folder: "Production",
-                dashboard: "System Metrics",
-                tab: "Overview",
-                passAllVariables: true,
-                variables: [
-                  { name: "service", value: "${series.__name}" },
-                  { name: "time_range", value: "1h" }
-                ]
-              }
-            }]
-          }
-        }
+            drilldown: [
+              {
+                name: "Related Dashboard",
+                type: "byDashboard",
+                targetBlank: false,
+                data: {
+                  folder: "Production",
+                  dashboard: "System Metrics",
+                  tab: "Overview",
+                  passAllVariables: true,
+                  variables: [
+                    { name: "service", value: "${series.__name}" },
+                    { name: "time_range", value: "1h" },
+                  ],
+                },
+              },
+            ],
+          },
+        },
       });
 
-      expect(wrapper.vm.panelSchema.config.drilldown[0].type).toBe("byDashboard");
-      expect(wrapper.vm.panelSchema.config.drilldown[0].data.passAllVariables).toBe(true);
+      expect(wrapper.vm.panelSchema.config.drilldown[0].type).toBe(
+        "byDashboard",
+      );
+      expect(
+        wrapper.vm.panelSchema.config.drilldown[0].data.passAllVariables,
+      ).toBe(true);
     });
 
     it("should calculate popup offset to prevent overflow", () => {
@@ -1580,15 +1639,15 @@ describe("PanelSchemaRenderer", () => {
 
     it("should handle different chart types in drilldown data preparation", () => {
       const tableWrapper = createWrapper({
-        panelSchema: { ...defaultProps.panelSchema, type: "table" }
+        panelSchema: { ...defaultProps.panelSchema, type: "table" },
       });
 
       const sankeyWrapper = createWrapper({
-        panelSchema: { ...defaultProps.panelSchema, type: "sankey" }
+        panelSchema: { ...defaultProps.panelSchema, type: "sankey" },
       });
 
       const pieWrapper = createWrapper({
-        panelSchema: { ...defaultProps.panelSchema, type: "pie" }
+        panelSchema: { ...defaultProps.panelSchema, type: "pie" },
       });
 
       expect(tableWrapper.vm.panelSchema.type).toBe("table");
@@ -1611,7 +1670,9 @@ describe("PanelSchemaRenderer", () => {
 
       // Test that component can handle complex query scenarios
       expect(wrapper.vm.panelSchema.queries).toHaveLength(1);
-      expect(wrapper.vm.panelSchema.queries[0].query).toBe("SELECT * FROM table");
+      expect(wrapper.vm.panelSchema.queries[0].query).toBe(
+        "SELECT * FROM table",
+      );
     });
 
     it("should support drilldown navigation features", () => {
@@ -1637,18 +1698,18 @@ describe("PanelSchemaRenderer", () => {
       wrapper = createWrapper({
         variablesData: {
           values: [
-            { 
-              name: "service", 
+            {
+              name: "service",
               value: ["web", "api"],
-              escapeSingleQuotes: true
+              escapeSingleQuotes: true,
             },
             {
               name: "environment",
               value: "production",
-              escapeSingleQuotes: false
-            }
-          ]
-        }
+              escapeSingleQuotes: false,
+            },
+          ],
+        },
       });
 
       // Test that variables data is properly configured
@@ -1723,7 +1784,7 @@ describe("PanelSchemaRenderer", () => {
       const mockPanelData = {
         chartType: "line",
         options: { series: [{ name: "test" }] },
-        extras: { isTimeSeries: true }
+        extras: { isTimeSeries: true },
       };
 
       wrapper.vm.panelData = { value: mockPanelData };
@@ -1736,15 +1797,17 @@ describe("PanelSchemaRenderer", () => {
     it("should handle data watcher for vrl function field extraction", async () => {
       wrapper = createWrapper();
 
-      const mockData = [[
-        {
-          "@timestamp": "2024-01-01T10:00:00Z",
-          "service.name": "web-server",
-          "log.level": "INFO",
-          "nested": { "field": "value" },
-          "message": "Request processed"
-        }
-      ]];
+      const mockData = [
+        [
+          {
+            "@timestamp": "2024-01-01T10:00:00Z",
+            "service.name": "web-server",
+            "log.level": "INFO",
+            nested: { field: "value" },
+            message: "Request processed",
+          },
+        ],
+      ];
 
       wrapper.vm.data = { value: mockData };
 
@@ -1818,13 +1881,15 @@ describe("PanelSchemaRenderer", () => {
       wrapper = createWrapper({
         panelSchema: {
           ...defaultProps.panelSchema,
-          queries: [{
-            ...defaultProps.panelSchema.queries[0],
-            fields: {
-              ...defaultProps.panelSchema.queries[0].fields,
-              breakdown: [{ field: "category" }],
+          queries: [
+            {
+              ...defaultProps.panelSchema.queries[0],
+              fields: {
+                ...defaultProps.panelSchema.queries[0].fields,
+                breakdown: [{ field: "category" }],
+              },
             },
-          }],
+          ],
           config: {
             trellis: { layout: "grid" },
           },
@@ -1910,7 +1975,7 @@ describe("PanelSchemaRenderer", () => {
 
       // Test validation for PromQL panels (should skip validation)
       wrapper = createWrapper({
-        panelSchema: { ...defaultProps.panelSchema, queryType: "promql" }
+        panelSchema: { ...defaultProps.panelSchema, queryType: "promql" },
       });
 
       expect(wrapper.vm.validatePanelData).toHaveLength(0);
@@ -2013,13 +2078,15 @@ describe("PanelSchemaRenderer", () => {
         panelSchema: {
           ...defaultProps.panelSchema,
           queryType: "sql",
-          queries: [{
-            ...defaultProps.panelSchema.queries[0],
-            fields: {
-              ...defaultProps.panelSchema.queries[0].fields,
-              y: [{ alias: "count", column: "count(*)" }],
+          queries: [
+            {
+              ...defaultProps.panelSchema.queries[0],
+              fields: {
+                ...defaultProps.panelSchema.queries[0].fields,
+                y: [{ alias: "count", column: "count(*)" }],
+              },
             },
-          }],
+          ],
         },
       });
 
@@ -2042,9 +2109,11 @@ describe("PanelSchemaRenderer", () => {
         panelSchema: {
           ...defaultProps.panelSchema,
           queryType: "promql",
-          queries: [{
-            query: 'up{job="prometheus"}',
-          }],
+          queries: [
+            {
+              query: 'up{job="prometheus"}',
+            },
+          ],
         },
       });
 
@@ -2109,7 +2178,7 @@ describe("PanelSchemaRenderer", () => {
 
       const testValues = [0, 1, 100, 0.5, -10, 999.99];
 
-      testValues.forEach(value => {
+      testValues.forEach((value) => {
         wrapper.vm.onChartDomContextMenu({
           x: 100,
           y: 200,

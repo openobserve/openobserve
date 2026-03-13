@@ -71,11 +71,8 @@
               style="width: 140px"
             >
               <template v-slot:append>
-                <q-icon
-                  name="info"
-                  size="16px"
-                  class="cursor-pointer"
-                >
+                <q-icon name="info" size="16px"
+class="cursor-pointer">
                   <q-tooltip
                     class="bg-grey-8"
                     anchor="top middle"
@@ -94,7 +91,7 @@
             </q-input>
           </div>
 
-                    <!-- Query Type Select (Range/Instant) -->
+          <!-- Query Type Select (Range/Instant) -->
           <div class="option-field-wrapper">
             <span class="field-label">{{ t("common.type") }}</span>
             <q-select
@@ -117,7 +114,8 @@
               style="width: 120px"
             >
               <template v-slot:append>
-                <q-icon name="info" size="16px" class="cursor-pointer">
+                <q-icon name="info"
+size="16px" class="cursor-pointer">
                   <q-tooltip
                     class="bg-grey-8"
                     anchor="top middle"

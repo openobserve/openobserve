@@ -91,7 +91,10 @@ describe("IncidentServiceGraph.vue", () => {
     wrapper?.unmount();
   });
 
-  const mountComponent = (props = {}, storeOverrides: { theme?: string } = {}) => {
+  const mountComponent = (
+    props = {},
+    storeOverrides: { theme?: string } = {},
+  ) => {
     const mockStore = createMockStore(storeOverrides.theme);
 
     return mount(IncidentServiceGraph, {
@@ -154,7 +157,9 @@ describe("IncidentServiceGraph.vue", () => {
       await nextTick();
 
       // Check that ChartRenderer component is rendered
-      expect(wrapper.findComponent({ name: "ChartRenderer" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "ChartRenderer" }).exists()).toBe(
+        true,
+      );
       expect(wrapper.vm.graphData).toEqual(mockGraphData);
     });
 
@@ -166,7 +171,7 @@ describe("IncidentServiceGraph.vue", () => {
       const chartData = wrapper.vm.chartData;
       // First node is always marked as root cause (red), so there should be 1
       const rootCauseNodes = chartData.options.series[0].data.filter(
-        (n: any) => n.itemStyle.color === "#ef4444"
+        (n: any) => n.itemStyle.color === "#ef4444",
       );
       expect(rootCauseNodes.length).toBe(1);
     });
@@ -183,7 +188,7 @@ describe("IncidentServiceGraph.vue", () => {
 
       expect(wrapper.text()).toContain("Service Graph Unavailable");
       expect(wrapper.text()).toContain(
-        "No topology data available for this incident"
+        "No topology data available for this incident",
       );
     });
   });
@@ -251,7 +256,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should change layout when layout selector changes", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -274,28 +278,23 @@ describe("IncidentServiceGraph.vue", () => {
         },
       };
 
-        data: emptyGraphData,
-
-      wrapper = mountComponent();
+      (emptyGraphData, (wrapper = mountComponent()));
       await flushPromises();
-
 
       // Find refresh button in empty state
       const buttons = wrapper.findAll("button");
       const refreshBtn = buttons.find((btn) =>
-        btn.text().includes("Refresh to Check Again")
+        btn.text().includes("Refresh to Check Again"),
       );
       if (refreshBtn) {
         await refreshBtn.trigger("click");
         await flushPromises();
-
       }
     });
   });
 
   describe("Layout Options", () => {
     it("should use D3-force pre-computed layout", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -312,7 +311,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should generate circular layout configuration", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -330,7 +328,6 @@ describe("IncidentServiceGraph.vue", () => {
 
   describe("Node Styling", () => {
     it("should color root cause nodes red", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -341,7 +338,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should color high alert nodes orange", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -411,9 +407,7 @@ describe("IncidentServiceGraph.vue", () => {
         },
       };
 
-        data: mixedData,
-
-      wrapper = mountComponent();
+      (mixedData, (wrapper = mountComponent()));
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
@@ -423,7 +417,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should calculate node size based on alert count", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -468,7 +461,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should add border to primary service nodes", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -481,7 +473,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should not add border to non-primary nodes", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -507,7 +498,7 @@ describe("IncidentServiceGraph.vue", () => {
         topologyContext: {
           ...mockGraphData,
           nodes: [],
-        }
+        },
       });
       await flushPromises();
 
@@ -516,7 +507,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should generate valid ECharts options with nodes and edges", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -528,7 +518,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should set tooltip configuration", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -537,7 +526,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should enable roam and draggable on graph", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -547,7 +535,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should set emphasis focus to adjacency", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -556,7 +543,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should generate edge with arrow symbols", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -568,7 +554,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should set edge curveness", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -581,7 +566,6 @@ describe("IncidentServiceGraph.vue", () => {
 
   describe("Theme Support", () => {
     it("should apply light theme colors", async () => {
-
       wrapper = mountComponent({}, { theme: "light" });
       await flushPromises();
 
@@ -593,7 +577,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should apply dark theme colors", async () => {
-
       wrapper = mountComponent({}, { theme: "dark" });
       await flushPromises();
 
@@ -605,7 +588,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should apply dark theme to edge colors", async () => {
-
       wrapper = mountComponent({}, { theme: "dark" });
       await flushPromises();
 
@@ -616,7 +598,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should apply light theme to edge colors", async () => {
-
       wrapper = mountComponent({}, { theme: "light" });
       await flushPromises();
 
@@ -627,7 +608,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should apply dark theme to node labels", async () => {
-
       wrapper = mountComponent({}, { theme: "dark" });
       await flushPromises();
 
@@ -637,7 +617,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should apply light theme to node labels", async () => {
-
       wrapper = mountComponent({}, { theme: "light" });
       await flushPromises();
 
@@ -696,7 +675,6 @@ describe("IncidentServiceGraph.vue", () => {
 
   describe("Legend Display", () => {
     it("should display legend with all node types", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
       await nextTick();
@@ -714,7 +692,6 @@ describe("IncidentServiceGraph.vue", () => {
 
   describe("Node Tooltips", () => {
     it("should include service name in tooltip", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -726,7 +703,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should include alert count in tooltip", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -739,7 +715,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should show root cause indicator in tooltip", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -752,7 +727,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should show primary service indicator in tooltip", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -765,7 +739,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should not show root cause indicator for non-root-cause nodes", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -888,7 +861,6 @@ describe("IncidentServiceGraph.vue", () => {
 
   describe("Animation Configuration", () => {
     it("should set animation duration", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -898,7 +870,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should set animation easing", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -910,7 +881,6 @@ describe("IncidentServiceGraph.vue", () => {
 
   describe("Chart Renderer Integration", () => {
     it("should pass chart data to ChartRenderer", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
       await nextTick();
@@ -940,7 +910,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should update chartKey when loadGraph is called", async () => {
-
       wrapper = mountComponent();
       await flushPromises();
 

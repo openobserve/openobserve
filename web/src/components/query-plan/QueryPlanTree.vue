@@ -16,11 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="query-plan-tree">
-    <div
-      v-for="(node, index) in tree.children"
-      :key="index"
-      class="tree-node"
-    >
+    <div v-for="(node, index) in tree.children" :key="index"
+class="tree-node">
       <QueryPlanNode
         :node="node"
         :is-last="index === tree.children.length - 1"
@@ -56,7 +53,8 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .query-plan-tree {
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", "Consolas", "source-code-pro", monospace;
+  font-family:
+    "Monaco", "Menlo", "Ubuntu Mono", "Consolas", "source-code-pro", monospace;
   font-size: 13px;
   line-height: 1.8;
   padding: 16px;

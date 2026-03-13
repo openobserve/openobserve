@@ -20,14 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:pb-4">
         <div class="tw:flex tw:items-start tw:gap-4">
           <div class="tw:flex-shrink-0">
-            <q-icon name="rocket_launch" size="2.5rem" color="primary" />
+            <q-icon name="rocket_launch" size="2.5rem"
+color="primary" />
           </div>
           <div class="tw:flex-1">
             <h5 class="tw:text-lg tw:font-bold tw:m-0 tw:mb-2 title">
               Complete AWS Integration
             </h5>
             <p class="tw:text-sm tw:m-0 tw:mb-4 description">
-              Deploy all AWS services in one click. This CloudFormation stack sets up comprehensive monitoring across your entire AWS infrastructure.
+              Deploy all AWS services in one click. This CloudFormation stack
+              sets up comprehensive monitoring across your entire AWS
+              infrastructure.
             </p>
 
             <div class="tw:flex tw:gap-2 tw:mt-4">
@@ -37,7 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="handleDeployStack"
                 data-test="aws-quick-setup-deploy-btn"
               >
-                <q-icon name="cloud_upload" left size="sm" />
+                <q-icon name="cloud_upload" left
+size="sm" />
                 Deploy Complete Stack
               </q-btn>
               <q-btn
@@ -46,8 +50,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="showDetails = !showDetails"
                 data-test="aws-quick-setup-details-btn"
               >
-                <q-icon :name="showDetails ? 'expand_less' : 'expand_more'" left size="sm" />
-                {{ showDetails ? 'Hide' : 'View' }} Details
+                <q-icon
+                  :name="showDetails ? 'expand_less' : 'expand_more'"
+                  left
+                  size="sm"
+                />
+                {{ showDetails ? "Hide" : "View" }} Details
               </q-btn>
             </div>
           </div>
@@ -59,7 +67,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-separator />
           <q-card-section class="tw:pt-4">
             <div class="tw:text-sm details-section">
-              <h6 class="tw:text-base tw:font-semibold tw:m-0 tw:mb-3 details-title">
+              <h6
+                class="tw:text-base tw:font-semibold tw:m-0 tw:mb-3 details-title"
+              >
                 Included AWS Services ({{ includedServices.length }})
               </h6>
 
@@ -95,20 +105,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <h6 class="tw:text-base tw:font-semibold tw:m-0 tw:mb-3 details-title">Deployment Details</h6>
+              <h6
+                class="tw:text-base tw:font-semibold tw:m-0 tw:mb-3 details-title"
+              >
+                Deployment Details
+              </h6>
 
               <div class="tw:mb-3">
-                <div class="tw:font-semibold tw:mb-1 detail-label">Estimated Setup Time:</div>
+                <div class="tw:font-semibold tw:mb-1 detail-label">
+                  Estimated Setup Time:
+                </div>
                 <div class="detail-value">5-10 minutes for stack creation</div>
               </div>
 
               <div class="tw:mb-3">
-                <div class="tw:font-semibold tw:mb-1 detail-label">AWS Permissions Required:</div>
-                <div class="detail-value">CloudFormation, IAM, Kinesis Firehose, S3</div>
+                <div class="tw:font-semibold tw:mb-1 detail-label">
+                  AWS Permissions Required:
+                </div>
+                <div class="detail-value">
+                  CloudFormation, IAM, Kinesis Firehose, S3
+                </div>
               </div>
 
               <div class="tw:mb-3">
-                <div class="tw:font-semibold tw:mb-1 detail-label">What Gets Created:</div>
+                <div class="tw:font-semibold tw:mb-1 detail-label">
+                  What Gets Created:
+                </div>
                 <ul class="tw:list-disc tw:ml-5 tw:space-y-1 detail-value">
                   <li>Kinesis Firehose delivery streams for each service</li>
                   <li>IAM roles with appropriate permissions</li>
@@ -118,10 +140,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div>
-                <div class="tw:font-semibold tw:mb-1 detail-label">Cost Considerations:</div>
+                <div class="tw:font-semibold tw:mb-1 detail-label">
+                  Cost Considerations:
+                </div>
                 <div class="detail-value">
-                  Charges apply for Kinesis Firehose data transfer, CloudWatch Logs ingestion, and OpenObserve storage.
-                  Refer to AWS and OpenObserve pricing for details.
+                  Charges apply for Kinesis Firehose data transfer, CloudWatch
+                  Logs ingestion, and OpenObserve storage. Refer to AWS and
+                  OpenObserve pricing for details.
                 </div>
               </div>
             </div>
@@ -137,7 +162,10 @@ import { defineComponent, ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
-import { generateCloudFormationURL, awsIntegrations } from "@/utils/awsIntegrations";
+import {
+  generateCloudFormationURL,
+  awsIntegrations,
+} from "@/utils/awsIntegrations";
 import segment from "@/services/segment_analytics";
 
 export default defineComponent({
@@ -159,11 +187,13 @@ export default defineComponent({
     // Get all services with CloudFormation templates
     const includedServices = computed(() => {
       return awsIntegrations
-        .filter(integration =>
-          integration.cloudFormationTemplate ||
-          (integration.cloudFormationTemplates && integration.cloudFormationTemplates.length > 0)
+        .filter(
+          (integration) =>
+            integration.cloudFormationTemplate ||
+            (integration.cloudFormationTemplates &&
+              integration.cloudFormationTemplates.length > 0),
         )
-        .map(integration => ({
+        .map((integration) => ({
           name: integration.displayName,
           description: integration.description,
           category: integration.category,
@@ -173,13 +203,13 @@ export default defineComponent({
 
     const getCategoryIcon = (category: string) => {
       const iconMap: Record<string, string> = {
-        'logs': 'description',
-        'metrics': 'speed',
-        'security': 'security',
-        'networking': 'network_check',
-        'other': 'settings',
+        logs: "description",
+        metrics: "speed",
+        security: "security",
+        networking: "network_check",
+        other: "settings",
       };
-      return iconMap[category] || 'cloud';
+      return iconMap[category] || "cloud";
     };
 
     const formatCategory = (category: string) => {
@@ -206,10 +236,15 @@ export default defineComponent({
 
         // Validate required data
         if (!organizationId || !email || !passcode) {
-          console.error("Missing required data:", { organizationId, email, hasPasscode: !!passcode });
+          console.error("Missing required data:", {
+            organizationId,
+            email,
+            hasPasscode: !!passcode,
+          });
           q.notify({
             type: "negative",
-            message: "Missing organization credentials. Please refresh the page.",
+            message:
+              "Missing organization credentials. Please refresh the page.",
             timeout: 3000,
           });
           return;
@@ -220,10 +255,11 @@ export default defineComponent({
 
         // Create a unified integration object
         const unifiedIntegration = {
-          id: 'aws-complete',
-          name: 'AWS-Complete',
-          displayName: 'AWS Complete Integration',
-          cloudFormationTemplate: 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/aws_complete.yaml',
+          id: "aws-complete",
+          name: "AWS-Complete",
+          displayName: "AWS Complete Integration",
+          cloudFormationTemplate:
+            "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/aws_complete.yaml",
           comingSoon: false,
         };
 
@@ -232,7 +268,7 @@ export default defineComponent({
           unifiedIntegration as any,
           organizationId,
           `${endpoint.url}/aws/${organizationId}/default/_kinesis_firehose`,
-          accessKey
+          accessKey,
         );
 
         if (!cloudFormationURL) {
@@ -245,7 +281,7 @@ export default defineComponent({
         }
 
         // Open AWS Console in new tab
-        window.open(cloudFormationURL, '_blank', 'noopener,noreferrer');
+        window.open(cloudFormationURL, "_blank", "noopener,noreferrer");
 
         // Track analytics
         segment.track("AWS Complete Integration Started", {
@@ -262,7 +298,7 @@ export default defineComponent({
         console.error("Error deploying stack:", error);
         q.notify({
           type: "negative",
-          message: `Error opening AWS Console: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          message: `Error opening AWS Console: ${error instanceof Error ? error.message : "Unknown error"}`,
           timeout: 5000,
         });
       }

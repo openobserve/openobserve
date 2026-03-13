@@ -16,22 +16,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="edit-group-section" class="relative-position full-height">
-    <div
-      data-test="edit-group-section-title"
-      class="tw:pb-[0.625rem]"
-    >
-    <div class="card-container q-py-sm">
-      <span style="font-size: 18px" class="q-px-md ">
-      {{ groupDetails.group_name }}
-      </span>
-  <q-separator />
-    <AppTabs
-      data-test="edit-group-tabs"
-      :tabs="tabs"
-      :active-tab="activeTab"
-      @update:active-tab="updateActiveTab"
-    />
-    </div>
+    <div data-test="edit-group-section-title" class="tw:pb-[0.625rem]">
+      <div class="card-container q-py-sm">
+        <span style="font-size: 18px" class="q-px-md">
+          {{ groupDetails.group_name }}
+        </span>
+        <q-separator />
+        <AppTabs
+          data-test="edit-group-tabs"
+          :tabs="tabs"
+          :active-tab="activeTab"
+          @update:active-tab="updateActiveTab"
+        />
+      </div>
     </div>
     <div style="min-height: calc(100% - (39px + 55px + 43px + 6px))">
       <GroupUsers
@@ -59,24 +56,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div
-    class="flex justify-end tw:w-full"
+      class="flex justify-end tw:w-full"
       style="position: sticky; bottom: 0.45rem; z-index: 2"
     >
-      <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex">
-      <q-btn
-        data-test="edit-group-cancel-btn"
-        class="o2-secondary-button"
-        :label="t('alerts.cancel')"
-        no-caps
-        @click="cancelEditGroup"
-      />
-      <q-btn
-        data-test="edit-group-submit-btn"
-        :label="t('alerts.save')"
-        class="o2-primary-button q-ml-md"
-        no-caps
-        @click="saveGroupChanges"
-      />
+      <div
+        class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex"
+      >
+        <q-btn
+          data-test="edit-group-cancel-btn"
+          class="o2-secondary-button"
+          :label="t('alerts.cancel')"
+          no-caps
+          @click="cancelEditGroup"
+        />
+        <q-btn
+          data-test="edit-group-submit-btn"
+          :label="t('alerts.save')"
+          class="o2-primary-button q-ml-md"
+          no-caps
+          @click="saveGroupChanges"
+        />
       </div>
     </div>
   </div>
@@ -149,7 +148,7 @@ const getGroupDetails = () => {
 
   getGroup(groupName, store.state.selectedOrganization.identifier)
     .then((res) => {
-      console.log(res,'res in get group')
+      console.log(res, "res in get group");
       groupDetails.value = {
         ...res.data,
         group_name: res.data.name,
@@ -159,7 +158,9 @@ const getGroupDetails = () => {
     .catch((err) => {
       console.log(err);
       q.notify({
-        message: err?.message || "Group not found or has been deleted. Redirecting to groups list.",
+        message:
+          err?.message ||
+          "Group not found or has been deleted. Redirecting to groups list.",
         color: "negative",
         position: "bottom",
         timeout: 3000,
@@ -217,7 +218,7 @@ const saveGroupChanges = () => {
 
       // Reset Roles
       groupDetails.value.roles = groupDetails.value.roles.filter(
-        (user) => !removedRoles.value.has(user)
+        (user) => !removedRoles.value.has(user),
       );
 
       addedRoles.value.forEach((value: any) => {
@@ -230,7 +231,7 @@ const saveGroupChanges = () => {
 
       // Reset Users
       groupDetails.value.users = groupDetails.value.users.filter(
-        (user) => !removedUsers.value.has(user)
+        (user) => !removedUsers.value.has(user),
       );
 
       addedUsers.value.forEach((value: any) => {
@@ -242,7 +243,7 @@ const saveGroupChanges = () => {
       removedUsers.value = new Set([]);
     })
     .catch((err) => {
-      if(err.response.status != 403){
+      if (err.response.status != 403) {
         q.notify({
           type: "negative",
           message: "Error while updating group!",
@@ -253,14 +254,12 @@ const saveGroupChanges = () => {
 };
 
 const cancelEditGroup = () => {
-  router.push(
-    { name: "groups", 
-    query: 
-      { 
-        org_identifier: store.state.selectedOrganization.identifier 
-      }
-    }
-  );
+  router.push({
+    name: "groups",
+    query: {
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
+  });
 };
 </script>
 

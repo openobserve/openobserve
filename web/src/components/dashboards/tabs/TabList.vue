@@ -73,7 +73,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-tab-add-btn"
       ><q-tooltip>Add Tab</q-tooltip></q-btn
     >
-    <q-dialog v-model="showAddTabDialog" position="right" full-height maximized>
+    <q-dialog v-model="showAddTabDialog" position="right"
+full-height maximized>
       <AddTab
         :dashboard-id="dashboardData?.dashboardId"
         @refresh="refreshDashboard"

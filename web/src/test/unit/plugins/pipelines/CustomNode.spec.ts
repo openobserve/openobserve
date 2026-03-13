@@ -79,7 +79,8 @@ vi.mock("@/utils/zincutils", () => ({
 }));
 
 vi.mock("@/utils/pipelines/constants", () => ({
-  defaultDestinationNodeWarningMessage: "Warning: This is a default destination node",
+  defaultDestinationNodeWarningMessage:
+    "Warning: This is a default destination node",
 }));
 
 describe("CustomNode.vue", () => {
@@ -247,7 +248,9 @@ describe("CustomNode.vue", () => {
         },
       });
 
-      expect(wrapper.find('[data-node-type="remote_stream"]').exists()).toBe(true);
+      expect(wrapper.find('[data-node-type="remote_stream"]').exists()).toBe(
+        true,
+      );
       expect(wrapper.text()).toContain("external_system");
     });
   });
@@ -341,7 +344,8 @@ describe("CustomNode.vue", () => {
 
       const text = wrapper.text();
       // Should contain ellipsis if truncated (truncated to 20 chars)
-      if (text.length > 23) { // 20 chars + "..."
+      if (text.length > 23) {
+        // 20 chars + "..."
         expect(text).toContain("...");
       }
     });
@@ -395,7 +399,11 @@ describe("CustomNode.vue", () => {
       const wrapper = mount(CustomNode, {
         props: {
           id: "node-1",
-          data: { node_type: "stream", stream_type: "logs", stream_name: "test" },
+          data: {
+            node_type: "stream",
+            stream_type: "logs",
+            stream_name: "test",
+          },
           io_type: "output",
         },
         global: {
@@ -421,7 +429,11 @@ describe("CustomNode.vue", () => {
       const wrapper = mount(CustomNode, {
         props: {
           id: "node-1",
-          data: { node_type: "query", stream_type: "logs", stream_name: "test" },
+          data: {
+            node_type: "query",
+            stream_type: "logs",
+            stream_name: "test",
+          },
           io_type: "input",
         },
         global: {
@@ -475,7 +487,11 @@ describe("CustomNode.vue", () => {
       const wrapper = mount(CustomNode, {
         props: {
           id: "node-1",
-          data: { node_type: "query", stream_type: "logs", stream_name: "test" },
+          data: {
+            node_type: "query",
+            stream_type: "logs",
+            stream_name: "test",
+          },
           io_type: "input",
         },
         global: {
@@ -498,7 +514,11 @@ describe("CustomNode.vue", () => {
       const wrapper = mount(CustomNode, {
         props: {
           id: "node-1",
-          data: { node_type: "stream", stream_type: "logs", stream_name: "test" },
+          data: {
+            node_type: "stream",
+            stream_type: "logs",
+            stream_name: "test",
+          },
           io_type: "output",
         },
         global: {

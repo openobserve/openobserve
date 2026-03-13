@@ -61,7 +61,7 @@ const organizationObj = {
   isDataIngested: false,
   regexPatterns: [],
   regexPatternPrompt: "",
-  regexPatternTestValue: ""
+  regexPatternTestValue: "",
 };
 
 export default createStore({
@@ -100,8 +100,8 @@ export default createStore({
     // These are the application's default colors used as fallback when no custom colors are set
     // Centralized here so they can be updated in one place instead of duplicating across components
     defaultThemeColors: {
-      light: "#3F7994",  // Default light mode color (Blue)
-      dark: "#5B9FBE",   // Default dark mode color (Light Blue)
+      light: "#3F7994", // Default light mode color (Blue)
+      dark: "#5B9FBE", // Default dark mode color (Light Blue)
     },
     // GitHub dashboard gallery cache
     githubDashboardGallery: {
@@ -118,8 +118,8 @@ export default createStore({
     // - Cleared when user clicks "Save" (saved permanently to localStorage & backend)
     // - Prevents other watchers/observers from overriding the preview color
     tempThemeColors: {
-      light: null,  // Hex color string (e.g., "#FF0000") or null
-      dark: null,   // Hex color string (e.g., "#0000FF") or null
+      light: null, // Hex color string (e.g., "#FF0000") or null
+      dark: null, // Hex color string (e.g., "#0000FF") or null
     },
     // Share URL state for Safari-compatible clipboard copy
     // Polling mechanism checks this value and copies when available
@@ -323,7 +323,8 @@ export default createStore({
      * @param payload - { key: 'folderPath/fileName', json: dashboardJson }
      */
     setDashboardJsonCache(state, payload) {
-      state.githubDashboardGallery.dashboardJsonCache[payload.key] = payload.json;
+      state.githubDashboardGallery.dashboardJsonCache[payload.key] =
+        payload.json;
     },
   },
   actions: {
@@ -472,6 +473,6 @@ export default createStore({
   modules: {
     streams,
     logs,
-    incidents
+    incidents,
   },
 });

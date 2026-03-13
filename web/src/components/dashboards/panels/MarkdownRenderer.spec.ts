@@ -30,11 +30,11 @@ vi.mock("vuex", () => ({
 vi.mock("@/utils/dashboard/variables/variablesUtils", () => ({
   processVariableContent: vi.fn((content, variables, context) => {
     // Simple mock implementation that replaces {{variable}} patterns
-    if (!content || typeof content !== 'string') return content;
+    if (!content || typeof content !== "string") return content;
 
     let processedContent = content;
     for (const [key, value] of Object.entries(variables || {})) {
-      const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+      const regex = new RegExp(`{{\\s*${key}\\s*}}`, "g");
       processedContent = processedContent.replace(regex, String(value));
     }
     return processedContent;
@@ -50,15 +50,15 @@ vi.mock("dompurify", () => ({
 vi.mock("marked", () => ({
   marked: vi.fn((content) => {
     // Simple mock implementation to convert basic markdown
-    if (!content || typeof content !== 'string') return content;
-    
+    if (!content || typeof content !== "string") return content;
+
     return content
-      .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-      .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-      .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-      .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
-      .replace(/\*(.*)\*/gim, '<em>$1</em>')
-      .replace(/^\* (.*$)/gim, '<li>$1</li>')
+      .replace(/^# (.*$)/gim, "<h1>$1</h1>")
+      .replace(/^## (.*$)/gim, "<h2>$1</h2>")
+      .replace(/^### (.*$)/gim, "<h3>$1</h3>")
+      .replace(/\*\*(.*)\*\*/gim, "<strong>$1</strong>")
+      .replace(/\*(.*)\*/gim, "<em>$1</em>")
+      .replace(/^\* (.*$)/gim, "<li>$1</li>")
       .replace(/\[([^\]]*)\]\(([^\)]*)\)/gim, '<a href="$2">$1</a>');
   }),
 }));
@@ -84,41 +84,45 @@ describe("MarkdownRenderer", () => {
   describe("Component Initialization", () => {
     it("should render correctly with default props", () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="markdown-renderer"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="markdown-renderer"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should have correct component name", () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.vm.$options.name).toBe("MarkdownRenderer");
     });
 
     it("should initialize with default prop values", () => {
       wrapper = createWrapper();
-      
-      expect(wrapper.props('markdownContent')).toBe("");
-      expect(wrapper.props('variablesData')).toEqual({});
+
+      expect(wrapper.props("markdownContent")).toBe("");
+      expect(wrapper.props("variablesData")).toEqual({});
     });
 
     it("should accept custom prop values", () => {
       const customProps = {
         markdownContent: "# Test Heading\n\nTest paragraph",
-        variablesData: { title: "Test Title" }
+        variablesData: { title: "Test Title" },
       };
-      
+
       wrapper = createWrapper(customProps);
-      
-      expect(wrapper.props('markdownContent')).toBe("# Test Heading\n\nTest paragraph");
-      expect(wrapper.props('variablesData')).toEqual({ title: "Test Title" });
+
+      expect(wrapper.props("markdownContent")).toBe(
+        "# Test Heading\n\nTest paragraph",
+      );
+      expect(wrapper.props("variablesData")).toEqual({ title: "Test Title" });
     });
   });
 
   describe("Markdown Content Rendering", () => {
     it("should render empty content by default", () => {
       wrapper = createWrapper();
-      
+
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
       expect(rendererElement.exists()).toBe(true);
       expect(rendererElement.text()).toBe("");
@@ -126,9 +130,9 @@ describe("MarkdownRenderer", () => {
 
     it("should render markdown content as HTML", () => {
       wrapper = createWrapper({
-        markdownContent: "# Test Heading\n\n**Bold text** and *italic text*"
+        markdownContent: "# Test Heading\n\n**Bold text** and *italic text*",
       });
-      
+
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
       expect(rendererElement.html()).toContain("<h1>Test Heading</h1>");
       expect(rendererElement.html()).toContain("<strong>Bold text</strong>");
@@ -137,14 +141,18 @@ describe("MarkdownRenderer", () => {
 
     it("should update content when markdownContent prop changes", async () => {
       wrapper = createWrapper({
-        markdownContent: "# Initial heading"
+        markdownContent: "# Initial heading",
       });
-      
-      expect(wrapper.find('[data-test="markdown-renderer"]').html()).toContain("Initial heading");
-      
+
+      expect(wrapper.find('[data-test="markdown-renderer"]').html()).toContain(
+        "Initial heading",
+      );
+
       await wrapper.setProps({ markdownContent: "# Updated heading" });
-      
-      expect(wrapper.find('[data-test="markdown-renderer"]').html()).toContain("Updated heading");
+
+      expect(wrapper.find('[data-test="markdown-renderer"]').html()).toContain(
+        "Updated heading",
+      );
     });
 
     it("should handle complex markdown structures", () => {
@@ -160,22 +168,24 @@ describe("MarkdownRenderer", () => {
 
 [Link text](https://example.com)
       `;
-      
+
       wrapper = createWrapper({ markdownContent: complexMarkdown });
-      
+
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
-      expect(rendererElement.html()).toContain('<h1>Main Title</h1>');
-      expect(rendererElement.html()).toContain('<h2>Subtitle</h2>');
-      expect(rendererElement.html()).toContain('<h3>Sub-subtitle</h3>');
-      expect(rendererElement.html()).toContain('<strong>Bold text</strong>');
-      expect(rendererElement.html()).toContain('<em>italic text</em>');
-      expect(rendererElement.html()).toContain('<li>List item 1</li>');
-      expect(rendererElement.html()).toContain('<a href="https://example.com">Link text</a>');
+      expect(rendererElement.html()).toContain("<h1>Main Title</h1>");
+      expect(rendererElement.html()).toContain("<h2>Subtitle</h2>");
+      expect(rendererElement.html()).toContain("<h3>Sub-subtitle</h3>");
+      expect(rendererElement.html()).toContain("<strong>Bold text</strong>");
+      expect(rendererElement.html()).toContain("<em>italic text</em>");
+      expect(rendererElement.html()).toContain("<li>List item 1</li>");
+      expect(rendererElement.html()).toContain(
+        '<a href="https://example.com">Link text</a>',
+      );
     });
 
     it("should handle empty or null markdown content", () => {
       wrapper = createWrapper({ markdownContent: null });
-      
+
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
       expect(rendererElement.exists()).toBe(true);
       expect(rendererElement.text()).toBe("");
@@ -183,36 +193,39 @@ describe("MarkdownRenderer", () => {
 
     it("should process plain text without markdown", () => {
       wrapper = createWrapper({
-        markdownContent: "This is plain text without any markdown."
+        markdownContent: "This is plain text without any markdown.",
       });
-      
+
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
-      expect(rendererElement.html()).toContain("This is plain text without any markdown.");
+      expect(rendererElement.html()).toContain(
+        "This is plain text without any markdown.",
+      );
     });
   });
 
   describe("Variable Processing", () => {
     it("should process variables in markdown content", async () => {
-      const { processVariableContent } = await import("@/utils/dashboard/variables/variablesUtils");
+      const { processVariableContent } =
+        await import("@/utils/dashboard/variables/variablesUtils");
 
       wrapper = createWrapper({
         markdownContent: "# {{title}}\n\nWelcome {{userName}}!",
-        variablesData: { title: "Dashboard", userName: "John" }
+        variablesData: { title: "Dashboard", userName: "John" },
       });
 
       expect(processVariableContent).toHaveBeenCalledWith(
         "# {{title}}\n\nWelcome {{userName}}!",
         { title: "Dashboard", userName: "John" },
-        { panelId: undefined, tabId: undefined }
+        { panelId: undefined, tabId: undefined },
       );
     });
 
     it("should handle variables with no substitution data", () => {
       wrapper = createWrapper({
         markdownContent: "# Hello {{name}}",
-        variablesData: {}
+        variablesData: {},
       });
-      
+
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
       expect(rendererElement.html()).toContain("Hello {{name}}");
     });
@@ -220,23 +233,23 @@ describe("MarkdownRenderer", () => {
     it("should update processed content when variables change", async () => {
       wrapper = createWrapper({
         markdownContent: "# {{title}}",
-        variablesData: { title: "Original" }
+        variablesData: { title: "Original" },
       });
-      
+
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
       expect(rendererElement.html()).toContain("Original");
-      
+
       await wrapper.setProps({ variablesData: { title: "Updated" } });
-      
+
       expect(rendererElement.html()).toContain("Updated");
     });
 
     it("should handle markdown syntax in variables", () => {
       wrapper = createWrapper({
         markdownContent: "{{content}}",
-        variablesData: { content: "**Bold** and *italic*" }
+        variablesData: { content: "**Bold** and *italic*" },
       });
-      
+
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
       expect(rendererElement.html()).toContain("<strong>Bold</strong>");
       expect(rendererElement.html()).toContain("<em>italic</em>");
@@ -244,23 +257,26 @@ describe("MarkdownRenderer", () => {
 
     it("should handle complex variable structures", () => {
       wrapper = createWrapper({
-        markdownContent: "# {{user.name}}\n\nEmail: {{user.email}}\n\nCount: {{count}}",
+        markdownContent:
+          "# {{user.name}}\n\nEmail: {{user.email}}\n\nCount: {{count}}",
         variablesData: {
           user: { name: "John", email: "john@test.com" },
-          count: 42
-        }
+          count: 42,
+        },
       });
-      
+
       // Variable processing is handled by the mocked function
-      expect(wrapper.find('[data-test="markdown-renderer"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="markdown-renderer"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should handle undefined variables data", () => {
       wrapper = createWrapper({
         markdownContent: "# {{title}}",
-        variablesData: undefined
+        variablesData: undefined,
       });
-      
+
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
       expect(rendererElement.exists()).toBe(true);
     });
@@ -269,12 +285,12 @@ describe("MarkdownRenderer", () => {
   describe("Theme Support", () => {
     it("should apply light theme classes by default", () => {
       wrapper = createWrapper();
-      
+
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
-      expect(rendererElement.classes()).toContain('tw:prose');
-      expect(rendererElement.classes()).toContain('tw:prose-sm');
-      expect(rendererElement.classes()).toContain('tw:max-w-none');
-      expect(rendererElement.classes()).not.toContain('tw:prose-invert');
+      expect(rendererElement.classes()).toContain("tw:prose");
+      expect(rendererElement.classes()).toContain("tw:prose-sm");
+      expect(rendererElement.classes()).toContain("tw:max-w-none");
+      expect(rendererElement.classes()).not.toContain("tw:prose-invert");
     });
 
     it("should apply dark theme classes when theme is dark", () => {
@@ -284,61 +300,61 @@ describe("MarkdownRenderer", () => {
           plugins: [Quasar],
           mocks: {
             store: {
-              state: { theme: "dark" }
-            }
-          }
-        }
+              state: { theme: "dark" },
+            },
+          },
+        },
       });
-      
+
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
-      expect(rendererElement.classes()).toContain('tw:prose');
-      expect(rendererElement.classes()).toContain('tw:prose-invert');
+      expect(rendererElement.classes()).toContain("tw:prose");
+      expect(rendererElement.classes()).toContain("tw:prose-invert");
     });
 
     it("should toggle theme classes when theme changes", async () => {
       // Test light theme first
       wrapper = createWrapper();
-      
+
       let rendererElement = wrapper.find('[data-test="markdown-renderer"]');
-      expect(rendererElement.classes()).not.toContain('tw:prose-invert');
-      
+      expect(rendererElement.classes()).not.toContain("tw:prose-invert");
+
       // Unmount and recreate with dark theme to test the toggle effect
       wrapper.unmount();
-      
+
       wrapper = mount(MarkdownRenderer, {
         global: {
           plugins: [Quasar],
           mocks: {
             store: {
-              state: { theme: "dark" }
-            }
-          }
-        }
+              state: { theme: "dark" },
+            },
+          },
+        },
       });
-      
+
       rendererElement = wrapper.find('[data-test="markdown-renderer"]');
-      expect(rendererElement.classes()).toContain('tw:prose-invert');
+      expect(rendererElement.classes()).toContain("tw:prose-invert");
     });
 
     it("should maintain theme classes with content updates", async () => {
       wrapper = mount(MarkdownRenderer, {
         props: {
-          markdownContent: "# Initial content"
+          markdownContent: "# Initial content",
         },
         global: {
           plugins: [Quasar],
           mocks: {
             store: {
-              state: { theme: "dark" }
-            }
-          }
-        }
+              state: { theme: "dark" },
+            },
+          },
+        },
       });
-      
+
       await wrapper.setProps({ markdownContent: "# Updated content" });
-      
+
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
-      expect(rendererElement.classes()).toContain('tw:prose-invert');
+      expect(rendererElement.classes()).toContain("tw:prose-invert");
       expect(rendererElement.html()).toContain("Updated content");
     });
   });
@@ -346,37 +362,37 @@ describe("MarkdownRenderer", () => {
   describe("Marked Integration", () => {
     it("should use marked library to convert markdown", async () => {
       const { marked } = await import("marked");
-      
+
       wrapper = createWrapper({
-        markdownContent: "# Heading\n\n**Bold text**"
+        markdownContent: "# Heading\n\n**Bold text**",
       });
-      
+
       expect(marked).toHaveBeenCalled();
     });
 
     it("should handle marked conversion on every render", async () => {
       const { marked } = await import("marked");
-      
+
       wrapper = createWrapper({
-        markdownContent: "# Initial"
+        markdownContent: "# Initial",
       });
-      
+
       const initialCallCount = marked.mock.calls.length;
-      
+
       await wrapper.setProps({ markdownContent: "# Updated" });
-      
+
       expect(marked.mock.calls.length).toBeGreaterThan(initialCallCount);
     });
 
     it("should handle marked conversion of processed variables", () => {
       wrapper = createWrapper({
         markdownContent: "# {{title}}\n\n{{content}}",
-        variablesData: { 
+        variablesData: {
           title: "Variable Title",
-          content: "**Variable bold text**"
-        }
+          content: "**Variable bold text**",
+        },
       });
-      
+
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
       expect(rendererElement.exists()).toBe(true);
     });
@@ -385,34 +401,38 @@ describe("MarkdownRenderer", () => {
   describe("DOMPurify Integration", () => {
     it("should sanitize converted HTML using DOMPurify", async () => {
       const DOMPurify = (await import("dompurify")).default;
-      
+
       wrapper = createWrapper({
-        markdownContent: "# Safe Heading\n\n[Link](javascript:alert('xss'))"
+        markdownContent: "# Safe Heading\n\n[Link](javascript:alert('xss'))",
       });
-      
+
       expect(DOMPurify.sanitize).toHaveBeenCalled();
     });
 
     it("should sanitize content on every render", async () => {
       const DOMPurify = (await import("dompurify")).default;
-      
+
       wrapper = createWrapper({
-        markdownContent: "# Initial"
+        markdownContent: "# Initial",
       });
-      
+
       const initialCallCount = DOMPurify.sanitize.mock.calls.length;
-      
+
       await wrapper.setProps({ markdownContent: "# Updated" });
-      
-      expect(DOMPurify.sanitize.mock.calls.length).toBeGreaterThan(initialCallCount);
+
+      expect(DOMPurify.sanitize.mock.calls.length).toBeGreaterThan(
+        initialCallCount,
+      );
     });
 
     it("should handle DOMPurify sanitization of processed markdown", () => {
       wrapper = createWrapper({
         markdownContent: "{{content}}",
-        variablesData: { content: "# Title\n\n[Safe link](http://example.com)" }
+        variablesData: {
+          content: "# Title\n\n[Safe link](http://example.com)",
+        },
       });
-      
+
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
       expect(rendererElement.exists()).toBe(true);
     });
@@ -421,48 +441,50 @@ describe("MarkdownRenderer", () => {
   describe("Layout and Styling", () => {
     it("should have correct container styling", () => {
       wrapper = createWrapper();
-      
-      const container = wrapper.find('.scroll');
+
+      const container = wrapper.find(".scroll");
       expect(container.exists()).toBe(true);
-      expect(container.attributes('style')).toContain('width: 100%');
-      expect(container.attributes('style')).toContain('height: 100%');
-      expect(container.attributes('style')).toContain('overflow: auto');
-      expect(container.attributes('style')).toContain('padding: 1%');
+      expect(container.attributes("style")).toContain("width: 100%");
+      expect(container.attributes("style")).toContain("height: 100%");
+      expect(container.attributes("style")).toContain("overflow: auto");
+      expect(container.attributes("style")).toContain("padding: 1%");
     });
 
     it("should maintain responsive design classes", () => {
       wrapper = createWrapper();
-      
+
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
-      expect(rendererElement.classes()).toContain('tw:prose');
-      expect(rendererElement.classes()).toContain('tw:prose-sm');
-      expect(rendererElement.classes()).toContain('tw:max-w-none');
+      expect(rendererElement.classes()).toContain("tw:prose");
+      expect(rendererElement.classes()).toContain("tw:prose-sm");
+      expect(rendererElement.classes()).toContain("tw:max-w-none");
     });
 
     it("should handle overflow content properly", () => {
-      const longContent = "# Long heading\n\n".repeat(100) + "Long content paragraph.".repeat(100);
-      
+      const longContent =
+        "# Long heading\n\n".repeat(100) +
+        "Long content paragraph.".repeat(100);
+
       wrapper = createWrapper({ markdownContent: longContent });
-      
-      const container = wrapper.find('.scroll');
-      expect(container.attributes('style')).toContain('overflow: auto');
+
+      const container = wrapper.find(".scroll");
+      expect(container.attributes("style")).toContain("overflow: auto");
     });
   });
 
   describe("Props Validation and Edge Cases", () => {
     it("should handle string markdownContent prop", () => {
       wrapper = createWrapper({
-        markdownContent: "# String content"
+        markdownContent: "# String content",
       });
-      
-      expect(wrapper.props('markdownContent')).toBe("# String content");
+
+      expect(wrapper.props("markdownContent")).toBe("# String content");
     });
 
     it("should handle empty string markdownContent", () => {
       wrapper = createWrapper({
-        markdownContent: ""
+        markdownContent: "",
       });
-      
+
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
       expect(rendererElement.text()).toBe("");
     });
@@ -471,43 +493,46 @@ describe("MarkdownRenderer", () => {
       const variablesData = {
         title: "Test",
         count: 123,
-        nested: { value: "deep" }
+        nested: { value: "deep" },
       };
-      
+
       wrapper = createWrapper({ variablesData });
-      
-      expect(wrapper.props('variablesData')).toEqual(variablesData);
+
+      expect(wrapper.props("variablesData")).toEqual(variablesData);
     });
 
     it("should handle empty variablesData object", () => {
       wrapper = createWrapper({
-        variablesData: {}
+        variablesData: {},
       });
-      
-      expect(wrapper.props('variablesData')).toEqual({});
+
+      expect(wrapper.props("variablesData")).toEqual({});
     });
 
     it("should handle rapid prop changes", async () => {
       wrapper = createWrapper({
         markdownContent: "# Initial",
-        variablesData: { value: "initial" }
+        variablesData: { value: "initial" },
       });
-      
+
       for (let i = 0; i < 5; i++) {
         await wrapper.setProps({
           markdownContent: `# Content ${i}`,
-          variablesData: { value: `value${i}` }
+          variablesData: { value: `value${i}` },
         });
       }
-      
-      expect(wrapper.find('[data-test="markdown-renderer"]').html()).toContain("Content 4");
+
+      expect(wrapper.find('[data-test="markdown-renderer"]').html()).toContain(
+        "Content 4",
+      );
     });
 
     it("should handle markdown with special characters", () => {
-      const specialMarkdown = "# Title with & < > characters\n\n**Bold & italic**";
-      
+      const specialMarkdown =
+        "# Title with & < > characters\n\n**Bold & italic**";
+
       wrapper = createWrapper({ markdownContent: specialMarkdown });
-      
+
       expect(wrapper.exists()).toBe(true);
     });
   });
@@ -516,9 +541,9 @@ describe("MarkdownRenderer", () => {
     it("should initialize computed properties correctly", () => {
       wrapper = createWrapper({
         markdownContent: "# {{test}}",
-        variablesData: { test: "value" }
+        variablesData: { test: "value" },
       });
-      
+
       expect(wrapper.vm.processedContent).toBeDefined();
       expect(wrapper.vm.DOMPurify).toBeDefined();
       expect(wrapper.vm.marked).toBeDefined();
@@ -527,22 +552,22 @@ describe("MarkdownRenderer", () => {
 
     it("should handle component unmounting cleanly", () => {
       wrapper = createWrapper();
-      
+
       expect(() => wrapper.unmount()).not.toThrow();
     });
 
     it("should maintain reactivity for computed properties", async () => {
       wrapper = createWrapper({
         markdownContent: "# {{title}}",
-        variablesData: { title: "Initial" }
+        variablesData: { title: "Initial" },
       });
-      
+
       const initialProcessed = wrapper.vm.processedContent;
-      
+
       await wrapper.setProps({
-        variablesData: { title: "Updated" }
+        variablesData: { title: "Updated" },
       });
-      
+
       expect(wrapper.vm.processedContent).not.toBe(initialProcessed);
     });
   });
@@ -550,11 +575,11 @@ describe("MarkdownRenderer", () => {
   describe("Error Handling", () => {
     it("should handle malformed markdown gracefully", () => {
       const malformedMarkdown = "# Unclosed **bold and *italic";
-      
+
       expect(() => {
         wrapper = createWrapper({ markdownContent: malformedMarkdown });
       }).not.toThrow();
-      
+
       expect(wrapper.exists()).toBe(true);
     });
 
@@ -562,39 +587,45 @@ describe("MarkdownRenderer", () => {
       expect(() => {
         wrapper = createWrapper({
           markdownContent: null,
-          variablesData: null
+          variablesData: null,
         });
       }).not.toThrow();
-      
+
       expect(wrapper.exists()).toBe(true);
     });
 
     it("should handle very large markdown content", () => {
-      const largeContent = "# Large heading\n\nLarge content paragraph.".repeat(1000);
-      
+      const largeContent = "# Large heading\n\nLarge content paragraph.".repeat(
+        1000,
+      );
+
       expect(() => {
         wrapper = createWrapper({ markdownContent: largeContent });
       }).not.toThrow();
-      
+
       expect(wrapper.exists()).toBe(true);
     });
 
     it("should handle mixed markdown and HTML", () => {
-      const mixedContent = "# Markdown Title\n\n<div>HTML content</div>\n\n**Bold markdown**";
-      
+      const mixedContent =
+        "# Markdown Title\n\n<div>HTML content</div>\n\n**Bold markdown**";
+
       wrapper = createWrapper({ markdownContent: mixedContent });
-      
+
       expect(wrapper.exists()).toBe(true);
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
       expect(rendererElement.html()).toContain("<h1>Markdown Title</h1>");
-      expect(rendererElement.html()).toContain("<strong>Bold markdown</strong>");
+      expect(rendererElement.html()).toContain(
+        "<strong>Bold markdown</strong>",
+      );
     });
 
     it("should handle markdown with code blocks", () => {
-      const markdownWithCode = "# Title\n\n```javascript\nconst x = 5;\n```\n\nNormal text.";
-      
+      const markdownWithCode =
+        "# Title\n\n```javascript\nconst x = 5;\n```\n\nNormal text.";
+
       wrapper = createWrapper({ markdownContent: markdownWithCode });
-      
+
       expect(wrapper.exists()).toBe(true);
     });
   });

@@ -25,7 +25,12 @@ import { defineComponent, ref } from "vue";
 import type { Ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
-import { getEndPoint, getImageURL, getIngestionURL, maskText } from "../../../utils/zincutils";
+import {
+  getEndPoint,
+  getImageURL,
+  getIngestionURL,
+  maskText,
+} from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
 export default defineComponent({
   name: "curl-mechanism",

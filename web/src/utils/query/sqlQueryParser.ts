@@ -114,7 +114,8 @@ const COMPLEX_PATTERNS = {
   setOperations: /\b(UNION|INTERSECT|EXCEPT)\b/i,
 
   // Window functions
-  windowFunctions: /\b(OVER\s*\(|PARTITION\s+BY|ROW_NUMBER|RANK|DENSE_RANK|LAG|LEAD|FIRST_VALUE|LAST_VALUE|NTH_VALUE)\b/i,
+  windowFunctions:
+    /\b(OVER\s*\(|PARTITION\s+BY|ROW_NUMBER|RANK|DENSE_RANK|LAG|LEAD|FIRST_VALUE|LAST_VALUE|NTH_VALUE)\b/i,
 
   // Nested functions (e.g., ceil(count(field))) - function inside function
   nestedFunctions: /\w+\s*\(\s*\w+\s*\(/i,
@@ -286,7 +287,8 @@ export async function parseSQL(
     const stream = await getStreamFromQuery(query);
 
     // Extract fields, filters, and joins
-    const { fields, filters, streamName, joins } = await getFieldsFromQuery(query);
+    const { fields, filters, streamName, joins } =
+      await getFieldsFromQuery(query);
 
     // If no fields extracted, use custom mode
     if (!fields || fields.length === 0) {

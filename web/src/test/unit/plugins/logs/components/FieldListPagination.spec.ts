@@ -26,7 +26,11 @@ describe("FieldListPagination.vue", () => {
     useUserDefinedSchemas: "user_defined_schema",
     showOnlyInterestingFields: false,
     userDefinedSchemaBtnGroupOption: [
-      { label: "User Defined", value: "user_defined_schema", slot: "user_defined_slot" },
+      {
+        label: "User Defined",
+        value: "user_defined_schema",
+        slot: "user_defined_slot",
+      },
       { label: "All Fields", value: "all_fields", slot: "all_fields_slot" },
     ],
     selectedFieldsBtnGroupOption: [
@@ -52,7 +56,11 @@ describe("FieldListPagination.vue", () => {
         },
       });
 
-      expect(wrapper.find('[data-test="logs-page-field-list-user-defined-schema-toggle"]').exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="logs-page-field-list-user-defined-schema-toggle"]')
+          .exists(),
+      ).toBe(true);
     });
 
     it("should not render user defined schema toggle when disabled", () => {
@@ -66,7 +74,9 @@ describe("FieldListPagination.vue", () => {
         },
       });
 
-      expect(wrapper.find('[data-test="logs-user-defined-fields-btn"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="logs-user-defined-fields-btn"]').exists(),
+      ).toBe(false);
     });
 
     it("should emit toggle-schema event when schema toggle changes", async () => {
@@ -101,7 +111,9 @@ describe("FieldListPagination.vue", () => {
         },
       });
 
-      expect(wrapper.find('[data-test="logs-interesting-fields-btn"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="logs-interesting-fields-btn"]').exists(),
+      ).toBe(true);
     });
 
     it("should emit toggle-interesting-fields event when interesting fields toggle changes", async () => {
@@ -170,7 +182,9 @@ describe("FieldListPagination.vue", () => {
         },
       });
 
-      const firstBtn = wrapper.find('[data-test="logs-page-fields-list-pagination-firstpage-button"]');
+      const firstBtn = wrapper.find(
+        '[data-test="logs-page-fields-list-pagination-firstpage-button"]',
+      );
       expect(firstBtn.attributes("aria-disabled")).toBe("true");
     });
 
@@ -188,7 +202,9 @@ describe("FieldListPagination.vue", () => {
         },
       });
 
-      const lastBtn = wrapper.find('[data-test="logs-page-fields-list-pagination-lastpage-button"]');
+      const lastBtn = wrapper.find(
+        '[data-test="logs-page-fields-list-pagination-lastpage-button"]',
+      );
       expect(lastBtn.attributes("aria-disabled")).toBe("true");
     });
 
@@ -206,7 +222,9 @@ describe("FieldListPagination.vue", () => {
         },
       });
 
-      const firstBtn = wrapper.find('[data-test="logs-page-fields-list-pagination-firstpage-button"]');
+      const firstBtn = wrapper.find(
+        '[data-test="logs-page-fields-list-pagination-firstpage-button"]',
+      );
       await firstBtn.trigger("click");
 
       expect(wrapper.emitted("first-page")).toBeTruthy();
@@ -226,7 +244,9 @@ describe("FieldListPagination.vue", () => {
         },
       });
 
-      const lastBtn = wrapper.find('[data-test="logs-page-fields-list-pagination-lastpage-button"]');
+      const lastBtn = wrapper.find(
+        '[data-test="logs-page-fields-list-pagination-lastpage-button"]',
+      );
       await lastBtn.trigger("click");
 
       expect(wrapper.emitted("last-page")).toBeTruthy();
@@ -246,7 +266,9 @@ describe("FieldListPagination.vue", () => {
         },
       });
 
-      const pageBtn = wrapper.find('[data-test="logs-page-fields-list-pagination-page-2-button"]');
+      const pageBtn = wrapper.find(
+        '[data-test="logs-page-fields-list-pagination-page-2-button"]',
+      );
       await pageBtn.trigger("click");
 
       expect(wrapper.emitted("set-page")).toBeTruthy();
@@ -269,9 +291,21 @@ describe("FieldListPagination.vue", () => {
         },
       });
 
-      expect(wrapper.find('[data-test="logs-page-fields-list-pagination-page-1-button"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="logs-page-fields-list-pagination-page-2-button"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="logs-page-fields-list-pagination-page-3-button"]').exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="logs-page-fields-list-pagination-page-1-button"]')
+          .exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="logs-page-fields-list-pagination-page-2-button"]')
+          .exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="logs-page-fields-list-pagination-page-3-button"]')
+          .exists(),
+      ).toBe(true);
     });
 
     it("should show 3 pages centered around current page", () => {
@@ -289,9 +323,21 @@ describe("FieldListPagination.vue", () => {
       });
 
       // Should show pages 4, 5, 6
-      expect(wrapper.find('[data-test="logs-page-fields-list-pagination-page-4-button"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="logs-page-fields-list-pagination-page-5-button"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="logs-page-fields-list-pagination-page-6-button"]').exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="logs-page-fields-list-pagination-page-4-button"]')
+          .exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="logs-page-fields-list-pagination-page-5-button"]')
+          .exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="logs-page-fields-list-pagination-page-6-button"]')
+          .exists(),
+      ).toBe(true);
     });
 
     it("should highlight current page", () => {
@@ -308,7 +354,9 @@ describe("FieldListPagination.vue", () => {
         },
       });
 
-      const currentBtn = wrapper.find('[data-test="logs-page-fields-list-pagination-page-3-button"]');
+      const currentBtn = wrapper.find(
+        '[data-test="logs-page-fields-list-pagination-page-3-button"]',
+      );
       expect(currentBtn.classes()).toContain("pagination-page-active");
     });
   });
@@ -322,7 +370,9 @@ describe("FieldListPagination.vue", () => {
         },
       });
 
-      expect(wrapper.find('[data-test="logs-page-fields-list-reset-icon"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="logs-page-fields-list-reset-icon"]').exists(),
+      ).toBe(true);
     });
 
     it("should emit reset-fields event when reset icon clicked", async () => {
@@ -333,7 +383,9 @@ describe("FieldListPagination.vue", () => {
         },
       });
 
-      const resetIcon = wrapper.find('[data-test="logs-page-fields-list-reset-icon"]');
+      const resetIcon = wrapper.find(
+        '[data-test="logs-page-fields-list-reset-icon"]',
+      );
       await resetIcon.trigger("click");
 
       expect(wrapper.emitted("reset-fields")).toBeTruthy();

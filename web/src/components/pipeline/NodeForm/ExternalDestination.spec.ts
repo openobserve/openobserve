@@ -1,7 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Dialog, Notify } from "quasar";
-import useDnD from '@/plugins/pipelines/useDnD';
+import useDnD from "@/plugins/pipelines/useDnD";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
@@ -35,7 +35,7 @@ vi.mock("@/services/alert_destination", () => ({
 
 const mockAddNode = vi.fn();
 const mockDeletePipelineNode = vi.fn();
-vi.mock('@/plugins/pipelines/useDnD', () => ({
+vi.mock("@/plugins/pipelines/useDnD", () => ({
   default: vi.fn(),
 }));
 
@@ -66,19 +66,27 @@ describe("ExternalDestination Component", () => {
     mockPipelineObj = {
       currentSelectedNodeData: {
         data: {},
-        type: 'destination'
+        type: "destination",
       },
-      currentSelectedNodeID: 'node-123',
+      currentSelectedNodeID: "node-123",
       userSelectedNode: {},
-      isEditNode: false
+      isEditNode: false,
     };
 
     // Mock destination service responses
     vi.mocked(destinationService.list).mockResolvedValue({
       data: [
-        { name: "dest1", url: "http://dest1.com", destination_type_name: "openobserve" },
-        { name: "dest2", url: "http://dest2.com", destination_type_name: "splunk" }
-      ]
+        {
+          name: "dest1",
+          url: "http://dest1.com",
+          destination_type_name: "openobserve",
+        },
+        {
+          name: "dest2",
+          url: "http://dest2.com",
+          destination_type_name: "splunk",
+        },
+      ],
     } as any);
 
     // Setup notify mock
@@ -89,7 +97,7 @@ describe("ExternalDestination Component", () => {
     vi.mocked(useDnD).mockImplementation(() => ({
       pipelineObj: mockPipelineObj,
       addNode: mockAddNode,
-      deletePipelineNode: mockDeletePipelineNode
+      deletePipelineNode: mockDeletePipelineNode,
     }));
 
     // Mount component
@@ -110,8 +118,8 @@ describe("ExternalDestination Component", () => {
           QItemLabel: true,
           ConfirmDialog: true,
           CreateDestinationForm: true,
-        }
-      }
+        },
+      },
     });
 
     await flushPromises();
@@ -135,8 +143,8 @@ describe("ExternalDestination Component", () => {
       expect(destinationService.list).toHaveBeenCalledWith(
         expect.objectContaining({
           org_identifier: "default",
-          module: "pipeline"
-        })
+          module: "pipeline",
+        }),
       );
       expect(wrapper.vm.destinations).toHaveLength(2);
     });
@@ -144,7 +152,7 @@ describe("ExternalDestination Component", () => {
     it("1.4 should initialize selectedDestination with empty values by default", () => {
       expect(wrapper.vm.selectedDestination).toEqual({
         label: "",
-        value: ""
+        value: "",
       });
     });
 
@@ -158,22 +166,22 @@ describe("ExternalDestination Component", () => {
           stubs: {
             ConfirmDialog: true,
             CreateDestinationForm: true,
-          }
-        }
+          },
+        },
       });
 
       // Mock useDnD with existing destination
       vi.mocked(useDnD).mockImplementation(() => ({
         pipelineObj: {
           currentSelectedNodeData: {
-            data: { destination_name: "existing-dest" }
+            data: { destination_name: "existing-dest" },
           },
-          currentSelectedNodeID: 'node-456',
+          currentSelectedNodeID: "node-456",
           userSelectedNode: {},
-          isEditNode: true
+          isEditNode: true,
         },
         addNode: mockAddNode,
-        deletePipelineNode: mockDeletePipelineNode
+        deletePipelineNode: mockDeletePipelineNode,
       }));
 
       await flushPromises();
@@ -187,15 +195,15 @@ describe("ExternalDestination Component", () => {
           stubs: {
             ConfirmDialog: true,
             CreateDestinationForm: true,
-          }
-        }
+          },
+        },
       });
 
       await flushPromises();
 
       expect(wrapperWithExisting.vm.selectedDestination).toEqual({
         label: "existing-dest",
-        value: "existing-dest"
+        value: "existing-dest",
       });
 
       wrapperWithData.unmount();
@@ -207,21 +215,23 @@ describe("ExternalDestination Component", () => {
     it("2.1 should format destinations correctly", () => {
       wrapper.vm.destinations = [
         { name: "dest1", url: "http://dest1.com" },
-        { name: "dest2", url: "http://dest2.com" }
+        { name: "dest2", url: "http://dest2.com" },
       ];
 
       const formatted = wrapper.vm.getFormattedDestinations;
       expect(formatted).toEqual([
         { label: "dest1", value: "dest1", url: "http://dest1.com" },
-        { label: "dest2", value: "dest2", url: "http://dest2.com" }
+        { label: "dest2", value: "dest2", url: "http://dest2.com" },
       ]);
     });
 
     it("2.2 should truncate long URLs", () => {
-      wrapper.vm.destinations = [{
-        name: "long-url-dest",
-        url: "https://very-long-url-that-exceeds-seventy-characters-limit-for-display.com/api/v1/webhooks"
-      }];
+      wrapper.vm.destinations = [
+        {
+          name: "long-url-dest",
+          url: "https://very-long-url-that-exceeds-seventy-characters-limit-for-display.com/api/v1/webhooks",
+        },
+      ];
 
       const formatted = wrapper.vm.getFormattedDestinations;
       expect(formatted[0].url.length).toBeLessThanOrEqual(73); // 70 + "..."
@@ -229,10 +239,12 @@ describe("ExternalDestination Component", () => {
     });
 
     it("2.3 should not truncate short URLs", () => {
-      wrapper.vm.destinations = [{
-        name: "short-url-dest",
-        url: "http://short.com"
-      }];
+      wrapper.vm.destinations = [
+        {
+          name: "short-url-dest",
+          url: "http://short.com",
+        },
+      ];
 
       const formatted = wrapper.vm.getFormattedDestinations;
       expect(formatted[0].url).toBe("http://short.com");
@@ -247,10 +259,12 @@ describe("ExternalDestination Component", () => {
 
     it("2.5 should handle URLs with exactly 70 characters", () => {
       const exactly70CharUrl = "a".repeat(70);
-      wrapper.vm.destinations = [{
-        name: "exact-length-dest",
-        url: exactly70CharUrl
-      }];
+      wrapper.vm.destinations = [
+        {
+          name: "exact-length-dest",
+          url: exactly70CharUrl,
+        },
+      ];
 
       const formatted = wrapper.vm.getFormattedDestinations;
       expect(formatted[0].url).toBe(exactly70CharUrl);
@@ -267,7 +281,7 @@ describe("ExternalDestination Component", () => {
         destination_name: "dest1",
         node_type: "remote_stream",
         io_type: "output",
-        org_id: "default"
+        org_id: "default",
       });
       expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
     });
@@ -294,8 +308,8 @@ describe("ExternalDestination Component", () => {
 
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
-          org_id: "default"
-        })
+          org_id: "default",
+        }),
       );
     });
   });
@@ -304,10 +318,12 @@ describe("ExternalDestination Component", () => {
     it("4.1 should fetch destinations successfully", async () => {
       const mockDestinations = [
         { name: "dest1", url: "http://dest1.com" },
-        { name: "dest2", url: "http://dest2.com" }
+        { name: "dest2", url: "http://dest2.com" },
       ];
 
-      vi.mocked(destinationService.list).mockResolvedValueOnce({ data: mockDestinations } as any);
+      vi.mocked(destinationService.list).mockResolvedValueOnce({
+        data: mockDestinations,
+      } as any);
 
       await wrapper.vm.getDestinations();
       await flushPromises();
@@ -319,7 +335,7 @@ describe("ExternalDestination Component", () => {
       // Skipped: Quasar notify is hard to mock in this context
       // The error handling logic exists in the component
       vi.mocked(destinationService.list).mockRejectedValueOnce({
-        response: { status: 500 }
+        response: { status: 500 },
       });
 
       await wrapper.vm.getDestinations();
@@ -328,15 +344,17 @@ describe("ExternalDestination Component", () => {
 
     it("4.3 should handle 403 error silently", async () => {
       vi.mocked(destinationService.list).mockRejectedValueOnce({
-        response: { status: 403 }
+        response: { status: 403 },
       });
 
       await wrapper.vm.getDestinations();
       await flushPromises();
 
-      expect(notifyMock).not.toHaveBeenCalledWith(expect.objectContaining({
-        type: "negative"
-      }));
+      expect(notifyMock).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "negative",
+        }),
+      );
     });
 
     it("4.4 should call with correct parameters", async () => {
@@ -348,7 +366,7 @@ describe("ExternalDestination Component", () => {
         sort_by: "name",
         desc: false,
         org_identifier: "default",
-        module: "pipeline"
+        module: "pipeline",
       });
     });
 
@@ -377,7 +395,7 @@ describe("ExternalDestination Component", () => {
 
       expect(wrapper.vm.selectedDestination).toEqual({
         label: destinationName,
-        value: destinationName
+        value: destinationName,
       });
       expect(wrapper.vm.createNewDestination).toBe(false);
     });
@@ -425,19 +443,19 @@ describe("ExternalDestination Component", () => {
 
   describe("7. Component Exposure", () => {
     it("7.1 should expose getDestinations method", () => {
-      expect(typeof wrapper.vm.getDestinations).toBe('function');
+      expect(typeof wrapper.vm.getDestinations).toBe("function");
     });
 
     it("7.2 should expose saveDestination method", () => {
-      expect(typeof wrapper.vm.saveDestination).toBe('function');
+      expect(typeof wrapper.vm.saveDestination).toBe("function");
     });
 
     it("7.3 should expose handleDestinationCreated method", () => {
-      expect(typeof wrapper.vm.handleDestinationCreated).toBe('function');
+      expect(typeof wrapper.vm.handleDestinationCreated).toBe("function");
     });
 
     it("7.4 should expose handleCancel method", () => {
-      expect(typeof wrapper.vm.handleCancel).toBe('function');
+      expect(typeof wrapper.vm.handleCancel).toBe("function");
     });
 
     it("7.5 should expose selectedDestination ref", () => {

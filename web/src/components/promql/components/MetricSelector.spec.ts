@@ -126,7 +126,7 @@ describe("MetricSelector", () => {
         -1,
         "",
         "",
-        false
+        false,
       );
     });
 
@@ -151,7 +151,7 @@ describe("MetricSelector", () => {
         () =>
           new Promise((resolve) => {
             setTimeout(() => resolve({ data: { list: mockMetrics } }), 100);
-          })
+          }),
       );
 
       wrapper = createWrapper();
@@ -180,7 +180,9 @@ describe("MetricSelector", () => {
     });
 
     it("should handle API error gracefully", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       mockStreamService.nameList.mockRejectedValue(new Error("API Error"));
 
       wrapper = createWrapper();
@@ -191,7 +193,7 @@ describe("MetricSelector", () => {
       expect(wrapper.vm.loading).toBe(false);
       expect(consoleSpy).toHaveBeenCalledWith(
         "Error loading metrics:",
-        expect.any(Error)
+        expect.any(Error),
       );
 
       consoleSpy.mockRestore();
@@ -220,7 +222,9 @@ describe("MetricSelector", () => {
       await wrapper.vm.onMetricSelect("cpu_usage_percent");
 
       expect(wrapper.emitted("update:metric")).toBeTruthy();
-      expect(wrapper.emitted("update:metric")[0]).toEqual(["cpu_usage_percent"]);
+      expect(wrapper.emitted("update:metric")[0]).toEqual([
+        "cpu_usage_percent",
+      ]);
     });
 
     it("should update selectedMetric when metric is selected", async () => {
@@ -287,7 +291,7 @@ describe("MetricSelector", () => {
         -1,
         "http",
         "",
-        false
+        false,
       );
     });
 
@@ -311,7 +315,7 @@ describe("MetricSelector", () => {
       expect(wrapper.vm.filteredMetrics.length).toBe(2);
       expect(wrapper.vm.filteredMetrics).toContain("http_requests_total");
       expect(wrapper.vm.filteredMetrics).toContain(
-        "http_request_duration_seconds"
+        "http_request_duration_seconds",
       );
     });
 
@@ -323,7 +327,7 @@ describe("MetricSelector", () => {
         () =>
           new Promise((resolve) => {
             setTimeout(() => resolve({ data: { list: [] } }), 100);
-          })
+          }),
       );
 
       const updateFn = vi.fn((callback) => callback());
@@ -338,7 +342,9 @@ describe("MetricSelector", () => {
     });
 
     it("should handle filter API error", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       wrapper = createWrapper();
       await flushPromises();
 
@@ -352,7 +358,7 @@ describe("MetricSelector", () => {
       expect(wrapper.vm.loading).toBe(false);
       expect(consoleSpy).toHaveBeenCalledWith(
         "Error filtering metrics:",
-        expect.any(Error)
+        expect.any(Error),
       );
 
       consoleSpy.mockRestore();
@@ -443,7 +449,7 @@ describe("MetricSelector", () => {
         () =>
           new Promise((resolve) => {
             setTimeout(() => resolve({ data: { list: [] } }), 100);
-          })
+          }),
       );
 
       wrapper = createWrapper();

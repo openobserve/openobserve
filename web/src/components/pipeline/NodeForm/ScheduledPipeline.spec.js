@@ -7,23 +7,25 @@ import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
 import ScheduledPipeline from "./ScheduledPipeline.vue";
 import searchService from "@/services/search";
-import { nextTick } from 'vue';
+import { nextTick } from "vue";
 
 // Mock Quasar
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
+vi.mock("quasar", async () => {
+  const actual = await vi.importActual("quasar");
   let isFullscreenActive = false;
   return {
     ...actual,
     useQuasar: () => ({
       notify: vi.fn(() => vi.fn()),
       fullscreen: {
-        get isActive() { return isFullscreenActive; },
+        get isActive() {
+          return isFullscreenActive;
+        },
         toggle: vi.fn(() => {
           isFullscreenActive = !isFullscreenActive;
         }),
-      }
-    })
+      },
+    }),
   };
 });
 
@@ -54,25 +56,21 @@ vi.mock("@/composables/useStreams", () => ({
     }),
   }),
 }));
-vi.mock('@/composables/useParser', () => {
+vi.mock("@/composables/useParser", () => {
   return {
     default: () => ({
       sqlParser: async () => ({
         astify: vi.fn((query) => {
           const lowerQuery = query.toLowerCase();
-        
+
           if (lowerQuery.includes("select *")) {
             return {
-              columns: [
-                { expr: { column: "*" } }
-              ]
+              columns: [{ expr: { column: "*" } }],
             };
           }
           if (lowerQuery.includes("valid_column")) {
             return {
-              columns: [
-                { expr: { column: "valid_column" } }
-              ]
+              columns: [{ expr: { column: "valid_column" } }],
             };
           }
           if (lowerQuery.includes("default")) {
@@ -86,11 +84,10 @@ vi.mock('@/composables/useParser', () => {
         whiteListCheck: vi.fn(),
         exprToSQL: vi.fn(),
         parse: vi.fn(),
-      })
-    })
+      }),
+    }),
   };
 });
-
 
 vi.mock("@/composables/useLogs", () => ({
   default: () => ({
@@ -112,29 +109,37 @@ describe("ScheduledPipeline Component", () => {
     // Setup mock store
     mockStore = {
       state: {
-        theme: 'light',
+        theme: "light",
         selectedOrganization: {
-          identifier: "test-org"
+          identifier: "test-org",
         },
         zoConfig: {
           min_auto_refresh_interval: 900,
           sql_base64_enabled: false,
           timestamp_column: "_timestamp",
-          all_fields_name: "_all"
+          all_fields_name: "_all",
         },
         isAiChatEnabled: false,
         organizationData: {
           functions: [
-            { name: 'avg', description: 'Average function', function: 'avg(value)' },
-            { name: 'sum', description: 'Sum function', function: 'sum(value)' }
-          ]
+            {
+              name: "avg",
+              description: "Average function",
+              function: "avg(value)",
+            },
+            {
+              name: "sum",
+              description: "Sum function",
+              function: "sum(value)",
+            },
+          ],
         },
         timezone: "UTC",
         userInfo: {
-          email: "test@example.com"
-        }
+          email: "test@example.com",
+        },
       },
-      dispatch: vi.fn()
+      dispatch: vi.fn(),
     };
 
     // Mount component with props
@@ -145,22 +150,22 @@ describe("ScheduledPipeline Component", () => {
           store: mockStore,
         },
         stubs: {
-          'q-splitter': true,
-          'q-dialog': true,
-          'q-select': true,
-          'q-input': true,
-          'q-btn': true,
-          'q-icon': true,
-          'q-tooltip': true,
-          'q-table': true,
-          'DateTime': true,
-          'FieldList': true,
-          'QueryEditor': true,
-          'TenstackTable': true,
-          'PreviewPromqlQuery': true,
-          'O2AIChat': true,
-          'FullViewContainer': true
-        }
+          "q-splitter": true,
+          "q-dialog": true,
+          "q-select": true,
+          "q-input": true,
+          "q-btn": true,
+          "q-icon": true,
+          "q-tooltip": true,
+          "q-table": true,
+          DateTime: true,
+          FieldList: true,
+          QueryEditor: true,
+          TenstackTable: true,
+          PreviewPromqlQuery: true,
+          O2AIChat: true,
+          FullViewContainer: true,
+        },
       },
       props: {
         columns: [],
@@ -172,7 +177,7 @@ describe("ScheduledPipeline Component", () => {
           timezone: "UTC",
           cron: "",
           operator: ">=",
-          threshold: 1
+          threshold: 1,
         },
         sql: "",
         query_type: "sql",
@@ -182,8 +187,8 @@ describe("ScheduledPipeline Component", () => {
         promql_condition: null,
         streamType: "logs",
         delay: 0,
-        validatingSqlQuery: false
-      }
+        validatingSqlQuery: false,
+      },
     });
 
     // Initialize required data
@@ -194,7 +199,7 @@ describe("ScheduledPipeline Component", () => {
       timezone: "UTC",
       cron: "",
       operator: ">=",
-      threshold: 1
+      threshold: 1,
     };
 
     // Initialize dateTime with valid values
@@ -202,7 +207,7 @@ describe("ScheduledPipeline Component", () => {
       startTime: Date.now() - 3600000, // 1 hour ago
       endTime: Date.now(),
       relativeTimePeriod: "15m",
-      valueType: "relative"
+      valueType: "relative",
     };
 
     wrapper.vm.cronJobError = "";
@@ -211,7 +216,7 @@ describe("ScheduledPipeline Component", () => {
 
   afterEach(() => {
     vi.clearAllMocks();
-    wrapper.vm.query = ""
+    wrapper.vm.query = "";
   });
 
   describe("Component Initialization", () => {
@@ -288,7 +293,9 @@ describe("ScheduledPipeline Component", () => {
       wrapper.vm.triggerData.frequency = 5;
       wrapper.vm.validateFrequency();
       await nextTick();
-      expect(wrapper.vm.cronJobError).toBe("Minimum frequency should be 15 minutes");
+      expect(wrapper.vm.cronJobError).toBe(
+        "Minimum frequency should be 15 minutes",
+      );
     });
 
     it("validates cron expression", async () => {
@@ -317,7 +324,10 @@ describe("ScheduledPipeline Component", () => {
     it("handles AI chat toggle", async () => {
       await wrapper.vm.toggleAIChat();
       await nextTick();
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "setIsAiChatEnabled",
+        true,
+      );
     });
 
     it("updates expand states correctly", async () => {
@@ -325,7 +335,6 @@ describe("ScheduledPipeline Component", () => {
       await nextTick();
       expect(wrapper.vm.expandState.query).toBe(false);
     });
-
   });
 
   describe("Search and Results", () => {
@@ -334,8 +343,8 @@ describe("ScheduledPipeline Component", () => {
       wrapper.vm.query = "SELECT * FROM test_stream";
       searchService.search.mockResolvedValueOnce({
         data: {
-          hits: [{ _timestamp: 1234567890000, message: "test" }]
-        }
+          hits: [{ _timestamp: 1234567890000, message: "test" }],
+        },
       });
 
       await wrapper.vm.runQuery();
@@ -346,8 +355,8 @@ describe("ScheduledPipeline Component", () => {
     it("handles empty search results", async () => {
       searchService.search.mockResolvedValueOnce({
         data: {
-          hits: []
-        }
+          hits: [],
+        },
       });
 
       await wrapper.vm.runQuery();
@@ -368,7 +377,7 @@ describe("ScheduledPipeline Component", () => {
         getCursorIndex: vi.fn().mockReturnValue(7),
         getValue: vi.fn().mockReturnValue("SELECT "),
         setValue: vi.fn(),
-        replaceRange: vi.fn()
+        replaceRange: vi.fn(),
       };
       wrapper.vm.pipelineEditorRef = mockEditorRef;
       wrapper.vm.tab = "custom";
@@ -384,9 +393,13 @@ describe("ScheduledPipeline Component", () => {
       // Reset the store's functions
       mockStore.state.organizationData = {
         functions: [
-          { name: 'avg', description: 'Average function', function: 'avg(value)' },
-          { name: 'sum', description: 'Sum function', function: 'sum(value)' }
-        ]
+          {
+            name: "avg",
+            description: "Average function",
+            function: "avg(value)",
+          },
+          { name: "sum", description: "Sum function", function: "sum(value)" },
+        ],
       };
       await nextTick();
     });
@@ -394,15 +407,14 @@ describe("ScheduledPipeline Component", () => {
     it("initializes with correct functions list", () => {
       expect(wrapper.vm.functionsList).toBeDefined();
       expect(wrapper.vm.functionsList.length).toBe(2);
-      expect(wrapper.vm.functionsList[0].name).toBe('avg');
+      expect(wrapper.vm.functionsList[0].name).toBe("avg");
     });
-
 
     it("handles function selection", async () => {
       const testFunction = {
-        name: 'avg',
-        description: 'Average function',
-        function: 'avg(value)'
+        name: "avg",
+        description: "Average function",
+        function: "avg(value)",
       };
 
       // Initialize the component's state
@@ -414,7 +426,7 @@ describe("ScheduledPipeline Component", () => {
       await nextTick();
 
       // Verify the state changes
-      expect(wrapper.vm.selectedFunction).toBe('avg');
+      expect(wrapper.vm.selectedFunction).toBe("avg");
     });
   });
 
@@ -498,7 +510,7 @@ describe("ScheduledPipeline Component", () => {
       // Mock the previewPromqlQueryRef
       const mockRefreshData = vi.fn();
       wrapper.vm.previewPromqlQueryRef = {
-        refreshData: mockRefreshData
+        refreshData: mockRefreshData,
       };
 
       // Simulate run query button click
@@ -540,15 +552,15 @@ describe("ScheduledPipeline Component", () => {
           plugins: [i18n],
           provide: { store: mockStore },
           stubs: {
-            'q-splitter': true,
-            'DateTime': true,
-            'FieldList': true,
-            'QueryEditor': true,
-            'TenstackTable': true,
-            'PreviewPromqlQuery': true,
-            'O2AIChat': true,
-            'FullViewContainer': true
-          }
+            "q-splitter": true,
+            DateTime: true,
+            FieldList: true,
+            QueryEditor: true,
+            TenstackTable: true,
+            PreviewPromqlQuery: true,
+            O2AIChat: true,
+            FullViewContainer: true,
+          },
         },
         props: {
           columns: [],
@@ -557,8 +569,8 @@ describe("ScheduledPipeline Component", () => {
           promql: promqlQuery,
           query_type: "promql",
           streamType: "metrics",
-          delay: 0
-        }
+          delay: 0,
+        },
       });
 
       expect(newWrapper.vm.query).toBe(promqlQuery);
@@ -572,15 +584,15 @@ describe("ScheduledPipeline Component", () => {
           plugins: [i18n],
           provide: { store: mockStore },
           stubs: {
-            'q-splitter': true,
-            'DateTime': true,
-            'FieldList': true,
-            'QueryEditor': true,
-            'TenstackTable': true,
-            'PreviewPromqlQuery': true,
-            'O2AIChat': true,
-            'FullViewContainer': true
-          }
+            "q-splitter": true,
+            DateTime: true,
+            FieldList: true,
+            QueryEditor: true,
+            TenstackTable: true,
+            PreviewPromqlQuery: true,
+            O2AIChat: true,
+            FullViewContainer: true,
+          },
         },
         props: {
           columns: [],
@@ -589,8 +601,8 @@ describe("ScheduledPipeline Component", () => {
           promql: "metric{}",
           query_type: "sql",
           streamType: "logs",
-          delay: 0
-        }
+          delay: 0,
+        },
       });
 
       expect(newWrapper.vm.query).toBe(sqlQuery);
@@ -708,7 +720,7 @@ describe("ScheduledPipeline Component", () => {
       // Fix #4: First click should work with nextTick
       const mockRefreshData = vi.fn();
       wrapper.vm.previewPromqlQueryRef = {
-        refreshData: mockRefreshData
+        refreshData: mockRefreshData,
       };
 
       await wrapper.vm.runQuery();
@@ -724,18 +736,17 @@ describe("ScheduledPipeline Component", () => {
       wrapper.vm.query = "SELECT * FROM traces_stream";
 
       searchService.search.mockResolvedValueOnce({
-        data: { hits: [] }
+        data: { hits: [] },
       });
 
       await wrapper.vm.runQuery();
 
       expect(searchService.search).toHaveBeenCalledWith(
         expect.objectContaining({
-          page_type: "traces"
+          page_type: "traces",
         }),
-        expect.any(String)
+        expect.any(String),
       );
     });
   });
 });
-

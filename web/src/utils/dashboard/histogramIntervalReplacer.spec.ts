@@ -26,7 +26,6 @@ import { replaceHistogramInterval } from "./histogramIntervalReplacer";
  */
 
 describe("Histogram Interval Replacement", () => {
-
   describe("Basic Cases", () => {
     it("should replace interval in basic histogram call", () => {
       const query = "SELECT histogram(_timestamp, '30 seconds')";
@@ -124,17 +123,19 @@ describe("Histogram Interval Replacement", () => {
     });
 
     it("should handle quoted field name", () => {
-      const query = 'SELECT histogram("_timestamp", \'30 seconds\')';
+      const query = "SELECT histogram(\"_timestamp\", '30 seconds')";
       const result = replaceHistogramInterval(query, "1 minute");
 
-      expect(result).toBe('SELECT histogram("_timestamp", \'1 minute\')');
+      expect(result).toBe("SELECT histogram(\"_timestamp\", '1 minute')");
     });
 
     it("should handle table prefix with quotes", () => {
       const query = 'SELECT histogram("default"."_timestamp", \'30 seconds\')';
       const result = replaceHistogramInterval(query, "1 minute");
 
-      expect(result).toBe('SELECT histogram("default"."_timestamp", \'1 minute\')');
+      expect(result).toBe(
+        'SELECT histogram("default"."_timestamp", \'1 minute\')',
+      );
     });
 
     it("should handle variable reference with $", () => {
@@ -198,28 +199,38 @@ describe("Histogram Interval Replacement", () => {
 
   describe("Multiple Histograms", () => {
     it("should replace interval in all histogram calls", () => {
-      const query = "SELECT histogram(_timestamp, '30 seconds'), count(*), histogram(event_time, '1 minute')";
+      const query =
+        "SELECT histogram(_timestamp, '30 seconds'), count(*), histogram(event_time, '1 minute')";
       const result = replaceHistogramInterval(query, "5 minutes");
 
-      expect(result).toBe("SELECT histogram(_timestamp, '5 minutes'), count(*), histogram(event_time, '5 minutes')");
+      expect(result).toBe(
+        "SELECT histogram(_timestamp, '5 minutes'), count(*), histogram(event_time, '5 minutes')",
+      );
     });
 
     it("should handle histograms with different intervals", () => {
-      const query = "SELECT histogram(field1, '10s'), histogram(field2, '1m'), histogram(field3, '1h')";
+      const query =
+        "SELECT histogram(field1, '10s'), histogram(field2, '1m'), histogram(field3, '1h')";
       const result = replaceHistogramInterval(query, "30 seconds");
 
-      expect(result).toBe("SELECT histogram(field1, '30 seconds'), histogram(field2, '30 seconds'), histogram(field3, '30 seconds')");
+      expect(result).toBe(
+        "SELECT histogram(field1, '30 seconds'), histogram(field2, '30 seconds'), histogram(field3, '30 seconds')",
+      );
     });
 
     it("should handle mix of histograms with and without intervals", () => {
-      const query = "SELECT histogram(_timestamp), histogram(field2, '1 minute')";
+      const query =
+        "SELECT histogram(_timestamp), histogram(field2, '1 minute')";
       const result = replaceHistogramInterval(query, "2 minutes");
 
-      expect(result).toBe("SELECT histogram(_timestamp, '2 minutes'), histogram(field2, '2 minutes')");
+      expect(result).toBe(
+        "SELECT histogram(_timestamp, '2 minutes'), histogram(field2, '2 minutes')",
+      );
     });
 
     it("should remove intervals from all histograms when newInterval is null", () => {
-      const query = "SELECT histogram(_timestamp, '30 seconds'), histogram(field2, '1 minute')";
+      const query =
+        "SELECT histogram(_timestamp, '30 seconds'), histogram(field2, '1 minute')";
       const result = replaceHistogramInterval(query, null);
 
       expect(result).toBe("SELECT histogram(_timestamp), histogram(field2)");
@@ -228,38 +239,53 @@ describe("Histogram Interval Replacement", () => {
 
   describe("Complex SQL Queries", () => {
     it("should work in full SELECT query with JOIN", () => {
-      const query = 'SELECT histogram(default._timestamp, \'30 seconds\') as "x_axis_1", count(default._timestamp) as "y_axis_1" FROM "default" INNER JOIN "default1" AS stream_0 ON default._timestamp = stream_0._timestamp GROUP BY x_axis_1 ORDER BY x_axis_1 ASC';
+      const query =
+        'SELECT histogram(default._timestamp, \'30 seconds\') as "x_axis_1", count(default._timestamp) as "y_axis_1" FROM "default" INNER JOIN "default1" AS stream_0 ON default._timestamp = stream_0._timestamp GROUP BY x_axis_1 ORDER BY x_axis_1 ASC';
       const result = replaceHistogramInterval(query, "1 minute");
 
-      expect(result).toBe('SELECT histogram(default._timestamp, \'1 minute\') as "x_axis_1", count(default._timestamp) as "y_axis_1" FROM "default" INNER JOIN "default1" AS stream_0 ON default._timestamp = stream_0._timestamp GROUP BY x_axis_1 ORDER BY x_axis_1 ASC');
+      expect(result).toBe(
+        'SELECT histogram(default._timestamp, \'1 minute\') as "x_axis_1", count(default._timestamp) as "y_axis_1" FROM "default" INNER JOIN "default1" AS stream_0 ON default._timestamp = stream_0._timestamp GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+      );
     });
 
     it("should work with GROUP BY and ORDER BY", () => {
-      const query = "SELECT histogram(_timestamp, '30 seconds') as x, count(*) as y FROM logs GROUP BY x ORDER BY x";
+      const query =
+        "SELECT histogram(_timestamp, '30 seconds') as x, count(*) as y FROM logs GROUP BY x ORDER BY x";
       const result = replaceHistogramInterval(query, "1 minute");
 
-      expect(result).toBe("SELECT histogram(_timestamp, '1 minute') as x, count(*) as y FROM logs GROUP BY x ORDER BY x");
+      expect(result).toBe(
+        "SELECT histogram(_timestamp, '1 minute') as x, count(*) as y FROM logs GROUP BY x ORDER BY x",
+      );
     });
 
     it("should work with WHERE clause", () => {
-      const query = "SELECT histogram(_timestamp, '30 seconds') FROM logs WHERE level = 'error'";
+      const query =
+        "SELECT histogram(_timestamp, '30 seconds') FROM logs WHERE level = 'error'";
       const result = replaceHistogramInterval(query, "5 minutes");
 
-      expect(result).toBe("SELECT histogram(_timestamp, '5 minutes') FROM logs WHERE level = 'error'");
+      expect(result).toBe(
+        "SELECT histogram(_timestamp, '5 minutes') FROM logs WHERE level = 'error'",
+      );
     });
 
     it("should work with subquery", () => {
-      const query = "SELECT histogram(_timestamp, '30 seconds') FROM (SELECT * FROM logs) as subquery";
+      const query =
+        "SELECT histogram(_timestamp, '30 seconds') FROM (SELECT * FROM logs) as subquery";
       const result = replaceHistogramInterval(query, "1 minute");
 
-      expect(result).toBe("SELECT histogram(_timestamp, '1 minute') FROM (SELECT * FROM logs) as subquery");
+      expect(result).toBe(
+        "SELECT histogram(_timestamp, '1 minute') FROM (SELECT * FROM logs) as subquery",
+      );
     });
 
     it("should work with HAVING clause", () => {
-      const query = "SELECT histogram(_timestamp, '30 seconds') as t, count(*) as c FROM logs GROUP BY t HAVING c > 10";
+      const query =
+        "SELECT histogram(_timestamp, '30 seconds') as t, count(*) as c FROM logs GROUP BY t HAVING c > 10";
       const result = replaceHistogramInterval(query, "2 minutes");
 
-      expect(result).toBe("SELECT histogram(_timestamp, '2 minutes') as t, count(*) as c FROM logs GROUP BY t HAVING c > 10");
+      expect(result).toBe(
+        "SELECT histogram(_timestamp, '2 minutes') as t, count(*) as c FROM logs GROUP BY t HAVING c > 10",
+      );
     });
   });
 
@@ -272,7 +298,8 @@ describe("Histogram Interval Replacement", () => {
     });
 
     it("should not modify histogram in string literals", () => {
-      const query = "SELECT 'histogram(_timestamp)' as text, histogram(_timestamp, '30 seconds')";
+      const query =
+        "SELECT 'histogram(_timestamp)' as text, histogram(_timestamp, '30 seconds')";
       const result = replaceHistogramInterval(query, "1 minute");
 
       // The regex will match both, but in real SQL, the first one is a string
@@ -310,7 +337,8 @@ describe("Histogram Interval Replacement", () => {
 
     it("should handle very long interval strings", () => {
       const query = "SELECT histogram(_timestamp, '30 seconds')";
-      const longInterval = "this is a very long interval string that should still work fine";
+      const longInterval =
+        "this is a very long interval string that should still work fine";
       const result = replaceHistogramInterval(query, longInterval);
 
       expect(result).toBe(`SELECT histogram(_timestamp, '${longInterval}')`);
@@ -363,62 +391,77 @@ describe("Histogram Interval Replacement", () => {
 
   describe("Real-world Query Examples", () => {
     it("should work with default dashboard query", () => {
-      const query = 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "default" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC';
+      const query =
+        'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "default" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC';
       const result = replaceHistogramInterval(query, "30 seconds");
 
-      expect(result).toBe('SELECT histogram(_timestamp, \'30 seconds\') as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "default" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC');
+      expect(result).toBe(
+        'SELECT histogram(_timestamp, \'30 seconds\') as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "default" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+      );
     });
 
     it("should work with breakdown query", () => {
-      const query = 'SELECT histogram(default._timestamp, \'45 minutes\') as "x_axis_1", count(default._timestamp) as "y_axis_1", default.k8s_namespace_name as "breakdown_1" FROM "default" GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC';
+      const query =
+        'SELECT histogram(default._timestamp, \'45 minutes\') as "x_axis_1", count(default._timestamp) as "y_axis_1", default.k8s_namespace_name as "breakdown_1" FROM "default" GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC';
       const result = replaceHistogramInterval(query, "1 hour");
 
-      expect(result).toBe('SELECT histogram(default._timestamp, \'1 hour\') as "x_axis_1", count(default._timestamp) as "y_axis_1", default.k8s_namespace_name as "breakdown_1" FROM "default" GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC');
+      expect(result).toBe(
+        'SELECT histogram(default._timestamp, \'1 hour\') as "x_axis_1", count(default._timestamp) as "y_axis_1", default.k8s_namespace_name as "breakdown_1" FROM "default" GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC',
+      );
     });
 
     it("should work with multi-stream JOIN query", () => {
-      const query = 'SELECT histogram(stream1._timestamp, \'30 seconds\') as t, count(*) FROM stream1 INNER JOIN stream2 ON stream1.id = stream2.id';
+      const query =
+        "SELECT histogram(stream1._timestamp, '30 seconds') as t, count(*) FROM stream1 INNER JOIN stream2 ON stream1.id = stream2.id";
       const result = replaceHistogramInterval(query, "2 minutes");
 
-      expect(result).toBe('SELECT histogram(stream1._timestamp, \'2 minutes\') as t, count(*) FROM stream1 INNER JOIN stream2 ON stream1.id = stream2.id');
+      expect(result).toBe(
+        "SELECT histogram(stream1._timestamp, '2 minutes') as t, count(*) FROM stream1 INNER JOIN stream2 ON stream1.id = stream2.id",
+      );
     });
   });
 
   describe("Preservation Tests", () => {
     it("should preserve exact query structure except interval", () => {
-      const query = 'SELECT   histogram(  _timestamp  ,  "30 seconds"  )  as  "x"  FROM  "default"';
+      const query =
+        'SELECT   histogram(  _timestamp  ,  "30 seconds"  )  as  "x"  FROM  "default"';
       const result = replaceHistogramInterval(query, "1 minute");
 
       // Spaces around histogram call should be preserved
-      expect(result).toContain('SELECT   histogram(  _timestamp  , \'1 minute\')  as  "x"  FROM  "default"');
+      expect(result).toContain(
+        'SELECT   histogram(  _timestamp  , \'1 minute\')  as  "x"  FROM  "default"',
+      );
     });
 
     it("should preserve lowercase keywords", () => {
-      const query = 'select histogram(_timestamp, \'30 seconds\') from logs';
+      const query = "select histogram(_timestamp, '30 seconds') from logs";
       const result = replaceHistogramInterval(query, "1 minute");
 
-      expect(result).toBe('select histogram(_timestamp, \'1 minute\') from logs');
+      expect(result).toBe("select histogram(_timestamp, '1 minute') from logs");
     });
 
     it("should preserve uppercase keywords", () => {
-      const query = 'SELECT HISTOGRAM(_timestamp, \'30 seconds\') FROM LOGS';
+      const query = "SELECT HISTOGRAM(_timestamp, '30 seconds') FROM LOGS";
       const result = replaceHistogramInterval(query, "1 minute");
 
-      expect(result).toBe('SELECT HISTOGRAM(_timestamp, \'1 minute\') FROM LOGS');
+      expect(result).toBe("SELECT HISTOGRAM(_timestamp, '1 minute') FROM LOGS");
     });
 
     it("should preserve mixed case keywords", () => {
-      const query = 'SeLeCt histogram(_timestamp, \'30 seconds\') FrOm logs';
+      const query = "SeLeCt histogram(_timestamp, '30 seconds') FrOm logs";
       const result = replaceHistogramInterval(query, "1 minute");
 
-      expect(result).toBe('SeLeCt histogram(_timestamp, \'1 minute\') FrOm logs');
+      expect(result).toBe("SeLeCt histogram(_timestamp, '1 minute') FrOm logs");
     });
 
     it("should preserve field aliasing format", () => {
-      const query = 'SELECT histogram(_timestamp, \'30 seconds\') as "my_alias"';
+      const query =
+        "SELECT histogram(_timestamp, '30 seconds') as \"my_alias\"";
       const result = replaceHistogramInterval(query, "1 minute");
 
-      expect(result).toBe('SELECT histogram(_timestamp, \'1 minute\') as "my_alias"');
+      expect(result).toBe(
+        "SELECT histogram(_timestamp, '1 minute') as \"my_alias\"",
+      );
     });
   });
 });

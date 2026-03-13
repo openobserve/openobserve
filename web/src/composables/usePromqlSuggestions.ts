@@ -90,8 +90,8 @@ const usePromqlSuggestions = () => {
       labelMeta.hasLabels = true;
       labelMeta.isEmpty = !hasCurlyBraces[1].length;
       labelMeta.isFocused =
-        hasCurlyBraces.index <= (cursorIndex) &&
-        hasCurlyBraces.index + hasCurlyBraces[1].length >= (cursorIndex);
+        hasCurlyBraces.index <= cursorIndex &&
+        hasCurlyBraces.index + hasCurlyBraces[1].length >= cursorIndex;
     }
 
     if (hasCurlyBraces) {
@@ -160,7 +160,7 @@ const usePromqlSuggestions = () => {
 
       const labelFocus: any = analyzeLabelFocus(
         autoCompleteData.value.query,
-        cursorIndex
+        cursorIndex,
       );
 
       if (cursorIndex === -1) return;
@@ -169,7 +169,6 @@ const usePromqlSuggestions = () => {
         updatePromqlKeywords([]);
         return;
       }
-
 
       if (!(labelFocus.focusOn === "value" || labelFocus.focusOn === "label"))
         return;
@@ -195,7 +194,7 @@ const usePromqlSuggestions = () => {
           labelSuggestions = getLabelSuggestions(
             response.data.data,
             labelFocus,
-            formattedLabels.join(",")
+            formattedLabels.join(","),
           );
         })
         .finally(() => {

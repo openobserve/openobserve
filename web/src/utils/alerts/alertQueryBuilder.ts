@@ -3,7 +3,7 @@
  * Extracted from AddAlert.vue to reduce file complexity
  */
 
-import { buildConditionsString } from './conditionsFormatter';
+import { buildConditionsString } from "./conditionsFormatter";
 
 export interface StreamFieldsMap {
   [key: string]: {

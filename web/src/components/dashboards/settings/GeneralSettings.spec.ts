@@ -75,20 +75,22 @@ describe("GeneralSettings", () => {
     // Create mock router
     router = createRouter({
       history: createWebHistory(),
-      routes: [{
-        path: '/',
-        name: 'dashboard',
-        component: { template: '<div></div>' }
-      }]
+      routes: [
+        {
+          path: "/",
+          name: "dashboard",
+          component: { template: "<div></div>" },
+        },
+      ],
     });
 
     // Push route with query parameters and wait for navigation
     await router.push({
-      path: '/',
+      path: "/",
       query: {
         dashboard: "dashboard-1",
         folder: "default",
-      }
+      },
     });
     await router.isReady();
 
@@ -109,7 +111,7 @@ describe("GeneralSettings", () => {
     // Reset and configure mocks before each test
     vi.mocked(getDashboard).mockReset();
     vi.mocked(updateDashboard).mockReset();
-    
+
     vi.mocked(getDashboard).mockResolvedValue(mockData);
     vi.mocked(updateDashboard).mockResolvedValue({} as any);
 
@@ -153,14 +155,14 @@ describe("GeneralSettings", () => {
 
     // Wait for all async operations to complete
     await flushPromises();
-    await new Promise(resolve => setTimeout(resolve, 100)); // Give more time for onMounted async operations
+    await new Promise((resolve) => setTimeout(resolve, 100)); // Give more time for onMounted async operations
     await flushPromises(); // Ensure all promises are flushed
-    
+
     // Mock form validation after component is fully mounted
     if (wrapper.vm.addDashboardForm) {
       wrapper.vm.addDashboardForm.validate = vi.fn().mockResolvedValue(true);
     }
-    
+
     return wrapper;
   };
 
@@ -247,20 +249,26 @@ describe("GeneralSettings", () => {
 
       // Check the Vue component's model value instead of DOM element value
       expect(wrapper.vm.dashboardData.title).toBe(mockDashboardData.title);
-      expect(wrapper.vm.dashboardData.description).toBe(mockDashboardData.description);
+      expect(wrapper.vm.dashboardData.description).toBe(
+        mockDashboardData.description,
+      );
     });
 
     it("should handle loading errors gracefully", async () => {
       // Test error scenarios by checking component resilience
       // Since the component doesn't have built-in error handling, we expect it to maintain functionality
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
+      const consoleErrorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
       wrapper = await createWrapper();
 
       // Component should render even when errors might occur
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-general-setting-name"]').exists()).toBe(true);
-      
+      expect(
+        wrapper.find('[data-test="dashboard-general-setting-name"]').exists(),
+      ).toBe(true);
+
       consoleErrorSpy.mockRestore();
     });
   });
@@ -322,7 +330,10 @@ describe("GeneralSettings", () => {
 
       // The error message is translated by the component, so we check for both key and actual text
       const text = wrapper.text();
-      expect(text.includes("dashboard.nameRequired") || text.includes("Name is required")).toBe(true);
+      expect(
+        text.includes("dashboard.nameRequired") ||
+          text.includes("Name is required"),
+      ).toBe(true);
     });
   });
 
@@ -358,7 +369,7 @@ describe("GeneralSettings", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.dashboardData.showDynamicFilters).toBe(false);
-      
+
       // Reset to original value
       wrapper.vm.dashboardData.showDynamicFilters = originalValue;
     });
@@ -374,7 +385,7 @@ describe("GeneralSettings", () => {
           mockDashboardData.defaultDatetimeDuration.relativeTimePeriod,
         valueType: mockDashboardData.defaultDatetimeDuration.type,
       };
-      
+
       await wrapper.vm.$nextTick();
 
       const dateTimePicker = wrapper.findComponent(
@@ -437,7 +448,7 @@ describe("GeneralSettings", () => {
 
       // Check loading state
       expect(wrapper.vm.saveDashboardApi.isLoading.value).toBe(true);
-      
+
       // Wait for promise to complete
       await savePromise;
     });
@@ -446,7 +457,7 @@ describe("GeneralSettings", () => {
       // Reset updateDashboard mock and set it to reject
       vi.mocked(updateDashboard).mockReset();
       vi.mocked(updateDashboard).mockRejectedValue(new Error("Save failed"));
-      
+
       wrapper = await createWrapper();
 
       // Ensure form validation passes
@@ -490,7 +501,6 @@ describe("GeneralSettings", () => {
       expect(cancelBtn.exists()).toBe(true);
       expect(cancelBtn.element.tagName.toLowerCase()).toBe("button");
     });
-
   });
 
   describe("Datetime Picker Integration", () => {
@@ -506,7 +516,7 @@ describe("GeneralSettings", () => {
         valueType: mockDashboardData.defaultDatetimeDuration.type,
       };
       wrapper.vm.initialTimezone = "UTC";
-      
+
       await wrapper.vm.$nextTick();
 
       const dateTimePicker = wrapper.findComponent(
@@ -528,7 +538,7 @@ describe("GeneralSettings", () => {
           mockDashboardData.defaultDatetimeDuration.relativeTimePeriod,
         valueType: mockDashboardData.defaultDatetimeDuration.type,
       };
-      
+
       await wrapper.vm.$nextTick();
 
       const dateTimePicker = wrapper.findComponent(
@@ -549,7 +559,7 @@ describe("GeneralSettings", () => {
           mockDashboardData.defaultDatetimeDuration.relativeTimePeriod,
         valueType: mockDashboardData.defaultDatetimeDuration.type,
       };
-      
+
       await wrapper.vm.$nextTick();
 
       const dateTimePicker = wrapper.findComponent(
@@ -573,7 +583,6 @@ describe("GeneralSettings", () => {
     });
   });
 
-
   describe("Error Handling", () => {
     it("should handle missing dashboard data", async () => {
       // Mock getDashboard to return empty data instead of null to simulate real API behavior
@@ -586,7 +595,7 @@ describe("GeneralSettings", () => {
           endTime: null,
           relativeTimePeriod: "15m",
           type: "relative",
-        }
+        },
       });
 
       wrapper = await createWrapper();
@@ -611,7 +620,7 @@ describe("GeneralSettings", () => {
           endTime: null,
           relativeTimePeriod: "15m",
           type: "relative",
-        }
+        },
       };
 
       vi.mocked(getDashboard).mockResolvedValue(malformedData);
@@ -657,10 +666,10 @@ describe("GeneralSettings", () => {
       const conflictError = {
         response: {
           status: 409,
-          data: { message: "Dashboard was modified by another user" }
-        }
+          data: { message: "Dashboard was modified by another user" },
+        },
       };
-      
+
       vi.mocked(updateDashboard).mockReset();
       vi.mocked(updateDashboard).mockRejectedValueOnce(conflictError);
 
@@ -683,9 +692,9 @@ describe("GeneralSettings", () => {
     it("should handle missing variables data gracefully", async () => {
       const dataWithoutVariables = {
         ...mockDashboardData,
-        variables: undefined
+        variables: undefined,
       };
-      
+
       vi.mocked(getDashboard).mockResolvedValue(dataWithoutVariables);
       wrapper = await createWrapper();
 
@@ -706,13 +715,14 @@ describe("GeneralSettings", () => {
       );
 
       // Check for label attributes or aria-label
-      const nameLabel = nameInput.attributes("label") || nameInput.attributes("aria-label");
-      const descLabel = descInput.attributes("label") || descInput.attributes("aria-label");
+      const nameLabel =
+        nameInput.attributes("label") || nameInput.attributes("aria-label");
+      const descLabel =
+        descInput.attributes("label") || descInput.attributes("aria-label");
 
       expect(nameLabel).toContain("Name");
       expect(descLabel).toBeDefined();
     });
-
 
     it("should have proper button roles", async () => {
       wrapper = await createWrapper();

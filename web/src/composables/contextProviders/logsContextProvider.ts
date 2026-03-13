@@ -1,50 +1,52 @@
 /**
  * Logs Context Provider - Extracts context from the logs page
- * 
+ *
  * This provider extracts context from the logs page including:
  * - Current search query and filters
  * - Time range selection
  * - Selected streams
  * - Search results and metadata
- * 
+ *
  * Example Usage:
  * ```typescript
  * import { logsContextProvider } from '@/composables/contextProviders/logsContextProvider';
  * import { contextRegistry } from '@/composables/contextProviders';
- * 
+ *
  * // Register the provider
  * contextRegistry.register('logs', logsContextProvider);
  * contextRegistry.setActive('logs');
- * 
+ *
  * // Get context
  * const context = await contextRegistry.getActiveContext();
  * // Returns: { currentPage: 'logs', currentSQLQuery: '...', selectedStreams: [...], ... }
  * ```
  */
 
-import type { ContextProvider, PageContext } from './types';
-import { getConsumableRelativeTime } from '@/utils/date';
-
+import type { ContextProvider, PageContext } from "./types";
+import { getConsumableRelativeTime } from "@/utils/date";
 
 /**
  * Extracts interesting fields organized by stream name from the actual selectedInterestingStreamFields structure
- * 
+ *
  * @param selectedInterestingStreamFields - Array of field objects with stream metadata
  * @returns Object with stream names as keys and their interesting fields as values
- * 
+ *
  * Example:
  * ```typescript
  * // Input: [{ name: "_timestamp", streams: ["default", "default11"], isInterestingField: true }, ...]
- * // Returns: { 
- * //   "default": ["_timestamp", "log", "level"], 
- * //   "default11": ["_timestamp", "log", "dfefjob"] 
+ * // Returns: {
+ * //   "default": ["_timestamp", "log", "level"],
+ * //   "default11": ["_timestamp", "log", "dfefjob"]
  * // }
  * ```
  */
 const extractInterestingFieldsByStream = (
-  selectedInterestingStreamFields: any[]
+  selectedInterestingStreamFields: any[],
 ): Record<string, string[]> => {
-  if (!selectedInterestingStreamFields || selectedInterestingStreamFields.length === 0) {
+  if (
+    !selectedInterestingStreamFields ||
+    selectedInterestingStreamFields.length === 0
+  ) {
     return {};
   }
 
@@ -52,7 +54,8 @@ const extractInterestingFieldsByStream = (
 
   // Filter only interesting fields (not labels or non-interesting fields)
   const interestingFields = selectedInterestingStreamFields.filter(
-    (field: any) => field.isInterestingField && field.isSchemaField && !field.label
+    (field: any) =>
+      field.isInterestingField && field.isSchemaField && !field.label,
   );
 
   // Organize fields by stream
@@ -65,7 +68,7 @@ const extractInterestingFieldsByStream = (
       if (!organizedFields[streamName]) {
         organizedFields[streamName] = [];
       }
-      
+
       // Only add if not already present
       if (!organizedFields[streamName].includes(fieldName)) {
         organizedFields[streamName].push(fieldName);
@@ -97,15 +100,16 @@ const extractInterestingFieldsByStream = (
  */
 const buildTimeRangeContext = (datetimeObj: any) => {
   if (!datetimeObj) {
-    return { type: 'unknown' };
+    return { type: "unknown" };
   }
 
   const baseContext = {
-    type: datetimeObj.type || 'relative'
+    type: datetimeObj.type || "relative",
   };
 
-  if (datetimeObj.type === 'relative') {
-    const relativeTimePeriod = datetimeObj.relativeTimePeriod || datetimeObj.relative_period;
+  if (datetimeObj.type === "relative") {
+    const relativeTimePeriod =
+      datetimeObj.relativeTimePeriod || datetimeObj.relative_period;
 
     // Calculate actual timestamps from relative period for AI agent
     // The agent needs real microsecond timestamps to execute search queries
@@ -116,17 +120,25 @@ const buildTimeRangeContext = (datetimeObj: any) => {
       relativeTimePeriod,
       // Always include calculated timestamps so AI agent can search without needing to guess
       startTime: calculatedTime?.startTime || datetimeObj.startTime,
-      endTime: calculatedTime?.endTime || datetimeObj.endTime
+      endTime: calculatedTime?.endTime || datetimeObj.endTime,
     };
-  } else if (datetimeObj.type === 'absolute') {
+  } else if (datetimeObj.type === "absolute") {
     return {
       ...baseContext,
       startTime: datetimeObj.startTime,
       endTime: datetimeObj.endTime,
-      ...(datetimeObj.selectedDate && { selectedDate: datetimeObj.selectedDate }),
-      ...(datetimeObj.selectedTime && { selectedTime: datetimeObj.selectedTime }),
-      ...(datetimeObj.queryRangeRestrictionMsg && { queryRangeRestrictionMsg: datetimeObj.queryRangeRestrictionMsg }),
-      ...(datetimeObj.queryRangeRestrictionInHour !== undefined && { queryRangeRestrictionInHour: datetimeObj.queryRangeRestrictionInHour })
+      ...(datetimeObj.selectedDate && {
+        selectedDate: datetimeObj.selectedDate,
+      }),
+      ...(datetimeObj.selectedTime && {
+        selectedTime: datetimeObj.selectedTime,
+      }),
+      ...(datetimeObj.queryRangeRestrictionMsg && {
+        queryRangeRestrictionMsg: datetimeObj.queryRangeRestrictionMsg,
+      }),
+      ...(datetimeObj.queryRangeRestrictionInHour !== undefined && {
+        queryRangeRestrictionInHour: datetimeObj.queryRangeRestrictionInHour,
+      }),
     };
   }
 
@@ -136,11 +148,11 @@ const buildTimeRangeContext = (datetimeObj: any) => {
 
 /**
  * Creates a logs context provider that extracts context from the current logs page state
- * 
+ *
  * @param searchObj - The search object containing query, filters, and other search state
  * @param store - The Vuex store instance (passed from component)
  * @param dashboardPanelData - Dashboard panel data for visualize mode (optional)
- * 
+ *
  * Example:
  * ```typescript
  * const provider = createLogsContextProvider(searchObj, store, dashboardPanelData);
@@ -149,7 +161,7 @@ const buildTimeRangeContext = (datetimeObj: any) => {
 export const createLogsContextProvider = (
   searchObj: any,
   store: any,
-  dashboardPanelData?: any
+  dashboardPanelData?: any,
 ): ContextProvider => {
   return {
     async getContext(): Promise<PageContext> {
@@ -158,31 +170,37 @@ export const createLogsContextProvider = (
         let actualStreams: string[] = [];
 
         // Handle logs and patterns mode - always use selected stream
-        if (searchObj.meta.logsVisualizeToggle === "logs" || searchObj.meta.logsVisualizeToggle === "patterns") {
+        if (
+          searchObj.meta.logsVisualizeToggle === "logs" ||
+          searchObj.meta.logsVisualizeToggle === "patterns"
+        ) {
           actualStreams = searchObj.data.stream.selectedStream || [];
         } else {
           // Dashboard/visualize mode
-          actualStreams = dashboardPanelData ? [
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream,
-          ] : [];
+          actualStreams = dashboardPanelData
+            ? [
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.stream,
+              ]
+            : [];
         }
 
-        const streamType = searchObj.meta.logsVisualizeToggle === "logs"
-          ? searchObj.data.stream.streamType
-          : dashboardPanelData ?
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields.stream_type : null;
-
+        const streamType =
+          searchObj.meta.logsVisualizeToggle === "logs"
+            ? searchObj.data.stream.streamType
+            : dashboardPanelData
+              ? dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.stream_type
+              : null;
 
         return {
-          currentPage: 'logs',
+          currentPage: "logs",
           // Query and search information
-          currentSQLQuery: searchObj?.data?.query || '',
+          currentSQLQuery: searchObj?.data?.query || "",
           sqlMode: searchObj?.meta?.sqlMode || false,
-          currentVRLQuery: searchObj?.data?.tempFunctionContent || '',
+          currentVRLQuery: searchObj?.data?.tempFunctionContent || "",
 
           // Stream information
           selectedStreams: actualStreams || [],
@@ -190,31 +208,33 @@ export const createLogsContextProvider = (
 
           // Interesting fields organized by stream name (using actual structure)
           interestingFields: extractInterestingFieldsByStream(
-            searchObj?.data?.stream?.selectedInterestingStreamFields || []
+            searchObj?.data?.stream?.selectedInterestingStreamFields || [],
           ),
 
           // Time range (conditional based on type)
           timeRange: buildTimeRangeContext(searchObj.data.datetime),
 
           // Current organization
-          organization_identifier: store?.state?.selectedOrganization?.identifier || '',
+          organization_identifier:
+            store?.state?.selectedOrganization?.identifier || "",
           quickMode: searchObj?.meta?.quickMode || false,
 
           // Current timestamp when request is fired (microseconds) for AI agent time calculations
           request_timestamp: Date.now() * 1000,
         };
       } catch (error) {
-        console.error('Error generating logs context:', error);
+        console.error("Error generating logs context:", error);
         // Return basic context on error
         return {
-          currentPage: 'logs',
-          currentSQLQuery: searchObj?.data?.query || '',
+          currentPage: "logs",
+          currentSQLQuery: searchObj?.data?.query || "",
           selectedStreams: searchObj?.data?.stream?.selectedStream || [],
-          organization_identifier: store?.state?.selectedOrganization?.identifier || '',
+          organization_identifier:
+            store?.state?.selectedOrganization?.identifier || "",
           timestamp: new Date().toISOString(),
-          error: 'Failed to extract full context'
+          error: "Failed to extract full context",
         };
       }
-    }
+    },
   };
 };

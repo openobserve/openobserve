@@ -16,7 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    :class="[store.state.theme === 'dark' ? 'bg-dark' : 'bg-white', !isInPipeline ? 'q-pt-md' : '']"
+    :class="[
+      store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
+      !isInPipeline ? 'q-pt-md' : '',
+    ]"
   >
     <div class="add-stream-header row items-center no-wrap q-px-md">
       <div class="col">
@@ -35,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-separator />
-    <div class="q-px-md  add-stream-inputs">
+    <div class="q-px-md add-stream-inputs">
       <q-form @submit="saveStream">
         <div data-test="add-stream-name-input">
           <q-input
@@ -96,7 +99,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('logStream.cancel')"
             no-caps
             flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
           />
           <q-btn
             data-test="save-stream-btn"
@@ -105,7 +112,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="submit"
             no-caps
             flat
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
           />
         </div>
       </q-form>
@@ -127,18 +138,16 @@ import { useReo } from "@/services/reodotdev_analytics";
 
 const { t } = useI18n();
 
-
 const streamTypes = [
   { label: "Logs", value: "logs" },
   { label: "Metrics", value: "metrics" },
   { label: "Traces", value: "traces" },
 ];
 
-const emits = defineEmits(["streamAdded", "close","added:stream-added"]);
+const emits = defineEmits(["streamAdded", "close", "added:stream-added"]);
 const props = defineProps<{
   isInPipeline: boolean;
 }>();
-
 
 const { addStream, getStream } = useStreams();
 
@@ -165,7 +174,6 @@ const getDefaultField = () => {
   };
 };
 
-
 const isSchemaUDSEnabled = computed(() => {
   return store.state.zoConfig.user_defined_schemas_enabled;
 });
@@ -176,11 +184,10 @@ const filteredStreamTypes = computed(() => {
   return streamTypes;
 });
 
-
 const showDataRetention = computed(
   () =>
     !!(store.state.zoConfig.data_retention_days || false) &&
-    streamInputs.value.stream_type !== "enrichment_tables"
+    streamInputs.value.stream_type !== "enrichment_tables",
 );
 
 const saveStream = async () => {
@@ -189,7 +196,7 @@ const saveStream = async () => {
   await getStream(
     streamInputs.value.name,
     streamInputs.value.stream_type,
-    false
+    false,
   )
     .then(() => {
       q.notify({
@@ -209,7 +216,7 @@ const saveStream = async () => {
       store.state.selectedOrganization.identifier,
       streamInputs.value.name,
       streamInputs.value.stream_type,
-      payload
+      payload,
     )
     .then(() => {
       q.notify({
@@ -222,7 +229,7 @@ const saveStream = async () => {
         .schema(
           store.state.selectedOrganization.identifier,
           streamInputs.value.name,
-          streamInputs.value.stream_type
+          streamInputs.value.stream_type,
         )
         .then((streamRes: any) => {
           addStream(streamRes.data);
@@ -232,19 +239,18 @@ const saveStream = async () => {
         });
     })
     .catch((err) => {
-      if(err.response.status != 403){
+      if (err.response.status != 403) {
         q.notify({
-        color: "negative",
-        message: err.response?.data?.message || "Failed to create stream",
-        timeout: 4000,
-      });
+          color: "negative",
+          message: err.response?.data?.message || "Failed to create stream",
+          timeout: 4000,
+        });
       }
     });
-    track("Button Click", {
-      button: "Save Stream",
-      page: "Add Stream"
-    });
-
+  track("Button Click", {
+    button: "Save Stream",
+    page: "Add Stream",
+  });
 };
 
 const getStreamPayload = () => {
@@ -257,7 +263,7 @@ const getStreamPayload = () => {
       bloom_filter_fields: any[];
       data_retention?: number;
       defined_schema_fields: any[];
-    }
+    };
   } = {
     fields: [],
     settings: {
@@ -266,7 +272,7 @@ const getStreamPayload = () => {
       full_text_search_keys: [],
       bloom_filter_fields: [],
       defined_schema_fields: [],
-    }
+    },
   };
 
   if (showDataRetention.value && streamInputs.value.dataRetentionDays < 1) {
@@ -280,17 +286,18 @@ const getStreamPayload = () => {
   }
 
   if (showDataRetention.value) {
-    stream.settings["data_retention"] = Number(streamInputs.value.dataRetentionDays);
+    stream.settings["data_retention"] = Number(
+      streamInputs.value.dataRetentionDays,
+    );
   }
 
   fields.value.forEach((field) => {
-
     field.name = field.name
       .trim()
       .toLowerCase()
       .replace(/ /g, "_")
       .replace(/-/g, "_");
-    
+
     // add to field list
     stream.fields.push(field);
 

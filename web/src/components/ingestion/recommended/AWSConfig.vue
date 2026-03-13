@@ -21,7 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         AWS Integrations
       </h6>
       <p class="tw:text-sm tw:m-0 tw:mb-4 page-description">
-        Set up AWS monitoring in one click or configure individual services for granular control.
+        Set up AWS monitoring in one click or configure individual services for
+        granular control.
       </p>
 
       <q-tabs
@@ -32,8 +33,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         indicator-color="primary"
         align="left"
       >
-        <q-tab name="quick-setup" label="Quick Setup" data-test="aws-quick-setup-tab" />
-        <q-tab name="individual-services" label="Individual Services" data-test="aws-individual-services-tab" />
+        <q-tab
+          name="quick-setup"
+          label="Quick Setup"
+          data-test="aws-quick-setup-tab"
+        />
+        <q-tab
+          name="individual-services"
+          label="Individual Services"
+          data-test="aws-individual-services-tab"
+        />
       </q-tabs>
     </div>
 
@@ -68,7 +77,11 @@ import { defineComponent, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
-import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
+import {
+  getEndPoint,
+  getImageURL,
+  getIngestionURL,
+} from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
 import AWSQuickSetup from "./AWSQuickSetup.vue";
 import AWSIndividualServices from "./AWSIndividualServices.vue";
@@ -97,21 +110,31 @@ export default defineComponent({
     const route = useRoute();
 
     // If there's a search query, default to individual-services tab
-    const activeTab = ref(props.searchQuery || route.query.search ? "individual-services" : "quick-setup");
+    const activeTab = ref(
+      props.searchQuery || route.query.search
+        ? "individual-services"
+        : "quick-setup",
+    );
 
     // Watch for search query changes in route
-    watch(() => route.query.search, (newSearch) => {
-      if (newSearch) {
-        activeTab.value = "individual-services";
-      }
-    });
+    watch(
+      () => route.query.search,
+      (newSearch) => {
+        if (newSearch) {
+          activeTab.value = "individual-services";
+        }
+      },
+    );
 
     // Watch for searchQuery prop changes
-    watch(() => props.searchQuery, (newSearch) => {
-      if (newSearch) {
-        activeTab.value = "individual-services";
-      }
-    });
+    watch(
+      () => props.searchQuery,
+      (newSearch) => {
+        if (newSearch) {
+          activeTab.value = "individual-services";
+        }
+      },
+    );
     // TODO OK: Create interface for ENDPOINT
     const endpoint: any = ref({
       url: "",

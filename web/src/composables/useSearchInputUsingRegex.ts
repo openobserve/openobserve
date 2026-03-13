@@ -3,7 +3,7 @@ import { ref, watch, type Ref } from "vue";
 export const useSearchInputUsingRegex = (
   options: Ref<any>,
   searchKey: string,
-  searchRegex: string
+  searchRegex: string,
 ) => {
   const filteredOptions = ref([...options.value]);
 
@@ -20,9 +20,9 @@ export const useSearchInputUsingRegex = (
     }
 
     const regex = new RegExp(searchRegex, "gi");
-    let match = regex.exec(val)
-    
-    if(!match) {
+    let match = regex.exec(val);
+
+    if (!match) {
       filteredOptions.value = [];
       return;
     }
@@ -37,7 +37,7 @@ export const useSearchInputUsingRegex = (
 
     filteredOptions.value = options.value?.filter((option: any) => {
       const value =
-      typeof option === "object" ? option[searchKey] : option.toString();
+        typeof option === "object" ? option[searchKey] : option.toString();
 
       const lowerCaseValue = value?.toLowerCase();
 

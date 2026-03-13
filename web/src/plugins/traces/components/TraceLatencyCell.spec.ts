@@ -54,7 +54,9 @@ describe("TraceLatencyCell", () => {
       wrapper = mount(TraceLatencyCell, {
         props: { item: { services: { "service-a": { duration: 100 } } } },
       });
-      expect(wrapper.find('[data-test="trace-row-latency-bar"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="trace-row-latency-bar"]').exists()).toBe(
+        true,
+      );
     });
 
     it("renders one segment per service", () => {
@@ -68,7 +70,9 @@ describe("TraceLatencyCell", () => {
           },
         },
       });
-      const segments = wrapper.findAll('[data-test="trace-row-latency-segment"]');
+      const segments = wrapper.findAll(
+        '[data-test="trace-row-latency-segment"]',
+      );
       expect(segments).toHaveLength(2);
     });
 
@@ -76,7 +80,9 @@ describe("TraceLatencyCell", () => {
       wrapper = mount(TraceLatencyCell, {
         props: { item: { services: {} } },
       });
-      const segments = wrapper.findAll('[data-test="trace-row-latency-segment"]');
+      const segments = wrapper.findAll(
+        '[data-test="trace-row-latency-segment"]',
+      );
       expect(segments).toHaveLength(0);
     });
 
@@ -84,7 +90,9 @@ describe("TraceLatencyCell", () => {
       wrapper = mount(TraceLatencyCell, {
         props: { item: {} },
       });
-      const segments = wrapper.findAll('[data-test="trace-row-latency-segment"]');
+      const segments = wrapper.findAll(
+        '[data-test="trace-row-latency-segment"]',
+      );
       expect(segments).toHaveLength(0);
     });
   });
@@ -111,7 +119,9 @@ describe("TraceLatencyCell", () => {
           },
         },
       });
-      const segments = wrapper.findAll('[data-test="trace-row-latency-segment"]');
+      const segments = wrapper.findAll(
+        '[data-test="trace-row-latency-segment"]',
+      );
       // service-a: 75%, service-b: 25%
       expect(segments[0].attributes("style")).toContain("width: 75%");
       expect(segments[1].attributes("style")).toContain("width: 25%");
@@ -137,7 +147,9 @@ describe("TraceLatencyCell", () => {
         },
       });
       const segment = wrapper.find('[data-test="trace-row-latency-segment"]');
-      expect(segment.attributes("style")).toContain("background-color: rgb(255, 0, 0)");
+      expect(segment.attributes("style")).toContain(
+        "background-color: rgb(255, 0, 0)",
+      );
     });
 
     it("falls back to #9e9e9e for unknown service colors", () => {
@@ -147,7 +159,9 @@ describe("TraceLatencyCell", () => {
         },
       });
       const segment = wrapper.find('[data-test="trace-row-latency-segment"]');
-      expect(segment.attributes("style")).toContain("background-color: rgb(158, 158, 158)");
+      expect(segment.attributes("style")).toContain(
+        "background-color: rgb(158, 158, 158)",
+      );
     });
   });
 

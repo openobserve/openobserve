@@ -1,56 +1,59 @@
-export const convertBillingData = (params:any) => {
+export const convertBillingData = (params: any) => {
+  let series: any = [];
+  let eventIndexMap: any = [];
+  if (params.data?.length > 0) {
+    params.data.forEach((data: any) => {
+      let eventIndex = eventIndexMap.indexOf(data.event);
+      if (eventIndex > -1) {
+        if (series[eventIndex] === undefined) {
+          series[eventIndex] = {
+            data: [],
+            name: data.event,
+            type: "bar",
+            emphasis: { focus: "series" },
+          };
+        }
+        series[eventIndex].data.push([
+          data.usage_timestamp,
+          Math.round(parseInt(data.size) / 1024 / 1024),
+        ]);
+      } else {
+        // If the event value is not found, add it to eventIndexMap and chartObj
+        // let newIndex = eventIndexMap.length;
+        eventIndexMap.push(data.event);
+        eventIndex = eventIndexMap.indexOf(data.event);
+        series[eventIndex] = {
+          data: [],
+          name: data.event,
+          type: "bar",
+          emphasis: { focus: "series" },
+        };
 
-          let series: any = [];
-          let eventIndexMap: any = [];
-          if (params.data?.length > 0) {
-            params.data.forEach(
-              (data: any) => {
-                let eventIndex = eventIndexMap.indexOf(data.event);
-                if (eventIndex > -1) {
-                  if (series[eventIndex] === undefined) {
-                    series[eventIndex] = {
-                      data:[],
-                      name: data.event,
-                      type: "bar",
-                      emphasis: { focus: "series" }
-                    };
-                  }
-                  series[eventIndex].data.push([data.usage_timestamp,Math.round(parseInt(data.size) / 1024 / 1024)]);
-                } else {
-                  // If the event value is not found, add it to eventIndexMap and chartObj
-                  // let newIndex = eventIndexMap.length;
-                  eventIndexMap.push(data.event);
-                  eventIndex = eventIndexMap.indexOf(data.event);
-                  series[eventIndex] = {
-                    data:[],
-                    name: data.event,
-                    type: "bar",
-                    emphasis: { focus: "series" }
-                  };
-                  
-                  // Update the newly added index with the data values
-                  series[eventIndex].data.push([data.usage_timestamp,Math.round(parseInt(data.size) / 1024 / 1024)]);
-                }
-              }
-            );
-          }
-  
+        // Update the newly added index with the data values
+        series[eventIndex].data.push([
+          data.usage_timestamp,
+          Math.round(parseInt(data.size) / 1024 / 1024),
+        ]);
+      }
+    });
+  }
+
   const options: any = {
     backgroundColor: "transparent",
     grid: {
       containLabel: true,
       left: "20",
-      right:"200",
+      right: "200",
       top: "30",
       bottom: "0",
     },
-    legend:{
+    legend: {
       show: true,
       type: "scroll",
       orient: "vertical",
-      left:null,
-      right:0,
-      bottom:"ceenter",
+      left: null,
+      right: 0,
+      bottom: "ceenter",
       padding: [10, 20, 10, 10],
       tooltip: {
         show: true,
@@ -66,7 +69,7 @@ export const convertBillingData = (params:any) => {
       },
     },
     tooltip: {
-      show:true,
+      show: true,
       trigger: "axis",
       textStyle: {
         fontSize: 12,
@@ -99,16 +102,16 @@ export const convertBillingData = (params:any) => {
       axisLine: {
         show: true,
       },
-      axisLabel:{
+      axisLabel: {
         formatter: function (value: any) {
-          return `${value}MB`
-        }
-      }
+          return `${value}MB`;
+        },
+      },
     },
     series: series,
-   }   
-    return {options};
-}
+  };
+  return { options };
+};
 
 export const formatDate = (date: any) => {
   const year = String(date.getFullYear());
@@ -119,4 +122,4 @@ export const formatDate = (date: any) => {
   const seconds = String(date.getSeconds()).padStart(2, "0");
 
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-}
+};

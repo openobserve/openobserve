@@ -15,18 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
+  <q-page
+    class="q-pa-none"
+    style="min-height: inherit; height: calc(100vh - 44px)"
+  >
     <div>
       <div class="card-container tw:mb-[0.625rem]">
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]"
-        >
         <div
-          data-test="iam-roles-section-title"
-          class="q-table__title tw:font-[600]"
+          class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]"
         >
-          {{ t("iam.roles") }}
-        </div>
-        <div class="row items-center justify-end">
+          <div
+            data-test="iam-roles-section-title"
+            class="q-table__title tw:font-[600]"
+          >
+            {{ t("iam.roles") }}
+          </div>
+          <div class="row items-center justify-end">
             <div data-test="iam-roles-search-input">
               <q-input
                 v-model="filterQuery"
@@ -50,102 +54,107 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="addRole"
             />
           </div>
+        </div>
+      </div>
+      <div class="tw:w-full tw:h-full">
+        <div class="card-container tw:h-[calc(100vh-127px)]">
+          <app-table
+            data-test="iam-roles-table-section"
+            class="iam-table o2-quasar-app-table o2-quasar-table-header-sticky"
+            :tableStyle="
+              hasVisibleRows
+                ? 'height: calc(100vh - 127px); overflow-y: auto;'
+                : ''
+            "
+            :rows="visibleRows"
+            :columns="columns"
+            pagination
+            :rows-per-page="20"
+            :filter="{
+              value: filterQuery,
+              method: filterRoles,
+            }"
+            :bordered="false"
+            :title="t('iam.roles')"
+            :hideTopPagination="true"
+            :showBottomPaginationWithTitle="true"
+            selection="multiple"
+            row-key="role_name"
+            v-model:selected="selectedRoles"
+            :theme="store.state.theme"
+          >
+            <template v-slot:actions="slotProps: any">
+              <div class="tw:flex tw:items-center tw:gap-2 tw:justify-center">
+                <q-btn
+                  :data-test="`iam-roles-edit-${slotProps.column.row.role_name}-role-icon`"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  icon="edit"
+                  :title="t('common.edit')"
+                  @click="() => editRole(slotProps.column.row)"
+                >
+                </q-btn>
+                <q-btn
+                  :data-test="`iam-roles-delete-${slotProps.column.row.role_name}-role-icon`"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  :icon="outlinedDelete"
+                  :title="t('common.delete')"
+                  @click="() => showConfirmDialog(slotProps.column.row)"
+                >
+                </q-btn>
+              </div>
+            </template>
+            <template v-slot:bottom-actions>
+              <q-btn
+                v-if="selectedRoles.length > 0"
+                data-test="iam-roles-bulk-delete-btn"
+                class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-secondary-button-dark'
+                    : 'o2-secondary-button-light'
+                "
+                no-caps
+                dense
+                @click="openBulkDeleteDialog"
+              >
+                <q-icon name="delete" size="16px" />
+                <span class="tw:ml-2">{{ t("common.delete") }}</span>
+              </q-btn>
+            </template>
+          </app-table>
+        </div>
       </div>
     </div>
-      <div class="tw:w-full tw:h-full">
-      <div class="card-container tw:h-[calc(100vh-127px)]">
-    <app-table
-      data-test="iam-roles-table-section"
-      class="iam-table o2-quasar-app-table o2-quasar-table-header-sticky"
-      :tableStyle="hasVisibleRows ? 'height: calc(100vh - 127px); overflow-y: auto;' : ''"
-      :rows="visibleRows"
-      :columns="columns"
-      pagination
-      :rows-per-page="20"
-      :filter="{
-        value: filterQuery,
-        method: filterRoles,
-      }"
-      :bordered="false"
-      :title="t('iam.roles')"
-      :hideTopPagination="true"
-      :showBottomPaginationWithTitle="true"
-      selection="multiple"
-      row-key="role_name"
-      v-model:selected="selectedRoles"
-      :theme="store.state.theme"
-    >
-      <template v-slot:actions="slotProps: any">
-        <div class="tw:flex tw:items-center tw:gap-2 tw:justify-center">
-          <q-btn
-            :data-test="`iam-roles-edit-${slotProps.column.row.role_name}-role-icon`"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            icon="edit"
-            :title="t('common.edit')"
-            @click="() => editRole(slotProps.column.row)"
-          >
-          </q-btn>
-          <q-btn
-            :data-test="`iam-roles-delete-${slotProps.column.row.role_name}-role-icon`"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            :icon="outlinedDelete"
-            :title="t('common.delete')"
-            @click="() => showConfirmDialog(slotProps.column.row)"
-          >
-          </q-btn>
-        </div>
-      </template>
-      <template v-slot:bottom-actions>
-        <q-btn
-          v-if="selectedRoles.length > 0"
-          data-test="iam-roles-bulk-delete-btn"
-          class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-secondary-button-dark'
-              : 'o2-secondary-button-light'
-          "
-          no-caps
-          dense
-          @click="openBulkDeleteDialog"
-        >
-          <q-icon name="delete" size="16px" />
-          <span class="tw:ml-2">{{ t('common.delete') }}</span>
-        </q-btn>
-      </template>
-    </app-table>
-  </div>
-  </div>
-  </div>
-  <q-dialog v-model="showAddGroup" position="right" full-height maximized>
-    <AddRole
-      style="width: 30vw"
-      @cancel:hideform="hideForm"
-      @added:role="setupRoles"
+    <q-dialog v-model="showAddGroup" position="right"
+full-height maximized>
+      <AddRole
+        style="width: 30vw"
+        @cancel:hideform="hideForm"
+        @added:role="setupRoles"
+      />
+    </q-dialog>
+    <ConfirmDialog
+      title="Delete Role"
+      :message="`Are you sure you want to delete '${deleteConformDialog?.data?.role_name as string}' role?`"
+      @update:ok="_deleteRole"
+      @update:cancel="deleteConformDialog.show = false"
+      v-model="deleteConformDialog.show"
     />
-  </q-dialog>
-  <ConfirmDialog
-    title="Delete Role"
-    :message="`Are you sure you want to delete '${deleteConformDialog?.data?.role_name as string}' role?`"
-    @update:ok="_deleteRole"
-    @update:cancel="deleteConformDialog.show = false"
-    v-model="deleteConformDialog.show"
-  />
-  <ConfirmDialog
-    title="Bulk Delete Roles"
-    :message="`Are you sure you want to delete ${selectedRoles.length} role(s)?`"
-    @update:ok="bulkDeleteUserRoles"
-    @update:cancel="confirmBulkDelete = false"
-    v-model="confirmBulkDelete"
-  />
+    <ConfirmDialog
+      title="Bulk Delete Roles"
+      :message="`Are you sure you want to delete ${selectedRoles.length} role(s)?`"
+      @update:ok="bulkDeleteUserRoles"
+      @update:cancel="confirmBulkDelete = false"
+      v-model="confirmBulkDelete"
+    />
   </q-page>
 </template>
 
@@ -192,7 +201,7 @@ const columns: any = [
     label: "#",
     field: "#",
     align: "left",
-    style: "width: 67px"
+    style: "width: 67px",
   },
   {
     name: "role_name",
@@ -222,20 +231,20 @@ onBeforeMount(() => {
 const filterQuery = ref("");
 
 const updateTable = () => {
-   let counter = 1;
+  let counter = 1;
   rows.value = cloneDeep(
     rolesState.roles.map((role: { role_name: string }, index) => ({
       ...role,
       // "#": index + 1,
-       "#": counter <= 9 ? `0${counter++}` : counter++,
-    }))
+      "#": counter <= 9 ? `0${counter++}` : counter++,
+    })),
   );
 };
 
 const addRole = () => {
   track("Button Click", {
     button: "Add Role",
-    page: "Roles"
+    page: "Roles",
   });
   showAddGroup.value = true;
 };
@@ -246,9 +255,9 @@ const editRole = (role: any) => {
     params: {
       role_name: role.role_name,
     },
-    query:{
-      org_identifier: store.state.selectedOrganization.identifier
-    }
+    query: {
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
   });
 };
 
@@ -319,9 +328,12 @@ const bulkDeleteUserRoles = async () => {
   const roleNames = selectedRoles.value.map((role: any) => role.role_name);
 
   try {
-    const response = await bulkDeleteRoles(store.state.selectedOrganization.identifier, {
-      ids: roleNames,
-    });
+    const response = await bulkDeleteRoles(
+      store.state.selectedOrganization.identifier,
+      {
+        ids: roleNames,
+      },
+    );
 
     const { successful = [], unsuccessful = [], err } = response.data || {};
 
@@ -355,7 +367,10 @@ const bulkDeleteUserRoles = async () => {
   } catch (error: any) {
     if (error.response?.status != 403 || error?.status != 403) {
       q.notify({
-        message: error.response?.data?.message || error?.message || "Error while deleting roles",
+        message:
+          error.response?.data?.message ||
+          error?.message ||
+          "Error while deleting roles",
         color: "negative",
         position: "bottom",
       });
@@ -365,11 +380,11 @@ const bulkDeleteUserRoles = async () => {
 };
 
 const visibleRows = computed(() => {
-  if (!filterQuery.value) return rows.value || []
-  return filterRoles(rows.value || [], filterQuery.value)
-})
+  if (!filterQuery.value) return rows.value || [];
+  return filterRoles(rows.value || [], filterQuery.value);
+});
 
-const hasVisibleRows = computed(() => visibleRows.value.length > 0)
+const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 </script>
 
 <style scoped></style>

@@ -12,9 +12,14 @@
 </template>
 
 <script setup>
-import { BaseEdge, getBezierPath,EdgeLabelRenderer,getSmoothStepPath,useVueFlow } from '@vue-flow/core'
-import { computed, onMounted } from 'vue'
-
+import {
+  BaseEdge,
+  getBezierPath,
+  EdgeLabelRenderer,
+  getSmoothStepPath,
+  useVueFlow,
+} from "@vue-flow/core";
+import { computed, onMounted } from "vue";
 
 const props = defineProps({
   id: {
@@ -62,14 +67,15 @@ const props = defineProps({
     required: false,
     default: false,
   },
-})
-const midX = computed(() => (props.sourceX + props.targetX) / 2)
-const midY = computed(() => (props.sourceY + props.targetY) / 2)
-const { removeEdges, getSelectedEdges, addSelectedEdges, removeSelectedEdges } = useVueFlow()
+});
+const midX = computed(() => (props.sourceX + props.targetX) / 2);
+const midY = computed(() => (props.sourceY + props.targetY) / 2);
+const { removeEdges, getSelectedEdges, addSelectedEdges, removeSelectedEdges } =
+  useVueFlow();
 
-const path = computed(() => getBezierPath(props))
+const path = computed(() => getBezierPath(props));
 
-let clickTimeout = null
+let clickTimeout = null;
 
 // Edge click handling moved to PipelineFlow.vue using VueFlow events
 // These handlers are no longer used but kept for backwards compatibility
@@ -78,13 +84,9 @@ let clickTimeout = null
 <script>
 export default {
   inheritAttrs: false,
-}
+};
 </script>
-
 
 <style scoped>
 /* Edge delete button styles removed - using keyboard deletion instead */
 </style>
-
-
-

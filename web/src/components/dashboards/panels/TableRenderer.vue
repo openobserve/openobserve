@@ -21,13 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         'my-sticky-virtscroll-table',
         { 'no-position-absolute': store.state.printMode },
         { 'wrap-enabled': wrapCells },
-        { 'pivot-sticky-totals': stickyRowTotals },
       ]"
       :virtual-scroll="!showPagination"
       v-model:pagination="pagination"
       :rows-per-page-options="paginationOptions"
-      :virtual-scroll-sticky-size-start="pivotHeaderLevels.length > 0 ? PIVOT_TABLE_HEADER_ROW_HEIGHT * pivotHeaderLevels.length : PIVOT_TABLE_DEFAULT_HEADER_HEIGHT"
-      :virtual-scroll-sticky-size-end="stickyTotalRow ? PIVOT_TABLE_HEADER_ROW_HEIGHT : 0"
+      :virtual-scroll-sticky-size-start="48"
       dense
       :wrap-cells="wrapCells"
       :rows="data.rows || []"
@@ -35,165 +33,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="id"
       ref="tableRef"
       data-test="dashboard-panel-table"
-      :data-sticky-id="tableId"
       @row-click="(...args: any) => $emit('row-click', ...args)"
       hide-no-data
-      :row-class="getRowClass"
     >
-      <!-- N-level hierarchical headers for pivot tables -->
-      <template v-slot:header="headerProps" v-if="pivotHeaderLevels.length > 0">
-        <q-tr
-          v-for="(level, levelIdx) in pivotHeaderLevels"
-          :key="'hl_' + levelIdx"
-        >
-          <!-- Row field headers — only in first row, spanning all levels -->
-          <q-th
-            v-if="levelIdx === 0"
-            v-for="col in pivotRowColumns"
-            :key="'rh_' + col.name"
-            :rowspan="pivotHeaderLevels.length"
-            class="pivot-group-header cursor-pointer"
-            :style="getStickyColumnStyle(col)"
-            @click="headerProps.sort(col.name)"
-          >
-            {{ col.label }}
-            <q-icon
-              :name="pagination.descending ? 'arrow_downward' : 'arrow_upward'"
-              size="12px"
-              class="q-ml-xs pivot-sort-icon"
-              :class="{ 'pivot-sort-active': pagination.sortBy === col.name }"
-            />
-          </q-th>
-          <!-- Pivot/value group headers at this level -->
-          <q-th
-            v-for="(cell, cellIdx) in level.cells"
-            :key="'c_' + levelIdx + '_' + cell.key"
-            :colspan="cell.colspan"
-            :rowspan="cell.rowspan || 1"
-            :class="[
-              level.isLeaf ? 'pivot-value-header' : 'pivot-group-header text-center',
-              { 'pivot-section-border': cell.hasBorder },
-              { 'pivot-total-col': stickyColTotals && cell._isTotalHeader },
-              { 'cursor-pointer': cell._sortColumn }
-            ]"
-            :style="stickyColTotals && cell._isTotalHeader ? getStickyTotalHeaderForPivot(cell) : {}"
-            @click="cell._sortColumn && headerProps.sort(cell._sortColumn)"
-          >
-            {{ cell.label }}
-            <q-icon
-              v-if="level.isLeaf && cell._sortColumn"
-              :name="pagination.descending ? 'arrow_downward' : 'arrow_upward'"
-              size="12px"
-              class="q-ml-xs pivot-sort-icon"
-              :class="{ 'pivot-sort-active': pagination.sortBy === cell._sortColumn }"
-            />
-          </q-th>
-        </q-tr>
-      </template>
       <template v-slot:body-cell="props">
         <q-td
           :props="props"
-          :style="[
-            getStyle(props),
-            getStickyColumnStyle(props.col),
-            getStickyTotalColumnStyle(props.col),
-            isPivotMergeNoBorder(props.row, props.col) ? { 'border-bottom': '0 none' } : {},
-          ]"
-          :class="{
-            'sticky-column': props.col.sticky,
-            'pivot-total-col': stickyColTotals && props.col._isTotalColumn,
-          }"
+          :style="[getStyle(props), getStickyColumnStyle(props.col)]"
+          :class="{ 'sticky-column': props.col.sticky }"
           :data-col-index="props.col.__colIndex"
           class="copy-cell-td"
         >
-          <template v-if="!isPivotMergeHidden(props.row, props.col)">
-            <div>
-              <!-- Copy button on left for numeric/right-aligned columns -->
-              <q-btn
-                v-if="
-                  props.col.align === 'right' && shouldShowCopyButton(props.value)
-                "
-                :icon="
-                  isCellCopied(props.rowIndex, props.col.name)
-                    ? 'check'
-                    : 'content_copy'
-                "
-                dense
-                size="xs"
-                no-caps
-                flat
-                class="copy-btn q-mr-xs"
-                @click.stop="
-                  copyCellContent(props.value, props.rowIndex, props.col.name)
-                "
-              >
-              </q-btn>
-              <!-- Use JsonFieldRenderer if column is marked as JSON -->
-              <JsonFieldRenderer
-                v-if="props.col.showFieldAsJson"
-                :value="props.value"
-              />
-              <!-- Otherwise show normal value -->
-              <template v-else>
-                {{
-                  props.value === "undefined" || props.value === null
-                    ? ""
-                    : props.col.format
-                      ? props.col.format(props.value, props.row)
-                      : props.value
-                }}
-              </template>
-              <!-- Copy button on right for non-numeric columns -->
-              <q-btn
-                v-if="
-                  props.col.align !== 'right' && shouldShowCopyButton(props.value)
-                "
-                :icon="
-                  isCellCopied(props.rowIndex, props.col.name)
-                    ? 'check'
-                    : 'content_copy'
-                "
-                dense
-                size="xs"
-                no-caps
-                flat
-                class="copy-btn q-ml-xs"
-                @click.stop="
-                  copyCellContent(props.value, props.rowIndex, props.col.name)
-                "
-              >
-              </q-btn>
-            </div>
-          </template>
-        </q-td>
-      </template>
-
-      <!-- Sticky total row rendered outside virtual scroll for sticky bottom -->
-      <template v-slot:bottom-row="bottomRowProps" v-if="stickyTotalRow">
-        <q-tr class="pivot-total-row pivot-sticky-total-row">
-          <q-td
-            v-for="col in bottomRowProps.cols"
-            :key="'ft_' + col.name"
-            :style="[
-              getStickyTotalColumnStyle(col),
-              getStickyColumnStyle(col),
-            ]"
-            :class="{
-              'pivot-total-col': stickyColTotals && col._isTotalColumn,
-              'sticky-column': col.sticky,
-              'text-right': col.align === 'right',
-              'text-left': col.align === 'left',
-            }"
+          <!-- Copy button on left for numeric/right-aligned columns -->
+          <q-btn
+            v-if="
+              props.col.align === 'right' && shouldShowCopyButton(props.value)
+            "
+            :icon="
+              isCellCopied(props.rowIndex, props.col.name)
+                ? 'check'
+                : 'content_copy'
+            "
+            dense
+            size="xs"
+            no-caps
+            flat
+            class="copy-btn q-mr-xs"
+            @click.stop="
+              copyCellContent(props.value, props.rowIndex, props.col.name)
+            "
           >
+          </q-btn>
+          <!-- Use JsonFieldRenderer if column is marked as JSON -->
+          <JsonFieldRenderer
+            v-if="props.col.showFieldAsJson"
+            :value="props.value"
+          />
+          <!-- Otherwise show normal value -->
+          <template v-else>
             {{
-              stickyTotalRow[col.field] === undefined || stickyTotalRow[col.field] === null
+              props.value === "undefined" || props.value === null
                 ? ""
-                : col.format
-                  ? col.format(stickyTotalRow[col.field], stickyTotalRow)
-                  : stickyTotalRow[col.field]
+                : props.col.format
+                  ? props.col.format(props.value, props.row)
+                  : props.value
             }}
-          </q-td>
-        </q-tr>
+          </template>
+          <!-- Copy button on right for non-numeric columns -->
+          <q-btn
+            v-if="
+              props.col.align !== 'right' && shouldShowCopyButton(props.value)
+            "
+            :icon="
+              isCellCopied(props.rowIndex, props.col.name)
+                ? 'check'
+                : 'content_copy'
+            "
+            dense
+            size="xs"
+            no-caps
+            flat
+            class="copy-btn q-ml-xs"
+            @click.stop="
+              copyCellContent(props.value, props.rowIndex, props.col.name)
+            "
+          >
+          </q-btn>
+        </q-td>
       </template>
 
       <!-- Expose a bottom slot so callers (e.g., PromQL table) can provide footer content -->
@@ -245,13 +151,7 @@ import { findFirstValidMappedValue } from "@/utils/dashboard/panelValidation";
 import { useStore } from "vuex";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
 import JsonFieldRenderer from "./JsonFieldRenderer.vue";
-import {
-  TABLE_ROWS_PER_PAGE_DEFAULT_VALUE,
-  PIVOT_TABLE_HEADER_ROW_HEIGHT,
-  PIVOT_TABLE_DEFAULT_HEADER_HEIGHT,
-  PIVOT_TABLE_TOTAL_COLUMN_WIDTH,
-  PIVOT_TABLE_ROW_KEY_SEPARATOR,
-} from "@/utils/dashboard/constants";
+import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
 import TablePaginationControls from "../addPanel/TablePaginationControls.vue";
 
 export default defineComponent({
@@ -298,180 +198,7 @@ export default defineComponent({
       useNotifications();
 
     // Use sticky columns composable
-    const { getStickyColumnStyle, tableId } = useStickyColumns(props, store);
-
-    // Pivot table header levels (from convertPivotTableData)
-    const pivotHeaderLevels = computed(() => {
-      return props.data?.pivotHeaderLevels || [];
-    });
-
-    const pivotRowColumns = computed(() => {
-      return props.data?.columns?.filter((c: any) => c._isRowField) || [];
-    });
-
-    // Reactive row merge map for pivot tables.
-    // Uses string keys (x-field values) instead of object references because
-    // Vue 3 reactive proxies break Map identity lookups.
-    //
-    // Algorithm: identify consecutive groups per column (hierarchically).
-    // The first row of each group shows the value; subsequent rows hide it.
-    // Bottom borders are removed within a group so it looks like one tall cell.
-    const pivotMergeMap = computed(() => {
-      const map = new Map<
-        string,
-        Record<string, { hideContent: boolean; hideBorder: boolean }>
-      >();
-
-      const rowCols = pivotRowColumns.value;
-      if (rowCols.length === 0) return map;
-
-      let rows = (props.data?.rows || []).filter(
-        (r: any) => !r.__isTotalRow,
-      );
-      if (rows.length === 0) return map;
-
-      const getRowKey = (row: any) =>
-        rowCols.map((c: any) => String(row[c.name] ?? "")).join(PIVOT_TABLE_ROW_KEY_SEPARATOR);
-
-      // Re-sort to match q-table's display order
-      const sortBy = pagination.value.sortBy;
-      const descending = pagination.value.descending;
-
-      if (sortBy) {
-        const col = props.data?.columns?.find(
-          (c: any) => c.name === sortBy,
-        );
-        rows = [...rows].sort((a: any, b: any) => {
-          const va = a[sortBy];
-          const vb = b[sortBy];
-          let result: number;
-          if (col?.sort) {
-            result = col.sort(va, vb, a, b);
-          } else if (typeof va === "number" && typeof vb === "number") {
-            result = va - vb;
-          } else {
-            result = String(va ?? "").localeCompare(String(vb ?? ""));
-          }
-          return descending ? -result : result;
-        });
-      }
-
-      // For each row-field column, find consecutive groups.
-      // A group = consecutive rows with same value in this column AND all
-      // parent (left-side) columns.
-      // First row shows the value, all others hide it.
-      for (let colIdx = 0; colIdx < rowCols.length; colIdx++) {
-        const col = rowCols[colIdx];
-        let groupStart = 0;
-
-        for (let i = 0; i <= rows.length; i++) {
-          let sameGroup = i < rows.length;
-          if (sameGroup) {
-            for (let p = 0; p <= colIdx; p++) {
-              if (
-                rows[i][rowCols[p].name] !==
-                rows[groupStart][rowCols[p].name]
-              ) {
-                sameGroup = false;
-                break;
-              }
-            }
-          }
-
-          // End of a group — process it
-          if (!sameGroup) {
-            const size = i - groupStart;
-
-            if (size > 1) {
-              for (let r = groupStart; r < i; r++) {
-                const key = getRowKey(rows[r]);
-                if (!map.has(key)) map.set(key, {});
-                map.get(key)![col.name] = {
-                  hideContent: r !== groupStart, // first row shows value
-                  hideBorder: r < i - 1, // all except last in group
-                };
-              }
-            }
-
-            groupStart = i;
-          }
-        }
-      }
-
-      return map;
-    });
-
-    const pivotRowKey = (row: any) =>
-      pivotRowColumns.value
-        .map((c: any) => String(row[c.name] ?? ""))
-        .join(PIVOT_TABLE_ROW_KEY_SEPARATOR);
-
-    const isPivotMergeHidden = (row: any, col: any): boolean => {
-      if (!col._isRowField) return false;
-      const info = pivotMergeMap.value.get(pivotRowKey(row));
-      return info?.[col.name]?.hideContent === true;
-    };
-
-    const isPivotMergeNoBorder = (row: any, col: any): boolean => {
-      if (!col._isRowField) return false;
-      const info = pivotMergeMap.value.get(pivotRowKey(row));
-      return info?.[col.name]?.hideBorder === true;
-    };
-
-    // Sticky totals support (separate controls for row and column)
-    const stickyRowTotals = computed(() => {
-      return !!props.data?.stickyRowTotals;
-    });
-
-    const stickyColTotals = computed(() => {
-      return !!props.data?.stickyColTotals;
-    });
-
-    const stickyTotalRow = computed(() => {
-      return props.data?.stickyTotalRow || null;
-    });
-
-    const getStickyTotalColumnStyle = (col: any) => {
-      if (!stickyColTotals.value || !col?._isTotalColumn) return {};
-      const rightOffset = (col._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
-      return {
-        position: "sticky",
-        right: `${rightOffset}px`,
-        "z-index": 2,
-        "width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
-        "min-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
-        "max-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
-        "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
-        "box-shadow": "-2px 0 4px rgba(0, 0, 0, 0.1)",
-        "white-space": "normal",
-        "word-break": "break-word",
-      };
-    };
-
-    // Style for Total header cells in multi-row pivot headers.
-    // Level-0 "Total" cell spans all sub-columns → right: 0.
-    // Y-label level cells have individual _totalColRightIndex offsets.
-    const getStickyTotalHeaderForPivot = (cell: any) => {
-      if (!stickyColTotals.value) return {};
-      const rightOffset = (cell._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
-      const width = cell.colspan ? cell.colspan * PIVOT_TABLE_TOTAL_COLUMN_WIDTH : PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
-      return {
-        position: "sticky",
-        right: `${rightOffset}px`,
-        "z-index": 3,
-        "width": `${width}px`,
-        "min-width": `${width}px`,
-        "max-width": `${width}px`,
-        "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
-        "box-shadow": "-2px 0 4px rgba(0, 0, 0, 0.1)",
-        "white-space": "normal",
-        "word-break": "break-word",
-      };
-    };
-
-    const getRowClass = (row: any) => {
-      return row?.__isTotalRow ? "pivot-total-row" : "";
-    };
+    const { getStickyColumnStyle } = useStickyColumns(props, store);
 
     function wrapCsvValue(val: any, formatFn?: any, row?: any) {
       let formatted = formatFn !== void 0 ? formatFn(val, row) : val;
@@ -492,15 +219,11 @@ export default defineComponent({
 
     const downloadTableAsCSV = (title?: any) => {
       // naive encoding to csv format
-      const allRows = [
-        ...(tableRef?.value?.filteredSortedRows || []),
-        ...(stickyTotalRow.value ? [stickyTotalRow.value] : []),
-      ];
       const content = [
         props?.data?.columns?.map((col: any) => wrapCsvValue(col.label)),
       ]
         .concat(
-          allRows?.map((row: any) =>
+          tableRef?.value?.filteredSortedRows?.map((row: any) =>
             props?.data?.columns
               ?.map((col: any) =>
                 wrapCsvValue(
@@ -533,14 +256,10 @@ export default defineComponent({
 
     const downloadTableAsJSON = (title?: string) => {
       try {
-        // Create JSON structure with columns and rows (include sticky total row if present)
-        const allRows = [
-          ...(tableRef?.value?.filteredSortedRows || []),
-          ...(stickyTotalRow.value ? [stickyTotalRow.value] : []),
-        ];
+        // Create JSON structure with columns and rows
         const jsonContent = {
           columns: props?.data?.columns,
-          rows: allRows,
+          rows: tableRef?.value?.filteredSortedRows || [],
         };
 
         const content = JSON.stringify(jsonContent, null, 2);
@@ -615,7 +334,6 @@ export default defineComponent({
 
     const isDarkColor = (hex: any) => {
       const result: any = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-      if (!result) return false;
       const r = parseInt(result[1], 16);
       const g = parseInt(result[2], 16);
       const b = parseInt(result[3], 16);
@@ -660,7 +378,8 @@ export default defineComponent({
       }
 
       const defaultOptions = [10, 20, 50, 100, 250, 500, 1000];
-      const configuredRows = props.rowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE;
+      const configuredRows =
+        props.rowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE;
 
       const options = new Set(defaultOptions);
       if (configuredRows > 0) {
@@ -672,13 +391,10 @@ export default defineComponent({
       return sorted;
     });
 
-    const pagination = ref<{
-      rowsPerPage: number;
-      page: number;
-      sortBy?: string;
-      descending?: boolean;
-    }>({
-      rowsPerPage: props.showPagination ? props.rowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE : 0,
+    const pagination = ref({
+      rowsPerPage: props.showPagination
+        ? props.rowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE
+        : 0,
       page: 1,
     });
 
@@ -688,7 +404,9 @@ export default defineComponent({
         // Force reset pagination when toggle or config changes
         pagination.value = {
           ...pagination.value,
-          rowsPerPage: newShowPagination ? newRowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE : 0,
+          rowsPerPage: newShowPagination
+            ? newRowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE
+            : 0,
           page: 1, // Reset to first page
         };
       },
@@ -702,23 +420,10 @@ export default defineComponent({
       tableRef,
       getStyle,
       getStickyColumnStyle,
-      getStickyTotalColumnStyle,
-      getStickyTotalHeaderForPivot,
       store,
       copyCellContent,
       isCellCopied,
       shouldShowCopyButton,
-      pivotHeaderLevels,
-      pivotRowColumns,
-      isPivotMergeHidden,
-      isPivotMergeNoBorder,
-      PIVOT_TABLE_HEADER_ROW_HEIGHT,
-      PIVOT_TABLE_DEFAULT_HEADER_HEIGHT,
-      getRowClass,
-      stickyRowTotals,
-      stickyColTotals,
-      stickyTotalRow,
-      tableId,
     };
   },
 });
@@ -737,7 +442,7 @@ export default defineComponent({
 
   :deep(.q-table__top),
   :deep(.q-table__bottom),
-  :deep(thead tr th) {
+  :deep(thead tr:first-child th) {
     /* bg color is important for th; just specify one */
     background-color: #fff;
   }
@@ -748,23 +453,14 @@ export default defineComponent({
     z-index: 1;
   }
 
+  /* this will be the loading indicator */
+  :deep(thead tr:last-child th) {
+    /* height of all previous header rows */
+    top: 48px;
+  }
+
   :deep(thead tr:first-child th) {
     top: 0;
-  }
-
-  /* Second header row (for 2+ row headers in pivot or loading indicator) */
-  :deep(thead tr:nth-child(2) th) {
-    top: 28px;
-  }
-
-  /* Third header row (for 3-level pivot: 2 pivot levels + Y labels) */
-  :deep(thead tr:nth-child(3) th) {
-    top: 56px;
-  }
-
-  /* Fourth header row (for 4-level pivot: 3 pivot levels + Y labels) */
-  :deep(thead tr:nth-child(4) th) {
-    top: 84px;
   }
 
   :deep(.q-virtual-scroll) {
@@ -779,8 +475,9 @@ export default defineComponent({
 .my-sticky-virtscroll-table.q-dark {
   :deep(.q-table__top),
   :deep(.q-table__bottom),
-  :deep(thead tr th) {
+  :deep(thead tr:first-child th) {
     /* bg color is important for th; just specify one */
+    //   background-color: #fff;
     background-color: $dark-page !important;
   }
 }
@@ -808,58 +505,6 @@ export default defineComponent({
   height: 100%;
   width: 100%;
   position: relative;
-}
-
-// Pivot table styles
-:deep(.pivot-total-row) {
-  font-weight: bold;
-  background-color: rgba(0, 0, 0, 0.03);
-}
-
-.body--dark :deep(.pivot-total-row) {
-  background-color: rgba(255, 255, 255, 0.05);
-}
-
-:deep(.pivot-group-header) {
-  font-weight: 600;
-  border-bottom: 2px solid rgba(0, 0, 0, 0.12);
-}
-
-:deep(.pivot-section-border) {
-  border-left: 2px solid rgba(0, 0, 0, 0.12) !important;
-}
-
-:deep(.pivot-value-header) {
-  font-weight: 500;
-  font-size: 0.85em;
-}
-
-// Sticky total row (bottom-row slot)
-:deep(.pivot-sticky-total-row) {
-  font-weight: bold;
-
-  td {
-    border-top: 2px solid rgba(0, 0, 0, 0.12);
-  }
-}
-
-// Pivot header sort icons
-:deep(.pivot-sort-icon) {
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-:deep(th:hover .pivot-sort-icon) {
-  opacity: 0.4;
-}
-
-:deep(.pivot-sort-active) {
-  opacity: 1 !important;
-}
-
-// Sticky total column visual separator
-:deep(.pivot-total-col) {
-  border-left: 2px solid rgba(0, 0, 0, 0.12) !important;
 }
 
 @media print {

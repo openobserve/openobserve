@@ -10,8 +10,7 @@ import store from "@/test/unit/helpers/store";
 vi.mock("./CrossLinkDialog.vue", () => ({
   default: {
     name: "CrossLinkDialog",
-    template:
-      '<div data-test="cross-link-dialog"><slot /></div>',
+    template: '<div data-test="cross-link-dialog"><slot /></div>',
     props: ["modelValue", "link", "availableFields"],
     emits: ["update:modelValue", "save", "cancel"],
   },
@@ -56,12 +55,10 @@ describe("CrossLinkManager Component", () => {
             emits: ["click"],
           },
           "q-chip": {
-            template:
-              '<span class="q-chip"><slot /></span>',
+            template: '<span class="q-chip"><slot /></span>',
           },
           "q-badge": {
-            template:
-              '<span class="q-badge">{{ $attrs.label }}</span>',
+            template: '<span class="q-badge">{{ $attrs.label }}</span>',
           },
         },
       },
@@ -145,9 +142,7 @@ describe("CrossLinkManager Component", () => {
 
     it("should display link URLs", () => {
       wrapper = createWrapper({ modelValue: sampleLinks });
-      expect(wrapper.text()).toContain(
-        "https://example.com/trace/${trace_id}",
-      );
+      expect(wrapper.text()).toContain("https://example.com/trace/${trace_id}");
     });
 
     it("should display field chips", () => {

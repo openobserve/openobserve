@@ -15,10 +15,7 @@
 
 import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
-import {
-  getUnitValue,
-  formatUnitValue,
-} from "../convertDataIntoUnitValue";
+import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 import { formatDate } from "../dateTimeUtils";
 import { findFirstValidMappedValue } from "../panelValidation";
 import { toZonedTime } from "date-fns-tz";
@@ -61,18 +58,13 @@ export class TableConverter implements PromQLChartConverter {
    * Note: Sticky columns remain in their ordered position (they don't move to front)
    * Sticky is just a CSS property for horizontal scrolling
    */
-  private applyColumnOrdering(
-    labelKeys: string[],
-    config: any,
-  ): string[] {
+  private applyColumnOrdering(labelKeys: string[], config: any): string[] {
     const columnOrder = config.column_order || [];
 
     // Apply custom ordering if specified
     if (columnOrder.length > 0) {
       // First: columns in column_order (in that order)
-      const orderedKeys = columnOrder.filter((key) =>
-        labelKeys.includes(key),
-      );
+      const orderedKeys = columnOrder.filter((key) => labelKeys.includes(key));
       // Then: columns not in column_order (alphabetically)
       const unorderedKeys = labelKeys
         .filter((key) => !columnOrder.includes(key))
@@ -213,7 +205,10 @@ export class TableConverter implements PromQLChartConverter {
       ];
 
       // Add columns for each label with custom ordering
-      const sortedLabelKeys = this.applyColumnOrdering(filteredLabelKeys, config);
+      const sortedLabelKeys = this.applyColumnOrdering(
+        filteredLabelKeys,
+        config,
+      );
       sortedLabelKeys.forEach((key) => {
         const isSticky = stickyColumns.includes(key);
         // Note: Don't apply makeFirstSticky here because timestamp is already the first column

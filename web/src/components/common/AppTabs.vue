@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           activeTab === tab.value ? 'active text-primary' : '',
           tab.disabled && 'disabled',
           tab.hide && 'hidden',
-          activeTab !== tab.value ? 'inactive' : ''
+          activeTab !== tab.value ? 'inactive' : '',
         ]"
         @click="changeTab(tab)"
       >
@@ -86,7 +86,11 @@ const changeTab = (tab: Tab) => {
   }
   .active {
     border-bottom: 2px solid var(--o2-primary-btn-bg);
-    background-color: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
+    background-color: color-mix(
+      in srgb,
+      var(--o2-primary-btn-bg) 20%,
+      white 10%
+    );
     color: var(--o2-card-text) !important;
   }
 }

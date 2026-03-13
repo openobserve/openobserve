@@ -21,7 +21,7 @@ import {
   mockEncryptionMechanismFormData,
   createCipherKeyMountConfig,
   setupCipherKeyMocks,
-  cloneMockData
+  cloneMockData,
 } from "@/test/unit/fixtures/cipherKeyTestFixtures";
 
 describe("AddEncryptionMechanism", () => {
@@ -36,10 +36,9 @@ describe("AddEncryptionMechanism", () => {
     const freshFormData = cloneMockData(mockEncryptionMechanismFormData);
 
     // Create mount configuration using shared fixtures
-    mountConfig = createCipherKeyMountConfig(
-      AddEncryptionMechanism,
-      { formData: freshFormData }
-    );
+    mountConfig = createCipherKeyMountConfig(AddEncryptionMechanism, {
+      formData: freshFormData,
+    });
 
     // Mount the component
     wrapper = mount(mountConfig.component, {
@@ -66,7 +65,9 @@ describe("AddEncryptionMechanism", () => {
 
   describe("Form Fields", () => {
     it("should render provider type select", () => {
-      const providerTypeSelect = wrapper.find('[data-test="add-cipher-key-auth-method-input"]');
+      const providerTypeSelect = wrapper.find(
+        '[data-test="add-cipher-key-auth-method-input"]',
+      );
       expect(providerTypeSelect.exists()).toBe(true);
     });
 
@@ -75,7 +76,9 @@ describe("AddEncryptionMechanism", () => {
       wrapper.vm.frmData.key.mechanism.type = "simple";
       await nextTick();
 
-      const algorithmSelect = wrapper.find('[data-test="add-cipher-algorithm-input"]');
+      const algorithmSelect = wrapper.find(
+        '[data-test="add-cipher-algorithm-input"]',
+      );
       expect(algorithmSelect.exists()).toBe(true);
     });
 
@@ -84,7 +87,9 @@ describe("AddEncryptionMechanism", () => {
       wrapper.vm.frmData.key.mechanism.type = "other";
       await nextTick();
 
-      const algorithmSelect = wrapper.find('[data-test="add-cipher-algorithm-input"]');
+      const algorithmSelect = wrapper.find(
+        '[data-test="add-cipher-algorithm-input"]',
+      );
       expect(algorithmSelect.exists()).toBe(false);
     });
   });
@@ -93,9 +98,9 @@ describe("AddEncryptionMechanism", () => {
     it("should have correct provider type options", () => {
       const expectedProviderTypes = [
         { value: "simple", label: "Simple" },
-        { value: "tink_keyset", label: "Tink KeySet" }
+        { value: "tink_keyset", label: "Tink KeySet" },
       ];
-      
+
       expect(wrapper.vm.providerTypeOptions).toEqual(expectedProviderTypes);
     });
   });
@@ -103,9 +108,9 @@ describe("AddEncryptionMechanism", () => {
   describe("Algorithm Options", () => {
     it("should have correct algorithm options", () => {
       const expectedAlgorithms = [
-        { value: "aes-256-siv", label: "AES 256 SIV" }
+        { value: "aes-256-siv", label: "AES 256 SIV" },
       ];
-      
+
       expect(wrapper.vm.plainAlgorithmOptions).toEqual(expectedAlgorithms);
     });
   });
@@ -114,7 +119,7 @@ describe("AddEncryptionMechanism", () => {
     it("should bind provider type to form data", async () => {
       wrapper.vm.frmData.key.mechanism.type = "simple";
       await nextTick();
-      
+
       expect(wrapper.vm.frmData.key.mechanism.type).toBe("simple");
     });
 
@@ -122,15 +127,19 @@ describe("AddEncryptionMechanism", () => {
       wrapper.vm.frmData.key.mechanism.type = "simple";
       wrapper.vm.frmData.key.mechanism.simple_algorithm = "aes-256-siv";
       await nextTick();
-      
-      expect(wrapper.vm.frmData.key.mechanism.simple_algorithm).toBe("aes-256-siv");
+
+      expect(wrapper.vm.frmData.key.mechanism.simple_algorithm).toBe(
+        "aes-256-siv",
+      );
     });
   });
 
   describe("Validation Rules", () => {
     it("should validate provider type is required", () => {
       // Test validation logic by checking if the component has validation rules
-      const providerTypeSelect = wrapper.find('[data-test="add-cipher-key-auth-method-input"]');
+      const providerTypeSelect = wrapper.find(
+        '[data-test="add-cipher-key-auth-method-input"]',
+      );
       expect(providerTypeSelect.exists()).toBe(true);
       // Validation rules are applied to the QSelect component through props
     });
@@ -139,8 +148,10 @@ describe("AddEncryptionMechanism", () => {
       // Set provider type to simple to show algorithm field
       wrapper.vm.frmData.key.mechanism.type = "simple";
       await nextTick();
-      
-      const algorithmSelect = wrapper.find('[data-test="add-cipher-algorithm-input"]');
+
+      const algorithmSelect = wrapper.find(
+        '[data-test="add-cipher-algorithm-input"]',
+      );
       expect(algorithmSelect.exists()).toBe(true);
       // Validation rules are applied to the QSelect component through props
     });
@@ -151,15 +162,19 @@ describe("AddEncryptionMechanism", () => {
       // Initially, provider type is simple, so algorithm should be visible
       wrapper.vm.frmData.key.mechanism.type = "simple";
       await nextTick();
-      
-      const algorithmSelect = wrapper.find('[data-test="add-cipher-algorithm-input"]');
+
+      const algorithmSelect = wrapper.find(
+        '[data-test="add-cipher-algorithm-input"]',
+      );
       expect(algorithmSelect.exists()).toBe(true);
-      
+
       // Change to non-simple provider type, algorithm should be hidden
       wrapper.vm.frmData.key.mechanism.type = "other";
       await nextTick();
-      
-      const algorithmSelectHidden = wrapper.find('[data-test="add-cipher-algorithm-input"]');
+
+      const algorithmSelectHidden = wrapper.find(
+        '[data-test="add-cipher-algorithm-input"]',
+      );
       expect(algorithmSelectHidden.exists()).toBe(false);
     });
   });
@@ -181,7 +196,7 @@ describe("AddEncryptionMechanism", () => {
       // Create mount configuration using shared fixtures
       const emptyMountConfig = createCipherKeyMountConfig(
         AddEncryptionMechanism,
-        { formData: emptyFormData }
+        { formData: emptyFormData },
       );
 
       // Mount the component
@@ -191,10 +206,10 @@ describe("AddEncryptionMechanism", () => {
       });
 
       await nextTick();
-      
+
       expect(wrapperWithoutProps.vm.frmData).toBeDefined();
       expect(wrapperWithoutProps.vm.frmData.key.mechanism).toBeDefined();
-      
+
       wrapperWithoutProps.unmount();
     });
 
@@ -214,7 +229,7 @@ describe("AddEncryptionMechanism", () => {
       // Create mount configuration using shared fixtures
       const customMountConfig = createCipherKeyMountConfig(
         AddEncryptionMechanism,
-        { formData: customFormData }
+        { formData: customFormData },
       );
 
       // Mount the component
@@ -224,28 +239,36 @@ describe("AddEncryptionMechanism", () => {
       });
 
       await nextTick();
-      
+
       expect(wrapperWithProps.vm.frmData.key.mechanism.type).toBe("custom");
-      expect(wrapperWithProps.vm.frmData.key.mechanism.simple_algorithm).toBe("custom-algorithm");
-      
+      expect(wrapperWithProps.vm.frmData.key.mechanism.simple_algorithm).toBe(
+        "custom-algorithm",
+      );
+
       wrapperWithProps.unmount();
     });
   });
 
   describe("Component Structure", () => {
     it("should have correct CSS classes", () => {
-      expect(wrapper.classes()).toContain("cipher-keys-add-encryption-mechanism");
+      expect(wrapper.classes()).toContain(
+        "cipher-keys-add-encryption-mechanism",
+      );
     });
 
     it("should render provider type select with correct structure", () => {
-      const providerTypeSelect = wrapper.find('[data-test="add-cipher-key-auth-method-input"]');
+      const providerTypeSelect = wrapper.find(
+        '[data-test="add-cipher-key-auth-method-input"]',
+      );
       expect(providerTypeSelect.exists()).toBe(true);
     });
   });
 
   describe("Accessibility", () => {
     it("should have proper tabindex for provider type select", () => {
-      const providerTypeSelect = wrapper.find('[data-test="add-cipher-key-auth-method-input"]');
+      const providerTypeSelect = wrapper.find(
+        '[data-test="add-cipher-key-auth-method-input"]',
+      );
       // With shared fixtures, tabindex should be properly handled through props
       expect(providerTypeSelect.exists()).toBe(true);
       // Note: Exact tabindex testing depends on the component implementation
@@ -256,7 +279,9 @@ describe("AddEncryptionMechanism", () => {
       wrapper.vm.frmData.key.mechanism.type = "simple";
       await nextTick();
 
-      const algorithmSelect = wrapper.find('[data-test="add-cipher-algorithm-input"]');
+      const algorithmSelect = wrapper.find(
+        '[data-test="add-cipher-algorithm-input"]',
+      );
       // With shared fixtures, tabindex should be properly handled through props
       expect(algorithmSelect.exists()).toBe(true);
       // Note: Exact tabindex testing depends on the component implementation
@@ -266,8 +291,10 @@ describe("AddEncryptionMechanism", () => {
 
   describe("Form Field Properties", () => {
     it("should have correct properties for provider type select", () => {
-      const providerTypeSelect = wrapper.find('[data-test="add-cipher-key-auth-method-input"]');
-      
+      const providerTypeSelect = wrapper.find(
+        '[data-test="add-cipher-key-auth-method-input"]',
+      );
+
       expect(providerTypeSelect.exists()).toBe(true);
       // Properties are now managed through shared fixtures
       // Focus on functional behavior rather than exact attribute values
@@ -277,8 +304,10 @@ describe("AddEncryptionMechanism", () => {
       wrapper.vm.frmData.key.mechanism.type = "simple";
       await nextTick();
 
-      const algorithmSelect = wrapper.find('[data-test="add-cipher-algorithm-input"]');
-      
+      const algorithmSelect = wrapper.find(
+        '[data-test="add-cipher-algorithm-input"]',
+      );
+
       expect(algorithmSelect.exists()).toBe(true);
       // Properties are now managed through shared fixtures
       // Focus on functional behavior rather than exact attribute values

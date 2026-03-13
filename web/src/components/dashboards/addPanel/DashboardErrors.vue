@@ -26,7 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             text-color="black"
             class="q-mr-sm"
           />
-          <span class="text-subtitle2 text-weight-bold" style="color: red"
+          <span class="text-subtitle2 text-weight-bold"
+style="color: red"
             >Errors ({{ props.errors.errors.length }})</span
           >
           <q-space />

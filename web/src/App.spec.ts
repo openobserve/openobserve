@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mount, VueWrapper } from '@vue/test-utils';
-import { createStore } from 'vuex';
-import { createRouter, createWebHistory } from 'vue-router';
-import App from '@/App.vue';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mount, VueWrapper } from "@vue/test-utils";
+import { createStore } from "vuex";
+import { createRouter, createWebHistory } from "vue-router";
+import App from "@/App.vue";
 
 // Mock localStorage
 const mockLocalStorage = {
@@ -11,18 +11,18 @@ const mockLocalStorage = {
   removeItem: vi.fn(),
   clear: vi.fn(),
 };
-Object.defineProperty(window, 'localStorage', {
+Object.defineProperty(window, "localStorage", {
   value: mockLocalStorage,
 });
 
 // Mock aws-exports
-vi.mock('@/aws-exports', () => ({
+vi.mock("@/aws-exports", () => ({
   default: {
-    isCloud: 'false'
-  }
+    isCloud: "false",
+  },
 }));
 
-describe('App.vue', () => {
+describe("App.vue", () => {
   let wrapper: VueWrapper;
   let store: any;
   let router: any;
@@ -46,14 +46,14 @@ describe('App.vue', () => {
           light: null,
           dark: null,
         },
-        theme: 'light',
+        theme: "light",
         organizationData: {
-          organizationSettings: {}
-        }
+          organizationSettings: {},
+        },
       },
       mutations: {},
       actions: {},
-      dispatch: mockDispatch
+      dispatch: mockDispatch,
     });
     store.dispatch = mockDispatch;
 
@@ -62,9 +62,9 @@ describe('App.vue', () => {
     router = createRouter({
       history: createWebHistory(),
       routes: [
-        { path: '/', component: { template: '<div>Home</div>' } },
-        { path: '/logs', component: { template: '<div>Logs</div>' } }
-      ]
+        { path: "/", component: { template: "<div>Home</div>" } },
+        { path: "/logs", component: { template: "<div>Logs</div>" } },
+      ],
     });
     router.push = mockPush;
   });
@@ -75,72 +75,72 @@ describe('App.vue', () => {
     }
   });
 
-  describe('Component Setup', () => {
-    it('renders router-view correctly', () => {
+  describe("Component Setup", () => {
+    it("renders router-view correctly", () => {
       wrapper = mount(App, {
         global: {
           plugins: [store, router],
           stubs: {
-            'router-view': true
-          }
-        }
+            "router-view": true,
+          },
+        },
       });
 
-      expect(wrapper.find('router-view-stub').exists()).toBe(true);
+      expect(wrapper.find("router-view-stub").exists()).toBe(true);
     });
 
-    it('initializes without localStorage credentials', () => {
+    it("initializes without localStorage credentials", () => {
       mockLocalStorage.getItem.mockReturnValue(null);
 
       wrapper = mount(App, {
         global: {
           plugins: [store, router],
           stubs: {
-            'router-view': true
-          }
-        }
+            "router-view": true,
+          },
+        },
       });
 
-      expect(mockLocalStorage.getItem).toHaveBeenCalledWith('creds');
+      expect(mockLocalStorage.getItem).toHaveBeenCalledWith("creds");
       expect(mockPush).not.toHaveBeenCalled();
     });
 
-    it('redirects to logs when credentials exist in localStorage', () => {
-      const mockCreds = JSON.stringify({ username: 'test', token: 'abc123' });
+    it("redirects to logs when credentials exist in localStorage", () => {
+      const mockCreds = JSON.stringify({ username: "test", token: "abc123" });
       mockLocalStorage.getItem.mockReturnValue(mockCreds);
 
       wrapper = mount(App, {
         global: {
           plugins: [store, router],
           stubs: {
-            'router-view': true
-          }
-        }
+            "router-view": true,
+          },
+        },
       });
 
-      expect(mockLocalStorage.getItem).toHaveBeenCalledWith('creds');
-      expect(mockPush).toHaveBeenCalledWith('/logs');
+      expect(mockLocalStorage.getItem).toHaveBeenCalledWith("creds");
+      expect(mockPush).toHaveBeenCalledWith("/logs");
     });
 
-    it('handles empty string credentials', () => {
-      mockLocalStorage.getItem.mockReturnValue('');
+    it("handles empty string credentials", () => {
+      mockLocalStorage.getItem.mockReturnValue("");
 
       wrapper = mount(App, {
         global: {
           plugins: [store, router],
           stubs: {
-            'router-view': true
-          }
-        }
+            "router-view": true,
+          },
+        },
       });
 
-      expect(mockLocalStorage.getItem).toHaveBeenCalledWith('creds');
+      expect(mockLocalStorage.getItem).toHaveBeenCalledWith("creds");
       expect(mockPush).not.toHaveBeenCalled();
     });
 
-    it('handles localStorage access errors gracefully', () => {
+    it("handles localStorage access errors gracefully", () => {
       mockLocalStorage.getItem.mockImplementation(() => {
-        throw new Error('localStorage not available');
+        throw new Error("localStorage not available");
       });
 
       // The component will throw because localStorage access fails in setup
@@ -149,114 +149,117 @@ describe('App.vue', () => {
           global: {
             plugins: [store, router],
             stubs: {
-              'router-view': true
-            }
-          }
+              "router-view": true,
+            },
+          },
         });
-      }).toThrow('localStorage not available');
+      }).toThrow("localStorage not available");
     });
   });
 
-  describe('Credential Handling', () => {
-    it('handles valid JSON credentials', () => {
-      const validCreds = JSON.stringify({ user: 'test@example.com', token: 'valid-token' });
+  describe("Credential Handling", () => {
+    it("handles valid JSON credentials", () => {
+      const validCreds = JSON.stringify({
+        user: "test@example.com",
+        token: "valid-token",
+      });
       mockLocalStorage.getItem.mockReturnValue(validCreds);
 
       wrapper = mount(App, {
         global: {
           plugins: [store, router],
           stubs: {
-            'router-view': true
-          }
-        }
+            "router-view": true,
+          },
+        },
       });
 
-      expect(mockPush).toHaveBeenCalledWith('/logs');
+      expect(mockPush).toHaveBeenCalledWith("/logs");
     });
 
-    it('handles whitespace-only credentials', () => {
-      mockLocalStorage.getItem.mockReturnValue('   ');
+    it("handles whitespace-only credentials", () => {
+      mockLocalStorage.getItem.mockReturnValue("   ");
 
       wrapper = mount(App, {
         global: {
           plugins: [store, router],
           stubs: {
-            'router-view': true
-          }
-        }
+            "router-view": true,
+          },
+        },
       });
 
       // Whitespace-only string is truthy in JavaScript, so it will redirect
-      expect(mockPush).toHaveBeenCalledWith('/logs');
+      expect(mockPush).toHaveBeenCalledWith("/logs");
     });
 
-    it('handles null credentials', () => {
+    it("handles null credentials", () => {
       mockLocalStorage.getItem.mockReturnValue(null);
 
       wrapper = mount(App, {
         global: {
           plugins: [store, router],
           stubs: {
-            'router-view': true
-          }
-        }
+            "router-view": true,
+          },
+        },
       });
 
       expect(mockPush).not.toHaveBeenCalled();
     });
 
-    it('handles undefined credentials', () => {
+    it("handles undefined credentials", () => {
       mockLocalStorage.getItem.mockReturnValue(undefined);
 
       wrapper = mount(App, {
         global: {
           plugins: [store, router],
           stubs: {
-            'router-view': true
-          }
-        }
+            "router-view": true,
+          },
+        },
       });
 
       expect(mockPush).not.toHaveBeenCalled();
     });
   });
 
-  describe('Store and Router Integration', () => {
-    it('uses the provided store correctly', () => {
+  describe("Store and Router Integration", () => {
+    it("uses the provided store correctly", () => {
       wrapper = mount(App, {
         global: {
           plugins: [store, router],
           stubs: {
-            'router-view': true
-          }
-        }
+            "router-view": true,
+          },
+        },
       });
 
       // Verify store is accessible in component
       expect(wrapper.vm).toBeDefined();
     });
 
-    it('uses the provided router correctly', () => {
-      const mockCreds = JSON.stringify({ test: 'data' });
+    it("uses the provided router correctly", () => {
+      const mockCreds = JSON.stringify({ test: "data" });
       mockLocalStorage.getItem.mockReturnValue(mockCreds);
 
       wrapper = mount(App, {
         global: {
           plugins: [store, router],
           stubs: {
-            'router-view': true
-          }
-        }
+            "router-view": true,
+          },
+        },
       });
 
-      expect(mockPush).toHaveBeenCalledWith('/logs');
+      expect(mockPush).toHaveBeenCalledWith("/logs");
     });
 
-    it('handles router push errors gracefully', () => {
-      const mockCreds = JSON.stringify({ test: 'data' });
+    it("handles router push errors gracefully", () => {
+      const mockCreds = JSON.stringify({ test: "data" });
       mockLocalStorage.getItem.mockReturnValue(mockCreds);
       mockPush.mockImplementation(() => {
-        throw new Error('Navigation failed');
+        throw new Error("Navigation failed");
       });
 
       // The component will throw because router.push fails
@@ -265,37 +268,37 @@ describe('App.vue', () => {
           global: {
             plugins: [store, router],
             stubs: {
-              'router-view': true
-            }
-          }
+              "router-view": true,
+            },
+          },
         });
-      }).toThrow('Navigation failed');
+      }).toThrow("Navigation failed");
     });
   });
 
-  describe('Component Structure', () => {
-    it('has correct template structure', () => {
+  describe("Component Structure", () => {
+    it("has correct template structure", () => {
       wrapper = mount(App, {
         global: {
           plugins: [store, router],
           stubs: {
-            'router-view': true
-          }
-        }
+            "router-view": true,
+          },
+        },
       });
 
-      const routerView = wrapper.find('router-view-stub');
+      const routerView = wrapper.find("router-view-stub");
       expect(routerView.exists()).toBe(true);
     });
 
-    it('renders without any props', () => {
+    it("renders without any props", () => {
       wrapper = mount(App, {
         global: {
           plugins: [store, router],
           stubs: {
-            'router-view': true
-          }
-        }
+            "router-view": true,
+          },
+        },
       });
 
       expect(wrapper.props()).toEqual({});

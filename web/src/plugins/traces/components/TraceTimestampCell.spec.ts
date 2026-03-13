@@ -64,8 +64,7 @@ const MICROS_TODAY = FIXED_NOW_MS * 1000 - 3600 * 1e6; // 1 hour ago → "Today"
 const MICROS_YESTERDAY = FIXED_NOW_MS * 1000 - 25 * 3600 * 1e6; // 25 h ago → "Yesterday"
 const MICROS_OLDER = FIXED_NOW_MS * 1000 - 3 * 86400 * 1e6; // 3 days ago → "D MMM"
 
-const makeStore = (timezone = "UTC") =>
-  createStore({ state: { timezone } });
+const makeStore = (timezone = "UTC") => createStore({ state: { timezone } });
 
 describe("TraceTimestampCell", () => {
   let wrapper: VueWrapper;
@@ -97,13 +96,17 @@ describe("TraceTimestampCell", () => {
     it("renders the timestamp container", async () => {
       wrapper = mount_(MICROS_TODAY);
       await flushPromises();
-      expect(wrapper.find('[data-test="trace-row-timestamp"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="trace-row-timestamp"]').exists()).toBe(
+        true,
+      );
     });
 
     it("renders the day/time span", async () => {
       wrapper = mount_(MICROS_TODAY);
       await flushPromises();
-      expect(wrapper.find('[data-test="trace-row-timestamp-day"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="trace-row-timestamp-day"]').exists(),
+      ).toBe(true);
     });
   });
 

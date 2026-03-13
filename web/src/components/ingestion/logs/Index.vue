@@ -63,7 +63,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   org_identifier: store.state.selectedOrganization.identifier,
                 },
               }"
-              :icon="'img:' + getImageURL('images/ingestion/fluentbit_icon.png')"
+              :icon="
+                'img:' + getImageURL('images/ingestion/fluentbit_icon.png')
+              "
               label="FluentBit"
               content-class="tab_content"
             />
@@ -178,13 +180,7 @@ export default defineComponent({
     const currentOrgIdentifier: any = ref(
       store.state.selectedOrganization.identifier,
     );
-    const ingestRoutes = [
-      "curl",
-      "fluentbit",
-      "fluentd",
-      "vector",
-      "syslogNg",
-    ];
+    const ingestRoutes = ["curl", "fluentbit", "fluentd", "vector", "syslogNg"];
 
     onBeforeMount(() => {
       if (ingestRoutes.includes(router.currentRoute.value.name)) {
@@ -280,7 +276,6 @@ export default defineComponent({
   .head {
     padding-bottom: 1rem;
   }
-  
 }
 </style>
 <style lang="scss">

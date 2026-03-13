@@ -13,7 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  afterAll,
+} from "vitest";
 import domainManagement from "./domainManagement";
 import http from "./http";
 
@@ -38,18 +46,18 @@ vi.mock("vuex", () => ({
 
 describe("domainManagement Service", () => {
   let mockHttpInstance: any;
-  
+
   beforeEach(() => {
     // Reset all mocks before each test
     vi.clearAllMocks();
     vi.resetAllMocks();
-    
+
     // Create a mock HTTP instance
     mockHttpInstance = {
       get: vi.fn(),
       put: vi.fn(),
     };
-    
+
     // Make http() return our mock instance
     (http as any).mockReturnValue(mockHttpInstance);
   });
@@ -86,7 +94,7 @@ describe("domainManagement Service", () => {
       const result = await domainManagement.getDomainRestrictions(metaOrg);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${metaOrg}/domain_management`
+        `/api/${metaOrg}/domain_management`,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -94,15 +102,15 @@ describe("domainManagement Service", () => {
     it("should handle API errors gracefully", async () => {
       const metaOrg = "test-meta-org";
       const errorMessage = "Network error";
-      
+
       mockHttpInstance.get.mockRejectedValue(new Error(errorMessage));
 
       await expect(
-        domainManagement.getDomainRestrictions(metaOrg)
+        domainManagement.getDomainRestrictions(metaOrg),
       ).rejects.toThrow(errorMessage);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${metaOrg}/domain_management`
+        `/api/${metaOrg}/domain_management`,
       );
     });
 
@@ -115,7 +123,7 @@ describe("domainManagement Service", () => {
       const result = await domainManagement.getDomainRestrictions(metaOrg);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${metaOrg}/domain_management`
+        `/api/${metaOrg}/domain_management`,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -139,12 +147,12 @@ describe("domainManagement Service", () => {
 
       const result = await domainManagement.updateDomainRestrictions(
         metaOrg,
-        domainData as any
+        domainData as any,
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${metaOrg}/domain_management`,
-        domainData
+        domainData,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -161,16 +169,16 @@ describe("domainManagement Service", () => {
         ],
       };
       const errorMessage = "Update failed";
-      
+
       mockHttpInstance.put.mockRejectedValue(new Error(errorMessage));
 
       await expect(
-        domainManagement.updateDomainRestrictions(metaOrg, domainData as any)
+        domainManagement.updateDomainRestrictions(metaOrg, domainData as any),
       ).rejects.toThrow(errorMessage);
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${metaOrg}/domain_management`,
-        domainData
+        domainData,
       );
     });
 
@@ -200,12 +208,12 @@ describe("domainManagement Service", () => {
 
       const result = await domainManagement.updateDomainRestrictions(
         metaOrg,
-        complexDomainData as any
+        complexDomainData as any,
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${metaOrg}/domain_management`,
-        complexDomainData
+        complexDomainData,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -219,12 +227,12 @@ describe("domainManagement Service", () => {
 
       const result = await domainManagement.updateDomainRestrictions(
         metaOrg,
-        emptyDomainData as any
+        emptyDomainData as any,
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${metaOrg}/domain_management`,
-        emptyDomainData
+        emptyDomainData,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -240,7 +248,7 @@ describe("domainManagement Service", () => {
       await domainManagement.getDomainRestrictions(metaOrg);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${metaOrg}/domain_management`
+        `/api/${metaOrg}/domain_management`,
       );
     });
 
@@ -252,7 +260,7 @@ describe("domainManagement Service", () => {
       await domainManagement.getDomainRestrictions(metaOrg);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${metaOrg}/domain_management`
+        `/api/${metaOrg}/domain_management`,
       );
     });
   });

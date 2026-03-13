@@ -54,7 +54,13 @@ function makeMockContext(overrides: Partial<any> = {}): any {
 
   return {
     options: {
-      xAxis: [{ data: ["Jan", "Feb", "Mar"], axisLabel: { rotate: 0, width: 120 }, name: "" }],
+      xAxis: [
+        {
+          data: ["Jan", "Feb", "Mar"],
+          axisLabel: { rotate: 0, width: 120 },
+          name: "",
+        },
+      ],
       yAxis: [{ data: [], axisLabel: { width: 80 }, name: "" }],
       series: [],
       tooltip: { axisPointer: {}, textStyle: {} },
@@ -62,10 +68,23 @@ function makeMockContext(overrides: Partial<any> = {}): any {
     },
     panelSchema: {
       type: "h-bar",
-      config: { unit: "default", unit_custom: "", decimals: 2, axis_label_truncate_width: 120, trellis: { layout: null } },
-      queries: [{ fields: { y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+      config: {
+        unit: "default",
+        unit_custom: "",
+        decimals: 2,
+        axis_label_truncate_width: 120,
+        trellis: { layout: null },
+      },
+      queries: [
+        {
+          fields: { y: [{ label: "Value" }], breakdown: [] },
+          customQuery: false,
+        },
+      ],
     },
-    store: { state: { theme: "light", zoConfig: { timestamp_column: "_timestamp" } } },
+    store: {
+      state: { theme: "light", zoConfig: { timestamp_column: "_timestamp" } },
+    },
     chartPanelRef: { value: { offsetWidth: 800, offsetHeight: 400 } },
     chartPanelStyle: {},
     hoveredSeriesState: { value: null },
@@ -119,7 +138,11 @@ describe("applyHStackedChart", () => {
     const ctx = makeMockContext();
     // Start with two xAxis elements to verify slicing works
     ctx.options.xAxis = [
-      { data: ["Jan", "Feb", "Mar"], axisLabel: { rotate: 0, width: 120 }, name: "" },
+      {
+        data: ["Jan", "Feb", "Mar"],
+        axisLabel: { rotate: 0, width: 120 },
+        name: "",
+      },
       { data: ["X", "Y"], axisLabel: { rotate: 0, width: 80 }, name: "" },
     ];
     applyHStackedChart(ctx);

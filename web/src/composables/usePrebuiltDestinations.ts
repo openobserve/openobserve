@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { ref, computed, watch } from 'vue';
-import { useQuasar } from 'quasar';
-import { useI18n } from 'vue-i18n';
+import { ref, computed, watch } from "vue";
+import { useQuasar } from "quasar";
+import { useI18n } from "vue-i18n";
 
 // Services
-import alertDestinationService from '@/services/alert_destination';
-import templatesService from '@/services/alert_templates';
+import alertDestinationService from "@/services/alert_destination";
+import templatesService from "@/services/alert_templates";
 
 // Types and configurations
 import {
@@ -30,8 +30,8 @@ import {
   generateDestinationUrl,
   generateDestinationHeaders,
   getPopularPrebuiltTypes,
-  getPrebuiltTypesByCategory
-} from '@/utils/prebuilt-templates';
+  getPrebuiltTypesByCategory,
+} from "@/utils/prebuilt-templates";
 
 /**
  * System Templates Architecture:
@@ -48,18 +48,18 @@ import type {
   ValidationResult,
   TestResult,
   PrebuiltTypeId,
-  DestinationWithPrebuilt
-} from '@/utils/prebuilt-templates/types';
+  DestinationWithPrebuilt,
+} from "@/utils/prebuilt-templates/types";
 
 // Store
-import { useStore } from 'vuex';
+import { useStore } from "vuex";
 
 /**
  * Parses a comma/space-separated string of email recipients into an array.
  */
 function parseEmailRecipients(recipients: string | string[]): string[] {
   if (Array.isArray(recipients)) return recipients;
-  return (recipients || '')
+  return (recipients || "")
     .split(/[,\s]+/)
     .map((e: string) => e.trim())
     .filter(Boolean);
@@ -80,7 +80,9 @@ export function usePrebuiltDestinations() {
   const lastTestResult = ref<TestResult | null>(null);
 
   // Computed properties
-  const organizationIdentifier = computed(() => store.state.selectedOrganization.identifier);
+  const organizationIdentifier = computed(
+    () => store.state.selectedOrganization.identifier,
+  );
 
   /**
    * Get all available prebuilt destination types
@@ -138,7 +140,7 @@ export function usePrebuiltDestinations() {
 
       console.log(`Fetched ${templates.length} system templates from backend`);
     } catch (error) {
-      console.error('Failed to fetch system templates from backend:', error);
+      console.error("Failed to fetch system templates from backend:", error);
       // Don't throw - allow destination operations to proceed
       // Backend will handle template resolution
     }
@@ -155,12 +157,15 @@ export function usePrebuiltDestinations() {
   /**
    * Validate credentials for a specific prebuilt destination type
    */
-  function validateCredentials(type: PrebuiltTypeId, credentials: Record<string, any>): ValidationResult {
+  function validateCredentials(
+    type: PrebuiltTypeId,
+    credentials: Record<string, any>,
+  ): ValidationResult {
     const config = getPrebuiltConfig(type);
     if (!config) {
       return {
         isValid: false,
-        errors: { type: 'Unknown destination type' }
+        errors: { type: "Unknown destination type" },
       };
     }
 
@@ -171,13 +176,13 @@ export function usePrebuiltDestinations() {
       const value = credentials[field.key];
 
       // Check required fields
-      if (field.required && (!value || value.toString().trim() === '')) {
+      if (field.required && (!value || value.toString().trim() === "")) {
         errors[field.key] = `${field.label} is required`;
         continue;
       }
 
       // Skip validation if field is optional and empty
-      if (!field.required && (!value || value.toString().trim() === '')) {
+      if (!field.required && (!value || value.toString().trim() === "")) {
         continue;
       }
 
@@ -192,16 +197,19 @@ export function usePrebuiltDestinations() {
 
     return {
       isValid: Object.keys(errors).length === 0,
-      errors
+      errors,
     };
   }
 
   /**
    * Generate preview data for template preview
    */
-  async function generatePreview(type: PrebuiltTypeId, credentials?: Record<string, any>): Promise<string> {
+  async function generatePreview(
+    type: PrebuiltTypeId,
+    credentials?: Record<string, any>,
+  ): Promise<string> {
     const config = getPrebuiltConfig(type);
-    if (!config) return '';
+    if (!config) return "";
 
     // Ensure system templates are fetched
     await fetchSystemTemplates();
@@ -217,13 +225,16 @@ export function usePrebuiltDestinations() {
       try {
         const templateResponse = await templatesService.get_by_name({
           org_identifier: organizationIdentifier.value,
-          template_name: config.templateName
+          template_name: config.templateName,
         });
         if (templateResponse.data?.body) {
           templateBody = templateResponse.data.body;
         }
       } catch (error) {
-        console.warn('Failed to fetch template from backend, using fallback:', error);
+        console.warn(
+          "Failed to fetch template from backend, using fallback:",
+          error,
+        );
         // Continue with hardcoded template as fallback
       }
     }
@@ -232,24 +243,24 @@ export function usePrebuiltDestinations() {
     const baseUrl = window.location.origin;
     const orgId = organizationIdentifier.value;
     const now = Date.now() * 1000; // microseconds
-    const oneHourAgo = now - (60 * 60 * 1000 * 1000);
+    const oneHourAgo = now - 60 * 60 * 1000 * 1000;
 
     // Sample alert data with realistic context
     const sampleData: Record<string, string> = {
-      alert_name: 'Test Alert - High CPU Usage',
-      stream_name: 'system-metrics',
-      stream_type: 'logs',
-      alert_count: '15',
-      alert_operator: 'greater than',
-      alert_threshold: '80%',
+      alert_name: "Test Alert - High CPU Usage",
+      stream_name: "system-metrics",
+      stream_type: "logs",
+      alert_count: "15",
+      alert_operator: "greater than",
+      alert_threshold: "80%",
       alert_time: new Date().toLocaleString(),
       // Use actual OpenObserve instance URL instead of fake example
       alert_url: `${baseUrl}/web/logs?org_identifier=${orgId}&stream_type=logs&stream=system-metrics&from=${oneHourAgo}&to=${now}&type=alert_destination_test`,
       // Default values for credential-based fields
-      integration_key: 'sample-integration-key',
-      severity: 'error',
-      assignment_group: 'IT Operations',
-      api_key: 'sample-api-key'
+      integration_key: "sample-integration-key",
+      severity: "error",
+      assignment_group: "IT Operations",
+      api_key: "sample-api-key",
     };
 
     // Override with actual credentials if provided
@@ -272,7 +283,7 @@ export function usePrebuiltDestinations() {
     // Replace placeholders in fetched template with sample data
     let preview = templateBody;
     for (const [key, value] of Object.entries(sampleData)) {
-      const regex = new RegExp(`{${key}}`, 'g');
+      const regex = new RegExp(`{${key}}`, "g");
       preview = preview.replace(regex, value);
     }
 
@@ -282,7 +293,10 @@ export function usePrebuiltDestinations() {
   /**
    * Test a prebuilt destination by sending a sample notification
    */
-  async function testDestination(type: PrebuiltTypeId, credentials: Record<string, any>): Promise<TestResult> {
+  async function testDestination(
+    type: PrebuiltTypeId,
+    credentials: Record<string, any>,
+  ): Promise<TestResult> {
     try {
       isTestInProgress.value = true;
 
@@ -293,7 +307,7 @@ export function usePrebuiltDestinations() {
         const result = {
           success: false,
           error: `Validation error: ${firstError}`,
-          timestamp: Date.now()
+          timestamp: Date.now(),
         };
         lastTestResult.value = result;
         return result;
@@ -303,8 +317,8 @@ export function usePrebuiltDestinations() {
       if (!config) {
         const result = {
           success: false,
-          error: 'Invalid destination type',
-          timestamp: Date.now()
+          error: "Invalid destination type",
+          timestamp: Date.now(),
         };
         lastTestResult.value = result;
         return result;
@@ -324,13 +338,16 @@ export function usePrebuiltDestinations() {
         try {
           const templateResponse = await templatesService.get_by_name({
             org_identifier: organizationIdentifier.value,
-            template_name: config.templateName
+            template_name: config.templateName,
           });
           if (templateResponse.data?.body) {
             templateBody = templateResponse.data.body;
           }
         } catch (error) {
-          console.warn('Failed to fetch template from backend, using fallback:', error);
+          console.warn(
+            "Failed to fetch template from backend, using fallback:",
+            error,
+          );
           // Continue with hardcoded template as fallback
         }
       }
@@ -343,49 +360,51 @@ export function usePrebuiltDestinations() {
       const baseUrl = window.location.origin;
       const orgId = organizationIdentifier.value;
       const now = Date.now() * 1000; // microseconds
-      const oneHourAgo = now - (60 * 60 * 1000 * 1000);
+      const oneHourAgo = now - 60 * 60 * 1000 * 1000;
 
       const sampleData: Record<string, string> = {
-        alert_name: 'Test Alert - High CPU Usage',
-        stream_name: 'system-metrics',
-        stream_type: 'logs',
-        alert_count: '15',
-        alert_operator: 'greater than',
-        alert_threshold: '80%',
+        alert_name: "Test Alert - High CPU Usage",
+        stream_name: "system-metrics",
+        stream_type: "logs",
+        alert_count: "15",
+        alert_operator: "greater than",
+        alert_threshold: "80%",
         alert_time: new Date().toLocaleString(),
         alert_url: `${baseUrl}/web/logs?org_identifier=${orgId}&stream_type=logs&stream=system-metrics&from=${oneHourAgo}&to=${now}&type=alert_destination_test`,
-        integration_key: 'sample-integration-key',
-        severity: 'error',
-        assignment_group: 'IT Operations',
-        api_key: 'sample-api-key'
+        integration_key: "sample-integration-key",
+        severity: "error",
+        assignment_group: "IT Operations",
+        api_key: "sample-api-key",
       };
 
       // Override with actual credentials
       if (credentials) {
-        if (credentials.integrationKey) sampleData.integration_key = credentials.integrationKey;
+        if (credentials.integrationKey)
+          sampleData.integration_key = credentials.integrationKey;
         if (credentials.severity) sampleData.severity = credentials.severity;
         if (credentials.apiKey) sampleData.api_key = credentials.apiKey;
-        if (credentials.assignmentGroup) sampleData.assignment_group = credentials.assignmentGroup;
+        if (credentials.assignmentGroup)
+          sampleData.assignment_group = credentials.assignmentGroup;
       }
 
       // Replace placeholders in fetched template
       let testBody = templateBody;
       for (const [key, value] of Object.entries(sampleData)) {
-        const regex = new RegExp(`{${key}}`, 'g');
+        const regex = new RegExp(`{${key}}`, "g");
         testBody = testBody.replace(regex, value);
       }
 
       // For email type, send email-specific test request to backend
-      if (type === 'email') {
+      if (type === "email") {
         const emailRecipients = parseEmailRecipients(credentials.recipients);
 
         const testResult = await alertDestinationService.test({
           org_identifier: organizationIdentifier.value,
           data: {
-            type: 'email',
+            type: "email",
             recipients: emailRecipients,
             body: testBody,
-          }
+          },
         });
 
         lastTestResult.value = {
@@ -405,8 +424,8 @@ export function usePrebuiltDestinations() {
           url: testUrl,
           method: config.method,
           headers: testHeaders,
-          body: testBody
-        }
+          body: testBody,
+        },
       });
 
       lastTestResult.value = {
@@ -414,16 +433,15 @@ export function usePrebuiltDestinations() {
         timestamp: Date.now(),
         error: testResult.data.error,
         statusCode: testResult.data.statusCode,
-        responseBody: testResult.data.responseBody
+        responseBody: testResult.data.responseBody,
       };
 
       return lastTestResult.value;
-
     } catch (error: any) {
       const result: TestResult = {
         success: false,
-        error: error.message || 'Test failed with unknown error',
-        timestamp: Date.now()
+        error: error.message || "Test failed with unknown error",
+        timestamp: Date.now(),
       };
 
       lastTestResult.value = result;
@@ -441,7 +459,7 @@ export function usePrebuiltDestinations() {
     name: string,
     credentials: Record<string, any>,
     headers: Record<string, string> = {},
-    skipTlsVerify: boolean = false
+    skipTlsVerify: boolean = false,
   ): Promise<void> {
     try {
       isLoading.value = true;
@@ -452,12 +470,14 @@ export function usePrebuiltDestinations() {
       // Validate inputs
       const validation = validateCredentials(type, credentials);
       if (!validation.isValid) {
-        throw new Error(`Validation error: ${Object.values(validation.errors).join(', ')}`);
+        throw new Error(
+          `Validation error: ${Object.values(validation.errors).join(", ")}`,
+        );
       }
 
       const config = getPrebuiltConfig(type);
       if (!config) {
-        throw new Error('Invalid destination type');
+        throw new Error("Invalid destination type");
       }
 
       // Generate destination data
@@ -468,59 +488,67 @@ export function usePrebuiltDestinations() {
       // Email destinations use different payload structure than HTTP destinations
       let destinationData: any;
 
-      if (type === 'email') {
+      if (type === "email") {
         // Email destination - no URL or HTTP-specific fields
         destinationData = {
           name,
-          type: 'email',
+          type: "email",
           template: config.templateName, // Include template for email
           skip_tls_verify: skipTlsVerify,
-          output_format: 'json',
+          output_format: "json",
           destination_type_name: type,
           emails: parseEmailRecipients(credentials.recipients),
           metadata: {
             prebuilt_type: type,
             // Flatten credentials into metadata (only non-sensitive fields)
             ...Object.fromEntries(
-              Object.entries(credentials).filter(([key]) =>
-                !key.toLowerCase().includes('password') &&
-                !key.toLowerCase().includes('key') &&
-                !key.toLowerCase().includes('token')
-              ).map(([k, v]) => [`credential_${k}`, String(v)])
-            )
-          }
+              Object.entries(credentials)
+                .filter(
+                  ([key]) =>
+                    !key.toLowerCase().includes("password") &&
+                    !key.toLowerCase().includes("key") &&
+                    !key.toLowerCase().includes("token"),
+                )
+                .map(([k, v]) => [`credential_${k}`, String(v)]),
+            ),
+          },
         };
       } else {
         // HTTP-based destinations (Slack, Teams, PagerDuty, Opsgenie, ServiceNow, Discord)
         destinationData = {
           name,
-          type: 'http',
+          type: "http",
           url: destinationUrl,
           method: config.method,
           template: config.templateName, // Include template for all destinations
           skip_tls_verify: skipTlsVerify,
           headers: { ...destinationHeaders, ...headers },
-          output_format: 'json',
+          output_format: "json",
           destination_type_name: type,
           metadata: {
             prebuilt_type: type,
             // Flatten credentials into metadata (only non-sensitive fields)
             ...Object.fromEntries(
-              Object.entries(credentials).filter(([key]) =>
-                !key.toLowerCase().includes('password') &&
-                !key.toLowerCase().includes('key') &&
-                !key.toLowerCase().includes('token')
-              ).map(([k, v]) => [`credential_${k}`, String(v)])
-            )
-          }
+              Object.entries(credentials)
+                .filter(
+                  ([key]) =>
+                    !key.toLowerCase().includes("password") &&
+                    !key.toLowerCase().includes("key") &&
+                    !key.toLowerCase().includes("token"),
+                )
+                .map(([k, v]) => [`credential_${k}`, String(v)]),
+            ),
+          },
         };
 
         // Special handling for ServiceNow - encode Basic Auth in Authorization header
-        if (type === 'servicenow') {
-          const authString = btoa(`${credentials.username}:${credentials.password}`);
+        if (type === "servicenow") {
+          const authString = btoa(
+            `${credentials.username}:${credentials.password}`,
+          );
           destinationData.headers = {
             ...destinationData.headers,
-            'Authorization': `Basic ${authString}`
+            Authorization: `Basic ${authString}`,
           };
         }
       }
@@ -529,20 +557,22 @@ export function usePrebuiltDestinations() {
       await alertDestinationService.create({
         org_identifier: organizationIdentifier.value,
         destination_name: name,
-        data: destinationData
+        data: destinationData,
       });
 
       $q.notify({
-        type: 'positive',
-        message: t('alerts.destinations.saved'),
-        timeout: 2000
+        type: "positive",
+        message: t("alerts.destinations.saved"),
+        timeout: 2000,
       });
-
     } catch (error: any) {
-      console.error('Failed to create prebuilt destination:', error);
+      console.error("Failed to create prebuilt destination:", error);
       $q.notify({
-        type: 'negative',
-        message: error.response?.data?.error || error.response?.data?.message || error.message,
+        type: "negative",
+        message:
+          error.response?.data?.error ||
+          error.response?.data?.message ||
+          error.message,
       });
       throw error;
     } finally {
@@ -559,7 +589,7 @@ export function usePrebuiltDestinations() {
     name: string,
     credentials: Record<string, any>,
     headers: Record<string, string> = {},
-    skipTlsVerify: boolean = false
+    skipTlsVerify: boolean = false,
   ): Promise<void> {
     try {
       isLoading.value = true;
@@ -572,7 +602,7 @@ export function usePrebuiltDestinations() {
 
       const config = getPrebuiltConfig(type);
       if (!config) {
-        throw new Error('Invalid destination type');
+        throw new Error("Invalid destination type");
       }
 
       // Generate destination data
@@ -582,54 +612,62 @@ export function usePrebuiltDestinations() {
       // Build update payload (same structure as create)
       let destinationData: any;
 
-      if (type === 'email') {
+      if (type === "email") {
         destinationData = {
           name,
-          type: 'email',
+          type: "email",
           template: config.templateName,
           skip_tls_verify: skipTlsVerify,
-          output_format: 'json',
+          output_format: "json",
           destination_type_name: type,
           emails: parseEmailRecipients(credentials.recipients),
           metadata: {
             prebuilt_type: type,
             ...Object.fromEntries(
-              Object.entries(credentials).filter(([key]) =>
-                !key.toLowerCase().includes('password') &&
-                !key.toLowerCase().includes('key') &&
-                !key.toLowerCase().includes('token')
-              ).map(([k, v]) => [`credential_${k}`, String(v)])
-            )
-          }
+              Object.entries(credentials)
+                .filter(
+                  ([key]) =>
+                    !key.toLowerCase().includes("password") &&
+                    !key.toLowerCase().includes("key") &&
+                    !key.toLowerCase().includes("token"),
+                )
+                .map(([k, v]) => [`credential_${k}`, String(v)]),
+            ),
+          },
         };
       } else {
         destinationData = {
           name,
-          type: 'http',
+          type: "http",
           url: destinationUrl,
           method: config.method,
           template: config.templateName,
           skip_tls_verify: skipTlsVerify,
           headers: { ...destinationHeaders, ...headers },
-          output_format: 'json',
+          output_format: "json",
           destination_type_name: type,
           metadata: {
             prebuilt_type: type,
             ...Object.fromEntries(
-              Object.entries(credentials).filter(([key]) =>
-                !key.toLowerCase().includes('password') &&
-                !key.toLowerCase().includes('key') &&
-                !key.toLowerCase().includes('token')
-              ).map(([k, v]) => [`credential_${k}`, String(v)])
-            )
-          }
+              Object.entries(credentials)
+                .filter(
+                  ([key]) =>
+                    !key.toLowerCase().includes("password") &&
+                    !key.toLowerCase().includes("key") &&
+                    !key.toLowerCase().includes("token"),
+                )
+                .map(([k, v]) => [`credential_${k}`, String(v)]),
+            ),
+          },
         };
 
-        if (type === 'servicenow') {
-          const authString = btoa(`${credentials.username}:${credentials.password}`);
+        if (type === "servicenow") {
+          const authString = btoa(
+            `${credentials.username}:${credentials.password}`,
+          );
           destinationData.headers = {
             ...destinationData.headers,
-            'Authorization': `Basic ${authString}`
+            Authorization: `Basic ${authString}`,
           };
         }
       }
@@ -638,20 +676,22 @@ export function usePrebuiltDestinations() {
       await alertDestinationService.update({
         org_identifier: organizationIdentifier.value,
         destination_name: originalName, // Use original name for lookup
-        data: destinationData
+        data: destinationData,
       });
 
       $q.notify({
-        type: 'positive',
-        message: t('alerts.destinations.saved'),
-        timeout: 2000
+        type: "positive",
+        message: t("alerts.destinations.saved"),
+        timeout: 2000,
       });
-
     } catch (error: any) {
-      console.error('Failed to update prebuilt destination:', error);
+      console.error("Failed to update prebuilt destination:", error);
       $q.notify({
-        type: 'negative',
-        message: error.response?.data?.error || error.response?.data?.message || error.message,
+        type: "negative",
+        message:
+          error.response?.data?.error ||
+          error.response?.data?.message ||
+          error.message,
       });
       throw error;
     } finally {
@@ -668,14 +708,17 @@ export function usePrebuiltDestinations() {
     }
 
     // Check if template name starts with "prebuilt_" or "system-prebuilt-" - this is the definitive indicator
-    if (destination.template && typeof destination.template === 'string') {
-      if (destination.template.startsWith('system-prebuilt-')) {
+    if (destination.template && typeof destination.template === "string") {
+      if (destination.template.startsWith("system-prebuilt-")) {
         // Extract type from template name (e.g., "system-prebuilt-email" -> "email")
-        return destination.template.replace('system-prebuilt-', '') as PrebuiltTypeId;
+        return destination.template.replace(
+          "system-prebuilt-",
+          "",
+        ) as PrebuiltTypeId;
       }
-      if (destination.template.startsWith('prebuilt_')) {
+      if (destination.template.startsWith("prebuilt_")) {
         // Extract type from template name (e.g., "prebuilt_slack" -> "slack")
-        return destination.template.replace('prebuilt_', '') as PrebuiltTypeId;
+        return destination.template.replace("prebuilt_", "") as PrebuiltTypeId;
       }
     }
 
@@ -692,7 +735,7 @@ export function usePrebuiltDestinations() {
    */
   async function convertToPrebuilt(
     destinationName: string,
-    targetType: PrebuiltTypeId
+    targetType: PrebuiltTypeId,
   ): Promise<void> {
     try {
       isLoading.value = true;
@@ -700,12 +743,12 @@ export function usePrebuiltDestinations() {
       // Get existing destination
       const existing = await alertDestinationService.get_by_name({
         org_identifier: organizationIdentifier.value,
-        destination_name: destinationName
+        destination_name: destinationName,
       });
 
       const config = getPrebuiltConfig(targetType);
       if (!config) {
-        throw new Error('Invalid target type');
+        throw new Error("Invalid target type");
       }
 
       // Ensure system templates exist
@@ -717,33 +760,35 @@ export function usePrebuiltDestinations() {
         template: config.templateName,
         headers: {
           ...existing.headers,
-          ...config.headers
+          ...config.headers,
         },
         metadata: {
           ...existing.metadata,
           prebuilt_type: targetType,
           converted_from_custom: true,
-          conversion_date: new Date().toISOString()
-        }
+          conversion_date: new Date().toISOString(),
+        },
       };
 
       await alertDestinationService.update({
         org_identifier: organizationIdentifier.value,
         destination_name: destinationName,
-        data: updatedData
+        data: updatedData,
       });
 
       $q.notify({
-        type: 'positive',
-        message: t('alerts.prebuilt.conversionSuccess'),
-        timeout: 2000
+        type: "positive",
+        message: t("alerts.prebuilt.conversionSuccess"),
+        timeout: 2000,
       });
-
     } catch (error: any) {
-      console.error('Failed to convert destination:', error);
+      console.error("Failed to convert destination:", error);
       $q.notify({
-        type: 'negative',
-        message: error.response?.data?.error || error.response?.data?.message || error.message,
+        type: "negative",
+        message:
+          error.response?.data?.error ||
+          error.response?.data?.message ||
+          error.message,
       });
       throw error;
     } finally {
@@ -782,6 +827,6 @@ export function usePrebuiltDestinations() {
     getPrebuiltConfig,
     isPrebuiltType,
     generateDestinationUrl,
-    generateDestinationHeaders
+    generateDestinationHeaders,
   };
 }

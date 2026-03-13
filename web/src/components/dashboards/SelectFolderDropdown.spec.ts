@@ -82,7 +82,9 @@ describe("SelectFolderDropdown", () => {
       },
     });
 
-    const addButton = wrapper.find('[data-test="dashboard-folder-move-new-add"]');
+    const addButton = wrapper.find(
+      '[data-test="dashboard-folder-move-new-add"]',
+    );
     expect(addButton.exists()).toBe(true);
   });
 
@@ -93,7 +95,9 @@ describe("SelectFolderDropdown", () => {
       },
     });
 
-    const addButton = wrapper.find('[data-test="dashboard-folder-move-new-add"]');
+    const addButton = wrapper.find(
+      '[data-test="dashboard-folder-move-new-add"]',
+    );
     await addButton.trigger("click");
 
     expect(wrapper.vm.showAddFolderDialog).toBe(true);

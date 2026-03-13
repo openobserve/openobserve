@@ -57,7 +57,11 @@ describe("AddFolder", () => {
         theme: "light",
         organizationData: {
           folders: [
-            { folderId: "folder1", name: "Test Folder", description: "Test description" },
+            {
+              folderId: "folder1",
+              name: "Test Folder",
+              description: "Test description",
+            },
           ],
         },
       },
@@ -121,7 +125,9 @@ describe("AddFolder", () => {
       },
     });
 
-    const descInput = wrapper.find('[data-test="dashboard-folder-add-description"]');
+    const descInput = wrapper.find(
+      '[data-test="dashboard-folder-add-description"]',
+    );
     expect(descInput.exists()).toBe(true);
   });
 
@@ -132,7 +138,9 @@ describe("AddFolder", () => {
       },
     });
 
-    const cancelButton = wrapper.find('[data-test="dashboard-folder-add-cancel"]');
+    const cancelButton = wrapper.find(
+      '[data-test="dashboard-folder-add-cancel"]',
+    );
     expect(cancelButton.exists()).toBe(true);
   });
 
@@ -225,7 +233,9 @@ describe("AddFolder", () => {
       },
     });
 
-    const descInput = wrapper.find('[data-test="dashboard-folder-add-description"]');
+    const descInput = wrapper.find(
+      '[data-test="dashboard-folder-add-description"]',
+    );
     await descInput.setValue("My folder description");
 
     expect(wrapper.vm.folderData.description).toBe("My folder description");

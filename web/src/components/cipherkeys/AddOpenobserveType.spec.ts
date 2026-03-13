@@ -21,7 +21,7 @@ import {
   mockOpenobserveFormData,
   createCipherKeyMountConfig,
   setupCipherKeyMocks,
-  cloneMockData
+  cloneMockData,
 } from "@/test/unit/fixtures/cipherKeyTestFixtures";
 
 describe("AddOpenobserveType", () => {
@@ -36,10 +36,9 @@ describe("AddOpenobserveType", () => {
     const freshFormData = cloneMockData(mockOpenobserveFormData);
 
     // Create mount configuration using shared fixtures
-    mountConfig = createCipherKeyMountConfig(
-      AddOpenobserveType,
-      { formData: freshFormData }
-    );
+    mountConfig = createCipherKeyMountConfig(AddOpenobserveType, {
+      formData: freshFormData,
+    });
 
     // Mount the component
     wrapper = mount(mountConfig.component, {
@@ -86,20 +85,28 @@ describe("AddOpenobserveType", () => {
 
   describe("Form Fields", () => {
     it("should render secret input field", () => {
-      const secretInput = wrapper.find('[data-test="add-cipher-key-openobserve-secret-input"]');
+      const secretInput = wrapper.find(
+        '[data-test="add-cipher-key-openobserve-secret-input"]',
+      );
       expect(secretInput.exists()).toBe(true);
     });
 
     it("should render secret input as textarea", () => {
-      const secretInput = wrapper.find('[data-test="add-cipher-key-openobserve-secret-input"]');
+      const secretInput = wrapper.find(
+        '[data-test="add-cipher-key-openobserve-secret-input"]',
+      );
       expect(secretInput.exists()).toBe(true);
       // The input should be a textarea type for multi-line secrets
     });
 
     it("should have correct input properties", () => {
-      const secretInput = wrapper.find('[data-test="add-cipher-key-openobserve-secret-input"]');
+      const secretInput = wrapper.find(
+        '[data-test="add-cipher-key-openobserve-secret-input"]',
+      );
       expect(secretInput.exists()).toBe(true);
-      expect(secretInput.attributes('data-test')).toBe('add-cipher-key-openobserve-secret-input');
+      expect(secretInput.attributes("data-test")).toBe(
+        "add-cipher-key-openobserve-secret-input",
+      );
     });
 
     it("should bind to formData.key.store.local", async () => {
@@ -109,25 +116,33 @@ describe("AddOpenobserveType", () => {
     });
 
     it("should have required validation rule", () => {
-      const secretInput = wrapper.find('[data-test="add-cipher-key-openobserve-secret-input"]');
+      const secretInput = wrapper.find(
+        '[data-test="add-cipher-key-openobserve-secret-input"]',
+      );
       expect(secretInput.exists()).toBe(true);
       // Input should have validation rules
     });
 
     it("should display correct label", () => {
-      const secretInput = wrapper.find('[data-test="add-cipher-key-openobserve-secret-input"]');
+      const secretInput = wrapper.find(
+        '[data-test="add-cipher-key-openobserve-secret-input"]',
+      );
       expect(secretInput.exists()).toBe(true);
       // Should have proper label from i18n
     });
 
     it("should have proper styling classes", () => {
-      const secretInput = wrapper.find('[data-test="add-cipher-key-openobserve-secret-input"]');
+      const secretInput = wrapper.find(
+        '[data-test="add-cipher-key-openobserve-secret-input"]',
+      );
       expect(secretInput.exists()).toBe(true);
       // Should have showLabelOnTop and other classes
     });
 
     it("should be stack-label and outlined", () => {
-      const secretInput = wrapper.find('[data-test="add-cipher-key-openobserve-secret-input"]');
+      const secretInput = wrapper.find(
+        '[data-test="add-cipher-key-openobserve-secret-input"]',
+      );
       expect(secretInput.exists()).toBe(true);
       // Should have stack-label, outlined, filled, and dense properties
     });
@@ -140,28 +155,28 @@ describe("AddOpenobserveType", () => {
     });
 
     it("should fail validation when secret is empty", () => {
-      const validationFn = (val: any) => !!val || 'Secret is required';
-      expect(validationFn("")).toBe('Secret is required');
-      expect(validationFn(null)).toBe('Secret is required');
-      expect(validationFn(undefined)).toBe('Secret is required');
+      const validationFn = (val: any) => !!val || "Secret is required";
+      expect(validationFn("")).toBe("Secret is required");
+      expect(validationFn(null)).toBe("Secret is required");
+      expect(validationFn(undefined)).toBe("Secret is required");
     });
 
     it("should pass validation when secret has value", () => {
-      const validationFn = (val: any) => !!val || 'Secret is required';
+      const validationFn = (val: any) => !!val || "Secret is required";
       expect(validationFn("test-secret")).toBe(true);
       expect(validationFn("a")).toBe(true);
       expect(validationFn("123")).toBe(true);
     });
 
     it("should validate secret with special characters", () => {
-      const validationFn = (val: any) => !!val || 'Secret is required';
+      const validationFn = (val: any) => !!val || "Secret is required";
       expect(validationFn("test@#$%^&*()")).toBe(true);
       expect(validationFn("test with spaces")).toBe(true);
       expect(validationFn("test\nwith\nnewlines")).toBe(true);
     });
 
     it("should validate secret with only whitespace as invalid", () => {
-      const validationFn = (val: any) => !!val || 'Secret is required';
+      const validationFn = (val: any) => !!val || "Secret is required";
       expect(validationFn("   ")).toBe(true); // !!("   ") is true
       expect(validationFn("\t\n")).toBe(true); // !!("\t\n") is true
     });
@@ -177,11 +192,17 @@ describe("AddOpenobserveType", () => {
     it("should update secret value when form data changes", async () => {
       wrapper.vm.formData.key.store.local = "updated-secret";
       await nextTick();
-      
+
       // Check if the component data is updated
-      if (wrapper.find('[data-test="add-cipher-key-openobserve-secret-input"]').exists()) {
+      if (
+        wrapper
+          .find('[data-test="add-cipher-key-openobserve-secret-input"]')
+          .exists()
+      ) {
         // If the input exists, test it
-        const secretInput = wrapper.find('[data-test="add-cipher-key-openobserve-secret-input"]');
+        const secretInput = wrapper.find(
+          '[data-test="add-cipher-key-openobserve-secret-input"]',
+        );
         expect(secretInput.exists()).toBe(true);
       } else {
         // Verify the data is updated even if DOM element is not accessible
@@ -209,12 +230,11 @@ describe("AddOpenobserveType", () => {
           },
         },
       };
-      
+
       // Create mount configuration using shared fixtures
-      const updateMountConfig = createCipherKeyMountConfig(
-        AddOpenobserveType,
-        { formData: updateFormData }
-      );
+      const updateMountConfig = createCipherKeyMountConfig(AddOpenobserveType, {
+        formData: updateFormData,
+      });
 
       // Mount the component
       updateWrapper = mount(updateMountConfig.component, {
@@ -238,7 +258,9 @@ describe("AddOpenobserveType", () => {
 
     it("should show update button in update mode", () => {
       expect(updateWrapper.vm.formData.isUpdate).toBe(true);
-      const updateButton = updateWrapper.find('[data-test="add-cipher-key-openobserve-secret-input-update"]');
+      const updateButton = updateWrapper.find(
+        '[data-test="add-cipher-key-openobserve-secret-input-update"]',
+      );
       // Update button should exist in update mode when not editing
     });
 
@@ -251,10 +273,12 @@ describe("AddOpenobserveType", () => {
     it("should toggle to edit mode when update button is clicked", async () => {
       expect(updateWrapper.vm.formData.isUpdate).toBe(true);
       expect(updateWrapper.vm.isUpdate).toBe(false);
-      
-      const updateButton = updateWrapper.find('[data-test="add-cipher-key-openobserve-secret-input-update"]');
+
+      const updateButton = updateWrapper.find(
+        '[data-test="add-cipher-key-openobserve-secret-input-update"]',
+      );
       if (updateButton.exists()) {
-        await updateButton.trigger('click');
+        await updateButton.trigger("click");
         await nextTick();
         expect(updateWrapper.vm.isUpdate).toBe(true);
       }
@@ -263,18 +287,22 @@ describe("AddOpenobserveType", () => {
     it("should show cancel button when in edit mode", async () => {
       updateWrapper.vm.isUpdate = true;
       await nextTick();
-      
-      const cancelButton = updateWrapper.find('[data-test="add-cipher-key-openobserve-secret-input-cancel"]');
+
+      const cancelButton = updateWrapper.find(
+        '[data-test="add-cipher-key-openobserve-secret-input-cancel"]',
+      );
       // Cancel button should be visible when isUpdate is true and formData.isUpdate is true
     });
 
     it("should cancel edit mode when cancel button is clicked", async () => {
       updateWrapper.vm.isUpdate = true;
       await nextTick();
-      
-      const cancelButton = updateWrapper.find('[data-test="add-cipher-key-openobserve-secret-input-cancel"]');
+
+      const cancelButton = updateWrapper.find(
+        '[data-test="add-cipher-key-openobserve-secret-input-cancel"]',
+      );
       if (cancelButton.exists()) {
-        await cancelButton.trigger('click');
+        await cancelButton.trigger("click");
         await nextTick();
         expect(updateWrapper.vm.isUpdate).toBe(false);
       }
@@ -282,12 +310,12 @@ describe("AddOpenobserveType", () => {
 
     it("should display pre-formatted secret text correctly", () => {
       expect(updateWrapper.vm.formData.key.store.local).toBe("existing-secret");
-      const preText = updateWrapper.find('pre.pre-text');
+      const preText = updateWrapper.find("pre.pre-text");
       // Pre-formatted text should display the secret
     });
 
     it("should have correct label for secret field", () => {
-      const label = updateWrapper.find('label b');
+      const label = updateWrapper.find("label b");
       // Label should contain translated secret text
     });
 
@@ -295,10 +323,10 @@ describe("AddOpenobserveType", () => {
       const originalSecret = updateWrapper.vm.formData.key.store.local;
       updateWrapper.vm.isUpdate = true;
       await nextTick();
-      
+
       updateWrapper.vm.isUpdate = false;
       await nextTick();
-      
+
       expect(updateWrapper.vm.formData.key.store.local).toBe(originalSecret);
     });
   });
@@ -324,7 +352,9 @@ describe("AddOpenobserveType", () => {
       expect(defaultFormData.key.store.local).toBe("");
       expect(defaultFormData.key.mechanism).toBeDefined();
       expect(defaultFormData.key.mechanism.type).toBe("simple");
-      expect(defaultFormData.key.mechanism.simple_algorithm).toBe("aes-256-siv");
+      expect(defaultFormData.key.mechanism.simple_algorithm).toBe(
+        "aes-256-siv",
+      );
     });
 
     it("should have complete akeyless store structure in defaults", () => {
@@ -391,7 +421,9 @@ describe("AddOpenobserveType", () => {
 
       await nextTick();
       expect(customWrapper.vm.formData.key.store.local).toBe("custom-secret");
-      expect(customWrapper.vm.formData.key.store.akeyless.base_url).toBe("https://custom.akeyless.io");
+      expect(customWrapper.vm.formData.key.store.akeyless.base_url).toBe(
+        "https://custom.akeyless.io",
+      );
       customWrapper.unmount();
     });
   });
@@ -404,13 +436,13 @@ describe("AddOpenobserveType", () => {
 
     it("should initialize useI18n correctly", () => {
       expect(wrapper.vm.t).toBeDefined();
-      expect(typeof wrapper.vm.t).toBe('function');
+      expect(typeof wrapper.vm.t).toBe("function");
     });
 
     it("should return correct values from setup function", () => {
       expect(wrapper.vm.t).toBeDefined();
       expect(wrapper.vm.isUpdate).toBeDefined();
-      expect(typeof wrapper.vm.isUpdate).toBe('boolean');
+      expect(typeof wrapper.vm.isUpdate).toBe("boolean");
     });
 
     it("should initialize isUpdate as reactive ref", () => {
@@ -424,21 +456,21 @@ describe("AddOpenobserveType", () => {
       wrapper.vm.isUpdate = true;
       await nextTick();
       expect(wrapper.vm.isUpdate).toBe(true);
-      
+
       wrapper.vm.isUpdate = false;
       await nextTick();
       expect(wrapper.vm.isUpdate).toBe(false);
     });
 
     it("should have translation function working", () => {
-      const translationKey = 'cipherKey.secret';
+      const translationKey = "cipherKey.secret";
       const result = wrapper.vm.t(translationKey);
       expect(result).toBeDefined();
-      expect(typeof result).toBe('string');
+      expect(typeof result).toBe("string");
     });
 
     it("should handle missing translation keys gracefully", () => {
-      const invalidKey = 'non.existent.key';
+      const invalidKey = "non.existent.key";
       const result = wrapper.vm.t(invalidKey);
       expect(result).toBeDefined();
     });
@@ -462,11 +494,11 @@ describe("AddOpenobserveType", () => {
           },
         },
       };
-      
+
       // Create mount configuration using shared fixtures
       const stylingMountConfig = createCipherKeyMountConfig(
         AddOpenobserveType,
-        { formData: updateFormData }
+        { formData: updateFormData },
       );
 
       // Mount the component
@@ -497,7 +529,9 @@ describe("AddOpenobserveType", () => {
 
   describe("Conditional Rendering Logic", () => {
     it("should render input when not in update mode", () => {
-      const secretInput = wrapper.find('[data-test="add-cipher-key-openobserve-secret-input"]');
+      const secretInput = wrapper.find(
+        '[data-test="add-cipher-key-openobserve-secret-input"]',
+      );
       // In non-update mode, input should be rendered
       expect(wrapper.vm.formData.isUpdate).toBeFalsy();
     });
@@ -517,11 +551,11 @@ describe("AddOpenobserveType", () => {
           },
         },
       };
-      
+
       // Create mount configuration using shared fixtures
       const conditionalMountConfig = createCipherKeyMountConfig(
         AddOpenobserveType,
-        { formData: updateFormData }
+        { formData: updateFormData },
       );
 
       // Mount the component
@@ -531,9 +565,9 @@ describe("AddOpenobserveType", () => {
       });
 
       await nextTick();
-      
+
       expect(conditionalWrapper.vm.formData.isUpdate).toBe(true);
-      
+
       conditionalWrapper.unmount();
     });
 
@@ -552,12 +586,11 @@ describe("AddOpenobserveType", () => {
           },
         },
       };
-      
+
       // Create mount configuration using shared fixtures
-      const emptyMountConfig = createCipherKeyMountConfig(
-        AddOpenobserveType,
-        { formData: emptyUpdateFormData }
-      );
+      const emptyMountConfig = createCipherKeyMountConfig(AddOpenobserveType, {
+        formData: emptyUpdateFormData,
+      });
 
       // Mount the component
       const emptyWrapper = mount(emptyMountConfig.component, {
@@ -566,10 +599,10 @@ describe("AddOpenobserveType", () => {
       });
 
       await nextTick();
-      
+
       expect(emptyWrapper.vm.formData.isUpdate).toBe(true);
       expect(emptyWrapper.vm.formData.key.store.local).toBe("");
-      
+
       emptyWrapper.unmount();
     });
   });
@@ -590,12 +623,11 @@ describe("AddOpenobserveType", () => {
           },
         },
       };
-      
+
       // Create mount configuration using shared fixtures
-      const buttonMountConfig = createCipherKeyMountConfig(
-        AddOpenobserveType,
-        { formData: buttonTestFormData }
-      );
+      const buttonMountConfig = createCipherKeyMountConfig(AddOpenobserveType, {
+        formData: buttonTestFormData,
+      });
 
       // Mount the component
       const buttonWrapper = mount(buttonMountConfig.component, {
@@ -604,10 +636,10 @@ describe("AddOpenobserveType", () => {
       });
 
       await nextTick();
-      
+
       expect(buttonWrapper.vm.formData.isUpdate).toBe(true);
       // Test button labels in update mode
-      
+
       buttonWrapper.unmount();
     });
 
@@ -621,25 +653,25 @@ describe("AddOpenobserveType", () => {
       testWrapper.vm.isUpdate = true;
       await nextTick();
       expect(testWrapper.vm.isUpdate).toBe(true);
-      
+
       testWrapper.unmount();
     });
 
     it("should display correct button text from translations", () => {
-      expect(wrapper.vm.t('common.update')).toBeDefined();
-      expect(wrapper.vm.t('common.cancel')).toBeDefined();
+      expect(wrapper.vm.t("common.update")).toBeDefined();
+      expect(wrapper.vm.t("common.cancel")).toBeDefined();
     });
 
     it("should handle rapid button click events", async () => {
       wrapper.vm.isUpdate = false;
       await nextTick();
-      
+
       // Simulate rapid clicks
       wrapper.vm.isUpdate = true;
       wrapper.vm.isUpdate = false;
       wrapper.vm.isUpdate = true;
       await nextTick();
-      
+
       expect(wrapper.vm.isUpdate).toBe(true);
     });
 
@@ -647,12 +679,12 @@ describe("AddOpenobserveType", () => {
       const initialState = wrapper.vm.isUpdate;
       wrapper.vm.isUpdate = !initialState;
       await nextTick();
-      
+
       expect(wrapper.vm.isUpdate).toBe(!initialState);
-      
+
       wrapper.vm.isUpdate = initialState;
       await nextTick();
-      
+
       expect(wrapper.vm.isUpdate).toBe(initialState);
     });
   });
@@ -666,7 +698,7 @@ describe("AddOpenobserveType", () => {
 
     it("should handle undefined properties in formData", () => {
       expect(wrapper.vm.formData.key.store.local).toBeDefined();
-      expect(typeof wrapper.vm.formData.key.store.local).toBe('string');
+      expect(typeof wrapper.vm.formData.key.store.local).toBe("string");
     });
 
     it("should handle empty string in local store", async () => {

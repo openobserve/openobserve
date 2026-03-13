@@ -50,7 +50,10 @@ vi.mock("gridstack", () => ({
 vi.mock("gridstack/dist/gridstack.min.css", () => ({}));
 
 // Mock composables
-const mockNotifications = { showPositiveNotification: vi.fn(), showErrorNotification: vi.fn() };
+const mockNotifications = {
+  showPositiveNotification: vi.fn(),
+  showErrorNotification: vi.fn(),
+};
 const mockLoading = { isLoading: ref(false) };
 const mockDebouncer = { setImmediateValue: vi.fn(), setDebounceValue: vi.fn() };
 
@@ -179,7 +182,9 @@ describe("RenderDashboardCharts", () => {
     });
 
     it("should handle props validation", () => {
-      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const consoleWarn = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => {});
       wrapper = createWrapper({
         viewOnly: "invalid", // Wrong type
         forceLoad: "invalid", // Wrong type
@@ -249,11 +254,11 @@ describe("RenderDashboardCharts", () => {
       mockGridStackInstance.init.mockImplementation(() => {
         throw new Error("GridStack initialization failed");
       });
-      
+
       expect(() => {
         wrapper = createWrapper();
       }).not.toThrow();
-      
+
       mockGridStackInstance.init.mockRestore();
     });
 

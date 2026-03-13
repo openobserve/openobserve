@@ -91,7 +91,12 @@ describe("StreamExplorer", () => {
     const wrapper = mount(StreamExplorer, {
       global: {
         plugins: [i18n],
-        stubs: { QPage: true, SearchBar: true, StreamDataTable: true, QSpinnerHourglass: true },
+        stubs: {
+          QPage: true,
+          SearchBar: true,
+          StreamDataTable: true,
+          QSpinnerHourglass: true,
+        },
       },
     });
 
@@ -103,13 +108,22 @@ describe("StreamExplorer", () => {
     const wrapper = mount(StreamExplorer, {
       global: {
         plugins: [i18n],
-        stubs: { QPage: true, SearchBar: true, StreamDataTable: true, QSpinnerHourglass: true },
+        stubs: {
+          QPage: true,
+          SearchBar: true,
+          StreamDataTable: true,
+          QSpinnerHourglass: true,
+        },
       },
     });
 
     await flushPromises();
 
-    expect(stream.schema).toHaveBeenCalledWith("default", "test_stream", "logs");
+    expect(stream.schema).toHaveBeenCalledWith(
+      "default",
+      "test_stream",
+      "logs",
+    );
     wrapper.unmount();
   });
 
@@ -117,7 +131,12 @@ describe("StreamExplorer", () => {
     const wrapper = mount(StreamExplorer, {
       global: {
         plugins: [i18n],
-        stubs: { QPage: true, SearchBar: true, StreamDataTable: true, QSpinnerHourglass: true },
+        stubs: {
+          QPage: true,
+          SearchBar: true,
+          StreamDataTable: true,
+          QSpinnerHourglass: true,
+        },
       },
     });
 
@@ -132,7 +151,12 @@ describe("StreamExplorer", () => {
     const wrapper = mount(StreamExplorer, {
       global: {
         plugins: [i18n],
-        stubs: { QPage: true, SearchBar: true, StreamDataTable: true, QSpinnerHourglass: true },
+        stubs: {
+          QPage: true,
+          SearchBar: true,
+          StreamDataTable: true,
+          QSpinnerHourglass: true,
+        },
       },
     });
 
@@ -147,7 +171,12 @@ describe("StreamExplorer", () => {
     const wrapper = mount(StreamExplorer, {
       global: {
         plugins: [i18n],
-        stubs: { QPage: true, SearchBar: true, StreamDataTable: true, QSpinnerHourglass: true },
+        stubs: {
+          QPage: true,
+          SearchBar: true,
+          StreamDataTable: true,
+          QSpinnerHourglass: true,
+        },
       },
     });
 

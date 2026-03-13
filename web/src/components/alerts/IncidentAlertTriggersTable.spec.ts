@@ -48,7 +48,7 @@ function createMockAlerts(count = 3, overrides = {}) {
       alert_name: `Alert ${index + 1}`,
       alert_fired_at: 1700000000000000 + index * 1000000,
       ...overrides,
-    })
+    }),
   );
 }
 
@@ -78,10 +78,14 @@ function createMockI18n() {
             correlationScopeMatch: "Scope Match",
             correlationWorkloadMatch: "Workload Match",
             correlationAlertId: "Alert ID",
-            correlationServiceDiscoveryTooltip: "Correlated using pre-computed service identity from service discovery",
-            correlationScopeMatchTooltip: "Correlated by matching environment scope (cluster, region, namespace)",
-            correlationWorkloadMatchTooltip: "Correlated by matching workload identity (service, deployment)",
-            correlationAlertIdTooltip: "No matching dimensions found — isolated by alert ID",
+            correlationServiceDiscoveryTooltip:
+              "Correlated using pre-computed service identity from service discovery",
+            correlationScopeMatchTooltip:
+              "Correlated by matching environment scope (cluster, region, namespace)",
+            correlationWorkloadMatchTooltip:
+              "Correlated by matching workload identity (service, deployment)",
+            correlationAlertIdTooltip:
+              "No matching dimensions found — isolated by alert ID",
           },
         },
       },
@@ -180,7 +184,7 @@ describe("IncidentAlertTriggersTable", () => {
       wrapper = mountComponent({ triggers: [] });
       expect(existsByTestId(wrapper, "no-triggers-message")).toBe(true);
       expect(findByTestId(wrapper, "no-triggers-message").text()).toContain(
-        "No triggers loaded"
+        "No triggers loaded",
       );
     });
 
@@ -330,7 +334,7 @@ describe("IncidentAlertTriggersTable", () => {
       wrapper = mountComponent();
       // QTablePagination is stubbed, but we can verify it's rendered
       expect(wrapper.findComponent({ name: "QTablePagination" }).exists()).toBe(
-        true
+        true,
       );
     });
 
@@ -356,7 +360,7 @@ describe("IncidentAlertTriggersTable", () => {
 
       expect(wrapper.findAll("tbody tr").length).toBe(1);
       expect(findByTestId(wrapper, "alert-name-text").text()).toBe(
-        "High CPU Alert"
+        "High CPU Alert",
       );
     });
 

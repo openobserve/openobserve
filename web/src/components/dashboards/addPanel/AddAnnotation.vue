@@ -60,7 +60,8 @@
                 <q-item-section>{{ opt.label }}</q-item-section>
               </q-item>
 
-              <q-item v-else v-ripple clickable @click="toggleOption(opt)">
+              <q-item v-else v-ripple
+clickable @click="toggleOption(opt)">
                 <q-item-section side>
                   <q-checkbox
                     :model-value="selected"
@@ -125,7 +126,8 @@
           Are you sure you want to delete this annotation?
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat label="Cancel" v-close-popup />
+          <q-btn flat
+label="Cancel" v-close-popup />
           <q-btn
             color="negative"
             label="Delete"

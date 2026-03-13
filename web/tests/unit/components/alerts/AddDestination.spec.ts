@@ -12,91 +12,91 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mount } from '@vue/test-utils';
-import { Quasar } from 'quasar';
-import AddDestination from '@/components/alerts/AddDestination.vue';
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { mount } from "@vue/test-utils";
+import { Quasar } from "quasar";
+import AddDestination from "@/components/alerts/AddDestination.vue";
 
 // Mock i18n
-vi.mock('vue-i18n', () => ({
+vi.mock("vue-i18n", () => ({
   useI18n: () => ({
-    t: (key: string) => key
-  })
+    t: (key: string) => key,
+  }),
 }));
 
 // Mock Quasar
 const mockNotify = vi.fn();
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
+vi.mock("quasar", async () => {
+  const actual = await vi.importActual("quasar");
   return {
     ...actual,
     useQuasar: () => ({
-      notify: mockNotify
-    })
+      notify: mockNotify,
+    }),
   };
 });
 
 // Mock router
 const mockPush = vi.fn();
-vi.mock('vue-router', () => ({
+vi.mock("vue-router", () => ({
   useRouter: () => ({
-    push: mockPush
-  })
+    push: mockPush,
+  }),
 }));
 
 // Mock store
 const mockStore = {
   state: {
     selectedOrganization: {
-      identifier: 'test-org'
-    }
-  }
+      identifier: "test-org",
+    },
+  },
 };
 
-vi.mock('vuex', () => ({
-  useStore: () => mockStore
+vi.mock("vuex", () => ({
+  useStore: () => mockStore,
 }));
 
 // Mock services
-vi.mock('@/services/alert_destination', () => ({
+vi.mock("@/services/alert_destination", () => ({
   default: {
     create: vi.fn().mockResolvedValue({ data: {} }),
     update: vi.fn().mockResolvedValue({ data: {} }),
-    test: vi.fn().mockResolvedValue({ data: { success: true } })
-  }
+    test: vi.fn().mockResolvedValue({ data: { success: true } }),
+  },
 }));
 
-vi.mock('@/services/alert_templates', () => ({
+vi.mock("@/services/alert_templates", () => ({
   default: {
-    list: vi.fn().mockResolvedValue({ data: { list: [] } })
-  }
+    list: vi.fn().mockResolvedValue({ data: { list: [] } }),
+  },
 }));
 
 // Mock composables
-vi.mock('@/composables/usePrebuiltDestinations', () => ({
+vi.mock("@/composables/usePrebuiltDestinations", () => ({
   default: () => ({
     availableTypes: { value: [] },
     getPrebuiltConfig: vi.fn(),
     validateCredentials: vi.fn(() => ({ isValid: true, errors: {} })),
     buildDestinationPayload: vi.fn(),
-    transformToPrebuiltForm: vi.fn()
-  })
+    transformToPrebuiltForm: vi.fn(),
+  }),
 }));
 
-vi.mock('@/composables/useActions', () => ({
+vi.mock("@/composables/useActions", () => ({
   default: () => ({
-    getAllActions: vi.fn().mockResolvedValue([])
-  })
+    getAllActions: vi.fn().mockResolvedValue([]),
+  }),
 }));
 
 // Mock tracking
-vi.mock('@/composables/useReo', () => ({
+vi.mock("@/composables/useReo", () => ({
   useReo: () => ({
-    track: vi.fn()
-  })
+    track: vi.fn(),
+  }),
 }));
 
-describe('AddDestination', () => {
+describe("AddDestination", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -106,7 +106,7 @@ describe('AddDestination', () => {
       props: {
         destination: null,
         templates: [],
-        ...props
+        ...props,
       },
       global: {
         plugins: [[Quasar, {}]],
@@ -128,96 +128,96 @@ describe('AddDestination', () => {
           PrebuiltDestinationSelector: true,
           PrebuiltDestinationForm: true,
           DestinationPreview: true,
-          DestinationTestResult: true
-        }
-      }
+          DestinationTestResult: true,
+        },
+      },
     });
   };
 
-  describe('Component Rendering', () => {
-    it('renders the component', () => {
+  describe("Component Rendering", () => {
+    it("renders the component", () => {
       const wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
     });
 
-    it('renders add mode when no destination is provided', () => {
+    it("renders add mode when no destination is provided", () => {
       const wrapper = createWrapper({ destination: null });
       expect(wrapper.exists()).toBe(true);
     });
 
-    it('renders edit mode when destination is provided', () => {
+    it("renders edit mode when destination is provided", () => {
       const destination = {
-        name: 'test-dest',
-        type: 'http',
-        url: 'https://example.com',
-        method: 'post',
-        template: 'default',
+        name: "test-dest",
+        type: "http",
+        url: "https://example.com",
+        method: "post",
+        template: "default",
         headers: {},
-        skip_tls_verify: false
+        skip_tls_verify: false,
       };
       const wrapper = createWrapper({ destination });
       expect(wrapper.exists()).toBe(true);
     });
   });
 
-  describe('Form Data Management', () => {
-    it('initializes with default form data for add mode', () => {
+  describe("Form Data Management", () => {
+    it("initializes with default form data for add mode", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
       expect(vm.formData).toBeDefined();
       expect(vm.formData.type).toBeDefined();
     });
 
-    it('initializes with destination data for edit mode', () => {
+    it("initializes with destination data for edit mode", () => {
       const destination = {
-        name: 'test-dest',
-        type: 'http',
-        url: 'https://example.com',
-        method: 'post',
-        template: 'default',
-        headers: { 'Content-Type': 'application/json' },
-        skip_tls_verify: false
+        name: "test-dest",
+        type: "http",
+        url: "https://example.com",
+        method: "post",
+        template: "default",
+        headers: { "Content-Type": "application/json" },
+        skip_tls_verify: false,
       };
       const wrapper = createWrapper({ destination });
       const vm = wrapper.vm as any;
-      expect(vm.formData.name).toBe('test-dest');
+      expect(vm.formData.name).toBe("test-dest");
     });
   });
 
-  describe('Utility Functions', () => {
-    it('generates UUID', () => {
+  describe("Utility Functions", () => {
+    it("generates UUID", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
       const uuid = vm.getUUID();
       expect(uuid).toBeDefined();
-      expect(typeof uuid).toBe('string');
+      expect(typeof uuid).toBe("string");
       expect(uuid.length).toBeGreaterThan(0);
     });
 
-    it('getDestinationTypeName returns correct name for known types', () => {
+    it("getDestinationTypeName returns correct name for known types", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
       // This function should return the display name for destination types
-      if (typeof vm.getDestinationTypeName === 'function') {
-        const result = vm.getDestinationTypeName('slack');
+      if (typeof vm.getDestinationTypeName === "function") {
+        const result = vm.getDestinationTypeName("slack");
         expect(result).toBeDefined();
       }
     });
 
-    it('getDestinationTypeIcon returns icon for known types', () => {
+    it("getDestinationTypeIcon returns icon for known types", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
-      if (typeof vm.getDestinationTypeIcon === 'function') {
-        const result = vm.getDestinationTypeIcon('slack');
+      if (typeof vm.getDestinationTypeIcon === "function") {
+        const result = vm.getDestinationTypeIcon("slack");
         expect(result).toBeDefined();
       }
     });
   });
 
-  describe('Computed Properties', () => {
-    it('tabs computed returns array of tabs', () => {
+  describe("Computed Properties", () => {
+    it("tabs computed returns array of tabs", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
@@ -226,7 +226,7 @@ describe('AddDestination', () => {
       }
     });
 
-    it('destinationTypes computed returns array of types', () => {
+    it("destinationTypes computed returns array of types", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
@@ -235,19 +235,19 @@ describe('AddDestination', () => {
       }
     });
 
-    it('isPrebuiltDestination computed indicates prebuilt status', () => {
+    it("isPrebuiltDestination computed indicates prebuilt status", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
       if (vm.isPrebuiltDestination !== undefined) {
-        expect(typeof vm.isPrebuiltDestination).toBe('boolean');
+        expect(typeof vm.isPrebuiltDestination).toBe("boolean");
       }
     });
 
-    it('getFormattedTemplates computed returns formatted templates', () => {
+    it("getFormattedTemplates computed returns formatted templates", () => {
       const templates = [
-        { name: 'template1', isDefault: false },
-        { name: 'template2', isDefault: true }
+        { name: "template1", isDefault: false },
+        { name: "template2", isDefault: true },
       ];
       const wrapper = createWrapper({ templates });
       const vm = wrapper.vm as any;
@@ -258,137 +258,139 @@ describe('AddDestination', () => {
     });
   });
 
-  describe('Form Actions', () => {
-    it('emits cancel event when cancel is called', async () => {
+  describe("Form Actions", () => {
+    it("emits cancel event when cancel is called", async () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
-      if (typeof vm.handleCancel === 'function') {
+      if (typeof vm.handleCancel === "function") {
         vm.handleCancel();
         await wrapper.vm.$nextTick();
-        expect(wrapper.emitted('cancel:hideform')).toBeTruthy();
+        expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
       }
     });
 
-    it('validates form before submission', () => {
+    it("validates form before submission", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
-      if (typeof vm.validateForm === 'function') {
+      if (typeof vm.validateForm === "function") {
         const result = vm.validateForm();
-        expect(typeof result).toBe('boolean');
+        expect(typeof result).toBe("boolean");
       }
     });
   });
 
-  describe('Destination Type Selection', () => {
-    it('handles HTTP destination type', () => {
+  describe("Destination Type Selection", () => {
+    it("handles HTTP destination type", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
-      vm.formData.type = 'http';
-      expect(vm.formData.type).toBe('http');
+      vm.formData.type = "http";
+      expect(vm.formData.type).toBe("http");
     });
 
-    it('handles Email destination type', () => {
+    it("handles Email destination type", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
-      vm.formData.type = 'email';
-      expect(vm.formData.type).toBe('email');
+      vm.formData.type = "email";
+      expect(vm.formData.type).toBe("email");
     });
 
-    it('handles Action destination type', () => {
+    it("handles Action destination type", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
-      vm.formData.type = 'action';
-      expect(vm.formData.type).toBe('action');
+      vm.formData.type = "action";
+      expect(vm.formData.type).toBe("action");
     });
   });
 
-  describe('Headers Management', () => {
-    it('initializes headers as empty object', () => {
+  describe("Headers Management", () => {
+    it("initializes headers as empty object", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
       if (vm.formData.headers !== undefined) {
-        expect(typeof vm.formData.headers).toBe('object');
+        expect(typeof vm.formData.headers).toBe("object");
       }
     });
 
-    it('handles custom headers', () => {
+    it("handles custom headers", () => {
       const destination = {
-        name: 'test',
-        type: 'http',
-        url: 'https://example.com',
-        method: 'post',
-        template: 'default',
+        name: "test",
+        type: "http",
+        url: "https://example.com",
+        method: "post",
+        template: "default",
         headers: {
-          'X-Custom-Header': 'value',
-          'Authorization': 'Bearer token'
+          "X-Custom-Header": "value",
+          Authorization: "Bearer token",
         },
-        skip_tls_verify: false
+        skip_tls_verify: false,
       };
       const wrapper = createWrapper({ destination });
       const vm = wrapper.vm as any;
 
       if (vm.formData.headers) {
-        expect(Object.keys(vm.formData.headers).length).toBeGreaterThanOrEqual(0);
+        expect(Object.keys(vm.formData.headers).length).toBeGreaterThanOrEqual(
+          0,
+        );
       }
     });
   });
 
-  describe('Template Selection', () => {
-    it('handles template selection', () => {
+  describe("Template Selection", () => {
+    it("handles template selection", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
-      vm.formData.template = 'custom-template';
-      expect(vm.formData.template).toBe('custom-template');
+      vm.formData.template = "custom-template";
+      expect(vm.formData.template).toBe("custom-template");
     });
 
-    it('handles default template', () => {
+    it("handles default template", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
-      vm.formData.template = 'default';
-      expect(vm.formData.template).toBe('default');
+      vm.formData.template = "default";
+      expect(vm.formData.template).toBe("default");
     });
   });
 
-  describe('Prebuilt Destinations', () => {
-    it('handles prebuilt destination selection', () => {
+  describe("Prebuilt Destinations", () => {
+    it("handles prebuilt destination selection", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
       if (vm.prebuiltCredentials !== undefined) {
-        expect(typeof vm.prebuiltCredentials).toBe('object');
+        expect(typeof vm.prebuiltCredentials).toBe("object");
       }
     });
 
-    it('tracks destination search query', () => {
+    it("tracks destination search query", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
       if (vm.destinationSearchQuery !== undefined) {
-        vm.destinationSearchQuery = 'slack';
-        expect(vm.destinationSearchQuery).toBe('slack');
+        vm.destinationSearchQuery = "slack";
+        expect(vm.destinationSearchQuery).toBe("slack");
       }
     });
   });
 
-  describe('Preview Functionality', () => {
-    it('tracks preview modal state', () => {
+  describe("Preview Functionality", () => {
+    it("tracks preview modal state", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
       if (vm.showPreviewModal !== undefined) {
-        expect(typeof vm.showPreviewModal).toBe('boolean');
+        expect(typeof vm.showPreviewModal).toBe("boolean");
       }
     });
 
-    it('tracks preview content', () => {
+    it("tracks preview content", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
@@ -399,29 +401,29 @@ describe('AddDestination', () => {
     });
   });
 
-  describe('Form State Management', () => {
-    it('tracks updating state', () => {
+  describe("Form State Management", () => {
+    it("tracks updating state", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
       if (vm.isUpdatingDestination !== undefined) {
-        expect(typeof vm.isUpdatingDestination).toBe('boolean');
+        expect(typeof vm.isUpdatingDestination).toBe("boolean");
         expect(vm.isUpdatingDestination).toBe(false);
       }
     });
 
-    it('tracks actions loading state', () => {
+    it("tracks actions loading state", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
       if (vm.isLoadingActions !== undefined) {
-        expect(typeof vm.isLoadingActions).toBe('boolean');
+        expect(typeof vm.isLoadingActions).toBe("boolean");
       }
     });
   });
 
-  describe('Action Filtering', () => {
-    it('initializes action options', () => {
+  describe("Action Filtering", () => {
+    it("initializes action options", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
@@ -430,7 +432,7 @@ describe('AddDestination', () => {
       }
     });
 
-    it('initializes filtered actions', () => {
+    it("initializes filtered actions", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 

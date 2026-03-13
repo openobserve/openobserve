@@ -26,7 +26,9 @@ vi.mock("@/composables/useFieldValuesStream", () => ({
 const mockFetchPercentiles = vi.fn();
 const mockCancelPercentileFetch = vi.fn();
 // Kept as a vi.fn() so individual tests can assert on calls or override the return value.
-const mockParseDurationWhereClause = vi.fn((whereClause: string) => whereClause);
+const mockParseDurationWhereClause = vi.fn(
+  (whereClause: string) => whereClause,
+);
 
 vi.mock("@/composables/useDurationPercentiles", () => ({
   default: () => ({
@@ -39,8 +41,9 @@ vi.mock("@/composables/useDurationPercentiles", () => ({
     cancelFetch: mockCancelPercentileFetch,
   }),
   // Delegates to the module-level vi.fn() so tests can inspect calls or change behaviour.
-  parseDurationWhereClause: (...args: Parameters<typeof mockParseDurationWhereClause>) =>
-    mockParseDurationWhereClause(...args),
+  parseDurationWhereClause: (
+    ...args: Parameters<typeof mockParseDurationWhereClause>
+  ) => mockParseDurationWhereClause(...args),
 }));
 
 vi.mock("@/composables/useParser", () => ({
@@ -232,7 +235,9 @@ describe("BasicValuesFilter — openFilterCreator", () => {
     mockFetchFieldValues.mockReset();
     mockFetchPercentiles.mockReset();
     // Restore the default pass-through implementation before each test.
-    mockParseDurationWhereClause.mockImplementation((whereClause: string) => whereClause);
+    mockParseDurationWhereClause.mockImplementation(
+      (whereClause: string) => whereClause,
+    );
   });
 
   afterEach(() => {
@@ -364,7 +369,9 @@ describe("BasicValuesFilter — openFilterCreator", () => {
   it("should pass the parseDurationWhereClause-converted whereClause to fetchPercentiles", async () => {
     // Simulate parseDurationWhereClause converting '1.50ms' → 1500 so the
     // resulting whereClause uses raw microseconds, not human-readable strings.
-    mockParseDurationWhereClause.mockImplementationOnce(() => "service_name='svc-a' AND duration >= 1500");
+    mockParseDurationWhereClause.mockImplementationOnce(
+      () => "service_name='svc-a' AND duration >= 1500",
+    );
     mockSearchObj.data.editorValue =
       "service_name='svc-a' AND duration >= '1.50ms'";
     wrapper = mountComponent("duration");

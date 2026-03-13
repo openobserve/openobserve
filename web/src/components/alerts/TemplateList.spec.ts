@@ -35,7 +35,6 @@ installQuasar({
 describe("Alert List", async () => {
   let wrapper: any;
   beforeEach(async () => {
-    
     wrapper = mount(TemplateList, {
       attachTo: "#app",
       global: {
@@ -54,12 +53,12 @@ describe("Alert List", async () => {
 
   it("Should render alerts title", () => {
     expect(
-      wrapper.find('[data-test="alert-templates-list-title"]').text()
+      wrapper.find('[data-test="alert-templates-list-title"]').text(),
     ).toBe("Templates");
   });
   it("Should reder table with templates", () => {
     expect(
-      wrapper.find('[data-test="alert-templates-list-table"]').exists()
+      wrapper.find('[data-test="alert-templates-list-table"]').exists(),
     ).toBeTruthy();
   });
 
@@ -88,7 +87,6 @@ describe("Alert List", async () => {
     expect(tableData[2].text()).toBe("Template2");
   });
 
-
   describe("When user clicks on delete alert", () => {
     const template_name = "Template2";
     const deleteAlert = vi.spyOn(templateService, "delete");
@@ -98,8 +96,8 @@ describe("Alert List", async () => {
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates/${template_name}`,
           () => {
             return HttpResponse.json({ code: 200 });
-          }
-        )
+          },
+        ),
       );
       global.server.use(
         http.get(
@@ -108,18 +106,18 @@ describe("Alert List", async () => {
             return HttpResponse.json({
               list: [
                 {
-                    name: "Template3",
-                    body: '\r\n[\r\n  {\r\n    "labels": {\r\n        "alertname": "{alert_name}",\r\n        "stream": "{stream_name}",\r\n        "organization": "{org_name}",\r\n        "alerttype": "{alert_type}",\r\n        "severity": "critical"\r\n    },\r\n    "annotations": {\r\n        "timestamp": "{timestamp}"\r\n    }\r\n  }\r\n]',
-                    isDefault: true,
-                  },
-                ],
+                  name: "Template3",
+                  body: '\r\n[\r\n  {\r\n    "labels": {\r\n        "alertname": "{alert_name}",\r\n        "stream": "{stream_name}",\r\n        "organization": "{org_name}",\r\n        "alerttype": "{alert_type}",\r\n        "severity": "critical"\r\n    },\r\n    "annotations": {\r\n        "timestamp": "{timestamp}"\r\n    }\r\n  }\r\n]',
+                  isDefault: true,
+                },
+              ],
             });
-          }
-        )
+          },
+        ),
       );
       await wrapper
         .find(
-          `[data-test="alert-template-list-${template_name}-delete-template"]`
+          `[data-test="alert-template-list-${template_name}-delete-template"]`,
         )
         .trigger("click");
       const mainWrapper = new DOMWrapper(document.body);
@@ -140,4 +138,3 @@ describe("Alert List", async () => {
     });
   });
 });
-

@@ -25,9 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card class="tw-w-full" style="width: 600px">
       <q-card-section class="q-pa-md">
         <div class="flex items-center justify-between">
-          <div class="text-h6" data-test="dialog-title">
-            Edit Backfill Job
-          </div>
+          <div class="text-h6" data-test="dialog-title">Edit Backfill Job</div>
           <q-btn
             icon="close"
             flat
@@ -58,7 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               min-date="1999/01/01"
             />
             <div
-              v-if="formData.startTimeMicros <= 0 || formData.endTimeMicros <= 0"
+              v-if="
+                formData.startTimeMicros <= 0 || formData.endTimeMicros <= 0
+              "
               class="text-caption text-red-600 q-mt-xs"
             >
               Please select a valid time range
@@ -72,12 +72,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             label="Advanced Options"
             data-test="advanced-options-expansion"
           >
-            <q-card flat bordered class="q-pa-md tw-space-y-4">
+            <q-card flat bordered
+class="q-pa-md tw-space-y-4">
               <!-- Chunk Period -->
               <div>
                 <div class="text-caption q-mb-xs">
                   Chunk Period (minutes)
-                  <q-icon name="info_outline" size="16px" color="grey-6">
+                  <q-icon name="info_outline" size="16px"
+color="grey-6">
                     <q-tooltip>
                       Size of each processing chunk in minutes. Default: 60
                     </q-tooltip>
@@ -89,7 +91,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   outlined
                   dense
                   placeholder="60"
-                  :rules="[(val) => !val || (val >= 1 && val <= 1440) || 'Must be between 1 and 1440']"
+                  :rules="[
+                    (val) =>
+                      !val ||
+                      (val >= 1 && val <= 1440) ||
+                      'Must be between 1 and 1440',
+                  ]"
                   data-test="chunk-period-input"
                 />
               </div>
@@ -98,7 +105,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div>
                 <div class="text-caption q-mb-xs">
                   Delay Between Chunks (seconds)
-                  <q-icon name="info_outline" size="16px" color="grey-6">
+                  <q-icon name="info_outline" size="16px"
+color="grey-6">
                     <q-tooltip>
                       Delay between processing chunks in seconds. Default: 5
                     </q-tooltip>
@@ -110,7 +118,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   outlined
                   dense
                   placeholder="5"
-                  :rules="[(val) => !val || (val >= 1 && val <= 3600) || 'Must be between 1 and 3600']"
+                  :rules="[
+                    (val) =>
+                      !val ||
+                      (val >= 1 && val <= 3600) ||
+                      'Must be between 1 and 3600',
+                  ]"
                   data-test="delay-between-chunks-input"
                 />
               </div>
@@ -127,17 +140,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw-mt-2 tw-p-3 tw-bg-orange-100 tw-rounded tw-border tw-border-orange-300"
                 >
                   <div class="flex items-start">
-                    <q-icon name="warning" color="orange" class="q-mr-sm tw-mt-0.5" />
+                    <q-icon
+                      name="warning"
+                      color="orange"
+                      class="q-mr-sm tw-mt-0.5"
+                    />
                     <div class="text-caption text-orange-800">
-                      <div class="tw-font-semibold tw-mb-1">Warning: Irreversible Data Deletion</div>
-                      <div class="tw-mb-2">
-                        This will permanently delete all data in the destination stream for the specified time
-                        range before running the backfill. This action cannot be undone.
+                      <div class="tw-font-semibold tw-mb-1">
+                        Warning: Irreversible Data Deletion
                       </div>
-                      <div class="tw-font-semibold tw-text-xs tw-mb-1">Time Alignment Requirements (UTC):</div>
-                      <ul class="tw-ml-5 tw-space-y-0.5 tw-list-disc tw-text-xs">
-                        <li><strong>Logs</strong> streams: Times must align to hour boundaries in UTC (e.g., 10:00:00, not 10:15:00)</li>
-                        <li><strong>Metrics/Traces</strong> streams: Times must align to day boundaries in UTC (e.g., 00:00:00)</li>
+                      <div class="tw-mb-2">
+                        This will permanently delete all data in the destination
+                        stream for the specified time range before running the
+                        backfill. This action cannot be undone.
+                      </div>
+                      <div class="tw-font-semibold tw-text-xs tw-mb-1">
+                        Time Alignment Requirements (UTC):
+                      </div>
+                      <ul
+                        class="tw-ml-5 tw-space-y-0.5 tw-list-disc tw-text-xs"
+                      >
+                        <li>
+                          <strong>Logs</strong> streams: Times must align to
+                          hour boundaries in UTC (e.g., 10:00:00, not 10:15:00)
+                        </li>
+                        <li>
+                          <strong>Metrics/Traces</strong> streams: Times must
+                          align to day boundaries in UTC (e.g., 00:00:00)
+                        </li>
                       </ul>
                     </div>
                   </div>
@@ -242,7 +272,7 @@ watch(
       }
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 // Handle datetime changes from the DateTime component
@@ -326,7 +356,8 @@ const updateBackfillJobRequest = async () => {
         start_time: formData.value.startTimeMicros,
         end_time: formData.value.endTimeMicros,
         chunk_period_minutes: formData.value.chunkPeriodMinutes || undefined,
-        delay_between_chunks_secs: formData.value.delayBetweenChunks || undefined,
+        delay_between_chunks_secs:
+          formData.value.delayBetweenChunks || undefined,
         delete_before_backfill: formData.value.deleteBeforeBackfill,
       },
     });

@@ -53,7 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="scope.selected"
           size="sm"
           class="o2-table-checkbox"
-
         />
       </template>
       <template v-slot:header="props">
@@ -78,21 +77,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-th>
         </q-tr>
       </template>
-       <template #top="scope" v-if="!hideTopPagination">
-        <div class="tw:flex tw:items-center tw:justify-between tw:w-full q-py-xs  ">
+      <template #top="scope" v-if="!hideTopPagination">
+        <div
+          class="tw:flex tw:items-center tw:justify-between tw:w-full q-py-xs"
+        >
           <span class="tw:font-bold tw:text-[14px] tw:w-full q-pa-none">
-          {{ rows.length }} {{ title }}
-        </span>
-        <QTablePagination
-          :scope="scope"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="top"
-          @update:changeRecordPerPage="changePagination"
-          style="padding: 0px;"
-        />
+            {{ rows.length }} {{ title }}
+          </span>
+          <QTablePagination
+            :scope="scope"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            position="top"
+            @update:changeRecordPerPage="changePagination"
+            style="padding: 0px"
+          />
         </div>
-       </template>
+      </template>
       <template v-slot:body-selection="scope" v-if="selection === 'multiple'">
         <q-td auto-width>
           <q-checkbox
@@ -127,7 +128,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template v-else-if="col.type === 'action'">
-              <q-icon :name="col.icon" size="24px" class="cursor-pointer" />
+              <q-icon :name="col.icon" size="24px"
+class="cursor-pointer" />
             </template>
             <template v-else>
               {{ col.value }}
@@ -146,10 +148,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
         </q-tr>
       </template>
-      <template  #bottom="scope">
-        <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+      <template #bottom="scope">
+        <div
+          class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+        >
           <div class="tw:flex tw:items-center tw:gap-2">
-            <div v-if="showBottomPaginationWithTitle" class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
+            <div
+              v-if="showBottomPaginationWithTitle"
+              class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md"
+            >
               {{ resultTotal }} {{ title }}
             </div>
             <slot name="bottom-actions" :scope="scope"></slot>
@@ -172,7 +179,7 @@ import type { QTable } from "quasar";
 import type { Ref } from "vue";
 import { ref } from "vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
-import { computed,watch  } from "vue";
+import { computed, watch } from "vue";
 import NoData from "./shared/grid/NoData.vue";
 const props = defineProps({
   columns: {
@@ -266,11 +273,11 @@ const props = defineProps({
 const emit = defineEmits(["event-emitted", "update:selected"]);
 
 const perPageOptions: any = [
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "250", value: 250 },
-      { label: "500", value: 500 }
+  { label: "20", value: 20 },
+  { label: "50", value: 50 },
+  { label: "100", value: 100 },
+  { label: "250", value: 250 },
+  { label: "500", value: 500 },
 ];
 
 const resultTotal = ref<number>(0);
@@ -311,9 +318,8 @@ watch(
   (newRows) => {
     resultTotal.value = newRows.length;
   },
-  { immediate: true } // Ensures it runs on initial load
+  { immediate: true }, // Ensures it runs on initial load
 );
-
 </script>
 
 <style lang="scss">

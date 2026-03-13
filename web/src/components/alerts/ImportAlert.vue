@@ -40,12 +40,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="updateUrl"
             :placeholder="t('dashboard.addURL')"
             borderless
-            style="padding: 10px 0px;"
+            style="padding: 10px 0px"
           />
         </div>
 
         <div
-          style="width: calc(30%);position: relative; bottom: 21px;"
+          style="width: calc(30%); position: relative; bottom: 21px"
           data-test="alert-folder-dropdown"
         >
           <SelectFolderDropDown
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-slot:hint> .json files only </template>
           </q-file>
         </div>
-        <div style="width: calc(30%); position: relative; bottom: 21px;">
+        <div style="width: calc(30%); position: relative; bottom: 21px">
           <SelectFolderDropDown
             :type="'alerts'"
             @folder-selected="updateActiveFolderId"
@@ -104,7 +104,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
       <q-separator class="q-mx-md q-mt-md" />
-      <div class="error-report-container" style="height: calc(100vh - 192px) !important; overflow: auto; resize: none;">
+      <div
+        class="error-report-container"
+        style="
+          height: calc(100vh - 192px) !important;
+          overflow: auto;
+          resize: none;
+        "
+      >
         <!-- Alert Errors Section -->
         <div class="error-section" v-if="alertErrorsToDisplay.length > 0">
           <div class="error-list">
@@ -143,10 +150,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       filled
                       dense
                       tabindex="0"
-                      @update:model-value="(val) => {
-                        userSelectedAlertName[index] = val;
-                        updateAlertName(val, index);
-                      }"
+                      @update:model-value="
+                        (val) => {
+                          userSelectedAlertName[index] = val;
+                          updateAlertName(val, index);
+                        }
+                      "
                     />
                   </div>
                 </span>
@@ -178,10 +187,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       hide-selected
                       fill-input
                       :input-debounce="400"
-                      @update:model-value="(val) => {
-                        userSelectedStreamName[index] = val;
-                        updateStreamFields(val, index);
-                      }"
+                      @update:model-value="
+                        (val) => {
+                          userSelectedStreamName[index] = val;
+                          updateStreamFields(val, index);
+                        }
+                      "
                       behavior="menu"
                     />
                   </div>
@@ -214,14 +225,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       multiple
                       :input-debounce="400"
                       behavior="menu"
-                      :rules="[
-                        (val: any) => !!val || 'Field is required!',
-                      ]"
+                      :rules="[(val: any) => !!val || 'Field is required!']"
                       style="width: 300px"
-                      @update:model-value="(val) => {
-                        userSelectedDestinations[index] = val;
-                        updateUserSelectedDestinations(val, index);
-                      }"
+                      @update:model-value="
+                        (val) => {
+                          userSelectedDestinations[index] = val;
+                          updateUserSelectedDestinations(val, index);
+                        }
+                      "
                     >
                       <template v-slot:option="scope">
                         <q-item
@@ -277,13 +288,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       outlined
                       filled
                       dense
-                      @update:model-value="(val) => {
-                        userSelectedStreamType[index] = val;
-                        updateStreams(val, index);
-                      }"
-                      :rules="[
-                        (val: any) => !!val || 'Field is required!',
-                      ]"
+                      @update:model-value="
+                        (val) => {
+                          userSelectedStreamType[index] = val;
+                          updateStreams(val, index);
+                        }
+                      "
+                      :rules="[(val: any) => !!val || 'Field is required!']"
                       style="width: 300px"
                     />
                   </div>
@@ -309,19 +320,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       outlined
                       filled
                       dense
-                      @update:model-value="(val) => {
-                        userSelectedTimezone[index] = val;
-                        updateTimezone(val, index);
-                      }"
+                      @update:model-value="
+                        (val) => {
+                          userSelectedTimezone[index] = val;
+                          updateTimezone(val, index);
+                        }
+                      "
                       @filter="timezoneFilterFn"
                       use-input
                       hide-selected
                       fill-input
                       :input-debounce="400"
                       behavior="menu"
-                      :rules="[
-                        (val: any) => !!val || 'Field is required!',
-                      ]"
+                      :rules="[(val: any) => !!val || 'Field is required!']"
                       style="width: 300px"
                     />
                   </div>
@@ -353,10 +364,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       hide-selected
                       fill-input
                       :input-debounce="400"
-                      @update:model-value="(val) => {
-                        userSelectedOrgId[index] = val;
-                        updateOrgId(val?.value || val, index);
-                      }"
+                      @update:model-value="
+                        (val) => {
+                          userSelectedOrgId[index] = val;
+                          updateOrgId(val?.value || val, index);
+                        }
+                      "
                       behavior="menu"
                     >
                     </q-select>
@@ -400,12 +413,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  onMounted,
-  computed,
-} from "vue";
+import { defineComponent, ref, onMounted, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -482,7 +490,7 @@ export default defineComponent({
         if (baseImportRef.value) {
           baseImportRef.value.jsonArrayOfObj = val;
         }
-      }
+      },
     });
     const streamTypes = ["logs", "metrics", "traces"];
     const selectedFolderId = ref<any>(
@@ -539,7 +547,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -551,7 +559,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -563,7 +571,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -739,7 +747,7 @@ export default defineComponent({
       // 6. Validate 'query_condition' field
       if (input.query_condition && input.query_condition.conditions) {
         const validateV2Condition = (item: any): boolean => {
-          if (item.filterType === 'group') {
+          if (item.filterType === "group") {
             // V2 group - validate it has conditions array
             if (!Array.isArray(item.conditions)) {
               alertErrors.push(
@@ -748,8 +756,10 @@ export default defineComponent({
               return false;
             }
             // Recursively validate nested conditions
-            return item.conditions.every((nestedItem: any) => validateV2Condition(nestedItem));
-          } else if (item.filterType === 'condition') {
+            return item.conditions.every((nestedItem: any) =>
+              validateV2Condition(nestedItem),
+            );
+          } else if (item.filterType === "condition") {
             // V2 condition - validate required fields
             if (!item.column || !item.operator || item.value === undefined) {
               alertErrors.push(
@@ -760,9 +770,17 @@ export default defineComponent({
             // Validate operator for custom type
             if (
               input.query_condition.type === "custom" &&
-              !["=", ">", "<", ">=", "<=", "Contains", "NotContains","contains","not_contains"].includes(
-                item.operator,
-              )
+              ![
+                "=",
+                ">",
+                "<",
+                ">=",
+                "<=",
+                "Contains",
+                "NotContains",
+                "contains",
+                "not_contains",
+              ].includes(item.operator)
             ) {
               alertErrors.push(
                 `Alert - ${index}: Invalid operator '${item.operator}'. Allowed: '=', '>', '<', '>=', '<=', 'Contains', 'NotContains'.`,
@@ -776,12 +794,24 @@ export default defineComponent({
 
         const validateV1Condition = (condition: any) => {
           // Check if it's a simple condition (V0/V1 format)
-          if (condition.column && condition.operator && condition.value !== undefined) {
+          if (
+            condition.column &&
+            condition.operator &&
+            condition.value !== undefined
+          ) {
             if (
               input.query_condition.type === "custom" &&
-              !["=", ">", "<", ">=", "<=", "Contains", "NotContains","contains","not_contains"].includes(
-                condition.operator,
-              )
+              ![
+                "=",
+                ">",
+                "<",
+                ">=",
+                "<=",
+                "Contains",
+                "NotContains",
+                "contains",
+                "not_contains",
+              ].includes(condition.operator)
             ) {
               alertErrors.push(
                 `Alert - ${index}: Invalid operator in query condition. Allowed operators: '=', '>', '<', '>=', '<=', 'Contains', 'NotContains'.`,
@@ -820,14 +850,18 @@ export default defineComponent({
         // Determine format and validate accordingly
         if (Array.isArray(conditionsToValidate)) {
           // V0 format - flat array of conditions
-          conditionsToValidate.forEach((condition:any) => {
-            if (!condition.column || !condition.operator || condition.value === undefined) {
+          conditionsToValidate.forEach((condition: any) => {
+            if (
+              !condition.column ||
+              !condition.operator ||
+              condition.value === undefined
+            ) {
               alertErrors.push(
                 `Alert - ${index}: Each query condition must have 'column', 'operator', and 'value'.`,
               );
             }
           });
-        } else if (conditionsToValidate.filterType === 'group') {
+        } else if (conditionsToValidate.filterType === "group") {
           // V2 format - new structure with filterType
           validateV2Condition(conditionsToValidate);
         } else if (conditionsToValidate.and || conditionsToValidate.or) {
@@ -1056,7 +1090,10 @@ export default defineComponent({
         let convertedConditions = input.query_condition.conditions;
 
         // Check if it's already wrapped with version
-        if (convertedConditions.version === 2 || convertedConditions.version === "2") {
+        if (
+          convertedConditions.version === 2 ||
+          convertedConditions.version === "2"
+        ) {
           // Already wrapped, extract the inner conditions for detection
           convertedConditions = convertedConditions.conditions;
         }
@@ -1118,7 +1155,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
 
@@ -1170,12 +1207,13 @@ export default defineComponent({
         if (!baseImportRef.value.jsonArrayOfObj[index].trigger_condition) {
           baseImportRef.value.jsonArrayOfObj[index].trigger_condition = {};
         }
-        baseImportRef.value.jsonArrayOfObj[index].trigger_condition.timezone = timezone;
+        baseImportRef.value.jsonArrayOfObj[index].trigger_condition.timezone =
+          timezone;
         // Directly update jsonStr without triggering editor re-render
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -1230,7 +1268,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };

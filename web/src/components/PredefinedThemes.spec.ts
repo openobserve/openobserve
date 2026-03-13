@@ -82,16 +82,16 @@ const mockStore = {
 // Mock localStorage
 const mockLocalStorage = {
   getItem: vi.fn((key: string) => {
-    if (key === 'appliedLightTheme') return null;
-    if (key === 'appliedDarkTheme') return null;
-    if (key === 'customLightColor') return null;
-    if (key === 'customDarkColor') return null;
+    if (key === "appliedLightTheme") return null;
+    if (key === "appliedDarkTheme") return null;
+    if (key === "customLightColor") return null;
+    if (key === "customDarkColor") return null;
     return null;
   }),
   setItem: vi.fn(),
   removeItem: vi.fn(),
 };
-Object.defineProperty(window, 'localStorage', {
+Object.defineProperty(window, "localStorage", {
   value: mockLocalStorage,
   writable: true,
 });
@@ -127,21 +127,23 @@ const createWrapper = (props = {}, options = {}) => {
         },
         QTabs: {
           template: '<div data-test-stub="q-tabs"><slot></slot></div>',
-          props: ['modelValue'],
+          props: ["modelValue"],
         },
         QTab: {
-          template: '<button data-test-stub="q-tab" @click="$emit(\'click\')"><slot></slot></button>',
+          template:
+            '<button data-test-stub="q-tab" @click="$emit(\'click\')"><slot></slot></button>',
         },
         QTabPanels: {
           template: '<div data-test-stub="q-tab-panels"><slot></slot></div>',
-          props: ['modelValue'],
+          props: ["modelValue"],
         },
         QTabPanel: {
           template: '<div data-test-stub="q-tab-panel"><slot></slot></div>',
-          props: ['name'],
+          props: ["name"],
         },
         QBtn: {
-          template: '<button data-test-stub="q-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot></slot></button>',
+          template:
+            '<button data-test-stub="q-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot></slot></button>',
         },
         QIcon: {
           template: '<i data-test-stub="q-icon"></i>',
@@ -154,8 +156,8 @@ const createWrapper = (props = {}, options = {}) => {
         },
         QColor: {
           template: '<div data-test-stub="q-color"></div>',
-          props: ['modelValue'],
-          emits: ['update:modelValue'],
+          props: ["modelValue"],
+          emits: ["update:modelValue"],
         },
       },
       ...options,
@@ -167,10 +169,10 @@ describe("PredefinedThemes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockLocalStorage.getItem.mockImplementation((key: string) => {
-      if (key === 'appliedLightTheme') return null;
-      if (key === 'appliedDarkTheme') return null;
-      if (key === 'customLightColor') return null;
-      if (key === 'customDarkColor') return null;
+      if (key === "appliedLightTheme") return null;
+      if (key === "appliedDarkTheme") return null;
+      if (key === "customLightColor") return null;
+      if (key === "customDarkColor") return null;
       return null;
     });
   });
@@ -318,12 +320,12 @@ describe("PredefinedThemes", () => {
       await nextTick();
 
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-        'customLightColor',
-        '#FF0000'
+        "customLightColor",
+        "#FF0000",
       );
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-        'appliedLightTheme',
-        '-1'
+        "appliedLightTheme",
+        "-1",
       );
     });
   });
@@ -333,7 +335,7 @@ describe("PredefinedThemes", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
       // The component should have resetToDefaultTheme function
-      expect(typeof vm.resetToDefaultTheme).toBe('function');
+      expect(typeof vm.resetToDefaultTheme).toBe("function");
     });
 
     it("should reset to organization settings when available", async () => {
@@ -378,7 +380,7 @@ describe("PredefinedThemes", () => {
     it("should show 'Applied' badge when theme is permanently applied", () => {
       mockStore.state.tempThemeColors.light = null;
       mockLocalStorage.getItem.mockImplementation((key: string) => {
-        if (key === 'appliedLightTheme') return '-1';
+        if (key === "appliedLightTheme") return "-1";
         return null;
       });
 
@@ -395,7 +397,7 @@ describe("PredefinedThemes", () => {
     it("should prioritize temp colors over localStorage", () => {
       mockStore.state.tempThemeColors.light = "#FF0000";
       mockLocalStorage.getItem.mockImplementation((key: string) => {
-        if (key === 'customLightColor') return '#00FF00';
+        if (key === "customLightColor") return "#00FF00";
         return null;
       });
 
@@ -408,7 +410,7 @@ describe("PredefinedThemes", () => {
     it("should use localStorage when no temp colors", () => {
       mockStore.state.tempThemeColors.light = null;
       mockLocalStorage.getItem.mockImplementation((key: string) => {
-        if (key === 'customLightColor') return '#00FF00';
+        if (key === "customLightColor") return "#00FF00";
         return null;
       });
 
@@ -456,7 +458,7 @@ describe("PredefinedThemes", () => {
       // Find button with icon "close"
       const buttons = wrapper.findAll('[data-test-stub="q-btn"]');
       // The close button is the one without text (icon only)
-      const closeButtons = buttons.filter(btn => btn.text().trim() === '');
+      const closeButtons = buttons.filter((btn) => btn.text().trim() === "");
       expect(closeButtons.length).toBeGreaterThan(0);
     });
 

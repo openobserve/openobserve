@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="!level"
     class="tw:py-[19px] tw:px-[16px] tw:font-bold tw:text-[14px]"
   >
-     {{ visibleResourceCount }} Permissions
+    {{ visibleResourceCount }} Permissions
   </div>
   <div
     :data-test="`iam-${
@@ -100,10 +100,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           parent ? parent.name : 'main'
         }-permissions-table`"
         :id="`permissions-table-${parent.resourceName}`"
-        style="max-height: calc(100vh - 310px); overflow-x: hidden; overflow-y: auto;"
+        style="
+          max-height: calc(100vh - 310px);
+          overflow-x: hidden;
+          overflow-y: auto;
+        "
         :style="{
           'max-height': level > 0 ? '400px' : 'calc(100vh - 310px)',
-          'height': 'auto',
+          height: 'auto',
         }"
         :items-size="getFilteredRows.length"
         :virtual-scroll-item-size="39"
@@ -361,7 +365,7 @@ const columns: any = [
     slot: true,
     slotName: "permission",
     style: { width: "80px" },
-  }
+  },
 ];
 
 const expandPermission = async (resource: any) => {
@@ -374,7 +378,7 @@ const handlePermissionChange = (row: any, permission: string) => {
 
 const getFilteredRows = computed(() => {
   return props.rows.filter((row: any) => row?.show);
-})
+});
 defineExpose({
   permissionsTableRef,
 });
@@ -383,13 +387,13 @@ defineExpose({
 <style scoped></style>
 <style lang="scss">
 .iam-permissions-table {
-  th{
+  th {
     height: 48px !important;
   }
   .q-table--bordered {
     border: none;
   }
-  .q-table__card{
+  .q-table__card {
     border-radius: 0px !important;
   }
 

@@ -788,7 +788,8 @@ const validateJoinFields = (joins: any, errors: string[]) => {
  */
 const validatePanelFields = (panel: any, errors: string[] = []) => {
   // Check if panel has promQL query type
-  const isPromQLMode = panel?.queryType === "promql" || panel?.queryType === "promql-builder";
+  const isPromQLMode =
+    panel?.queryType === "promql" || panel?.queryType === "promql-builder";
   const currentQueryIndex = 0; // Default to first query
 
   // Validate panel content based on type
@@ -909,7 +910,9 @@ export const validatePanel = (
   const currentQueryIndex = panelData?.layout?.currentQueryIndex || 0;
 
   // Check if panel has promQL query type
-  const isPromQLMode = panelData?.data?.queryType === "promql" || panelData?.data?.queryType === "promql-builder";
+  const isPromQLMode =
+    panelData?.data?.queryType === "promql" ||
+    panelData?.data?.queryType === "promql-builder";
 
   // Validate panel content based on type
   validatePanelContentByType(panelData?.data, errors);
@@ -922,9 +925,7 @@ export const validatePanel = (
     panelData?.data?.queries?.forEach((queryObj: any, index: number) => {
       if (queryObj?.query && queryObj?.customQuery) {
         if (!checkTimestampAlias(queryObj.query)) {
-          errors.push(
-            `Alias '${timestampColumn}' is not allowed.`,
-          );
+          errors.push(`Alias '${timestampColumn}' is not allowed.`);
         }
       }
     });

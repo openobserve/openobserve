@@ -79,7 +79,9 @@ function findAllByTestId(wrapper: VueWrapper, testId: string) {
  * Finds a destination card by type
  */
 function findCardByType(wrapper: VueWrapper, typeId: string) {
-  return wrapper.find(`[data-test="destination-type-card"][data-type="${typeId}"]`);
+  return wrapper.find(
+    `[data-test="destination-type-card"][data-type="${typeId}"]`,
+  );
 }
 
 /**
@@ -134,7 +136,9 @@ describe("PrebuiltDestinationSelector", () => {
     it("should render the component", () => {
       wrapper = mountComponent();
       expect(wrapper.exists()).toBe(true);
-      expect(existsByTestId(wrapper, "prebuilt-destination-selector")).toBe(true);
+      expect(existsByTestId(wrapper, "prebuilt-destination-selector")).toBe(
+        true,
+      );
     });
 
     it("should render destination type cards", () => {
@@ -173,7 +177,9 @@ describe("PrebuiltDestinationSelector", () => {
       const cards = getAllCards(wrapper);
 
       cards.forEach((card) => {
-        const description = card.find('[data-test="destination-type-description"]');
+        const description = card.find(
+          '[data-test="destination-type-description"]',
+        );
         expect(description.exists()).toBe(true);
       });
     });
@@ -190,7 +196,7 @@ describe("PrebuiltDestinationSelector", () => {
       wrapper = mountComponent();
       const customCard = findCardByType(wrapper, "custom");
       const description = customCard.find(
-        '[data-test="destination-type-description"]'
+        '[data-test="destination-type-description"]',
       );
 
       expect(description.text()).toBe("Configure a custom webhook destination");
@@ -457,7 +463,9 @@ describe("PrebuiltDestinationSelector", () => {
       const cards = getAllCards(wrapper);
 
       cards.forEach((card) => {
-        const description = card.find('[data-test="destination-type-description"]');
+        const description = card.find(
+          '[data-test="destination-type-description"]',
+        );
         expect(description.exists()).toBe(true);
       });
     });
@@ -573,9 +581,9 @@ describe("PrebuiltDestinationSelector", () => {
 
       // All cards should be within the grid
       cards.forEach((card) => {
-        expect(card.element.parentElement?.classList.contains("selector-grid")).toBe(
-          true
-        );
+        expect(
+          card.element.parentElement?.classList.contains("selector-grid"),
+        ).toBe(true);
       });
     });
 

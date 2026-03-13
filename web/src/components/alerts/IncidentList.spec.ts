@@ -97,7 +97,7 @@ describe("IncidentList.vue", () => {
       cachedData: [],
       pageBeforeSearch: 1,
       isInitialized: false,
-      shouldRefresh: false
+      shouldRefresh: false,
     };
 
     // Default mock implementation
@@ -135,7 +135,7 @@ describe("IncidentList.vue", () => {
         undefined,
         1000,
         0,
-        undefined
+        undefined,
       );
       expect(wrapper.vm.incidents).toHaveLength(3);
     });
@@ -296,7 +296,11 @@ describe("IncidentList.vue", () => {
     });
 
     it("should have correct status options", () => {
-      expect(wrapper.vm.statusOptions).toEqual(["open", "acknowledged", "resolved"]);
+      expect(wrapper.vm.statusOptions).toEqual([
+        "open",
+        "acknowledged",
+        "resolved",
+      ]);
     });
   });
 
@@ -405,7 +409,8 @@ describe("IncidentList.vue", () => {
       wrapper.vm.pagination.page = 1;
       wrapper.vm.pagination.rowsPerPage = 25;
 
-      const offset = (wrapper.vm.pagination.page - 1) * wrapper.vm.pagination.rowsPerPage;
+      const offset =
+        (wrapper.vm.pagination.page - 1) * wrapper.vm.pagination.rowsPerPage;
       expect(offset).toBe(0);
     });
 
@@ -413,7 +418,8 @@ describe("IncidentList.vue", () => {
       wrapper.vm.pagination.page = 2;
       wrapper.vm.pagination.rowsPerPage = 25;
 
-      const offset = (wrapper.vm.pagination.page - 1) * wrapper.vm.pagination.rowsPerPage;
+      const offset =
+        (wrapper.vm.pagination.page - 1) * wrapper.vm.pagination.rowsPerPage;
       expect(offset).toBe(25);
     });
 
@@ -459,7 +465,7 @@ describe("IncidentList.vue", () => {
 
     it("should set selected incident and navigate when viewing incident", async () => {
       const incident = wrapper.vm.incidents[0];
-      const pushSpy = vi.spyOn(router, 'push');
+      const pushSpy = vi.spyOn(router, "push");
 
       // viewIncident navigates via router to incident detail page
       wrapper.vm.viewIncident(incident);
@@ -477,9 +483,12 @@ describe("IncidentList.vue", () => {
     });
 
     it("should set correct incident when viewing", async () => {
-      const incident = createIncident({ id: "test-123", title: "Test Incident" });
+      const incident = createIncident({
+        id: "test-123",
+        title: "Test Incident",
+      });
       wrapper.vm.incidents.push(incident);
-      const pushSpy = vi.spyOn(router, 'push');
+      const pushSpy = vi.spyOn(router, "push");
 
       await wrapper.vm.viewIncident(incident);
       await flushPromises();
@@ -512,7 +521,7 @@ describe("IncidentList.vue", () => {
       expect(incidentsService.updateStatus).toHaveBeenCalledWith(
         "default",
         incident.id,
-        "acknowledged"
+        "acknowledged",
       );
     });
 
@@ -524,7 +533,7 @@ describe("IncidentList.vue", () => {
       expect(incidentsService.updateStatus).toHaveBeenCalledWith(
         "default",
         incident.id,
-        "resolved"
+        "resolved",
       );
     });
 
@@ -536,7 +545,7 @@ describe("IncidentList.vue", () => {
       expect(incidentsService.updateStatus).toHaveBeenCalledWith(
         "default",
         incident.id,
-        "open"
+        "open",
       );
     });
 
@@ -562,7 +571,9 @@ describe("IncidentList.vue", () => {
 
     it("should handle status update error", async () => {
       const mockNotify = vi.fn();
-      (incidentsService.updateStatus as any).mockRejectedValue(new Error("Update failed"));
+      (incidentsService.updateStatus as any).mockRejectedValue(
+        new Error("Update failed"),
+      );
 
       wrapper.vm.$q.notify = mockNotify;
       const incident = wrapper.vm.incidents[0];
@@ -581,7 +592,7 @@ describe("IncidentList.vue", () => {
       expect(incidentsService.updateStatus).toHaveBeenCalledWith(
         "default",
         "custom-id",
-        "acknowledged"
+        "acknowledged",
       );
     });
   });
@@ -596,11 +607,15 @@ describe("IncidentList.vue", () => {
     });
 
     it("should return correct color for acknowledged status", () => {
-      expect(wrapper.vm.getStatusColorClass("acknowledged")).toBe("status-acknowledged");
+      expect(wrapper.vm.getStatusColorClass("acknowledged")).toBe(
+        "status-acknowledged",
+      );
     });
 
     it("should return correct color for resolved status", () => {
-      expect(wrapper.vm.getStatusColorClass("resolved")).toBe("status-resolved");
+      expect(wrapper.vm.getStatusColorClass("resolved")).toBe(
+        "status-resolved",
+      );
     });
 
     it("should return grey for unknown status", () => {
@@ -662,7 +677,9 @@ describe("IncidentList.vue", () => {
     });
 
     it("should return grey for unknown severity", () => {
-      expect(wrapper.vm.getSeverityColorClass("unknown")).toBe("severity-default");
+      expect(wrapper.vm.getSeverityColorClass("unknown")).toBe(
+        "severity-default",
+      );
     });
   });
 
@@ -755,7 +772,9 @@ describe("IncidentList.vue", () => {
     });
 
     it("should have status column with correct config", () => {
-      const statusCol = wrapper.vm.columns.find((c: any) => c.name === "status");
+      const statusCol = wrapper.vm.columns.find(
+        (c: any) => c.name === "status",
+      );
 
       expect(statusCol).toBeDefined();
       expect(statusCol.sortable).toBe(false);
@@ -763,7 +782,9 @@ describe("IncidentList.vue", () => {
     });
 
     it("should have severity column with correct config", () => {
-      const severityCol = wrapper.vm.columns.find((c: any) => c.name === "severity");
+      const severityCol = wrapper.vm.columns.find(
+        (c: any) => c.name === "severity",
+      );
 
       expect(severityCol).toBeDefined();
       expect(severityCol.sortable).toBe(false);
@@ -778,21 +799,27 @@ describe("IncidentList.vue", () => {
     });
 
     it("should have alert_count column", () => {
-      const countCol = wrapper.vm.columns.find((c: any) => c.name === "alert_count");
+      const countCol = wrapper.vm.columns.find(
+        (c: any) => c.name === "alert_count",
+      );
 
       expect(countCol).toBeDefined();
       expect(countCol.align).toBe("center");
     });
 
     it("should have last_alert_at column with sorting", () => {
-      const dateCol = wrapper.vm.columns.find((c: any) => c.name === "last_alert_at");
+      const dateCol = wrapper.vm.columns.find(
+        (c: any) => c.name === "last_alert_at",
+      );
 
       expect(dateCol).toBeDefined();
       expect(dateCol.sortable).toBe(true);
     });
 
     it("should have actions column", () => {
-      const actionsCol = wrapper.vm.columns.find((c: any) => c.name === "actions");
+      const actionsCol = wrapper.vm.columns.find(
+        (c: any) => c.name === "actions",
+      );
 
       expect(actionsCol).toBeDefined();
       expect(actionsCol.align).toBe("center");
@@ -814,7 +841,8 @@ describe("IncidentList.vue", () => {
       wrapper.vm.pagination.page = 1000;
       wrapper.vm.pagination.rowsPerPage = 100;
 
-      const offset = (wrapper.vm.pagination.page - 1) * wrapper.vm.pagination.rowsPerPage;
+      const offset =
+        (wrapper.vm.pagination.page - 1) * wrapper.vm.pagination.rowsPerPage;
       expect(offset).toBe(99900);
     });
 
@@ -873,7 +901,11 @@ describe("IncidentList.vue", () => {
       await nextTick();
 
       expect(wrapper.vm.filteredIncidents).toHaveLength(2);
-      expect(wrapper.vm.filteredIncidents.every((i: Incident) => i.severity === "P1")).toBe(true);
+      expect(
+        wrapper.vm.filteredIncidents.every(
+          (i: Incident) => i.severity === "P1",
+        ),
+      ).toBe(true);
     });
 
     it("should reactively update when both filters change", async () => {
@@ -898,7 +930,7 @@ describe("IncidentList.vue", () => {
         undefined,
         1000,
         0,
-        undefined
+        undefined,
       );
     });
 
@@ -916,7 +948,7 @@ describe("IncidentList.vue", () => {
       expect(incidentsService.updateStatus).toHaveBeenCalledWith(
         "org-123",
         expect.any(String),
-        "acknowledged"
+        "acknowledged",
       );
     });
   });
@@ -929,7 +961,7 @@ describe("IncidentList.vue", () => {
         cachedData: [],
         pageBeforeSearch: 1,
         isInitialized: false,
-        shouldRefresh: false
+        shouldRefresh: false,
       };
     });
 
@@ -954,7 +986,7 @@ describe("IncidentList.vue", () => {
     it("should restore state from store on mount", async () => {
       // Mock enough incidents
       const mockIncidents = Array.from({ length: 500 }, (_, i) =>
-        createIncident({ id: `${i}`, title: `Incident ${i}` })
+        createIncident({ id: `${i}`, title: `Incident ${i}` }),
       );
 
       (incidentsService.list as any).mockResolvedValue({
@@ -969,10 +1001,10 @@ describe("IncidentList.vue", () => {
         incidents: {
           searchQuery: "",
           pagination: { page: 3, rowsPerPage: 50 },
-          organizationIdentifier: "default"
+          organizationIdentifier: "default",
         },
         pageBeforeSearch: 1,
-        isInitialized: true
+        isInitialized: true,
       };
 
       wrapper = createWrapper();
@@ -990,10 +1022,10 @@ describe("IncidentList.vue", () => {
         incidents: {
           searchQuery: "old org query",
           pagination: { page: 3, rowsPerPage: 50 },
-          organizationIdentifier: "old-org"
+          organizationIdentifier: "old-org",
         },
         pageBeforeSearch: 3,
-        isInitialized: true
+        isInitialized: true,
       };
 
       // New organization
@@ -1020,10 +1052,10 @@ describe("IncidentList.vue", () => {
         incidents: {
           searchQuery: "should not restore",
           pagination: { page: 10, rowsPerPage: 500 },
-          organizationIdentifier: "default"
+          organizationIdentifier: "default",
         },
         pageBeforeSearch: 10,
-        isInitialized: false // Not initialized
+        isInitialized: false, // Not initialized
       };
 
       wrapper = createWrapper();
@@ -1044,13 +1076,13 @@ describe("IncidentList.vue", () => {
         cachedData: [],
         pageBeforeSearch: 1,
         isInitialized: false,
-        shouldRefresh: false
+        shouldRefresh: false,
       };
 
       (incidentsService.list as any).mockResolvedValue({
         data: {
           incidents: Array.from({ length: 100 }, (_, i) =>
-            createIncident({ id: `${i}`, title: `Incident ${i}` })
+            createIncident({ id: `${i}`, title: `Incident ${i}` }),
           ),
           total: 100,
         },
@@ -1120,13 +1152,13 @@ describe("IncidentList.vue", () => {
         incidents: {
           searchQuery: "restored search",
           pagination: { page: 1, rowsPerPage: 20 },
-          organizationIdentifier: "default"
+          organizationIdentifier: "default",
         },
         pageBeforeSearch: 3,
-        isInitialized: true
+        isInitialized: true,
       };
 
-      const setPageBeforeSearchSpy = vi.spyOn(store, 'dispatch');
+      const setPageBeforeSearchSpy = vi.spyOn(store, "dispatch");
 
       wrapper = createWrapper();
       await flushPromises();
@@ -1137,8 +1169,9 @@ describe("IncidentList.vue", () => {
 
       // During restoration, setPageBeforeSearch should NOT be called
       // (because isRestoringState flag prevents watch logic)
-      const setPageBeforeSearchCalls = setPageBeforeSearchSpy.mock.calls
-        .filter((call: any) => call[0] === 'incidents/setPageBeforeSearch');
+      const setPageBeforeSearchCalls = setPageBeforeSearchSpy.mock.calls.filter(
+        (call: any) => call[0] === "incidents/setPageBeforeSearch",
+      );
 
       expect(setPageBeforeSearchCalls).toHaveLength(0);
     });
@@ -1151,13 +1184,13 @@ describe("IncidentList.vue", () => {
         cachedData: [],
         pageBeforeSearch: 1,
         isInitialized: false,
-        shouldRefresh: false
+        shouldRefresh: false,
       };
 
       (incidentsService.list as any).mockResolvedValue({
         data: {
           incidents: Array.from({ length: 100 }, (_, i) =>
-            createIncident({ id: `${i}`, title: `Incident ${i}` })
+            createIncident({ id: `${i}`, title: `Incident ${i}` }),
           ),
           total: 100,
         },
@@ -1182,13 +1215,13 @@ describe("IncidentList.vue", () => {
       expect(wrapper.vm.pagination.page).toBe(1);
 
       // STEP 3: Save state (simulate navigation)
-      store.dispatch('incidents/setIncidents', {
+      store.dispatch("incidents/setIncidents", {
         searchQuery: wrapper.vm.searchQuery,
         pagination: {
           page: wrapper.vm.pagination.page,
-          rowsPerPage: wrapper.vm.pagination.rowsPerPage
+          rowsPerPage: wrapper.vm.pagination.rowsPerPage,
         },
-        organizationIdentifier: store.state.selectedOrganization.identifier
+        organizationIdentifier: store.state.selectedOrganization.identifier,
       });
 
       // STEP 4: Restore state (simulate coming back)
@@ -1217,7 +1250,7 @@ describe("IncidentList.vue", () => {
         cachedData: [],
         pageBeforeSearch: 1,
         isInitialized: false,
-        shouldRefresh: false
+        shouldRefresh: false,
       };
     });
 
@@ -1227,17 +1260,17 @@ describe("IncidentList.vue", () => {
         incidents: {
           searchQuery: "",
           pagination: { page: 5, rowsPerPage: 20 },
-          organizationIdentifier: "default"
+          organizationIdentifier: "default",
         },
         pageBeforeSearch: 1,
-        isInitialized: true
+        isInitialized: true,
       };
 
       // Now only 10 records exist (1 page max)
       (incidentsService.list as any).mockResolvedValue({
         data: {
           incidents: Array.from({ length: 10 }, (_, i) =>
-            createIncident({ id: `${i}` })
+            createIncident({ id: `${i}` }),
           ),
           total: 10,
         },
@@ -1256,10 +1289,10 @@ describe("IncidentList.vue", () => {
         incidents: {
           searchQuery: "",
           pagination: { page: 3, rowsPerPage: 20 },
-          organizationIdentifier: "default"
+          organizationIdentifier: "default",
         },
         pageBeforeSearch: 1,
-        isInitialized: true
+        isInitialized: true,
       };
 
       // No data available
@@ -1284,13 +1317,13 @@ describe("IncidentList.vue", () => {
         cachedData: [],
         pageBeforeSearch: 1,
         isInitialized: false,
-        shouldRefresh: false
+        shouldRefresh: false,
       };
 
       (incidentsService.list as any).mockResolvedValue({
         data: {
           incidents: Array.from({ length: 20 }, (_, i) =>
-            createIncident({ id: `${i}` })
+            createIncident({ id: `${i}` }),
           ),
           total: 20,
         },
@@ -1319,14 +1352,14 @@ describe("IncidentList.vue", () => {
       (incidentsService.list as any).mockResolvedValue({
         data: {
           incidents: Array.from({ length: 20 }, (_, i) =>
-            createIncident({ id: `${i}` })
+            createIncident({ id: `${i}` }),
           ),
           total: 20,
         },
       });
 
       wrapper.vm.allIncidents = Array.from({ length: 20 }, (_, i) =>
-        createIncident({ id: `${i}` })
+        createIncident({ id: `${i}` }),
       );
       wrapper.vm.pagination.rowsNumber = 20;
 
@@ -1346,13 +1379,13 @@ describe("IncidentList.vue", () => {
         cachedData: [],
         pageBeforeSearch: 1,
         isInitialized: false,
-        shouldRefresh: false
+        shouldRefresh: false,
       };
 
       (incidentsService.list as any).mockResolvedValue({
         data: {
           incidents: Array.from({ length: 50 }, (_, i) =>
-            createIncident({ id: `${i}` })
+            createIncident({ id: `${i}` }),
           ),
           total: 50,
         },
@@ -1364,10 +1397,10 @@ describe("IncidentList.vue", () => {
         incidents: {
           searchQuery: "",
           pagination: { page: 1, rowsPerPage: 0 }, // Invalid
-          organizationIdentifier: "default"
+          organizationIdentifier: "default",
         },
         pageBeforeSearch: 1,
-        isInitialized: true
+        isInitialized: true,
       };
 
       wrapper = createWrapper();
@@ -1383,10 +1416,10 @@ describe("IncidentList.vue", () => {
         incidents: {
           searchQuery: "",
           pagination: { page: 1, rowsPerPage: -10 }, // Invalid
-          organizationIdentifier: "default"
+          organizationIdentifier: "default",
         },
         pageBeforeSearch: 1,
-        isInitialized: true
+        isInitialized: true,
       };
 
       wrapper = createWrapper();
@@ -1402,10 +1435,10 @@ describe("IncidentList.vue", () => {
         incidents: {
           searchQuery: "",
           pagination: { page: 0, rowsPerPage: 20 }, // Invalid
-          organizationIdentifier: "default"
+          organizationIdentifier: "default",
         },
         pageBeforeSearch: 1,
-        isInitialized: true
+        isInitialized: true,
       };
 
       wrapper = createWrapper();
@@ -1421,10 +1454,10 @@ describe("IncidentList.vue", () => {
         incidents: {
           searchQuery: "",
           pagination: { page: -5, rowsPerPage: 20 }, // Invalid
-          organizationIdentifier: "default"
+          organizationIdentifier: "default",
         },
         pageBeforeSearch: 1,
-        isInitialized: true
+        isInitialized: true,
       };
 
       wrapper = createWrapper();
@@ -1443,7 +1476,7 @@ describe("IncidentList.vue", () => {
         cachedData: [],
         pageBeforeSearch: 1,
         isInitialized: false,
-        shouldRefresh: false
+        shouldRefresh: false,
       };
     });
 
@@ -1452,7 +1485,7 @@ describe("IncidentList.vue", () => {
       (incidentsService.list as any).mockResolvedValue({
         data: {
           incidents: Array.from({ length: 100 }, (_, i) =>
-            createIncident({ id: `${i}`, title: `Incident ${i}` })
+            createIncident({ id: `${i}`, title: `Incident ${i}` }),
           ),
           total: 100,
         },
@@ -1468,7 +1501,7 @@ describe("IncidentList.vue", () => {
 
       // User searches - only 5 results (fits on 1 page)
       wrapper.vm.allIncidents = Array.from({ length: 5 }, (_, i) =>
-        createIncident({ id: `${i}`, title: `Match ${i}` })
+        createIncident({ id: `${i}`, title: `Match ${i}` }),
       );
 
       wrapper.vm.searchQuery = "Match";
@@ -1484,10 +1517,30 @@ describe("IncidentList.vue", () => {
       (incidentsService.list as any).mockResolvedValue({
         data: {
           incidents: [
-            createIncident({ id: "1", title: "Database Error", status: "open", severity: "P1" }),
-            createIncident({ id: "2", title: "API Timeout", status: "acknowledged", severity: "P2" }),
-            createIncident({ id: "3", title: "Login Issue", status: "resolved", severity: "P3" }),
-            createIncident({ id: "4", title: "Database Connection Failed", status: "open", severity: "P1" }),
+            createIncident({
+              id: "1",
+              title: "Database Error",
+              status: "open",
+              severity: "P1",
+            }),
+            createIncident({
+              id: "2",
+              title: "API Timeout",
+              status: "acknowledged",
+              severity: "P2",
+            }),
+            createIncident({
+              id: "3",
+              title: "Login Issue",
+              status: "resolved",
+              severity: "P3",
+            }),
+            createIncident({
+              id: "4",
+              title: "Database Connection Failed",
+              status: "open",
+              severity: "P1",
+            }),
           ],
           total: 4,
         },
@@ -1553,12 +1606,12 @@ describe("IncidentList.vue", () => {
         cachedData: [],
         pageBeforeSearch: 1,
         isInitialized: false,
-        shouldRefresh: false
+        shouldRefresh: false,
       };
     });
 
     it("should dispatch setPageBeforeSearch action", async () => {
-      const dispatchSpy = vi.spyOn(store, 'dispatch');
+      const dispatchSpy = vi.spyOn(store, "dispatch");
 
       wrapper = createWrapper();
       await flushPromises();
@@ -1570,11 +1623,14 @@ describe("IncidentList.vue", () => {
       wrapper.vm.searchQuery = "test";
       await nextTick();
 
-      expect(dispatchSpy).toHaveBeenCalledWith('incidents/setPageBeforeSearch', 5);
+      expect(dispatchSpy).toHaveBeenCalledWith(
+        "incidents/setPageBeforeSearch",
+        5,
+      );
     });
 
     it("should dispatch setIncidents action on pagination change", async () => {
-      const dispatchSpy = vi.spyOn(store, 'dispatch');
+      const dispatchSpy = vi.spyOn(store, "dispatch");
 
       wrapper = createWrapper();
       await flushPromises();
@@ -1585,30 +1641,30 @@ describe("IncidentList.vue", () => {
       await wrapper.vm.changePagination({ label: "50", value: 50 });
 
       expect(dispatchSpy).toHaveBeenCalledWith(
-        'incidents/setIncidents',
+        "incidents/setIncidents",
         expect.objectContaining({
           searchQuery: expect.any(String),
           pagination: expect.objectContaining({
             page: expect.any(Number),
-            rowsPerPage: 50
+            rowsPerPage: 50,
           }),
-          organizationIdentifier: "default"
-        })
+          organizationIdentifier: "default",
+        }),
       );
     });
 
     it("should dispatch resetIncidents when organization changes", async () => {
-      const dispatchSpy = vi.spyOn(store, 'dispatch');
+      const dispatchSpy = vi.spyOn(store, "dispatch");
 
       // Set up old org state
       store.state.incidents = {
         incidents: {
           searchQuery: "old",
           pagination: { page: 3, rowsPerPage: 50 },
-          organizationIdentifier: "old-org"
+          organizationIdentifier: "old-org",
         },
         pageBeforeSearch: 3,
-        isInitialized: true
+        isInitialized: true,
       };
 
       store.state.selectedOrganization = {
@@ -1622,16 +1678,19 @@ describe("IncidentList.vue", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(dispatchSpy).toHaveBeenCalledWith('incidents/resetIncidents');
+      expect(dispatchSpy).toHaveBeenCalledWith("incidents/resetIncidents");
     });
 
     it("should dispatch setIsInitialized on first load", async () => {
-      const dispatchSpy = vi.spyOn(store, 'dispatch');
+      const dispatchSpy = vi.spyOn(store, "dispatch");
 
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(dispatchSpy).toHaveBeenCalledWith('incidents/setIsInitialized', true);
+      expect(dispatchSpy).toHaveBeenCalledWith(
+        "incidents/setIsInitialized",
+        true,
+      );
     });
   });
 
@@ -1642,7 +1701,7 @@ describe("IncidentList.vue", () => {
         cachedData: [],
         pageBeforeSearch: 1,
         isInitialized: false,
-        shouldRefresh: false
+        shouldRefresh: false,
       };
     });
 
@@ -1651,10 +1710,10 @@ describe("IncidentList.vue", () => {
         incidents: {
           searchQuery: "test",
           pagination: { page: 3, rowsPerPage: 20 },
-          organizationIdentifier: "default"
+          organizationIdentifier: "default",
         },
         pageBeforeSearch: 5,
-        isInitialized: true
+        isInitialized: true,
       };
 
       wrapper = createWrapper();
@@ -1675,7 +1734,7 @@ describe("IncidentList.vue", () => {
     it("should clear isRestoringState flag after restoration completes", async () => {
       // Mock enough incidents
       const mockIncidents = Array.from({ length: 150 }, (_, i) =>
-        createIncident({ id: `${i}`, title: `test Incident ${i}` })
+        createIncident({ id: `${i}`, title: `test Incident ${i}` }),
       );
 
       (incidentsService.list as any).mockResolvedValue({
@@ -1711,7 +1770,7 @@ describe("IncidentList.vue", () => {
       (incidentsService.list as any).mockResolvedValue({
         data: {
           incidents: Array.from({ length: 50 }, (_, i) =>
-            createIncident({ id: `${i}` })
+            createIncident({ id: `${i}` }),
           ),
           total: 50,
         },

@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <span
-      v-for="(item) in list"
-      :key="item.id"
-      :title="title"
-      :class="{ highlight: item.isKeyWord }"
-    >
-      {{ item.text }}
-    </span>
+  <span
+    v-for="item in list"
+    :key="item.id"
+    :title="title"
+    :class="{ highlight: item.isKeyWord }"
+  >
+    {{ item.text }}
+  </span>
 </template>
 
 <script lang="ts">
@@ -53,7 +53,8 @@ export default defineComponent({
     const getKeywords = (queryString: string): string[] => {
       if (!queryString?.trim()) return [];
 
-      const regex = /\b(?:match_all|fuzzy_match_all)\(\s*(['"])([^'"]+)\1(?:\s*,\s*\d+)?\s*\)/g;
+      const regex =
+        /\b(?:match_all|fuzzy_match_all)\(\s*(['"])([^'"]+)\1(?:\s*,\s*\d+)?\s*\)/g;
       const result: string[] = [];
       let match;
 
@@ -63,24 +64,30 @@ export default defineComponent({
           result.push(match[4]);
         }
       }
-    return Array.from(new Set(result));
-  };
-
+      return Array.from(new Set(result));
+    };
 
     //it takes the content and the keywords and returns the content with the keywords highlighted
     const highlightText = (content: any, keywords: string[]) => {
       const result = [];
-      let remaining = typeof content === "number" ? content.toString() : content;
-      if (!keywords.length || !remaining) return [{ isKeyWord: false, text: remaining }];
+      let remaining =
+        typeof content === "number" ? content.toString() : content;
+      if (!keywords.length || !remaining)
+        return [{ isKeyWord: false, text: remaining }];
 
       //this pattern is used to highlight the keywords in the content
       //it is a regular expression that matches the keywords in the content
-      const pattern = new RegExp(`(${keywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
+      const pattern = new RegExp(
+        `(${keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`,
+        "gi",
+      );
       const parts = remaining.split(pattern);
 
       for (const part of parts) {
         if (!part) continue;
-        const isKeyWord = keywords.some(k => k.toLowerCase() === part.toLowerCase());
+        const isKeyWord = keywords.some(
+          (k) => k.toLowerCase() === part.toLowerCase(),
+        );
         result.push({ isKeyWord, text: part, id: getUUID() });
       }
       return result;
@@ -92,10 +99,13 @@ export default defineComponent({
     };
 
     watch(() => props.content, updateList, { immediate: true });
-    watch(() => props.queryString, () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(updateList, 300); // debounce duration
-    });
+    watch(
+      () => props.queryString,
+      () => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(updateList, 300); // debounce duration
+      },
+    );
 
     //this is used to clear the timeout when the component is destroyed
     //this is used to prevent memory leaks

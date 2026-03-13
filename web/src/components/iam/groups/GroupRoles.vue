@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="iam-roles-selection-section" class="col q-pa-none" >
+  <div data-test="iam-roles-selection-section" class="col q-pa-none">
     <div
       class="flex justify-start q-px-md q-py-sm card-container"
       style="position: sticky; top: 0px; z-index: 2"
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="11px"
                 class="q-px-md visual-selection-btn"
                 @click="updateUserTable(visual.value)"
-                style="height: 30px;"
+                style="height: 30px"
               >
                 {{ visual.label }}</q-btn
               >
@@ -78,7 +78,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-input>
       </div>
     </div>
-    <div data-test="iam-roles-selection-table" style="height: calc(100vh - 250px); overflow-y: auto;" class="card-container">
+    <div
+      data-test="iam-roles-selection-table"
+      style="height: calc(100vh - 250px); overflow-y: auto"
+      class="card-container"
+    >
       <template v-if="rows.length">
         <app-table
           :rows="visibleRows"
@@ -87,7 +91,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :virtual-scroll="false"
           :title="t('iam.roles')"
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          :tableStyle="hasVisibleRows ? 'height: calc(100vh - 250px); overflow-y: auto;' : ''"
+          :tableStyle="
+            hasVisibleRows
+              ? 'height: calc(100vh - 250px); overflow-y: auto;'
+              : ''
+          "
           :hideTopPagination="true"
           :showBottomPaginationWithTitle="true"
         >
@@ -213,7 +221,7 @@ watch(
   },
   {
     deep: true,
-  }
+  },
 );
 
 const updateUserTable = async (value: string) => {
@@ -235,7 +243,7 @@ const getchOrgUsers = async () => {
   hasFetchedOrgUsers.value = true;
   return new Promise(async (resolve) => {
     const data: any = await getRoles(
-      store.state.selectedOrganization.identifier
+      store.state.selectedOrganization.identifier,
     );
 
     users.value = cloneDeep(data.data).map((role: any, index: number) => {

@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { useMetricsCorrelationDashboard, type MetricsCorrelationConfig } from "./useMetricsCorrelationDashboard";
+import {
+  useMetricsCorrelationDashboard,
+  type MetricsCorrelationConfig,
+} from "./useMetricsCorrelationDashboard";
 import type { StreamInfo } from "@/services/service_streams";
 
 describe("useMetricsCorrelationDashboard", () => {
@@ -69,7 +72,7 @@ describe("useMetricsCorrelationDashboard", () => {
       expect(panel.queries).toHaveLength(1);
       expect(panel.queries[0].query).toContain('FROM "cpu_usage"');
       expect(panel.queries[0].query).toContain("service = 'api'");
-      expect(panel.queries[0].query).toContain('"k8s-cluster" = \'prod\'');
+      expect(panel.queries[0].query).toContain("\"k8s-cluster\" = 'prod'");
     });
 
     it("should handle special characters in filter values", () => {
@@ -186,7 +189,9 @@ describe("useMetricsCorrelationDashboard", () => {
       const dashboard = composable.generateLogsDashboard(logStreams, config);
 
       expect(dashboard).toBeDefined();
-      expect(dashboard!.tabs[0].panels[0].queries[0].fields.stream).toBe("default");
+      expect(dashboard!.tabs[0].panels[0].queries[0].fields.stream).toBe(
+        "default",
+      );
 
       // Should only use matched dimension values from API filters
       const query = dashboard!.tabs[0].panels[0].queries[0].query;
@@ -220,7 +225,7 @@ describe("useMetricsCorrelationDashboard", () => {
       expect(dashboard).toBeDefined();
       const query = dashboard!.tabs[0].panels[0].queries[0].query;
       expect(query).toContain('FROM "correlated_logs"');
-      expect(query).toContain('"k8s-pod" = \'api-xyz\'');
+      expect(query).toContain("\"k8s-pod\" = 'api-xyz'");
     });
 
     it("should return null when no log streams available", () => {
@@ -304,8 +309,8 @@ describe("useMetricsCorrelationDashboard", () => {
       const query = dashboard!.tabs[0].panels[0].queries[0].query;
 
       // Fields with hyphens should be quoted
-      expect(query).toContain('"k8s-cluster" = \'prod\'');
-      expect(query).toContain('"k8s-namespace" = \'default\'');
+      expect(query).toContain("\"k8s-cluster\" = 'prod'");
+      expect(query).toContain("\"k8s-namespace\" = 'default'");
       // Regular field names should not be quoted
       expect(query).toContain("service = 'api'");
     });
@@ -328,7 +333,9 @@ describe("useMetricsCorrelationDashboard", () => {
 
       const dashboard = composable.generateLogsDashboard(logStreams, config);
 
-      expect(dashboard!.tabs[0].panels[0].config.table_dynamic_columns).toBe(true);
+      expect(dashboard!.tabs[0].panels[0].config.table_dynamic_columns).toBe(
+        true,
+      );
       expect(dashboard!.tabs[0].panels[0].type).toBe("table");
     });
   });
@@ -354,7 +361,9 @@ describe("useMetricsCorrelationDashboard", () => {
       expect(dashboard).toBeDefined();
       const query = dashboard!.tabs[0].panels[0].queries[0].query;
       // Should have no WHERE clause but should have LIMIT 100
-      expect(query).toBe('SELECT * FROM "default"  ORDER BY _timestamp DESC LIMIT 100');
+      expect(query).toBe(
+        'SELECT * FROM "default"  ORDER BY _timestamp DESC LIMIT 100',
+      );
     });
 
     it("should handle streams with empty filters", () => {
@@ -381,9 +390,7 @@ describe("useMetricsCorrelationDashboard", () => {
     });
 
     it("should use time range from config", () => {
-      const metricStreams: StreamInfo[] = [
-        { stream_name: "cpu", filters: {} },
-      ];
+      const metricStreams: StreamInfo[] = [{ stream_name: "cpu", filters: {} }];
 
       const config: MetricsCorrelationConfig = {
         serviceName: "test",
@@ -398,7 +405,9 @@ describe("useMetricsCorrelationDashboard", () => {
 
       const dashboard = composable.generateDashboard(metricStreams, config);
 
-      expect(dashboard.defaultDatetimeDuration.startTime).toBe(1234567890000000);
+      expect(dashboard.defaultDatetimeDuration.startTime).toBe(
+        1234567890000000,
+      );
       expect(dashboard.defaultDatetimeDuration.endTime).toBe(1234567990000000);
     });
   });

@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="step-deduplication" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+  <div
+    class="step-deduplication"
+    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
+  >
     <div class="step-content card-container tw:px-3 tw:py-4">
       <!-- Fingerprint Fields -->
       <div class="tw:mb-4">
@@ -25,9 +28,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="info"
             size="17px"
             class="q-ml-xs cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+            :class="
+              store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+            "
           >
-            <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px">
+            <q-tooltip
+              anchor="center right"
+              self="center left"
+              max-width="300px"
+              style="font-size: 12px"
+            >
               {{ t("alerts.deduplication.fingerprintFieldsTooltip") }}
             </q-tooltip>
           </q-icon>
@@ -56,13 +66,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template v-slot:hint>
               <div class="tw:text-xs">
-                💡 Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition
-                fields)
+                💡 Leave empty to auto-detect based on query (SQL: GROUP BY
+                columns, PromQL: labels, Custom: condition fields)
               </div>
             </template>
           </q-select>
-          <q-tooltip v-if="localDeduplication.fingerprint_fields?.length > 0" max-width="400px">
-            {{ localDeduplication.fingerprint_fields.join(', ') }}
+          <q-tooltip
+            v-if="localDeduplication.fingerprint_fields?.length > 0"
+            max-width="400px"
+          >
+            {{ localDeduplication.fingerprint_fields.join(", ") }}
           </q-tooltip>
         </div>
       </div>
@@ -75,9 +88,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="info"
             size="17px"
             class="q-ml-xs cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+            :class="
+              store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+            "
           >
-            <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px">
+            <q-tooltip
+              anchor="center right"
+              self="center left"
+              max-width="300px"
+              style="font-size: 12px"
+            >
               {{ t("alerts.deduplication.timeWindowTooltip") }}
             </q-tooltip>
           </q-icon>
@@ -94,12 +114,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               borderless
               min="1"
               :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"
-              style="background: none;"
+              style="background: none"
               @update:model-value="emitUpdate"
             />
           </div>
           <div
-            style="min-width: 90px; margin-left: 0 !important; height: 36px; font-weight: normal"
+            style="
+              min-width: 90px;
+              margin-left: 0 !important;
+              height: 36px;
+              font-weight: normal;
+            "
             :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
             class="flex justify-center items-center"
           >
@@ -140,7 +165,8 @@ export default defineComponent({
     const localDeduplication = ref({
       enabled: (props.deduplication?.fingerprint_fields?.length ?? 0) > 0,
       fingerprint_fields: props.deduplication?.fingerprint_fields || [],
-      time_window_minutes: props.deduplication?.time_window_minutes || undefined,
+      time_window_minutes:
+        props.deduplication?.time_window_minutes || undefined,
     });
 
     const filteredColumns = ref(props.columns || []);
@@ -158,7 +184,7 @@ export default defineComponent({
           };
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     // Watch for columns prop changes
@@ -166,7 +192,7 @@ export default defineComponent({
       () => props.columns,
       (newVal) => {
         filteredColumns.value = newVal || [];
-      }
+      },
     );
 
     const sanitizeTimeWindow = (val: any): number | undefined => {
@@ -180,18 +206,20 @@ export default defineComponent({
       emit("update:deduplication", {
         enabled: hasFields,
         fingerprint_fields: localDeduplication.value.fingerprint_fields,
-        time_window_minutes: sanitizeTimeWindow(localDeduplication.value.time_window_minutes),
+        time_window_minutes: sanitizeTimeWindow(
+          localDeduplication.value.time_window_minutes,
+        ),
       });
     };
 
     const filterColumns = (val: string, update: any) => {
       update(() => {
-        if (val === '') {
+        if (val === "") {
           filteredColumns.value = props.columns || [];
         } else {
           const needle = val.toLowerCase();
           filteredColumns.value = (props.columns || []).filter((v: any) => {
-            const str = typeof v === 'string' ? v : (v?.label || v?.value || '');
+            const str = typeof v === "string" ? v : v?.label || v?.value || "";
             return str.toLowerCase().indexOf(needle) > -1;
           });
         }

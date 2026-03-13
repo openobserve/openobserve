@@ -70,7 +70,8 @@
                   animated
                   style="height: 100%"
                 >
-                  <q-tab-panel dense name="condition" class="q-pa-none">
+                  <q-tab-panel dense name="condition"
+class="q-pa-none">
                     <div class="flex column" style="height: 220px">
                       <q-select
                         dense
@@ -96,7 +97,8 @@
                       ></CommonAutoComplete>
                     </div>
                   </q-tab-panel>
-                  <q-tab-panel dense name="list" class="q-pa-none">
+                  <q-tab-panel dense name="list"
+class="q-pa-none">
                     <q-select
                       dense
                       borderless

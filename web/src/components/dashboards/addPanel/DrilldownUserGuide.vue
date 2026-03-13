@@ -9,7 +9,8 @@
       icon="help_outline"
       data-test="dashboard-drilldown-help-btn"
     >
-      <q-tooltip class="bg-grey-8" anchor="bottom middle" self="top middle">
+      <q-tooltip class="bg-grey-8" anchor="bottom middle"
+self="top middle">
         User Guide
       </q-tooltip>
     </q-btn>

@@ -23,8 +23,7 @@ import {
   decodeBuildConfig,
 } from "./logsVisualization";
 
-describe('logsVisualization Functions', () => {
-  
+describe("logsVisualization Functions", () => {
   describe("getVisualizationConfig", () => {
     it("should extract visualization config from dashboard panel data", () => {
       const dashboardPanelData = {
@@ -32,30 +31,30 @@ describe('logsVisualization Functions', () => {
           config: {
             decimals: 2,
           },
-          type: "table"
-        }
+          type: "table",
+        },
       };
 
       const config = getVisualizationConfig(dashboardPanelData);
-      
+
       expect(config).toEqual({
         config: {
           decimals: 2,
         },
-        type: "table"
+        type: "table",
       });
     });
 
     it("should handle empty dashboard panel data", () => {
       const dashboardPanelData = {};
       const config = getVisualizationConfig(dashboardPanelData);
-      
+
       expect(config).toBeNull();
     });
 
     it("should handle null dashboard panel data", () => {
       const config = getVisualizationConfig(null);
-      
+
       expect(config).toBeNull();
     });
   });
@@ -64,27 +63,27 @@ describe('logsVisualization Functions', () => {
     it("should encode configuration object to base64", () => {
       const config = {
         chart_type: "bar",
-        title: "Test Chart"
+        title: "Test Chart",
       };
 
       const encoded = encodeVisualizationConfig(config);
-      
+
       expect(encoded).toBeTruthy();
-      expect(typeof encoded).toBe('string');
+      expect(typeof encoded).toBe("string");
     });
 
     it("should handle empty configuration", () => {
       const encoded = encodeVisualizationConfig({});
-      
+
       expect(encoded).toBeTruthy();
-      expect(typeof encoded).toBe('string');
+      expect(typeof encoded).toBe("string");
     });
 
     it("should handle null configuration", () => {
       const encoded = encodeVisualizationConfig(null);
-      
+
       expect(encoded).toBeTruthy();
-      expect(typeof encoded).toBe('string');
+      expect(typeof encoded).toBe("string");
     });
 
     it("should handle encoding errors gracefully", () => {
@@ -93,7 +92,7 @@ describe('logsVisualization Functions', () => {
       circularConfig.self = circularConfig;
 
       const encoded = encodeVisualizationConfig(circularConfig);
-      
+
       expect(encoded).toBeNull();
     });
   });
@@ -102,25 +101,25 @@ describe('logsVisualization Functions', () => {
     it("should decode base64 string to configuration object", () => {
       const originalConfig = {
         chart_type: "pie",
-        colors: ["red", "blue", "green"]
+        colors: ["red", "blue", "green"],
       };
-      
+
       const encoded = encodeVisualizationConfig(originalConfig);
       const decoded = decodeVisualizationConfig(encoded!);
-      
+
       expect(decoded).toEqual(originalConfig);
     });
 
     it("should handle invalid base64 string", () => {
       const result = decodeVisualizationConfig("invalid-base64");
-      
+
       // Should handle the error gracefully, returns empty object as fallback
       expect(result).toEqual({});
     });
 
     it("should handle empty string", () => {
       const result = decodeVisualizationConfig("");
-      
+
       expect(result).toBeNull();
     });
 
@@ -148,7 +147,11 @@ describe("Build Configuration Functions", () => {
                 x: [{ column: "timestamp" }],
                 y: [{ column: "count" }],
                 breakdown: [],
-                filter: { filterType: "group", logicalOperator: "AND", conditions: [] },
+                filter: {
+                  filterType: "group",
+                  logicalOperator: "AND",
+                  conditions: [],
+                },
               },
               customQuery: false,
               query: "",
@@ -168,7 +171,11 @@ describe("Build Configuration Functions", () => {
           x: [{ column: "timestamp" }],
           y: [{ column: "count" }],
           breakdown: [],
-          filter: { filterType: "group", logicalOperator: "AND", conditions: [] },
+          filter: {
+            filterType: "group",
+            logicalOperator: "AND",
+            conditions: [],
+          },
         },
         joins: [],
         customQuery: false,

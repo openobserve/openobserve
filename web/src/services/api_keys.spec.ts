@@ -171,7 +171,10 @@ describe("API Keys Service", () => {
 
       await apiKeys.createUserAPIKey(complexConfig);
 
-      expect(mockHttp.post).toHaveBeenCalledWith("/api/usertoken", complexConfig);
+      expect(mockHttp.post).toHaveBeenCalledWith(
+        "/api/usertoken",
+        complexConfig,
+      );
     });
 
     it("should handle API key data with special characters", async () => {
@@ -197,7 +200,10 @@ describe("API Keys Service", () => {
 
       await apiKeys.updateUserAPIKey(updateData);
 
-      expect(mockHttp.put).toHaveBeenCalledWith("/api/usertoken/key-123", updateData);
+      expect(mockHttp.put).toHaveBeenCalledWith(
+        "/api/usertoken/key-123",
+        updateData,
+      );
     });
 
     it("should handle different key ID formats", async () => {
@@ -213,7 +219,10 @@ describe("API Keys Service", () => {
       for (const keyId of keyIds) {
         const updateData = { id: keyId, name: "Updated Name" };
         await apiKeys.updateUserAPIKey(updateData);
-        expect(mockHttp.put).toHaveBeenCalledWith(`/api/usertoken/${keyId}`, updateData);
+        expect(mockHttp.put).toHaveBeenCalledWith(
+          `/api/usertoken/${keyId}`,
+          updateData,
+        );
       }
     });
 
@@ -228,7 +237,10 @@ describe("API Keys Service", () => {
 
       for (const update of partialUpdates) {
         await apiKeys.updateUserAPIKey(update);
-        expect(mockHttp.put).toHaveBeenCalledWith(`/api/usertoken/${update.id}`, update);
+        expect(mockHttp.put).toHaveBeenCalledWith(
+          `/api/usertoken/${update.id}`,
+          update,
+        );
       }
     });
 
@@ -258,7 +270,10 @@ describe("API Keys Service", () => {
 
       await apiKeys.updateUserAPIKey(complexUpdate);
 
-      expect(mockHttp.put).toHaveBeenCalledWith("/api/usertoken/complex-key", complexUpdate);
+      expect(mockHttp.put).toHaveBeenCalledWith(
+        "/api/usertoken/complex-key",
+        complexUpdate,
+      );
     });
 
     it("should handle update with only ID", async () => {
@@ -266,7 +281,10 @@ describe("API Keys Service", () => {
 
       await apiKeys.updateUserAPIKey(minimalUpdate);
 
-      expect(mockHttp.put).toHaveBeenCalledWith("/api/usertoken/minimal-key", minimalUpdate);
+      expect(mockHttp.put).toHaveBeenCalledWith(
+        "/api/usertoken/minimal-key",
+        minimalUpdate,
+      );
     });
   });
 
@@ -280,7 +298,7 @@ describe("API Keys Service", () => {
     it("should handle different organization identifiers", async () => {
       const organizations = [
         "simple-org",
-        "org-with-dashes", 
+        "org-with-dashes",
         "org_with_underscores",
         "production.environment",
         "12345",
@@ -305,7 +323,7 @@ describe("API Keys Service", () => {
       const specialOrgs = [
         "org@domain.com",
         "org#hash",
-        "org$dollar", 
+        "org$dollar",
         "org%percent",
         "org&ampersand",
       ];
@@ -441,19 +459,22 @@ describe("API Keys Service", () => {
 
       // Create
       await apiKeys.createUserAPIKey(keyData);
-      
-      // List 
+
+      // List
       await apiKeys.list();
-      
+
       // Update
       await apiKeys.updateUserAPIKey(updateData);
-      
+
       // Delete
       await apiKeys.deleteUserAPIKey("key-123");
 
       expect(mockHttp.post).toHaveBeenCalledWith("/api/usertoken", keyData);
       expect(mockHttp.get).toHaveBeenCalledWith("/api/usertoken");
-      expect(mockHttp.put).toHaveBeenCalledWith("/api/usertoken/key-123", updateData);
+      expect(mockHttp.put).toHaveBeenCalledWith(
+        "/api/usertoken/key-123",
+        updateData,
+      );
       expect(mockHttp.delete).toHaveBeenCalledWith("/api/usertoken/key-123");
     });
 
@@ -463,11 +484,11 @@ describe("API Keys Service", () => {
 
       // List RUM tokens
       await apiKeys.listRUMTokens(org);
-      
+
       // Create RUM token
       await apiKeys.createRUMToken(org);
-      
-      // Update RUM token  
+
+      // Update RUM token
       await apiKeys.updateRUMToken(org, tokenId);
 
       expect(mockHttp.get).toHaveBeenCalledWith(`/api/${org}/rumtoken`);
@@ -491,7 +512,10 @@ describe("API Keys Service", () => {
       // Verify user token endpoints use consistent pattern
       expect(mockHttp.get).toHaveBeenCalledWith("/api/usertoken");
       expect(mockHttp.post).toHaveBeenCalledWith("/api/usertoken", keyData);
-      expect(mockHttp.put).toHaveBeenCalledWith(`/api/usertoken/${keyId}`, { id: keyId, ...keyData });
+      expect(mockHttp.put).toHaveBeenCalledWith(`/api/usertoken/${keyId}`, {
+        id: keyId,
+        ...keyData,
+      });
       expect(mockHttp.delete).toHaveBeenCalledWith(`/api/usertoken/${keyId}`);
 
       // Verify RUM token endpoints use consistent pattern
@@ -515,7 +539,7 @@ describe("API Keys Service", () => {
       await apiKeys.createUserAPIKey({ name: "Multi-org key" });
 
       expect(mockHttp.get).toHaveBeenCalledTimes(4); // 3 RUM lists + 1 user token list
-      expect(mockHttp.post).toHaveBeenCalledTimes(4); // 3 RUM creates + 1 user token create  
+      expect(mockHttp.post).toHaveBeenCalledTimes(4); // 3 RUM creates + 1 user token create
       expect(mockHttp.put).toHaveBeenCalledTimes(3); // 3 RUM updates
     });
   });

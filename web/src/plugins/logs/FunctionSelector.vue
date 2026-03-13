@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
-          {{ t('search.toggleFunctionEditor') }}
+          {{ t("search.toggleFunctionEditor") }}
         </q-tooltip>
       </q-toggle>
     </div>
@@ -51,52 +51,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-tooltip :delay="0">
           {{ selectedFunctionTooltip }}
         </q-tooltip>
-      <q-list data-test="logs-search-saved-function-list">
-        <!-- Search Input -->
-        <div>
-          <q-input
-            v-model="searchTerm"
-            dense
-            filled
-            borderless
-            clearable
-            debounce="300"
-            :placeholder="t('search.searchSavedFunction')"
-            data-test="function-search-input"
-          >
-            <template #prepend>
-              <q-icon name="search" />
-            </template>
-          </q-input>
-        </div>
+        <q-list data-test="logs-search-saved-function-list">
+          <!-- Search Input -->
+          <div>
+            <q-input
+              v-model="searchTerm"
+              dense
+              filled
+              borderless
+              clearable
+              debounce="300"
+              :placeholder="t('search.searchSavedFunction')"
+              data-test="function-search-input"
+            >
+              <template #prepend>
+                <q-icon name="search" />
+              </template>
+            </q-input>
+          </div>
 
-        <div v-if="filteredFunctionOptions.length">
-          <q-item
-            class="tw:border-b saved-view-item"
-            clickable
-            v-for="(item, i) in filteredFunctionOptions"
-            :key="'saved-view-' + i"
-            v-close-popup
-          >
-            <q-item-section
-              @click.stop="applyFunction(item, true)"
+          <div v-if="filteredFunctionOptions.length">
+            <q-item
+              class="tw:border-b saved-view-item"
+              clickable
+              v-for="(item, i) in filteredFunctionOptions"
+              :key="'saved-view-' + i"
               v-close-popup
             >
-              <q-item-label>{{ item.name }}</q-item-label>
-            </q-item-section>
-          </q-item>
-        </div>
-        <div v-else>
-          <q-item>
-            <q-item-section>
-              <q-item-label>{{
-                t("search.savedFunctionNotFound")
-              }}</q-item-label>
-            </q-item-section>
-          </q-item>
-        </div>
-      </q-list>
-    </q-btn-dropdown>
+              <q-item-section
+                @click.stop="applyFunction(item, true)"
+                v-close-popup
+              >
+                <q-item-label>{{ item.name }}</q-item-label>
+              </q-item-section>
+            </q-item>
+          </div>
+          <div v-else>
+            <q-item>
+              <q-item-section>
+                <q-item-label>{{
+                  t("search.savedFunctionNotFound")
+                }}</q-item-label>
+              </q-item-section>
+            </q-item>
+          </div>
+        </q-list>
+      </q-btn-dropdown>
     </div>
     <q-btn
       data-test="logs-search-bar-save-function-btn"
@@ -132,9 +132,9 @@ const store = useStore();
 const functionToggleIcon = computed(() => {
   return (
     "img:" +
-    (store.state.theme == 'dark' ?
-      getImageURL("images/common/function_dark.svg") :
-      getImageURL("images/common/function.svg"))
+    (store.state.theme == "dark"
+      ? getImageURL("images/common/function_dark.svg")
+      : getImageURL("images/common/function.svg"))
   );
 });
 
@@ -180,8 +180,8 @@ const applyFunction = (
 </script>
 
 <style scoped lang="scss">
-@import '@/styles/logs/function-selector.scss';
-.save-function-btn{
+@import "@/styles/logs/function-selector.scss";
+.save-function-btn {
   border-left: 1px solid var(--o2-border-color);
 }
 </style>

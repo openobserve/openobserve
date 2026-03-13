@@ -17,15 +17,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
+  <q-page
+    class="q-pa-none"
+    style="min-height: inherit; height: calc(100vh - 44px)"
+  >
     <div>
-    <div class="card-container tw:mb-[0.625rem]">
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
-      style="position: sticky; top: 0; z-index: 1000 ;"
-      >
-          <div  class="q-table__title full-width tw:font-[600]" data-test="organizations-title-text">{{ t("organization.header") }}</div>
+      <div class="card-container tw:mb-[0.625rem]">
+        <div
+          class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+          style="position: sticky; top: 0; z-index: 1000"
+        >
+          <div
+            class="q-table__title full-width tw:font-[600]"
+            data-test="organizations-title-text"
+          >
+            {{ t("organization.header") }}
+          </div>
           <div class="full-width tw:flex tw:justify-end">
-
             <q-input
               v-model="filterQuery"
               borderless
@@ -37,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon class="o2-search-input-icon" name="search" />
               </template>
             </q-input>
-          
+
             <q-btn
               class="q-ml-sm o2-primary-button tw:h-[36px]"
               flat
@@ -46,28 +54,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="addOrganization"
               data-test="Add Organization"
             />
-            </div>
+          </div>
         </div>
-        </div>
-    <div>
-      <div class="tw:w-full tw:h-full">
-      <div class="card-container tw:h-[calc(100vh-127px)]">
-      <q-table
-      ref="qTable"
-      :rows="visibleRows"
-      :columns="columns"
-      row-key="id"
-      :pagination="pagination"
-      :loading="loading"
-      class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-      style="overflow-y: auto;"
-      :style="hasVisibleRows
-            ? 'height: calc(100vh - 127px); overflow-y: auto;' 
-            : ''"
-    >
-      <template #no-data><NoData /></template>
+      </div>
+      <div>
+        <div class="tw:w-full tw:h-full">
+          <div class="card-container tw:h-[calc(100vh-127px)]">
+            <q-table
+              ref="qTable"
+              :rows="visibleRows"
+              :columns="columns"
+              row-key="id"
+              :pagination="pagination"
+              :loading="loading"
+              class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+              style="overflow-y: auto"
+              :style="
+                hasVisibleRows
+                  ? 'height: calc(100vh - 127px); overflow-y: auto;'
+                  : ''
+              "
+            >
+              <template #no-data><NoData /></template>
 
-      <!-- <template #body-cell-actions="props">
+              <!-- <template #body-cell-actions="props">
         <q-td :props="props">
           <q-btn
             v-if="props.row.role == 'Admin'"
@@ -83,45 +93,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-td>
       </template> -->
 
+              <template #bottom="scope">
+                <div
+                  class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+                >
+                  <div
+                    class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md"
+                  >
+                    {{ resultTotal }} {{ t("organization.header") }}
+                  </div>
+                  <QTablePagination
+                    :scope="scope"
+                    :resultTotal="resultTotal"
+                    :perPageOptions="perPageOptions"
+                    position="bottom"
+                    @update:changeRecordPerPage="changePagination"
+                  />
+                </div>
+              </template>
 
-      <template #bottom="scope">
-        <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-          <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
-            {{ resultTotal }} {{ t('organization.header') }}
+              <template #body-cell-actions="props">
+                <q-td :props="props" side>
+                  <q-btn
+                    data-test="organization-name-edit"
+                    :title="'Edit'"
+                    class="q-ml-xs"
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
+                    icon="edit"
+                    @click="renameOrganization(props)"
+                    style="cursor: pointer !important"
+                  >
+                  </q-btn>
+                </q-td>
+              </template>
+            </q-table>
           </div>
-            <QTablePagination
-              :scope="scope"
-              :resultTotal="resultTotal"
-              :perPageOptions="perPageOptions"
-              position="bottom"
-              @update:changeRecordPerPage="changePagination"
-            />
         </div>
-      </template>
-
-      <template #body-cell-actions="props">
-        <q-td :props="props" side>
-          <q-btn
-            data-test="organization-name-edit"
-            :title="'Edit'"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            icon="edit"
-            @click="renameOrganization(props)"
-            style="cursor: pointer !important"
-          >
-          </q-btn>
-        </q-td>
-      </template>
-    </q-table>
-    </div>
-    </div>
-    </div>
       </div>
+    </div>
     <q-dialog
       v-model="showAddOrganizationDialog"
       position="right"
@@ -129,14 +142,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       maximized
       @before-hide="hideAddOrgDialog"
     >
-      <add-update-organization @updated="updateOrganizationList" :model-value="toBeUpdatedOrganization" @cancel:hideform="hideAddOrgDialog" />
+      <add-update-organization
+        @updated="updateOrganizationList"
+        :model-value="toBeUpdatedOrganization"
+        @cancel:hideform="hideAddOrgDialog"
+      />
     </q-dialog>
   </q-page>
 </template>
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, onMounted, onBeforeMount, onUpdated, computed } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  onMounted,
+  onBeforeMount,
+  onUpdated,
+  computed,
+} from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, date, copyToClipboard } from "quasar";
@@ -197,7 +222,6 @@ export default defineComponent({
         label: t("organization.identifier"),
         align: "left",
         sortable: true,
-        
       },
       {
         name: "type",
@@ -218,17 +242,15 @@ export default defineComponent({
         sortable: true,
       });
     }
-      columns.value.push(
-        {
-        name: "actions",
-        field: "actions",
-        label: t("user.actions"),
-        align: "center",
-        sortable: false,
-        classes: "actions-column",
-        style: "width: 67px;",
-      }
-    )
+    columns.value.push({
+      name: "actions",
+      field: "actions",
+      label: t("user.actions"),
+      align: "center",
+      sortable: false,
+      classes: "actions-column",
+      style: "width: 67px;",
+    });
 
     const perPageOptions = [
       { label: "20", value: 20 },
@@ -249,50 +271,42 @@ export default defineComponent({
       (action) => {
         if (action == "add") {
           showAddOrganizationDialog.value = true;
-        }
-        else if (action == "update") {
+        } else if (action == "update") {
           showAddOrganizationDialog.value = true;
           toBeUpdatedOrganization.value = {
             id: router.currentRoute.value.query?.to_be_updated_org_id || "",
             name: router.currentRoute.value.query?.to_be_updated_org_name || "",
-            identifier: router.currentRoute.value.query?.to_be_updated_org_id || "",
+            identifier:
+              router.currentRoute.value.query?.to_be_updated_org_id || "",
           };
         }
       },
     );
 
     onMounted(() => {
-      if (
-        router.currentRoute.value.query.action == "add"
-      ) {
+      if (router.currentRoute.value.query.action == "add") {
         showAddOrganizationDialog.value = true;
-      }
-      else if (
-        router.currentRoute.value.query.action == "update"
-      ) {
+      } else if (router.currentRoute.value.query.action == "update") {
         showAddOrganizationDialog.value = true;
         toBeUpdatedOrganization.value = {
           id: router.currentRoute.value.query?.to_be_updated_org_id || "",
           name: router.currentRoute.value.query?.to_be_updated_org_name || "",
-          identifier: router.currentRoute.value.query?.to_be_updated_org_id || "",
+          identifier:
+            router.currentRoute.value.query?.to_be_updated_org_id || "",
         };
       }
     });
 
     onUpdated(() => {
-      if (
-        router.currentRoute.value.query.action == "add"
-      ) {
+      if (router.currentRoute.value.query.action == "add") {
         showAddOrganizationDialog.value = true;
-      }
-      else if (
-        router.currentRoute.value.query.action == "update"
-      ) {
+      } else if (router.currentRoute.value.query.action == "update") {
         showAddOrganizationDialog.value = true;
         toBeUpdatedOrganization.value = {
           id: router.currentRoute.value.query?.to_be_updated_org_id || "",
           name: router.currentRoute.value.query?.to_be_updated_org_name || "",
-          identifier: router.currentRoute.value.query?.to_be_updated_org_id || "",
+          identifier:
+            router.currentRoute.value.query?.to_be_updated_org_id || "",
         };
       }
 
@@ -326,7 +340,7 @@ export default defineComponent({
         const billingPlans = {
           "0": "Free",
           "1": "Pay as you go",
-          "2": "Enterprise"
+          "2": "Enterprise",
         };
         organizations.value = res.data.data.map((data) => {
           // Common fields for all configurations
@@ -442,26 +456,33 @@ export default defineComponent({
     };
 
     const filterData = (rows: string | any[], terms: string) => {
-        const filtered = [];
-        terms = terms.toLowerCase();
-        for (let i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms.trim()) || rows[i]["identifier"].toLowerCase().includes(terms.trim())) {
-            filtered.push(rows[i]);
-          }
+      const filtered = [];
+      terms = terms.toLowerCase();
+      for (let i = 0; i < rows.length; i++) {
+        if (
+          rows[i]["name"].toLowerCase().includes(terms.trim()) ||
+          rows[i]["identifier"].toLowerCase().includes(terms.trim())
+        ) {
+          filtered.push(rows[i]);
         }
-        return filtered;
-      };
+      }
+      return filtered;
+    };
 
     const visibleRows = computed(() => {
-      if (!filterQuery.value) return organizations.value || []
-      return filterData(organizations.value || [], filterQuery.value)
+      if (!filterQuery.value) return organizations.value || [];
+      return filterData(organizations.value || [], filterQuery.value);
     });
     const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
     // Watch visibleRows to sync resultTotal with search filter
-    watch(visibleRows, (newVisibleRows) => {
-      resultTotal.value = newVisibleRows.length;
-    }, { immediate: true });
+    watch(
+      visibleRows,
+      (newVisibleRows) => {
+        resultTotal.value = newVisibleRows.length;
+      },
+      { immediate: true },
+    );
 
     const renameOrganization = (props: any) => {
       router.push({
@@ -471,13 +492,12 @@ export default defineComponent({
           to_be_updated_org_id: props.row.identifier,
           to_be_updated_org_name: props.row.name,
         },
-      })
+      });
       toBeUpdatedOrganization.value = {
         id: props.row.identifier,
         name: props.row.name,
         identifier: props.row.identifier,
       };
-
     };
 
     return {
@@ -527,12 +547,14 @@ export default defineComponent({
         id: "",
         name: "",
         identifier: "",
-      }
+      };
       this.getOrganizations();
 
       this.$q.notify({
         type: "positive",
-        message: isUpdated ? 'Organization updated successfully.' : 'Organization added successfully.',
+        message: isUpdated
+          ? "Organization updated successfully."
+          : "Organization added successfully.",
       });
     },
     joinOrganization() {

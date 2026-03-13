@@ -46,7 +46,7 @@ export default defineComponent({
       const dashboard = await getDashboard(
         store,
         props.dashboardId,
-        route.query.folder
+        route.query.folder,
       );
       dashboard.owner = "";
 

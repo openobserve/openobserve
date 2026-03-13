@@ -44,7 +44,8 @@
       >
 
       <div v-show="showLoginInput" class="o2-input login-inputs q-pt-lg">
-        <q-form ref="loginform" class="q-gutter-md" @submit.prevent="">
+        <q-form ref="loginform" class="q-gutter-md"
+@submit.prevent="">
           <q-input
             v-model="name"
             data-cy="login-user-id"

@@ -41,17 +41,17 @@ describe("SummaryList.vue", () => {
       numOfQueries: 5,
       duration: "2.5s",
       queryRange: "1h",
-      trace_ids: ["trace1", "trace2"]
+      trace_ids: ["trace1", "trace2"],
     },
     {
-      row_id: "2", 
+      row_id: "2",
       user_id: "user2@example.com",
       search_type_label: "Metrics",
       numOfQueries: 3,
       duration: "1.2s",
       queryRange: "30m",
-      trace_ids: ["trace3", "trace4"]
-    }
+      trace_ids: ["trace3", "trace4"],
+    },
   ];
   const mockSelectedRows: any[] = [];
 
@@ -104,12 +104,14 @@ describe("SummaryList.vue", () => {
   // Test 5: Test isMetaOrg computed property
   it("should show table when isMetaOrg is true", async () => {
     // Use commit to properly update store state
-    store.commit('setConfig', {
+    store.commit("setConfig", {
       ...store.state.zoConfig,
-      meta_org: "default"
+      meta_org: "default",
     });
     await wrapper.vm.$nextTick();
-    expect(wrapper.find('[data-test="running-queries-table"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="running-queries-table"]').exists()).toBe(
+      true,
+    );
   });
 
   // Test 6: Test initial reactive values
@@ -123,7 +125,9 @@ describe("SummaryList.vue", () => {
   it("should initialize deleteDialog with correct default values", () => {
     expect(wrapper.vm.deleteDialog.show).toBe(false);
     expect(wrapper.vm.deleteDialog.title).toBe("Delete Running Query");
-    expect(wrapper.vm.deleteDialog.message).toBe("Are you sure you want to delete this running query?");
+    expect(wrapper.vm.deleteDialog.message).toBe(
+      "Are you sure you want to delete this running query?",
+    );
     expect(wrapper.vm.deleteDialog.data).toBe(null);
   });
 
@@ -160,30 +164,32 @@ describe("SummaryList.vue", () => {
   // Test 11: Test changePagination function
   it("should update pagination when changePagination is called", async () => {
     const mockQTable = {
-      setPagination: vi.fn()
+      setPagination: vi.fn(),
     };
     wrapper.vm.qTable = mockQTable;
-    
+
     const newPaginationValue = { label: "50", value: 50 };
     wrapper.vm.changePagination(newPaginationValue);
-    
+
     expect(wrapper.vm.selectedPerPage).toBe(50);
     expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
-    expect(mockQTable.setPagination).toHaveBeenCalledWith(wrapper.vm.pagination);
+    expect(mockQTable.setPagination).toHaveBeenCalledWith(
+      wrapper.vm.pagination,
+    );
   });
 
   // Test 12: Test changePagination with different values
   it("should handle different pagination values", async () => {
     const mockQTable = {
-      setPagination: vi.fn()
+      setPagination: vi.fn(),
     };
     wrapper.vm.qTable = mockQTable;
-    
+
     const testValues = [
       { label: "5", value: 5 },
-      { label: "100", value: 100 }
+      { label: "100", value: 100 },
     ];
-    
+
     for (const val of testValues) {
       wrapper.vm.changePagination(val);
       expect(wrapper.vm.selectedPerPage).toBe(val.value);
@@ -195,11 +201,11 @@ describe("SummaryList.vue", () => {
   it("should handle changePagination when qTable is null", () => {
     wrapper.vm.qTable = null;
     const newPaginationValue = { label: "10", value: 10 };
-    
+
     expect(() => {
       wrapper.vm.changePagination(newPaginationValue);
     }).not.toThrow();
-    
+
     expect(wrapper.vm.selectedPerPage).toBe(10);
     expect(wrapper.vm.pagination.rowsPerPage).toBe(10);
   });
@@ -208,24 +214,26 @@ describe("SummaryList.vue", () => {
   it("should emit delete:queries when confirmDeleteAction is called", () => {
     const mockProps = {
       row: {
-        trace_ids: ["trace1", "trace2"]
-      }
+        trace_ids: ["trace1", "trace2"],
+      },
     };
-    
+
     wrapper.vm.confirmDeleteAction(mockProps);
-    
+
     expect(wrapper.emitted("delete:queries")).toBeTruthy();
-    expect(wrapper.emitted("delete:queries")[0]).toEqual([["trace1", "trace2"]]);
+    expect(wrapper.emitted("delete:queries")[0]).toEqual([
+      ["trace1", "trace2"],
+    ]);
   });
 
   // Test 15: Test confirmDeleteAction with empty trace_ids
   it("should emit empty array when trace_ids is undefined", () => {
     const mockProps = {
-      row: {}
+      row: {},
     };
-    
+
     wrapper.vm.confirmDeleteAction(mockProps);
-    
+
     expect(wrapper.emitted("delete:queries")).toBeTruthy();
     expect(wrapper.emitted("delete:queries")[0]).toEqual([[]]);
   });
@@ -233,7 +241,7 @@ describe("SummaryList.vue", () => {
   // Test 16: Test handleMultiQueryCancel function
   it("should emit delete:queries without parameters when handleMultiQueryCancel is called", () => {
     wrapper.vm.handleMultiQueryCancel();
-    
+
     expect(wrapper.emitted("delete:queries")).toBeTruthy();
     expect(wrapper.emitted("delete:queries")[0]).toEqual([]);
   });
@@ -242,9 +250,9 @@ describe("SummaryList.vue", () => {
   it("should emit filter:queries when getAllUserQueries is called", () => {
     const mockEvent = { type: "click" };
     const mockRow = { user_id: "test@example.com" };
-    
+
     wrapper.vm.getAllUserQueries(mockEvent, mockRow);
-    
+
     expect(wrapper.emitted("filter:queries")).toBeTruthy();
     expect(wrapper.emitted("filter:queries")[0]).toEqual([mockRow]);
   });
@@ -258,18 +266,20 @@ describe("SummaryList.vue", () => {
   it("should emit update:selectedRows when selectedRow is set", () => {
     const newSelectedRows = [mockRows[0]];
     wrapper.vm.selectedRow = newSelectedRows;
-    
+
     expect(wrapper.emitted("update:selectedRows")).toBeTruthy();
-    expect(wrapper.emitted("update:selectedRows")[0]).toEqual([newSelectedRows]);
+    expect(wrapper.emitted("update:selectedRows")[0]).toEqual([
+      newSelectedRows,
+    ]);
   });
 
   // Test 20: Test component emits definition
   it("should have correct emits defined", () => {
     const expectedEmits = [
       "cancel:hideform",
-      "filter:queries", 
+      "filter:queries",
       "update:selectedRows",
-      "delete:queries"
+      "delete:queries",
     ];
     expect(wrapper.vm.$options.emits).toEqual(expectedEmits);
   });
@@ -330,7 +340,7 @@ describe("SummaryList.vue", () => {
   it("should allow deleteDialog properties to be modified", () => {
     wrapper.vm.deleteDialog.show = true;
     wrapper.vm.deleteDialog.data = { id: 123 };
-    
+
     expect(wrapper.vm.deleteDialog.show).toBe(true);
     expect(wrapper.vm.deleteDialog.data).toEqual({ id: 123 });
   });
@@ -370,13 +380,26 @@ describe("SummaryList.vue", () => {
   // Test 33: Test component has correct setup function return values
   it("should return all required values from setup function", () => {
     const setupReturnKeys = [
-      "t", "columns", "confirmDeleteAction", "deleteDialog", "perPageOptions",
-      "showListSchemaDialog", "changePagination", "outlinedCancel", "loadingState",
-      "isMetaOrg", "resultTotal", "selectedPerPage", "qTable", "selectedRow",
-      "handleMultiQueryCancel", "pagination", "getAllUserQueries"
+      "t",
+      "columns",
+      "confirmDeleteAction",
+      "deleteDialog",
+      "perPageOptions",
+      "showListSchemaDialog",
+      "changePagination",
+      "outlinedCancel",
+      "loadingState",
+      "isMetaOrg",
+      "resultTotal",
+      "selectedPerPage",
+      "qTable",
+      "selectedRow",
+      "handleMultiQueryCancel",
+      "pagination",
+      "getAllUserQueries",
     ];
-    
-    setupReturnKeys.forEach(key => {
+
+    setupReturnKeys.forEach((key) => {
       expect(wrapper.vm[key]).toBeDefined();
     });
   });
@@ -387,7 +410,7 @@ describe("SummaryList.vue", () => {
     wrapper.vm.handleMultiQueryCancel();
     wrapper.vm.getAllUserQueries({}, mockRows[0]);
     wrapper.vm.confirmDeleteAction({ row: mockRows[0] });
-    
+
     expect(wrapper.emitted("delete:queries")).toHaveLength(2);
     expect(wrapper.emitted("filter:queries")).toHaveLength(1);
   });

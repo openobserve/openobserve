@@ -15,27 +15,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="height: calc(100vh - 88px); min-height: inherit" >
-
-    <div v-if="!showDestinationEditor && !showImportDestination" >
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+  <q-page
+    class="q-pa-none"
+    style="height: calc(100vh - 88px); min-height: inherit"
+  >
+    <div v-if="!showDestinationEditor && !showImportDestination">
+      <div
+        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
       >
-        <div class="q-table__title tw:font-[600]" data-test="alert-destinations-list-title">
-            {{ t("alert_destinations.header") }}
-          </div>
-          <div class="tw:flex tw:justify-end">
-            <q-input
-              v-model="filterQuery"
-              borderless
-              dense
-              data-test="destination-list-search-input"
-              class="q-ml-auto no-border o2-search-input"
-              :placeholder="t('alert_destinations.search')"
-            >
-              <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
-              </template>
-            </q-input>
+        <div
+          class="q-table__title tw:font-[600]"
+          data-test="alert-destinations-list-title"
+        >
+          {{ t("alert_destinations.header") }}
+        </div>
+        <div class="tw:flex tw:justify-end">
+          <q-input
+            v-model="filterQuery"
+            borderless
+            dense
+            data-test="destination-list-search-input"
+            class="q-ml-auto no-border o2-search-input"
+            :placeholder="t('alert_destinations.search')"
+          >
+            <template #prepend>
+              <q-icon class="o2-search-input-icon" name="search" />
+            </template>
+          </q-input>
           <q-btn
             class="o2-secondary-button q-ml-sm tw:h-[36px]"
             no-caps
@@ -53,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t(`alert_destinations.add`)"
             @click="editDestination(null)"
           />
-          </div>
+        </div>
       </div>
       <q-table
         data-test="alert-destinations-list-table"
@@ -65,9 +71,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         selection="multiple"
         v-model:selected="selectedDestinations"
         class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-        :style="hasVisibleRows
+        :style="
+          hasVisibleRows
             ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;'
-            : 'width: 100%'"
+            : 'width: 100%'
+        "
       >
         <template #no-data>
           <div
@@ -155,7 +163,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="auto_awesome"
                   size="16px"
                   color="primary"
-                  :title="'Prebuilt ' + getPrebuiltTypeName(props.row) + ' destination'"
+                  :title="
+                    'Prebuilt ' +
+                    getPrebuiltTypeName(props.row) +
+                    ' destination'
+                  "
                 />
               </template>
               <!-- Custom Destination -->
@@ -178,14 +190,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template v-slot:body-selection="scope">
-          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+          <q-checkbox
+            v-model="scope.selected"
+            size="sm"
+            class="o2-table-checkbox"
+          />
         </template>
 
         <template #bottom="scope">
-          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-sm">
-                  {{ resultTotal }} {{ t('alert_destinations.header') }}
-                </div>
+          <div
+            class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+          >
+            <div
+              class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-sm"
+            >
+              {{ resultTotal }} {{ t("alert_destinations.header") }}
+            </div>
             <q-btn
               v-if="selectedDestinations.length > 0"
               data-test="destination-list-delete-destinations-btn"
@@ -202,39 +222,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="delete" size="16px" />
               <span class="tw:ml-2">Delete</span>
             </q-btn>
-          <QTablePagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
+            <QTablePagination
+              :scope="scope"
+              :position="'bottom'"
+              :resultTotal="resultTotal"
+              :perPageOptions="perPageOptions"
+              @update:changeRecordPerPage="changePagination"
+            />
           </div>
         </template>
         <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Adding this block to render the select-all checkbox -->
-              <q-th v-if="columns.length > 0" auto-width>
-                <q-checkbox
-                  v-model="props.selected"
-                  size="sm"
-                  :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                  class="o2-table-checkbox"
-                />
-              </q-th>
+          <q-tr :props="props">
+            <!-- Adding this block to render the select-all checkbox -->
+            <q-th v-if="columns.length > 0" auto-width>
+              <q-checkbox
+                v-model="props.selected"
+                size="sm"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-table-checkbox-dark'
+                    : 'o2-table-checkbox-light'
+                "
+                class="o2-table-checkbox"
+              />
+            </q-th>
 
-              <!-- Render the table headers -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
+            <!-- Render the table headers -->
+            <q-th
+              v-for="col in props.cols"
+              :key="col.name"
+              :props="props"
+              :class="col.classes"
+              :style="col.style"
+            >
+              {{ col.label }}
+            </q-th>
+          </q-tr>
+        </template>
       </q-table>
     </div>
     <div v-else-if="showDestinationEditor && !showImportDestination">
@@ -371,7 +395,7 @@ export default defineComponent({
         label: t("alert_destinations.actions"),
         align: "center",
         sortable: false,
-        classes:'actions-column'
+        classes: "actions-column",
       },
     ]);
     const destinations: Ref<DestinationPayload[]> = ref([]);
@@ -508,7 +532,7 @@ export default defineComponent({
       if (!destination) {
         track("Button Click", {
           button: "Add Destination",
-          page: "Alert Destinations"
+          page: "Alert Destinations",
         });
       }
       toggleDestinationEditor();
@@ -642,16 +666,22 @@ export default defineComponent({
     };
 
     // Get display name for prebuilt destination type
-    const getPrebuiltTypeName = (destination: DestinationPayload): string | null => {
+    const getPrebuiltTypeName = (
+      destination: DestinationPayload,
+    ): string | null => {
       const prebuiltType = detectPrebuiltType(destination);
       if (!prebuiltType) return null;
 
-      const typeConfig = availableTypes.value.find(t => t.id === prebuiltType);
+      const typeConfig = availableTypes.value.find(
+        (t) => t.id === prebuiltType,
+      );
       return typeConfig ? typeConfig.name : prebuiltType;
     };
 
     // Get display label for custom destination sub-type
-    const getCustomDestinationLabel = (destination: DestinationPayload): string => {
+    const getCustomDestinationLabel = (
+      destination: DestinationPayload,
+    ): string => {
       if (destination.type === "http") {
         return t("alert_destinations.customWebhook");
       } else if (destination.type === "email") {
@@ -697,7 +727,7 @@ export default defineComponent({
 
         const response = await destinationService.bulkDelete(
           store.state.selectedOrganization.identifier,
-          payload
+          payload,
         );
 
         dismiss();
@@ -745,7 +775,10 @@ export default defineComponent({
       } catch (error: any) {
         dismiss();
         // Show error message from response if available
-        const errorMessage = error.response?.data?.message || error?.message || "Error deleting destinations. Please try again.";
+        const errorMessage =
+          error.response?.data?.message ||
+          error?.message ||
+          "Error deleting destinations. Please try again.";
         if (error.response?.status != 403 || error?.status != 403) {
           q.notify({
             type: "negative",
@@ -758,11 +791,14 @@ export default defineComponent({
       confirmBulkDelete.value = false;
     };
 
-
     // Watch visibleRows to sync resultTotal with search filter
-    watch(visibleRows, (newVisibleRows) => {
-      resultTotal.value = newVisibleRows.length;
-    }, { immediate: true });
+    watch(
+      visibleRows,
+      (newVisibleRows) => {
+        resultTotal.value = newVisibleRows.length;
+      },
+      { immediate: true },
+    );
 
     return {
       t,

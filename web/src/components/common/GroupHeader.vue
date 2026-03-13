@@ -16,7 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:flex tw:items-center tw:gap-2">
-    <img v-if="showIcon" style="width: 24px; height: 24px;" :src="icon" alt="icon" />
+    <img
+      v-if="showIcon"
+      style="width: 24px; height: 24px"
+      :src="icon"
+      alt="icon"
+    />
     <span class="title-text">
       {{ title }}
     </span>
@@ -25,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </span>
   </div>
 </template>
-  
+
 <script lang="ts">
 import { getImageURL } from "@/utils/zincutils";
 import { computed, defineComponent } from "vue";
@@ -38,31 +43,30 @@ export default defineComponent({
       type: String,
       default: "",
     },
-    iconPath:{
+    iconPath: {
       type: String,
       default: "",
     },
     showIcon: {
       type: Boolean,
       default: true,
-    }
+    },
   },
   setup(props, { emit }) {
     const icon = computed(() => {
-      return getImageURL(props.iconPath)
-    })
+      return getImageURL(props.iconPath);
+    });
     return {
       icon,
     };
   },
 });
 </script>
-    
+
 <style scoped lang="scss">
-.title-text{
+.title-text {
   font-size: 16px;
   font-weight: 700;
   line-height: 24px;
 }
 </style>
-    

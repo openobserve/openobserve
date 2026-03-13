@@ -70,7 +70,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="q-table__control q-ml-auto">
       <span class="q-table__bottom-item">
         {{ t("search.showing") }}
-        {{ resultTotal > 0 ?  (scope.pagination.page - 1) * scope.pagination.rowsPerPage + 1 : 0 }} -
+        {{
+          resultTotal > 0
+            ? (scope.pagination.page - 1) * scope.pagination.rowsPerPage + 1
+            : 0
+        }}
+        -
         {{
           scope.pagination.page * scope.pagination.rowsPerPage >= resultTotal
             ? resultTotal
@@ -85,7 +90,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
 
       <div v-if="position === 'bottom'" class="flex items-center">
-        <q-separator vertical inset class="q-mr-md" />
+        <q-separator vertical
+inset class="q-mr-md" />
 
         <span class="q-table__bottom-item">
           {{ t("search.recordsPerPage") }}
@@ -138,7 +144,7 @@ import { getImageURL } from "../../../utils/zincutils";
 
 export default defineComponent({
   name: "QTablePagination",
-  // eslint-disable-next-line vue/require-prop-types
+
   props: [
     "scope",
     "pageTitle",
@@ -168,7 +174,7 @@ export default defineComponent({
     const toggleSidePanel = () => {
       store.dispatch(
         "setSearchCollapseToggle",
-        store.state.searchCollapsibleSection == 0 ? 20 : 0
+        store.state.searchCollapsibleSection == 0 ? 20 : 0,
       );
     };
 

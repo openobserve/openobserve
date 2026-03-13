@@ -16,13 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-card class="o2-side-dialog column full-height">
-    <q-card-section class=" q-py-md tw:w-full">
+    <q-card-section class="q-py-md tw:w-full">
       <div class="row items-center no-wrap q-py-sm">
-        <div class="col ">
+        <div class="col">
           <div v-if="beingUpdated" style="font-size: 18px">
             {{ t("serviceAccounts.update") }}
           </div>
-          <div v-else style="font-size: 18px">{{ t("serviceAccounts.add") }}</div>
+          <div v-else style="font-size: 18px">
+            {{ t("serviceAccounts.add") }}
+          </div>
         </div>
         <div class="col-auto">
           <q-icon
@@ -71,7 +73,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('user.cancel')"
               no-caps
               flat
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
               data-test="cancel-button"
               @click="$emit('cancel:hideform')"
             />
@@ -81,7 +87,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="submit"
               no-caps
               flat
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-primary-button-dark'
+                  : 'o2-primary-button-light'
+              "
             />
           </div>
         </q-form>
@@ -211,34 +221,34 @@ export default defineComponent({
             dismiss();
             this.formData.email = userEmail;
           });
-          this.track("Button Click", {
-            button: "Update Service Account",
-            page: "Add Service Account"
-          });
+        this.track("Button Click", {
+          button: "Update Service Account",
+          page: "Add Service Account",
+        });
       } else {
-          service_accounts
-            .create(this.formData, selectedOrg)
-            .then((res: any) => {
-              dismiss();
-              this.$emit("updated", res.data, this.formData, "created");
-            })
-            .catch((err: any) => {
-              if(err.response?.status != 403){
-                if(err?.response?.data?.message ) {
-                  this.$q.notify({
-                    color: "negative",
-                    message: err?.response?.data?.message,
-                    timeout: 2000,
-                  });
-                }
+        service_accounts
+          .create(this.formData, selectedOrg)
+          .then((res: any) => {
+            dismiss();
+            this.$emit("updated", res.data, this.formData, "created");
+          })
+          .catch((err: any) => {
+            if (err.response?.status != 403) {
+              if (err?.response?.data?.message) {
+                this.$q.notify({
+                  color: "negative",
+                  message: err?.response?.data?.message,
+                  timeout: 2000,
+                });
               }
-              
-              dismiss();
-            });
-          this.track("Button Click", {
-            button: "Create Service Account",
-            page: "Add Service Account"
+            }
+
+            dismiss();
           });
+        this.track("Button Click", {
+          button: "Create Service Account",
+          page: "Add Service Account",
+        });
       }
     },
   },

@@ -48,15 +48,20 @@ describe("useAnnotationsData", () => {
   });
 
   it("should create useAnnotationsData composable with correct initial state", () => {
-    const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-    
+    const composable = useAnnotationsData(
+      "test-org",
+      "test-dashboard",
+      "test-panel",
+      "test-folder",
+    );
+
     expect(composable).toBeDefined();
     expect(composable.isAddAnnotationMode.value).toBe(false);
     expect(composable.isAddAnnotationDialogVisible.value).toBe(false);
     expect(composable.isEditMode.value).toBe(false);
     expect(composable.annotationToAddEdit.value).toBe(null);
     expect(composable.panelsList.value).toEqual([]);
-    
+
     // Check that all functions are defined
     expect(typeof composable.enableAddAnnotationMode).toBe("function");
     expect(typeof composable.disableAddAnnotationMode).toBe("function");
@@ -72,31 +77,46 @@ describe("useAnnotationsData", () => {
 
   describe("mode toggle functions", () => {
     it("should enable add annotation mode", () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
+
       composable.enableAddAnnotationMode();
-      
+
       expect(composable.isAddAnnotationMode.value).toBe(true);
     });
 
     it("should disable add annotation mode", () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
+
       composable.enableAddAnnotationMode();
       expect(composable.isAddAnnotationMode.value).toBe(true);
-      
+
       composable.disableAddAnnotationMode();
       expect(composable.isAddAnnotationMode.value).toBe(false);
     });
 
     it("should toggle add annotation mode", () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
+
       expect(composable.isAddAnnotationMode.value).toBe(false);
-      
+
       composable.toggleAddAnnotationMode();
       expect(composable.isAddAnnotationMode.value).toBe(true);
-      
+
       composable.toggleAddAnnotationMode();
       expect(composable.isAddAnnotationMode.value).toBe(false);
     });
@@ -104,23 +124,33 @@ describe("useAnnotationsData", () => {
 
   describe("dialog visibility functions", () => {
     it("should show add annotation dialog", () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
+
       composable.showAddAnnotationDialog();
-      
+
       expect(composable.isAddAnnotationDialogVisible.value).toBe(true);
     });
 
     it("should hide add annotation dialog and reset state", () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
+
       // Set some initial state
       composable.showAddAnnotationDialog();
       composable.isEditMode.value = true;
       composable.annotationToAddEdit.value = { test: "data" };
-      
+
       composable.hideAddAnnotationDialog();
-      
+
       expect(composable.isAddAnnotationDialogVisible.value).toBe(false);
       expect(composable.isEditMode.value).toBe(false);
       expect(composable.annotationToAddEdit.value).toBe(null);
@@ -129,14 +159,19 @@ describe("useAnnotationsData", () => {
 
   describe("handleAddAnnotationButtonClick", () => {
     it("should disable add annotation mode and show dialog", () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
+
       composable.enableAddAnnotationMode();
       composable.isEditMode.value = true;
       composable.annotationToAddEdit.value = { test: "data" };
-      
+
       composable.handleAddAnnotationButtonClick();
-      
+
       expect(composable.isAddAnnotationMode.value).toBe(false);
       expect(composable.isEditMode.value).toBe(false);
       expect(composable.annotationToAddEdit.value).toBe(null);
@@ -146,7 +181,12 @@ describe("useAnnotationsData", () => {
 
   describe("handleAddAnnotation", () => {
     it("should create annotation with start and end times", () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
 
       // Input is in milliseconds (chart timestamp format)
       composable.handleAddAnnotation(1500, 2500);
@@ -163,7 +203,12 @@ describe("useAnnotationsData", () => {
     });
 
     it("should create annotation with only start time", () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
 
       composable.handleAddAnnotation(1500, null);
 
@@ -178,7 +223,12 @@ describe("useAnnotationsData", () => {
     });
 
     it("should create annotation with null start time", () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
 
       composable.handleAddAnnotation(null, 2500);
 
@@ -193,7 +243,12 @@ describe("useAnnotationsData", () => {
     });
 
     it("should create annotation with both null times", () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
 
       composable.handleAddAnnotation(null, null);
 
@@ -208,7 +263,12 @@ describe("useAnnotationsData", () => {
     });
 
     it("should handle zero times", () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
 
       composable.handleAddAnnotation(0, 0);
 
@@ -223,7 +283,12 @@ describe("useAnnotationsData", () => {
     });
 
     it("should handle negative times", () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
 
       composable.handleAddAnnotation(-1500, -500);
 
@@ -238,26 +303,38 @@ describe("useAnnotationsData", () => {
     });
 
     it("should use correct panelId in annotation", () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "different-panel", "test-folder");
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "different-panel",
+        "test-folder",
+      );
 
       composable.handleAddAnnotation(1000, 2000);
 
-      expect(composable.annotationToAddEdit.value.panels).toEqual(["different-panel"]);
+      expect(composable.annotationToAddEdit.value.panels).toEqual([
+        "different-panel",
+      ]);
     });
   });
 
   describe("editAnnotation", () => {
     it("should set annotation to edit and show dialog", () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
+
       const annotationData = {
         id: 1,
         title: "Test annotation",
         text: "Test text",
       };
-      
+
       composable.editAnnotation(annotationData);
-      
+
       expect(composable.annotationToAddEdit.value).toEqual(annotationData);
       expect(composable.isAddAnnotationDialogVisible.value).toBe(true);
     });
@@ -265,16 +342,21 @@ describe("useAnnotationsData", () => {
 
   describe("closeAddAnnotation", () => {
     it("should reset all states", () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
+
       // Set initial state
       composable.isAddAnnotationDialogVisible.value = true;
       composable.isAddAnnotationMode.value = true;
       composable.isEditMode.value = true;
       composable.annotationToAddEdit.value = { test: "data" };
-      
+
       composable.closeAddAnnotation();
-      
+
       expect(composable.isAddAnnotationDialogVisible.value).toBe(false);
       expect(composable.isAddAnnotationMode.value).toBe(false);
       expect(composable.isEditMode.value).toBe(false);
@@ -284,36 +366,51 @@ describe("useAnnotationsData", () => {
 
   describe("watch behavior", () => {
     it("should show notification when add annotation mode is enabled", async () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
+
       composable.enableAddAnnotationMode();
       await nextTick();
-      
+
       expect(mockShowInfoNotification).toHaveBeenCalledWith(
         "Click on the chart data or select a range to add an annotation",
-        {}
+        {},
       );
     });
 
     it("should not show notification when add annotation mode is disabled", async () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
+
       composable.enableAddAnnotationMode();
       await nextTick();
-      
+
       mockShowInfoNotification.mockClear();
-      
+
       composable.disableAddAnnotationMode();
       await nextTick();
-      
+
       expect(mockShowInfoNotification).not.toHaveBeenCalled();
     });
   });
 
   describe("processTabPanels", () => {
     it("should process dashboard tabs and return chart panels", async () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
+
       const mockDashboardData = {
         tabs: [
           {
@@ -332,7 +429,7 @@ describe("useAnnotationsData", () => {
               },
               {
                 id: "panel3",
-                type: "table",  // Should be filtered out
+                type: "table", // Should be filtered out
                 title: "Table",
               },
             ],
@@ -391,8 +488,13 @@ describe("useAnnotationsData", () => {
     });
 
     it("should handle dashboard data without tabs", async () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
+
       const mockDashboardData = {};
       mockGetDashboard.mockResolvedValue(mockDashboardData);
 
@@ -402,8 +504,13 @@ describe("useAnnotationsData", () => {
     });
 
     it("should handle tabs without panels", async () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
+
       const mockDashboardData = {
         tabs: [
           {
@@ -420,8 +527,13 @@ describe("useAnnotationsData", () => {
     });
 
     it("should handle tabs with empty panel arrays", async () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
+
       const mockDashboardData = {
         tabs: [
           {
@@ -439,8 +551,13 @@ describe("useAnnotationsData", () => {
     });
 
     it("should handle tabs without names", async () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
+
       const mockDashboardData = {
         tabs: [
           {
@@ -463,8 +580,13 @@ describe("useAnnotationsData", () => {
     });
 
     it("should handle tabs with empty string names", async () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
+
       const mockDashboardData = {
         tabs: [
           {
@@ -488,8 +610,13 @@ describe("useAnnotationsData", () => {
     });
 
     it("should filter out non-chart panel types", async () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
+
       const mockDashboardData = {
         tabs: [
           {
@@ -509,13 +636,30 @@ describe("useAnnotationsData", () => {
       await composable.fetchAllPanels();
 
       expect(composable.panelsList.value).toHaveLength(2);
-      expect(composable.panelsList.value.map(p => p.type)).toEqual(["line", "bar"]);
+      expect(composable.panelsList.value.map((p) => p.type)).toEqual([
+        "line",
+        "bar",
+      ]);
     });
 
     it("should handle all supported chart types", async () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
-      const supportedTypes = ["area", "area-stacked", "bar", "h-bar", "line", "scatter", "stacked", "h-stacked"];
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
+
+      const supportedTypes = [
+        "area",
+        "area-stacked",
+        "bar",
+        "h-bar",
+        "line",
+        "scatter",
+        "stacked",
+        "h-stacked",
+      ];
       const mockDashboardData = {
         tabs: [
           {
@@ -534,44 +678,78 @@ describe("useAnnotationsData", () => {
       await composable.fetchAllPanels();
 
       expect(composable.panelsList.value).toHaveLength(supportedTypes.length);
-      expect(composable.panelsList.value.map(p => p.type)).toEqual(supportedTypes);
+      expect(composable.panelsList.value.map((p) => p.type)).toEqual(
+        supportedTypes,
+      );
     });
 
     it("should handle getDashboard error", async () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
+
       const mockError = new Error("Failed to fetch dashboard");
       mockGetDashboard.mockRejectedValue(mockError);
 
       await composable.fetchAllPanels();
 
       expect(composable.panelsList.value).toEqual([]);
-      expect(consoleErrorSpy).toHaveBeenCalledWith("Error fetching panels:", mockError);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Error fetching panels:",
+        mockError,
+      );
     });
 
     it("should call getDashboard with correct parameters", async () => {
-      const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
-      
+      const composable = useAnnotationsData(
+        "test-org",
+        "test-dashboard",
+        "test-panel",
+        "test-folder",
+      );
+
       mockGetDashboard.mockResolvedValue({ tabs: [] });
 
       await composable.fetchAllPanels();
 
-      expect(mockGetDashboard).toHaveBeenCalledWith(mockStore, "test-dashboard", "test-folder");
+      expect(mockGetDashboard).toHaveBeenCalledWith(
+        mockStore,
+        "test-dashboard",
+        "test-folder",
+      );
     });
   });
 
   it("should create independent instances", () => {
-    const composable1 = useAnnotationsData("org1", "dash1", "panel1", "folder1");
-    const composable2 = useAnnotationsData("org2", "dash2", "panel2", "folder2");
+    const composable1 = useAnnotationsData(
+      "org1",
+      "dash1",
+      "panel1",
+      "folder1",
+    );
+    const composable2 = useAnnotationsData(
+      "org2",
+      "dash2",
+      "panel2",
+      "folder2",
+    );
 
     composable1.enableAddAnnotationMode();
-    
+
     expect(composable1.isAddAnnotationMode.value).toBe(true);
     expect(composable2.isAddAnnotationMode.value).toBe(false);
   });
 
   it("should handle multiple annotation operations", () => {
-    const composable = useAnnotationsData("test-org", "test-dashboard", "test-panel", "test-folder");
+    const composable = useAnnotationsData(
+      "test-org",
+      "test-dashboard",
+      "test-panel",
+      "test-folder",
+    );
 
     // Add annotation (input in milliseconds, output in microseconds)
     composable.handleAddAnnotation(1000, 2000);

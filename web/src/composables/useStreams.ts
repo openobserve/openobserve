@@ -290,7 +290,11 @@ const useStreams = () => {
               streamList.list[streamIndex] = removeSchemaFields(_stream.data);
               updateStreamsInStore(streamType, streamList);
             } catch (err: any) {
-              return reject(new Error(`Error while fetching schema: ${err?.message || 'Unknown error'}`));
+              return reject(
+                new Error(
+                  `Error while fetching schema: ${err?.message || "Unknown error"}`,
+                ),
+              );
             }
           }
           return resolve(
@@ -309,7 +313,11 @@ const useStreams = () => {
           //     return resolve(streams[streamType].list[streamIndex]);
           //   })
           //   .catch(() => reject(new Error("Stream Not Found")));
-          return reject(new Error(`Stream '${streamName}' not found for type '${streamType}'`));
+          return reject(
+            new Error(
+              `Stream '${streamName}' not found for type '${streamType}'`,
+            ),
+          );
         }
       } catch (e: any) {
         reject(new Error(e.message));

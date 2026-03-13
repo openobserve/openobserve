@@ -34,7 +34,6 @@ installQuasar({
 describe.skip("Search Result", async () => {
   let wrapper: any;
   beforeEach(async () => {
-    
     wrapper = mount(QueryEditor, {
       attachTo: "#app",
       props: {

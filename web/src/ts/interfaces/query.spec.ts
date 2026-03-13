@@ -477,7 +477,7 @@ describe("Query Interfaces", () => {
   describe("PromQL Interfaces", () => {
     it("should accept PromQLQueryPayload", () => {
       const payload: PromQLQueryPayload = {
-        query: 'rate(http_requests_total[5m])',
+        query: "rate(http_requests_total[5m])",
         start_time: 1640995200000000,
         end_time: 1640998800000000,
         step: "30s",
@@ -615,7 +615,8 @@ describe("Query Interfaces", () => {
             order_by: "_timestamp DESC",
             histogram_interval: 300,
             is_histogram_eligible: true,
-            converted_histogram_query: "SELECT histogram(_timestamp, 300) FROM logs",
+            converted_histogram_query:
+              "SELECT histogram(_timestamp, 300) FROM logs",
           },
           streaming_aggs: true,
           total: 2,

@@ -27,7 +27,7 @@
         }"
       >
         <div
-          class="tw:absolute tw:inset-0 tw:bg-gradient-to-r tw:from-transparent tw:to-transparent "
+          class="tw:absolute tw:inset-0 tw:bg-gradient-to-r tw:from-transparent tw:to-transparent"
           :class="
             store.state.theme === 'dark'
               ? 'tw:via-gray-300/40'

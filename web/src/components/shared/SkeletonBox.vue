@@ -4,90 +4,91 @@
     :class="[
       `skeleton-${variant}`,
       rounded && 'skeleton-rounded',
-      circle && 'skeleton-circle'
+      circle && 'skeleton-circle',
     ]"
     :style="{
       width: width,
       height: height,
-      borderRadius: customRadius
+      borderRadius: customRadius,
     }"
   ></div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useStore } from 'vuex'
+import { computed } from "vue";
+import { useStore } from "vuex";
 
 interface Props {
   // Size props
-  width?: string
-  height?: string
-  
+  width?: string;
+  height?: string;
+
   // Variant presets
-  variant?: 'text' | 'title' | 'button' | 'avatar' | 'image' | 'custom'
-  
+  variant?: "text" | "title" | "button" | "avatar" | "image" | "custom";
+
   // Shape props
-  rounded?: boolean
-  circle?: boolean
-  customRadius?: string
-  
+  rounded?: boolean;
+  circle?: boolean;
+  customRadius?: string;
+
   // Text-specific props (when variant is 'text')
-  lines?: number
+  lines?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  width: '100px',
-  height: '16px',
-  variant: 'custom',
+  width: "100px",
+  height: "16px",
+  variant: "custom",
   rounded: false,
   circle: false,
-  lines: 1
-})
+  lines: 1,
+});
 
-const store = useStore()
+const store = useStore();
 
 // Computed styles based on variant
 const computedWidth = computed(() => {
   switch (props.variant) {
-    case 'text':
-      return props.width
-    case 'title':
-      return props.width || '200px'
-    case 'button':
-      return props.width || '80px'
-    case 'avatar':
-      return props.width || '40px'
-    case 'image':
-      return props.width || '100px'
+    case "text":
+      return props.width;
+    case "title":
+      return props.width || "200px";
+    case "button":
+      return props.width || "80px";
+    case "avatar":
+      return props.width || "40px";
+    case "image":
+      return props.width || "100px";
     default:
-      return props.width
+      return props.width;
   }
-})
+});
 
 const computedHeight = computed(() => {
   switch (props.variant) {
-    case 'text':
-      return props.height || '14px'
-    case 'title':
-      return props.height || '24px'
-    case 'button':
-      return props.height || '32px'
-    case 'avatar':
-      return props.height || '40px'
-    case 'image':
-      return props.height || '100px'
+    case "text":
+      return props.height || "14px";
+    case "title":
+      return props.height || "24px";
+    case "button":
+      return props.height || "32px";
+    case "avatar":
+      return props.height || "40px";
+    case "image":
+      return props.height || "100px";
     default:
-      return props.height
+      return props.height;
   }
-})
+});
 </script>
 
 <style scoped lang="scss">
 /* Base Skeleton Animation */
 .skeleton-box {
-  background: linear-gradient(90deg, 
-    transparent, 
-    rgba(255, 255, 255, 0.15), 
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.15),
     transparent
   );
   background-size: 200% 100%;
@@ -102,9 +103,10 @@ const computedHeight = computed(() => {
 :deep(.dark-tile-content) .skeleton-box,
 :deep(.chart-container-dark) .skeleton-box,
 :deep(.o2-quasar-table-dark) .skeleton-box {
-  background: linear-gradient(90deg, 
-    rgba(255, 255, 255, 0.02), 
-    rgba(255, 255, 255, 0.08), 
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.02),
+    rgba(255, 255, 255, 0.08),
     rgba(255, 255, 255, 0.02)
   );
   background-size: 200% 100%;
@@ -114,9 +116,10 @@ const computedHeight = computed(() => {
 :deep(.light-tile-content) .skeleton-box,
 :deep(.chart-container-light) .skeleton-box,
 :deep(.o2-quasar-table-light) .skeleton-box {
-  background: linear-gradient(90deg, 
-    rgba(0, 0, 0, 0.02), 
-    rgba(0, 0, 0, 0.08), 
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.02),
+    rgba(0, 0, 0, 0.08),
     rgba(0, 0, 0, 0.02)
   );
   background-size: 200% 100%;
@@ -171,7 +174,7 @@ const computedHeight = computed(() => {
 }
 
 .skeleton-text.skeleton-multiline::before {
-  content: '';
+  content: "";
   display: block;
   height: 14px;
   background: inherit;
@@ -181,7 +184,7 @@ const computedHeight = computed(() => {
 }
 
 .skeleton-text.skeleton-multiline.skeleton-lines-3::after {
-  content: '';
+  content: "";
   display: block;
   height: 14px;
   width: 60%;

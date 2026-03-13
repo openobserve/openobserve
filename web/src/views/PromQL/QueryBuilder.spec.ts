@@ -114,15 +114,23 @@ describe("QueryBuilder", () => {
     it("should display the title and subtitle", () => {
       wrapper = createWrapper();
       expect(wrapper.text()).toContain("PromQL Query Builder");
-      expect(wrapper.text()).toContain("Build and test PromQL queries visually");
+      expect(wrapper.text()).toContain(
+        "Build and test PromQL queries visually",
+      );
     });
 
     it("should render all child components", () => {
       wrapper = createWrapper();
       // Child components are stubbed, so check if they exist by component name
-      expect(wrapper.findComponent({ name: "MetricSelector" }).exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "LabelFilterEditor" }).exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "OperationsList" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "MetricSelector" }).exists()).toBe(
+        true,
+      );
+      expect(
+        wrapper.findComponent({ name: "LabelFilterEditor" }).exists(),
+      ).toBe(true);
+      expect(wrapper.findComponent({ name: "OperationsList" }).exists()).toBe(
+        true,
+      );
     });
 
     it("should render action buttons", () => {
@@ -170,13 +178,12 @@ describe("QueryBuilder", () => {
       wrapper = createWrapper();
 
       wrapper.vm.visualQuery.metric = "http_requests_total";
-      wrapper.vm.visualQuery.operations = [
-        { type: "rate" },
-        { type: "sum" },
-      ];
+      wrapper.vm.visualQuery.operations = [{ type: "rate" }, { type: "sum" }];
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.generatedQuery).toContain("sum(rate(http_requests_total))");
+      expect(wrapper.vm.generatedQuery).toContain(
+        "sum(rate(http_requests_total))",
+      );
     });
 
     it("should return empty string when metric and labels are empty", async () => {
@@ -224,16 +231,16 @@ describe("QueryBuilder", () => {
         expect.objectContaining({
           type: "positive",
           message: "Query copied to clipboard!",
-        })
+        }),
       );
     });
 
     it("should disable copy button when no query is generated", () => {
       wrapper = createWrapper();
 
-      const copyButton = wrapper.findAll("button").find((btn: any) =>
-        btn.text().includes("Copy Query")
-      );
+      const copyButton = wrapper
+        .findAll("button")
+        .find((btn: any) => btn.text().includes("Copy Query"));
 
       expect(copyButton?.element.disabled).toBe(true);
     });
@@ -244,9 +251,9 @@ describe("QueryBuilder", () => {
       wrapper.vm.visualQuery.metric = "test_metric";
       await wrapper.vm.$nextTick();
 
-      const copyButton = wrapper.findAll("button").find((btn: any) =>
-        btn.text().includes("Copy Query")
-      );
+      const copyButton = wrapper
+        .findAll("button")
+        .find((btn: any) => btn.text().includes("Copy Query"));
 
       expect(copyButton?.element.disabled).toBe(false);
     });
@@ -282,16 +289,16 @@ describe("QueryBuilder", () => {
         expect.objectContaining({
           type: "info",
           message: "Query cleared",
-        })
+        }),
       );
     });
 
     it("should clear button should always be enabled", () => {
       wrapper = createWrapper();
 
-      const clearButton = wrapper.findAll("button").find((btn: any) =>
-        btn.text().includes("Clear All")
-      );
+      const clearButton = wrapper
+        .findAll("button")
+        .find((btn: any) => btn.text().includes("Clear All"));
 
       expect(clearButton?.element.disabled).toBe(false);
     });
@@ -323,7 +330,7 @@ describe("QueryBuilder", () => {
         expect.objectContaining({
           type: "info",
           message: "Query testing will be implemented soon",
-        })
+        }),
       );
     });
 
@@ -345,9 +352,9 @@ describe("QueryBuilder", () => {
     it("should disable test button when no query is generated", () => {
       wrapper = createWrapper();
 
-      const testButton = wrapper.findAll("button").find((btn: any) =>
-        btn.text().includes("Test Query")
-      );
+      const testButton = wrapper
+        .findAll("button")
+        .find((btn: any) => btn.text().includes("Test Query"));
 
       expect(testButton?.element.disabled).toBe(true);
     });
@@ -358,9 +365,9 @@ describe("QueryBuilder", () => {
       wrapper.vm.visualQuery.metric = "test_metric";
       await wrapper.vm.$nextTick();
 
-      const testButton = wrapper.findAll("button").find((btn: any) =>
-        btn.text().includes("Test Query")
-      );
+      const testButton = wrapper
+        .findAll("button")
+        .find((btn: any) => btn.text().includes("Test Query"));
 
       expect(testButton?.element.disabled).toBe(false);
     });
@@ -409,7 +416,9 @@ describe("QueryBuilder", () => {
     it("should handle copy when clipboard API fails", async () => {
       wrapper = createWrapper();
 
-      (navigator.clipboard.writeText as any).mockRejectedValueOnce(new Error("Clipboard error"));
+      (navigator.clipboard.writeText as any).mockRejectedValueOnce(
+        new Error("Clipboard error"),
+      );
 
       wrapper.vm.visualQuery.metric = "test_metric";
       await wrapper.vm.$nextTick();

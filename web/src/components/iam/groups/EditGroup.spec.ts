@@ -77,7 +77,12 @@ vi.mock("./GroupServiceAccounts.vue", () => ({
   default: {
     name: "GroupServiceAccounts",
     template: `<div data-test="group-service-accounts-mock">GroupServiceAccounts</div>`,
-    props: ["groupServiceAccounts", "activeTab", "addedServiceAccounts", "removedServiceAccounts"],
+    props: [
+      "groupServiceAccounts",
+      "activeTab",
+      "addedServiceAccounts",
+      "removedServiceAccounts",
+    ],
   },
 }));
 
@@ -117,7 +122,9 @@ describe("EditGroup Component", () => {
       groups: {},
     };
 
-    vi.mocked(await import("@/composables/iam/usePermissions")).default.mockReturnValue({
+    vi.mocked(
+      await import("@/composables/iam/usePermissions"),
+    ).default.mockReturnValue({
       groupsState: mockGroupsState,
     });
 
@@ -134,14 +141,18 @@ describe("EditGroup Component", () => {
   describe("Component Mounting", () => {
     it("renders the component correctly", () => {
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="edit-group-section"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="edit-group-section"]').exists()).toBe(
+        true,
+      );
     });
 
     it("displays group name in title", async () => {
       wrapper.vm.groupDetails.group_name = "test-group";
       await wrapper.vm.$nextTick();
 
-      const titleElement = wrapper.find('[data-test="edit-group-section-title"]');
+      const titleElement = wrapper.find(
+        '[data-test="edit-group-section-title"]',
+      );
       expect(titleElement.exists()).toBe(true);
       // The title div contains both the group name and tabs, so we check if it includes the group name
       expect(titleElement.text()).toContain("test-group");
@@ -156,7 +167,7 @@ describe("EditGroup Component", () => {
     it("renders cancel and save buttons", () => {
       const cancelButton = wrapper.find('[data-test="edit-group-cancel-btn"]');
       const saveButton = wrapper.find('[data-test="edit-group-submit-btn"]');
-      
+
       expect(cancelButton.exists()).toBe(true);
       expect(saveButton.exists()).toBe(true);
       expect(cancelButton.text()).toContain("Cancel");
@@ -210,7 +221,7 @@ describe("EditGroup Component", () => {
     it("shows GroupRoles when roles tab is active", async () => {
       wrapper.vm.activeTab = "roles";
       await wrapper.vm.$nextTick();
-      
+
       const groupRoles = wrapper.find('[data-test="group-roles-mock"]');
       expect(groupRoles.exists()).toBe(true);
     });
@@ -218,7 +229,7 @@ describe("EditGroup Component", () => {
     it("shows GroupUsers when users tab is active", async () => {
       wrapper.vm.activeTab = "users";
       await wrapper.vm.$nextTick();
-      
+
       const groupUsers = wrapper.find('[data-test="group-users-mock"]');
       expect(groupUsers.exists()).toBe(true);
     });
@@ -226,8 +237,10 @@ describe("EditGroup Component", () => {
     it("shows GroupServiceAccounts when serviceAccounts tab is active and not in cloud", async () => {
       wrapper.vm.activeTab = "serviceAccounts";
       await wrapper.vm.$nextTick();
-      
-      const groupServiceAccounts = wrapper.find('[data-test="group-service-accounts-mock"]');
+
+      const groupServiceAccounts = wrapper.find(
+        '[data-test="group-service-accounts-mock"]',
+      );
       expect(groupServiceAccounts.exists()).toBe(true);
     });
   });
@@ -248,7 +261,7 @@ describe("EditGroup Component", () => {
 
       expect(getGroup).toHaveBeenCalledWith(
         "test-group",
-        store.state.selectedOrganization.identifier
+        store.state.selectedOrganization.identifier,
       );
       expect(wrapper.vm.groupDetails).toEqual({
         name: "test-group",
@@ -261,7 +274,7 @@ describe("EditGroup Component", () => {
     it("handles error when fetching group details", async () => {
       const { getGroup } = await import("@/services/iam");
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      
+
       // Create a new wrapper to avoid interference with previous calls
       const newWrapper = mount(EditGroup, {
         global: {
@@ -269,7 +282,7 @@ describe("EditGroup Component", () => {
           plugins: [i18n, router],
         },
       });
-      
+
       vi.mocked(getGroup).mockRejectedValueOnce(new Error("Network error"));
 
       await newWrapper.vm.getGroupDetails();
@@ -388,7 +401,10 @@ describe("EditGroup Component", () => {
 
       await wrapper.vm.saveGroupChanges();
 
-      expect(wrapper.vm.groupDetails.users).toEqual(["user1@test.com", "newuser@test.com"]);
+      expect(wrapper.vm.groupDetails.users).toEqual([
+        "user1@test.com",
+        "newuser@test.com",
+      ]);
       expect(wrapper.vm.groupDetails.roles).toEqual(["admin", "new-role"]);
     });
 
@@ -430,27 +446,29 @@ describe("EditGroup Component", () => {
 
   describe("Navigation", () => {
     it("navigates back to groups page when cancel is clicked", async () => {
-      const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      const routerPushSpy = vi
+        .spyOn(router, "push")
+        .mockResolvedValue(undefined as any);
 
       await wrapper.vm.cancelEditGroup();
 
       expect(routerPushSpy).toHaveBeenCalledWith({
         name: "groups",
         query: {
-          org_identifier: store.state.selectedOrganization.identifier
-        }
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
       });
     });
 
     it("triggers navigation when cancel button is clicked", async () => {
       const cancelButton = wrapper.find('[data-test="edit-group-cancel-btn"]');
-      
+
       expect(cancelButton.exists()).toBe(true);
       expect(cancelButton.text()).toContain("Cancel");
-      
+
       // Test that the button can be clicked (without actually triggering navigation)
       await cancelButton.trigger("click");
-      
+
       // The click event should be handled (we tested the actual navigation above)
       expect(cancelButton.exists()).toBe(true);
     });
@@ -459,7 +477,7 @@ describe("EditGroup Component", () => {
   describe("Theme Support", () => {
     it("applies correct theme classes to sticky footer", () => {
       // Footer classes have been updated to use Tailwind CSS
-      const footer = wrapper.find('.flex.justify-end.tw\\:w-full');
+      const footer = wrapper.find(".flex.justify-end.tw\\:w-full");
       expect(footer.exists()).toBe(true);
       // Test that theme classes are applied correctly
     });
@@ -469,7 +487,7 @@ describe("EditGroup Component", () => {
         ...store,
         state: {
           ...store.state,
-          theme: 'dark',
+          theme: "dark",
         },
       };
 
@@ -481,7 +499,7 @@ describe("EditGroup Component", () => {
       });
 
       // Footer classes have been updated, theme classes are no longer applied to footer
-      const footer = wrapper.find('.flex.justify-end.tw\\:w-full');
+      const footer = wrapper.find(".flex.justify-end.tw\\:w-full");
       expect(footer.exists()).toBe(true);
     });
   });
@@ -492,9 +510,9 @@ describe("EditGroup Component", () => {
       wrapper.vm.groupDetails.roles = ["admin", "user"];
       wrapper.vm.addedRoles.add("new-role");
       wrapper.vm.removedRoles.add("old-role");
-      
+
       await wrapper.vm.$nextTick();
-      
+
       const groupRoles = wrapper.findComponent({ name: "GroupRoles" });
       expect(groupRoles.props()).toEqual({
         groupRoles: ["admin", "user"],
@@ -509,9 +527,9 @@ describe("EditGroup Component", () => {
       wrapper.vm.groupDetails.users = ["user1@test.com"];
       wrapper.vm.addedUsers.add("new-user@test.com");
       wrapper.vm.removedUsers.add("old-user@test.com");
-      
+
       await wrapper.vm.$nextTick();
-      
+
       const groupUsers = wrapper.findComponent({ name: "GroupUsers" });
       expect(groupUsers.props()).toEqual({
         groupUsers: ["user1@test.com"],
@@ -528,7 +546,7 @@ describe("EditGroup Component", () => {
       vi.mocked(router).currentRoute = {
         value: { params: {} },
       } as any;
-      
+
       expect(() => wrapper.vm.getGroupDetails()).not.toThrow();
     });
 

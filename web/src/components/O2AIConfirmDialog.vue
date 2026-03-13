@@ -7,7 +7,8 @@
       @click="handleDialogClick"
     >
       <div class="confirmation-header">
-        <q-icon name="help_outline" size="20px" class="confirmation-icon" />
+        <q-icon name="help_outline" size="20px"
+class="confirmation-icon" />
         <span class="confirmation-title">{{ formattedMessage }}</span>
       </div>
 
@@ -87,8 +88,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, computed, onMounted, onUnmounted } from 'vue';
-import { useStore } from 'vuex';
+import { ref, watch, nextTick, computed, onMounted, onUnmounted } from "vue";
+import { useStore } from "vuex";
 
 interface ConfirmationData {
   tool?: string;
@@ -104,8 +105,8 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  confirmLabel: 'Yes',
-  cancelLabel: 'No',
+  confirmLabel: "Yes",
+  cancelLabel: "No",
   confirmation: null,
 });
 
@@ -119,11 +120,13 @@ const store = useStore();
 const theme = computed(() => store.state.theme);
 
 // Check if this is a navigation action
-const isNavigationAction = computed(() => props.confirmation?.tool === 'navigation_action');
+const isNavigationAction = computed(
+  () => props.confirmation?.tool === "navigation_action",
+);
 
 // Format message based on confirmation data
 const formattedMessage = computed(() => {
-  if (!props.confirmation) return '';
+  if (!props.confirmation) return "";
 
   // Handle navigation_action
   if (isNavigationAction.value) {
@@ -139,18 +142,24 @@ const formattedMessage = computed(() => {
       return `Allow O2 Assistant to navigate to ${target.name}?`;
     }
 
-    return 'Allow O2 Assistant to navigate?';
+    return "Allow O2 Assistant to navigate?";
   }
 
   // Handle Delete* operations generically (DeleteAlert, DeleteDashboard, DeletePipeline, etc.)
-  if (props.confirmation.tool && props.confirmation.tool.startsWith('Delete')) {
+  if (props.confirmation.tool && props.confirmation.tool.startsWith("Delete")) {
     // Extract entity type (e.g., "Alert" from "DeleteAlert")
-    const entityType = props.confirmation.tool.replace('Delete', '');
+    const entityType = props.confirmation.tool.replace("Delete", "");
     const entityTypeLower = entityType.toLowerCase();
     const args = props.confirmation.args || {};
 
     // Try to find a name or title for the entity
-    const name = args.name || args.title || args.alert_id || args.dashboard_id || args.pipeline_id || args.id;
+    const name =
+      args.name ||
+      args.title ||
+      args.alert_id ||
+      args.dashboard_id ||
+      args.pipeline_id ||
+      args.id;
 
     if (name) {
       return `Do you really want to delete the "${name}" ${entityTypeLower}?`;
@@ -161,7 +170,7 @@ const formattedMessage = computed(() => {
   }
 
   // Fallback to message property
-  return props.confirmation.message || '';
+  return props.confirmation.message || "";
 });
 
 const yesButtonRef = ref<any>(null);
@@ -181,7 +190,8 @@ watch(
       nextTick(() => {
         setTimeout(() => {
           // Check if this is a delete operation
-          const isDeleteOperation = props.confirmation?.tool?.startsWith('Delete');
+          const isDeleteOperation =
+            props.confirmation?.tool?.startsWith("Delete");
 
           if (isDeleteOperation) {
             // Focus "No" button for delete operations
@@ -201,19 +211,19 @@ watch(
         }, 100);
       });
     }
-  }
+  },
 );
 
 const handleConfirm = () => {
-  emit('confirm');
+  emit("confirm");
 };
 
 const handleCancel = () => {
-  emit('cancel');
+  emit("cancel");
 };
 
 const handleAlwaysConfirm = () => {
-  emit('alwaysConfirm');
+  emit("alwaysConfirm");
 };
 
 const focusYes = () => {
@@ -270,7 +280,7 @@ const handleAlwaysBlur = () => {
 const handleDialogClick = (event: MouseEvent) => {
   // If click is not on a button, refocus the last focused button
   const target = event.target as HTMLElement;
-  if (!target.closest('.confirmation-btn')) {
+  if (!target.closest(".confirmation-btn")) {
     nextTick(() => {
       if (isFocusedNo.value) {
         focusNo();
@@ -284,8 +294,7 @@ const handleDialogClick = (event: MouseEvent) => {
 };
 
 const handleDialogKeydown = (event: KeyboardEvent) => {
-
-  if (event.key === 'Enter') {
+  if (event.key === "Enter") {
     event.preventDefault();
     if (isFocusedYes.value) {
       handleConfirm();
@@ -294,7 +303,7 @@ const handleDialogKeydown = (event: KeyboardEvent) => {
     } else if (isFocusedNo.value) {
       handleCancel();
     }
-  } else if (event.key === 'ArrowDown' || event.key === 'Down') {
+  } else if (event.key === "ArrowDown" || event.key === "Down") {
     event.preventDefault();
     if (isNavigationAction.value) {
       // For navigation: Allow -> Always Allow -> No -> Allow
@@ -309,7 +318,7 @@ const handleDialogKeydown = (event: KeyboardEvent) => {
       // For other actions: Yes -> No -> Yes
       focusNo();
     }
-  } else if (event.key === 'ArrowUp' || event.key === 'Up') {
+  } else if (event.key === "ArrowUp" || event.key === "Up") {
     event.preventDefault();
     if (isNavigationAction.value) {
       // For navigation: No -> Always Allow -> Allow -> No
@@ -344,10 +353,10 @@ onMounted(() => {
 
     if (yesBtnEl) {
       yesBtnHandler = (e: KeyboardEvent) => {
-        if (e.key === 'Enter') {
+        if (e.key === "Enter") {
           e.preventDefault();
           handleConfirm();
-        } else if (e.key === 'ArrowDown') {
+        } else if (e.key === "ArrowDown") {
           e.preventDefault();
           if (isNavigationAction.value) {
             focusAlways();
@@ -356,31 +365,31 @@ onMounted(() => {
           }
         }
       };
-      yesBtnEl.addEventListener('keydown', yesBtnHandler);
+      yesBtnEl.addEventListener("keydown", yesBtnHandler);
     }
 
     if (alwaysBtnEl) {
       alwaysBtnHandler = (e: KeyboardEvent) => {
-        if (e.key === 'Enter') {
+        if (e.key === "Enter") {
           e.preventDefault();
           handleAlwaysConfirm();
-        } else if (e.key === 'ArrowDown') {
+        } else if (e.key === "ArrowDown") {
           e.preventDefault();
           focusNo();
-        } else if (e.key === 'ArrowUp') {
+        } else if (e.key === "ArrowUp") {
           e.preventDefault();
           focusYes();
         }
       };
-      alwaysBtnEl.addEventListener('keydown', alwaysBtnHandler);
+      alwaysBtnEl.addEventListener("keydown", alwaysBtnHandler);
     }
 
     if (noBtnEl) {
       noBtnHandler = (e: KeyboardEvent) => {
-        if (e.key === 'Enter') {
+        if (e.key === "Enter") {
           e.preventDefault();
           handleCancel();
-        } else if (e.key === 'ArrowUp') {
+        } else if (e.key === "ArrowUp") {
           e.preventDefault();
           if (isNavigationAction.value) {
             focusAlways();
@@ -389,20 +398,20 @@ onMounted(() => {
           }
         }
       };
-      noBtnEl.addEventListener('keydown', noBtnHandler);
+      noBtnEl.addEventListener("keydown", noBtnHandler);
     }
   });
 });
 
 onUnmounted(() => {
   if (yesBtnEl && yesBtnHandler) {
-    yesBtnEl.removeEventListener('keydown', yesBtnHandler);
+    yesBtnEl.removeEventListener("keydown", yesBtnHandler);
   }
   if (alwaysBtnEl && alwaysBtnHandler) {
-    alwaysBtnEl.removeEventListener('keydown', alwaysBtnHandler);
+    alwaysBtnEl.removeEventListener("keydown", alwaysBtnHandler);
   }
   if (noBtnEl && noBtnHandler) {
-    noBtnEl.removeEventListener('keydown', noBtnHandler);
+    noBtnEl.removeEventListener("keydown", noBtnHandler);
   }
 });
 </script>
@@ -524,7 +533,7 @@ onUnmounted(() => {
 
       .dark-mode & {
         color: var(--q-primary);
-         border: 2px solid #4b5563;
+        border: 2px solid #4b5563;
         background: transparent;
 
         &:hover {

@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Output Section with Pipeline-specific Error Display -->
     <template #output-content>
-      <div class="tw:w-full" style="min-width: 400px;">
+      <div class="tw:w-full" style="min-width: 400px">
         <div
           v-if="pipelineErrorsToDisplay.length > 0"
           class="text-center text-h6 tw:py-2"
@@ -41,12 +41,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
         <q-separator class="q-mx-md q-mt-md" />
-        <div class="error-report-container" style="height: calc(100vh - 128px) !important; overflow: auto; resize: none;">
+        <div
+          class="error-report-container"
+          style="
+            height: calc(100vh - 128px) !important;
+            overflow: auto;
+            resize: none;
+          "
+        >
           <!-- Pipeline Errors Section -->
-          <div
-            class="error-section"
-            v-if="pipelineErrorsToDisplay.length > 0"
-          >
+          <div class="error-section" v-if="pipelineErrorsToDisplay.length > 0">
             <div class="error-list">
               <!-- Iterate through the outer array -->
               <div
@@ -84,10 +88,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         filled
                         dense
                         tabindex="0"
-                        @update:model-value="(val: string) => {
-                          userSelectedPipelineName[index] = val;
-                          updatePipelineName(val as string, index);
-                        }"
+                        @update:model-value="
+                          (val: string) => {
+                            userSelectedPipelineName[index] = val;
+                            updatePipelineName(val as string, index);
+                          }
+                        "
                       />
                     </div>
                   </span>
@@ -119,10 +125,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         hide-selected
                         fill-input
                         :input-debounce="400"
-                        @update:model-value="(val) => {
-                          userSelectedStreamName[index] = val;
-                          updateStreamFields(val, index);
-                        }"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedStreamName[index] = val;
+                            updateStreamFields(val, index);
+                          }
+                        "
                         behavior="menu"
                         @input-value="handleDynamicStreamName($event, index)"
                       >
@@ -167,13 +175,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         outlined
                         filled
                         dense
-                        @update:model-value="(val) => {
-                          userSelectedStreamType[index] = val;
-                          getSourceStreamsList(val, index);
-                        }"
-                        :rules="[
-                          (val: any) => !!val || 'Field is required!',
-                        ]"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedStreamType[index] = val;
+                            getSourceStreamsList(val, index);
+                          }
+                        "
+                        :rules="[(val: any) => !!val || 'Field is required!']"
                         style="width: 300px"
                       />
                     </div>
@@ -195,10 +203,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :label="'SQL Query'"
                         :debounceTime="300"
                         language="sql"
-                        @update:query="(val) => {
-                          userSelectedSqlQuery[index] = val;
-                          updateSqlQuery(val, index);
-                        }"
+                        @update:query="
+                          (val) => {
+                            userSelectedSqlQuery[index] = val;
+                            updateSqlQuery(val, index);
+                          }
+                        "
                       />
                     </div>
                   </span>
@@ -214,7 +224,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div>
                       <q-select
                         data-test="pipeline-import-destination-stream-type-input"
-                        :model-value="userSelectedDestinationStreamType[index] || ''"
+                        :model-value="
+                          userSelectedDestinationStreamType[index] || ''
+                        "
                         :options="destinationStreamTypes"
                         :label="t('alerts.streamType') + ' *'"
                         :popup-content-style="{
@@ -227,13 +239,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         outlined
                         filled
                         dense
-                        @update:model-value="(val) => {
-                          userSelectedDestinationStreamType[index] = val;
-                          getDestinationStreamsList(val, index);
-                        }"
-                        :rules="[
-                          (val: any) => !!val || 'Field is required!',
-                        ]"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedDestinationStreamType[index] = val;
+                            getDestinationStreamsList(val, index);
+                          }
+                        "
+                        :rules="[(val: any) => !!val || 'Field is required!']"
                         style="width: 300px"
                       />
                     </div>
@@ -266,10 +278,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         hide-selected
                         fill-input
                         :input-debounce="400"
-                        @update:model-value="(val) => {
-                          userSelectedOrgId[index] = val;
-                          updateOrgId(val?.value || val, index);
-                        }"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedOrgId[index] = val;
+                            updateOrgId(val?.value || val, index);
+                          }
+                        "
                         behavior="menu"
                       >
                       </q-select>
@@ -287,7 +301,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div>
                       <q-select
                         data-test="pipeline-import-destination-function-name-input"
-                        :model-value="userSelectedFunctionName[errorMessage.nodeIndex] || ''"
+                        :model-value="
+                          userSelectedFunctionName[errorMessage.nodeIndex] || ''
+                        "
                         :options="existingFunctions"
                         :label="'Function Name'"
                         :popup-content-style="{
@@ -300,13 +316,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         outlined
                         filled
                         dense
-                        @update:model-value="(val) => {
-                          userSelectedFunctionName[errorMessage.nodeIndex] = val;
-                          updateFunctionName(val, index, errorMessage.nodeIndex);
-                        }"
-                        :rules="[
-                          (val: any) => !!val || 'Field is required!',
-                        ]"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedFunctionName[errorMessage.nodeIndex] =
+                              val;
+                            updateFunctionName(
+                              val,
+                              index,
+                              errorMessage.nodeIndex,
+                            );
+                          }
+                        "
+                        :rules="[(val: any) => !!val || 'Field is required!']"
                         style="width: 300px"
                       />
                     </div>
@@ -323,7 +344,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div>
                       <q-select
                         data-test="pipeline-import-destination-stream-type-input"
-                        :model-value="userSelectedRemoteDestination[index] || ''"
+                        :model-value="
+                          userSelectedRemoteDestination[index] || ''
+                        "
                         :options="pipelineDestinations"
                         :label="'Remote Destination'"
                         :popup-content-style="{
@@ -336,13 +359,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         outlined
                         filled
                         dense
-                        @update:model-value="(val) => {
-                          userSelectedRemoteDestination[index] = val;
-                          updateRemoteDestination(val, index);
-                        }"
-                        :rules="[
-                          (val: any) => !!val || 'Field is required!',
-                        ]"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedRemoteDestination[index] = val;
+                            updateRemoteDestination(val, index);
+                          }
+                        "
+                        :rules="[(val: any) => !!val || 'Field is required!']"
                         style="width: 300px"
                       />
                     </div>
@@ -368,13 +391,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         outlined
                         filled
                         dense
-                        @update:model-value="(val) => {
-                          userSelectedTimezone[index] = val;
-                          updateTimezone(val, index);
-                        }"
-                        :rules="[
-                          (val: any) => !!val || 'Field is required!',
-                        ]"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedTimezone[index] = val;
+                            updateTimezone(val, index);
+                          }
+                        "
+                        :rules="[(val: any) => !!val || 'Field is required!']"
                         style="width: 300px"
                       />
                     </div>
@@ -411,10 +434,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 :data-test="`pipeline-import-creation-${index}-message`"
               >
-                <pre
-                  style="white-space: pre-wrap; word-break: break-word"
-                  >{{ val.message }}</pre
-                >
+                <pre style="white-space: pre-wrap; word-break: break-word">{{
+                  val.message
+                }}</pre>
               </div>
             </div>
           </div>
@@ -513,7 +535,7 @@ export default defineComponent({
         if (baseImportRef.value) {
           baseImportRef.value.jsonArrayOfObj = val;
         }
-      }
+      },
     });
 
     const streamTypes = ["logs", "metrics", "traces"];
@@ -561,7 +583,8 @@ export default defineComponent({
     const updateSqlQuery = (sqlQuery: string, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].sql_query = sqlQuery;
-        baseImportRef.value.jsonArrayOfObj[index].source.query_condition.sql = sqlQuery;
+        baseImportRef.value.jsonArrayOfObj[index].source.query_condition.sql =
+          sqlQuery;
         baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
           if (
             node.io_type == "input" &&
@@ -574,7 +597,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -582,7 +605,8 @@ export default defineComponent({
     const updateStreamFields = (streamName: any, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         const stream_name = streamName.value || streamName;
-        baseImportRef.value.jsonArrayOfObj[index].source.stream_name = stream_name;
+        baseImportRef.value.jsonArrayOfObj[index].source.stream_name =
+          stream_name;
         baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
           if (node.io_type == "input") {
             node.data.stream_name = stream_name;
@@ -598,7 +622,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -617,7 +641,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -633,7 +657,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -645,7 +669,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -656,7 +680,8 @@ export default defineComponent({
       nodeIndex: any,
     ) => {
       if (baseImportRef.value?.jsonArrayOfObj[pipelineIndex]) {
-        const node = baseImportRef.value.jsonArrayOfObj[pipelineIndex].nodes[nodeIndex];
+        const node =
+          baseImportRef.value.jsonArrayOfObj[pipelineIndex].nodes[nodeIndex];
 
         if (
           node &&
@@ -670,7 +695,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -1131,7 +1156,10 @@ export default defineComponent({
         let hasErrors = false;
 
         input.nodes.forEach((node: any, nodeIndex: number) => {
-          if (node.io_type === "default" && node.data.node_type === "condition") {
+          if (
+            node.io_type === "default" &&
+            node.data.node_type === "condition"
+          ) {
             // Check if conditions exist
             if (!node.data.conditions) {
               pipelineErrors.push({
@@ -1144,7 +1172,7 @@ export default defineComponent({
 
             // Validate the condition format (V0, V1, or V2)
             const validateV2Condition = (item: any): boolean => {
-              if (item.filterType === 'group') {
+              if (item.filterType === "group") {
                 if (!Array.isArray(item.conditions)) {
                   pipelineErrors.push({
                     message: `Pipeline - ${index}, Node ${nodeIndex}: V2 group must have a conditions array.`,
@@ -1152,9 +1180,15 @@ export default defineComponent({
                   });
                   return false;
                 }
-                return item.conditions.every((nestedItem: any) => validateV2Condition(nestedItem));
-              } else if (item.filterType === 'condition') {
-                if (!item.column || !item.operator || item.value === undefined) {
+                return item.conditions.every((nestedItem: any) =>
+                  validateV2Condition(nestedItem),
+                );
+              } else if (item.filterType === "condition") {
+                if (
+                  !item.column ||
+                  !item.operator ||
+                  item.value === undefined
+                ) {
                   pipelineErrors.push({
                     message: `Pipeline - ${index}, Node ${nodeIndex}: V2 condition must have column, operator, and value.`,
                     field: "condition_format",
@@ -1167,7 +1201,11 @@ export default defineComponent({
             };
 
             const validateV1Condition = (condition: any): boolean => {
-              if (condition.column && condition.operator && condition.value !== undefined) {
+              if (
+                condition.column &&
+                condition.operator &&
+                condition.value !== undefined
+              ) {
                 return true;
               }
               if (condition.and || condition.or) {
@@ -1179,7 +1217,9 @@ export default defineComponent({
                   });
                   return false;
                 }
-                return conditions.every((cond: any) => validateV1Condition(cond));
+                return conditions.every((cond: any) =>
+                  validateV1Condition(cond),
+                );
               }
               return false;
             };
@@ -1190,7 +1230,11 @@ export default defineComponent({
             if (Array.isArray(conditionsToValidate)) {
               // V0 format - flat array
               const valid = conditionsToValidate.every((condition: any) => {
-                return condition.column && condition.operator && condition.value !== undefined;
+                return (
+                  condition.column &&
+                  condition.operator &&
+                  condition.value !== undefined
+                );
               });
               if (!valid) {
                 pipelineErrors.push({
@@ -1199,7 +1243,7 @@ export default defineComponent({
                 });
                 hasErrors = true;
               }
-            } else if (conditionsToValidate.filterType === 'group') {
+            } else if (conditionsToValidate.filterType === "group") {
               // V2 format
               if (!validateV2Condition(conditionsToValidate)) {
                 hasErrors = true;
@@ -1273,7 +1317,10 @@ export default defineComponent({
                 if (convertedConditions.and || convertedConditions.or) {
                   // V1 Backend format
                   convertedConditions = convertV1BEToV2(convertedConditions);
-                } else if (convertedConditions.label && convertedConditions.items) {
+                } else if (
+                  convertedConditions.label &&
+                  convertedConditions.items
+                ) {
                   // V1 Frontend format
                   convertedConditions = convertV1ToV2(convertedConditions);
                 }
@@ -1325,7 +1372,8 @@ export default defineComponent({
     ) => {
       //update the stream type if user selects a different stream type
       if (index != -1 && baseImportRef.value?.jsonArrayOfObj[index]) {
-        baseImportRef.value.jsonArrayOfObj[index].source.stream_type = streamType;
+        baseImportRef.value.jsonArrayOfObj[index].source.stream_type =
+          streamType;
         baseImportRef.value.jsonArrayOfObj[index].stream_type = streamType;
         baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
           if (node.io_type == "input") {
@@ -1336,7 +1384,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
       try {
@@ -1380,7 +1428,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
       try {
@@ -1411,7 +1459,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
       try {
@@ -1426,7 +1474,9 @@ export default defineComponent({
 
     const updateTimezone = (timezone: string, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
-        baseImportRef.value.jsonArrayOfObj[index].source.trigger_condition.timezone = timezone;
+        baseImportRef.value.jsonArrayOfObj[
+          index
+        ].source.trigger_condition.timezone = timezone;
         baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
           if (node.data.node_type == "query") {
             node.data.trigger_condition.timezone = timezone;
@@ -1436,14 +1486,18 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
 
     const handleDynamicStreamName = (streamName: string, index: number) => {
-      if (streamName?.trim() != "" && baseImportRef.value?.jsonArrayOfObj[index]) {
-        baseImportRef.value.jsonArrayOfObj[index].source.stream_name = streamName;
+      if (
+        streamName?.trim() != "" &&
+        baseImportRef.value?.jsonArrayOfObj[index]
+      ) {
+        baseImportRef.value.jsonArrayOfObj[index].source.stream_name =
+          streamName;
         baseImportRef.value.jsonArrayOfObj[index].stream_name = streamName;
         baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
           if (node.io_type == "input") {
@@ -1454,7 +1508,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };
@@ -1474,7 +1528,10 @@ export default defineComponent({
         baseImportRef.value.jsonArrayOfObj[index].org = orgId;
         baseImportRef.value.jsonArrayOfObj[index].source.org_id = orgId;
         baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
-          if (node.data.node_type == "stream" || node.data.node_type == "query") {
+          if (
+            node.data.node_type == "stream" ||
+            node.data.node_type == "query"
+          ) {
             node.data.org_id = orgId;
           }
         });
@@ -1482,7 +1539,7 @@ export default defineComponent({
         baseImportRef.value.jsonStr = JSON.stringify(
           baseImportRef.value.jsonArrayOfObj,
           null,
-          2
+          2,
         );
       }
     };

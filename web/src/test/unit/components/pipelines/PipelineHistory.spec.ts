@@ -32,7 +32,7 @@ vi.mock("@/services/pipelines", () => ({
             { name: "test-pipeline-2", pipeline_id: "pid2" },
           ],
         },
-      })
+      }),
     ),
   },
 }));
@@ -56,7 +56,7 @@ vi.mock("@/services/http", () => ({
           ],
           total: 1,
         },
-      })
+      }),
     ),
     post: vi.fn(() => Promise.resolve({ data: {} })),
     put: vi.fn(() => Promise.resolve({ data: {} })),
@@ -104,50 +104,68 @@ describe("PipelineHistory.vue", () => {
       const wrapper = mountComponent();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="pipeline-history-page"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-history-page"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should render back button", () => {
       const wrapper = mountComponent();
 
-      expect(wrapper.find('[data-test="alert-history-back-btn"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="alert-history-back-btn"]').exists(),
+      ).toBe(true);
     });
 
     it("should render page title with info icon", () => {
       const wrapper = mountComponent();
 
-      expect(wrapper.find('[data-test="pipeline-history-title"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="pipeline-history-title"]').exists(),
+      ).toBe(true);
     });
 
     it("should render date time picker", () => {
       const wrapper = mountComponent();
 
       // DateTime component is present (either stub or actual component)
-      expect(wrapper.find('[data-test="pipeline-history-date-picker"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="pipeline-history-date-picker"]').exists(),
+      ).toBe(true);
     });
 
     it("should render pipeline search select", () => {
       const wrapper = mountComponent();
 
-      expect(wrapper.find('[data-test="pipeline-history-search-select"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="pipeline-history-search-select"]').exists(),
+      ).toBe(true);
     });
 
     it("should render manual search button", () => {
       const wrapper = mountComponent();
 
-      expect(wrapper.find('[data-test="pipeline-history-manual-search-btn"]').exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="pipeline-history-manual-search-btn"]')
+          .exists(),
+      ).toBe(true);
     });
 
     it("should render refresh button", () => {
       const wrapper = mountComponent();
 
-      expect(wrapper.find('[data-test="pipeline-history-refresh-btn"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="pipeline-history-refresh-btn"]').exists(),
+      ).toBe(true);
     });
 
     it("should render history table", () => {
       const wrapper = mountComponent();
 
-      expect(wrapper.find('[data-test="pipeline-history-table"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="pipeline-history-table"]').exists(),
+      ).toBe(true);
     });
   });
 
@@ -173,7 +191,9 @@ describe("PipelineHistory.vue", () => {
       const wrapper = mountComponent();
       await flushPromises();
 
-      const refreshBtn = wrapper.find('[data-test="pipeline-history-refresh-btn"]');
+      const refreshBtn = wrapper.find(
+        '[data-test="pipeline-history-refresh-btn"]',
+      );
       expect(refreshBtn.exists()).toBe(true);
 
       // Trigger click - this will call refreshData internally
@@ -326,7 +346,9 @@ describe("PipelineHistory.vue", () => {
     it("should have clearable search select", () => {
       const wrapper = mountComponent();
 
-      const searchSelect = wrapper.find('[data-test="pipeline-history-search-select"]');
+      const searchSelect = wrapper.find(
+        '[data-test="pipeline-history-search-select"]',
+      );
       // Just verify the select exists
       expect(searchSelect.exists()).toBe(true);
     });
@@ -344,7 +366,9 @@ describe("PipelineHistory.vue", () => {
       await flushPromises();
 
       // Verify DateTime component is rendered with the data-test attribute
-      const dateTimeElement = wrapper.find('[data-test="pipeline-history-date-picker"]');
+      const dateTimeElement = wrapper.find(
+        '[data-test="pipeline-history-date-picker"]',
+      );
       expect(dateTimeElement.exists()).toBe(true);
     });
   });
@@ -357,10 +381,13 @@ describe("PipelineHistory.vue", () => {
       vm.loading = true;
       await wrapper.vm.$nextTick();
 
-      const refreshBtn = wrapper.find('[data-test="pipeline-history-refresh-btn"]');
+      const refreshBtn = wrapper.find(
+        '[data-test="pipeline-history-refresh-btn"]',
+      );
       // Check for Quasar loading state
-      const hasLoading = refreshBtn.attributes("loading") !== undefined ||
-                        refreshBtn.classes().includes("q-btn--loading");
+      const hasLoading =
+        refreshBtn.attributes("loading") !== undefined ||
+        refreshBtn.classes().includes("q-btn--loading");
       expect(hasLoading || vm.loading).toBe(true);
     });
 
@@ -371,7 +398,9 @@ describe("PipelineHistory.vue", () => {
       vm.loading = true;
       await wrapper.vm.$nextTick();
 
-      const searchBtn = wrapper.find('[data-test="pipeline-history-manual-search-btn"]');
+      const searchBtn = wrapper.find(
+        '[data-test="pipeline-history-manual-search-btn"]',
+      );
       expect(searchBtn.attributes("aria-disabled")).toBe("true");
     });
   });

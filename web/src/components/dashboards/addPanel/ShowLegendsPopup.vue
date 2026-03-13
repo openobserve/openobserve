@@ -249,24 +249,22 @@ export default defineComponent({
     };
 
     const copyLegend = (text: string, index: number) => {
-      copyToClipboard(text)
-        .then(() => {
-          copiedLegendIndices.value.add(index);
-          setTimeout(() => {
-            copiedLegendIndices.value.delete(index);
-          }, 3000);
-        });
+      copyToClipboard(text).then(() => {
+        copiedLegendIndices.value.add(index);
+        setTimeout(() => {
+          copiedLegendIndices.value.delete(index);
+        }, 3000);
+      });
     };
 
     const copyAllLegends = () => {
       const allLegendsText = legends.value.map((l: any) => l.name).join("\n");
-      copyToClipboard(allLegendsText)
-        .then(() => {
-          isAllCopied.value = true;
-          setTimeout(() => {
-            isAllCopied.value = false;
-          }, 3000);
-        });
+      copyToClipboard(allLegendsText).then(() => {
+        isAllCopied.value = true;
+        setTimeout(() => {
+          isAllCopied.value = false;
+        }, 3000);
+      });
     };
 
     return {

@@ -84,7 +84,9 @@ describe("SelectDashboardDropdown", () => {
       },
     });
 
-    const dropdown = wrapper.find('[data-test="dashboard-dropdown-dashboard-selection"]');
+    const dropdown = wrapper.find(
+      '[data-test="dashboard-dropdown-dashboard-selection"]',
+    );
     expect(dropdown.exists()).toBe(true);
   });
 
@@ -130,7 +132,10 @@ describe("SelectDashboardDropdown", () => {
 
     await flushPromises();
 
-    wrapper.vm.selectedDashboard = { label: "Test Dashboard", value: "test123" };
+    wrapper.vm.selectedDashboard = {
+      label: "Test Dashboard",
+      value: "test123",
+    };
     await wrapper.vm.$nextTick();
 
     expect(wrapper.emitted("dashboard-selected")).toBeTruthy();

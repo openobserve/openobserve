@@ -48,8 +48,16 @@ describe("Recommended", () => {
     router = createRouter({
       history: createWebHistory(),
       routes: [
-        { path: "/", name: "recommended", component: { template: "<div>Recommended</div>" } },
-        { path: "/kubernetes", name: "ingestFromKubernetes", component: { template: "<div>Kubernetes</div>" } },
+        {
+          path: "/",
+          name: "recommended",
+          component: { template: "<div>Recommended</div>" },
+        },
+        {
+          path: "/kubernetes",
+          name: "ingestFromKubernetes",
+          component: { template: "<div>Kubernetes</div>" },
+        },
       ],
     });
 
@@ -63,7 +71,7 @@ describe("Recommended", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          'router-view': true,
+          "router-view": true,
         },
       },
     });
@@ -76,7 +84,7 @@ describe("Recommended", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          'router-view': true,
+          "router-view": true,
         },
       },
     });
@@ -90,7 +98,7 @@ describe("Recommended", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          'router-view': true,
+          "router-view": true,
         },
       },
     });
@@ -104,7 +112,7 @@ describe("Recommended", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          'router-view': true,
+          "router-view": true,
         },
       },
     });
@@ -118,7 +126,7 @@ describe("Recommended", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          'router-view': true,
+          "router-view": true,
         },
       },
     });
@@ -131,7 +139,7 @@ describe("Recommended", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          'router-view': true,
+          "router-view": true,
         },
       },
     });
@@ -144,7 +152,7 @@ describe("Recommended", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          'router-view': true,
+          "router-view": true,
         },
       },
     });
@@ -157,7 +165,7 @@ describe("Recommended", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          'router-view': true,
+          "router-view": true,
         },
       },
     });
@@ -172,13 +180,13 @@ describe("Recommended", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          'router-view': true,
+          "router-view": true,
         },
       },
     });
 
     const kubernetesTab = wrapper.vm.recommendedTabs.find(
-      (tab: any) => tab.name === "ingestFromKubernetes"
+      (tab: any) => tab.name === "ingestFromKubernetes",
     );
     expect(kubernetesTab).toBeDefined();
   });
@@ -188,13 +196,13 @@ describe("Recommended", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          'router-view': true,
+          "router-view": true,
         },
       },
     });
 
     const windowsTab = wrapper.vm.recommendedTabs.find(
-      (tab: any) => tab.name === "ingestFromWindows"
+      (tab: any) => tab.name === "ingestFromWindows",
     );
     expect(windowsTab).toBeDefined();
   });
@@ -204,13 +212,13 @@ describe("Recommended", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          'router-view': true,
+          "router-view": true,
         },
       },
     });
 
     const linuxTab = wrapper.vm.recommendedTabs.find(
-      (tab: any) => tab.name === "ingestFromLinux"
+      (tab: any) => tab.name === "ingestFromLinux",
     );
     expect(linuxTab).toBeDefined();
   });
@@ -220,13 +228,13 @@ describe("Recommended", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          'router-view': true,
+          "router-view": true,
         },
       },
     });
 
     const awsTab = wrapper.vm.recommendedTabs.find(
-      (tab: any) => tab.name === "AWSConfig"
+      (tab: any) => tab.name === "AWSConfig",
     );
     expect(awsTab).toBeDefined();
   });
@@ -236,13 +244,13 @@ describe("Recommended", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          'router-view': true,
+          "router-view": true,
         },
       },
     });
 
     const tracesTab = wrapper.vm.recommendedTabs.find(
-      (tab: any) => tab.name === "ingestFromTraces"
+      (tab: any) => tab.name === "ingestFromTraces",
     );
     expect(tracesTab).toBeDefined();
   });
@@ -252,7 +260,7 @@ describe("Recommended", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          'router-view': true,
+          "router-view": true,
         },
       },
     });
@@ -266,7 +274,7 @@ describe("Recommended", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          'router-view': true,
+          "router-view": true,
         },
       },
     });
@@ -279,7 +287,7 @@ describe("Recommended", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          'router-view': true,
+          "router-view": true,
         },
       },
     });

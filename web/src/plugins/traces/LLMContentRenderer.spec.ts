@@ -186,7 +186,7 @@ describe("LLMContentRenderer", () => {
       const toolContent = wrapper.vm.toolContent;
       expect(toolContent).toBeTruthy();
       // Check that it either unwrapped to the text or kept the structure
-      if (typeof toolContent === 'string') {
+      if (typeof toolContent === "string") {
         expect(toolContent).toBe("Nested text content");
       } else {
         expect(toolContent.content).toBeDefined();
@@ -269,7 +269,10 @@ describe("LLMContentRenderer", () => {
         props: {
           content: JSON.stringify([
             { type: "text", text: "Hello world" },
-            { type: "image_url", image_url: { url: "https://example.com/img.png" } },
+            {
+              type: "image_url",
+              image_url: { url: "https://example.com/img.png" },
+            },
           ]),
           viewMode: "formatted",
         },
@@ -375,7 +378,10 @@ describe("LLMContentRenderer", () => {
             role: "user",
             content: [
               { type: "text", text: "What is this?" },
-              { type: "image_url", image_url: { url: "https://example.com/img.png" } },
+              {
+                type: "image_url",
+                image_url: { url: "https://example.com/img.png" },
+              },
             ],
           }),
           viewMode: "formatted",
@@ -384,7 +390,9 @@ describe("LLMContentRenderer", () => {
 
       const messages = wrapper.vm.parsedMessages;
       expect(messages[0].content).toContain("What is this?");
-      expect(messages[0].content).toContain("[Image: https://example.com/img.png]");
+      expect(messages[0].content).toContain(
+        "[Image: https://example.com/img.png]",
+      );
     });
 
     it("should handle Anthropic image format", () => {
@@ -408,7 +416,10 @@ describe("LLMContentRenderer", () => {
 
   describe("Content Truncation", () => {
     it("should truncate long content", () => {
-      const longContent = Array.from({ length: 20 }, (_, i) => `Line ${i}`).join("\n");
+      const longContent = Array.from(
+        { length: 20 },
+        (_, i) => `Line ${i}`,
+      ).join("\n");
 
       wrapper = mount(LLMContentRenderer, {
         props: {
@@ -437,7 +448,10 @@ describe("LLMContentRenderer", () => {
     });
 
     it("should expand content when expand button is clicked", async () => {
-      const longContent = Array.from({ length: 20 }, (_, i) => `Line ${i}`).join("\n");
+      const longContent = Array.from(
+        { length: 20 },
+        (_, i) => `Line ${i}`,
+      ).join("\n");
 
       wrapper = mount(LLMContentRenderer, {
         props: {
@@ -457,7 +471,10 @@ describe("LLMContentRenderer", () => {
     });
 
     it("should collapse content when collapse button is clicked", async () => {
-      const longContent = Array.from({ length: 20 }, (_, i) => `Line ${i}`).join("\n");
+      const longContent = Array.from(
+        { length: 20 },
+        (_, i) => `Line ${i}`,
+      ).join("\n");
 
       wrapper = mount(LLMContentRenderer, {
         props: {
@@ -651,7 +668,8 @@ describe("LLMContentRenderer", () => {
     });
 
     it("should handle content with special characters", () => {
-      const specialContent = "Content with\ttabs\nand\rnewlines\r\nand unicode: 🎉";
+      const specialContent =
+        "Content with\ttabs\nand\rnewlines\r\nand unicode: 🎉";
 
       wrapper = mount(LLMContentRenderer, {
         props: {
@@ -687,7 +705,9 @@ describe("LLMContentRenderer", () => {
     it("should handle messages with missing role", () => {
       wrapper = mount(LLMContentRenderer, {
         props: {
-          content: JSON.stringify([{ role: undefined, content: "No role specified" }]),
+          content: JSON.stringify([
+            { role: undefined, content: "No role specified" },
+          ]),
           viewMode: "formatted",
         },
       });
@@ -737,7 +757,10 @@ describe("LLMContentRenderer", () => {
 
     it("should format image URLs in content", () => {
       const content = [
-        { type: "image_url", image_url: { url: "https://example.com/image.png" } },
+        {
+          type: "image_url",
+          image_url: { url: "https://example.com/image.png" },
+        },
       ];
 
       wrapper = mount(LLMContentRenderer, {
@@ -768,7 +791,7 @@ describe("LLMContentRenderer", () => {
 
   describe("XSS Prevention", () => {
     it("should sanitize HTML content through DOMPurify", () => {
-      const maliciousContent = '<img src=x onerror="alert(\'xss\')">';
+      const maliciousContent = "<img src=x onerror=\"alert('xss')\">";
 
       wrapper = mount(LLMContentRenderer, {
         props: {

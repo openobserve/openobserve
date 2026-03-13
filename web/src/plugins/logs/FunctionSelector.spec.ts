@@ -61,19 +61,30 @@ describe("FunctionSelector", () => {
         plugins: [i18n, store],
         stubs: {
           "q-toggle": {
-            template: '<button class="q-toggle" @click="$emit(\'update:modelValue\', !modelValue)" :data-test="$attrs[\'data-test\']"><slot /></button>',
+            template:
+              '<button class="q-toggle" @click="$emit(\'update:modelValue\', !modelValue)" :data-test="$attrs[\'data-test\']"><slot /></button>',
             props: ["modelValue"],
           },
           "q-btn-group": {
-            template: '<div class="q-btn-group" :class="{ disabled: disable }"><slot /></div>',
+            template:
+              '<div class="q-btn-group" :class="{ disabled: disable }"><slot /></div>',
             props: ["disable"],
           },
           "q-btn-dropdown": {
-            template: '<div class="q-btn-dropdown" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></div>',
-            props: ["modelValue", "size", "icon", "iconRight", "title", "split"],
+            template:
+              '<div class="q-btn-dropdown" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></div>',
+            props: [
+              "modelValue",
+              "size",
+              "icon",
+              "iconRight",
+              "title",
+              "split",
+            ],
           },
           "q-btn": {
-            template: '<button class="q-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>',
+            template:
+              '<button class="q-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>',
             props: ["icon", "class"],
           },
           "q-tooltip": {
@@ -81,22 +92,34 @@ describe("FunctionSelector", () => {
             props: ["class", "offset", "delay"],
           },
           "q-list": {
-            template: '<div class="q-list" :data-test="$attrs[\'data-test\']"><slot /></div>',
+            template:
+              '<div class="q-list" :data-test="$attrs[\'data-test\']"><slot /></div>',
           },
           "q-input": {
-            template: '<input class="q-input" v-model="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" :data-test="$attrs[\'data-test\']" />',
-            props: ["modelValue", "dense", "filled", "borderless", "clearable", "debounce", "placeholder"],
+            template:
+              '<input class="q-input" v-model="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" :data-test="$attrs[\'data-test\']" />',
+            props: [
+              "modelValue",
+              "dense",
+              "filled",
+              "borderless",
+              "clearable",
+              "debounce",
+              "placeholder",
+            ],
           },
           "q-icon": {
             template: '<span class="q-icon" :name="name"></span>',
             props: ["name"],
           },
           "q-item": {
-            template: '<div class="q-item" @click="$emit(\'click\')" v-close-popup><slot /></div>',
+            template:
+              '<div class="q-item" @click="$emit(\'click\')" v-close-popup><slot /></div>',
             props: ["clickable"],
           },
           "q-item-section": {
-            template: '<div class="q-item-section" @click="$emit(\'click\')"><slot /></div>',
+            template:
+              '<div class="q-item-section" @click="$emit(\'click\')"><slot /></div>',
           },
           "q-item-label": {
             template: '<div class="q-item-label"><slot /></div>',
@@ -129,12 +152,16 @@ describe("FunctionSelector", () => {
   });
 
   it("should render function toggle button", () => {
-    const toggle = wrapper.find('[data-test="logs-search-bar-show-query-toggle-btn"]');
+    const toggle = wrapper.find(
+      '[data-test="logs-search-bar-show-query-toggle-btn"]',
+    );
     expect(toggle.exists()).toBeTruthy();
   });
 
   it("should render function dropdown", () => {
-    const dropdown = wrapper.find('[data-test="logs-search-bar-function-dropdown"]');
+    const dropdown = wrapper.find(
+      '[data-test="logs-search-bar-function-dropdown"]',
+    );
     expect(dropdown.exists()).toBeTruthy();
   });
 
@@ -144,7 +171,9 @@ describe("FunctionSelector", () => {
   });
 
   it("should render saved function list", () => {
-    const functionList = wrapper.find('[data-test="logs-search-saved-function-list"]');
+    const functionList = wrapper.find(
+      '[data-test="logs-search-saved-function-list"]',
+    );
     expect(functionList.exists()).toBeTruthy();
   });
 
@@ -171,12 +200,12 @@ describe("FunctionSelector", () => {
     } else {
       expect(wrapper.vm.iconRight).toContain("function.svg");
     }
-    
+
     // Change to dark theme and verify reactivity
     store.state.theme = "dark";
     await wrapper.vm.$nextTick();
     expect(wrapper.vm.iconRight).toContain("function_dark.svg");
-    
+
     // Reset theme for other tests
     store.state.theme = "light";
     await wrapper.vm.$nextTick();
@@ -235,7 +264,9 @@ describe("FunctionSelector", () => {
     wrapper.vm.searchTerm = "Analytics Function";
     await wrapper.vm.$nextTick();
     expect(wrapper.vm.filteredFunctionOptions).toHaveLength(1);
-    expect(wrapper.vm.filteredFunctionOptions[0].name).toBe("Analytics Function");
+    expect(wrapper.vm.filteredFunctionOptions[0].name).toBe(
+      "Analytics Function",
+    );
   });
 
   // Function Tests
@@ -256,7 +287,7 @@ describe("FunctionSelector", () => {
   it("should emit select:function when applyFunction is called", () => {
     const testFunction = { name: "Test", function: "SELECT test" };
     wrapper.vm.applyFunction(testFunction, true);
-    
+
     expect(wrapper.emitted("select:function")).toBeTruthy();
     expect(wrapper.emitted("select:function")[0]).toEqual([testFunction, true]);
   });
@@ -264,14 +295,19 @@ describe("FunctionSelector", () => {
   it("should call applyFunction with default flag when not provided", () => {
     const testFunction = { name: "Test", function: "SELECT test" };
     wrapper.vm.applyFunction(testFunction);
-    
+
     expect(wrapper.emitted("select:function")).toBeTruthy();
-    expect(wrapper.emitted("select:function")[0]).toEqual([testFunction, false]);
+    expect(wrapper.emitted("select:function")[0]).toEqual([
+      testFunction,
+      false,
+    ]);
   });
 
   // Template Interaction Tests
   it("should emit save:function when save button is clicked", async () => {
-    const saveBtn = wrapper.find('[data-test="logs-search-bar-save-function-btn"]');
+    const saveBtn = wrapper.find(
+      '[data-test="logs-search-bar-save-function-btn"]',
+    );
     await saveBtn.trigger("click");
     expect(wrapper.emitted("save:function")).toBeTruthy();
   });
@@ -285,7 +321,7 @@ describe("FunctionSelector", () => {
   it("should display 'no functions found' message when filtered list is empty", async () => {
     wrapper.vm.searchTerm = "nonexistent";
     await wrapper.vm.$nextTick();
-    
+
     const notFoundText = wrapper.text();
     // The translation key gets resolved to actual text
     expect(notFoundText).toContain("Function not found");
@@ -302,7 +338,7 @@ describe("FunctionSelector", () => {
         stubs: wrapper.vm.$options.components,
       },
     });
-    
+
     expect(emptyWrapper.vm.filteredFunctionOptions).toHaveLength(0);
     emptyWrapper.unmount();
   });
@@ -312,7 +348,7 @@ describe("FunctionSelector", () => {
       { name: "Custom 1", function: "CUSTOM QUERY 1" },
       { name: "Custom 2", function: "CUSTOM QUERY 2" },
     ];
-    
+
     const customWrapper = mount(FunctionSelector, {
       props: {
         functionOptions: customFunctions,
@@ -322,7 +358,7 @@ describe("FunctionSelector", () => {
         stubs: wrapper.vm.$options.components,
       },
     });
-    
+
     expect(customWrapper.vm.filteredFunctionOptions).toEqual(customFunctions);
     customWrapper.unmount();
   });
@@ -362,7 +398,7 @@ describe("FunctionSelector", () => {
     expect(wrapper.vm.filteredFunctionOptions).toEqual(newFunctions);
   });
 
-  // State Management Tests  
+  // State Management Tests
   it("should access store state for theme", () => {
     expect(wrapper.vm.store).toBeTruthy();
     expect(wrapper.vm.store.state.theme).toBeDefined();
@@ -380,7 +416,7 @@ describe("FunctionSelector", () => {
       name: `Function ${i}`,
       function: `SELECT * FROM table${i}`,
     }));
-    
+
     const largeWrapper = mount(FunctionSelector, {
       props: {
         functionOptions: largeFunctionsList,
@@ -390,12 +426,12 @@ describe("FunctionSelector", () => {
         stubs: wrapper.vm.$options.components,
       },
     });
-    
+
     // Test filtering performance with large dataset
     largeWrapper.vm.searchTerm = "999";
     await largeWrapper.vm.$nextTick();
     expect(largeWrapper.vm.filteredFunctionOptions).toHaveLength(1);
-    
+
     largeWrapper.unmount();
   });
 });

@@ -14,10 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { sanitizeStreamName, sanitizeStaticPart } from "./pipelineCommonValidation";
+import {
+  sanitizeStreamName,
+  sanitizeStaticPart,
+} from "./pipelineCommonValidation";
 
 describe("pipelineCommonValidation", () => {
-
   describe("sanitizeStreamName", () => {
     describe("Basic functionality", () => {
       it("should sanitize simple alphanumeric string", () => {
@@ -226,7 +228,18 @@ describe("pipelineCommonValidation", () => {
 
       it("should preserve numbers", () => {
         const result = sanitizeStaticPart("0123456789");
-        expect(result).toEqual(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]);
+        expect(result).toEqual([
+          "0",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+        ]);
       });
 
       it("should convert spaces to underscores", () => {
@@ -248,7 +261,21 @@ describe("pipelineCommonValidation", () => {
     describe("Mixed content", () => {
       it("should handle mixed alphanumeric and special characters", () => {
         const result = sanitizeStaticPart("Test@123#Data");
-        expect(result).toEqual(["T", "e", "s", "t", "_", "1", "2", "3", "_", "D", "a", "t", "a"]);
+        expect(result).toEqual([
+          "T",
+          "e",
+          "s",
+          "t",
+          "_",
+          "1",
+          "2",
+          "3",
+          "_",
+          "D",
+          "a",
+          "t",
+          "a",
+        ]);
       });
 
       it("should handle string with multiple consecutive special characters", () => {

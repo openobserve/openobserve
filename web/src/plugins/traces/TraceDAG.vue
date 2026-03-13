@@ -16,7 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="trace-dag-container">
-    <div v-if="isLoading" class="flex items-center justify-center column q-pa-xl loading-container">
+    <div
+      v-if="isLoading"
+      class="flex items-center justify-center column q-pa-xl loading-container"
+    >
       <q-spinner color="primary" size="50px" />
       <div class="q-mt-md text-grey-7">Loading trace DAG...</div>
     </div>
@@ -30,8 +33,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-banner>
     </div>
 
-    <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" class="flex items-center justify-center column q-pa-xl empty-container">
-      <q-icon name="info" size="48px" color="grey-5" />
+    <div
+      v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0"
+      class="flex items-center justify-center column q-pa-xl empty-container"
+    >
+      <q-icon name="info" size="48px"
+color="grey-5" />
       <div class="q-mt-md text-grey-7">No DAG data available</div>
     </div>
 
@@ -50,19 +57,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <Controls />
 
         <template #node-custom="{ data }">
-          <Handle v-if="data.hasIncoming" type="target" :position="Position.Top" class="dag-handle" />
+          <Handle
+            v-if="data.hasIncoming"
+            type="target"
+            :position="Position.Top"
+            class="dag-handle"
+          />
           <div
             class="custom-node"
             :class="[
               getObservationTypeClass(data.llm_observation_type),
               {
                 'node-error': data.span_status === 'ERROR',
-                'node-ok': data.span_status === 'OK' && !data.llm_observation_type,
-              }
+                'node-ok':
+                  data.span_status === 'OK' && !data.llm_observation_type,
+              },
             ]"
             @click="handleNodeClick(data.span_id)"
           >
-            <div class="node-operation" :class="getObservationTypeTextClass(data.llm_observation_type)">{{ data.operation_name }}</div>
+            <div
+              class="node-operation"
+              :class="getObservationTypeTextClass(data.llm_observation_type)"
+            >
+              {{ data.operation_name }}
+            </div>
             <q-chip
               v-if="data.span_status === 'ERROR'"
               dense
@@ -74,7 +92,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ERR
             </q-chip>
           </div>
-          <Handle v-if="data.hasOutgoing" type="source" :position="Position.Bottom" class="dag-handle" />
+          <Handle
+            v-if="data.hasOutgoing"
+            type="source"
+            :position="Position.Bottom"
+            class="dag-handle"
+          />
         </template>
       </VueFlow>
     </div>
@@ -83,7 +106,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch, nextTick } from "vue";
-import { VueFlow, Position, MarkerType, Handle, useVueFlow } from "@vue-flow/core";
+import {
+  VueFlow,
+  Position,
+  MarkerType,
+  Handle,
+  useVueFlow,
+} from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import { useStore } from "vuex";
@@ -270,13 +299,17 @@ export default defineComponent({
         totalChildWidth += (childNodes.length - 1) * horizontalGap;
 
         // Position children centered under parent
-        let childX = x - totalChildWidth / 2 + (subtreeWidth.get(childNodes[0]) || nodeWidth) / 2;
+        let childX =
+          x -
+          totalChildWidth / 2 +
+          (subtreeWidth.get(childNodes[0]) || nodeWidth) / 2;
         const childY = y + nodeHeight + verticalGap;
 
         childNodes.forEach((childId, index) => {
           const childWidth = subtreeWidth.get(childId) || nodeWidth;
           if (index > 0) {
-            const prevChildWidth = subtreeWidth.get(childNodes[index - 1]) || nodeWidth;
+            const prevChildWidth =
+              subtreeWidth.get(childNodes[index - 1]) || nodeWidth;
             childX += prevChildWidth / 2 + horizontalGap + childWidth / 2;
           }
           positionNode(childId, childX, childY);
@@ -288,14 +321,15 @@ export default defineComponent({
       roots.forEach((root, index) => {
         const rootWidth = subtreeWidth.get(root.span_id) || nodeWidth;
         if (index > 0) {
-          const prevRootWidth = subtreeWidth.get(roots[index - 1].span_id) || nodeWidth;
+          const prevRootWidth =
+            subtreeWidth.get(roots[index - 1].span_id) || nodeWidth;
           rootX += prevRootWidth / 2 + horizontalGap * 2 + rootWidth / 2;
         }
         positionNode(root.span_id, rootX, 0);
       });
 
       // Center the entire tree
-      const allX = Array.from(positions.values()).map(p => p.x);
+      const allX = Array.from(positions.values()).map((p) => p.x);
       const minX = Math.min(...allX);
       const maxX = Math.max(...allX);
       const offsetX = -(minX + maxX) / 2;
@@ -312,13 +346,16 @@ export default defineComponent({
       if (!dagData.value || !dagData.value.nodes) return [];
 
       // Create a set of valid node IDs
-      const validNodeIds = new Set(dagData.value.nodes.map(n => n.span_id));
+      const validNodeIds = new Set(dagData.value.nodes.map((n) => n.span_id));
 
       // Filter out edges that reference non-existent nodes
-      return dagData.value.edges.filter(edge => {
-        const isValid = validNodeIds.has(edge.from) && validNodeIds.has(edge.to);
+      return dagData.value.edges.filter((edge) => {
+        const isValid =
+          validNodeIds.has(edge.from) && validNodeIds.has(edge.to);
         if (!isValid) {
-          console.warn(`[TraceDAG] Skipping invalid edge: ${edge.from} → ${edge.to}`);
+          console.warn(
+            `[TraceDAG] Skipping invalid edge: ${edge.from} → ${edge.to}`,
+          );
         }
         return isValid;
       });
@@ -331,8 +368,8 @@ export default defineComponent({
       const positions = calculateLayout(dagData.value.nodes, validEdges.value);
 
       // Determine which nodes have incoming/outgoing edges
-      const nodesWithIncoming = new Set(validEdges.value.map(e => e.to));
-      const nodesWithOutgoing = new Set(validEdges.value.map(e => e.from));
+      const nodesWithIncoming = new Set(validEdges.value.map((e) => e.to));
+      const nodesWithOutgoing = new Set(validEdges.value.map((e) => e.from));
 
       return dagData.value.nodes.map((node) => ({
         id: node.span_id,
@@ -381,7 +418,10 @@ export default defineComponent({
         dagData.value = response.data;
       } catch (err: any) {
         console.error("[TraceDAG] Failed to fetch DAG:", err);
-        error.value = err.response?.data?.message || err.message || "Unknown error occurred";
+        error.value =
+          err.response?.data?.message ||
+          err.message ||
+          "Unknown error occurred";
       } finally {
         isLoading.value = false;
       }
@@ -389,7 +429,13 @@ export default defineComponent({
 
     // Watch for prop changes and refetch
     watch(
-      () => [props.traceId, props.streamName, props.startTime, props.endTime] as const,
+      () =>
+        [
+          props.traceId,
+          props.streamName,
+          props.startTime,
+          props.endTime,
+        ] as const,
       ([traceId, streamName, startTime, endTime]) => {
         // Validate all props before fetching
         if (
@@ -397,8 +443,8 @@ export default defineComponent({
           !streamName ||
           startTime == null ||
           endTime == null ||
-          typeof startTime !== 'number' ||
-          typeof endTime !== 'number' ||
+          typeof startTime !== "number" ||
+          typeof endTime !== "number" ||
           startTime >= endTime
         ) {
           error.value = "Invalid parameters for DAG fetch";
@@ -408,7 +454,7 @@ export default defineComponent({
 
         fetchDAG();
       },
-      { immediate: true }
+      { immediate: true },
     );
 
     const handleNodeClick = (spanId: string) => {
@@ -417,22 +463,33 @@ export default defineComponent({
 
     // Known LLM observation types (from ObservationType enum)
     const knownObservationTypes = new Set([
-      'generation', 'span', 'tool', 'agent', 'chain', 'retriever',
-      'task', 'evaluator', 'workflow', 'embedding', 'rerank', 'guardrail', 'event',
+      "generation",
+      "span",
+      "tool",
+      "agent",
+      "chain",
+      "retriever",
+      "task",
+      "evaluator",
+      "workflow",
+      "embedding",
+      "rerank",
+      "guardrail",
+      "event",
     ]);
 
     const getObservationTypeClass = (type: string | null): string => {
-      if (!type) return '';
+      if (!type) return "";
       const key = type.toLowerCase();
       if (knownObservationTypes.has(key)) return `node-llm-${key}`;
-      return 'node-llm-default';
+      return "node-llm-default";
     };
 
     const getObservationTypeTextClass = (type: string | null): string => {
-      if (!type) return '';
+      if (!type) return "";
       const key = type.toLowerCase();
       if (knownObservationTypes.has(key)) return `node-llm-text-${key}`;
-      return 'node-llm-text-default';
+      return "node-llm-text-default";
     };
 
     // Watch for sidebar state changes and re-center the DAG
@@ -446,7 +503,7 @@ export default defineComponent({
             fitView({ padding: 0.3, duration: 300 });
           }, 50);
         });
-      }
+      },
     );
 
     return {
@@ -523,20 +580,62 @@ export default defineComponent({
       }
 
       // LLM observation type node colors (consistent with llmUtils getObservationTypeColor)
-      &.node-llm-generation { border-color: #4caf50; background: #e8f5e9; }  // green
-      &.node-llm-embedding  { border-color: #2196f3; background: #e3f2fd; }  // blue
-      &.node-llm-agent      { border-color: #9c27b0; background: #f3e5f5; }  // purple
-      &.node-llm-tool       { border-color: #ff9800; background: #fff3e0; }  // orange
-      &.node-llm-chain      { border-color: #3f51b5; background: #e8eaf6; }  // indigo
-      &.node-llm-retriever  { border-color: #00bcd4; background: #e0f7fa; }  // cyan
-      &.node-llm-task       { border-color: #009688; background: #e0f2f1; }  // teal
-      &.node-llm-evaluator  { border-color: #e91e63; background: #fce4ec; }  // pink
-      &.node-llm-workflow   { border-color: #673ab7; background: #ede7f6; }  // deep-purple
-      &.node-llm-rerank     { border-color: #03a9f4; background: #e1f5fe; }  // light-blue
-      &.node-llm-guardrail  { border-color: #f44336; background: #ffebee; }  // red
-      &.node-llm-span       { border-color: #9e9e9e; background: #f5f5f5; }  // grey
-      &.node-llm-event      { border-color: #ffc107; background: #fff8e1; }  // amber
-      &.node-llm-default    { border-color: #9e9e9e; background: #fafafa; }
+      &.node-llm-generation {
+        border-color: #4caf50;
+        background: #e8f5e9;
+      } // green
+      &.node-llm-embedding {
+        border-color: #2196f3;
+        background: #e3f2fd;
+      } // blue
+      &.node-llm-agent {
+        border-color: #9c27b0;
+        background: #f3e5f5;
+      } // purple
+      &.node-llm-tool {
+        border-color: #ff9800;
+        background: #fff3e0;
+      } // orange
+      &.node-llm-chain {
+        border-color: #3f51b5;
+        background: #e8eaf6;
+      } // indigo
+      &.node-llm-retriever {
+        border-color: #00bcd4;
+        background: #e0f7fa;
+      } // cyan
+      &.node-llm-task {
+        border-color: #009688;
+        background: #e0f2f1;
+      } // teal
+      &.node-llm-evaluator {
+        border-color: #e91e63;
+        background: #fce4ec;
+      } // pink
+      &.node-llm-workflow {
+        border-color: #673ab7;
+        background: #ede7f6;
+      } // deep-purple
+      &.node-llm-rerank {
+        border-color: #03a9f4;
+        background: #e1f5fe;
+      } // light-blue
+      &.node-llm-guardrail {
+        border-color: #f44336;
+        background: #ffebee;
+      } // red
+      &.node-llm-span {
+        border-color: #9e9e9e;
+        background: #f5f5f5;
+      } // grey
+      &.node-llm-event {
+        border-color: #ffc107;
+        background: #fff8e1;
+      } // amber
+      &.node-llm-default {
+        border-color: #9e9e9e;
+        background: #fafafa;
+      }
     }
 
     .node-operation {
@@ -551,20 +650,48 @@ export default defineComponent({
       overflow: hidden;
       text-overflow: ellipsis;
 
-      &.node-llm-text-generation { color: #388e3c; }  // green-dark
-      &.node-llm-text-embedding  { color: #1976d2; }  // blue-dark
-      &.node-llm-text-agent      { color: #7b1fa2; }  // purple-dark
-      &.node-llm-text-tool       { color: #e65100; }  // orange-dark
-      &.node-llm-text-chain      { color: #283593; }  // indigo-dark
-      &.node-llm-text-retriever  { color: #00838f; }  // cyan-dark
-      &.node-llm-text-task       { color: #00796b; }  // teal-dark
-      &.node-llm-text-evaluator  { color: #c2185b; }  // pink-dark
-      &.node-llm-text-workflow   { color: #4527a0; }  // deep-purple-dark
-      &.node-llm-text-rerank     { color: #0277bd; }  // light-blue-dark
-      &.node-llm-text-guardrail  { color: #c62828; }  // red-dark
-      &.node-llm-text-span       { color: #616161; }  // grey-dark
-      &.node-llm-text-event      { color: #f57f17; }  // amber-dark
-      &.node-llm-text-default    { color: #757575; }
+      &.node-llm-text-generation {
+        color: #388e3c;
+      } // green-dark
+      &.node-llm-text-embedding {
+        color: #1976d2;
+      } // blue-dark
+      &.node-llm-text-agent {
+        color: #7b1fa2;
+      } // purple-dark
+      &.node-llm-text-tool {
+        color: #e65100;
+      } // orange-dark
+      &.node-llm-text-chain {
+        color: #283593;
+      } // indigo-dark
+      &.node-llm-text-retriever {
+        color: #00838f;
+      } // cyan-dark
+      &.node-llm-text-task {
+        color: #00796b;
+      } // teal-dark
+      &.node-llm-text-evaluator {
+        color: #c2185b;
+      } // pink-dark
+      &.node-llm-text-workflow {
+        color: #4527a0;
+      } // deep-purple-dark
+      &.node-llm-text-rerank {
+        color: #0277bd;
+      } // light-blue-dark
+      &.node-llm-text-guardrail {
+        color: #c62828;
+      } // red-dark
+      &.node-llm-text-span {
+        color: #616161;
+      } // grey-dark
+      &.node-llm-text-event {
+        color: #f57f17;
+      } // amber-dark
+      &.node-llm-text-default {
+        color: #757575;
+      }
     }
 
     .dag-handle {
@@ -619,20 +746,62 @@ export default defineComponent({
         }
 
         // LLM observation type dark mode colors (consistent with llmUtils)
-        &.node-llm-generation { border-color: #66bb6a; background: #1a2e1a; }  // green
-        &.node-llm-embedding  { border-color: #64b5f6; background: #1a2a3a; }  // blue
-        &.node-llm-agent      { border-color: #ce93d8; background: #2a1a2e; }  // purple
-        &.node-llm-tool       { border-color: #ffb74d; background: #2e2218; }  // orange
-        &.node-llm-chain      { border-color: #7986cb; background: #1a1a2e; }  // indigo
-        &.node-llm-retriever  { border-color: #4dd0e1; background: #1a2a2e; }  // cyan
-        &.node-llm-task       { border-color: #4db6ac; background: #1a2e2a; }  // teal
-        &.node-llm-evaluator  { border-color: #f48fb1; background: #2e1a22; }  // pink
-        &.node-llm-workflow   { border-color: #b39ddb; background: #221a2e; }  // deep-purple
-        &.node-llm-rerank     { border-color: #4fc3f7; background: #1a2a3a; }  // light-blue
-        &.node-llm-guardrail  { border-color: #ef5350; background: #2e1a1a; }  // red
-        &.node-llm-span       { border-color: #9e9e9e; background: #262626; }  // grey
-        &.node-llm-event      { border-color: #ffd54f; background: #2e2a18; }  // amber
-        &.node-llm-default    { border-color: #9e9e9e; background: #262626; }
+        &.node-llm-generation {
+          border-color: #66bb6a;
+          background: #1a2e1a;
+        } // green
+        &.node-llm-embedding {
+          border-color: #64b5f6;
+          background: #1a2a3a;
+        } // blue
+        &.node-llm-agent {
+          border-color: #ce93d8;
+          background: #2a1a2e;
+        } // purple
+        &.node-llm-tool {
+          border-color: #ffb74d;
+          background: #2e2218;
+        } // orange
+        &.node-llm-chain {
+          border-color: #7986cb;
+          background: #1a1a2e;
+        } // indigo
+        &.node-llm-retriever {
+          border-color: #4dd0e1;
+          background: #1a2a2e;
+        } // cyan
+        &.node-llm-task {
+          border-color: #4db6ac;
+          background: #1a2e2a;
+        } // teal
+        &.node-llm-evaluator {
+          border-color: #f48fb1;
+          background: #2e1a22;
+        } // pink
+        &.node-llm-workflow {
+          border-color: #b39ddb;
+          background: #221a2e;
+        } // deep-purple
+        &.node-llm-rerank {
+          border-color: #4fc3f7;
+          background: #1a2a3a;
+        } // light-blue
+        &.node-llm-guardrail {
+          border-color: #ef5350;
+          background: #2e1a1a;
+        } // red
+        &.node-llm-span {
+          border-color: #9e9e9e;
+          background: #262626;
+        } // grey
+        &.node-llm-event {
+          border-color: #ffd54f;
+          background: #2e2a18;
+        } // amber
+        &.node-llm-default {
+          border-color: #9e9e9e;
+          background: #262626;
+        }
       }
 
       .node-operation {
@@ -640,20 +809,48 @@ export default defineComponent({
         font-size: 13px;
         max-width: 160px;
 
-        &.node-llm-text-generation { color: #81c784; }  // green-light
-        &.node-llm-text-embedding  { color: #90caf9; }  // blue-light
-        &.node-llm-text-agent      { color: #ce93d8; }  // purple-light
-        &.node-llm-text-tool       { color: #ffcc80; }  // orange-light
-        &.node-llm-text-chain      { color: #9fa8da; }  // indigo-light
-        &.node-llm-text-retriever  { color: #80deea; }  // cyan-light
-        &.node-llm-text-task       { color: #80cbc4; }  // teal-light
-        &.node-llm-text-evaluator  { color: #f48fb1; }  // pink-light
-        &.node-llm-text-workflow   { color: #b39ddb; }  // deep-purple-light
-        &.node-llm-text-rerank     { color: #81d4fa; }  // light-blue-light
-        &.node-llm-text-guardrail  { color: #ef9a9a; }  // red-light
-        &.node-llm-text-span       { color: #bdbdbd; }  // grey-light
-        &.node-llm-text-event      { color: #ffe082; }  // amber-light
-        &.node-llm-text-default    { color: #bdbdbd; }
+        &.node-llm-text-generation {
+          color: #81c784;
+        } // green-light
+        &.node-llm-text-embedding {
+          color: #90caf9;
+        } // blue-light
+        &.node-llm-text-agent {
+          color: #ce93d8;
+        } // purple-light
+        &.node-llm-text-tool {
+          color: #ffcc80;
+        } // orange-light
+        &.node-llm-text-chain {
+          color: #9fa8da;
+        } // indigo-light
+        &.node-llm-text-retriever {
+          color: #80deea;
+        } // cyan-light
+        &.node-llm-text-task {
+          color: #80cbc4;
+        } // teal-light
+        &.node-llm-text-evaluator {
+          color: #f48fb1;
+        } // pink-light
+        &.node-llm-text-workflow {
+          color: #b39ddb;
+        } // deep-purple-light
+        &.node-llm-text-rerank {
+          color: #81d4fa;
+        } // light-blue-light
+        &.node-llm-text-guardrail {
+          color: #ef9a9a;
+        } // red-light
+        &.node-llm-text-span {
+          color: #bdbdbd;
+        } // grey-light
+        &.node-llm-text-event {
+          color: #ffe082;
+        } // amber-light
+        &.node-llm-text-default {
+          color: #bdbdbd;
+        }
       }
     }
   }

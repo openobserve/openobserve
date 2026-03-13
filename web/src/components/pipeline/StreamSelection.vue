@@ -146,7 +146,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('alerts.cancel')"
           no-caps
           flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-secondary-button-dark'
+              : 'o2-secondary-button-light'
+          "
           data-test="add-pipeline-cancel-btn"
         />
         <q-btn
@@ -155,7 +159,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="submit"
           no-caps
           flat
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-primary-button-dark'
+              : 'o2-primary-button-light'
+          "
           data-test="add-pipeline-submit-btn"
         />
       </div>

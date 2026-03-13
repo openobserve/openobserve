@@ -18,12 +18,12 @@ import { describe, expect, it, vi } from "vitest";
 // Mock Vuex store
 const mockStore = {
   state: {
-    selectedOrganization: { 
-      label: "regular-org", 
-      identifier: "regular-org-id" 
+    selectedOrganization: {
+      label: "regular-org",
+      identifier: "regular-org-id",
     },
-    zoConfig: { 
-      meta_org: "meta-organization" 
+    zoConfig: {
+      meta_org: "meta-organization",
     },
   },
 };

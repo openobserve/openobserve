@@ -81,35 +81,41 @@ describe("DestinationPreview", () => {
       type: "slack",
     });
 
-    const messageBody = document.querySelector('[data-test="slack-message-body"]');
+    const messageBody = document.querySelector(
+      '[data-test="slack-message-body"]',
+    );
     expect(messageBody).toBeTruthy();
   });
 
   it("should render MS Teams preview when type is msteams", async () => {
     await mountComponent({
-        modelValue: true,
-        type: "msteams",
+      modelValue: true,
+      type: "msteams",
     });
 
-    const teamsPreview = document.querySelector('[data-test="msteams-preview"]');
+    const teamsPreview = document.querySelector(
+      '[data-test="msteams-preview"]',
+    );
     expect(teamsPreview).toBeTruthy();
   });
 
   it("should display MS Teams card content", async () => {
     await mountComponent({
-        modelValue: true,
-        type: "msteams",
+      modelValue: true,
+      type: "msteams",
     });
 
-    const cardContent = document.querySelector('[data-test="msteams-card-content"]');
+    const cardContent = document.querySelector(
+      '[data-test="msteams-card-content"]',
+    );
     expect(cardContent).toBeTruthy();
     expect(cardContent?.textContent).toContain("Alert");
   });
 
   it("should render Email preview when type is email", async () => {
     await mountComponent({
-        modelValue: true,
-        type: "email",
+      modelValue: true,
+      type: "email",
     });
 
     const emailPreview = document.querySelector('[data-test="email-preview"]');
@@ -118,8 +124,8 @@ describe("DestinationPreview", () => {
 
   it("should display Email subject", async () => {
     await mountComponent({
-        modelValue: true,
-        type: "email",
+      modelValue: true,
+      type: "email",
     });
 
     const subject = document.querySelector('[data-test="email-subject"]');
@@ -128,8 +134,8 @@ describe("DestinationPreview", () => {
 
   it("should display Email from address", async () => {
     await mountComponent({
-        modelValue: true,
-        type: "email",
+      modelValue: true,
+      type: "email",
     });
 
     const from = document.querySelector('[data-test="email-from"]');
@@ -138,8 +144,8 @@ describe("DestinationPreview", () => {
 
   it("should display Email body", async () => {
     await mountComponent({
-        modelValue: true,
-        type: "email",
+      modelValue: true,
+      type: "email",
     });
 
     const body = document.querySelector('[data-test="email-body"]');
@@ -148,41 +154,49 @@ describe("DestinationPreview", () => {
 
   it("should render PagerDuty preview when type is pagerduty", async () => {
     await mountComponent({
-        modelValue: true,
-        type: "pagerduty",
+      modelValue: true,
+      type: "pagerduty",
     });
 
-    const pagerdutyPreview = document.querySelector('[data-test="pagerduty-preview"]');
+    const pagerdutyPreview = document.querySelector(
+      '[data-test="pagerduty-preview"]',
+    );
     expect(pagerdutyPreview).toBeTruthy();
   });
 
   it("should render ServiceNow preview when type is servicenow", async () => {
     await mountComponent({
-        modelValue: true,
-        type: "servicenow",
+      modelValue: true,
+      type: "servicenow",
     });
 
-    const servicenowPreview = document.querySelector('[data-test="servicenow-preview"]');
+    const servicenowPreview = document.querySelector(
+      '[data-test="servicenow-preview"]',
+    );
     expect(servicenowPreview).toBeTruthy();
   });
 
   it("should render Opsgenie preview when type is opsgenie", async () => {
     await mountComponent({
-        modelValue: true,
-        type: "opsgenie",
+      modelValue: true,
+      type: "opsgenie",
     });
 
-    const opsgeniePreview = document.querySelector('[data-test="opsgenie-preview"]');
+    const opsgeniePreview = document.querySelector(
+      '[data-test="opsgenie-preview"]',
+    );
     expect(opsgeniePreview).toBeTruthy();
   });
 
   it("should emit update:modelValue when close button is clicked", async () => {
     await mountComponent({
-        modelValue: true,
-        type: "slack",
+      modelValue: true,
+      type: "slack",
     });
 
-    const closeBtn = document.querySelector('[data-test="preview-close-button"]') as HTMLElement;
+    const closeBtn = document.querySelector(
+      '[data-test="preview-close-button"]',
+    ) as HTMLElement;
     closeBtn?.click();
     await flushPromises();
 
@@ -192,8 +206,8 @@ describe("DestinationPreview", () => {
 
   it("should display correct destination type name for slack", async () => {
     await mountComponent({
-        modelValue: true,
-        type: "slack",
+      modelValue: true,
+      type: "slack",
     });
 
     const title = document.querySelector('[data-test="preview-title"]');
@@ -202,8 +216,8 @@ describe("DestinationPreview", () => {
 
   it("should display correct destination type name for msteams", async () => {
     await mountComponent({
-        modelValue: true,
-        type: "msteams",
+      modelValue: true,
+      type: "msteams",
     });
 
     const title = document.querySelector('[data-test="preview-title"]');
@@ -212,8 +226,8 @@ describe("DestinationPreview", () => {
 
   it("should display correct destination type name for email", async () => {
     await mountComponent({
-        modelValue: true,
-        type: "email",
+      modelValue: true,
+      type: "email",
     });
 
     const title = document.querySelector('[data-test="preview-title"]');
@@ -229,9 +243,9 @@ describe("DestinationPreview", () => {
     });
 
     await mountComponent({
-        modelValue: true,
-        type: "slack",
-        templateContent: "Test template content",
+      modelValue: true,
+      type: "slack",
+      templateContent: "Test template content",
     });
 
     await wrapper.vm.copyTemplate();
@@ -241,8 +255,8 @@ describe("DestinationPreview", () => {
 
   it("should display current time", async () => {
     await mountComponent({
-        modelValue: true,
-        type: "slack",
+      modelValue: true,
+      type: "slack",
     });
 
     const time = wrapper.vm.getCurrentTime();
@@ -252,12 +266,14 @@ describe("DestinationPreview", () => {
 
   it("should get correct destination type name", async () => {
     await mountComponent({
-        modelValue: true,
-        type: "slack",
+      modelValue: true,
+      type: "slack",
     });
 
     expect(wrapper.vm.getDestinationTypeName("slack")).toBe("Slack");
-    expect(wrapper.vm.getDestinationTypeName("msteams")).toBe("Microsoft Teams");
+    expect(wrapper.vm.getDestinationTypeName("msteams")).toBe(
+      "Microsoft Teams",
+    );
     expect(wrapper.vm.getDestinationTypeName("email")).toBe("Email");
     expect(wrapper.vm.getDestinationTypeName("pagerduty")).toBe("PagerDuty");
     expect(wrapper.vm.getDestinationTypeName("servicenow")).toBe("ServiceNow");
@@ -267,8 +283,8 @@ describe("DestinationPreview", () => {
 
   it("should render copy template button", async () => {
     await mountComponent({
-        modelValue: true,
-        type: "slack",
+      modelValue: true,
+      type: "slack",
     });
 
     const copyBtn = document.querySelector('[data-test="preview-copy-button"]');
@@ -278,19 +294,21 @@ describe("DestinationPreview", () => {
 
   it("should not render preview when modelValue is false", async () => {
     await mountComponent({
-        modelValue: false,
-        type: "slack",
+      modelValue: false,
+      type: "slack",
     });
 
     // When modelValue is false, q-dialog doesn't render content
-    const card = document.querySelector('[data-test="destination-preview-card"]');
+    const card = document.querySelector(
+      '[data-test="destination-preview-card"]',
+    );
     expect(card).toBeNull();
   });
 
   it("should update isOpen when modelValue changes", async () => {
     await mountComponent({
-        modelValue: false,
-        type: "slack",
+      modelValue: false,
+      type: "slack",
     });
 
     expect(wrapper.vm.isOpen).toBe(false);

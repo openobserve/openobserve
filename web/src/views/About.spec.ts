@@ -97,7 +97,11 @@ describe("About", () => {
       history: createWebHistory(),
       routes: [
         { path: "/about", name: "about", component: About },
-        { path: "/license", name: "license", component: { template: "<div>License</div>" } },
+        {
+          path: "/license",
+          name: "license",
+          component: { template: "<div>License</div>" },
+        },
       ],
     });
 

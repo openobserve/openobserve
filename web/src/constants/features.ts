@@ -31,9 +31,9 @@
  * - Bundled with UI build automatically
  */
 
-import featuresData from './features.json';
+import featuresData from "./features.json";
 
-export type EditionType = 'opensource' | 'enterprise' | 'cloud';
+export type EditionType = "opensource" | "enterprise" | "cloud";
 
 export interface FeatureAvailability {
   opensource: boolean | string;
@@ -67,7 +67,7 @@ export interface FeatureDefinition {
   /**
    * Category for grouping features (optional, for future enhancements)
    */
-  category?: 'core' | 'enterprise' | 'support' | 'infrastructure';
+  category?: "core" | "enterprise" | "support" | "infrastructure";
 }
 
 /**
@@ -76,7 +76,8 @@ export interface FeatureDefinition {
  * Loaded from features.json at build time.
  * To add new features, edit features.json instead of this file.
  */
-export const FEATURE_REGISTRY: FeatureDefinition[] = featuresData.features as FeatureDefinition[];
+export const FEATURE_REGISTRY: FeatureDefinition[] =
+  featuresData.features as FeatureDefinition[];
 
 /**
  * Helper function to get feature name key
@@ -88,8 +89,8 @@ export function getFeatureNameKey(feature: FeatureDefinition): string {
 /**
  * Helper function to get features by category
  */
-export function getFeaturesByCategory(category: FeatureDefinition['category']) {
-  return FEATURE_REGISTRY.filter(f => f.category === category);
+export function getFeaturesByCategory(category: FeatureDefinition["category"]) {
+  return FEATURE_REGISTRY.filter((f) => f.category === category);
 }
 
 /**

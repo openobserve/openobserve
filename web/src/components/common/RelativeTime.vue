@@ -90,7 +90,7 @@ export default {
       return `${props.fullTimePrefix} ${timestampToTimezoneDate(
         timestampMs,
         store.state.timezone,
-        "yyyy-MM-dd HH:mm:ss.SSS"
+        "yyyy-MM-dd HH:mm:ss.SSS",
       )} ${store.state.timezone}`;
     });
 
@@ -103,7 +103,7 @@ export default {
       () => props.timestamp,
       () => {
         updateRelativeTime(); // Update immediately if the timestamp prop changes
-      }
+      },
     );
 
     onBeforeUnmount(() => {

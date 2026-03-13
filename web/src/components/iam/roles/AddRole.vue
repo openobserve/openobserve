@@ -65,7 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('alerts.cancel')"
             no-caps
             flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
             @click="emits('cancel:hideform')"
             data-test="add-alert-cancel-btn"
           />
@@ -75,7 +79,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('alerts.save')"
             no-caps
             flat
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
             @click="saveRole"
             data-test="add-alert-submit-btn"
           />
@@ -135,20 +143,19 @@ const saveRole = () => {
       });
     })
     .catch((err) => {
-      if(err.response.status != 403){
+      if (err.response.status != 403) {
         q.notify({
-        message: err?.response?.data?.message,
-        color: "negative",
-        position: "bottom",
-        timeout: 3000,
-      });
+          message: err?.response?.data?.message,
+          color: "negative",
+          position: "bottom",
+          timeout: 3000,
+        });
       }
       console.log(err);
     });
-    track("Button Click", {
-      button: "Save Role",
-      page: "Add Role"
-    });
+  track("Button Click", {
+    button: "Save Role",
+    page: "Add Role",
+  });
 };
 </script>
-

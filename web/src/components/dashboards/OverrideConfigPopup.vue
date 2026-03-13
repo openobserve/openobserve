@@ -38,7 +38,8 @@
         borderless
         dense
         class="tw:flex-1 o2-custom-select-dashboard"
-       hide-bottom-space/>
+        hide-bottom-space
+      />
       <div class="tw:flex items-center" style="width: 60%; gap: 10px">
         <q-select
           v-model="overrideConfig.config[0].type"
@@ -54,7 +55,8 @@
           dense
           class="o2-custom-select-dashboard"
           @update:model-value="onConfigTypeChange(index)"
-         hide-bottom-space/>
+          hide-bottom-space
+        />
 
         <div
           v-if="overrideConfig.config[0].type === 'unit'"
@@ -74,7 +76,8 @@
             borderless
             dense
             class="tw:flex-1 o2-custom-select-dashboard"
-           hide-bottom-space/>
+            hide-bottom-space
+          />
           <q-input
             v-if="overrideConfig.config[0].value.unit === 'custom'"
             v-model="overrideConfig.config[0].value.customUnit"
@@ -86,7 +89,9 @@
             label-slot
             data-test="dashboard-config-unit"
             style="width: 50%"
-           borderless hide-bottom-space/>
+            borderless
+            hide-bottom-space
+          />
         </div>
 
         <div
@@ -121,13 +126,21 @@
     />
 
     <q-card-actions align="right">
-      <q-btn label="Save" color="primary" @click="saveOverrides" />
+      <q-btn label="Save" color="primary"
+@click="saveOverrides" />
     </q-card-actions>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, PropType, onMounted } from "vue";
+import {
+  defineComponent,
+  ref,
+  computed,
+  watch,
+  PropType,
+  onMounted,
+} from "vue";
 import { useI18n } from "vue-i18n";
 
 export default defineComponent({
@@ -136,10 +149,11 @@ export default defineComponent({
     columns: {
       type: Array as PropType<Array<{ label: string; alias: string }>>,
       required: true,
-      validator: (value: any[]) => value.every(item => 
-        typeof item.label === 'string' && 
-        typeof item.alias === 'string'
-      )
+      validator: (value: any[]) =>
+        value.every(
+          (item) =>
+            typeof item.label === "string" && typeof item.alias === "string",
+        ),
     },
     overrideConfig: {
       type: Object as PropType<{
@@ -152,7 +166,7 @@ export default defineComponent({
           }>;
         }>;
       }>,
-      required: true
+      required: true,
     },
   },
   emits: ["close", "save"],

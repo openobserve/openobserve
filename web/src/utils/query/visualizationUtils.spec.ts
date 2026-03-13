@@ -25,7 +25,8 @@ describe("visualizationUtils", () => {
     });
 
     it("should return true when all function expressions have aliases", () => {
-      const sql = "SELECT COUNT(*) as total_count, AVG(age) as average_age FROM users";
+      const sql =
+        "SELECT COUNT(*) as total_count, AVG(age) as average_age FROM users";
       const result = allSelectionFieldsHaveAlias(sql);
       expect(result).toBe(true);
     });
@@ -61,31 +62,36 @@ describe("visualizationUtils", () => {
     });
 
     it("should handle UNION queries correctly when all have aliases", () => {
-      const sql = "SELECT name, COUNT(*) as total FROM users GROUP BY name UNION SELECT department, COUNT(*) as dept_total FROM employees GROUP BY department";
+      const sql =
+        "SELECT name, COUNT(*) as total FROM users GROUP BY name UNION SELECT department, COUNT(*) as dept_total FROM employees GROUP BY department";
       const result = allSelectionFieldsHaveAlias(sql);
       expect(result).toBe(true);
     });
 
     it("should return false for UNION queries when some lack aliases", () => {
-      const sql = "SELECT name, COUNT(*) FROM users GROUP BY name UNION SELECT department, COUNT(*) as dept_total FROM employees GROUP BY department";
+      const sql =
+        "SELECT name, COUNT(*) FROM users GROUP BY name UNION SELECT department, COUNT(*) as dept_total FROM employees GROUP BY department";
       const result = allSelectionFieldsHaveAlias(sql);
       expect(result).toBe(false);
     });
 
     it("should handle subqueries with aliases", () => {
-      const sql = "SELECT u.name, u.total FROM (SELECT name, COUNT(*) as total FROM users GROUP BY name) as u";
+      const sql =
+        "SELECT u.name, u.total FROM (SELECT name, COUNT(*) as total FROM users GROUP BY name) as u";
       const result = allSelectionFieldsHaveAlias(sql);
       expect(result).toBe(true);
     });
 
     it("should handle complex expressions with aliases", () => {
-      const sql = "SELECT CASE WHEN age > 18 THEN 'adult' ELSE 'minor' END as age_category FROM users";
+      const sql =
+        "SELECT CASE WHEN age > 18 THEN 'adult' ELSE 'minor' END as age_category FROM users";
       const result = allSelectionFieldsHaveAlias(sql);
       expect(result).toBe(true);
     });
 
     it("should return false for complex expressions without aliases", () => {
-      const sql = "SELECT CASE WHEN age > 18 THEN 'adult' ELSE 'minor' END FROM users";
+      const sql =
+        "SELECT CASE WHEN age > 18 THEN 'adult' ELSE 'minor' END FROM users";
       const result = allSelectionFieldsHaveAlias(sql);
       expect(result).toBe(false);
     });
@@ -121,13 +127,15 @@ describe("visualizationUtils", () => {
     });
 
     it("should handle aggregation functions with GROUP BY", () => {
-      const sql = "SELECT department, MIN(salary) as min_salary, MAX(salary) as max_salary FROM employees GROUP BY department";
+      const sql =
+        "SELECT department, MIN(salary) as min_salary, MAX(salary) as max_salary FROM employees GROUP BY department";
       const result = allSelectionFieldsHaveAlias(sql);
       expect(result).toBe(true);
     });
 
     it("should return false when mixing aliased and non-aliased aggregations", () => {
-      const sql = "SELECT department, MIN(salary), MAX(salary) as max_salary FROM employees GROUP BY department";
+      const sql =
+        "SELECT department, MIN(salary), MAX(salary) as max_salary FROM employees GROUP BY department";
       const result = allSelectionFieldsHaveAlias(sql);
       expect(result).toBe(false);
     });
@@ -145,13 +153,15 @@ describe("visualizationUtils", () => {
     });
 
     it("should handle string functions with aliases", () => {
-      const sql = "SELECT UPPER(name) as uppercase_name, LENGTH(description) as desc_length FROM items";
+      const sql =
+        "SELECT UPPER(name) as uppercase_name, LENGTH(description) as desc_length FROM items";
       const result = allSelectionFieldsHaveAlias(sql);
       expect(result).toBe(true);
     });
 
     it("should handle window functions with aliases", () => {
-      const sql = "SELECT name, ROW_NUMBER() OVER (ORDER BY salary DESC) as rank FROM employees";
+      const sql =
+        "SELECT name, ROW_NUMBER() OVER (ORDER BY salary DESC) as rank FROM employees";
       const result = allSelectionFieldsHaveAlias(sql);
       expect(result).toBe(true);
     });
@@ -181,14 +191,14 @@ describe("visualizationUtils", () => {
     it("should handle SELECT statements with various edge cases", () => {
       // Test multiple edge cases that might trigger the uncovered lines
       const edgeCases = [
-        "",  // empty string
-        "   ",  // whitespace only
-        "SELECT;",  // bare SELECT with semicolon
-        "SELECT\n",  // SELECT with newline
-        "SELECT FROM",  // incomplete SELECT FROM
+        "", // empty string
+        "   ", // whitespace only
+        "SELECT;", // bare SELECT with semicolon
+        "SELECT\n", // SELECT with newline
+        "SELECT FROM", // incomplete SELECT FROM
       ];
-      
-      edgeCases.forEach(sql => {
+
+      edgeCases.forEach((sql) => {
         const result = allSelectionFieldsHaveAlias(sql);
         expect(result).toBe(false);
       });
@@ -197,7 +207,8 @@ describe("visualizationUtils", () => {
     it("should return false for UNION with malformed second SELECT (line 73)", () => {
       // Target line 73: if (!node || node?.type !== "select") return false;
       // This occurs when a UNION has a malformed second part
-      const sql = "SELECT name as n FROM users UNION INSERT INTO test VALUES (1)";
+      const sql =
+        "SELECT name as n FROM users UNION INSERT INTO test VALUES (1)";
       const result = allSelectionFieldsHaveAlias(sql);
       expect(result).toBe(false);
     });

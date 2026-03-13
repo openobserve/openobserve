@@ -229,7 +229,6 @@ function buildChartQuery(config: {
   // Only use stream alias when joins exist
   const streamAlias = queryData?.joins?.length > 0 ? stream : "";
 
-
   // Build SELECT clause
   const selectExpressions: string[] = [];
   for (const fieldConfig of config.selectFields) {

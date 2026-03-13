@@ -37,7 +37,7 @@ export function useWorker() {
 
   function runWorker<T, R>(
     data: T,
-    workerFunction: (data: T) => R
+    workerFunction: (data: T) => R,
   ): Promise<R> {
     return new Promise((resolve, reject) => {
       // Convert the function to a string
@@ -54,7 +54,7 @@ export function useWorker() {
           };
         `,
         ],
-        { type: "application/javascript" }
+        { type: "application/javascript" },
       );
 
       // Create a worker from the blob

@@ -34,7 +34,10 @@ const permissions = {
 
 const users = {
   users: [] as any[],
-  getOrgUsers: (org_identifier: string, queryParams?: { list_all?: boolean } ) => {
+  getOrgUsers: (
+    org_identifier: string,
+    queryParams?: { list_all?: boolean },
+  ) => {
     return new Promise((resolve, reject) => {
       usersService
         .orgUsers(org_identifier)
@@ -67,7 +70,9 @@ const groupsState = reactive(Object.assign({}, groups));
 
 const usersState = reactive(Object.assign({}, users));
 
-const serviceAccountsState = reactive(Object.assign({}, service_accounts_users));
+const serviceAccountsState = reactive(
+  Object.assign({}, service_accounts_users),
+);
 
 const usePermissions = () => {
   const resetPermissionsState = () => {

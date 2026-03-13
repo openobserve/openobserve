@@ -37,10 +37,12 @@ describe("OverrideConfigPopup", () => {
   ];
 
   const defaultOverrideConfig = {
-    overrideConfigs: [{
-      field: { matchBy: "name", value: "" },
-      config: [{ type: "unit", value: { unit: "", customUnit: "" } }]
-    }]
+    overrideConfigs: [
+      {
+        field: { matchBy: "name", value: "" },
+        config: [{ type: "unit", value: { unit: "", customUnit: "" } }],
+      },
+    ],
   };
 
   beforeEach(() => {
@@ -58,16 +60,16 @@ describe("OverrideConfigPopup", () => {
       props: {
         columns: defaultColumns,
         overrideConfig: JSON.parse(JSON.stringify(defaultOverrideConfig)), // Create a fresh copy
-        ...props
+        ...props,
       },
       global: {
         plugins: [i18n, store],
         mocks: {
-          $t: (key: string) => key
-        }
-      }
+          $t: (key: string) => key,
+        },
+      },
     });
-    
+
     // Wait for the component to be fully mounted and onMounted hook to run
     await flushPromises();
     return wrapper;
@@ -108,7 +110,7 @@ describe("OverrideConfigPopup", () => {
     it("should render close button", async () => {
       wrapper = await createWrapper();
 
-      expect(wrapper.html()).toContain('close');
+      expect(wrapper.html()).toContain("close");
     });
 
     it("should render add field override button", async () => {
@@ -170,14 +172,16 @@ describe("OverrideConfigPopup", () => {
 
       expect(wrapper.vm.unitOptions).toBeInstanceOf(Array);
       expect(wrapper.vm.unitOptions.length).toBeGreaterThan(0);
-      expect(wrapper.vm.unitOptions[0]).toHaveProperty('label');
-      expect(wrapper.vm.unitOptions[0]).toHaveProperty('value');
+      expect(wrapper.vm.unitOptions[0]).toHaveProperty("label");
+      expect(wrapper.vm.unitOptions[0]).toHaveProperty("value");
     });
 
     it("should include custom unit option", async () => {
       wrapper = await createWrapper();
 
-      const customOption = wrapper.vm.unitOptions.find((option: any) => option.value === "custom");
+      const customOption = wrapper.vm.unitOptions.find(
+        (option: any) => option.value === "custom",
+      );
       expect(customOption).toBeDefined();
       expect(customOption.label.toLowerCase()).toContain("custom");
     });
@@ -209,7 +213,8 @@ describe("OverrideConfigPopup", () => {
       wrapper = await createWrapper();
 
       await wrapper.vm.addOverrideConfig();
-      const newConfig = wrapper.vm.overrideConfigs[wrapper.vm.overrideConfigs.length - 1];
+      const newConfig =
+        wrapper.vm.overrideConfigs[wrapper.vm.overrideConfigs.length - 1];
 
       expect(newConfig.field.matchBy).toBe("name");
       expect(newConfig.field.value).toBe("");
@@ -259,7 +264,9 @@ describe("OverrideConfigPopup", () => {
     it("should return error message for non-existent field", async () => {
       wrapper = await createWrapper();
 
-      expect(wrapper.vm.getFieldDisplayValue("non_existent")).toBe("non_existent (Field not found)");
+      expect(wrapper.vm.getFieldDisplayValue("non_existent")).toBe(
+        "non_existent (Field not found)",
+      );
     });
   });
 
@@ -269,12 +276,15 @@ describe("OverrideConfigPopup", () => {
 
       wrapper.vm.overrideConfigs[0].field.value = "field1";
       wrapper.vm.overrideConfigs[0].config[0].type = "unit";
-      wrapper.vm.overrideConfigs[0].config[0].value = { unit: "bytes", customUnit: "" };
+      wrapper.vm.overrideConfigs[0].config[0].value = {
+        unit: "bytes",
+        customUnit: "",
+      };
 
       wrapper.vm.saveOverrides();
 
-      expect(wrapper.emitted('save')).toBeTruthy();
-      expect(wrapper.emitted('close')).toBeTruthy();
+      expect(wrapper.emitted("save")).toBeTruthy();
+      expect(wrapper.emitted("close")).toBeTruthy();
     });
 
     it("should filter out configs without field values", async () => {
@@ -286,7 +296,7 @@ describe("OverrideConfigPopup", () => {
 
       wrapper.vm.saveOverrides();
 
-      const savedConfigs = wrapper.emitted('save')[0][0];
+      const savedConfigs = wrapper.emitted("save")[0][0];
       expect(savedConfigs).toHaveLength(1);
       expect(savedConfigs[0].field.value).toBe("field1");
     });
@@ -296,17 +306,22 @@ describe("OverrideConfigPopup", () => {
 
       wrapper.vm.overrideConfigs[0].field.value = "field1";
       wrapper.vm.overrideConfigs[0].config[0].type = "unit";
-      wrapper.vm.overrideConfigs[0].config[0].value = { unit: "bytes", customUnit: "" };
+      wrapper.vm.overrideConfigs[0].config[0].value = {
+        unit: "bytes",
+        customUnit: "",
+      };
 
       wrapper.vm.saveOverrides();
 
-      const savedConfigs = wrapper.emitted('save')[0][0];
+      const savedConfigs = wrapper.emitted("save")[0][0];
       expect(savedConfigs[0]).toEqual({
         field: { matchBy: "name", value: "field1" },
-        config: [{
-          type: "unit",
-          value: { unit: "bytes", customUnit: "" }
-        }]
+        config: [
+          {
+            type: "unit",
+            value: { unit: "bytes", customUnit: "" },
+          },
+        ],
       });
     });
 
@@ -319,13 +334,15 @@ describe("OverrideConfigPopup", () => {
 
       wrapper.vm.saveOverrides();
 
-      const savedConfigs = wrapper.emitted('save')[0][0];
+      const savedConfigs = wrapper.emitted("save")[0][0];
       expect(savedConfigs[0]).toEqual({
         field: { matchBy: "name", value: "field1" },
-        config: [{
-          type: "unique_value_color",
-          autoColor: true
-        }]
+        config: [
+          {
+            type: "unique_value_color",
+            autoColor: true,
+          },
+        ],
       });
     });
   });
@@ -336,15 +353,19 @@ describe("OverrideConfigPopup", () => {
 
       wrapper.vm.closePopup();
 
-      expect(wrapper.emitted('close')).toBeTruthy();
+      expect(wrapper.emitted("close")).toBeTruthy();
     });
 
     it("should reset configs to original state when closing", async () => {
       const existingConfig = {
-        overrideConfigs: [{
-          field: { matchBy: "name", value: "field1" },
-          config: [{ type: "unit", value: { unit: "bytes", customUnit: "" } }]
-        }]
+        overrideConfigs: [
+          {
+            field: { matchBy: "name", value: "field1" },
+            config: [
+              { type: "unit", value: { unit: "bytes", customUnit: "" } },
+            ],
+          },
+        ],
       };
 
       wrapper = await createWrapper({ overrideConfig: existingConfig });
@@ -364,10 +385,12 @@ describe("OverrideConfigPopup", () => {
     it("should accept valid columns prop", async () => {
       const validColumns = [
         { label: "Field 1", alias: "field1" },
-        { label: "Field 2", alias: "field2" }
+        { label: "Field 2", alias: "field2" },
       ];
 
-      await expect(createWrapper({ columns: validColumns })).resolves.toBeDefined();
+      await expect(
+        createWrapper({ columns: validColumns }),
+      ).resolves.toBeDefined();
       wrapper = await createWrapper({ columns: validColumns });
     });
 
@@ -384,13 +407,19 @@ describe("OverrideConfigPopup", () => {
 
     it("should accept valid override config prop", async () => {
       const validConfig = {
-        overrideConfigs: [{
-          field: { matchBy: "name", value: "field1" },
-          config: [{ type: "unit", value: { unit: "bytes", customUnit: "" } }]
-        }]
+        overrideConfigs: [
+          {
+            field: { matchBy: "name", value: "field1" },
+            config: [
+              { type: "unit", value: { unit: "bytes", customUnit: "" } },
+            ],
+          },
+        ],
       };
 
-      await expect(createWrapper({ overrideConfig: validConfig })).resolves.toBeDefined();
+      await expect(
+        createWrapper({ overrideConfig: validConfig }),
+      ).resolves.toBeDefined();
       wrapper = await createWrapper({ overrideConfig: validConfig });
     });
   });
@@ -404,7 +433,7 @@ describe("OverrideConfigPopup", () => {
 
     it("should handle component unmounting without errors", async () => {
       wrapper = await createWrapper();
-      
+
       expect(() => {
         wrapper.unmount();
       }).not.toThrow();
@@ -424,33 +453,41 @@ describe("OverrideConfigPopup", () => {
   describe("Edge Cases", () => {
     it("should handle undefined/null config values", async () => {
       const configWithNulls = {
-        overrideConfigs: [{
-          field: { matchBy: "name", value: "" },
-          config: [{ type: "unit", value: { unit: "", customUnit: "" } }]
-        }]
+        overrideConfigs: [
+          {
+            field: { matchBy: "name", value: "" },
+            config: [{ type: "unit", value: { unit: "", customUnit: "" } }],
+          },
+        ],
       };
 
-      await expect(createWrapper({ overrideConfig: configWithNulls })).resolves.toBeDefined();
+      await expect(
+        createWrapper({ overrideConfig: configWithNulls }),
+      ).resolves.toBeDefined();
     });
 
     it("should handle empty overrideConfigs", async () => {
       const emptyConfig = { overrideConfigs: [] };
 
       wrapper = await createWrapper({ overrideConfig: emptyConfig });
-      
+
       // Should create default config
       expect(wrapper.vm.overrideConfigs.length).toBeGreaterThanOrEqual(1);
     });
 
     it("should handle malformed config structure", async () => {
       const malformedConfig = {
-        overrideConfigs: [{
-          field: { matchBy: "name", value: "" },
-          config: [{ type: "unit", value: { unit: "", customUnit: "" } }]
-        }]
+        overrideConfigs: [
+          {
+            field: { matchBy: "name", value: "" },
+            config: [{ type: "unit", value: { unit: "", customUnit: "" } }],
+          },
+        ],
       };
 
-      await expect(createWrapper({ overrideConfig: malformedConfig })).resolves.toBeDefined();
+      await expect(
+        createWrapper({ overrideConfig: malformedConfig }),
+      ).resolves.toBeDefined();
     });
   });
 
@@ -474,7 +511,10 @@ describe("OverrideConfigPopup", () => {
       wrapper.vm.overrideConfigs[0].field.value = "field1";
       wrapper.vm.overrideConfigs[0].config[0].type = "unit";
       // Ensure the value object is properly initialized
-      wrapper.vm.overrideConfigs[0].config[0].value = { unit: "bytes", customUnit: "" };
+      wrapper.vm.overrideConfigs[0].config[0].value = {
+        unit: "bytes",
+        customUnit: "",
+      };
 
       wrapper.vm.addOverrideConfig();
 
@@ -496,17 +536,23 @@ describe("OverrideConfigPopup", () => {
 
       const unitOptions = wrapper.vm.unitOptions;
       expect(unitOptions.length).toBeGreaterThan(0);
-      expect(unitOptions.every((option: any) => typeof option.label === 'string')).toBe(true);
+      expect(
+        unitOptions.every((option: any) => typeof option.label === "string"),
+      ).toBe(true);
     });
   });
 
   describe("Data Normalization", () => {
     it("should initialize with existing configs", async () => {
       const existingConfig = {
-        overrideConfigs: [{
-          field: { matchBy: "name", value: "field1" },
-          config: [{ type: "unit", value: { unit: "bytes", customUnit: "" } }]
-        }]
+        overrideConfigs: [
+          {
+            field: { matchBy: "name", value: "field1" },
+            config: [
+              { type: "unit", value: { unit: "bytes", customUnit: "" } },
+            ],
+          },
+        ],
       };
 
       wrapper = await createWrapper({ overrideConfig: existingConfig });
@@ -518,15 +564,19 @@ describe("OverrideConfigPopup", () => {
 
     it("should normalize unique_value_color configs", async () => {
       const existingConfig = {
-        overrideConfigs: [{
-          field: { matchBy: "name", value: "field1" },
-          config: [{ type: "unique_value_color", autoColor: true }]
-        }]
+        overrideConfigs: [
+          {
+            field: { matchBy: "name", value: "field1" },
+            config: [{ type: "unique_value_color", autoColor: true }],
+          },
+        ],
       };
 
       wrapper = await createWrapper({ overrideConfig: existingConfig });
 
-      expect(wrapper.vm.overrideConfigs[0].config[0].type).toBe("unique_value_color");
+      expect(wrapper.vm.overrideConfigs[0].config[0].type).toBe(
+        "unique_value_color",
+      );
       expect(wrapper.vm.overrideConfigs[0].config[0].autoColor).toBe(true);
     });
   });

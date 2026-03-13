@@ -53,7 +53,9 @@ describe("RegexPatternCache", () => {
     });
 
     it("should handle storage errors gracefully", () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       // Mock storage to throw quota exceeded error
       vi.spyOn(Storage.prototype, "setItem").mockImplementationOnce(() => {
@@ -128,7 +130,9 @@ describe("RegexPatternCache", () => {
     });
 
     it("should handle JSON parse errors gracefully", () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       // Store invalid JSON
       sessionStorage.setItem(`regex_patterns_cache_${orgId}`, "invalid json");
@@ -141,10 +145,15 @@ describe("RegexPatternCache", () => {
     });
 
     it("should handle corrupted cache data", () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       // Store data without required fields
-      sessionStorage.setItem(`regex_patterns_cache_${orgId}`, JSON.stringify({ data: "test" }));
+      sessionStorage.setItem(
+        `regex_patterns_cache_${orgId}`,
+        JSON.stringify({ data: "test" }),
+      );
 
       // Should handle missing timestamp gracefully
       RegexPatternCache.get(orgId);
@@ -156,10 +165,14 @@ describe("RegexPatternCache", () => {
   describe("clear", () => {
     it("should remove cache for specific orgId", () => {
       RegexPatternCache.set(orgId, testData);
-      expect(sessionStorage.getItem(`regex_patterns_cache_${orgId}`)).toBeTruthy();
+      expect(
+        sessionStorage.getItem(`regex_patterns_cache_${orgId}`),
+      ).toBeTruthy();
 
       RegexPatternCache.clear(orgId);
-      expect(sessionStorage.getItem(`regex_patterns_cache_${orgId}`)).toBeNull();
+      expect(
+        sessionStorage.getItem(`regex_patterns_cache_${orgId}`),
+      ).toBeNull();
     });
 
     it("should not affect other org caches", () => {
@@ -173,7 +186,9 @@ describe("RegexPatternCache", () => {
     });
 
     it("should handle errors gracefully", () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       vi.spyOn(Storage.prototype, "removeItem").mockImplementationOnce(() => {
         throw new Error("Storage error");
@@ -208,7 +223,9 @@ describe("RegexPatternCache", () => {
     });
 
     it("should handle errors gracefully", () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       // Mock Object.keys to throw
       vi.spyOn(Object, "keys").mockImplementationOnce(() => {
@@ -257,7 +274,9 @@ describe("RegexPatternCache", () => {
     });
 
     it("should handle JSON parse errors", () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       sessionStorage.setItem(`regex_patterns_cache_${orgId}`, "invalid json");
 

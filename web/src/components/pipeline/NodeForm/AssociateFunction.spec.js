@@ -1,7 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Dialog, Notify } from "quasar";
-import useDnD from '@/plugins/pipelines/useDnD';
+import useDnD from "@/plugins/pipelines/useDnD";
 import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -13,7 +13,7 @@ installQuasar({
 });
 
 const mockAddNode = vi.fn();
-vi.mock('@/plugins/pipelines/useDnD', () => ({
+vi.mock("@/plugins/pipelines/useDnD", () => ({
   default: vi.fn(),
   useDnD: () => ({
     addNode: mockAddNode,
@@ -23,8 +23,8 @@ vi.mock('@/plugins/pipelines/useDnD', () => ({
       userClickedNode: {},
       userSelectedNode: {},
     },
-    deletePipelineNode: vi.fn()
-  })
+    deletePipelineNode: vi.fn(),
+  }),
 }));
 
 describe("AssociateFunction Component", () => {
@@ -36,45 +36,45 @@ describe("AssociateFunction Component", () => {
     // Setup mock store
     mockStore = {
       state: {
-        theme: 'light',
+        theme: "light",
         selectedOrganization: {
-          identifier: "test-org"
+          identifier: "test-org",
         },
         userInfo: {
-          email: "test@example.com"
-        }
-      }
+          email: "test@example.com",
+        },
+      },
     };
 
     // Setup mock pipeline object
     mockPipelineObj = {
       currentSelectedNodeData: {
         data: {},
-        type: 'function'
+        type: "function",
       },
       userSelectedNode: {},
       isEditNode: false,
       functions: {
         function1: {
           function: 'console.log("test function 1");',
-          name: 'function1'
+          name: "function1",
         },
         function2: {
           function: 'console.log("test function 2");',
-          name: 'function2'
+          name: "function2",
         },
         function3: {
           function: 'console.log("test function 3");',
-          name: 'function3'
-        }
-      }
+          name: "function3",
+        },
+      },
     };
 
     // Mock useDnD composable
     vi.mocked(useDnD).mockImplementation(() => ({
       pipelineObj: mockPipelineObj,
       addNode: mockAddNode,
-      deletePipelineNode: vi.fn()
+      deletePipelineNode: vi.fn(),
     }));
 
     // Mount component
@@ -87,12 +87,12 @@ describe("AssociateFunction Component", () => {
         stubs: {
           AddFunction: true,
           ConfirmDialog: true,
-        }
+        },
       },
       props: {
         functions: ["function1", "function2", "function3"],
-        associatedFunctions: ["function4"]
-      }
+        associatedFunctions: ["function4"],
+      },
     });
 
     const notifyMock = vi.fn();
@@ -117,7 +117,11 @@ describe("AssociateFunction Component", () => {
     });
 
     it("initializes with provided functions", () => {
-      expect(wrapper.vm.filteredFunctions).toEqual(["function1", "function2", "function3"]);
+      expect(wrapper.vm.filteredFunctions).toEqual([
+        "function1",
+        "function2",
+        "function3",
+      ]);
     });
   });
 
@@ -125,7 +129,7 @@ describe("AssociateFunction Component", () => {
     it("filters functions based on search value", async () => {
       const mockUpdate = vi.fn();
       wrapper.vm.filterFunctions("function1", mockUpdate);
-      
+
       expect(mockUpdate).toHaveBeenCalled();
       const updateFn = mockUpdate.mock.calls[0][0];
       updateFn();
@@ -135,7 +139,7 @@ describe("AssociateFunction Component", () => {
     it("prevents selecting already associated function", async () => {
       wrapper.vm.selectedFunction = "function4";
       await wrapper.vm.saveFunction();
-      
+
       expect(wrapper.vm.functionExists).toBe(true);
       expect(mockAddNode).not.toHaveBeenCalled();
     });
@@ -143,48 +147,50 @@ describe("AssociateFunction Component", () => {
 
   describe("Create New Function Mode", () => {
     it("toggles create new function mode", async () => {
-      await wrapper.find('[data-test="create-function-toggle"]').trigger('click');
+      await wrapper
+        .find('[data-test="create-function-toggle"]')
+        .trigger("click");
       expect(wrapper.vm.createNewFunction).toBe(true);
     });
 
     it("shows create function form when in create mode", async () => {
       wrapper.vm.createNewFunction = true;
       await wrapper.vm.$nextTick();
-      
-      expect(wrapper.find('.pipeline-add-function').exists()).toBe(true);
+
+      expect(wrapper.find(".pipeline-add-function").exists()).toBe(true);
     });
 
     it("prevents saving when function name is empty in create mode", async () => {
       wrapper.vm.createNewFunction = true;
       await wrapper.vm.$nextTick();
-      
+
       // Mock the addFunctionRef properly
       wrapper.vm.addFunctionRef = {
         formData: {
           name: "",
-          function: ""
-        }
+          function: "",
+        },
       };
 
       await wrapper.vm.saveFunction();
-      
+
       expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
         expect.objectContaining({
           message: "Function Name is required",
-          color: "negative"
-        })
+          color: "negative",
+        }),
       );
     });
 
     it("handles valid function creation", async () => {
       wrapper.vm.createNewFunction = true;
       await wrapper.vm.$nextTick();
-      
+
       wrapper.vm.addFunctionRef = {
         formData: {
           name: "newFunction",
-          function: "console.log('test')"
-        }
+          function: "console.log('test')",
+        },
       };
 
       await wrapper.vm.saveFunction();
@@ -196,25 +202,28 @@ describe("AssociateFunction Component", () => {
     it("opens cancel dialog with changes", async () => {
       wrapper.vm.selectedFunction = "function1";
       await wrapper.vm.openCancelDialog();
-      
+
       expect(wrapper.vm.dialog.show).toBe(true);
       expect(wrapper.vm.dialog.title).toBe("Discard Changes");
-      expect(wrapper.vm.dialog.message).toBe("Are you sure you want to cancel changes?");
+      expect(wrapper.vm.dialog.message).toBe(
+        "Are you sure you want to cancel changes?",
+      );
     });
-
 
     it("opens delete dialog with correct content", async () => {
       await wrapper.vm.openDeleteDialog();
-      
+
       expect(wrapper.vm.dialog.show).toBe(true);
       expect(wrapper.vm.dialog.title).toBe("Delete Node");
-      expect(wrapper.vm.dialog.message).toBe("Are you sure you want to delete function association?");
+      expect(wrapper.vm.dialog.message).toBe(
+        "Are you sure you want to delete function association?",
+      );
     });
 
     it("handles dialog confirmation", async () => {
       await wrapper.vm.openDeleteDialog();
       await wrapper.vm.dialog.okCallback();
-      
+
       expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
     });
   });
@@ -225,29 +234,29 @@ describe("AssociateFunction Component", () => {
       mockPipelineObj.currentSelectedNodeData = {
         data: {
           name: "function1",
-          after_flatten: false
-        }
+          after_flatten: false,
+        },
       };
       mockPipelineObj.functions = {
         function1: {
           function: 'console.log("test function 1");',
-          name: 'function1'
+          name: "function1",
         },
         function2: {
           function: 'console.log("test function 2");',
-          name: 'function2'
+          name: "function2",
         },
         function3: {
           function: 'console.log("test function 3");',
-          name: 'function3'
-        }
+          name: "function3",
+        },
       };
 
       // Mock useDnD composable for edit mode
       vi.mocked(useDnD).mockImplementation(() => ({
         pipelineObj: mockPipelineObj,
         addNode: mockAddNode,
-        deletePipelineNode: vi.fn()
+        deletePipelineNode: vi.fn(),
       }));
 
       // Mount component with edit mode props
@@ -259,13 +268,13 @@ describe("AssociateFunction Component", () => {
           },
           stubs: {
             AddFunction: true,
-            ConfirmDialog: true
-          }
+            ConfirmDialog: true,
+          },
         },
         props: {
           functions: ["function1", "function2", "function3"],
-          associatedFunctions: ["function4"]
-        }
+          associatedFunctions: ["function4"],
+        },
       });
 
       const notifyMock = vi.fn();
@@ -286,42 +295,47 @@ describe("AssociateFunction Component", () => {
       await wrapper.vm.$nextTick();
 
       // Find the select input wrapper
-      const selectInput = wrapper.find('[data-test="associate-function-select-function-input"]');
+      const selectInput = wrapper.find(
+        '[data-test="associate-function-select-function-input"]',
+      );
       expect(selectInput.exists()).toBe(true);
 
       // Find the q-select element
-      const select = selectInput.find('.q-select');
+      const select = selectInput.find(".q-select");
       expect(select.exists()).toBe(true);
 
-
       // Verify the component is actually disabled
-      const inputElement = select.find('input');
+      const inputElement = select.find("input");
       expect(inputElement.exists()).toBe(true);
-      expect(inputElement.attributes().disabled).toBe('');
+      expect(inputElement.attributes().disabled).toBe("");
     });
 
     it("shows delete button in edit mode", () => {
-      const deleteButton = wrapper.find('[data-test="associate-function-delete-btn"]');
+      const deleteButton = wrapper.find(
+        '[data-test="associate-function-delete-btn"]',
+      );
       expect(deleteButton.exists()).toBe(true);
     });
   });
 
   describe("After Flattening Toggle", () => {
     it("toggles after flattening option", async () => {
-      const toggle = wrapper.find('[data-test="associate-function-after-flattening-toggle"]');
-      await toggle.trigger('click');
+      const toggle = wrapper.find(
+        '[data-test="associate-function-after-flattening-toggle"]',
+      );
+      await toggle.trigger("click");
       expect(wrapper.vm.afterFlattening).toBe(false);
     });
 
     it("saves function with after flattening option", async () => {
       wrapper.vm.selectedFunction = "function1";
       wrapper.vm.afterFlattening = false;
-      
+
       await wrapper.vm.saveFunction();
-      
+
       expect(mockAddNode).toHaveBeenCalledWith({
         name: "function1",
-        after_flatten: false
+        after_flatten: false,
       });
     });
   });
@@ -335,22 +349,26 @@ describe("AssociateFunction Component", () => {
           stubs: {
             AddFunction: true,
             ConfirmDialog: true,
-          }
+          },
         },
         props: {
           functions: ["zFunction", "aFunction", "mFunction"],
-          associatedFunctions: []
-        }
+          associatedFunctions: [],
+        },
       });
 
       await flushPromises();
-      expect(wrapper.vm.filteredFunctions).toEqual(["aFunction", "mFunction", "zFunction"]);
+      expect(wrapper.vm.filteredFunctions).toEqual([
+        "aFunction",
+        "mFunction",
+        "zFunction",
+      ]);
     });
 
     it("filters functions case-insensitively", async () => {
       const mockUpdate = vi.fn();
       wrapper.vm.filterFunctions("FUNCTION1", mockUpdate);
-      
+
       expect(mockUpdate).toHaveBeenCalled();
       const updateFn = mockUpdate.mock.calls[0][0];
       updateFn();
@@ -360,11 +378,14 @@ describe("AssociateFunction Component", () => {
 
   describe("Component Style", () => {
     it("applies correct style based on create function mode", async () => {
-      expect(wrapper.vm.computedStyleForFunction).toEqual({ width: "100%", height: "100%" });
-      
+      expect(wrapper.vm.computedStyleForFunction).toEqual({
+        width: "100%",
+        height: "100%",
+      });
+
       wrapper.vm.createNewFunction = true;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.computedStyleForFunction).toEqual({ width: "100%" });
     });
   });
@@ -373,23 +394,23 @@ describe("AssociateFunction Component", () => {
     it("shows spinner when loading", async () => {
       wrapper.vm.loading = true;
       await wrapper.vm.$nextTick();
-      
-      const spinner = wrapper.find('.q-spinner');
+
+      const spinner = wrapper.find(".q-spinner");
       expect(spinner.exists()).toBe(true);
     });
 
     it("hides form content when loading", async () => {
       wrapper.vm.loading = true;
       await wrapper.vm.$nextTick();
-      
-      const formContent = wrapper.find('.stream-routing-container');
+
+      const formContent = wrapper.find(".stream-routing-container");
       // Check if v-else is working correctly
       expect(formContent.exists()).toBe(false);
-      
+
       // Also verify that when not loading, the form is visible
       wrapper.vm.loading = false;
       await wrapper.vm.$nextTick();
-      const visibleForm = wrapper.find('.stream-routing-container');
+      const visibleForm = wrapper.find(".stream-routing-container");
       expect(visibleForm.exists()).toBe(true);
     });
   });

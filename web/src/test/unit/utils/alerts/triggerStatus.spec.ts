@@ -28,7 +28,9 @@ describe("triggerStatus.ts", () => {
     it("should have correct backend status values", () => {
       expect(TriggerDataStatus.Completed).toBe("completed");
       expect(TriggerDataStatus.Failed).toBe("failed");
-      expect(TriggerDataStatus.ConditionNotSatisfied).toBe("condition_not_satisfied");
+      expect(TriggerDataStatus.ConditionNotSatisfied).toBe(
+        "condition_not_satisfied",
+      );
       expect(TriggerDataStatus.Skipped).toBe("skipped");
     });
   });
@@ -45,16 +47,16 @@ describe("triggerStatus.ts", () => {
   describe("TRIGGER_STATUS_DISPLAY_MAP", () => {
     it("should map backend statuses to UI labels correctly", () => {
       expect(TRIGGER_STATUS_DISPLAY_MAP[TriggerDataStatus.Completed]).toBe(
-        TriggerStatusLabel.Firing
+        TriggerStatusLabel.Firing,
       );
       expect(TRIGGER_STATUS_DISPLAY_MAP[TriggerDataStatus.Failed]).toBe(
-        TriggerStatusLabel.Errored
+        TriggerStatusLabel.Errored,
       );
-      expect(TRIGGER_STATUS_DISPLAY_MAP[TriggerDataStatus.ConditionNotSatisfied]).toBe(
-        TriggerStatusLabel.Resolved
-      );
+      expect(
+        TRIGGER_STATUS_DISPLAY_MAP[TriggerDataStatus.ConditionNotSatisfied],
+      ).toBe(TriggerStatusLabel.Resolved);
       expect(TRIGGER_STATUS_DISPLAY_MAP[TriggerDataStatus.Skipped]).toBe(
-        TriggerStatusLabel.Skipped
+        TriggerStatusLabel.Skipped,
       );
     });
 
@@ -97,7 +99,9 @@ describe("triggerStatus.ts", () => {
       expect(sql).toContain("CASE");
       expect(sql).toContain("WHEN status = 'completed' THEN 'Firing'");
       expect(sql).toContain("WHEN status = 'failed' THEN 'Errored'");
-      expect(sql).toContain("WHEN status = 'condition_not_satisfied' THEN 'Resolved'");
+      expect(sql).toContain(
+        "WHEN status = 'condition_not_satisfied' THEN 'Resolved'",
+      );
       expect(sql).toContain("WHEN status = 'skipped' THEN 'Skipped'");
       expect(sql).toContain("ELSE status");
       expect(sql).toContain("END");
@@ -107,7 +111,9 @@ describe("triggerStatus.ts", () => {
       const sql = getStatusMappingSQL("trigger_status");
       expect(sql).toContain("WHEN trigger_status = 'completed' THEN 'Firing'");
       expect(sql).toContain("WHEN trigger_status = 'failed' THEN 'Errored'");
-      expect(sql).toContain("WHEN trigger_status = 'condition_not_satisfied' THEN 'Resolved'");
+      expect(sql).toContain(
+        "WHEN trigger_status = 'condition_not_satisfied' THEN 'Resolved'",
+      );
       expect(sql).toContain("WHEN trigger_status = 'skipped' THEN 'Skipped'");
       expect(sql).toContain("ELSE trigger_status");
     });
@@ -129,7 +135,9 @@ describe("triggerStatus.ts", () => {
     });
 
     it("should return correct backend status for Resolved label", () => {
-      expect(getBackendStatusFromLabel("Resolved")).toBe("condition_not_satisfied");
+      expect(getBackendStatusFromLabel("Resolved")).toBe(
+        "condition_not_satisfied",
+      );
     });
 
     it("should return correct backend status for Skipped label", () => {
@@ -152,10 +160,12 @@ describe("triggerStatus.ts", () => {
 
   describe("bidirectional mapping consistency", () => {
     it("should maintain consistency between forward and reverse mappings", () => {
-      Object.entries(TRIGGER_STATUS_DISPLAY_MAP).forEach(([backendStatus, displayLabel]) => {
-        expect(getStatusDisplayLabel(backendStatus)).toBe(displayLabel);
-        expect(getBackendStatusFromLabel(displayLabel)).toBe(backendStatus);
-      });
+      Object.entries(TRIGGER_STATUS_DISPLAY_MAP).forEach(
+        ([backendStatus, displayLabel]) => {
+          expect(getStatusDisplayLabel(backendStatus)).toBe(displayLabel);
+          expect(getBackendStatusFromLabel(displayLabel)).toBe(backendStatus);
+        },
+      );
     });
   });
 });

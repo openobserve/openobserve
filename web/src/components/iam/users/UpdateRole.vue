@@ -25,7 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- <div>({{ orgMemberData.first_name }}: {{ orgMemberData.email }})</div> -->
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round flat icon="cancel" />
+          <q-btn v-close-popup="true" round
+flat icon="cancel" />
         </div>
       </div>
     </q-card-section>
@@ -171,7 +172,7 @@ export default defineComponent({
             role: this.orgMemberData.role,
             organization_id: parseInt(this.store.state.selectedOrganization.id),
           },
-          this.store.state.selectedOrganization.identifier
+          this.store.state.selectedOrganization.identifier,
         );
 
         callOrgMember.then((res: { data: any }) => {

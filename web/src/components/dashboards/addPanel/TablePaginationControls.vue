@@ -18,8 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="row items-center">
     <!-- Records per page dropdown: only when pagination is enabled -->
     <div v-if="showPagination" class="row items-center q-gutter-sm">
-      <span class="text-caption">{{ t("dashboard.rowsPerPage") }}
-</span>
+      <span class="text-caption">{{ t("dashboard.rowsPerPage") }} </span>
       <q-select
         :model-value="pagination.rowsPerPage"
         @update:model-value="(val: number) => $emit('update:rowsPerPage', val)"

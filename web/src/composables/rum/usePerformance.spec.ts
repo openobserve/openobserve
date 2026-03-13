@@ -12,41 +12,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { describe, it, expect } from 'vitest';
-import usePerformance from './usePerformance';
+import { describe, it, expect } from "vitest";
+import usePerformance from "./usePerformance";
 
-describe('usePerformance', () => {
-  it('should return performanceState and resetSessionState function', () => {
+describe("usePerformance", () => {
+  it("should return performanceState and resetSessionState function", () => {
     const { performanceState, resetSessionState } = usePerformance();
 
     expect(performanceState).toBeDefined();
     expect(resetSessionState).toBeInstanceOf(Function);
   });
 
-  it('should have default performance state structure', () => {
+  it("should have default performance state structure", () => {
     const { performanceState } = usePerformance();
 
-    expect(performanceState).toHaveProperty('data');
-    expect(performanceState.data).toHaveProperty('datetime');
-    expect(performanceState.data).toHaveProperty('streams');
+    expect(performanceState).toHaveProperty("data");
+    expect(performanceState.data).toHaveProperty("datetime");
+    expect(performanceState.data).toHaveProperty("streams");
   });
 
-  it('should have datetime with expected default values', () => {
+  it("should have datetime with expected default values", () => {
     const { performanceState } = usePerformance();
 
     expect(performanceState.data.datetime.startTime).toBe(0);
     expect(performanceState.data.datetime.endTime).toBe(0);
-    expect(performanceState.data.datetime.relativeTimePeriod).toBe('15m');
-    expect(performanceState.data.datetime.valueType).toBe('relative');
+    expect(performanceState.data.datetime.relativeTimePeriod).toBe("15m");
+    expect(performanceState.data.datetime.valueType).toBe("relative");
   });
 
-  it('should have streams object', () => {
+  it("should have streams object", () => {
     const { performanceState } = usePerformance();
 
-    expect(typeof performanceState.data.streams).toBe('object');
+    expect(typeof performanceState.data.streams).toBe("object");
   });
 
-  it('should call resetSessionState without errors', () => {
+  it("should call resetSessionState without errors", () => {
     const { resetSessionState } = usePerformance();
 
     // Should execute without throwing errors

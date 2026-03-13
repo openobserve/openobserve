@@ -69,9 +69,7 @@ export const convertPanelData = async (
         !query?.fields?.y?.length &&
         !query?.fields?.breakdown?.length
       ) {
-        throw new Error(
-          "Please select required fields to render the chart",
-        );
+        throw new Error("Please select required fields to render the chart");
       }
 
       if (

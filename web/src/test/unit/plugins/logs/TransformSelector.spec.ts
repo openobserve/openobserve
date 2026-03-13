@@ -108,15 +108,23 @@ describe("TransformSelector.vue", () => {
         },
         stubs: {
           "q-toggle": { template: "<div class='q-toggle' />" },
-          "q-btn-group": { template: "<div class='q-btn-group'><slot /></div>" },
-          "q-btn-dropdown": { template: "<div class='q-btn-dropdown'><slot /></div>" },
+          "q-btn-group": {
+            template: "<div class='q-btn-group'><slot /></div>",
+          },
+          "q-btn-dropdown": {
+            template: "<div class='q-btn-dropdown'><slot /></div>",
+          },
           "q-btn": { template: "<button class='q-btn'><slot /></button>" },
           "q-icon": { template: "<span class='q-icon' />" },
           "q-tooltip": { template: "<div class='q-tooltip'><slot /></div>" },
           "q-list": { template: "<div class='q-list'><slot /></div>" },
           "q-item": { template: "<div class='q-item'><slot /></div>" },
-          "q-item-section": { template: "<div class='q-item-section'><slot /></div>" },
-          "q-item-label": { template: "<div class='q-item-label'><slot /></div>" },
+          "q-item-section": {
+            template: "<div class='q-item-section'><slot /></div>",
+          },
+          "q-item-label": {
+            template: "<div class='q-item-label'><slot /></div>",
+          },
           "q-select": { template: "<div class='q-select' />" },
           "q-input": { template: "<input class='q-input' />" },
           ...options.stubs,
@@ -315,7 +323,7 @@ describe("TransformSelector.vue", () => {
             "q-list": { template: "<div><slot /></div>" },
             "q-item": { template: "<div><slot /></div>" },
             "q-item-section": {
-              template: '<div @click="$emit(\'click\')"><slot /></div>',
+              template: "<div @click=\"$emit('click')\"><slot /></div>",
             },
             "q-item-label": { template: "<div><slot /></div>" },
             "q-select": true,
@@ -520,7 +528,8 @@ describe("TransformSelector.vue", () => {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
             "q-btn-dropdown": {
-              template: '<div class="dropdown" :disable="$attrs.disable"><slot /></div>',
+              template:
+                '<div class="dropdown" :disable="$attrs.disable"><slot /></div>',
             },
             "q-btn": true,
             "q-icon": true,

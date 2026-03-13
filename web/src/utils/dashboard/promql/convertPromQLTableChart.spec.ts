@@ -183,8 +183,7 @@ describe("TableConverter", () => {
     });
 
     it("should apply value mappings in single mode", async () => {
-      const { findFirstValidMappedValue } =
-        await import("../panelValidation");
+      const { findFirstValidMappedValue } = await import("../panelValidation");
       vi.mocked(findFirstValidMappedValue).mockReturnValueOnce({
         text: "High",
       });
@@ -595,8 +594,7 @@ describe("TableConverter", () => {
     });
 
     it("should apply value mappings to label columns in expanded_timeseries mode", async () => {
-      const { findFirstValidMappedValue } =
-        await import("../panelValidation");
+      const { findFirstValidMappedValue } = await import("../panelValidation");
       vi.mocked(findFirstValidMappedValue).mockReturnValueOnce({
         text: "Production",
       });
@@ -752,8 +750,7 @@ describe("TableConverter", () => {
     });
 
     it("should apply value mappings in value column in expanded_timeseries mode", async () => {
-      const { findFirstValidMappedValue } =
-        await import("../panelValidation");
+      const { findFirstValidMappedValue } = await import("../panelValidation");
       vi.mocked(findFirstValidMappedValue).mockReturnValueOnce({
         text: "High",
       });
@@ -1141,8 +1138,7 @@ describe("TableConverter", () => {
     });
 
     it("should apply value mappings to label columns in all mode", async () => {
-      const { findFirstValidMappedValue } =
-        await import("../panelValidation");
+      const { findFirstValidMappedValue } = await import("../panelValidation");
       vi.mocked(findFirstValidMappedValue).mockReturnValueOnce({
         text: "Production",
       });
@@ -1400,7 +1396,9 @@ describe("TableConverter", () => {
         mockExtras,
       );
 
-      const labelColumns = result.columns.filter((c: any) => !c.name.startsWith("value"));
+      const labelColumns = result.columns.filter(
+        (c: any) => !c.name.startsWith("value"),
+      );
       expect(labelColumns[0].name).toBe("banana");
       expect(labelColumns[1].name).toBe("zebra");
       expect(labelColumns[2].name).toBe("apple");
@@ -1436,7 +1434,9 @@ describe("TableConverter", () => {
         mockExtras,
       );
 
-      const labelColumns = result.columns.filter((c: any) => !c.name.startsWith("value"));
+      const labelColumns = result.columns.filter(
+        (c: any) => !c.name.startsWith("value"),
+      );
       expect(labelColumns[0].name).toBe("banana");
       // Remaining should be alphabetically sorted
       expect(labelColumns[1].name).toBe("apple");
@@ -1474,7 +1474,9 @@ describe("TableConverter", () => {
         mockExtras,
       );
 
-      const labelColumns = result.columns.filter((c: any) => !c.name.startsWith("value"));
+      const labelColumns = result.columns.filter(
+        (c: any) => !c.name.startsWith("value"),
+      );
       // Only banana and apple should be present (zebra and cat don't exist)
       expect(labelColumns.length).toBe(2);
       expect(labelColumns[0].name).toBe("banana");
@@ -1549,7 +1551,9 @@ describe("TableConverter", () => {
         mockExtras,
       );
 
-      const labelColumns = result.columns.filter((c: any) => !c.name.startsWith("value"));
+      const labelColumns = result.columns.filter(
+        (c: any) => !c.name.startsWith("value"),
+      );
       expect(labelColumns[0].name).toBe("apple");
       expect(labelColumns[1].name).toBe("banana");
       expect(labelColumns[2].name).toBe("zebra");
@@ -1558,7 +1562,12 @@ describe("TableConverter", () => {
 
   describe("Edge Cases and Error Handling", () => {
     it("should handle empty processedData array", () => {
-      const result = converter.convert([], { type: "table", config: {} }, mockStore, mockExtras);
+      const result = converter.convert(
+        [],
+        { type: "table", config: {} },
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.rows).toEqual([]);
       expect(result.columns).toBeDefined();
@@ -1709,15 +1718,16 @@ describe("TableConverter", () => {
         mockExtras,
       );
 
-      const labelColumns = result.columns.filter((c: any) => !c.name.startsWith("value"));
+      const labelColumns = result.columns.filter(
+        (c: any) => !c.name.startsWith("value"),
+      );
       expect(labelColumns.length).toBe(8);
     });
   });
 
   describe("Value Mapping Edge Cases", () => {
     it("should handle value mapping when mapped text returns null", async () => {
-      const { findFirstValidMappedValue } =
-        await import("../panelValidation");
+      const { findFirstValidMappedValue } = await import("../panelValidation");
       vi.mocked(findFirstValidMappedValue).mockReturnValueOnce(null);
 
       const processedData: ProcessedPromQLData[] = [
@@ -1755,8 +1765,7 @@ describe("TableConverter", () => {
     });
 
     it("should handle value mapping without text property", async () => {
-      const { findFirstValidMappedValue } =
-        await import("../panelValidation");
+      const { findFirstValidMappedValue } = await import("../panelValidation");
       vi.mocked(findFirstValidMappedValue).mockReturnValueOnce({});
 
       const processedData: ProcessedPromQLData[] = [
@@ -1803,7 +1812,10 @@ describe("TableConverter", () => {
               metric: { job: "api" },
               name: "metric",
               data: [],
-              values: [[1234567890, "100"], [1234567900, "200"]],
+              values: [
+                [1234567890, "100"],
+                [1234567900, "200"],
+              ],
             },
           ],
           timestamps: [],
@@ -1882,4 +1894,3 @@ describe("TableConverter", () => {
     });
   });
 });
-

@@ -8,7 +8,7 @@ import { createI18n } from "vue-i18n";
 
 // Mock external dependencies
 vi.mock("../../utils/zincutils", () => ({
-  getImageURL: vi.fn().mockReturnValue("mocked-image-url")
+  getImageURL: vi.fn().mockReturnValue("mocked-image-url"),
 }));
 
 // Create mock store
@@ -84,8 +84,8 @@ describe("PanelLayoutSettings.vue", () => {
       w: 12,
       x: 0,
       y: 0,
-      i: "panel1"
-    }
+      i: "panel1",
+    },
   };
 
   beforeEach(() => {
@@ -107,14 +107,14 @@ describe("PanelLayoutSettings.vue", () => {
       global: {
         plugins: [store, router, i18n],
         stubs: {
-          'q-btn': true,
-          'q-separator': true,
-          'q-form': true,
-          'q-input': true,
-          'q-icon': true,
-          'q-tooltip': true,
+          "q-btn": true,
+          "q-separator": true,
+          "q-form": true,
+          "q-input": true,
+          "q-icon": true,
+          "q-tooltip": true,
         },
-      }
+      },
     });
 
     expect(wrapper.exists()).toBe(true);
@@ -123,23 +123,23 @@ describe("PanelLayoutSettings.vue", () => {
 
   it("should accept layout prop correctly", () => {
     const layout = { h: 10, w: 8, x: 2, y: 3, i: "test-panel" };
-    
+
     wrapper = shallowMount(PanelLayoutSettings, {
       props: { layout },
       global: {
         plugins: [store, router, i18n],
         stubs: {
-          'q-btn': true,
-          'q-separator': true,
-          'q-form': true,
-          'q-input': true,
-          'q-icon': true,
-          'q-tooltip': true,
+          "q-btn": true,
+          "q-separator": true,
+          "q-form": true,
+          "q-input": true,
+          "q-icon": true,
+          "q-tooltip": true,
         },
-      }
+      },
     });
 
-    expect(wrapper.props('layout')).toEqual(layout);
+    expect(wrapper.props("layout")).toEqual(layout);
     expect(wrapper.vm.updatedLayout).toEqual(layout);
   });
 
@@ -149,14 +149,14 @@ describe("PanelLayoutSettings.vue", () => {
       global: {
         plugins: [store, router, i18n],
         stubs: {
-          'q-btn': true,
-          'q-separator': true,
-          'q-form': true,
-          'q-input': true,
-          'q-icon': true,
-          'q-tooltip': true,
+          "q-btn": true,
+          "q-separator": true,
+          "q-form": true,
+          "q-input": true,
+          "q-icon": true,
+          "q-tooltip": true,
         },
-      }
+      },
     });
 
     expect(wrapper.vm.updatedLayout).toEqual(defaultProps.layout);
@@ -169,14 +169,14 @@ describe("PanelLayoutSettings.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            'q-btn': true,
-            'q-separator': true,
-            'q-form': true,
-            'q-input': true,
-            'q-icon': true,
-            'q-tooltip': true,
+            "q-btn": true,
+            "q-separator": true,
+            "q-form": true,
+            "q-input": true,
+            "q-icon": true,
+            "q-tooltip": true,
           },
-        }
+        },
       });
     });
 
@@ -214,14 +214,14 @@ describe("PanelLayoutSettings.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            'q-btn': true,
-            'q-separator': true,
-            'q-form': true,
-            'q-input': true,
-            'q-icon': true,
-            'q-tooltip': true,
+            "q-btn": true,
+            "q-separator": true,
+            "q-form": true,
+            "q-input": true,
+            "q-icon": true,
+            "q-tooltip": true,
           },
-        }
+        },
       });
     });
 
@@ -229,12 +229,12 @@ describe("PanelLayoutSettings.vue", () => {
       // Modify the layout
       wrapper.vm.updatedLayout.h = 8;
       wrapper.vm.updatedLayout.w = 10;
-      
+
       // Call the method
       wrapper.vm.savePanelLayout();
-      
+
       // Check that the event was emitted with the updated layout
-      const emittedEvents = wrapper.emitted('save:layout');
+      const emittedEvents = wrapper.emitted("save:layout");
       expect(emittedEvents).toBeTruthy();
       expect(emittedEvents!.length).toBe(1);
       expect(emittedEvents![0][0]).toEqual({
@@ -242,18 +242,18 @@ describe("PanelLayoutSettings.vue", () => {
         w: 10,
         x: 0,
         y: 0,
-        i: "panel1"
+        i: "panel1",
       });
     });
 
     it("should emit save:layout with a copy of updatedLayout", () => {
       const originalLayout = { ...wrapper.vm.updatedLayout };
-      
+
       wrapper.vm.savePanelLayout();
-      
-      const emittedEvents = wrapper.emitted('save:layout');
+
+      const emittedEvents = wrapper.emitted("save:layout");
       const emittedLayout = emittedEvents![0][0];
-      
+
       // Verify it's a copy by modifying the original and checking emitted is unchanged
       wrapper.vm.updatedLayout.h = 999;
       expect(emittedLayout).toEqual(originalLayout);
@@ -268,64 +268,66 @@ describe("PanelLayoutSettings.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            'q-btn': true,
-            'q-separator': true,
-            'q-form': true,
-            'q-input': true,
-            'q-icon': true,
-            'q-tooltip': true,
+            "q-btn": true,
+            "q-separator": true,
+            "q-form": true,
+            "q-input": true,
+            "q-icon": true,
+            "q-tooltip": true,
           },
-        }
+        },
       });
     });
 
     it("should apply dark mode class when theme is dark", async () => {
       // Change store theme to dark
       store.state.theme = "dark";
-      
+
       wrapper = shallowMount(PanelLayoutSettings, {
         props: defaultProps,
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            'q-btn': true,
-            'q-separator': true,
-            'q-form': true,
-            'q-input': true,
-            'q-icon': true,
-            'q-tooltip': true,
+            "q-btn": true,
+            "q-separator": true,
+            "q-form": true,
+            "q-input": true,
+            "q-icon": true,
+            "q-tooltip": true,
           },
-        }
+        },
       });
-      
+
       await nextTick();
-      
-      const rootDiv = wrapper.find('div').element;
-      expect(rootDiv.className).toContain('dark-mode');
+
+      const rootDiv = wrapper.find("div").element;
+      expect(rootDiv.className).toContain("dark-mode");
     });
 
     it("should apply light mode class when theme is light", async () => {
-      const rootDiv = wrapper.find('div').element;
-      expect(rootDiv.className).toContain('bg-white');
-      expect(rootDiv.className).not.toContain('dark-mode');
+      const rootDiv = wrapper.find("div").element;
+      expect(rootDiv.className).toContain("bg-white");
+      expect(rootDiv.className).not.toContain("dark-mode");
     });
 
     it("should display panel layout title", () => {
-      expect(wrapper.text()).toContain('Panel Layout');
+      expect(wrapper.text()).toContain("Panel Layout");
     });
 
     it("should have form element", () => {
-      const form = wrapper.find('q-form-stub');
+      const form = wrapper.find("q-form-stub");
       expect(form.exists()).toBe(true);
     });
 
     it("should use getImageURL for close button icon", () => {
       expect(wrapper.vm.getImageURL).toBeDefined();
-      expect(wrapper.vm.getImageURL('images/common/close_icon.svg')).toBe('mocked-image-url');
+      expect(wrapper.vm.getImageURL("images/common/close_icon.svg")).toBe(
+        "mocked-image-url",
+      );
     });
 
     it("should have buttons for actions", () => {
-      const buttons = wrapper.findAll('q-btn-stub');
+      const buttons = wrapper.findAll("q-btn-stub");
       expect(buttons.length).toBeGreaterThan(0);
     });
   });
@@ -337,14 +339,14 @@ describe("PanelLayoutSettings.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            'q-btn': true,
-            'q-separator': true,
-            'q-form': true,
-            'q-input': true,
-            'q-icon': true,
-            'q-tooltip': true,
+            "q-btn": true,
+            "q-separator": true,
+            "q-form": true,
+            "q-input": true,
+            "q-icon": true,
+            "q-tooltip": true,
           },
-        }
+        },
       });
     });
 
@@ -357,14 +359,14 @@ describe("PanelLayoutSettings.vue", () => {
     it("should handle very large height in getRowCount", () => {
       wrapper.vm.updatedLayout.h = 1000;
       const result = wrapper.vm.getRowCount;
-      expect(typeof result).toBe('number');
+      expect(typeof result).toBe("number");
       expect(result).toBeGreaterThan(0);
     });
 
     it("should handle decimal heights in getRowCount", () => {
       wrapper.vm.updatedLayout.h = 2.5;
       const result = wrapper.vm.getRowCount;
-      expect(typeof result).toBe('number');
+      expect(typeof result).toBe("number");
       expect(Number.isInteger(result)).toBe(true);
     });
 
@@ -374,7 +376,7 @@ describe("PanelLayoutSettings.vue", () => {
         w: 6,
         x: 1,
         y: 2,
-        i: "custom-panel"
+        i: "custom-panel",
       };
 
       wrapper = shallowMount(PanelLayoutSettings, {
@@ -382,14 +384,14 @@ describe("PanelLayoutSettings.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            'q-btn': true,
-            'q-separator': true,
-            'q-form': true,
-            'q-input': true,
-            'q-icon': true,
-            'q-tooltip': true,
+            "q-btn": true,
+            "q-separator": true,
+            "q-form": true,
+            "q-input": true,
+            "q-icon": true,
+            "q-tooltip": true,
           },
-        }
+        },
       });
 
       expect(wrapper.vm.updatedLayout).toEqual(customLayout);
@@ -402,18 +404,18 @@ describe("PanelLayoutSettings.vue", () => {
         w: 10,
         x: 2,
         y: 3,
-        i: "updated-panel"
+        i: "updated-panel",
       };
 
       await wrapper.setProps({ layout: newLayout });
       // Note: The component creates a copy, so original layout should be preserved
-      expect(wrapper.props('layout')).toEqual(newLayout);
+      expect(wrapper.props("layout")).toEqual(newLayout);
     });
 
     it("should emit correct event name", () => {
       wrapper.vm.savePanelLayout();
       const emittedEvents = Object.keys(wrapper.emitted());
-      expect(emittedEvents).toContain('save:layout');
+      expect(emittedEvents).toContain("save:layout");
     });
 
     it("should handle negative result in getRowCount calculation", () => {

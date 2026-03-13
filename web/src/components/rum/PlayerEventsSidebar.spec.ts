@@ -281,7 +281,9 @@ describe("PlayerEventsSidebar Component", () => {
     });
 
     it("should render event type selector", () => {
-      const eventSelector = wrapper.find('[data-test="player-events-filter-select"]');
+      const eventSelector = wrapper.find(
+        '[data-test="player-events-filter-select"]',
+      );
       expect(eventSelector.exists()).toBe(true);
     });
 
@@ -516,12 +518,12 @@ describe("PlayerEventsSidebar Component", () => {
     });
 
     it("should have correct search input width", () => {
-      const searchContainer = wrapper.find('.tw\\:w-\\[60\\%\\]');
+      const searchContainer = wrapper.find(".tw\\:w-\\[60\\%\\]");
       expect(searchContainer.exists()).toBe(true);
     });
 
     it("should have correct selector width", () => {
-      const selectorContainer = wrapper.find('.tw\\:w-\\[40\\%\\]');
+      const selectorContainer = wrapper.find(".tw\\:w-\\[40\\%\\]");
       expect(selectorContainer.exists()).toBe(true);
     });
   });
@@ -667,7 +669,8 @@ describe("PlayerEventsSidebar Component", () => {
           stubs: {
             FrustrationEventBadge: {
               name: "FrustrationEventBadge",
-              template: '<span data-test="frustration-badge-stub">{{ frustrationTypes }}</span>',
+              template:
+                '<span data-test="frustration-badge-stub">{{ frustrationTypes }}</span>',
               props: ["frustrationTypes"],
             },
           },
@@ -678,7 +681,7 @@ describe("PlayerEventsSidebar Component", () => {
 
     it("should calculate correct frustration event count", () => {
       const frustratedEvents = wrapper.vm.events.filter(
-        (e: any) => e.frustration_types && e.frustration_types.length > 0
+        (e: any) => e.frustration_types && e.frustration_types.length > 0,
       );
       expect(frustratedEvents.length).toBe(3);
     });
@@ -686,7 +689,7 @@ describe("PlayerEventsSidebar Component", () => {
     it("should return 0 frustration count when no frustrated events", async () => {
       await wrapper.setProps({ events: [mockEventsWithFrustrations[2]] });
       const frustratedEvents = wrapper.vm.events.filter(
-        (e: any) => e.frustration_types && e.frustration_types.length > 0
+        (e: any) => e.frustration_types && e.frustration_types.length > 0,
       );
       expect(frustratedEvents.length).toBe(0);
     });
@@ -734,7 +737,7 @@ describe("PlayerEventsSidebar Component", () => {
 
       const filteredTypes = wrapper.vm.filteredEvents.map((e: any) => e.type);
       const hasFrustrations = wrapper.vm.filteredEvents.some(
-        (e: any) => e.frustration_types && e.frustration_types.length > 0
+        (e: any) => e.frustration_types && e.frustration_types.length > 0,
       );
 
       expect(filteredTypes).toContain("error");
@@ -747,7 +750,7 @@ describe("PlayerEventsSidebar Component", () => {
       await wrapper.vm.$nextTick();
 
       const nonFrustratedEvent = wrapper.vm.filteredEvents.find(
-        (e: any) => e.id === "normal1"
+        (e: any) => e.id === "normal1",
       );
       expect(nonFrustratedEvent).toBeUndefined();
     });
@@ -771,7 +774,7 @@ describe("PlayerEventsSidebar Component", () => {
 
     it("should update frustration count when events change", async () => {
       let frustratedEvents = wrapper.vm.events.filter(
-        (e: any) => e.frustration_types && e.frustration_types.length > 0
+        (e: any) => e.frustration_types && e.frustration_types.length > 0,
       );
       expect(frustratedEvents.length).toBe(3);
 
@@ -780,13 +783,15 @@ describe("PlayerEventsSidebar Component", () => {
       });
 
       frustratedEvents = wrapper.vm.events.filter(
-        (e: any) => e.frustration_types && e.frustration_types.length > 0
+        (e: any) => e.frustration_types && e.frustration_types.length > 0,
       );
       expect(frustratedEvents.length).toBe(1);
     });
 
     it("should handle events with multiple frustration types", () => {
-      const multipleTypes = wrapper.vm.events.find((e: any) => e.id === "frustrated3");
+      const multipleTypes = wrapper.vm.events.find(
+        (e: any) => e.id === "frustrated3",
+      );
       expect(multipleTypes.frustration_types).toHaveLength(2);
       expect(multipleTypes.frustration_types).toContain("rage_click");
       expect(multipleTypes.frustration_types).toContain("error_click");
@@ -804,7 +809,7 @@ describe("PlayerEventsSidebar Component", () => {
 
       await wrapper.setProps({ events: [eventWithEmptyArray] });
       const frustratedEvents = wrapper.vm.events.filter(
-        (e: any) => e.frustration_types && e.frustration_types.length > 0
+        (e: any) => e.frustration_types && e.frustration_types.length > 0,
       );
       expect(frustratedEvents.length).toBe(0);
     });

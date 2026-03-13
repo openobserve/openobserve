@@ -33,12 +33,15 @@ document.body.appendChild(node);
 
 // Mock child components
 vi.mock("@/components/shared/grid/NoData.vue", () => ({
-  default: { name: "NoData", template: "<div data-testid='no-data'>No Data</div>" },
+  default: {
+    name: "NoData",
+    template: "<div data-testid='no-data'>No Data</div>",
+  },
 }));
 
 vi.mock("@/components/shared/grid/Pagination.vue", () => ({
-  default: { 
-    name: "QTablePagination", 
+  default: {
+    name: "QTablePagination",
     template: "<div data-testid='pagination'>Pagination</div>",
     props: ["scope", "resultTotal", "perPageOptions", "position"],
     emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
@@ -50,8 +53,8 @@ vi.mock("@/services/billings", () => ({
   default: {
     list_invoice_history: vi.fn().mockResolvedValue({
       data: {
-        invoices: []
-      }
+        invoices: [],
+      },
     }),
   },
 }));
@@ -69,7 +72,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
 describe("InvoiceTable Component", () => {
   let wrapper: any;
   const mockNotify = vi.fn();
-  
+
   const mockInvoiceData = {
     data: {
       invoices: [
@@ -104,12 +107,12 @@ describe("InvoiceTable Component", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     mockNotify.mockClear();
-    
+
     // Reset BillingService mock with default empty response
     BillingService.list_invoice_history = vi.fn().mockResolvedValue({
-      data: { invoices: [] }
+      data: { invoices: [] },
     });
-    
+
     wrapper = mount(InvoiceTable, {
       attachTo: "#app",
       global: {
@@ -124,7 +127,7 @@ describe("InvoiceTable Component", () => {
         },
       },
     });
-    
+
     await flushPromises();
   });
 
@@ -198,7 +201,9 @@ describe("InvoiceTable Component", () => {
     });
 
     it("should have correct column properties for amount", () => {
-      const amountColumn = wrapper.vm.columns.find((col: any) => col.name === "amount");
+      const amountColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "amount",
+      );
       expect(amountColumn).toEqual({
         name: "amount",
         field: "amount",
@@ -209,7 +214,9 @@ describe("InvoiceTable Component", () => {
     });
 
     it("should have correct column properties for actions", () => {
-      const actionsColumn = wrapper.vm.columns.find((col: any) => col.name === "actions");
+      const actionsColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "actions",
+      );
       expect(actionsColumn).toEqual({
         name: "actions",
         field: "actions",
@@ -222,13 +229,17 @@ describe("InvoiceTable Component", () => {
 
   describe("Service Integration Tests", () => {
     it("should call BillingService on mount", async () => {
-      expect(BillingService.list_invoice_history).toHaveBeenCalledWith("default");
+      expect(BillingService.list_invoice_history).toHaveBeenCalledWith(
+        "default",
+      );
     });
 
     it("should handle service response correctly", async () => {
       // Mock BillingService to return test data
-      BillingService.list_invoice_history = vi.fn().mockResolvedValue(mockInvoiceData);
-      
+      BillingService.list_invoice_history = vi
+        .fn()
+        .mockResolvedValue(mockInvoiceData);
+
       // Create a clean wrapper to avoid VNode issues
       const cleanWrapper = mount(InvoiceTable, {
         attachTo: "#app",
@@ -238,16 +249,16 @@ describe("InvoiceTable Component", () => {
           mocks: { $q: { notify: mockNotify } },
         },
       });
-      
+
       // Call the actual component method
       await cleanWrapper.vm.getInvoiceHistory();
-      
+
       expect(cleanWrapper.vm.invoiceHistory).toHaveLength(2);
       expect(cleanWrapper.vm.invoiceHistory[0].id).toBe(1);
       expect(cleanWrapper.vm.invoiceHistory[0].paid).toBe("Yes");
       expect(cleanWrapper.vm.invoiceHistory[0].amount).toBe("100 USD");
       expect(cleanWrapper.vm.resultTotal).toBe(2);
-      
+
       cleanWrapper.unmount();
     });
 
@@ -256,11 +267,11 @@ describe("InvoiceTable Component", () => {
       const formatCurrency = (total: number, currency: string) => {
         return total + " " + currency.toUpperCase();
       };
-      
+
       const formatPaidStatus = (paid: boolean) => {
         return paid ? "Yes" : "No";
       };
-      
+
       expect(formatCurrency(100, "usd")).toBe("100 USD");
       expect(formatCurrency(150, "eur")).toBe("150 EUR");
       expect(formatPaidStatus(true)).toBe("Yes");
@@ -272,14 +283,14 @@ describe("InvoiceTable Component", () => {
       const testError = new Error("API Error");
       const mockDismiss = vi.fn();
       const mockNotifyFunc = vi.fn(() => mockDismiss);
-      
+
       // Simulate the error handling that would happen in the component
       const simulateErrorHandling = () => {
         const dismiss = mockNotifyFunc({
           spinner: true,
           message: "Please wait while loading invoice history...",
         });
-        
+
         // Simulate the catch block
         dismiss();
         mockNotifyFunc({
@@ -288,16 +299,16 @@ describe("InvoiceTable Component", () => {
           timeout: 5000,
         });
       };
-      
+
       simulateErrorHandling();
-      
+
       // Verify error notification was called with correct parameters
       expect(mockNotifyFunc).toHaveBeenCalledWith({
         type: "negative",
         message: "API Error",
         timeout: 5000,
       });
-      
+
       // Verify invoice history remains empty after error
       expect(wrapper.vm.invoiceHistory).toEqual([]);
       expect(wrapper.vm.resultTotal).toBe(0);
@@ -309,9 +320,11 @@ describe("InvoiceTable Component", () => {
         spinner: true,
         message: "Please wait while loading invoice history...",
       };
-      
+
       expect(expectedLoadingNotification.spinner).toBe(true);
-      expect(expectedLoadingNotification.message).toBe("Please wait while loading invoice history...");
+      expect(expectedLoadingNotification.message).toBe(
+        "Please wait while loading invoice history...",
+      );
       expect(typeof expectedLoadingNotification.message).toBe("string");
     });
   });
@@ -326,18 +339,18 @@ describe("InvoiceTable Component", () => {
 
     it("should update pagination rowsPerPage correctly", () => {
       const newPagination = { label: "10", value: 10 };
-      
+
       wrapper.vm.changePagination(newPagination);
-      
+
       expect(wrapper.vm.pagination.rowsPerPage).toBe(10);
     });
 
     it("should call qTable.setPagination with updated pagination", () => {
       const newPagination = { label: "20", value: 20 };
-      const setPaginationSpy = vi.spyOn(wrapper.vm.qTable, 'setPagination');
-      
+      const setPaginationSpy = vi.spyOn(wrapper.vm.qTable, "setPagination");
+
       wrapper.vm.changePagination(newPagination);
-      
+
       expect(setPaginationSpy).toHaveBeenCalledWith(wrapper.vm.pagination);
     });
 
@@ -347,7 +360,7 @@ describe("InvoiceTable Component", () => {
         { label: "50", value: 50 },
         { label: "All", value: 0 },
       ];
-      
+
       testCases.forEach((testCase) => {
         wrapper.vm.changePagination(testCase);
         expect(wrapper.vm.pagination.rowsPerPage).toBe(testCase.value);
@@ -357,9 +370,9 @@ describe("InvoiceTable Component", () => {
     it("should preserve other pagination properties", () => {
       wrapper.vm.pagination.page = 2;
       wrapper.vm.pagination.sortBy = "amount";
-      
+
       wrapper.vm.changePagination({ label: "10", value: 10 });
-      
+
       expect(wrapper.vm.pagination.page).toBe(2);
       expect(wrapper.vm.pagination.sortBy).toBe("amount");
       expect(wrapper.vm.pagination.rowsPerPage).toBe(10);
@@ -379,7 +392,7 @@ describe("InvoiceTable Component", () => {
 
     it("should handle different parameter types", () => {
       const testValues = [100, "50", null, undefined, {}];
-      
+
       testValues.forEach((value) => {
         expect(() => wrapper.vm.changeMaxRecordToReturn(value)).not.toThrow();
       });
@@ -394,11 +407,14 @@ describe("InvoiceTable Component", () => {
     it("should render QTablePagination component", () => {
       // Check that the template includes pagination slot
       const templateHTML = wrapper.html();
-      const hasPaginationSlot = templateHTML.includes('template') || templateHTML.includes('pagination');
-      
+      const hasPaginationSlot =
+        templateHTML.includes("template") ||
+        templateHTML.includes("pagination");
+
       // As a fallback, check if the component is set up to use pagination
-      const hasPaginationConfig = wrapper.vm.perPageOptions && wrapper.vm.resultTotal !== undefined;
-      
+      const hasPaginationConfig =
+        wrapper.vm.perPageOptions && wrapper.vm.resultTotal !== undefined;
+
       expect(hasPaginationConfig).toBe(true);
     });
 
@@ -407,26 +423,32 @@ describe("InvoiceTable Component", () => {
       expect(wrapper.vm.resultTotal).toBe(0);
       expect(wrapper.vm.perPageOptions).toHaveLength(5);
       expect(wrapper.vm.perPageOptions[0]).toEqual({ label: "5", value: 5 });
-      
+
       // Test that pagination functions exist and work
-      expect(typeof wrapper.vm.changePagination).toBe('function');
-      expect(typeof wrapper.vm.changeMaxRecordToReturn).toBe('function');
-      
+      expect(typeof wrapper.vm.changePagination).toBe("function");
+      expect(typeof wrapper.vm.changeMaxRecordToReturn).toBe("function");
+
       // Verify template structure includes pagination-related elements
       const templateHTML = wrapper.html();
-      expect(templateHTML).toContain('q-table');
+      expect(templateHTML).toContain("q-table");
     });
 
     it("should emit pagination events correctly", async () => {
       // Test the actual pagination event handlers directly
-      const changePaginationSpy = vi.spyOn(wrapper.vm, 'changePagination');
-      const changeMaxRecordSpy = vi.spyOn(wrapper.vm, 'changeMaxRecordToReturn');
-      
+      const changePaginationSpy = vi.spyOn(wrapper.vm, "changePagination");
+      const changeMaxRecordSpy = vi.spyOn(
+        wrapper.vm,
+        "changeMaxRecordToReturn",
+      );
+
       // Call the methods directly to test their behavior
       wrapper.vm.changePagination({ label: "10", value: 10 });
       wrapper.vm.changeMaxRecordToReturn(100);
-      
-      expect(changePaginationSpy).toHaveBeenCalledWith({ label: "10", value: 10 });
+
+      expect(changePaginationSpy).toHaveBeenCalledWith({
+        label: "10",
+        value: 10,
+      });
       expect(changeMaxRecordSpy).toHaveBeenCalledWith(100);
       expect(wrapper.vm.pagination.rowsPerPage).toBe(10);
     });
@@ -438,9 +460,11 @@ describe("InvoiceTable Component", () => {
         total: 100,
         currency: "usd",
       };
-      
+
       const expectedAmount = "100 USD";
-      expect(`${testInvoice.total} ${testInvoice.currency.toUpperCase()}`).toBe(expectedAmount);
+      expect(`${testInvoice.total} ${testInvoice.currency.toUpperCase()}`).toBe(
+        expectedAmount,
+      );
     });
 
     it("should convert paid status correctly", () => {
@@ -454,7 +478,7 @@ describe("InvoiceTable Component", () => {
         ...invoice,
         id: ++index,
       }));
-      
+
       expect(processedInvoices[0].id).toBe(1);
       expect(processedInvoices[1].id).toBe(2);
     });
@@ -469,7 +493,7 @@ describe("InvoiceTable Component", () => {
       const exposedProps = Object.keys(wrapper.vm);
       const expectedProps = [
         "t",
-        "store", 
+        "store",
         "qTable",
         "columns",
         "resultTotal",
@@ -481,7 +505,7 @@ describe("InvoiceTable Component", () => {
         "getInvoiceHistory",
         "getImageURL",
       ];
-      
+
       expectedProps.forEach((prop) => {
         expect(exposedProps).toContain(prop);
       });
@@ -499,25 +523,25 @@ describe("InvoiceTable Component", () => {
       // Test timeout error structure
       const timeoutError = new Error("Network timeout");
       timeoutError.name = "TimeoutError";
-      
+
       expect(timeoutError.message).toBe("Network timeout");
       expect(timeoutError.name).toBe("TimeoutError");
-      
+
       const expectedErrorNotification = {
         type: "negative",
         message: timeoutError.message,
         timeout: 5000,
       };
-      
+
       expect(expectedErrorNotification.type).toBe("negative");
       expect(expectedErrorNotification.timeout).toBe(5000);
     });
 
     it("should handle malformed response data", async () => {
       BillingService.list_invoice_history = vi.fn().mockResolvedValue({
-        data: null
+        data: null,
       });
-      
+
       const testWrapper = mount(InvoiceTable, {
         attachTo: "#app",
         global: {
@@ -526,12 +550,12 @@ describe("InvoiceTable Component", () => {
           mocks: { $q: { notify: mockNotify } },
         },
       });
-      
+
       await flushPromises();
-      
+
       // Should not crash, just handle gracefully
       expect(testWrapper.exists()).toBe(true);
-      
+
       testWrapper.unmount();
     });
 
@@ -542,13 +566,15 @@ describe("InvoiceTable Component", () => {
             {
               period_start: "2023-01-01",
               // Missing other properties
-            }
+            },
           ],
         },
       };
-      
-      BillingService.list_invoice_history = vi.fn().mockResolvedValue(incompleteInvoiceData);
-      
+
+      BillingService.list_invoice_history = vi
+        .fn()
+        .mockResolvedValue(incompleteInvoiceData);
+
       const testWrapper = mount(InvoiceTable, {
         attachTo: "#app",
         global: {
@@ -557,16 +583,16 @@ describe("InvoiceTable Component", () => {
           mocks: { $q: { notify: mockNotify } },
         },
       });
-      
+
       await flushPromises();
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       if (testWrapper.vm.invoiceHistory.length > 0) {
         const invoice = testWrapper.vm.invoiceHistory[0];
         expect(invoice.id).toBe(1);
         expect(invoice.start_date).toBe("2023-01-01");
       }
-      
+
       testWrapper.unmount();
     });
   });
@@ -589,10 +615,10 @@ describe("InvoiceTable Component", () => {
       wrapper.vm.qTable = {
         setPagination: vi.fn(),
       };
-      
+
       // Change pagination
       wrapper.vm.changePagination({ label: "10", value: 10 });
-      
+
       // Verify final state
       expect(wrapper.vm.pagination.rowsPerPage).toBe(10);
       expect(wrapper.vm.resultTotal).toBe(0);
@@ -608,7 +634,7 @@ describe("InvoiceTable Component", () => {
   describe("Additional Edge Cases", () => {
     it("should handle component destruction gracefully", () => {
       expect(wrapper.exists()).toBe(true);
-      
+
       // Create a test wrapper specifically for testing unmounting
       const testWrapper = mount(InvoiceTable, {
         attachTo: "#app",
@@ -618,10 +644,10 @@ describe("InvoiceTable Component", () => {
           mocks: { $q: { notify: mockNotify } },
         },
       });
-      
+
       expect(testWrapper.exists()).toBe(true);
       testWrapper.unmount();
-      
+
       // After unmounting, the wrapper should no longer exist
       expect(testWrapper.exists()).toBe(false);
     });
@@ -631,42 +657,46 @@ describe("InvoiceTable Component", () => {
       columns.forEach((column: any) => {
         expect(column.name).toBe(column.field);
         expect(column.label).toBeDefined();
-        expect(['left', 'right', 'center']).toContain(column.align);
+        expect(["left", "right", "center"]).toContain(column.align);
       });
     });
 
     it("should handle empty BillingService response", async () => {
       BillingService.list_invoice_history = vi.fn().mockResolvedValue({
-        data: { invoices: [] }
+        data: { invoices: [] },
       });
-      
+
       // Component already mounted with empty response in beforeEach
       expect(wrapper.vm.invoiceHistory).toEqual([]);
       expect(wrapper.vm.resultTotal).toBe(0);
     });
 
     it("should verify all component methods exist", () => {
-      const requiredMethods = ['getInvoiceHistory', 'changePagination', 'changeMaxRecordToReturn'];
-      requiredMethods.forEach(method => {
-        expect(typeof wrapper.vm[method]).toBe('function');
+      const requiredMethods = [
+        "getInvoiceHistory",
+        "changePagination",
+        "changeMaxRecordToReturn",
+      ];
+      requiredMethods.forEach((method) => {
+        expect(typeof wrapper.vm[method]).toBe("function");
       });
     });
 
     it("should validate pagination configuration", () => {
       const pagination = wrapper.vm.pagination;
-      expect(pagination).toHaveProperty('rowsPerPage');
-      expect(typeof pagination.rowsPerPage).toBe('number');
+      expect(pagination).toHaveProperty("rowsPerPage");
+      expect(typeof pagination.rowsPerPage).toBe("number");
       expect(pagination.rowsPerPage).toBeGreaterThan(0);
     });
 
     it("should handle multiple currency formats", () => {
       const testCases = [
-        { total: 100, currency: 'usd', expected: '100 USD' },
-        { total: 50.50, currency: 'eur', expected: '50.5 EUR' },
-        { total: 0, currency: 'gbp', expected: '0 GBP' },
+        { total: 100, currency: "usd", expected: "100 USD" },
+        { total: 50.5, currency: "eur", expected: "50.5 EUR" },
+        { total: 0, currency: "gbp", expected: "0 GBP" },
       ];
-      
-      testCases.forEach(testCase => {
+
+      testCases.forEach((testCase) => {
         const result = `${testCase.total} ${testCase.currency.toUpperCase()}`;
         expect(result).toBe(testCase.expected);
       });

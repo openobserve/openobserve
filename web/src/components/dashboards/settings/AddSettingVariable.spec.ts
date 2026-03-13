@@ -43,81 +43,83 @@ vi.mock("vue-i18n", () => ({
         "dashboard.queryValues": "Query Values",
         "dashboard.constant": "Constant",
         "dashboard.textbox": "Textbox",
-        "dashboard.custom": "Custom"
+        "dashboard.custom": "Custom",
       };
       return translations[key] || key;
-    })
-  })
+    }),
+  }),
 }));
 
 vi.mock("vuex", () => ({
   useStore: () => ({
     state: {
       selectedOrganization: {
-        identifier: "test-org"
+        identifier: "test-org",
       },
-      theme: "light"
-    }
-  })
+      theme: "light",
+    },
+  }),
 }));
 
 vi.mock("vue-router", () => ({
   useRoute: () => ({
     query: {
       dashboard: "test-dashboard",
-      folder: "test-folder"
-    }
-  })
+      folder: "test-folder",
+    },
+  }),
 }));
 
 // Mock composables
 const mockStreams = {
-  getStreams: vi.fn().mockResolvedValue({ list: [
-    { name: "stream1", type: "logs" },
-    { name: "stream2", type: "logs" }
-  ]}),
+  getStreams: vi.fn().mockResolvedValue({
+    list: [
+      { name: "stream1", type: "logs" },
+      { name: "stream2", type: "logs" },
+    ],
+  }),
   getStream: vi.fn().mockResolvedValue({
     schema: [
       { name: "field1", type: "string" },
-      { name: "field2", type: "number" }
-    ]
-  })
+      { name: "field2", type: "number" },
+    ],
+  }),
 };
 
 vi.mock("@/composables/useStreams", () => ({
-  default: vi.fn(() => mockStreams)
+  default: vi.fn(() => mockStreams),
 }));
 
 const mockUseSelectAutoComplete = {
   filterFn: vi.fn(),
   filteredOptions: ref([
     { name: "stream1", type: "logs" },
-    { name: "stream2", type: "logs" }
-  ])
+    { name: "stream2", type: "logs" },
+  ]),
 };
 
 vi.mock("../../../composables/useSelectAutocomplete", () => ({
-  useSelectAutoComplete: vi.fn(() => mockUseSelectAutoComplete)
+  useSelectAutoComplete: vi.fn(() => mockUseSelectAutoComplete),
 }));
 
 const mockLoading = {
   isLoading: { value: false },
   execute: vi.fn().mockResolvedValue({}),
-  error: { value: null }
+  error: { value: null },
 };
 
 vi.mock("../../../composables/useLoading", () => ({
-  useLoading: vi.fn(() => mockLoading)
+  useLoading: vi.fn(() => mockLoading),
 }));
 
 const mockNotifications = {
   showPositiveNotification: vi.fn(),
   showErrorNotification: vi.fn(),
-  showConfictErrorNotificationWithRefreshBtn: vi.fn()
+  showConfictErrorNotificationWithRefreshBtn: vi.fn(),
 };
 
 vi.mock("@/composables/useNotifications", () => ({
-  default: vi.fn(() => mockNotifications)
+  default: vi.fn(() => mockNotifications),
 }));
 
 // Mock utils
@@ -126,17 +128,21 @@ vi.mock("../../../utils/commons", () => ({
   getDashboard: vi.fn().mockResolvedValue({
     variables: {
       list: [
-        { name: "existingVar", type: "custom", options: [{ label: "test", value: "test", selected: true }] }
-      ]
-    }
+        {
+          name: "existingVar",
+          type: "custom",
+          options: [{ label: "test", value: "test", selected: true }],
+        },
+      ],
+    },
   }),
-  updateVariable: vi.fn().mockResolvedValue({})
+  updateVariable: vi.fn().mockResolvedValue({}),
 }));
 
 // Mock dependency utils
 vi.mock("../../../utils/dashboard/variables/variablesDependencyUtils", () => ({
   buildVariablesDependencyGraph: vi.fn().mockReturnValue({}),
-  isGraphHasCycle: vi.fn().mockReturnValue(null)
+  isGraphHasCycle: vi.fn().mockReturnValue(null),
 }));
 
 // Mock scope utils
@@ -145,7 +151,7 @@ vi.mock("@/utils/dashboard/variables/variablesScopeUtils", () => ({
     if (v.panels && v.panels.length > 0) return "panels";
     if (v.tabs && v.tabs.length > 0) return "tabs";
     return "global";
-  })
+  }),
 }));
 
 // Mock child components
@@ -154,17 +160,24 @@ vi.mock("./common/DashboardHeader.vue", () => ({
     name: "DashboardHeader",
     template: '<div data-test="dashboard-header-mock"><slot /></div>',
     props: ["title", "backButton"],
-    emits: ["back"]
-  }
+    emits: ["back"],
+  },
 }));
 
 vi.mock("../addPanel/CommonAutoComplete.vue", () => ({
   default: {
     name: "CommonAutoComplete",
     template: '<div class="common-autocomplete-mock" v-bind="$attrs"></div>',
-    props: ["modelValue", "items", "searchRegex", "rules", "debounce", "placeholder"],
+    props: [
+      "modelValue",
+      "items",
+      "searchRegex",
+      "rules",
+      "debounce",
+      "placeholder",
+    ],
     emits: ["update:modelValue", "select"],
-  }
+  },
 }));
 
 describe("AddSettingVariable", () => {
@@ -174,8 +187,8 @@ describe("AddSettingVariable", () => {
     variableName: null,
     dashboardVariablesList: [
       { name: "var1", type: "custom" },
-      { name: "var2", type: "query_values" }
-    ]
+      { name: "var2", type: "query_values" },
+    ],
   };
 
   beforeEach(async () => {
@@ -185,7 +198,7 @@ describe("AddSettingVariable", () => {
       global: {
         plugins: [Quasar],
       },
-      props: defaultProps
+      props: defaultProps,
     });
 
     // Wait for async onMounted to complete (it awaits getDashboard)
@@ -199,7 +212,9 @@ describe("AddSettingVariable", () => {
   describe("Component Initialization", () => {
     it("should render correctly", () => {
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-header-mock"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-header-mock"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should have correct component name", () => {
@@ -207,8 +222,10 @@ describe("AddSettingVariable", () => {
     });
 
     it("should accept props correctly", () => {
-      expect(wrapper.props('variableName')).toBe(null);
-      expect(wrapper.props('dashboardVariablesList')).toEqual(defaultProps.dashboardVariablesList);
+      expect(wrapper.props("variableName")).toBe(null);
+      expect(wrapper.props("dashboardVariablesList")).toEqual(
+        defaultProps.dashboardVariablesList,
+      );
     });
 
     it("should initialize with default variable type", () => {
@@ -222,7 +239,9 @@ describe("AddSettingVariable", () => {
 
   describe("Variable Types", () => {
     it("should render variable type selector", () => {
-      const typeSelect = wrapper.find('[data-test="dashboard-variable-type-select"]');
+      const typeSelect = wrapper.find(
+        '[data-test="dashboard-variable-type-select"]',
+      );
       expect(typeSelect.exists()).toBe(true);
     });
 
@@ -231,7 +250,7 @@ describe("AddSettingVariable", () => {
         { label: "Query Values", value: "query_values" },
         { label: "Constant", value: "constant" },
         { label: "Textbox", value: "textbox" },
-        { label: "Custom", value: "custom" }
+        { label: "Custom", value: "custom" },
       ];
       expect(wrapper.vm.variableTypes).toEqual(expectedTypes);
     });
@@ -240,20 +259,32 @@ describe("AddSettingVariable", () => {
       // Test query_values type
       wrapper.vm.variableData.type = "query_values";
       await nextTick();
-      
-      expect(wrapper.find('[data-test="dashboard-variable-stream-type-select"]').exists()).toBe(true);
+
+      expect(
+        wrapper
+          .find('[data-test="dashboard-variable-stream-type-select"]')
+          .exists(),
+      ).toBe(true);
 
       // Test constant type
       wrapper.vm.variableData.type = "constant";
       await nextTick();
-      
-      expect(wrapper.find('[data-test="dashboard-variable-constant-value"]').exists()).toBe(true);
+
+      expect(
+        wrapper
+          .find('[data-test="dashboard-variable-constant-value"]')
+          .exists(),
+      ).toBe(true);
 
       // Test textbox type
       wrapper.vm.variableData.type = "textbox";
       await nextTick();
-      
-      expect(wrapper.find('[data-test="dashboard-variable-textbox-default-value"]').exists()).toBe(true);
+
+      expect(
+        wrapper
+          .find('[data-test="dashboard-variable-textbox-default-value"]')
+          .exists(),
+      ).toBe(true);
     });
   });
 
@@ -271,7 +302,7 @@ describe("AddSettingVariable", () => {
     it("should validate required name field", async () => {
       const nameField = wrapper.find('[data-test="dashboard-variable-name"]');
       expect(nameField.exists()).toBe(true);
-      
+
       // Test that field has validation functionality
       expect(wrapper.vm.variableData.name).toBeDefined();
     });
@@ -279,7 +310,7 @@ describe("AddSettingVariable", () => {
     it("should validate name field format", () => {
       const nameField = wrapper.find('[data-test="dashboard-variable-name"]');
       expect(nameField.exists()).toBe(true);
-      
+
       // Test that the component has validation logic
       expect(wrapper.vm.variableData.name).toBeDefined();
     });
@@ -292,53 +323,69 @@ describe("AddSettingVariable", () => {
     });
 
     it("should render stream type selector", () => {
-      const streamTypeSelect = wrapper.find('[data-test="dashboard-variable-stream-type-select"]');
+      const streamTypeSelect = wrapper.find(
+        '[data-test="dashboard-variable-stream-type-select"]',
+      );
       expect(streamTypeSelect.exists()).toBe(true);
     });
 
     it("should render stream selector", () => {
-      const streamSelect = wrapper.find('[data-test="dashboard-variable-stream-select"]');
+      const streamSelect = wrapper.find(
+        '[data-test="dashboard-variable-stream-select"]',
+      );
       expect(streamSelect.exists()).toBe(true);
     });
 
     it("should render field selector", () => {
-      const fieldSelect = wrapper.find('[data-test="dashboard-variable-field-select"]');
+      const fieldSelect = wrapper.find(
+        '[data-test="dashboard-variable-field-select"]',
+      );
       expect(fieldSelect.exists()).toBe(true);
     });
 
     it("should render max record size field", () => {
-      const maxRecordSize = wrapper.find('[data-test="dashboard-variable-max-record-size"]');
+      const maxRecordSize = wrapper.find(
+        '[data-test="dashboard-variable-max-record-size"]',
+      );
       expect(maxRecordSize.exists()).toBe(true);
     });
 
     it("should have correct stream type options", () => {
       expect(wrapper.vm.data.streamType).toEqual([
-        "logs", "metrics", "traces", "enrichment_tables", "metadata"
+        "logs",
+        "metrics",
+        "traces",
+        "enrichment_tables",
+        "metadata",
       ]);
     });
 
     it("should update streams when stream type changes", async () => {
       wrapper.vm.variableData.query_data.stream_type = "logs";
-      
+
       await wrapper.vm.streamTypeUpdated();
-      
+
       expect(mockStreams.getStreams).toHaveBeenCalledWith("logs", false);
       expect(wrapper.vm.data.streams).toEqual([
         { name: "stream1", type: "logs" },
-        { name: "stream2", type: "logs" }
+        { name: "stream2", type: "logs" },
       ]);
     });
 
     it("should update fields when stream changes", async () => {
       wrapper.vm.variableData.query_data.stream_type = "logs";
       wrapper.vm.variableData.query_data.stream = "stream1";
-      
+
       await wrapper.vm.streamUpdated();
-      
-      expect(mockStreams.getStream).toHaveBeenCalledWith("stream1", "logs", true);
+
+      expect(mockStreams.getStream).toHaveBeenCalledWith(
+        "stream1",
+        "logs",
+        true,
+      );
       expect(wrapper.vm.data.currentFieldsList).toEqual([
         { name: "field1", type: "string" },
-        { name: "field2", type: "number" }
+        { name: "field2", type: "number" },
       ]);
     });
   });
@@ -350,23 +397,33 @@ describe("AddSettingVariable", () => {
     });
 
     it("should render add filter button", () => {
-      const addFilterBtn = wrapper.find('[data-test="dashboard-add-filter-btn"]');
+      const addFilterBtn = wrapper.find(
+        '[data-test="dashboard-add-filter-btn"]',
+      );
       expect(addFilterBtn.exists()).toBe(true);
     });
 
     it("should add filter when button clicked", async () => {
-      const initialFilterCount = wrapper.vm.variableData.query_data.filter.length;
-      const addFilterBtn = wrapper.find('[data-test="dashboard-add-filter-btn"]');
+      const initialFilterCount =
+        wrapper.vm.variableData.query_data.filter.length;
+      const addFilterBtn = wrapper.find(
+        '[data-test="dashboard-add-filter-btn"]',
+      );
 
       await addFilterBtn.trigger("click");
 
-      expect(wrapper.vm.variableData.query_data.filter).toHaveLength(initialFilterCount + 1);
-      
-      const newFilter = wrapper.vm.variableData.query_data.filter[wrapper.vm.variableData.query_data.filter.length - 1];
+      expect(wrapper.vm.variableData.query_data.filter).toHaveLength(
+        initialFilterCount + 1,
+      );
+
+      const newFilter =
+        wrapper.vm.variableData.query_data.filter[
+          wrapper.vm.variableData.query_data.filter.length - 1
+        ];
       expect(newFilter).toEqual({
         name: "",
         operator: "=",
-        value: ""
+        value: "",
       });
     });
 
@@ -374,27 +431,45 @@ describe("AddSettingVariable", () => {
       // Add a filter first
       wrapper.vm.addFilter();
       wrapper.vm.addFilter();
-      const initialFilterCount = wrapper.vm.variableData.query_data.filter.length;
+      const initialFilterCount =
+        wrapper.vm.variableData.query_data.filter.length;
 
       wrapper.vm.removeFilter(0);
 
-      expect(wrapper.vm.variableData.query_data.filter).toHaveLength(initialFilterCount - 1);
+      expect(wrapper.vm.variableData.query_data.filter).toHaveLength(
+        initialFilterCount - 1,
+      );
     });
 
     it("should have correct operator options for filters", () => {
       const expectedOperators = [
-        '=', '!=', '>=', '<=', '>', '<', 'IN', 'NOT IN',
-        'str_match', 'str_match_ignore_case', 'match_all',
-        're_match', 're_not_match', 'Contains', 'Not Contains',
-        'Starts With', 'Ends With', 'Is Null', 'Is Not Null'
+        "=",
+        "!=",
+        ">=",
+        "<=",
+        ">",
+        "<",
+        "IN",
+        "NOT IN",
+        "str_match",
+        "str_match_ignore_case",
+        "match_all",
+        "re_match",
+        "re_not_match",
+        "Contains",
+        "Not Contains",
+        "Starts With",
+        "Ends With",
+        "Is Null",
+        "Is Not Null",
       ];
 
       // Add a filter to test
       wrapper.vm.addFilter();
-      
+
       // The operators are defined in the template, so we check if they're available
-      expect(expectedOperators).toContain('=');
-      expect(expectedOperators).toContain('Is Null');
+      expect(expectedOperators).toContain("=");
+      expect(expectedOperators).toContain("Is Null");
     });
   });
 
@@ -412,16 +487,21 @@ describe("AddSettingVariable", () => {
 
     it("should add new custom option", () => {
       const initialOptionsCount = wrapper.vm.variableData.options.length;
-      
+
       wrapper.vm.addField();
-      
-      expect(wrapper.vm.variableData.options).toHaveLength(initialOptionsCount + 1);
-      
-      const newOption = wrapper.vm.variableData.options[wrapper.vm.variableData.options.length - 1];
+
+      expect(wrapper.vm.variableData.options).toHaveLength(
+        initialOptionsCount + 1,
+      );
+
+      const newOption =
+        wrapper.vm.variableData.options[
+          wrapper.vm.variableData.options.length - 1
+        ];
       expect(newOption).toEqual({
         label: "",
         value: "",
-        selected: false
+        selected: false,
       });
     });
 
@@ -430,27 +510,31 @@ describe("AddSettingVariable", () => {
       wrapper.vm.addField();
       wrapper.vm.addField();
       const initialOptionsCount = wrapper.vm.variableData.options.length;
-      
+
       wrapper.vm.removeField(0);
-      
-      expect(wrapper.vm.variableData.options).toHaveLength(initialOptionsCount - 1);
+
+      expect(wrapper.vm.variableData.options).toHaveLength(
+        initialOptionsCount - 1,
+      );
     });
 
     it("should not remove option if only one exists", () => {
       // Reset to single option
-      wrapper.vm.variableData.options = [{ label: "test", value: "test", selected: true }];
-      
+      wrapper.vm.variableData.options = [
+        { label: "test", value: "test", selected: true },
+      ];
+
       wrapper.vm.removeField(0);
-      
+
       expect(wrapper.vm.variableData.options).toHaveLength(1);
     });
 
     it("should handle custom select all checkbox", () => {
       wrapper.vm.variableData.options = [
         { label: "opt1", value: "val1", selected: true },
-        { label: "opt2", value: "val2", selected: true }
+        { label: "opt2", value: "val2", selected: true },
       ];
-      
+
       // Test that custom select all model exists
       expect(wrapper.vm.customSelectAllModel).toBeDefined();
     });
@@ -460,8 +544,10 @@ describe("AddSettingVariable", () => {
     it("should render multi-select toggle for query_values", async () => {
       wrapper.vm.variableData.type = "query_values";
       await nextTick();
-      
-      const multiSelectToggle = wrapper.find('[data-test="dashboard-query_values-show_multiple_values"]');
+
+      const multiSelectToggle = wrapper.find(
+        '[data-test="dashboard-query_values-show_multiple_values"]',
+      );
       expect(multiSelectToggle.exists()).toBe(true);
     });
 
@@ -469,11 +555,17 @@ describe("AddSettingVariable", () => {
       wrapper.vm.variableData.type = "query_values";
       wrapper.vm.variableData.multiSelect = true;
       await nextTick();
-      
-      const firstValueBtn = wrapper.find('[data-test="dashboard-multi-select-default-value-toggle-first-value"]');
-      const allValuesBtn = wrapper.find('[data-test="dashboard-multi-select-default-value-toggle-all-values"]');
-      const customBtn = wrapper.find('[data-test="dashboard-multi-select-default-value-toggle-custom"]');
-      
+
+      const firstValueBtn = wrapper.find(
+        '[data-test="dashboard-multi-select-default-value-toggle-first-value"]',
+      );
+      const allValuesBtn = wrapper.find(
+        '[data-test="dashboard-multi-select-default-value-toggle-all-values"]',
+      );
+      const customBtn = wrapper.find(
+        '[data-test="dashboard-multi-select-default-value-toggle-custom"]',
+      );
+
       expect(firstValueBtn.exists()).toBe(true);
       expect(allValuesBtn.exists()).toBe(true);
       expect(customBtn.exists()).toBe(true);
@@ -482,39 +574,46 @@ describe("AddSettingVariable", () => {
     it("should handle multi-select default value selection", async () => {
       wrapper.vm.variableData.type = "query_values";
       wrapper.vm.variableData.selectAllValueForMultiSelect = "first";
-      
-      const allValuesBtn = wrapper.find('[data-test="dashboard-multi-select-default-value-toggle-all-values"]');
+
+      const allValuesBtn = wrapper.find(
+        '[data-test="dashboard-multi-select-default-value-toggle-all-values"]',
+      );
       await allValuesBtn.trigger("click");
-      
+
       expect(wrapper.vm.variableData.selectAllValueForMultiSelect).toBe("all");
     });
   });
 
   describe("Additional Options", () => {
     it("should render hide on dashboard toggle", () => {
-      const hideToggle = wrapper.find('[data-test="dashboard-variable-hide_on_dashboard"]');
+      const hideToggle = wrapper.find(
+        '[data-test="dashboard-variable-hide_on_dashboard"]',
+      );
       expect(hideToggle.exists()).toBe(true);
     });
 
     it("should toggle hide on dashboard option", async () => {
       const initialValue = wrapper.vm.variableData.hideOnDashboard;
-      
+
       wrapper.vm.variableData.hideOnDashboard = !initialValue;
       await nextTick();
-      
+
       expect(wrapper.vm.variableData.hideOnDashboard).toBe(!initialValue);
     });
 
     it("should render escape single quotes toggle", () => {
-      const escapeToggle = wrapper.find('[data-test*="dashboard-config-limit-info"]').exists() || 
-                          wrapper.vm.variableData.hasOwnProperty('escapeSingleQuotes');
+      const escapeToggle =
+        wrapper.find('[data-test*="dashboard-config-limit-info"]').exists() ||
+        wrapper.vm.variableData.hasOwnProperty("escapeSingleQuotes");
       expect(escapeToggle).toBe(true);
     });
   });
 
   describe("Form Actions", () => {
     it("should render cancel button", () => {
-      const cancelBtn = wrapper.find('[data-test="dashboard-variable-cancel-btn"]');
+      const cancelBtn = wrapper.find(
+        '[data-test="dashboard-variable-cancel-btn"]',
+      );
       expect(cancelBtn.exists()).toBe(true);
     });
 
@@ -524,10 +623,12 @@ describe("AddSettingVariable", () => {
     });
 
     it("should emit close event when cancel clicked", async () => {
-      const cancelBtn = wrapper.find('[data-test="dashboard-variable-cancel-btn"]');
-      
+      const cancelBtn = wrapper.find(
+        '[data-test="dashboard-variable-cancel-btn"]',
+      );
+
       await cancelBtn.trigger("click");
-      
+
       expect(wrapper.emitted("close")).toBeTruthy();
     });
 
@@ -536,15 +637,15 @@ describe("AddSettingVariable", () => {
       wrapper.vm.variableData.name = "test-variable";
       wrapper.vm.variableData.type = "constant";
       wrapper.vm.variableData.value = "test-value";
-      
+
       // Mock form validation to pass
       const mockForm = {
-        validate: vi.fn().mockResolvedValue(true)
+        validate: vi.fn().mockResolvedValue(true),
       };
       wrapper.vm.addVariableForm = mockForm;
-      
+
       await wrapper.vm.onSubmit();
-      
+
       expect(mockForm.validate).toHaveBeenCalled();
     });
   });
@@ -557,10 +658,10 @@ describe("AddSettingVariable", () => {
         },
         props: {
           variableName: "existingVar",
-          dashboardVariablesList: defaultProps.dashboardVariablesList
-        }
+          dashboardVariablesList: defaultProps.dashboardVariablesList,
+        },
       });
-      
+
       wrapper.unmount();
       wrapper = editWrapper;
       await nextTick();
@@ -568,7 +669,7 @@ describe("AddSettingVariable", () => {
 
     it("should set edit mode when variableName is provided", () => {
       // In edit mode, the component should be initialized differently
-      expect(wrapper.props('variableName')).toBe("existingVar");
+      expect(wrapper.props("variableName")).toBe("existingVar");
     });
 
     it("should have correct title in edit mode", () => {
@@ -585,7 +686,7 @@ describe("AddSettingVariable", () => {
     it("should have form validation", () => {
       const nameField = wrapper.find('[data-test="dashboard-variable-name"]');
       expect(nameField.exists()).toBe(true);
-      
+
       // Component should have validation logic
       expect(wrapper.vm.variableData).toBeDefined();
     });
@@ -594,7 +695,7 @@ describe("AddSettingVariable", () => {
       wrapper.vm.variableData.name = "test-variable";
       wrapper.vm.variableData.type = "constant";
       wrapper.vm.variableData.value = "test-value";
-      
+
       expect(wrapper.vm.onSubmit).toBeDefined();
     });
   });
@@ -614,27 +715,32 @@ describe("AddSettingVariable", () => {
     it("should have cycle detection functionality", async () => {
       wrapper.vm.variableData.name = "test-variable";
       wrapper.vm.variableData.type = "query_values";
-      
+
       expect(wrapper.vm.filterCycleError).toBeDefined();
-      expect(wrapper.vm.variableData).toHaveProperty('name');
+      expect(wrapper.vm.variableData).toHaveProperty("name");
     });
   });
 
   describe("Custom Value Management", () => {
     it("should add custom value for multi-select", () => {
       wrapper.vm.variableData.customMultiSelectValue = ["value1"];
-      
+
       wrapper.vm.addCustomValue();
-      
-      expect(wrapper.vm.variableData.customMultiSelectValue).toEqual(["value1", ""]);
+
+      expect(wrapper.vm.variableData.customMultiSelectValue).toEqual([
+        "value1",
+        "",
+      ]);
     });
 
     it("should remove custom value", () => {
       wrapper.vm.variableData.customMultiSelectValue = ["value1", "value2"];
-      
+
       wrapper.vm.removeCustomValue(0);
-      
-      expect(wrapper.vm.variableData.customMultiSelectValue).toEqual(["value2"]);
+
+      expect(wrapper.vm.variableData.customMultiSelectValue).toEqual([
+        "value2",
+      ]);
     });
   });
 
@@ -642,9 +748,9 @@ describe("AddSettingVariable", () => {
     it("should reset customMultiSelectValue when selectAllValueForMultiSelect changes", async () => {
       wrapper.vm.variableData.customMultiSelectValue = ["test"];
       wrapper.vm.variableData.selectAllValueForMultiSelect = "all";
-      
+
       await nextTick();
-      
+
       expect(wrapper.vm.variableData.customMultiSelectValue).toEqual([]);
     });
 
@@ -652,12 +758,12 @@ describe("AddSettingVariable", () => {
       wrapper.vm.variableData.type = "custom";
       wrapper.vm.variableData.options = [
         { label: "opt1", value: "val1", selected: true },
-        { label: "opt2", value: "val2", selected: false }
+        { label: "opt2", value: "val2", selected: false },
       ];
       wrapper.vm.variableData.multiSelect = false;
-      
+
       await nextTick();
-      
+
       // Should reset all selections and select first one
       expect(wrapper.vm.variableData.options[0].selected).toBe(true);
     });
@@ -725,9 +831,7 @@ describe("AddSettingVariable", () => {
 
     it("should clear currentFieldsList when stream is a variable reference", async () => {
       // Set some initial fields
-      wrapper.vm.data.currentFieldsList = [
-        { name: "field1", type: "string" },
-      ];
+      wrapper.vm.data.currentFieldsList = [{ name: "field1", type: "string" }];
 
       wrapper.vm.variableData.query_data.stream = "$var1";
 
@@ -743,7 +847,11 @@ describe("AddSettingVariable", () => {
       await wrapper.vm.streamUpdated();
 
       // Should call getStream for non-variable streams
-      expect(mockStreams.getStream).toHaveBeenCalledWith("regular-stream", "logs", true);
+      expect(mockStreams.getStream).toHaveBeenCalledWith(
+        "regular-stream",
+        "logs",
+        true,
+      );
     });
 
     it("should set empty field when stream is non-variable and updated", async () => {
@@ -758,12 +866,16 @@ describe("AddSettingVariable", () => {
     });
 
     it("should render stream select with CommonAutoComplete", () => {
-      const streamSelect = wrapper.find('[data-test="dashboard-variable-stream-select"]');
+      const streamSelect = wrapper.find(
+        '[data-test="dashboard-variable-stream-select"]',
+      );
       expect(streamSelect.exists()).toBe(true);
     });
 
     it("should render field select with CommonAutoComplete", () => {
-      const fieldSelect = wrapper.find('[data-test="dashboard-variable-field-select"]');
+      const fieldSelect = wrapper.find(
+        '[data-test="dashboard-variable-field-select"]',
+      );
       expect(fieldSelect.exists()).toBe(true);
     });
   });

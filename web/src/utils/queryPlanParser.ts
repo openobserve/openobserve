@@ -44,14 +44,14 @@ function parseTime(timeStr: string): number {
   const unit = match[2].toLowerCase();
 
   switch (unit) {
-    case 's':
+    case "s":
       return value * 1000;
-    case 'ms':
+    case "ms":
       return value;
-    case 'us':
-    case 'µs':
+    case "us":
+    case "µs":
       return value / 1000;
-    case 'ns':
+    case "ns":
       return value / 1000000;
     default:
       return 0;
@@ -69,15 +69,15 @@ function parseMemory(memStr: string): number {
   const unit = match[2].toUpperCase();
 
   switch (unit) {
-    case 'TB':
+    case "TB":
       return value * 1024 * 1024 * 1024 * 1024;
-    case 'GB':
+    case "GB":
       return value * 1024 * 1024 * 1024;
-    case 'MB':
+    case "MB":
       return value * 1024 * 1024;
-    case 'KB':
+    case "KB":
       return value * 1024;
-    case 'B':
+    case "B":
     default:
       return value;
   }
@@ -87,7 +87,7 @@ function parseMemory(memStr: string): number {
  * Format time in milliseconds to human-readable string
  */
 export function formatTime(ms: number): string {
-  if (ms === 0) return '0ms';
+  if (ms === 0) return "0ms";
   if (ms < 1) return `${(ms * 1000).toFixed(0)}µs`;
   if (ms < 1000) return `${ms.toFixed(2)}ms`;
   if (ms < 60000) return `${(ms / 1000).toFixed(2)}s`;
@@ -98,10 +98,11 @@ export function formatTime(ms: number): string {
  * Format bytes to human-readable string
  */
 export function formatMemory(bytes: number): string {
-  if (bytes === 0) return 'N/A';
+  if (bytes === 0) return "N/A";
   if (bytes < 1024) return `${bytes}B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)}KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)}MB`;
+  if (bytes < 1024 * 1024 * 1024)
+    return `${(bytes / (1024 * 1024)).toFixed(2)}MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)}GB`;
 }
 
@@ -125,7 +126,9 @@ function extractMetrics(line: string): { [key: string]: any } {
   }
 
   // Extract memory-related metrics
-  const memoryMatch = line.match(/(?:memory|spill_count|mem_used)=([^,\s\]]+)/i);
+  const memoryMatch = line.match(
+    /(?:memory|spill_count|mem_used)=([^,\s\]]+)/i,
+  );
   if (memoryMatch) {
     metrics.memory = memoryMatch[1];
     metrics.memory_bytes = parseMemory(memoryMatch[1]);
@@ -156,10 +159,10 @@ function getDepth(line: string): number {
  * Parse query plan text into tree structure
  */
 export function parseQueryPlanTree(planText: string): OperatorNode {
-  const lines = planText.split('\n').filter(line => line.trim());
+  const lines = planText.split("\n").filter((line) => line.trim());
   const root: OperatorNode = {
-    name: 'Root',
-    fullText: '',
+    name: "Root",
+    fullText: "",
     depth: -1,
     metrics: {},
     children: [],
@@ -177,9 +180,9 @@ export function parseQueryPlanTree(planText: string): OperatorNode {
 
     let name: string;
 
-    if (trimmed.includes(':')) {
+    if (trimmed.includes(":")) {
       // Has colon: extract name from before first colon
-      const colonIndex = trimmed.indexOf(':');
+      const colonIndex = trimmed.indexOf(":");
       name = trimmed.substring(0, colonIndex).trim();
     } else {
       // No colon: check if it looks like an operator
@@ -236,7 +239,9 @@ function calculateNodeMetrics(node: OperatorNode): {
   }
 
   // Recursive: aggregate children first
-  const childMetrics = node.children.map(child => calculateNodeMetrics(child));
+  const childMetrics = node.children.map((child) =>
+    calculateNodeMetrics(child),
+  );
 
   // Check if this is a RepartitionExec (parallel execution coordinator)
   if (node.isRepartitionExec) {
@@ -244,12 +249,12 @@ function calculateNodeMetrics(node: OperatorNode): {
     return {
       maxTime: Math.max(
         node.metrics.elapsed_compute_ms || 0,
-        ...childMetrics.map(m => m.maxTime)
+        ...childMetrics.map((m) => m.maxTime),
       ),
       totalRows: childMetrics.reduce((sum, m) => sum + m.totalRows, 0),
       maxMemory: Math.max(
         node.metrics.memory_bytes || 0,
-        ...childMetrics.map(m => m.maxMemory)
+        ...childMetrics.map((m) => m.maxMemory),
       ),
     };
   } else {
@@ -260,7 +265,7 @@ function calculateNodeMetrics(node: OperatorNode): {
       totalRows: node.metrics.output_rows || childMetrics[0]?.totalRows || 0,
       maxMemory: Math.max(
         node.metrics.memory_bytes || 0,
-        ...childMetrics.map(m => m.maxMemory)
+        ...childMetrics.map((m) => m.maxMemory),
       ),
     };
   }
@@ -275,7 +280,7 @@ export function calculateSummaryMetrics(planText: string): SummaryMetrics {
 
   return {
     totalTime: formatTime(metrics.maxTime),
-    totalRows: metrics.totalRows.toLocaleString('en-US'),
+    totalRows: metrics.totalRows.toLocaleString("en-US"),
     peakMemory: formatMemory(metrics.maxMemory),
   };
 }
@@ -305,9 +310,12 @@ export function findRemoteExecNode(node: OperatorNode): OperatorNode | null {
  * Collapse long projection lists in query plan
  * Example: "Projection: [field1, field2, field3, ... 97 more]"
  */
-export function collapseProjections(planText: string, threshold: number = 5): string {
-  const lines = planText.split('\n');
-  const collapsedLines = lines.map(line => {
+export function collapseProjections(
+  planText: string,
+  threshold: number = 5,
+): string {
+  const lines = planText.split("\n");
+  const collapsedLines = lines.map((line) => {
     // Match projection patterns like: Projection: [field1, field2, field3, ...]
     const projectionMatch = line.match(/(.*Projection.*:\s*\[)([^\]]+)(\].*)/i);
 
@@ -317,20 +325,20 @@ export function collapseProjections(planText: string, threshold: number = 5): st
 
     // Split by comma, handling nested brackets and quotes
     const fields: string[] = [];
-    let current = '';
+    let current = "";
     let depth = 0;
     let inQuotes = false;
 
     for (const char of fieldsList) {
       if (char === '"' || char === "'") {
         inQuotes = !inQuotes;
-      } else if (!inQuotes && (char === '(' || char === '[' || char === '{')) {
+      } else if (!inQuotes && (char === "(" || char === "[" || char === "{")) {
         depth++;
-      } else if (!inQuotes && (char === ')' || char === ']' || char === '}')) {
+      } else if (!inQuotes && (char === ")" || char === "]" || char === "}")) {
         depth--;
-      } else if (!inQuotes && depth === 0 && char === ',') {
+      } else if (!inQuotes && depth === 0 && char === ",") {
         fields.push(current.trim());
-        current = '';
+        current = "";
         continue;
       }
       current += char;
@@ -343,12 +351,12 @@ export function collapseProjections(planText: string, threshold: number = 5): st
     if (fields.length > threshold) {
       const visible = fields.slice(0, 3);
       const hiddenCount = fields.length - 3;
-      const collapsed = `${visible.join(', ')}, ... ${hiddenCount} more`;
+      const collapsed = `${visible.join(", ")}, ... ${hiddenCount} more`;
       return `${prefix}${collapsed}${suffix}`;
     }
 
     return line;
   });
 
-  return collapsedLines.join('\n');
+  return collapsedLines.join("\n");
 }

@@ -37,7 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :multiple="variableItem.multiSelect"
       popup-no-route-dismiss
       popup-content-style="z-index: 10001"
-     borderless hide-bottom-space>
+      borderless
+      hide-bottom-space
+    >
       <template v-slot:no-option>
         <q-item>
           <q-item-section class="text-italic text-grey">
@@ -106,7 +108,7 @@ export default defineComponent({
       () => props.variableItem,
       () => {
         options.value = props.variableItem?.options;
-      }
+      },
     );
 
     // Add watch for variableItem value changes
@@ -130,7 +132,7 @@ export default defineComponent({
     const toggleSelectAll = () => {
       if (!isAllSelected.value) {
         selectedValue.value = fieldsFilteredOptions.value.map(
-          (option: any) => option.value
+          (option: any) => option.value,
         );
       } else {
         selectedValue.value = [];
@@ -151,7 +153,7 @@ export default defineComponent({
               .slice(0, 2)
               .map((val) => {
                 const option = props.variableItem?.options?.find(
-                  (opt: any) => opt.value === val
+                  (opt: any) => opt.value === val,
                 );
                 return option ? option.label : val;
               })
@@ -163,7 +165,7 @@ export default defineComponent({
             return selectedValue.value
               .map((val) => {
                 const option = props.variableItem?.options?.find(
-                  (opt: any) => opt.value === val
+                  (opt: any) => opt.value === val,
                 );
                 return option ? option.label : val;
               })
@@ -171,7 +173,7 @@ export default defineComponent({
           }
         } else {
           const option = props.variableItem?.options?.find(
-            (opt: any) => opt.value === selectedValue.value
+            (opt: any) => opt.value === selectedValue.value,
           );
           return option ? option.label : selectedValue.value;
         }

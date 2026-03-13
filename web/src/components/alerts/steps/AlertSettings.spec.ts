@@ -143,7 +143,7 @@ describe("AlertSettings.vue", () => {
 
     it("should render with correct theme class (light mode)", () => {
       expect(wrapper.find(".step-alert-conditions.light-mode").exists()).toBe(
-        true
+        true,
       );
     });
 
@@ -165,9 +165,9 @@ describe("AlertSettings.vue", () => {
         },
       });
 
-      expect(darkWrapper.find(".step-alert-conditions.dark-mode").exists()).toBe(
-        true
-      );
+      expect(
+        darkWrapper.find(".step-alert-conditions.dark-mode").exists(),
+      ).toBe(true);
       darkWrapper.unmount();
     });
 
@@ -314,28 +314,30 @@ describe("AlertSettings.vue", () => {
       wrapper.vm.localIsAggregationEnabled = true;
       await wrapper.vm.toggleAggregation();
       expect(wrapper.emitted("update:isAggregationEnabled")).toBeTruthy();
-      expect(
-        wrapper.emitted("update:isAggregationEnabled")![0]
-      ).toEqual([true]);
+      expect(wrapper.emitted("update:isAggregationEnabled")![0]).toEqual([
+        true,
+      ]);
     });
 
     it("should disable aggregation when toggled off", async () => {
       wrapper.vm.localIsAggregationEnabled = false;
       await wrapper.vm.toggleAggregation();
-      expect(
-        wrapper.emitted("update:isAggregationEnabled")![0]
-      ).toEqual([false]);
+      expect(wrapper.emitted("update:isAggregationEnabled")![0]).toEqual([
+        false,
+      ]);
     });
 
     it("should initialize aggregation object when enabled", async () => {
       wrapper.vm.localIsAggregationEnabled = true;
       await wrapper.vm.toggleAggregation();
-      expect(wrapper.props().formData.query_condition.aggregation).toBeDefined();
       expect(
-        wrapper.props().formData.query_condition.aggregation.group_by
+        wrapper.props().formData.query_condition.aggregation,
+      ).toBeDefined();
+      expect(
+        wrapper.props().formData.query_condition.aggregation.group_by,
       ).toEqual([""]);
       expect(
-        wrapper.props().formData.query_condition.aggregation.function
+        wrapper.props().formData.query_condition.aggregation.function,
       ).toBe("avg");
     });
 
@@ -384,7 +386,7 @@ describe("AlertSettings.vue", () => {
         wrapper.props().formData.query_condition.aggregation.group_by.length;
       await wrapper.vm.addGroupByColumn();
       expect(
-        wrapper.props().formData.query_condition.aggregation.group_by.length
+        wrapper.props().formData.query_condition.aggregation.group_by.length,
       ).toBe(initialLength + 1);
     });
 
@@ -395,7 +397,7 @@ describe("AlertSettings.vue", () => {
       ];
       await wrapper.vm.deleteGroupByColumn(0);
       expect(
-        wrapper.props().formData.query_condition.aggregation.group_by
+        wrapper.props().formData.query_condition.aggregation.group_by,
       ).toEqual(["field2"]);
     });
 
@@ -545,7 +547,9 @@ describe("AlertSettings.vue", () => {
     it("should sync cron with period when period changes", async () => {
       wrapper.props().formData.trigger_condition.period = 5;
       await wrapper.vm.handlePeriodChange();
-      expect(wrapper.props().formData.trigger_condition.cron).toBe("0 */5 * * * *");
+      expect(wrapper.props().formData.trigger_condition.cron).toBe(
+        "0 */5 * * * *",
+      );
     });
   });
 
@@ -557,7 +561,7 @@ describe("AlertSettings.vue", () => {
 
     it("should have minutes as default frequency type", () => {
       expect(wrapper.props().formData.trigger_condition.frequency_type).toBe(
-        "minutes"
+        "minutes",
       );
     });
 
@@ -654,7 +658,7 @@ describe("AlertSettings.vue", () => {
       wrapper.props().formData.trigger_condition.frequency = 10;
       await wrapper.vm.handleFrequencyTypeChange("cron");
       expect(wrapper.props().formData.trigger_condition.frequency_type).toBe(
-        "cron"
+        "cron",
       );
     });
 
@@ -664,7 +668,7 @@ describe("AlertSettings.vue", () => {
       wrapper.props().formData.trigger_condition.cron = "";
       await wrapper.vm.handleFrequencyTypeChange("cron");
       expect(wrapper.props().formData.trigger_condition.cron).toBe(
-        "0 */10 * * * *"
+        "0 */10 * * * *",
       );
     });
 
@@ -674,7 +678,7 @@ describe("AlertSettings.vue", () => {
       wrapper.props().formData.trigger_condition.cron = "0 */5 * * * *";
       await wrapper.vm.handleFrequencyTypeChange("cron");
       expect(wrapper.props().formData.trigger_condition.cron).toBe(
-        "0 */5 * * * *"
+        "0 */5 * * * *",
       );
     });
 
@@ -690,7 +694,7 @@ describe("AlertSettings.vue", () => {
       wrapper.props().formData.trigger_condition.frequency_type = "cron";
       await wrapper.vm.handleFrequencyTypeChange("minutes");
       expect(wrapper.props().formData.trigger_condition.frequency_type).toBe(
-        "minutes"
+        "minutes",
       );
     });
 
@@ -761,7 +765,7 @@ describe("AlertSettings.vue", () => {
       const mockUpdate = vi.fn((cb: Function) => cb());
       await wrapper.vm.filterDestinations("", mockUpdate);
       expect(wrapper.vm.filteredDestinations).toEqual(
-        wrapper.props().formattedDestinations
+        wrapper.props().formattedDestinations,
       );
     });
 
@@ -997,7 +1001,7 @@ describe("AlertSettings.vue", () => {
     it("should handle rapid frequency type switching", async () => {
       for (let i = 0; i < 5; i++) {
         await wrapper.vm.handleFrequencyTypeChange(
-          i % 2 === 0 ? "cron" : "minutes"
+          i % 2 === 0 ? "cron" : "minutes",
         );
       }
       expect(wrapper.emitted("update:trigger")!.length).toBeGreaterThan(0);
@@ -1026,7 +1030,7 @@ describe("AlertSettings.vue", () => {
       };
       await nextTick();
       expect(
-        wrapper.props().formData.query_condition.aggregation.group_by.length
+        wrapper.props().formData.query_condition.aggregation.group_by.length,
       ).toBe(3);
     });
   });
@@ -1041,7 +1045,7 @@ describe("AlertSettings.vue", () => {
     it("should have info tooltips", () => {
       const infoIcons = wrapper.findAll(".q-icon");
       const hasInfoIcon = infoIcons.some((icon) =>
-        icon.html().includes("info")
+        icon.html().includes("info"),
       );
       expect(hasInfoIcon).toBe(true);
     });
@@ -1119,7 +1123,10 @@ describe("AlertSettings.vue", () => {
     });
 
     it("should handle maximum destinations", async () => {
-      const manyDestinations = Array.from({ length: 100 }, (_, i) => `dest${i}`);
+      const manyDestinations = Array.from(
+        { length: 100 },
+        (_, i) => `dest${i}`,
+      );
       wrapper.vm.localDestinations = manyDestinations;
       await wrapper.vm.emitDestinationsUpdate();
       expect(wrapper.emitted("update:destinations")![0][0].length).toBe(100);
@@ -1367,7 +1374,7 @@ describe("AlertSettings.vue", () => {
       wrapper.props().formData.trigger_condition.period = 20;
       await wrapper.vm.handlePeriodChange();
       expect(wrapper.props().formData.trigger_condition.timezone).toBe(
-        "America/New_York"
+        "America/New_York",
       );
     });
   });

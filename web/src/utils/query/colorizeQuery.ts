@@ -23,7 +23,10 @@ const registerLanguages = async () => {
   languagesRegistered = true;
 };
 
-export const colorizeQuery = async (query: string, language: string): Promise<string> => {
+export const colorizeQuery = async (
+  query: string,
+  language: string,
+): Promise<string> => {
   if (!query) return "";
 
   await registerLanguages();

@@ -46,113 +46,149 @@ describe("Dashboards Service", () => {
 
   describe("list", () => {
     it("should build correct URL and params for basic dashboard list", async () => {
-      await dashboards.list(1, 10, "name", false, "test", "test-org", "folder-123", "");
-
-      expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/test-org/dashboards",
-        {
-          params: {
-            page_num: 1,
-            page_size: 10,
-            sort_by: "name",
-            desc: false,
-            name: "test",
-            folder: "folder-123",
-          },
-        }
+      await dashboards.list(
+        1,
+        10,
+        "name",
+        false,
+        "test",
+        "test-org",
+        "folder-123",
+        "",
       );
+
+      expect(mockHttp.get).toHaveBeenCalledWith("/api/test-org/dashboards", {
+        params: {
+          page_num: 1,
+          page_size: 10,
+          sort_by: "name",
+          desc: false,
+          name: "test",
+          folder: "folder-123",
+        },
+      });
     });
 
     it("should include title parameter when provided", async () => {
-      await dashboards.list(1, 10, "name", true, "test", "test-org", "folder-123", "Dashboard Title");
-
-      expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/test-org/dashboards",
-        {
-          params: {
-            page_num: 1,
-            page_size: 10,
-            sort_by: "name",
-            desc: true,
-            name: "test",
-            folder: "folder-123",
-            title: "Dashboard Title",
-          },
-        }
+      await dashboards.list(
+        1,
+        10,
+        "name",
+        true,
+        "test",
+        "test-org",
+        "folder-123",
+        "Dashboard Title",
       );
+
+      expect(mockHttp.get).toHaveBeenCalledWith("/api/test-org/dashboards", {
+        params: {
+          page_num: 1,
+          page_size: 10,
+          sort_by: "name",
+          desc: true,
+          name: "test",
+          folder: "folder-123",
+          title: "Dashboard Title",
+        },
+      });
     });
 
     it("should omit title parameter when empty string", async () => {
-      await dashboards.list(1, 10, "name", false, "test", "test-org", "folder-123", "");
-
-      expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/test-org/dashboards",
-        {
-          params: {
-            page_num: 1,
-            page_size: 10,
-            sort_by: "name",
-            desc: false,
-            name: "test",
-            folder: "folder-123",
-          },
-        }
+      await dashboards.list(
+        1,
+        10,
+        "name",
+        false,
+        "test",
+        "test-org",
+        "folder-123",
+        "",
       );
+
+      expect(mockHttp.get).toHaveBeenCalledWith("/api/test-org/dashboards", {
+        params: {
+          page_num: 1,
+          page_size: 10,
+          sort_by: "name",
+          desc: false,
+          name: "test",
+          folder: "folder-123",
+        },
+      });
     });
 
     it("should omit folder parameter when not provided", async () => {
-      await dashboards.list(1, 10, "created", true, "search", "test-org", "", "My Dashboard");
-
-      expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/test-org/dashboards",
-        {
-          params: {
-            page_num: 1,
-            page_size: 10,
-            sort_by: "created",
-            desc: true,
-            name: "search",
-            title: "My Dashboard",
-          },
-        }
+      await dashboards.list(
+        1,
+        10,
+        "created",
+        true,
+        "search",
+        "test-org",
+        "",
+        "My Dashboard",
       );
+
+      expect(mockHttp.get).toHaveBeenCalledWith("/api/test-org/dashboards", {
+        params: {
+          page_num: 1,
+          page_size: 10,
+          sort_by: "created",
+          desc: true,
+          name: "search",
+          title: "My Dashboard",
+        },
+      });
     });
 
     it("should handle different page sizes and sorting options", async () => {
-      await dashboards.list(5, 50, "updated", false, "", "my-org", "default", "");
-
-      expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/my-org/dashboards",
-        {
-          params: {
-            page_num: 5,
-            page_size: 50,
-            sort_by: "updated",
-            desc: false,
-            name: "",
-            folder: "default",
-          },
-        }
+      await dashboards.list(
+        5,
+        50,
+        "updated",
+        false,
+        "",
+        "my-org",
+        "default",
+        "",
       );
+
+      expect(mockHttp.get).toHaveBeenCalledWith("/api/my-org/dashboards", {
+        params: {
+          page_num: 5,
+          page_size: 50,
+          sort_by: "updated",
+          desc: false,
+          name: "",
+          folder: "default",
+        },
+      });
     });
 
     it("should handle zero page numbers and sizes", async () => {
-      await dashboards.list(0, 0, "name", true, "filter", "org", "folder", "title");
-
-      expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/org/dashboards",
-        {
-          params: {
-            page_num: 0,
-            page_size: 0,
-            sort_by: "name",
-            desc: true,
-            name: "filter",
-            folder: "folder",
-            title: "title",
-          },
-        }
+      await dashboards.list(
+        0,
+        0,
+        "name",
+        true,
+        "filter",
+        "org",
+        "folder",
+        "title",
       );
+
+      expect(mockHttp.get).toHaveBeenCalledWith("/api/org/dashboards", {
+        params: {
+          page_num: 0,
+          page_size: 0,
+          sort_by: "name",
+          desc: true,
+          name: "filter",
+          folder: "folder",
+          title: "title",
+        },
+      });
     });
   });
 
@@ -169,7 +205,7 @@ describe("Dashboards Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/dashboards?folder=default",
         dashboardData,
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
 
@@ -185,7 +221,7 @@ describe("Dashboards Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/dashboards?folder=custom-folder",
         dashboardData,
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
 
@@ -198,17 +234,13 @@ describe("Dashboards Service", () => {
             id: "panel-1",
             title: "Panel 1",
             type: "line",
-            queries: [
-              { sql: "SELECT * FROM logs WHERE level = 'error'" },
-            ],
+            queries: [{ sql: "SELECT * FROM logs WHERE level = 'error'" }],
           },
           {
             id: "panel-2",
             title: "Panel 2",
             type: "bar",
-            queries: [
-              { sql: "SELECT count(*) FROM metrics" },
-            ],
+            queries: [{ sql: "SELECT count(*) FROM metrics" }],
           },
         ],
         variables: [
@@ -222,7 +254,7 @@ describe("Dashboards Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/production-org/dashboards?folder=monitoring",
         complexDashboard,
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
 
@@ -232,7 +264,7 @@ describe("Dashboards Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/dashboards?folder=default",
         {},
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
   });
@@ -242,7 +274,7 @@ describe("Dashboards Service", () => {
       await dashboards.delete("test-org", "dashboard-123");
 
       expect(mockHttp.delete).toHaveBeenCalledWith(
-        "/api/test-org/dashboards/dashboard-123?folder=default"
+        "/api/test-org/dashboards/dashboard-123?folder=default",
       );
     });
 
@@ -250,7 +282,7 @@ describe("Dashboards Service", () => {
       await dashboards.delete("test-org", "dashboard-456", "custom-folder");
 
       expect(mockHttp.delete).toHaveBeenCalledWith(
-        "/api/test-org/dashboards/dashboard-456?folder=custom-folder"
+        "/api/test-org/dashboards/dashboard-456?folder=custom-folder",
       );
     });
 
@@ -267,7 +299,7 @@ describe("Dashboards Service", () => {
         await dashboards.delete("test-org", id, "test-folder");
 
         expect(mockHttp.delete).toHaveBeenCalledWith(
-          `/api/test-org/dashboards/${id}?folder=test-folder`
+          `/api/test-org/dashboards/${id}?folder=test-folder`,
         );
       }
 
@@ -280,7 +312,7 @@ describe("Dashboards Service", () => {
       for (const org of organizations) {
         await dashboards.delete(org, "dashboard-id", "folder");
         expect(mockHttp.delete).toHaveBeenCalledWith(
-          `/api/${org}/dashboards/dashboard-id?folder=folder`
+          `/api/${org}/dashboards/dashboard-id?folder=folder`,
         );
       }
     });
@@ -291,29 +323,37 @@ describe("Dashboards Service", () => {
       await dashboards.get_Dashboard("test-org", "dashboard-123");
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/test-org/dashboards/dashboard-123?folder=default"
+        "/api/test-org/dashboards/dashboard-123?folder=default",
       );
     });
 
     it("should get dashboard with specified folder", async () => {
-      await dashboards.get_Dashboard("test-org", "dashboard-456", "custom-folder");
+      await dashboards.get_Dashboard(
+        "test-org",
+        "dashboard-456",
+        "custom-folder",
+      );
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/test-org/dashboards/dashboard-456?folder=custom-folder"
+        "/api/test-org/dashboards/dashboard-456?folder=custom-folder",
       );
     });
 
     it("should handle various organizations and dashboard IDs", async () => {
       const testCases = [
         { org: "org1", id: "dash1", folder: "folder1" },
-        { org: "long-organization-name", id: "uuid-12345", folder: "analytics" },
+        {
+          org: "long-organization-name",
+          id: "uuid-12345",
+          folder: "analytics",
+        },
         { org: "test", id: "simple", folder: "default" },
       ];
 
       for (const { org, id, folder } of testCases) {
         await dashboards.get_Dashboard(org, id, folder);
         expect(mockHttp.get).toHaveBeenCalledWith(
-          `/api/${org}/dashboards/${id}?folder=${folder}`
+          `/api/${org}/dashboards/${id}?folder=${folder}`,
         );
       }
     });
@@ -327,36 +367,53 @@ describe("Dashboards Service", () => {
         panels: [{ id: "panel-1", title: "Updated Panel" }],
       };
 
-      await dashboards.save("test-org", "dashboard-123", dashboardData, "folder-1", "hash-456");
+      await dashboards.save(
+        "test-org",
+        "dashboard-123",
+        dashboardData,
+        "folder-1",
+        "hash-456",
+      );
 
       expect(mockHttp.put).toHaveBeenCalledWith(
         "/api/test-org/dashboards/dashboard-123?folder=folder-1&hash=hash-456",
         dashboardData,
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
 
     it("should save dashboard with default folder when folderId not provided", async () => {
       const dashboardData = { title: "Test Dashboard" };
 
-      await dashboards.save("test-org", "dashboard-123", dashboardData, undefined, "hash-123");
+      await dashboards.save(
+        "test-org",
+        "dashboard-123",
+        dashboardData,
+        undefined,
+        "hash-123",
+      );
 
       expect(mockHttp.put).toHaveBeenCalledWith(
         "/api/test-org/dashboards/dashboard-123?folder=default&hash=hash-123",
         dashboardData,
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
 
     it("should handle undefined hash parameter", async () => {
       const dashboardData = { title: "Test Dashboard" };
 
-      await dashboards.save("test-org", "dashboard-123", dashboardData, "folder-1");
+      await dashboards.save(
+        "test-org",
+        "dashboard-123",
+        dashboardData,
+        "folder-1",
+      );
 
       expect(mockHttp.put).toHaveBeenCalledWith(
         "/api/test-org/dashboards/dashboard-123?folder=folder-1&hash=undefined",
         dashboardData,
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
 
@@ -366,7 +423,7 @@ describe("Dashboards Service", () => {
       expect(mockHttp.put).toHaveBeenCalledWith(
         "/api/org/dashboards/id?folder=folder&hash=hash",
         {},
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
 
@@ -377,7 +434,12 @@ describe("Dashboards Service", () => {
           id: `panel-${i}`,
           title: `Panel ${i}`,
           type: "chart",
-          data: { series: Array.from({ length: 1000 }, (_, j) => ({ x: j, y: Math.random() })) },
+          data: {
+            series: Array.from({ length: 1000 }, (_, j) => ({
+              x: j,
+              y: Math.random(),
+            })),
+          },
         })),
         variables: Array.from({ length: 50 }, (_, i) => ({
           name: `var-${i}`,
@@ -386,12 +448,18 @@ describe("Dashboards Service", () => {
         })),
       };
 
-      await dashboards.save("test-org", "large-dash", largeDashboard, "analytics", "hash-large");
+      await dashboards.save(
+        "test-org",
+        "large-dash",
+        largeDashboard,
+        "analytics",
+        "hash-large",
+      );
 
       expect(mockHttp.put).toHaveBeenCalledWith(
         "/api/test-org/dashboards/large-dash?folder=analytics&hash=hash-large",
         largeDashboard,
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
   });
@@ -400,7 +468,9 @@ describe("Dashboards Service", () => {
     it("should list folders for organization", async () => {
       await dashboards.list_Folders("test-org");
 
-      expect(mockHttp.get).toHaveBeenCalledWith("/api/v2/test-org/folders/dashboards");
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        "/api/v2/test-org/folders/dashboards",
+      );
     });
 
     it("should handle different organization names", async () => {
@@ -414,7 +484,9 @@ describe("Dashboards Service", () => {
 
       for (const org of organizations) {
         await dashboards.list_Folders(org);
-        expect(mockHttp.get).toHaveBeenCalledWith(`/api/v2/${org}/folders/dashboards`);
+        expect(mockHttp.get).toHaveBeenCalledWith(
+          `/api/v2/${org}/folders/dashboards`,
+        );
       }
 
       expect(mockHttp.get).toHaveBeenCalledTimes(organizations.length);
@@ -425,7 +497,9 @@ describe("Dashboards Service", () => {
 
       for (const org of specialOrgs) {
         await dashboards.list_Folders(org);
-        expect(mockHttp.get).toHaveBeenCalledWith(`/api/v2/${org}/folders/dashboards`);
+        expect(mockHttp.get).toHaveBeenCalledWith(
+          `/api/v2/${org}/folders/dashboards`,
+        );
       }
     });
   });
@@ -442,7 +516,7 @@ describe("Dashboards Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/v2/test-org/folders/dashboards",
         folderData,
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
 
@@ -471,7 +545,7 @@ describe("Dashboards Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/v2/prod-org/folders/dashboards",
         complexFolderData,
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
 
@@ -481,7 +555,7 @@ describe("Dashboards Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/v2/test-org/folders/dashboards",
         {},
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
 
@@ -500,7 +574,7 @@ describe("Dashboards Service", () => {
         expect(mockHttp.post).toHaveBeenCalledWith(
           "/api/v2/test-org/folders/dashboards",
           folderData,
-          { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+          { headers: { "Content-Type": "application/json; charset=UTF-8" } },
         );
       }
     });
@@ -518,7 +592,7 @@ describe("Dashboards Service", () => {
       expect(mockHttp.put).toHaveBeenCalledWith(
         "/api/v2/test-org/folders/dashboards/folder-123",
         updatedData,
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
 
@@ -539,7 +613,7 @@ describe("Dashboards Service", () => {
         expect(mockHttp.put).toHaveBeenCalledWith(
           `/api/v2/test-org/folders/dashboards/${folderId}`,
           updateData,
-          { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+          { headers: { "Content-Type": "application/json; charset=UTF-8" } },
         );
       }
     });
@@ -557,7 +631,7 @@ describe("Dashboards Service", () => {
         expect(mockHttp.put).toHaveBeenCalledWith(
           "/api/v2/test-org/folders/dashboards/folder-id",
           update,
-          { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+          { headers: { "Content-Type": "application/json; charset=UTF-8" } },
         );
       }
     });
@@ -570,7 +644,7 @@ describe("Dashboards Service", () => {
         expect(mockHttp.put).toHaveBeenCalledWith(
           `/api/v2/test-org/folders/dashboards/${id}`,
           { name: "Test" },
-          { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+          { headers: { "Content-Type": "application/json; charset=UTF-8" } },
         );
       }
     });
@@ -580,7 +654,9 @@ describe("Dashboards Service", () => {
     it("should delete folder by ID", async () => {
       await dashboards.delete_Folder("test-org", "folder-123");
 
-      expect(mockHttp.delete).toHaveBeenCalledWith("/api/v2/test-org/folders/dashboards/folder-123");
+      expect(mockHttp.delete).toHaveBeenCalledWith(
+        "/api/v2/test-org/folders/dashboards/folder-123",
+      );
     });
 
     it("should handle different folder ID types", async () => {
@@ -594,7 +670,9 @@ describe("Dashboards Service", () => {
 
       for (const folderId of folderIds) {
         await dashboards.delete_Folder("org", folderId);
-        expect(mockHttp.delete).toHaveBeenCalledWith(`/api/v2/org/folders/dashboards/${folderId}`);
+        expect(mockHttp.delete).toHaveBeenCalledWith(
+          `/api/v2/org/folders/dashboards/${folderId}`,
+        );
       }
     });
 
@@ -607,14 +685,21 @@ describe("Dashboards Service", () => {
 
       for (const { org, folderId } of testCases) {
         await dashboards.delete_Folder(org, folderId);
-        expect(mockHttp.delete).toHaveBeenCalledWith(`/api/v2/${org}/folders/dashboards/${folderId}`);
+        expect(mockHttp.delete).toHaveBeenCalledWith(
+          `/api/v2/${org}/folders/dashboards/${folderId}`,
+        );
       }
     });
   });
 
   describe("move_Dashboard", () => {
     it("should move single dashboard to another folder", async () => {
-      await dashboards.move_Dashboard("test-org", ["dashboard-123"], "source-folder", "target-folder");
+      await dashboards.move_Dashboard(
+        "test-org",
+        ["dashboard-123"],
+        "source-folder",
+        "target-folder",
+      );
 
       expect(mockHttp.patch).toHaveBeenCalledWith(
         "/api/test-org/dashboards/move?folder=source-folder",
@@ -622,14 +707,19 @@ describe("Dashboards Service", () => {
           dashboard_ids: ["dashboard-123"],
           dst_folder_id: "target-folder",
         },
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
 
     it("should move multiple dashboards to another folder", async () => {
       const dashboardIds = ["dash-1", "dash-2", "dash-3", "dash-4"];
 
-      await dashboards.move_Dashboard("test-org", dashboardIds, "old-folder", "new-folder");
+      await dashboards.move_Dashboard(
+        "test-org",
+        dashboardIds,
+        "old-folder",
+        "new-folder",
+      );
 
       expect(mockHttp.patch).toHaveBeenCalledWith(
         "/api/test-org/dashboards/move?folder=old-folder",
@@ -637,7 +727,7 @@ describe("Dashboards Service", () => {
           dashboard_ids: dashboardIds,
           dst_folder_id: "new-folder",
         },
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
 
@@ -650,14 +740,22 @@ describe("Dashboards Service", () => {
           dashboard_ids: [],
           dst_folder_id: "target",
         },
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
 
     it("should handle large number of dashboard IDs", async () => {
-      const manyDashboards = Array.from({ length: 100 }, (_, i) => `dashboard-${i}`);
+      const manyDashboards = Array.from(
+        { length: 100 },
+        (_, i) => `dashboard-${i}`,
+      );
 
-      await dashboards.move_Dashboard("prod-org", manyDashboards, "analytics", "archive");
+      await dashboards.move_Dashboard(
+        "prod-org",
+        manyDashboards,
+        "analytics",
+        "archive",
+      );
 
       expect(mockHttp.patch).toHaveBeenCalledWith(
         "/api/prod-org/dashboards/move?folder=analytics",
@@ -665,7 +763,7 @@ describe("Dashboards Service", () => {
           dashboard_ids: manyDashboards,
           dst_folder_id: "archive",
         },
-        { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+        { headers: { "Content-Type": "application/json; charset=UTF-8" } },
       );
     });
 
@@ -685,7 +783,7 @@ describe("Dashboards Service", () => {
             dashboard_ids: ["dash-1"],
             dst_folder_id: to,
           },
-          { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+          { headers: { "Content-Type": "application/json; charset=UTF-8" } },
         );
       }
     });
@@ -708,7 +806,7 @@ describe("Dashboards Service", () => {
             dashboard_ids: ids,
             dst_folder_id: "dest",
           },
-          { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+          { headers: { "Content-Type": "application/json; charset=UTF-8" } },
         );
       }
     });

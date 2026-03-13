@@ -87,7 +87,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             flat
             class="o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
             data-test="dashboard-add-cancel"
           />
           <q-btn
@@ -97,7 +101,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('dashboard.save')"
             flat
             class="o2-primary-button tw:h-[36px] q-ml-md"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
             type="submit"
             no-caps
           />
@@ -159,7 +167,7 @@ export default defineComponent({
       useNotifications();
 
     const activeFolder: any = store.state.organizationData.folders.find(
-      (item: any) => item.folderId === props.activeFolderId
+      (item: any) => item.folderId === props.activeFolderId,
     );
     const selectedFolder = ref({
       label: activeFolder.name,
@@ -216,14 +224,14 @@ export default defineComponent({
           callDashboard = dashboardService.create(
             store.state.selectedOrganization.identifier,
             baseObj,
-            selectedFolder.value.value ?? "default"
+            selectedFolder.value.value ?? "default",
           );
         }
         try {
           const res = await callDashboard;
 
           const data = convertDashboardSchemaVersion(
-            res?.data["v" + res?.data?.version]
+            res?.data["v" + res?.data?.version],
           );
 
           //update store

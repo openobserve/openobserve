@@ -7,7 +7,7 @@
     :vertical="direction === 'vertical'"
     @update:model-value="handleTabChange"
   >
-    <template v-for="tab in (tabs as any)" :key="tab.name">
+    <template v-for="tab in tabs as any" :key="tab.name">
       <q-route-tab
         :data-test="tab.dataTest"
         :name="tab.name"

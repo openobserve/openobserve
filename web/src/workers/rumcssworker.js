@@ -12,7 +12,7 @@ self.addEventListener("message", (e) => {
 function replaceAbsoluteUrlsWithProxies(
   proxyUrl,
   cssString,
-  excludedDomains = []
+  excludedDomains = [],
 ) {
   const urlRegex = /url\(\s*(['"]?)(https?:\/\/[^'"\)]+)\1\s*\)/g;
 

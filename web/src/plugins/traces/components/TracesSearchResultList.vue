@@ -21,7 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="noResults"
       class="text-center tw:mx-[10%] tw:my-[2.5rem] tw:text-[1.25rem]"
     >
-      <q-icon name="info" color="primary" size="md" />
+      <q-icon name="info" color="primary"
+size="md" />
       {{ t("traces.noTracesFoundAdjust") }}
     </div>
 

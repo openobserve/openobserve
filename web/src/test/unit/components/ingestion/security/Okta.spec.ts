@@ -23,7 +23,8 @@ import Okta from "@/components/ingestion/security/Okta.vue";
 vi.mock("@/composables/useIngestion", () => ({
   default: vi.fn(() => ({
     endpoint: "https://api.example.com/ingest",
-    securityContent: "curl -X POST https://api.example.com/ingest -d '{\"stream\": \"[STREAM_NAME]\"}' ",
+    securityContent:
+      'curl -X POST https://api.example.com/ingest -d \'{"stream": "[STREAM_NAME]"}\' ',
     securityDocURLs: {
       okta: "https://docs.example.com/okta",
       falco: "https://docs.example.com/falco",
@@ -73,7 +74,9 @@ describe("Okta.vue", () => {
     it("should render CopyContent component", () => {
       const wrapper = mountComponent();
 
-      expect(wrapper.find('[data-test="copy-content-stub"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="copy-content-stub"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should render documentation link", () => {

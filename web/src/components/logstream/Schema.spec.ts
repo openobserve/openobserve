@@ -70,7 +70,7 @@ describe("Schema Component Tests", async () => {
               approx_partition: false,
               defined_schema_fields: [],
               extended_retention_days: [],
-              pattern_associations: []
+              pattern_associations: [],
             },
           },
         },
@@ -103,7 +103,7 @@ describe("Schema Component Tests", async () => {
     it("should change pagination correctly", () => {
       const newPagination = { label: "50", value: 50 };
       wrapper.vm.changePagination(newPagination);
-      
+
       expect(wrapper.vm.selectedPerPage).toBe(50);
       expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
     });
@@ -112,11 +112,11 @@ describe("Schema Component Tests", async () => {
     it("should update active tab and result total", () => {
       wrapper.vm.indexData.defined_schema_fields = ["field1"];
       wrapper.vm.indexData.schema = [{ name: "field1" }, { name: "field2" }];
-      
+
       wrapper.vm.updateActiveTab("schemaFields");
       expect(wrapper.vm.activeTab).toBe("schemaFields");
       expect(wrapper.vm.resultTotal).toBe(1);
-      
+
       wrapper.vm.updateActiveTab("allFields");
       expect(wrapper.vm.activeTab).toBe("allFields");
       expect(wrapper.vm.resultTotal).toBe(2);
@@ -131,7 +131,7 @@ describe("Schema Component Tests", async () => {
     // Test 6: openDialog function
     it("should open dialog and initialize fields", () => {
       wrapper.vm.openDialog();
-      
+
       expect(wrapper.vm.isDialogOpen).toBe(true);
       expect(wrapper.vm.formDirtyFlag).toBe(true);
       expect(wrapper.vm.newSchemaFields.length).toBe(1);
@@ -145,10 +145,12 @@ describe("Schema Component Tests", async () => {
     // Test 7: closeDialog function
     it("should close dialog and reset fields", () => {
       wrapper.vm.isDialogOpen = true;
-      wrapper.vm.newSchemaFields = [{ name: "test", type: "string", index_type: [] }];
-      
+      wrapper.vm.newSchemaFields = [
+        { name: "test", type: "string", index_type: [] },
+      ];
+
       wrapper.vm.closeDialog();
-      
+
       expect(wrapper.vm.isDialogOpen).toBe(false);
       expect(wrapper.vm.newSchemaFields).toEqual([]);
     });
@@ -157,24 +159,23 @@ describe("Schema Component Tests", async () => {
     it("should compute hasUserDefinedSchema correctly", () => {
       // Initially false
       expect(wrapper.vm.hasUserDefinedSchema).toBe(false);
-      
+
       // Set defined schema fields
       wrapper.vm.indexData.defined_schema_fields = ["field1"];
       expect(wrapper.vm.hasUserDefinedSchema).toBe(true);
     });
 
-
-    // Test 10: showDataRetention computed property  
+    // Test 10: showDataRetention computed property
     it("should compute showDataRetention correctly", async () => {
       expect(wrapper.vm.showDataRetention).toBe(true);
-      
+
       // Test with enrichment_tables
       const enrichmentWrapper = mount(LogStream, {
         props: {
           modelValue: {
             name: "test-stream",
             stream_type: "enrichment_tables",
-            settings: { defined_schema_fields: [] }
+            settings: { defined_schema_fields: [] },
           },
         },
         global: {
@@ -182,12 +183,11 @@ describe("Schema Component Tests", async () => {
           plugins: [i18n],
         },
       });
-      
+
       await flushPromises();
       expect(enrichmentWrapper.vm.showDataRetention).toBe(false);
       enrichmentWrapper.unmount();
     });
-
 
     // Test 12: getFieldIndices function with full text search
     it("should get correct field indices for full text search", () => {
@@ -198,16 +198,17 @@ describe("Schema Component Tests", async () => {
         bloom_filter_fields: [],
         partition_keys: {},
       };
-      
+
       // Mock store properties that are used in getFieldIndices
-      wrapper.vm.store.state.zoConfig.default_fts_keys = wrapper.vm.store.state.zoConfig.default_fts_keys || [];
-      wrapper.vm.store.state.zoConfig.default_secondary_index_fields = wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
-      
+      wrapper.vm.store.state.zoConfig.default_fts_keys =
+        wrapper.vm.store.state.zoConfig.default_fts_keys || [];
+      wrapper.vm.store.state.zoConfig.default_secondary_index_fields =
+        wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
+
       const indices = wrapper.vm.getFieldIndices(property, settings);
       expect(indices).toContain("fullTextSearchKey");
       expect(property.index_type).toContain("fullTextSearchKey");
     });
-
 
     // Test 14: getFieldIndices function with secondary index
     it("should get correct field indices for secondary index", () => {
@@ -218,11 +219,13 @@ describe("Schema Component Tests", async () => {
         bloom_filter_fields: [],
         partition_keys: {},
       };
-      
+
       // Mock store properties that are used in getFieldIndices
-      wrapper.vm.store.state.zoConfig.default_fts_keys = wrapper.vm.store.state.zoConfig.default_fts_keys || [];
-      wrapper.vm.store.state.zoConfig.default_secondary_index_fields = wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
-      
+      wrapper.vm.store.state.zoConfig.default_fts_keys =
+        wrapper.vm.store.state.zoConfig.default_fts_keys || [];
+      wrapper.vm.store.state.zoConfig.default_secondary_index_fields =
+        wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
+
       const indices = wrapper.vm.getFieldIndices(property, settings);
       expect(indices).toContain("secondaryIndexKey");
     });
@@ -236,11 +239,13 @@ describe("Schema Component Tests", async () => {
         bloom_filter_fields: ["userId"],
         partition_keys: {},
       };
-      
+
       // Mock store properties that are used in getFieldIndices
-      wrapper.vm.store.state.zoConfig.default_fts_keys = wrapper.vm.store.state.zoConfig.default_fts_keys || [];
-      wrapper.vm.store.state.zoConfig.default_secondary_index_fields = wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
-      
+      wrapper.vm.store.state.zoConfig.default_fts_keys =
+        wrapper.vm.store.state.zoConfig.default_fts_keys || [];
+      wrapper.vm.store.state.zoConfig.default_secondary_index_fields =
+        wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
+
       const indices = wrapper.vm.getFieldIndices(property, settings);
       expect(indices).toContain("bloomFilterKey");
     });
@@ -253,14 +258,16 @@ describe("Schema Component Tests", async () => {
         index_fields: [],
         bloom_filter_fields: [],
         partition_keys: {
-          level1: { field: "region", types: "value", disabled: false }
+          level1: { field: "region", types: "value", disabled: false },
         },
       };
-      
+
       // Mock store properties that are used in getFieldIndices
-      wrapper.vm.store.state.zoConfig.default_fts_keys = wrapper.vm.store.state.zoConfig.default_fts_keys || [];
-      wrapper.vm.store.state.zoConfig.default_secondary_index_fields = wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
-      
+      wrapper.vm.store.state.zoConfig.default_fts_keys =
+        wrapper.vm.store.state.zoConfig.default_fts_keys || [];
+      wrapper.vm.store.state.zoConfig.default_secondary_index_fields =
+        wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
+
       const indices = wrapper.vm.getFieldIndices(property, settings);
       expect(indices).toContain("keyPartition");
       expect(property.level).toBe("level1");
@@ -274,27 +281,36 @@ describe("Schema Component Tests", async () => {
         index_fields: [],
         bloom_filter_fields: [],
         partition_keys: {
-          level1: { field: "customerId", types: { hash: 16 }, disabled: false }
+          level1: { field: "customerId", types: { hash: 16 }, disabled: false },
         },
       };
-      
+
       // Mock store properties that are used in getFieldIndices
-      wrapper.vm.store.state.zoConfig.default_fts_keys = wrapper.vm.store.state.zoConfig.default_fts_keys || [];
-      wrapper.vm.store.state.zoConfig.default_secondary_index_fields = wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
-      
+      wrapper.vm.store.state.zoConfig.default_fts_keys =
+        wrapper.vm.store.state.zoConfig.default_fts_keys || [];
+      wrapper.vm.store.state.zoConfig.default_secondary_index_fields =
+        wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
+
       const indices = wrapper.vm.getFieldIndices(property, settings);
       expect(indices).toContain("hashPartition_16");
     });
 
     // Test 18: updateDefinedSchemaFields function - removing fields
     it("should update defined schema fields when removing", () => {
-      wrapper.vm.indexData.defined_schema_fields = ["field1", "field2", "field3"];
+      wrapper.vm.indexData.defined_schema_fields = [
+        "field1",
+        "field2",
+        "field3",
+      ];
       wrapper.vm.selectedFields = [{ name: "field2" }];
       wrapper.vm.activeTab = "schemaFields";
-      
+
       wrapper.vm.updateDefinedSchemaFields();
-      
-      expect(wrapper.vm.indexData.defined_schema_fields).toEqual(["field1", "field3"]);
+
+      expect(wrapper.vm.indexData.defined_schema_fields).toEqual([
+        "field1",
+        "field3",
+      ]);
       expect(wrapper.vm.selectedFields).toEqual([]);
       expect(wrapper.vm.formDirtyFlag).toBe(true);
     });
@@ -304,9 +320,9 @@ describe("Schema Component Tests", async () => {
       wrapper.vm.indexData.defined_schema_fields = ["field1"];
       wrapper.vm.selectedFields = [{ name: "field2" }];
       wrapper.vm.activeTab = "allFields";
-      
+
       wrapper.vm.updateDefinedSchemaFields();
-      
+
       expect(wrapper.vm.indexData.defined_schema_fields).toContain("field1");
       expect(wrapper.vm.indexData.defined_schema_fields).toContain("field2");
     });
@@ -316,9 +332,9 @@ describe("Schema Component Tests", async () => {
       wrapper.vm.indexData.defined_schema_fields = ["field1"];
       wrapper.vm.selectedFields = [{ name: "field1" }];
       wrapper.vm.activeTab = "schemaFields";
-      
+
       wrapper.vm.updateDefinedSchemaFields();
-      
+
       expect(wrapper.vm.indexData.defined_schema_fields).toEqual([]);
       expect(wrapper.vm.activeTab).toBe("allFields");
     });
@@ -327,16 +343,16 @@ describe("Schema Component Tests", async () => {
     it("should update stream response with user defined flags", () => {
       const streamResponse = {
         settings: {
-          defined_schema_fields: ["field1"]
+          defined_schema_fields: ["field1"],
         },
         schema: [
           { name: "field1", type: "string" },
-          { name: "field2", type: "number" }
-        ]
+          { name: "field2", type: "number" },
+        ],
       };
-      
+
       const result = wrapper.vm.updateStreamResponse(streamResponse);
-      
+
       expect(result.schema[0].isUserDefined).toBe(true);
       expect(result.schema[1].isUserDefined).toBe(false);
     });
@@ -370,11 +386,13 @@ describe("Schema Component Tests", async () => {
     // Test 26: openPatternAssociationDialog function
     it("should open pattern association dialog", () => {
       wrapper.vm.patternAssociations = {
-        field1: [{ field: "field1", pattern_name: "pattern1", pattern_id: "id1" }]
+        field1: [
+          { field: "field1", pattern_name: "pattern1", pattern_id: "id1" },
+        ],
       };
-      
+
       wrapper.vm.openPatternAssociationDialog("field1");
-      
+
       expect(wrapper.vm.patternAssociationDialog.show).toBe(true);
       expect(wrapper.vm.patternAssociationDialog.fieldName).toBe("field1");
     });
@@ -386,14 +404,14 @@ describe("Schema Component Tests", async () => {
         pattern_name: "test-pattern",
         pattern_id: "pattern-123",
         policy: "replace",
-        apply_at: "ingestion"
+        apply_at: "ingestion",
       };
-      
+
       wrapper.vm.handleAddPattern(pattern);
-      
+
       expect(wrapper.vm.formDirtyFlag).toBe(true);
       expect(wrapper.vm.patternAssociations.field1).toEqual(
-        expect.arrayContaining([expect.objectContaining(pattern)])
+        expect.arrayContaining([expect.objectContaining(pattern)]),
       );
     });
 
@@ -402,12 +420,12 @@ describe("Schema Component Tests", async () => {
       wrapper.vm.patternAssociations = {
         field1: [
           { field: "field1", pattern_name: "pattern1", pattern_id: "id1" },
-          { field: "field1", pattern_name: "pattern2", pattern_id: "id2" }
-        ]
+          { field: "field1", pattern_name: "pattern2", pattern_id: "id2" },
+        ],
       };
-      
+
       wrapper.vm.handleRemovePattern("id1", "field1");
-      
+
       expect(wrapper.vm.formDirtyFlag).toBe(true);
       expect(wrapper.vm.patternAssociations.field1).toHaveLength(1);
       expect(wrapper.vm.patternAssociations.field1[0].pattern_id).toBe("id2");
@@ -416,17 +434,29 @@ describe("Schema Component Tests", async () => {
     // Test 29: handleUpdateAppliedPattern for policy
     it("should update applied pattern policy", () => {
       wrapper.vm.patternAssociations = {
-        field1: [{ field: "field1", pattern_name: "pattern1", pattern_id: "id1", policy: "old" }]
+        field1: [
+          {
+            field: "field1",
+            pattern_name: "pattern1",
+            pattern_id: "id1",
+            policy: "old",
+          },
+        ],
       };
-      
+
       const updatedPattern = {
         field: "field1",
         pattern_name: "pattern1",
         pattern_id: "id1",
-        policy: "new"
+        policy: "new",
       };
-      
-      wrapper.vm.handleUpdateAppliedPattern(updatedPattern, "field1", "id1", "policy");
+
+      wrapper.vm.handleUpdateAppliedPattern(
+        updatedPattern,
+        "field1",
+        "id1",
+        "policy",
+      );
       expect(wrapper.vm.patternAssociations.field1[0].policy).toBe("new");
     });
 
@@ -434,11 +464,15 @@ describe("Schema Component Tests", async () => {
     it("should scroll to add fields section", () => {
       const mockElement = { scrollIntoView: vi.fn() };
       vi.spyOn(document, "getElementById").mockReturnValue(mockElement);
-      
+
       wrapper.vm.scrollToAddFields();
-      
-      expect(document.getElementById).toHaveBeenCalledWith("schema-add-fields-section");
-      expect(mockElement.scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth" });
+
+      expect(document.getElementById).toHaveBeenCalledWith(
+        "schema-add-fields-section",
+      );
+      expect(mockElement.scrollIntoView).toHaveBeenCalledWith({
+        behavior: "smooth",
+      });
     });
 
     // Test 31: dateChangeValue function
@@ -446,11 +480,11 @@ describe("Schema Component Tests", async () => {
       const dateValue = {
         selectedDate: {
           from: new Date("2023-12-25"),
-          to: new Date("2023-12-26")
+          to: new Date("2023-12-26"),
         },
-        relativeTimePeriod: null
+        relativeTimePeriod: null,
       };
-      
+
       wrapper.vm.dateChangeValue(dateValue);
       expect(wrapper.vm.redDaysList.length).toBeGreaterThan(0);
     });
@@ -458,9 +492,9 @@ describe("Schema Component Tests", async () => {
     // Test 32: deleteDates function
     it("should delete dates correctly", () => {
       wrapper.vm.selectedDateFields = [
-        { original_start: 1703505000000, original_end: 1703591400000 }
+        { original_start: 1703505000000, original_end: 1703591400000 },
       ];
-      
+
       wrapper.vm.deleteDates();
       expect(wrapper.vm.formDirtyFlag).toBe(true);
     });
@@ -470,9 +504,9 @@ describe("Schema Component Tests", async () => {
       const associations = [
         { field: "field1", pattern_name: "pattern1", pattern_id: "id1" },
         { field: "field1", pattern_name: "pattern2", pattern_id: "id2" },
-        { field: "field2", pattern_name: "pattern3", pattern_id: "id3" }
+        { field: "field2", pattern_name: "pattern3", pattern_id: "id3" },
       ];
-      
+
       const result = wrapper.vm.groupPatternAssociationsByField(associations);
       expect(result.field1).toHaveLength(2);
       expect(result.field2).toHaveLength(1);
@@ -483,11 +517,13 @@ describe("Schema Component Tests", async () => {
       const grouped = {
         field1: [
           { field: "field1", pattern_name: "pattern1", pattern_id: "id1" },
-          { field: "field1", pattern_name: "pattern2", pattern_id: "id2" }
+          { field: "field1", pattern_name: "pattern2", pattern_id: "id2" },
         ],
-        field2: [{ field: "field2", pattern_name: "pattern3", pattern_id: "id3" }]
+        field2: [
+          { field: "field2", pattern_name: "pattern3", pattern_id: "id3" },
+        ],
       };
-      
+
       const result = wrapper.vm.ungroupPatternAssociations(grouped);
       expect(result).toHaveLength(3);
     });
@@ -496,7 +532,7 @@ describe("Schema Component Tests", async () => {
     it("should compute schema fields name correctly", () => {
       // Without user defined schema
       expect(wrapper.vm.computedSchemaFieldsName).toBe("All Fields");
-      
+
       // With user defined schema
       wrapper.vm.indexData.defined_schema_fields = ["field1"];
       expect(wrapper.vm.computedSchemaFieldsName).toBe("Other Fields");
@@ -506,7 +542,7 @@ describe("Schema Component Tests", async () => {
     it("should compute tabs correctly", () => {
       wrapper.vm.indexData.defined_schema_fields = ["field1"];
       wrapper.vm.indexData.schema = [{ name: "field1" }, { name: "field2" }];
-      
+
       const tabs = wrapper.vm.tabs;
       expect(tabs[0].value).toBe("schemaFields");
       expect(tabs[1].value).toBe("allFields");
@@ -537,14 +573,14 @@ describe("Schema Component Tests", async () => {
     // Test 40: showStoreOriginalDataToggle computed property
     it("should compute store original data toggle visibility", async () => {
       expect(wrapper.vm.showStoreOriginalDataToggle).toBe(true);
-      
+
       // Test with traces
       const tracesWrapper = mount(LogStream, {
         props: {
           modelValue: {
             name: "test-stream",
             stream_type: "traces",
-            settings: { defined_schema_fields: [] }
+            settings: { defined_schema_fields: [] },
           },
         },
         global: {
@@ -552,7 +588,7 @@ describe("Schema Component Tests", async () => {
           plugins: [i18n],
         },
       });
-      
+
       await flushPromises();
       expect(tracesWrapper.vm.showStoreOriginalDataToggle).toBe(false);
       tracesWrapper.unmount();
@@ -566,44 +602,58 @@ describe("Schema Component Tests", async () => {
 
     it("should handle adding pattern to existing field", () => {
       wrapper.vm.patternAssociations = {
-        field1: [{ field: "field1", pattern_name: "existing", pattern_id: "existing-id" }]
+        field1: [
+          {
+            field: "field1",
+            pattern_name: "existing",
+            pattern_id: "existing-id",
+          },
+        ],
       };
-      
+
       const newPattern = {
         field: "field1",
         pattern_name: "new-pattern",
-        pattern_id: "new-id"
+        pattern_id: "new-id",
       };
-      
+
       wrapper.vm.handleAddPattern(newPattern);
       expect(wrapper.vm.patternAssociations.field1).toHaveLength(2);
     });
 
     it("should handle updateAppliedPattern with apply_at attribute", () => {
       wrapper.vm.patternAssociations = {
-        field1: [{ field: "field1", pattern_name: "pattern1", pattern_id: "id1", apply_at: "old" }]
+        field1: [
+          {
+            field: "field1",
+            pattern_name: "pattern1",
+            pattern_id: "id1",
+            apply_at: "old",
+          },
+        ],
       };
-      
+
       const updatedPattern = {
         field: "field1",
-        pattern_name: "pattern1", 
+        pattern_name: "pattern1",
         pattern_id: "id1",
-        apply_at: "new"
+        apply_at: "new",
       };
-      
-      wrapper.vm.handleUpdateAppliedPattern(updatedPattern, "field1", "id1", "apply_at");
+
+      wrapper.vm.handleUpdateAppliedPattern(
+        updatedPattern,
+        "field1",
+        "id1",
+        "apply_at",
+      );
       expect(wrapper.vm.patternAssociations.field1[0].apply_at).toBe("new");
     });
 
     it("should handle filter field function with schema fields", () => {
       wrapper.vm.indexData.defined_schema_fields = ["field1", "field2"];
-      
-      const rows = [
-        { name: "field1" },
-        { name: "field2" },
-        { name: "field3" }
-      ];
-      
+
+      const rows = [{ name: "field1" }, { name: "field2" }, { name: "field3" }];
+
       const result = wrapper.vm.filterFieldFn(rows, "field@schemaFields");
       expect(result.length).toBe(2);
     });
@@ -623,9 +673,9 @@ describe("Schema Component Tests", async () => {
     it("should handle empty stream response in updateStreamResponse", () => {
       const streamResponse = {
         settings: {},
-        schema: []
+        schema: [],
       };
-      
+
       const result = wrapper.vm.updateStreamResponse(streamResponse);
       expect(result.schema).toEqual([]);
     });
@@ -633,14 +683,14 @@ describe("Schema Component Tests", async () => {
     it("should handle partition key conflicts in disableOptions", () => {
       const schema = { index_type: ["prefixPartition"] };
       const keyPartitionOption = { value: "keyPartition" };
-      
+
       expect(wrapper.vm.disableOptions(schema, keyPartitionOption)).toBe(true);
     });
 
     it("should handle hash partition conflicts in disableOptions", () => {
       const schema = { index_type: ["hashPartition_8"] };
       const hashOption = { value: "hashPartition_16" };
-      
+
       expect(wrapper.vm.disableOptions(schema, hashOption)).toBe(true);
     });
 
@@ -703,7 +753,7 @@ describe("Schema Component Tests", async () => {
               approx_partition: false,
               defined_schema_fields: [],
               extended_retention_days: [],
-              pattern_associations: []
+              pattern_associations: [],
             },
           },
         },
@@ -718,8 +768,8 @@ describe("Schema Component Tests", async () => {
                   default_fts_keys: ["user_id"],
                   default_secondary_index_fields: ["log_level"],
                   user_defined_schema_max_fields: 100,
-                }
-              }
+                },
+              },
             },
           },
           plugins: [i18n],
@@ -734,9 +784,11 @@ describe("Schema Component Tests", async () => {
       const missing = wrapper.vm.getMissingPerformanceFields(selectedFieldsSet);
 
       expect(missing.length).toBeGreaterThan(0);
-      const ftsFields = missing.filter(f => f.type === "Full Text Search");
+      const ftsFields = missing.filter((f) => f.type === "Full Text Search");
       expect(ftsFields.length).toBeGreaterThan(0);
-      expect(ftsFields.some(f => f.name === "user_id" || f.name === "message")).toBe(true);
+      expect(
+        ftsFields.some((f) => f.name === "user_id" || f.name === "message"),
+      ).toBe(true);
     });
 
     // Test 2: getMissingPerformanceFields should detect missing Secondary Index fields
@@ -745,14 +797,23 @@ describe("Schema Component Tests", async () => {
       const missing = wrapper.vm.getMissingPerformanceFields(selectedFieldsSet);
 
       expect(missing.length).toBeGreaterThan(0);
-      const secondaryIndexFields = missing.filter(f => f.type === "Secondary Index");
+      const secondaryIndexFields = missing.filter(
+        (f) => f.type === "Secondary Index",
+      );
       expect(secondaryIndexFields.length).toBeGreaterThan(0);
-      expect(secondaryIndexFields.some(f => f.name === "log_level")).toBe(true);
+      expect(secondaryIndexFields.some((f) => f.name === "log_level")).toBe(
+        true,
+      );
     });
 
     // Test 3: getMissingPerformanceFields should not detect fields already selected
     it("should not detect fields already selected by user", () => {
-      const selectedFieldsSet = new Set(["user_id", "message", "log_level", "timestamp"]);
+      const selectedFieldsSet = new Set([
+        "user_id",
+        "message",
+        "log_level",
+        "timestamp",
+      ]);
       const missing = wrapper.vm.getMissingPerformanceFields(selectedFieldsSet);
 
       expect(missing.length).toBe(0);
@@ -764,8 +825,8 @@ describe("Schema Component Tests", async () => {
       const selectedFieldsSet = new Set(["message", "timestamp"]); // Not including user_id
       const missing = wrapper.vm.getMissingPerformanceFields(selectedFieldsSet);
 
-      const ftsFields = missing.filter(f => f.type === "Full Text Search");
-      expect(ftsFields.some(f => f.name === "user_id")).toBe(true);
+      const ftsFields = missing.filter((f) => f.type === "Full Text Search");
+      expect(ftsFields.some((f) => f.name === "user_id")).toBe(true);
     });
 
     // Test 5: getMissingPerformanceFields should detect default secondary index keys from config
@@ -774,8 +835,12 @@ describe("Schema Component Tests", async () => {
       const selectedFieldsSet = new Set(["user_id", "timestamp"]); // Not including log_level
       const missing = wrapper.vm.getMissingPerformanceFields(selectedFieldsSet);
 
-      const secondaryIndexFields = missing.filter(f => f.type === "Secondary Index");
-      expect(secondaryIndexFields.some(f => f.name === "log_level")).toBe(true);
+      const secondaryIndexFields = missing.filter(
+        (f) => f.type === "Secondary Index",
+      );
+      expect(secondaryIndexFields.some((f) => f.name === "log_level")).toBe(
+        true,
+      );
     });
 
     // Test 6: updateDefinedSchemaFields should show popup when UDS is enabled first time with missing fields
@@ -798,7 +863,7 @@ describe("Schema Component Tests", async () => {
         { name: "user_id" },
         { name: "message" },
         { name: "log_level" },
-        { name: "timestamp" }
+        { name: "timestamp" },
       ];
       wrapper.vm.activeTab = "allFields";
 
@@ -818,7 +883,9 @@ describe("Schema Component Tests", async () => {
       wrapper.vm.updateDefinedSchemaFields();
 
       expect(wrapper.vm.confirmAddPerformanceFieldsDialog).toBe(false);
-      expect(wrapper.vm.indexData.defined_schema_fields).toContain("existing_field");
+      expect(wrapper.vm.indexData.defined_schema_fields).toContain(
+        "existing_field",
+      );
       expect(wrapper.vm.indexData.defined_schema_fields).toContain("timestamp");
     });
 
@@ -827,7 +894,7 @@ describe("Schema Component Tests", async () => {
       wrapper.vm.pendingSelectedFields = ["timestamp"];
       wrapper.vm.missingPerformanceFields = [
         { name: "user_id", type: "Full Text Search" },
-        { name: "log_level", type: "Secondary Index" }
+        { name: "log_level", type: "Secondary Index" },
       ];
 
       wrapper.vm.addPerformanceFields();
@@ -845,15 +912,19 @@ describe("Schema Component Tests", async () => {
       wrapper.vm.pendingSelectedFields = ["timestamp"];
       wrapper.vm.missingPerformanceFields = [
         { name: "user_id", type: "Full Text Search" },
-        { name: "log_level", type: "Secondary Index" }
+        { name: "log_level", type: "Secondary Index" },
       ];
 
       wrapper.vm.skipPerformanceFields();
 
       expect(wrapper.vm.confirmAddPerformanceFieldsDialog).toBe(false);
       expect(wrapper.vm.indexData.defined_schema_fields).toContain("timestamp");
-      expect(wrapper.vm.indexData.defined_schema_fields).not.toContain("user_id");
-      expect(wrapper.vm.indexData.defined_schema_fields).not.toContain("log_level");
+      expect(wrapper.vm.indexData.defined_schema_fields).not.toContain(
+        "user_id",
+      );
+      expect(wrapper.vm.indexData.defined_schema_fields).not.toContain(
+        "log_level",
+      );
       expect(wrapper.vm.missingPerformanceFields).toEqual([]);
       expect(wrapper.vm.pendingSelectedFields).toEqual([]);
     });
@@ -871,7 +942,9 @@ describe("Schema Component Tests", async () => {
 
       expect(wrapper.vm.indexData.defined_schema_fields).toContain("user_id");
       expect(wrapper.vm.indexData.defined_schema_fields).not.toContain("_all");
-      expect(wrapper.vm.indexData.defined_schema_fields).not.toContain("_timestamp");
+      expect(wrapper.vm.indexData.defined_schema_fields).not.toContain(
+        "_timestamp",
+      );
     });
 
     // Test 13: proceedWithAddingFields should mark form as dirty
@@ -887,14 +960,17 @@ describe("Schema Component Tests", async () => {
     // Test 14: getMissingPerformanceFields should only include fields that exist in schema
     it("should only include backend default fields that exist in current schema", () => {
       // Add a field to default config that doesn't exist in schema
-      wrapper.vm.store.state.zoConfig.default_fts_keys = ["user_id", "nonexistent_field"];
+      wrapper.vm.store.state.zoConfig.default_fts_keys = [
+        "user_id",
+        "nonexistent_field",
+      ];
 
       const selectedFieldsSet = new Set(["timestamp"]);
       const missing = wrapper.vm.getMissingPerformanceFields(selectedFieldsSet);
 
-      const ftsFields = missing.filter(f => f.type === "Full Text Search");
-      expect(ftsFields.some(f => f.name === "user_id")).toBe(true);
-      expect(ftsFields.some(f => f.name === "nonexistent_field")).toBe(false);
+      const ftsFields = missing.filter((f) => f.type === "Full Text Search");
+      expect(ftsFields.some((f) => f.name === "user_id")).toBe(true);
+      expect(ftsFields.some((f) => f.name === "nonexistent_field")).toBe(false);
     });
 
     // Test 15: updateDefinedSchemaFields should respect max field limit
@@ -910,8 +986,8 @@ describe("Schema Component Tests", async () => {
       expect(notifySpy).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "negative",
-          message: expect.stringContaining("Maximum allowed fields")
-        })
+          message: expect.stringContaining("Maximum allowed fields"),
+        }),
       );
       expect(wrapper.vm.selectedFields).toEqual([]);
     });

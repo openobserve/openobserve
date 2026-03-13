@@ -79,7 +79,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="field-container flex content-center ellipsis hover:tw:bg-[var(--o2-hover-accent)]!"
                 :title="props.row.label || props.row.name"
               >
-                <div class="field_label ellipsis tw:flex tw:items-center tw:pl-[calc(1.5rem+3px)]" style="font-size: 14px">
+                <div
+                  class="field_label ellipsis tw:flex tw:items-center tw:pl-[calc(1.5rem+3px)]"
+                  style="font-size: 14px"
+                >
                   {{ props.row.label || props.row.name }}
                 </div>
                 <div
@@ -126,8 +129,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="searchObj.loadingStream"
             class="tw:flex tw:items-center tw:justify-center tw:w-full tw:pt-[2rem]"
           >
-            <q-td colspan="100%" class="text-bold"
-style="opacity: 0.7">
+            <q-td colspan="100%"
+class="text-bold" style="opacity: 0.7">
               <div
                 class="text-subtitle2 text-weight-bold tw:w-fit tw:mx-auto tw:my-0 tw:flex-col tw:justify-items-center"
               >

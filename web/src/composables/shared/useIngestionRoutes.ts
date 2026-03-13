@@ -47,18 +47,18 @@ import DatabaseConfig from "@/components/ingestion/Database.vue";
 import SqlServer from "@/components/ingestion/databases/SqlServer.vue";
 import Postgres from "@/components/ingestion/databases/Postgres.vue";
 import Oracle from "@/components/ingestion/databases/Oracle.vue";
-import MongoDB from '@/components/ingestion/databases/MongoDB.vue';
-import Redis from '@/components/ingestion/databases/Redis.vue';
-import CouchDB from '@/components/ingestion/databases/CouchDB.vue';
-import Elasticsearch from '@/components/ingestion/databases/Elasticsearch.vue';
-import MySQL from '@/components/ingestion/databases/MySQL.vue';
-import SAPHana from '@/components/ingestion/databases/SAPHana.vue';
-import Snowflake from '@/components/ingestion/databases/Snowflake.vue';
-import Zookeeper from '@/components/ingestion/databases/Zookeeper.vue';
-import Cassandra from '@/components/ingestion/databases/Cassandra.vue';
-import Aerospike from '@/components/ingestion/databases/Aerospike.vue';
-import DynamoDB from '@/components/ingestion/databases/DynamoDB.vue';
-import Databricks from '@/components/ingestion/databases/Databricks.vue';
+import MongoDB from "@/components/ingestion/databases/MongoDB.vue";
+import Redis from "@/components/ingestion/databases/Redis.vue";
+import CouchDB from "@/components/ingestion/databases/CouchDB.vue";
+import Elasticsearch from "@/components/ingestion/databases/Elasticsearch.vue";
+import MySQL from "@/components/ingestion/databases/MySQL.vue";
+import SAPHana from "@/components/ingestion/databases/SAPHana.vue";
+import Snowflake from "@/components/ingestion/databases/Snowflake.vue";
+import Zookeeper from "@/components/ingestion/databases/Zookeeper.vue";
+import Cassandra from "@/components/ingestion/databases/Cassandra.vue";
+import Aerospike from "@/components/ingestion/databases/Aerospike.vue";
+import DynamoDB from "@/components/ingestion/databases/DynamoDB.vue";
+import Databricks from "@/components/ingestion/databases/Databricks.vue";
 
 import Security from "@/components/ingestion/Security.vue";
 import Falco from "@/components/ingestion/security/Falco.vue";
@@ -111,7 +111,7 @@ const useIngestionRoutes = () => {
       path: "ingestion",
       name: "ingestion",
       component: Ingestion,
-      meta:{
+      meta: {
         title: "Ingestion",
       },
       beforeEnter(to: any, from: any, next: any) {
@@ -472,7 +472,7 @@ const useIngestionRoutes = () => {
                 routeGuard(to, from, next);
               },
             },
-          ]
+          ],
         },
         {
           path: "security",
@@ -538,7 +538,7 @@ const useIngestionRoutes = () => {
                 routeGuard(to, from, next);
               },
             },
-          ]
+          ],
         },
         {
           path: "devops",
@@ -656,7 +656,7 @@ const useIngestionRoutes = () => {
               component: Kafka,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
-              }
+              },
             },
             {
               path: "nats",
@@ -664,7 +664,7 @@ const useIngestionRoutes = () => {
               component: NATS,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
-              }
+              },
             },
           ],
         },
@@ -690,7 +690,7 @@ const useIngestionRoutes = () => {
               component: DotNetTracing,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
-              }
+              },
             },
             {
               path: "dotnetlogs",
@@ -698,7 +698,7 @@ const useIngestionRoutes = () => {
               component: DotNetLogs,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
-              }
+              },
             },
             {
               path: "nodejs",
@@ -706,7 +706,7 @@ const useIngestionRoutes = () => {
               component: NodeJS,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
-              }
+              },
             },
             {
               path: "java",
@@ -714,7 +714,7 @@ const useIngestionRoutes = () => {
               component: Java,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
-              }
+              },
             },
             {
               path: "go",
@@ -722,7 +722,7 @@ const useIngestionRoutes = () => {
               component: Go,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
-              }
+              },
             },
             {
               path: "rust",
@@ -730,7 +730,7 @@ const useIngestionRoutes = () => {
               component: Rust,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
-              }
+              },
             },
             {
               path: "fastapi",
@@ -738,7 +738,7 @@ const useIngestionRoutes = () => {
               component: FastAPI,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
-              }
+              },
             },
           ],
         },

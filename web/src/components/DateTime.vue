@@ -1335,7 +1335,7 @@ export default defineComponent({
 }
 .startEndTime {
   margin: 0.5rem 0.4rem 0.3rem 0.4rem;
-  .q-field__control-container{
+  .q-field__control-container {
     min-height: 32px;
     height: 32px;
   }

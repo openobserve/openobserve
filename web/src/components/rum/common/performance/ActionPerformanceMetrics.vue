@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 lg:tw:grid-cols-3 tw:gap-3" data-test="action-performance-metrics">
+  <div
+    class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 lg:tw:grid-cols-3 tw:gap-3"
+    data-test="action-performance-metrics"
+  >
     <MetricCard
       v-if="metrics?.action?.loading_time"
       label="Loading Time"
@@ -84,13 +87,17 @@ defineProps<Props>();
 const LOADING_TIME_GOOD = 1000000000; // 1s
 const LOADING_TIME_NEEDS_IMPROVEMENT = 3000000000; // 3s
 
-const getLoadingTimeStatus = (value: number): "good" | "needs-improvement" | "poor" => {
+const getLoadingTimeStatus = (
+  value: number,
+): "good" | "needs-improvement" | "poor" => {
   if (value <= LOADING_TIME_GOOD) return "good";
   if (value <= LOADING_TIME_NEEDS_IMPROVEMENT) return "needs-improvement";
   return "poor";
 };
 
-const getLongTaskStatus = (count: number): "good" | "needs-improvement" | "poor" => {
+const getLongTaskStatus = (
+  count: number,
+): "good" | "needs-improvement" | "poor" => {
   if (count === 0) return "good";
   if (count <= 2) return "needs-improvement";
   return "poor";

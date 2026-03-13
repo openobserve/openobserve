@@ -1093,9 +1093,18 @@ describe("TableRenderer", () => {
       await flushPromises();
 
       // Test offsets through getStickyColumnStyle function
-      const col1Style = wrapper.vm.getStickyColumnStyle({ name: "col1", sticky: true });
-      const col2Style = wrapper.vm.getStickyColumnStyle({ name: "col2", sticky: true });
-      const col3Style = wrapper.vm.getStickyColumnStyle({ name: "col3", sticky: true });
+      const col1Style = wrapper.vm.getStickyColumnStyle({
+        name: "col1",
+        sticky: true,
+      });
+      const col2Style = wrapper.vm.getStickyColumnStyle({
+        name: "col2",
+        sticky: true,
+      });
+      const col3Style = wrapper.vm.getStickyColumnStyle({
+        name: "col3",
+        sticky: true,
+      });
 
       expect(col1Style.left).toBe("0px");
       expect(col2Style.left).toBe("100px");
@@ -1125,8 +1134,14 @@ describe("TableRenderer", () => {
       await flushPromises();
 
       // Test offsets through getStickyColumnStyle function
-      const col1Style = wrapper.vm.getStickyColumnStyle({ name: "col1", sticky: true });
-      const col2Style = wrapper.vm.getStickyColumnStyle({ name: "col2", sticky: true });
+      const col1Style = wrapper.vm.getStickyColumnStyle({
+        name: "col1",
+        sticky: true,
+      });
+      const col2Style = wrapper.vm.getStickyColumnStyle({
+        name: "col2",
+        sticky: true,
+      });
 
       expect(col1Style.left).toBe("0px");
       expect(col2Style.left).toBe("100px"); // Default width
@@ -1157,8 +1172,14 @@ describe("TableRenderer", () => {
       await flushPromises();
 
       // Test offsets through getStickyColumnStyle function
-      const col1Style = wrapper.vm.getStickyColumnStyle({ name: "col1", sticky: true });
-      const col2Style = wrapper.vm.getStickyColumnStyle({ name: "col2", sticky: true });
+      const col1Style = wrapper.vm.getStickyColumnStyle({
+        name: "col1",
+        sticky: true,
+      });
+      const col2Style = wrapper.vm.getStickyColumnStyle({
+        name: "col2",
+        sticky: true,
+      });
 
       expect(col1Style.left).toBe("0px");
       expect(col2Style.left).toBe("120px");

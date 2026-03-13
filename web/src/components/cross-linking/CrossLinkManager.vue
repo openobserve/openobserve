@@ -4,7 +4,11 @@
     <div class="tw:flex tw:justify-between tw:items-center q-mb-md">
       <div>
         <div class="text-body1 text-bold">{{ title }}</div>
-        <div v-if="subtitle" class="text-caption" style="color: var(--o2-text-muted)">
+        <div
+          v-if="subtitle"
+          class="text-caption"
+          style="color: var(--o2-text-muted)"
+        >
           {{ subtitle }}
         </div>
       </div>
@@ -16,14 +20,22 @@
         icon="add"
         :label="t('crossLinks.addCrossLink')"
         class="o2-secondary-button tw:h-[36px]"
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+        :class="
+          store.state.theme === 'dark'
+            ? 'o2-secondary-button-dark'
+            : 'o2-secondary-button-light'
+        "
         @click="onAddClick"
         data-test="add-cross-link-btn"
       />
     </div>
 
     <!-- Links List -->
-    <div v-if="links.length > 0" class="cross-link-list" data-test="cross-link-list">
+    <div
+      v-if="links.length > 0"
+      class="cross-link-list"
+      data-test="cross-link-list"
+    >
       <div
         v-for="(link, idx) in links"
         :key="link.name"
@@ -33,7 +45,11 @@
         <div class="tw:flex tw:justify-between tw:items-start">
           <div class="tw:flex-1 tw:min-w-0">
             <!-- Name -->
-            <div class="text-subtitle2 text-bold tw:truncate" :title="link.name" style="color: var(--o2-text-primary)">
+            <div
+              class="text-subtitle2 text-bold tw:truncate"
+              :title="link.name"
+              style="color: var(--o2-text-primary)"
+            >
               {{ link.name }}
               <q-badge
                 v-if="link._source"
@@ -43,23 +59,35 @@
               />
             </div>
             <!-- URL -->
-            <div class="text-caption tw:truncate q-mt-xs" :title="link.url" style="color: var(--o2-text-muted)">
+            <div
+              class="text-caption tw:truncate q-mt-xs"
+              :title="link.url"
+              style="color: var(--o2-text-muted)"
+            >
               {{ link.url }}
             </div>
             <!-- Fields -->
-            <div v-if="link.fields?.length" class="tw:flex tw:flex-wrap tw:gap-1 q-mt-xs">
+            <div
+              v-if="link.fields?.length"
+              class="tw:flex tw:flex-wrap tw:gap-1 q-mt-xs"
+            >
               <q-chip
                 v-for="(field, fIdx) in link.fields"
                 :key="fIdx"
                 dense
                 class="tw:max-w-[200px]"
               >
-                <span class="tw:truncate text-caption" :title="field.name">{{ field.name }}</span>
+                <span class="tw:truncate text-caption" :title="field.name">{{
+                  field.name
+                }}</span>
               </q-chip>
             </div>
           </div>
           <!-- Actions -->
-          <div v-if="!readonly" class="tw:flex tw:items-center tw:gap-1 tw:ml-2 tw:shrink-0">
+          <div
+            v-if="!readonly"
+            class="tw:flex tw:items-center tw:gap-1 tw:ml-2 tw:shrink-0"
+          >
             <q-btn
               dense
               flat
@@ -91,7 +119,9 @@
       style="color: var(--o2-text-muted)"
       data-test="cross-link-empty"
     >
-      {{ t("crossLinks.emptyState", { addLabel: t("crossLinks.addCrossLink") }) }}
+      {{
+        t("crossLinks.emptyState", { addLabel: t("crossLinks.addCrossLink") })
+      }}
     </div>
 
     <!-- Add/Edit Dialog -->
