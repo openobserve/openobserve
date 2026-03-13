@@ -407,7 +407,7 @@ describe("convertTraceData", () => {
 
       expect(result.options.series[0].roam).toBe(true);
       expect(result.options.series[0].label.show).toBe(true);
-      expect(result.options.series[0].draggable).toBe(true);
+      expect(result.options.series[0].draggable).toBe(false);
       expect(result.options.series[0].focusNodeAdjacency).toBe(true);
     });
 
