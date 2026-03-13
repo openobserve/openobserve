@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -319,6 +319,20 @@ pub fn filter_source_by_partition_key(source: &str, filters: &[(String, Vec<Stri
     })
 }
 
+/// compare two schemas, return true if they are equal
+pub fn schema_eq(a: &Schema, b: &Schema) -> bool {
+    // fast path
+    if a.fields.eq(&b.fields) {
+        return true;
+    }
+    // slow path, get all the filelds and sort them by name
+    let mut a_fields = a.fields.iter().collect::<Vec<_>>();
+    let mut b_fields = b.fields.iter().collect::<Vec<_>>();
+    a_fields.sort_by(|a, b| a.name().cmp(b.name()));
+    b_fields.sort_by(|a, b| a.name().cmp(b.name()));
+    a_fields.eq(&b_fields)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -508,5 +522,62 @@ mod tests {
         for (filter, expected) in filters {
             assert_eq!(filter_source_by_partition_key(path, &filter), expected);
         }
+    }
+
+    #[test]
+    fn test_schema_eq() {
+        let schema1 = Schema::new(vec![
+            Field::new("a", DataType::Int64, true),
+            Field::new("b", DataType::Int64, true),
+        ]);
+        let schema2 = Schema::new(vec![
+            Field::new("b", DataType::Int64, true),
+            Field::new("a", DataType::Int64, true),
+        ]);
+        assert!(schema_eq(&schema1, &schema2));
+    }
+
+    #[test]
+    fn test_schema_eq_with_metadata() {
+        let schema1 = Schema::new(vec![
+            Field::new("a", DataType::Int64, true),
+            Field::new("b", DataType::Int64, true),
+        ]);
+        let mut metadata = std::collections::HashMap::new();
+        metadata.insert("key".to_string(), "value".to_string());
+        let schema2 = Schema::new_with_metadata(
+            vec![
+                Field::new("b", DataType::Int64, true),
+                Field::new("a", DataType::Int64, true),
+            ],
+            metadata,
+        );
+        assert!(schema_eq(&schema1, &schema2));
+    }
+
+    #[test]
+    fn test_schema_eq_with_different_order() {
+        let schema1 = Schema::new(vec![
+            Field::new("a", DataType::Int64, true),
+            Field::new("b", DataType::Int64, true),
+        ]);
+        let schema2 = Schema::new(vec![
+            Field::new("b", DataType::Int64, true),
+            Field::new("a", DataType::Int64, true),
+        ]);
+        assert!(schema_eq(&schema1, &schema2));
+    }
+
+    #[test]
+    fn test_schema_eq_with_different_data_type() {
+        let schema1 = Schema::new(vec![
+            Field::new("a", DataType::Int64, true),
+            Field::new("b", DataType::Int64, true),
+        ]);
+        let schema2 = Schema::new(vec![
+            Field::new("a", DataType::Utf8, true),
+            Field::new("b", DataType::Int64, true),
+        ]);
+        assert!(!schema_eq(&schema1, &schema2));
     }
 }
