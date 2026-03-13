@@ -42,6 +42,7 @@ vi.mock("@/services/billings", () => ({
 vi.mock("@/utils/zincutils", () => ({
   useLocalOrganization: vi.fn(),
   convertToTitleCase: vi.fn((str) => str),
+  getImageURL: vi.fn((path) => `mocked-image-url-${path}`),
 }));
 
 // Mock config

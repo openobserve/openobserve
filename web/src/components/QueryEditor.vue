@@ -224,7 +224,10 @@ const currentSessionId = ref<string | null>(null);
 const currentAbortController = ref<AbortController | null>(null);
 
 // Chat history tracking (shared IndexedDB with O2AIChat)
-const { saveToHistory } = useChatHistory();
+const { saveToHistory } = useChatHistory(
+  () => store.state.userInfo.email ?? '',
+  () => store.state.selectedOrganization.identifier ?? '',
+);
 const currentChatId = ref<number | null>(null);
 const chatMessages = ref<ChatMessage[]>([]);
 
