@@ -1611,8 +1611,17 @@ describe("Index List", async () => {
   });
 
   it("adds field to filter with correct format", async () => {
+    wrapper.vm.searchObj.meta.sqlMode = false;
     wrapper.vm.addToFilter("field1=value1");
     expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("field1=value1");
+  });
+
+  it("quotes field when adding filter in SQL mode", async () => {
+    wrapper.vm.searchObj.meta.sqlMode = true;
+    wrapper.vm.addToFilter("user='alice'");
+    expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe(
+      '"user"=\'alice\'',
+    );
   });
 
   it("toggles field selection in clickFieldFn", async () => {

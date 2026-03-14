@@ -673,6 +673,16 @@ export default defineComponent({
     };
 
     const addToFilter = (field: any) => {
+      if (searchObj.meta.sqlMode === true && typeof field === "string") {
+        const fieldAndOperator = field.match(
+          /^([^=!<>\s()"]+)(\s*(?:!=|=)\s*.*)$/,
+        );
+        if (fieldAndOperator) {
+          searchObj.data.stream.addToFilter =
+            `"${fieldAndOperator[1]}"${fieldAndOperator[2]}`;
+          return;
+        }
+      }
       searchObj.data.stream.addToFilter = field;
     };
 
