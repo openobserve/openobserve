@@ -1,7 +1,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { getOrgIdentifier, isCloudEnvironment } = require('../utils/cloud-auth.js');
 
 test.describe("Ingestion Configuration Tests", () => {
   test.describe.configure({ mode: 'parallel' });
@@ -194,9 +194,13 @@ test.describe("Ingestion Configuration Tests", () => {
 
       // URL patterns known to work in browsers but fail in automated HEAD/GET checks
       const skipUrls = [
-        'short.openobserve.ai', // Redirector service is unreliable in automated testing
         'axoflow.com/docs/axosyslog-core/chapter-destinations/openobserve' // Returns 405 for HEAD requests
       ];
+
+      // Cloud CI runners have intermittent issues with the short.openobserve.ai redirector
+      if (isCloudEnvironment()) {
+        skipUrls.push('short.openobserve.ai');
+      }
 
       if (skipUrls.length > 0) {
         testLogger.info(`Note: Skipping ${skipUrls.length} URL(s) known to work but cause issues in automated testing:`);
