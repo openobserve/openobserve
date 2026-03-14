@@ -62,17 +62,18 @@ test.describe("ConfigPanel — Legends", () => {
     await expect(legendWidthInput).toBeVisible();
     await expect(page.locator('[data-test="dashboard-config-legend-height"]')).not.toBeVisible();
 
-    // Set width value
-    await legendWidthInput.click();
-    await legendWidthInput.fill("200");
-
-    // Toggle unit from px to %
+    // Toggle unit from px to % FIRST, then fill a safe % value
+    // (filling 200 then switching to % would set 200% width which collapses the chart area)
     await expect(page.locator('[data-test="dashboard-config-legend-width-unit-active"]').first()).toBeVisible();
     await page.locator('[data-test="dashboard-config-legend-width-unit-inactive"]').click();
     await expect(page.locator('[data-test="dashboard-config-legend-width-unit-active"]').first()).toBeVisible();
 
+    // Set width value in % (30% keeps enough chart area for canvas pixel check)
+    await legendWidthInput.click();
+    await legendWidthInput.fill("30");
+
     await pm.dashboardPanelActions.applyDashboardBtn();
-    testLogger.info("Legend position Right: width set and unit toggled to %");
+    testLogger.info("Legend position Right: width set to 30% and unit toggled to %");
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
 
@@ -80,7 +81,7 @@ test.describe("ConfigPanel — Legends", () => {
     testLogger.info("Verifying legend position Right persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-legend-position"]')).toContainText("right");
-    await expect(page.locator('[data-test="dashboard-config-legend-width"]')).toHaveValue("200");
+    await expect(page.locator('[data-test="dashboard-config-legend-width"]')).toHaveValue("30");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });

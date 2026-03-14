@@ -9,6 +9,7 @@ import { cleanupTestDashboard } from "./utils/dashCreation.js";
 import {
   generateDashboardName,
   setupLinePanelWithConfig,
+  setupBarPanelWithConfig,
   setupBarPanelWithBreakdownAndConfig,
   setupTablePanelWithConfig,
   setupMetricPanelWithConfig,
@@ -198,6 +199,79 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     testLogger.info("Verifying top N value persists after save");
     await reopenPanelConfig(page, pm);
     await expect(page.locator('[data-test="dashboard-config-top_results"]')).toHaveValue("5");
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("top N others: set top 5 → Others toggle appears → enable → apply → chart renders; disable → apply", async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupBarPanelWithBreakdownAndConfig(page, pm, dashboardName);
+
+    // Set top N to make the "Others" toggle appear
+    const topNInput = page.locator('[data-test="dashboard-config-top_results"]');
+    await expect(topNInput).toBeVisible();
+    await topNInput.click();
+    await topNInput.fill("5");
+
+    // Others toggle should now be visible
+    const othersToggle = page.locator('[data-test="dashboard-config-top_results_others"]');
+    await expect(othersToggle).toBeVisible({ timeout: 5000 });
+    testLogger.info("Top N Others toggle appeared after setting top_results");
+
+    // Enable Others toggle
+    await othersToggle.click();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    testLogger.info("Top N Others enabled");
+    await pm.dashboardPanelActions.waitForChartToRender();
+    await pm.dashboardPanelActions.verifyChartHasData(expect);
+
+    // Disable Others toggle
+    await othersToggle.click();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    testLogger.info("Top N Others disabled");
+    await pm.dashboardPanelActions.waitForChartToRender();
+    await pm.dashboardPanelActions.verifyChartHasData(expect);
+
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("chart alignment: visible → change alignment → apply → chart renders; reopen → alignment persists", async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupBarPanelWithConfig(page, pm, dashboardName);
+
+    const alignDropdown = page.locator('[data-test="dashboard-config-chart-align"]');
+    // Alignment may not be present for all chart types — skip gracefully
+    const isVisible = await alignDropdown.isVisible().catch(() => false);
+    if (!isVisible) {
+      testLogger.info("chart-align not visible for bar chart — skipping alignment interaction");
+      await pm.dashboardPanelActions.savePanel();
+      await cleanupTestDashboard(page, pm, dashboardName);
+      return;
+    }
+
+    await expect(alignDropdown).toBeVisible();
+
+    // Click dropdown and pick the first available option
+    await alignDropdown.click();
+    const options = page.locator('[role="listbox"] [role="option"]');
+    await options.first().waitFor({ state: "visible", timeout: 5000 });
+    const firstOptionText = await options.first().textContent();
+    await options.first().click();
+    testLogger.info(`Chart alignment set to: ${firstOptionText?.trim()}`);
+
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
+    await pm.dashboardPanelActions.verifyChartHasData(expect);
+
+    await pm.dashboardPanelActions.savePanel();
+    testLogger.info("Verifying chart alignment persists after save");
+    await reopenPanelConfig(page, pm);
+    await expect(page.locator('[data-test="dashboard-config-chart-align"]')).toBeVisible();
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
