@@ -274,3 +274,24 @@ export async function setupPromQLTablePanelWithConfig(page, pm, dashboardName, p
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("PromQL table panel with config ready", { dashboardName, panelName });
 }
+
+/**
+ * Creates a destination dashboard (bar panel) and adds a second tab named `secondTabName`.
+ * Leaves the browser on the dashboard view page — caller should call backToDashboardList() next.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {object} pm - PageManager instance
+ * @param {string} dashboardName - Name for the destination dashboard
+ * @param {string} [secondTabName="Tab Two"] - Name for the second tab to add
+ */
+export async function setupDestinationDashboardWithTabs(page, pm, dashboardName, secondTabName = "Tab Two") {
+  await setupBarPanelWithConfig(page, pm, dashboardName);
+  await pm.dashboardPanelActions.savePanel();
+
+  // Add a second tab via dashboard settings
+  await pm.dashboardSetting.openSetting();
+  await pm.dashboardSetting.addTabAndWait(secondTabName);
+  await pm.dashboardSetting.closeSettingDashboard();
+
+  testLogger.info("Destination dashboard ready with second tab", { dashboardName, secondTabName });
+}
