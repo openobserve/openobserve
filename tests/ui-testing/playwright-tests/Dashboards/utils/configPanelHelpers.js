@@ -189,3 +189,88 @@ export async function setupMetricPanelWithConfig(page, pm, dashboardName, panelN
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("Metric panel with config ready", { dashboardName, panelName });
 }
+
+// ---------------------------------------------------------------------------
+// PromQL helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Internal helper: creates a dashboard + panel in PromQL mode.
+ * Switches stream type to metrics, enables PromQL mode, enters a custom query,
+ * applies it, and waits for chart to render.
+ * Caller must open config panel if needed.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {object} pm - PageManager instance
+ * @param {string} dashboardName
+ * @param {object} options
+ * @param {string} options.chartType  - e.g. "line", "pie", "table"
+ * @param {string} [options.panelName]
+ * @param {string} [options.query]    - PromQL query string
+ */
+async function buildPromQLPanel(page, pm, dashboardName, {
+  chartType,
+  panelName = "Test Panel",
+  query = "up",
+}) {
+  await setupTestDashboard(page, pm, dashboardName);
+  await pm.dashboardCreate.addPanel();
+  await pm.chartTypeSelector.selectChartType(chartType);
+  await pm.chartTypeSelector.selectStreamType("metrics");
+
+  // Switch to PromQL mode — button only visible after selecting metrics stream type
+  const promqlBtn = page.locator('[data-test="dashboard-promql-query-type"]');
+  await promqlBtn.waitFor({ state: "visible", timeout: 10000 });
+  await promqlBtn.click();
+
+  // Switch to Custom query mode to access Monaco editor
+  const customBtn = page.locator('[data-test="dashboard-custom-query-type"]');
+  await customBtn.waitFor({ state: "visible", timeout: 5000 });
+  await customBtn.click();
+
+  // Enter PromQL query in Monaco editor
+  const queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
+  await queryEditor.waitFor({ state: "visible", timeout: 10000 });
+  const monacoEditor = queryEditor.getByRole('code');
+  await monacoEditor.click({ clickCount: 3 });
+  await page.keyboard.press('Backspace');
+  await page.keyboard.type(query, { delay: 50 });
+  await page.keyboard.press('Escape'); // dismiss any autocomplete
+  // Wait for Monaco debounce to sync editor content to Vue data model
+  await page.waitForTimeout(3000);
+
+  await pm.dashboardPanelActions.addPanelName(panelName);
+  await pm.dashboardPanelActions.applyDashboardBtn();
+  await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+  testLogger.info("PromQL panel built", { chartType, dashboardName, panelName });
+}
+
+/**
+ * PromQL line chart panel — config sidebar opened and ready.
+ * Caller's test.beforeAll must call ensureMetricsIngested().
+ */
+export async function setupPromQLPanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPromQLPanel(page, pm, dashboardName, { chartType: "line", panelName });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("PromQL line panel with config ready", { dashboardName, panelName });
+}
+
+/**
+ * PromQL pie chart panel — config sidebar opened and ready.
+ * Used for aggregation function tests (only visible on pie/donut/geomap/maps in PromQL mode).
+ */
+export async function setupPromQLPiePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPromQLPanel(page, pm, dashboardName, { chartType: "pie", panelName });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("PromQL pie panel with config ready", { dashboardName, panelName });
+}
+
+/**
+ * PromQL table panel — config sidebar opened and ready.
+ * Used for PromQL table mode, column visibility, sticky columns tests.
+ */
+export async function setupPromQLTablePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPromQLPanel(page, pm, dashboardName, { chartType: "table", panelName });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("PromQL table panel with config ready", { dashboardName, panelName });
+}
