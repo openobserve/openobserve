@@ -276,6 +276,28 @@ export async function setupPromQLTablePanelWithConfig(page, pm, dashboardName, p
 }
 
 /**
+ * PromQL geomap panel — config sidebar opened and ready.
+ * Used for testing PromQL-specific geo lat/lon/weight label config options.
+ * Chart may not render (no geo data), but config sidebar shows geo label inputs.
+ */
+export async function setupPromQLGeomapPanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPromQLPanel(page, pm, dashboardName, { chartType: "geomap", panelName });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("PromQL geomap panel with config ready", { dashboardName, panelName });
+}
+
+/**
+ * PromQL maps panel — config sidebar opened and ready.
+ * Used for testing PromQL-specific maps name label and map type config options.
+ * Chart may not render (no geo data), but config sidebar shows maps config inputs.
+ */
+export async function setupPromQLMapsPanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPromQLPanel(page, pm, dashboardName, { chartType: "maps", panelName });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("PromQL maps panel with config ready", { dashboardName, panelName });
+}
+
+/**
  * Creates a destination dashboard (bar panel) and adds a second tab named `secondTabName`.
  * Leaves the browser on the dashboard view page — caller should call backToDashboardList() next.
  *

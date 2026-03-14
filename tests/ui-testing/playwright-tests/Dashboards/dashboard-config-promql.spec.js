@@ -10,6 +10,8 @@ import {
   setupPromQLPanelWithConfig,
   setupPromQLPiePanelWithConfig,
   setupPromQLTablePanelWithConfig,
+  setupPromQLGeomapPanelWithConfig,
+  setupPromQLMapsPanelWithConfig,
   reopenPanelConfig,
 } from "./utils/configPanelHelpers.js";
 const testLogger = require('../utils/test-logger.js');
@@ -522,6 +524,98 @@ test.describe("ConfigPanel — PromQL Settings", () => {
 
     await pm.dashboardPanelConfigs.saveColumnOrder();
     testLogger.info("Column order saved");
+
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  // ---------------------------------------------------------------------------
+  // GeoMap config — only visible in PromQL geomap chart type
+  // ---------------------------------------------------------------------------
+
+  test("PromQL geomap - geo lat/lon/weight labels: set values → apply; reopen → persists", async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupPromQLGeomapPanelWithConfig(page, pm, dashboardName);
+
+    const latInput = page.locator('[data-test="dashboard-config-geo-lat-label"]');
+    const lonInput = page.locator('[data-test="dashboard-config-geo-lon-label"]');
+    const weightInput = page.locator('[data-test="dashboard-config-geo-weight-label"]');
+
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(latInput);
+    await expect(latInput).toBeVisible();
+    await expect(lonInput).toBeVisible();
+    await expect(weightInput).toBeVisible();
+
+    await latInput.fill("lat_field");
+    await lonInput.fill("lon_field");
+    await weightInput.fill("weight_field");
+    testLogger.info("Geo lat/lon/weight labels set");
+
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+    await pm.dashboardPanelActions.savePanel();
+    testLogger.info("Verifying geo labels persist after save");
+    await reopenPanelConfig(page, pm);
+
+    const latAfter = page.locator('[data-test="dashboard-config-geo-lat-label"]');
+    const lonAfter = page.locator('[data-test="dashboard-config-geo-lon-label"]');
+    const weightAfter = page.locator('[data-test="dashboard-config-geo-weight-label"]');
+
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(latAfter);
+    await expect(latAfter).toHaveValue("lat_field");
+    await expect(lonAfter).toHaveValue("lon_field");
+    await expect(weightAfter).toHaveValue("weight_field");
+    testLogger.info("Geo lat/lon/weight labels persisted after save");
+
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Maps config — only visible in PromQL maps chart type
+  // ---------------------------------------------------------------------------
+
+  test("PromQL maps - name label and map type: set name label → select map type → apply; reopen → persists", async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupPromQLMapsPanelWithConfig(page, pm, dashboardName);
+
+    const nameLabelInput = page.locator('[data-test="dashboard-config-maps-name-label"]');
+    const mapTypeSelect = page.locator('[data-test="dashboard-config-maps-type"]');
+
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(nameLabelInput);
+    await expect(nameLabelInput).toBeVisible();
+    await expect(mapTypeSelect).toBeVisible();
+
+    await nameLabelInput.fill("country_name");
+    testLogger.info("Maps name label set to 'country_name'");
+
+    // Map type select — click and choose "world"
+    await mapTypeSelect.click();
+    await page.getByRole("option", { name: "world", exact: true }).click();
+    testLogger.info("Maps map type set to 'world'");
+
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+    await pm.dashboardPanelActions.savePanel();
+    testLogger.info("Verifying maps config persists after save");
+    await reopenPanelConfig(page, pm);
+
+    const nameLabelAfter = page.locator('[data-test="dashboard-config-maps-name-label"]');
+    const mapTypeAfter = page.locator('[data-test="dashboard-config-maps-type"]');
+
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(nameLabelAfter);
+    await expect(nameLabelAfter).toHaveValue("country_name");
+
+    // Map type wrapper should contain "world"
+    const mapTypeWrapper = mapTypeAfter.locator('xpath=ancestor::div[contains(@class,"q-field")][1]');
+    await expect(mapTypeWrapper).toContainText("world");
+    testLogger.info("Maps name label and map type persisted after save");
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
