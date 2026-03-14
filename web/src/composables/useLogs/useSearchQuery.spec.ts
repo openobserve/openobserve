@@ -129,7 +129,8 @@ vi.mock("@/aws-exports", () => ({
 
 vi.mock("@/utils/zincutils", () => ({
   b64EncodeUnicode: vi.fn((s: string) => s),
-  addSpacesToOperators: vi.fn((s: string) => s),
+  // buildSearch tokenizes WHERE by spaces; this keeps '=' parsing realistic in tests.
+  addSpacesToOperators: vi.fn((s: string) => s.replace(/=/g, " = ")),
 }));
 
 vi.mock("@/utils/date", () => ({
@@ -228,7 +229,7 @@ describe("useSearchQuery › buildSearch › ignoreQuickMode parameter", () => {
       const result = buildSearch(false, false);
 
       const sql = getSql(result);
-      expect(sql).toContain("field1,field2");
+      expect(sql).toContain('"field1","field2"');
       expect(sql).not.toContain("SELECT *");
       expect(sql).not.toMatch(/\bfrom\b.*\*/i);
     });
@@ -240,7 +241,7 @@ describe("useSearchQuery › buildSearch › ignoreQuickMode parameter", () => {
 
       const sql = getSql(result);
       expect(sql).toContain("*");
-      expect(sql).not.toContain("field1,field2");
+      expect(sql).not.toContain('"field1","field2"');
     });
 
     it("should use SELECT * in SQL when quickMode=false regardless of ignoreQuickMode", () => {
@@ -250,7 +251,7 @@ describe("useSearchQuery › buildSearch › ignoreQuickMode parameter", () => {
 
       const sql = getSql(result);
       expect(sql).toContain("*");
-      expect(sql).not.toContain("field1,field2");
+      expect(sql).not.toContain('"field1","field2"');
     });
 
     it("should use SELECT * in SQL when quickMode=false and ignoreQuickMode=true", () => {
@@ -260,7 +261,22 @@ describe("useSearchQuery › buildSearch › ignoreQuickMode parameter", () => {
 
       const sql = getSql(result);
       expect(sql).toContain("*");
-      expect(sql).not.toContain("field1,field2");
+      expect(sql).not.toContain('"field1","field2"');
+    });
+  });
+
+  describe("WHERE clause field quoting", () => {
+    it("should quote filter field names when SQL mode is disabled", () => {
+      mockState.searchObj.meta.sqlMode = false;
+      mockState.searchObj.meta.quickMode = false;
+      mockState.searchObj.data.stream.selectedStream = ["my-stream"];
+      mockState.searchObj.data.stream.selectedStreamFields = [{ name: "user" }];
+      mockState.searchObj.data.query = "user='asdf'";
+
+      const result = buildSearch(false, false);
+
+      const sql = getSql(result);
+      expect(sql).toContain('WHERE "user" = \'asdf\'');
     });
   });
 

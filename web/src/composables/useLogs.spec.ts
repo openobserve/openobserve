@@ -2518,6 +2518,58 @@ describe("Use Logs Composable", () => {
     });
   });
 
+  describe("getFilterExpressionByFieldType", () => {
+    const setupStreamSchema = (fieldName: string, fieldType: string) => {
+      wrapper.vm.searchObj.data.stream.selectedStream = ["logs"];
+      wrapper.vm.searchObj.data.streamResults.list = [
+        {
+          name: "logs",
+          schema: [{ name: fieldName, type: fieldType }],
+        },
+      ];
+    };
+
+    it("keeps unquoted field in non-SQL mode", () => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      setupStreamSchema("user", "Utf8");
+
+      expect(
+        wrapper.vm.getFilterExpressionByFieldType("user", "alice", "include"),
+      ).toBe("user = 'alice'");
+    });
+
+    it("quotes string field in SQL mode", () => {
+      wrapper.vm.searchObj.meta.sqlMode = true;
+      setupStreamSchema("user", "Utf8");
+
+      expect(
+        wrapper.vm.getFilterExpressionByFieldType("user", "alice", "include"),
+      ).toBe('"user" = \'alice\'');
+    });
+
+    it("quotes numeric field in SQL mode", () => {
+      wrapper.vm.searchObj.meta.sqlMode = true;
+      setupStreamSchema("duration", "Int64");
+
+      expect(
+        wrapper.vm.getFilterExpressionByFieldType(
+          "duration",
+          123,
+          "include",
+        ),
+      ).toBe('"duration" = 123');
+    });
+
+    it("quotes boolean field in SQL mode", () => {
+      wrapper.vm.searchObj.meta.sqlMode = true;
+      setupStreamSchema("enabled", "Boolean");
+
+      expect(
+        wrapper.vm.getFilterExpressionByFieldType("enabled", true, "include"),
+      ).toBe('"enabled" is true');
+    });
+  });
+
   describe.skip("Utility Helper Functions", () => {
     // These functions have been moved to other composables or removed entirely
     it("functions moved to separate composables or removed", () => {
