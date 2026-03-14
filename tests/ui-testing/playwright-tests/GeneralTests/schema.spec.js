@@ -98,10 +98,12 @@ test.describe("Schema testcases", () => {
 
         // Navigate to logs page with VRL editor enabled
         await pm.logsPage.navigateToLogs(getOrgIdentifier());
-        
-        await pm.logsPage.selectStream(testStreamName); 
+
+        await pm.logsPage.selectStream(testStreamName);
+        const allsearch2 = page.waitForResponse(`**/api/${getOrgIdentifier()}/_search**`, { timeout: 60000 });
         await pm.schemaPage.applyQuery();
-        
+        await allsearch2;
+
         // Start of actual test - complete blank to detailed stream workflow
         await pm.schemaPage.completeBlankToDetailedStreamWorkflow(streamName, testStreamName);
         
@@ -127,10 +129,12 @@ test.describe("Schema testcases", () => {
 
         // Navigate to logs page with VRL editor enabled
         await pm.logsPage.navigateToLogs(getOrgIdentifier());
-        
-        await pm.logsPage.selectStream(testStreamName); 
+
+        await pm.logsPage.selectStream(testStreamName);
+        const allsearch3 = page.waitForResponse(`**/api/${getOrgIdentifier()}/_search**`, { timeout: 60000 });
         await pm.schemaPage.applyQuery();
-        
+        await allsearch3;
+
         // Start of actual test - use original working enhanced framework method
         await pm.schemaPage.completeAddAndDeleteFieldWorkflow(testStreamName);
         
