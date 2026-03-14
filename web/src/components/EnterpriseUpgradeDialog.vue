@@ -169,6 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="feature-name">
                   {{ feature.name }}
                   <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
+                  <span v-if="feature.beta" class="beta-badge">BETA</span>
                 </div>
                 <div class="feature-desc">{{ feature.note }}</div>
               </div>
@@ -191,6 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="feature-name">
                   {{ feature.name }}
                   <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
+                  <span v-if="feature.beta" class="beta-badge">BETA</span>
                   <span v-if="feature.requiresHA" class="ha-badge">
                     HA
                     <q-tooltip anchor="top middle" self="bottom middle" :offset="[0, 8]">
@@ -554,6 +556,7 @@ export default defineComponent({
         note: t("about.enterprise_offer.enterprise_features.incident_management.note"),
         icon: "emergency",
         requiresHA: true,
+        beta: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.incident_management,
       },
       {
@@ -561,6 +564,7 @@ export default defineComponent({
         note: t("about.enterprise_offer.enterprise_features.sre_agent.note"),
         icon: "smart_toy",
         requiresHA: true,
+        beta: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.sre_agent,
       },
       {
@@ -568,6 +572,7 @@ export default defineComponent({
         note: t("about.enterprise_offer.enterprise_features.ai_assistant.note"),
         icon: "psychology",
         requiresHA: true,
+        beta: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.ai_assistant,
       },
       {
@@ -575,6 +580,7 @@ export default defineComponent({
         note: t("about.enterprise_offer.enterprise_features.anomaly_detection.note"),
         icon: "query_stats",
         requiresHA: false,
+        beta: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.anomaly_detection,
       },
       {
@@ -1393,6 +1399,20 @@ export default defineComponent({
       margin-left: 4px;
     }
 
+    .beta-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 4px;
+      color: var(--q-primary);
+      border: 1px solid var(--q-primary);
+      border-radius: 10px;
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      line-height: 1.4;
+      text-transform: uppercase;
+    }
+
     .feature-desc {
       font-size: 11px;
       color: rgba(0, 0, 0, 0.55);
@@ -1452,6 +1472,11 @@ body.body--dark {
       .ha-badge {
         background: rgba(var(--q-primary-rgb), 0.2);
         color: var(--q-primary);
+      }
+
+      .beta-badge {
+        color: var(--q-primary);
+        border-color: var(--q-primary);
       }
 
       .feature-desc {
