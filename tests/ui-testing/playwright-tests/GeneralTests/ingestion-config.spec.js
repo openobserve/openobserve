@@ -197,7 +197,11 @@ test.describe("Ingestion Configuration Tests", () => {
         'axoflow.com/docs/axosyslog-core/chapter-destinations/openobserve' // Returns 405 for HEAD requests
       ];
 
-      // Cloud CI runners have intermittent issues with the short.openobserve.ai redirector
+      // Cloud CI runners get intermittent failures from the short.openobserve.ai
+      // redirector service (timeouts, connection resets). Domain-level skip is
+      // intentional — there are 60+ unique paths under this domain across all
+      // integrations, and they ALL use the same unreliable redirector backend.
+      // Enumerating each path individually would be unmaintainable.
       if (isCloudEnvironment()) {
         skipUrls.push('short.openobserve.ai');
       }
