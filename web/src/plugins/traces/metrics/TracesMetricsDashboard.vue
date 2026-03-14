@@ -726,9 +726,9 @@ const stopAutoRefresh = () => {
 };
 
 onMounted(async () => {
+  loadDashboard();
   const { sqlParser: loadSqlParser } = useParser();
   sqlParser.value = await loadSqlParser();
-  loadDashboard();
 });
 
 onBeforeUnmount(() => {
