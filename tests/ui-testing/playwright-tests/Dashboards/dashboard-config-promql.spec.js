@@ -373,6 +373,43 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await cleanupTestDashboard(page, pm, dashboardName);
   });
 
+  test("sticky columns disabled when sticky first column (Aggregate mode): enable toggle → sticky columns input disabled → disable toggle → re-enabled", async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupPromQLTablePanelWithConfig(page, pm, dashboardName);
+    await switchToAggregateMode(page, pm);
+
+    const stickyFirstColToggle = page.locator('[data-test="dashboard-config-sticky-first-column"]');
+    const stickyColsInput = page.locator('[data-test="dashboard-config-sticky-columns"]');
+
+    // Scroll sticky columns into view to verify initial state
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(stickyColsInput);
+    await expect(stickyColsInput).not.toBeDisabled();
+    testLogger.info("Sticky columns is initially enabled");
+
+    // Enable sticky_first_column — sticky columns select should become disabled
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(stickyFirstColToggle);
+    await stickyFirstColToggle.click();
+    testLogger.info("Sticky first column toggle enabled");
+
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(stickyColsInput);
+    await expect(stickyColsInput).toBeDisabled();
+    testLogger.info("Sticky columns input is disabled");
+
+    // Disable sticky_first_column — sticky columns select should be enabled again
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(stickyFirstColToggle);
+    await stickyFirstColToggle.click();
+    testLogger.info("Sticky first column toggle disabled");
+
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(stickyColsInput);
+    await expect(stickyColsInput).not.toBeDisabled();
+    testLogger.info("Sticky columns input is re-enabled");
+
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
   test("column order button (Aggregate mode): button visible → click → dialog opens → cancel closes dialog", async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = generateDashboardName();
@@ -396,6 +433,95 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await page.locator('[data-test="dashboard-column-order-cancel-btn"]').click();
     await expect(dialog).not.toBeVisible({ timeout: 5000 });
     testLogger.info("Column order dialog closed via Cancel");
+
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("column order move down (Aggregate mode): first column moves to position 2 → save → persists after panel save+reopen", async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupPromQLTablePanelWithConfig(page, pm, dashboardName);
+    await switchToAggregateMode(page, pm);
+
+    // Apply to load chart data so available columns are populated
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+    await pm.dashboardPanelConfigs.openColumnOrderDialog();
+
+    // Wait for at least 2 column rows to be present
+    await pm.dashboardPanelConfigs.columnOrderRow(0).waitFor({ state: 'visible', timeout: 10000 });
+    await pm.dashboardPanelConfigs.columnOrderRow(1).waitFor({ state: 'visible', timeout: 10000 });
+
+    // Record column names before move
+    const nameBefore0 = await pm.dashboardPanelConfigs.getColumnName(0);
+    const nameBefore1 = await pm.dashboardPanelConfigs.getColumnName(1);
+    testLogger.info("Column names before move", { row0: nameBefore0, row1: nameBefore1 });
+
+    // Move column at index 0 down (→ now at index 1)
+    await pm.dashboardPanelConfigs.moveColumnDown(0);
+    testLogger.info("Moved column 0 down");
+
+    // Row 0 should now contain what was previously row 1's name
+    const nameAfter0 = await pm.dashboardPanelConfigs.getColumnName(0);
+    expect(nameAfter0).toBe(nameBefore1);
+    testLogger.info("Column order changed correctly after move down");
+
+    await pm.dashboardPanelConfigs.saveColumnOrder();
+    testLogger.info("Column order saved");
+
+    await pm.dashboardPanelActions.savePanel();
+    testLogger.info("Verifying column order persists after panel save+reopen");
+
+    await reopenPanelConfig(page, pm);
+    await switchToAggregateMode(page, pm);
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+    await pm.dashboardPanelConfigs.openColumnOrderDialog();
+    await pm.dashboardPanelConfigs.columnOrderRow(0).waitFor({ state: 'visible', timeout: 10000 });
+
+    const namePersisted = await pm.dashboardPanelConfigs.getColumnName(0);
+    expect(namePersisted).toBe(nameBefore1);
+    testLogger.info("Column order persisted: row 0 is still the moved column");
+
+    await pm.dashboardPanelConfigs.cancelColumnOrder();
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("column order move up (Aggregate mode): second column moves to position 1 → save → order updated", async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupPromQLTablePanelWithConfig(page, pm, dashboardName);
+    await switchToAggregateMode(page, pm);
+
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+    await pm.dashboardPanelConfigs.openColumnOrderDialog();
+
+    await pm.dashboardPanelConfigs.columnOrderRow(0).waitFor({ state: 'visible', timeout: 10000 });
+    await pm.dashboardPanelConfigs.columnOrderRow(1).waitFor({ state: 'visible', timeout: 10000 });
+
+    const nameBefore0 = await pm.dashboardPanelConfigs.getColumnName(0);
+    const nameBefore1 = await pm.dashboardPanelConfigs.getColumnName(1);
+    testLogger.info("Column names before move", { row0: nameBefore0, row1: nameBefore1 });
+
+    // Move column at index 1 up (→ now at index 0)
+    await pm.dashboardPanelConfigs.moveColumnUp(1);
+    testLogger.info("Moved column 1 up");
+
+    // Row 0 should now contain what was previously row 1's name
+    const nameAfter0 = await pm.dashboardPanelConfigs.getColumnName(0);
+    expect(nameAfter0).toBe(nameBefore1);
+    testLogger.info("Column order changed correctly after move up");
+
+    await pm.dashboardPanelConfigs.saveColumnOrder();
+    testLogger.info("Column order saved");
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);

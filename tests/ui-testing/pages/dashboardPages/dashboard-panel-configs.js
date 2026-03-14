@@ -100,6 +100,10 @@ export default class DashboardPanelConfigs {
       '[data-test="dashboard-addpanel-config-time-shift-add-btn"]'
     );
 
+    // Column Order Popup locators (PromQL Aggregate mode)
+    this.columnOrderBtn = page.locator('[data-test="dashboard-config-column-order-button"]');
+    this.columnOrderDialog = page.locator('[data-test="column-order-dialog"]');
+
     // Color By Series locators
     this.colorBySeriesBtn = page.locator(
       '[data-test="dashboard-addpanel-config-colorBySeries-add-btn"]'
@@ -729,6 +733,56 @@ export default class DashboardPanelConfigs {
   async cancelColorBySeries() {
     await this.colorBySeriesCancelBtn.click();
     await this.colorBySeriesPopup.waitFor({ state: "hidden", timeout: 10000 });
+  }
+
+  // ========== Column Order Popup (PromQL Aggregate / Expanded Time series mode) ==========
+
+  /** Returns the locator for the column row at the given index in the column order popup. */
+  columnOrderRow(index) {
+    return this.page.locator(`[data-test="column-order-row-${index}"]`);
+  }
+
+  /** Opens the column order dialog via the "Configure Column Order" button in the config sidebar. */
+  async openColumnOrderDialog() {
+    await this.scrollSidebarToElement(this.columnOrderBtn);
+    await this.columnOrderBtn.click();
+    await this.columnOrderDialog.waitFor({ state: 'visible', timeout: 5000 });
+  }
+
+  /**
+   * Returns the column NAME text (not row number or icons) of the row at the given index.
+   * Targets the `.column-name` div inside the row.
+   */
+  async getColumnName(index) {
+    const nameEl = this.columnOrderRow(index).locator('.column-name');
+    await nameEl.waitFor({ state: 'visible', timeout: 5000 });
+    return (await nameEl.textContent() || '').trim();
+  }
+
+  /** Clicks the move-down button for the column at the given index. */
+  async moveColumnDown(index) {
+    const btn = this.page.locator(`[data-test="column-order-move-down-${index}"]`);
+    await btn.waitFor({ state: 'visible', timeout: 5000 });
+    await btn.click();
+  }
+
+  /** Clicks the move-up button for the column at the given index. */
+  async moveColumnUp(index) {
+    const btn = this.page.locator(`[data-test="column-order-move-up-${index}"]`);
+    await btn.waitFor({ state: 'visible', timeout: 5000 });
+    await btn.click();
+  }
+
+  /** Saves the column order and waits for the dialog to close. */
+  async saveColumnOrder() {
+    await this.page.locator('[data-test="dashboard-column-order-save-btn"]').click();
+    await this.columnOrderDialog.waitFor({ state: 'hidden', timeout: 5000 });
+  }
+
+  /** Cancels the column order dialog without saving. */
+  async cancelColumnOrder() {
+    await this.page.locator('[data-test="dashboard-column-order-cancel-btn"]').click();
+    await this.columnOrderDialog.waitFor({ state: 'hidden', timeout: 5000 });
   }
 
   /**
