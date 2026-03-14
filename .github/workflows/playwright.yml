@@ -334,6 +334,8 @@ jobs:
                 "dashboard-config-panel-time.spec.js",
                 "dashboard-config-table.spec.js",
                 "dashboard-config-trellis.spec.js",
+                "dashboard-config-drilldown.spec.js",
+                "dashboard-config-promql.spec.js",
               ]
     steps:
       - name: Clone the current repo
