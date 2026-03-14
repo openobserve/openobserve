@@ -168,4 +168,237 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
+
+  test("connect null values: PromQL line chart → enable toggle → apply; reopen → toggle state persists", async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupPromQLPanelWithConfig(page, pm, dashboardName);
+
+    const connectNullToggle = page.locator('[data-test="dashboard-config-connect-null-values"]');
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(connectNullToggle);
+    await expect(connectNullToggle).toBeVisible();
+
+    // Enable connect null values
+    await connectNullToggle.click();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    testLogger.info("Connect null values enabled");
+    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+    await pm.dashboardPanelActions.savePanel();
+    testLogger.info("Verifying connect null values persists after save");
+    await reopenPanelConfig(page, pm);
+    const toggleAfter = page.locator('[data-test="dashboard-config-connect-null-values"]');
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(toggleAfter);
+    const ariaChecked = await toggleAfter.getAttribute("aria-checked");
+    expect(ariaChecked).toBe("true");
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("wrap table cells: PromQL table → enable wrap toggle → apply; reopen → toggle state persists", async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupPromQLTablePanelWithConfig(page, pm, dashboardName);
+
+    const wrapToggle = page.locator('[data-test="dashboard-config-wrap-table-cells"]');
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(wrapToggle);
+    await expect(wrapToggle).toBeVisible();
+
+    await wrapToggle.click();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    testLogger.info("Wrap table cells enabled");
+    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+    await pm.dashboardPanelActions.savePanel();
+    testLogger.info("Verifying wrap table cells persists after save");
+    await reopenPanelConfig(page, pm);
+    const toggleAfter = page.locator('[data-test="dashboard-config-wrap-table-cells"]');
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(toggleAfter);
+    const ariaChecked = await toggleAfter.getAttribute("aria-checked");
+    expect(ariaChecked).toBe("true");
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Aggregate mode (promql_table_mode = 'all') — options only visible in this mode
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Switch the PromQL table to Aggregate mode and scroll to a target element.
+   * Extracted to avoid repeating the same 4 steps in every Aggregate test.
+   */
+  async function switchToAggregateMode(page, pm) {
+    const tableModeDropdown = page.locator('[data-test="dashboard-config-promql-table-mode"]');
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(tableModeDropdown);
+    await tableModeDropdown.click();
+    await page.getByRole("option", { name: "Aggregate" }).click();
+    testLogger.info("Table mode switched to Aggregate");
+  }
+
+  test("table aggregations (Aggregate mode): dropdown visible → add Avg to default Last → apply; reopen → multi-selection persists", async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupPromQLTablePanelWithConfig(page, pm, dashboardName);
+    await switchToAggregateMode(page, pm);
+
+    const aggDropdown = page.locator('[data-test="dashboard-config-table-aggregations"]');
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(aggDropdown);
+    await expect(aggDropdown).toBeVisible();
+
+    // Default is ["last"] — add "avg" to get ["last", "avg"]; display shows "last (+1 more)"
+    await aggDropdown.click();
+    await page.getByRole("option", { name: /^Avg/i }).first().click();
+    await page.keyboard.press("Escape");
+    testLogger.info("Table aggregations: added Avg (now last + avg)");
+
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+    await pm.dashboardPanelActions.savePanel();
+    testLogger.info("Verifying table aggregations persist after save");
+    await reopenPanelConfig(page, pm);
+    await switchToAggregateMode(page, pm);
+    const aggAfter = page.locator('[data-test="dashboard-config-table-aggregations"]');
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(aggAfter);
+    await expect(aggAfter).toContainText("(+1 more)");
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("visible columns (Aggregate mode): type custom column → chip added → apply; reopen → value persists", async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupPromQLTablePanelWithConfig(page, pm, dashboardName);
+    await switchToAggregateMode(page, pm);
+
+    // data-test is on the <input> element itself (Quasar passes attrs to native input)
+    // Use xpath to find the parent q-field wrapper for display-value assertions
+    const visibleColsInput = page.locator('[data-test="dashboard-config-visible-columns"]');
+    const visibleColsWrapper = visibleColsInput.locator('xpath=ancestor::div[contains(@class,"q-field")][1]');
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(visibleColsInput);
+    await expect(visibleColsInput).toBeVisible();
+
+    // Type a custom column name and press Enter (new-value-mode="add-unique")
+    await visibleColsInput.pressSequentially("instance");
+    await visibleColsInput.press("Enter");
+    testLogger.info("Visible column 'instance' added");
+
+    // Display-value in the q-field wrapper should now show "instance"
+    await expect(visibleColsWrapper).toContainText("instance");
+
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+    await pm.dashboardPanelActions.savePanel();
+    testLogger.info("Verifying visible columns persist after save");
+    await reopenPanelConfig(page, pm);
+    await switchToAggregateMode(page, pm);
+    const visibleAfterInput = page.locator('[data-test="dashboard-config-visible-columns"]');
+    const visibleAfterWrapper = visibleAfterInput.locator('xpath=ancestor::div[contains(@class,"q-field")][1]');
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(visibleAfterInput);
+    await expect(visibleAfterWrapper).toContainText("instance");
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("hidden columns (Aggregate mode): type custom column → chip added → apply; reopen → value persists", async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupPromQLTablePanelWithConfig(page, pm, dashboardName);
+    await switchToAggregateMode(page, pm);
+
+    const hiddenColsInput = page.locator('[data-test="dashboard-config-hidden-columns"]');
+    const hiddenColsWrapper = hiddenColsInput.locator('xpath=ancestor::div[contains(@class,"q-field")][1]');
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(hiddenColsInput);
+    await expect(hiddenColsInput).toBeVisible();
+
+    await hiddenColsInput.pressSequentially("job");
+    await hiddenColsInput.press("Enter");
+    testLogger.info("Hidden column 'job' added");
+
+    await expect(hiddenColsWrapper).toContainText("job");
+
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+    await pm.dashboardPanelActions.savePanel();
+    testLogger.info("Verifying hidden columns persist after save");
+    await reopenPanelConfig(page, pm);
+    await switchToAggregateMode(page, pm);
+    const hiddenAfterInput = page.locator('[data-test="dashboard-config-hidden-columns"]');
+    const hiddenAfterWrapper = hiddenAfterInput.locator('xpath=ancestor::div[contains(@class,"q-field")][1]');
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(hiddenAfterInput);
+    await expect(hiddenAfterWrapper).toContainText("job");
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("sticky columns (Aggregate mode): type custom column → chip added → apply; reopen → value persists", async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupPromQLTablePanelWithConfig(page, pm, dashboardName);
+    await switchToAggregateMode(page, pm);
+
+    // Sticky columns multi-select is disabled when sticky_first_column=true — leave that toggle off
+    const stickyColsInput = page.locator('[data-test="dashboard-config-sticky-columns"]');
+    const stickyColsWrapper = stickyColsInput.locator('xpath=ancestor::div[contains(@class,"q-field")][1]');
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(stickyColsInput);
+    await expect(stickyColsInput).toBeVisible();
+
+    await stickyColsInput.pressSequentially("instance");
+    await stickyColsInput.press("Enter");
+    testLogger.info("Sticky column 'instance' added");
+
+    await expect(stickyColsWrapper).toContainText("instance");
+
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+    await pm.dashboardPanelActions.savePanel();
+    testLogger.info("Verifying sticky columns persist after save");
+    await reopenPanelConfig(page, pm);
+    await switchToAggregateMode(page, pm);
+    const stickyAfterInput = page.locator('[data-test="dashboard-config-sticky-columns"]');
+    const stickyAfterWrapper = stickyAfterInput.locator('xpath=ancestor::div[contains(@class,"q-field")][1]');
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(stickyAfterInput);
+    await expect(stickyAfterWrapper).toContainText("instance");
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("column order button (Aggregate mode): button visible → click → dialog opens → cancel closes dialog", async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupPromQLTablePanelWithConfig(page, pm, dashboardName);
+    await switchToAggregateMode(page, pm);
+
+    const columnOrderBtn = page.locator('[data-test="dashboard-config-column-order-button"]');
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(columnOrderBtn);
+    await expect(columnOrderBtn).toBeVisible();
+
+    await columnOrderBtn.click();
+    testLogger.info("Column order button clicked");
+
+    // Dialog should open
+    const dialog = page.locator('[data-test="column-order-dialog"]');
+    await expect(dialog).toBeVisible({ timeout: 5000 });
+    testLogger.info("Column order dialog opened");
+
+    // Cancel closes the dialog (ColumnOrderPopUp uses dashboard-column-order-cancel-btn)
+    await page.locator('[data-test="dashboard-column-order-cancel-btn"]').click();
+    await expect(dialog).not.toBeVisible({ timeout: 5000 });
+    testLogger.info("Column order dialog closed via Cancel");
+
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
 });

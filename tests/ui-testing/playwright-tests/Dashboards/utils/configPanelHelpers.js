@@ -211,7 +211,7 @@ export async function setupMetricPanelWithConfig(page, pm, dashboardName, panelN
 async function buildPromQLPanel(page, pm, dashboardName, {
   chartType,
   panelName = "Test Panel",
-  query = "up",
+  query = "zo_node_memory_usage",
 }) {
   await setupTestDashboard(page, pm, dashboardName);
   await pm.dashboardCreate.addPanel();
