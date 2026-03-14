@@ -3,6 +3,7 @@ const logData = require("../../fixtures/log.json");
 const { toZonedTime } = require("date-fns-tz");
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe.configure({ mode: "parallel" });
 const folderName = `Folder ${Date.now()}`;
@@ -35,7 +36,7 @@ test.describe("Sanity Test Cases", () => {
     pm = new PageManager(page);
     
     // Navigate to logs page
-    const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`;
+    const logsUrl = `${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`;
     testLogger.navigation('Navigating to logs page', { url: logsUrl });
     
     await page.goto(logsUrl);
