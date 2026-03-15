@@ -96,7 +96,7 @@ export class IamPage {
     async enterSameEmailServiceAccount() {
 
         await this.page.getByLabel('Email *').click();
-        await this.page.getByLabel('Email *').fill(process.env["ZO_ROOT_USER_EMAIL"]);
+        await this.page.getByLabel('Email *').fill(process.env["ZO_ROOT_USER_EMAIL"] || process.env["ALPHA1_USER_EMAIL"]);
 
     }
 
