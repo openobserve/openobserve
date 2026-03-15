@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alerts.updateTitle") }}:
             <span
               :class="[
-                'tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block tw:ml-2',
+                'text-subtitle2 tw:font-medium tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block tw:ml-2',
                 store.state.theme === 'dark'
                   ? 'tw:text-blue-400 tw:bg-blue-900/50'
                   : 'tw:text-blue-600 tw:bg-blue-50'

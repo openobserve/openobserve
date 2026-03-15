@@ -43,7 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="config.alert_enabled"
             :label="config.alert_enabled ? 'Enabled' : 'Disabled'"
             color="primary"
-            size="sm"
+            size="xs"
+            class="o2-toggle-button-xs"
+            :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
             data-test="anomaly-alert-enabled"
           />
         </div>

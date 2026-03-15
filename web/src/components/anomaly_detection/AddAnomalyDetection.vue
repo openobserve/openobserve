@@ -19,9 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Header -->
     <div class="row items-center no-wrap card-container tw:mx-[0.625rem] tw:mb-[0.625rem]">
       <div class="flex items-center justify-between tw:w-full card-container tw:h-[68px] tw:px-2 tw:py-3">
-        <div class="flex items-center">
+        <div class="flex items-center tw:gap-3">
           <div
-            class="flex justify-center items-center q-mr-md cursor-pointer"
+            class="flex justify-center items-center q-mr-xs cursor-pointer"
             style="
               border: 1.5px solid;
               border-radius: 50%;
@@ -33,33 +33,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-icon name="arrow_back_ios_new" size="14px" />
           </div>
-          <div class="text-h6">
-            {{ isEdit ? t("alerts.editAnomalyDetection") : t("alerts.newAnomalyDetection") }}
+          <div class="flex items-center tw:gap-2 tw:flex-wrap">
+            <div class="text-h6 tw:flex tw:items-center tw:gap-2">
+              {{ isEdit ? t("alerts.updateAnomalyDetection") : t("alerts.newAnomalyDetection") }}
+              <span
+                v-if="isEdit && config.name"
+                class="anomaly-name-chip text-subtitle2"
+              >{{ config.name }}</span>
+            </div>
+            <!-- Status badge inline beside name (edit mode only) -->
+            <q-badge v-if="isEdit && config.status" :color="statusColor" :label="config.status" class="text-caption" />
+            <span
+              v-if="isEdit && config.last_detection_run && config.last_detection_run > 0"
+              class="text-caption"
+              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+            >
+              Last run: {{ formatTs(config.last_detection_run) }}
+            </span>
+            <q-btn
+              v-if="isEdit && config.status === 'failed'"
+              flat
+              no-caps
+              dense
+              size="sm"
+              color="negative"
+              icon="replay"
+              label="Retry Training"
+              :loading="retraining"
+              @click="triggerRetrain"
+            />
           </div>
-        </div>
-
-        <!-- Status badge (edit mode only) -->
-        <div v-if="isEdit && config.status" class="flex items-center tw:gap-3 tw:flex-wrap">
-          <q-badge :color="statusColor" :label="config.status" class="text-caption" />
-          <span
-            v-if="config.last_detection_run && config.last_detection_run > 0"
-            class="text-caption"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-          >
-            Last run: {{ formatTs(config.last_detection_run) }}
-          </span>
-          <q-btn
-            v-if="config.status === 'failed'"
-            flat
-            no-caps
-            dense
-            size="sm"
-            color="negative"
-            icon="replay"
-            label="Retry Training"
-            :loading="retraining"
-            @click="triggerRetrain"
-          />
         </div>
         <!-- Error banner (edit mode, failed status) -->
         <div
@@ -623,6 +626,14 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+.anomaly-name-chip {
+  background-color: color-mix(in srgb, var(--o2-primary-color) 12%, transparent);
+  color: var(--o2-primary-color);
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  font-weight: 500;
+}
+
 .anomaly-wizard {
   .q-stepper--horizontal .q-stepper__step-inner {
     padding: 5px !important;

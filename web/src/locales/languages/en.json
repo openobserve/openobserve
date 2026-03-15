@@ -1951,6 +1951,7 @@
     "anomalyDetection": "Anomaly Detection",
     "newAnomalyDetection": "New anomaly detection",
     "editAnomalyDetection": "Edit anomaly detection",
+    "updateAnomalyDetection": "Update anomaly detection:",
     "anomalyDetectionSubtitle": "Detect anomalies in your observability data using machine learning",
     "anomalyDetectionConfig": "Detection Config",
     "alerting": "Alerting",
