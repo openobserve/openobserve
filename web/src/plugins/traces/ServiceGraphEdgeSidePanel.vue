@@ -290,6 +290,8 @@ export default defineComponent({
       if (!ns || ns === 0) return 'N/A';
       const ms = ns / 1_000_000;
       if (ms >= 1_000) return (ms / 1_000).toFixed(2) + 's';
+      if (ms < 10) return ms.toFixed(2) + 'ms';
+      if (ms < 100) return ms.toFixed(1) + 'ms';
       return ms.toFixed(0) + 'ms';
     };
 
@@ -1111,11 +1113,10 @@ export default defineComponent({
         gap: 4px;
         padding: 2px 6px 4px;
         span {
-          font-size: 9px;
-          font-weight: 700;
-          color: #4b5563;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
+          font-size: 10px;
+          font-weight: 600;
+          color: #9ca3af;
+          letter-spacing: 0.04em;
         }
         .col-current, .col-baseline, .col-delta { text-align: right; }
       }
@@ -1178,7 +1179,7 @@ export default defineComponent({
         .latency-baseline {
           font-size: 11px;
           font-weight: 500;
-          color: #4b5563;
+          color: #9ca3af;
         }
 
         .delta-badge {
@@ -1274,7 +1275,7 @@ export default defineComponent({
         }
 
         .percentile-badge { background: rgba(107, 114, 128, 0.1); color: #6b7280; }
-        .latency-baseline { color: #9ca3af; }
+        .latency-baseline { color: #6b7280; }
 
         .delta-badge {
           &.delta-improved       { background: rgba(16, 185, 129, 0.1);  color: #059669; }
