@@ -161,6 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :options="detectionFunctions"
               dense
               borderless
+              hide-bottom-space
               :rules="[(v) => !!v || 'Detection function is required']"
               data-test="anomaly-detection-function"
               style="max-width: 200px; background: none"
@@ -338,23 +339,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-tooltip>
             </q-icon>
           </div>
-          <div class="tw:flex tw:items-center tw:gap-2" style="width: calc(100% - 190px)">
+          <div class="tw:flex tw:flex-col" style="width: calc(100% - 190px)">
             <q-input
               v-model.number="config.training_window_days"
               type="number"
               dense
               borderless
+              hide-bottom-space
               :min="1"
               :rules="[(v) => (v >= 1) || 'Minimum 1 day']"
               data-test="anomaly-training-window"
               style="width: 87px"
             />
-            <br />
-            <span class="text-caption" :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">
-              days
-              <span class="tw:ml-2">
-                (seasonality: {{ config.training_window_days >= 7 ? 'hour + day-of-week' : 'hour-of-day' }})
-              </span>
+            <span class="text-caption tw:mt-1" :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">
+              days (seasonality: {{ config.training_window_days >= 7 ? 'hour + day-of-week' : 'hour-of-day' }})
             </span>
           </div>
         </div>
