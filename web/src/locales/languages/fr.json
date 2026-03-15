@@ -2108,7 +2108,8 @@
       "alertSetup": "Donnez un nom à votre détecteur et sélectionnez un flux à surveiller",
       "detectionConfig": "Configuration des paramètres de requête et de détection",
       "alerting": "Configurer des notifications lorsque des anomalies sont détectées"
-    }
+    },
+    "updateAnomalyDetection": "Mettre à jour la détection des anomalies :"
   },
   "alert_templates": {
     "header": "Modèles",

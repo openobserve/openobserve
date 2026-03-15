@@ -2108,7 +2108,8 @@
       "alertSetup": "Dedektörünüzü adlandırın ve izlenecek bir akış seçin",
       "detectionConfig": "Sorgu ve algılama parametrelerini yapılandırma",
       "alerting": "Anormallikler tespit edildiğinde bildirimleri ayarlayın"
-    }
+    },
+    "updateAnomalyDetection": "Anomali algılamayı güncelle:"
   },
   "alert_templates": {
     "header": "Şablonlar",

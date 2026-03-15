@@ -2108,7 +2108,8 @@
       "alertSetup": "Geef je detector een naam en selecteer een stream om te monitoren",
       "detectionConfig": "Configureer de query- en detectieparameters",
       "alerting": "Meldingen instellen wanneer er afwijkingen worden gedetecteerd"
-    }
+    },
+    "updateAnomalyDetection": "Anomaliedetectie bijwerken:"
   },
   "alert_templates": {
     "header": "Sjablonen",

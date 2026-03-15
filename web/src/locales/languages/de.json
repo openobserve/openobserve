@@ -2108,7 +2108,8 @@
       "alertSetup": "Benennen Sie Ihren Detektor und wählen Sie einen Stream zur Überwachung aus",
       "detectionConfig": "Konfiguration der Abfrage- und Erkennungsparameter",
       "alerting": "Richten Sie Benachrichtigungen ein, wenn Anomalien erkannt werden"
-    }
+    },
+    "updateAnomalyDetection": "Anomalieerkennung aktualisieren:"
   },
   "alert_templates": {
     "header": "Vorlagen",

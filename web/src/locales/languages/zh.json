@@ -2108,7 +2108,8 @@
       "alertSetup": "为您的探测器命名并选择要监视的直播",
       "detectionConfig": "配置查询和检测参数",
       "alerting": "在检测到异常时设置通知"
-    }
+    },
+    "updateAnomalyDetection": "更新异常检测："
   },
   "alert_templates": {
     "header": "模板",
