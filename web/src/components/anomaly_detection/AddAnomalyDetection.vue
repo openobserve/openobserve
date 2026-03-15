@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Step 1: Setup -->
           <q-step :name="1" :title="t('alerts.steps.alertSetup')" icon="settings" :done="step > 1">
-            <div style="display: flex; gap: 0.625rem; height: calc(100vh - 323px);">
+            <div style="display: flex; gap: 0.625rem; height: calc(100vh - 305px);">
               <div style="flex: 0 0 61.5%; display: flex; flex-direction: column; overflow: hidden;">
                 <div style="flex: 1; overflow: auto;">
                   <AnomalySetup
@@ -127,8 +127,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon="manage_search"
             :done="step > 2"
           >
-            <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px);">
-              <div style="flex: 0 0 62%; display: flex; flex-direction: column; overflow: hidden;">
+            <div style="display: flex; gap: 0.625rem; height: calc(100vh - 305px);">
+              <div style="flex: 0 0 61.5%; display: flex; flex-direction: column; overflow: hidden;">
                 <div style="flex: 1; overflow: auto;">
                   <AnomalyDetectionConfig ref="step2Ref" :config="config" />
                 </div>
@@ -139,8 +139,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Step 3: Alerting -->
           <q-step :name="3" :title="t('alerts.alerting')" icon="notifications">
-            <div style="display: flex; gap: 0.625rem; height: calc(100vh - 323px);">
-              <div style="flex: 0 0 62%; display: flex; flex-direction: column; overflow: hidden;">
+            <div style="display: flex; gap: 0.625rem; height: calc(100vh - 305px);">
+              <div style="flex: 0 0 61.5%; display: flex; flex-direction: column; overflow: hidden;">
                 <div style="flex: 1; overflow: auto;">
                   <AnomalyAlerting
                     :config="config"
@@ -159,10 +159,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="anomaly-right-column"
           style="
             position: absolute;
-            top: 102px;
+            top: 92px;
             right: 12px;
             width: calc(39% - 1.5rem);
-            height: calc(100vh - 323px);
+            height: calc(100vh - 305px);
             pointer-events: auto;
             z-index: 10;
             display: flex;
@@ -182,12 +182,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Summary -->
-          <div class="collapsible-section" :style="summarySectionStyle">
+          <div class="collapsible-section card-container" :style="summarySectionStyle">
             <div
               class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
               @click="showSummary = !showSummary"
             >
-              <span class="tw:text-sm tw:font-semibold">{{ t("alerts.configSummary") }}</span>
+              <span class="tw:text-sm tw:font-semibold">{{ t("alerts.summary.title") }}</span>
               <q-btn
                 flat
                 dense
@@ -198,59 +198,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop
               />
             </div>
-            <div v-show="showSummary" class="summary-section-content tw:px-4 tw:pb-3">
-              <div class="tw:flex tw:flex-col tw:gap-3 tw:pt-1">
-                <div v-if="config.stream_name" class="summary-row">
-                  <span class="summary-label">Stream</span>
-                  <span>
-                    <q-badge color="primary" :label="config.stream_type" class="tw:mr-1 text-caption" />
-                    <span class="text-caption">{{ config.stream_name }}</span>
-                  </span>
-                </div>
-                <div class="summary-row">
-                  <span class="summary-label">Query mode</span>
-                  <q-badge
-                    :color="config.query_mode === 'custom_sql' ? 'deep-purple' : 'teal'"
-                    :label="config.query_mode === 'custom_sql' ? 'Custom SQL' : 'Filters'"
-                    class="text-caption"
-                  />
-                </div>
-                <div v-if="config.query_mode === 'filters'" class="summary-row">
-                  <span class="summary-label">Function</span>
-                  <span class="text-caption">{{ config.detection_function }}</span>
-                </div>
-                <div class="summary-row">
-                  <span class="summary-label">Resolution</span>
-                  <span class="text-caption">{{ config.histogram_interval_value }}{{ config.histogram_interval_unit }}</span>
-                </div>
-                <div class="summary-row">
-                  <span class="summary-label">Schedule</span>
-                  <span class="text-caption">{{ config.schedule_interval_value }}{{ config.schedule_interval_unit }}</span>
-                </div>
-                <div class="summary-row">
-                  <span class="summary-label">Training</span>
-                  <span class="text-caption">
-                    {{ config.training_window_days }} days
-                    ({{ config.training_window_days >= 7 ? 'hour + day-of-week' : 'hour-of-day' }})
-                  </span>
-                </div>
-                <div class="summary-row">
-                  <span class="summary-label">Retrain</span>
-                  <span class="text-caption">{{ config.retrain_interval_days === 0 ? 'Never' : config.retrain_interval_days + 'd' }}</span>
-                </div>
-                <div class="summary-row">
-                  <span class="summary-label">Threshold</span>
-                  <span class="text-caption">{{ 100 - config.threshold }}% anomaly rate</span>
-                </div>
-                <div class="summary-row">
-                  <span class="summary-label">Alerting</span>
-                  <q-badge
-                    :color="config.alert_enabled ? 'positive' : 'grey'"
-                    :label="config.alert_enabled ? 'Enabled' : 'Disabled'"
-                    class="text-caption"
-                  />
-                </div>
-              </div>
+            <div v-show="showSummary" class="summary-section-content">
+              <AnomalySummary
+                style="height: 100%; overflow: auto;"
+                :config="config"
+                :destinations="destinations"
+                :wizard-step="step"
+              />
             </div>
           </div>
         </div>
@@ -314,6 +268,7 @@ import { useStore } from "vuex";
 import AnomalySetup from "./steps/AnomalySetup.vue";
 import AnomalyDetectionConfig from "./steps/AnomalyDetectionConfig.vue";
 import AnomalyAlerting from "./steps/AnomalyAlerting.vue";
+import AnomalySummary from "./AnomalySummary.vue";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import { getFoldersListByType } from "@/utils/commons";
 
@@ -357,6 +312,7 @@ export default defineComponent({
     AnomalySetup,
     AnomalyDetectionConfig,
     AnomalyAlerting,
+    AnomalySummary,
   },
 
   props: {
@@ -668,20 +624,6 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .anomaly-wizard {
-  .summary-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .summary-label {
-    font-weight: 600;
-    min-width: 80px;
-    font-size: 12px;
-    line-height: 20px;
-    color: var(--o2-text-secondary, #757575);
-  }
-
   .q-stepper--horizontal .q-stepper__step-inner {
     padding: 5px !important;
   }
@@ -719,7 +661,9 @@ export default defineComponent({
 
   .summary-section-content {
     flex: 1;
-    overflow-y: auto;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 
   .expand-toggle-btn {
@@ -781,7 +725,7 @@ export default defineComponent({
   }
 
   :deep(.q-stepper__tab) {
-    padding: 12px 16px;
+    padding: 8px 16px;
     min-height: 60px;
   }
 
