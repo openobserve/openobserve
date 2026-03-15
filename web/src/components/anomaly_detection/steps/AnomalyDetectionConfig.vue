@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               placeholder="SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM stream_name GROUP BY time_bucket ORDER BY time_bucket"
               :rules="[(v) => !!v || 'SQL is required in custom SQL mode']"
               data-test="anomaly-custom-sql"
-              style="background: none; font-family: monospace; font-size: 12px"
+              class="sql-input"
             />
             <div
               class="text-caption tw:mt-1"
@@ -597,6 +597,25 @@ export default defineComponent({
 .alert-settings-row {
   margin-bottom: 24px !important;
   padding-bottom: 0 !important;
+}
+
+// SQL textarea — border applied directly to the Quasar field control
+.sql-input {
+  :deep(.q-field__control) {
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 0.25rem;
+    padding: 0;
+  }
+
+  :deep(.q-field__native) {
+    font-family: monospace;
+    font-size: 0.75rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .body--dark & :deep(.q-field__control) {
+    border-color: rgba(255, 255, 255, 0.18);
+  }
 }
 
 // Reuse alerts wizard frequency toggle button styles
