@@ -349,6 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="anomaly-training-window"
               style="width: 87px"
             />
+            <br />
             <span class="text-caption" :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">
               days
               <span class="tw:ml-2">
@@ -414,7 +415,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="anomaly-threshold-dec"
               />
               <div class="tw:text-center" style="min-width: 140px">
-                <span class="tw:font-semibold" style="font-size: 18px">~{{ 100 - config.threshold }}%</span>
+                <span class="tw:font-semibold" style="font-size: 13px">~{{ 100 - config.threshold }}%</span>
                 <span class="text-caption text-grey-6 q-ml-xs">of data flagged</span>
               </div>
               <q-btn
