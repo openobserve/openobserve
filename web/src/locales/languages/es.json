@@ -2103,6 +2103,11 @@
       "active": "Activo",
       "failed": "Falló",
       "disabled": "Discapacitado"
+    },
+    "anomalyStepCaptions": {
+      "alertSetup": "Asigne un nombre a su detector y seleccione una transmisión para monitorear",
+      "detectionConfig": "Configurar los parámetros de consulta y detección",
+      "alerting": "Configure las notificaciones cuando se detecten anomalías"
     }
   },
   "alert_templates": {

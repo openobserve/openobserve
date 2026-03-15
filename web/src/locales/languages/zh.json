@@ -2103,6 +2103,11 @@
       "active": "活跃",
       "failed": "失败",
       "disabled": "已禁用"
+    },
+    "anomalyStepCaptions": {
+      "alertSetup": "为您的探测器命名并选择要监视的直播",
+      "detectionConfig": "配置查询和检测参数",
+      "alerting": "在检测到异常时设置通知"
     }
   },
   "alert_templates": {

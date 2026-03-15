@@ -2120,6 +2120,11 @@
       "active": "アクティブ",
       "failed": "失敗",
       "disabled": "無効"
+    },
+    "anomalyStepCaptions": {
+      "alertSetup": "検出器に名前を付け、監視するストリームを選択します",
+      "detectionConfig": "クエリと検出パラメータの設定",
+      "alerting": "異常が検出されたときの通知を設定する"
     }
   },
   "alert_templates": {

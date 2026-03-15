@@ -2103,6 +2103,11 @@
       "active": "Ativo",
       "failed": "Falhou",
       "disabled": "Desativado"
+    },
+    "anomalyStepCaptions": {
+      "alertSetup": "Nomeie seu detector e selecione um fluxo para monitorar",
+      "detectionConfig": "Configurar os parâmetros de consulta e detecção",
+      "alerting": "Configure notificações quando anomalias forem detectadas"
     }
   },
   "alert_templates": {
