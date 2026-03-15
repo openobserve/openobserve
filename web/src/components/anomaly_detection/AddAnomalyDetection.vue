@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="anomaly-wizard full-width q-mx-lg q-pt-xs" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+  <div class="anomaly-wizard full-width q-mx-lg q-pt-xs">
     <!-- Header -->
     <div class="row items-center no-wrap card-container tw:mx-[0.625rem] tw:mb-[0.625rem]">
       <div class="flex items-center justify-between tw:w-full card-container tw:h-[68px] tw:px-2 tw:py-3">
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           flat
           header-nav
           keep-alive
-          class="anomaly-wizard-stepper alert-wizard-stepper"
+          class="anomaly-wizard-stepper"
         >
           <!-- Step caption (appears below active step header) -->
           <template v-slot:message>
@@ -764,9 +764,21 @@ export default defineComponent({
 }
 
 .anomaly-wizard-stepper {
-  :deep(.q-stepper__step-inner) {
-    padding: 0;
+  box-shadow: none;
+
+  .q-stepper__step-inner {
+    padding: 0.375rem !important;
   }
+
+  .q-stepper__tab {
+    padding-left: 0.375rem !important;
+    min-height: 30px !important;
+  }
+
+  :deep(.q-stepper__header) {
+    border-bottom: 1px solid #e0e0e0;
+  }
+
   :deep(.q-stepper__tab) {
     padding: 12px 16px;
     min-height: 60px;
@@ -798,6 +810,22 @@ export default defineComponent({
     color: #4caf50;
     cursor: pointer;
   }
+
+  :deep(.q-stepper__dot) {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+
+  .q-stepper--horizontal .q-stepper__step-inner {
+    padding: 8px !important;
+  }
+
+  // Make step titles more compact
+  :deep(.q-stepper__title) {
+    font-size: 14px;
+    line-height: 1.2;
+  }
 }
 
 // Persistent step caption styles
@@ -821,7 +849,7 @@ export default defineComponent({
 .light-mode-caption {
   background-color: transparent;
   color: #757575;
-  border-left: 3px solid #e0e0e0;
+  border-left: 3px solid #bdbdbd;
   padding-left: 12px !important;
 }
 </style>
