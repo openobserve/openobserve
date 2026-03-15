@@ -104,8 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Step 1: Setup -->
           <q-step :name="1" :title="t('alerts.steps.alertSetup')" icon="settings" :done="step > 1">
-            <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px);">
-              <div style="flex: 0 0 62%; display: flex; flex-direction: column; overflow: hidden;">
+            <div style="display: flex; gap: 0.625rem; height: calc(100vh - 323px);">
+              <div style="flex: 0 0 61.5%; display: flex; flex-direction: column; overflow: hidden;">
                 <div style="flex: 1; overflow: auto;">
                   <AnomalySetup
                     ref="step1Ref"
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Step 3: Alerting -->
           <q-step :name="3" :title="t('alerts.alerting')" icon="notifications">
-            <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px);">
+            <div style="display: flex; gap: 0.625rem; height: calc(100vh - 323px);">
               <div style="flex: 0 0 62%; display: flex; flex-direction: column; overflow: hidden;">
                 <div style="flex: 1; overflow: auto;">
                   <AnomalyAlerting
@@ -159,10 +159,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="anomaly-right-column"
           style="
             position: absolute;
-            top: 86px;
-            right: 4px;
+            top: 102px;
+            right: 12px;
             width: calc(39% - 1.5rem);
-            height: calc(100vh - 302px);
+            height: calc(100vh - 323px);
             pointer-events: auto;
             z-index: 10;
             display: flex;
@@ -681,6 +681,10 @@ export default defineComponent({
     line-height: 20px;
     color: var(--o2-text-secondary, #757575);
   }
+
+  .q-stepper--horizontal .q-stepper__step-inner {
+    padding: 5px !important;
+  }
 }
 
 .collapsible-section {
@@ -763,7 +767,8 @@ export default defineComponent({
   }
 }
 
-.anomaly-wizard-stepper {
+// Wizard Stepper Styles
+.anomaly-wizard {
   box-shadow: none;
 
   .q-stepper__step-inner {
@@ -773,6 +778,214 @@ export default defineComponent({
   .q-stepper__tab {
     padding-left: 0.375rem !important;
     min-height: 30px !important;
+  }
+
+  :deep(.q-stepper__tab) {
+    padding: 12px 16px;
+    min-height: 60px;
+  }
+
+  // Hide captions for inactive steps
+  :deep(.q-stepper__tab) {
+    .q-stepper__caption {
+      display: none !important;
+    }
+  }
+
+  // Show caption only on active step
+  :deep(.q-stepper__tab--active) {
+    .q-stepper__caption {
+      display: block !important;
+      opacity: 0.7;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+  }
+
+
+  .q-stepper--horizontal .q-stepper__step-inner {
+    padding: 8px !important;
+  }
+
+  :deep(.q-stepper__title) {
+    font-size: 14px;
+    line-height: 1.2;
+  }
+}
+
+.wizard-view-container {
+  :deep(.q-stepper) {
+    background: transparent !important;
+  }
+}
+
+// Persistent step caption styles
+.persistent-step-caption {
+  font-size: 12px;
+  line-height: 1.6;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  font-weight: 400;
+  margin-left: 0.375rem;
+  letter-spacing: 0.01em;
+}
+
+.dark-mode-caption {
+  background-color: transparent;
+  color: #9e9e9e;
+  border-left: 3px solid #5a5a5a;
+  padding-left: 12px !important;
+}
+
+.light-mode-caption {
+  background-color: transparent;
+  color: #757575;
+  border-left: 3px solid #bdbdbd;
+  padding-left: 12px !important;
+}
+</style>
+
+<style lang="scss">
+.no-case .q-field__native span {
+  text-transform: none !important;
+}
+
+.no-case .q-field__input {
+  text-transform: none !important;
+}
+
+.add-alert-form {
+  .q-field--dense .q-field__control {
+    .q-field__native span {
+      overflow: hidden;
+    }
+  }
+
+  .alert-condition .__column .q-field__control .q-field__native span {
+    max-width: 152px;
+    text-overflow: ellipsis;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .q-field__bottom {
+    padding: 2px 0;
+  }
+}
+
+.silence-notification-input,
+.threshould-input {
+  .q-field--filled .q-field__control {
+    background-color: transparent !important;
+  }
+
+  .q-field--dark .q-field__control {
+    background-color: rgba(255, 255, 255, 0.07) !important;
+  }
+}
+
+.dark-mode{
+  .alert-setup-container{
+  background-color: #212121;
+  padding: 8px 16px;
+  margin-left: 8px;
+  border: 1px solid #343434;
+  border-top: 0px !important;
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px ;
+}
+.q-text-area-input > div > div  { 
+  background-color:rgb(30, 31, 31) !important;
+  border: 1px solid $input-border !important;
+}
+.dark-mode-row-template  > div > div  { 
+  background-color:rgb(30, 31, 31) !important;
+  border: 1px solid $input-border !important;
+}
+.custom-input-label{
+  color: #BDBDBD;
+}
+}
+.light-mode{
+  .alert-setup-container{
+    background-color: #ffffff;
+    padding: 8px 16px;
+    margin-left: 8px;
+    border: 1px solid #e6e6e6;
+    border-top: 0px !important;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px ;
+  }
+  .custom-input-label{
+    color: #5C5C5C;
+  }
+  .q-field--labeled.showLabelOnTop.q-field .q-field__control{
+    border: 1px solid #d4d4d4;
+  }
+  .add-folder-btn{
+    border: 1px solid #d4d4d4;
+  }
+  .dark-mode .q-text-area-input > div > div  { 
+  background-color: #181a1b !important;
+  border: 1px solid black !important;
+}
+
+.light-mode .q-text-area-input > div > div  { 
+  background-color:#ffffff !important;
+  border: 1px solid #e0e0e0 !important;
+}
+.dark-mode-row-template > div > div  { 
+  background-color: #181a1b !important;
+  border: 1px solid black !important;
+}
+.light-mode-row-template > div > div  { 
+  background-color:#ffffff !important;
+  border: 1px solid #e0e0e0 !important;
+}
+}
+.q-text-area-input > div > div > div > textarea{  
+    height: 80px !important;
+    resize: none !important;
+}
+.row-template-input > div > div > div > textarea{
+  height: 160px !important;
+  resize: none !important;
+}
+.bottom-sticky-dark{
+  background-color: #212121;
+}
+.bottom-sticky-light{
+  background-color: #ffffff;
+  border-top: 1px solid #d4d4d4
+}
+.input-box-bg-dark .q-field__control{
+  background-color: #181a1b !important;
+}
+.input-box-bg-light .q-field__control{
+  background-color: #ffffff !important;
+}
+.input-border-dark .q-field__control{
+  border: 1px solid #181a1b !important;
+}
+.input-border-light .q-field__control{
+  border: 1px solid #d4d4d4 !important;
+}
+
+
+.o2-alert-tab-border{
+  border-top: 0.0625rem solid var(--o2-border-color);
+}
+
+// Wizard Stepper Styles
+.anomaly-wizard-stepper {
+  box-shadow: none;
+  .q-stepper__step-inner{
+    padding: 0.375rem !important;
+  }
+  .q-stepper__tab{
+    padding-left: 0.375rem !important;
+    min-height: 30px !important;
+
   }
 
   :deep(.q-stepper__header) {
@@ -828,7 +1041,22 @@ export default defineComponent({
   }
 }
 
-// Persistent step caption styles
+.wizard-view-container {
+  .q-stepper {
+    background: transparent !important;
+  }
+}
+
+// Dark mode adjustments
+.dark-mode1 {
+  .anomaly-wizard-stepper {
+    :deep(.q-stepper__header) {
+      border-bottom-color: #424242;
+    }
+  }
+}
+
+// Persistent step caption styles (helper text style)
 .persistent-step-caption {
   font-size: 12px;
   line-height: 1.6;
@@ -852,4 +1080,5 @@ export default defineComponent({
   border-left: 3px solid #bdbdbd;
   padding-left: 12px !important;
 }
+
 </style>
