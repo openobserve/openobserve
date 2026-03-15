@@ -1,6 +1,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -15,13 +16,10 @@ test.describe("Schema Load testcases", () => {
     async function largePayloadIngestion(page, streamName, logData) {
         testLogger.debug('Starting large payload ingestion', { streamName, fieldCount: Object.keys(logData[0]).length });
         
-        const orgId = process.env["ORGNAME"];
-        const basicAuthCredentials = Buffer.from(
-            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-        ).toString('base64');
+        const orgId = getOrgIdentifier();
 
         const headers = {
-            "Authorization": `Basic ${basicAuthCredentials}`,
+            ...getAuthHeaders(),
             "Content-Type": "application/json",
         };
         
@@ -112,7 +110,7 @@ test.describe("Schema Load testcases", () => {
         await page.waitForTimeout(5000);
         
         // Navigate to logs page and verify data
-        const logsUrl = `${process.env["ZO_BASE_URL"]}/web/logs?org_identifier=${process.env["ORGNAME"]}`;
+        const logsUrl = `${process.env["ZO_BASE_URL"]}/web/logs?org_identifier=${getOrgIdentifier()}`;
         testLogger.navigation('Navigating to logs page', { url: logsUrl });
         await page.goto(logsUrl);
         await page.waitForLoadState('domcontentloaded');

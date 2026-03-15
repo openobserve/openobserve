@@ -481,7 +481,7 @@ alt="SQL Mode" class="toolbar-icon" />
                       "
                     >
                       <q-toggle
-                        v-model="searchObj.meta.quickMode"
+                        :model-value="searchObj.meta.quickMode"
                         size="xs"
                         flat
                         class="o2-toggle-button-xs"
@@ -4308,6 +4308,7 @@ export default defineComponent({
     };
 
     const handleQuickMode = () => {
+      searchObj.meta.quickMode = !searchObj.meta.quickMode;
       emit("handleQuickModeChange");
     };
 

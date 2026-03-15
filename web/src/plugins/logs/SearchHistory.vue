@@ -154,6 +154,7 @@
                         "
                       />
                       <q-btn
+                        v-if="config.isEnterprise == 'true' && config.isCloud == 'false'"
                         @click.stop="goToInspector(props.row)"
                         size="xs"
                         label="Inspect"
@@ -286,6 +287,7 @@ import { date, QTable, useQuasar } from "quasar";
 import type { Ref } from "vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
+import config from "@/aws-exports";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 
@@ -785,6 +787,7 @@ export default defineComponent({
       tabs,
       moreDetailsToDisplay,
       wrapText,
+      config,
     };
     // Watch the searchObj for changes
   },

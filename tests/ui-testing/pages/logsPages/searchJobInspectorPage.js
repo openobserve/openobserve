@@ -333,16 +333,24 @@ export class SearchJobInspectorPage {
    * @returns {Promise<string>}
    */
   async getSqlQueryContent() {
-    // Look for SQL content in dialog (pre/code elements or SQL keywords)
+    // Wait for the SQL dialog to be visible first
+    await this.page.waitForSelector('.q-dialog', { state: 'visible', timeout: 5000 }).catch(() => {});
+
+    // Look for SQL content using specific selector from SearchJobInspector.vue
     const sqlLocators = [
-      this.page.locator('pre').first(),
-      this.page.locator('code').first(),
-      this.page.locator('text=/SELECT.*FROM/i').first()
+      this.page.locator('pre.sql-query'),
+      this.page.locator('.sql-query-container pre'),
+      this.page.locator('.q-dialog pre').first(),
+      this.page.locator('.q-dialog code').first()
     ];
 
     for (const locator of sqlLocators) {
-      if (await locator.isVisible({ timeout: 2000 }).catch(() => false)) {
-        return await locator.textContent() || '';
+      if (await locator.isVisible({ timeout: 5000 }).catch(() => false)) {
+        const content = await locator.textContent() || '';
+        // Skip if it's the fallback message
+        if (content && content !== 'No SQL query available') {
+          return content;
+        }
       }
     }
     return '';

@@ -352,7 +352,11 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
       const pipelineIcon = getImageURL("images/usage/pipeline.svg");
       const remotePipelineIcon = getImageURL("images/usage/remote_pipeline.svg");
       const dataRetentionIcon = getImageURL("images/usage/data_retention.svg");
-      const aiIcon = getImageURL("images/common/ai_icon.svg");
+      const aiIcon = computed(() =>
+        store.state.theme === "dark"
+          ? getImageURL("images/common/ai_icon_dark.svg")
+          : getImageURL("images/common/ai_icon.svg")
+      );
       //this is the example data that needs to be used to get the chart in usage page 
       //we just need to have the data in the format of the dataModel
       //eg: date and value and in the array format

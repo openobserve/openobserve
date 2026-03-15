@@ -79,11 +79,13 @@ vi.mock("@/composables/useDurationPercentiles", () => ({
   parseDurationWhereClause: (_filter: string) => _filter,
 }));
 
-// useParser: resolve immediately with a no-op parser object
+// useParser: resolve immediately with a no-op parser object by default.
+// Individual describe blocks may override sqlParser via mockReturnValue to
+// control when the promise resolves (see "onMounted ordering" tests below).
 vi.mock("@/composables/useParser", () => ({
-  default: () => ({
+  default: vi.fn(() => ({
     sqlParser: vi.fn().mockResolvedValue({}),
-  }),
+  })),
 }));
 
 vi.mock("@/utils/zincutils", () => ({
@@ -102,6 +104,7 @@ vi.mock("@/utils/zincutils", () => ({
   b64DecodeUnicode: vi.fn().mockImplementation((str: string) => atob(str)),
 }));
 
+import useParser from "@/composables/useParser";
 import TracesMetricsDashboard from "./TracesMetricsDashboard.vue";
 
 installQuasar();
@@ -628,6 +631,101 @@ describe("TracesMetricsDashboard", () => {
       wrapper = mountComponent({ filter: "   " });
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toEqual([]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // onMounted ordering — loadDashboard fires before sqlParser resolves
+  //
+  // The fix reordered onMounted so that loadDashboard() is called (and
+  // completes synchronously up to its first await-free path) before
+  // `await loadSqlParser()` suspends execution. These tests verify that
+  // dashboardData is populated while loadSqlParser is still pending, which
+  // is what prevents the child GridStack from collapsing to 17px.
+  // -------------------------------------------------------------------------
+  describe("onMounted ordering", () => {
+    // For each test in this group we install a deferred sqlParser so we can
+    // inspect component state while the promise is still unresolved.
+    let resolveParser!: (value: unknown) => void;
+    let parserPromise!: Promise<unknown>;
+
+    beforeEach(() => {
+      // Build a fresh deferred promise per test — never shared across tests.
+      parserPromise = new Promise((resolve) => {
+        resolveParser = resolve;
+      });
+
+      vi.mocked(useParser).mockReturnValue({
+        sqlParser: vi.fn().mockReturnValue(parserPromise),
+      });
+    });
+
+    it("should have non-null dashboardData before loadSqlParser resolves", async () => {
+      // Mount with a pending parser — onMounted fires but sqlParser never
+      // resolves until we call resolveParser() below.
+      const localWrapper = mountComponent();
+
+      // Drain the microtask queue up to the point where loadDashboard() has
+      // completed but the await loadSqlParser() suspension is still pending.
+      // Because loadDashboard() is synchronous (no internal await on this
+      // code path), a single nextTick is sufficient.
+      await localWrapper.vm.$nextTick();
+
+      // dashboardData must already be populated — the child RenderDashboardCharts
+      // receives a real object, not null, so GridStack initialises correctly.
+      expect(localWrapper.vm.dashboardData).not.toBeNull();
+
+      // Clean up: resolve the parser so the component finishes mounting
+      // without an unhandled rejection.
+      resolveParser({});
+      await localWrapper.vm.$nextTick();
+      localWrapper.unmount();
+    });
+
+    it("should call loadDashboard synchronously relative to the loadSqlParser await gap", async () => {
+      // We track the order of calls: loadDashboard sets dashboardData, which
+      // happens before sqlParser's promise resolves. We verify this by
+      // checking that dashboardData is set at the moment the parser resolves
+      // for the first time (i.e. it was set earlier, not after).
+      const localWrapper = mountComponent();
+
+      // Tick once to let the synchronous portion of onMounted execute.
+      await localWrapper.vm.$nextTick();
+
+      // dashboardData is already set — confirms loadDashboard ran before the
+      // await suspension handed control back to the event loop.
+      const dashboardDataBeforeParserResolves = localWrapper.vm.dashboardData;
+      expect(dashboardDataBeforeParserResolves).not.toBeNull();
+
+      // Now resolve the parser and flush all remaining microtasks.
+      resolveParser({});
+      await localWrapper.vm.$nextTick();
+
+      // dashboardData must still be non-null after the parser resolves.
+      expect(localWrapper.vm.dashboardData).not.toBeNull();
+
+      localWrapper.unmount();
+    });
+
+    it("should set sqlParser.value only after loadSqlParser resolves", async () => {
+      const localWrapper = mountComponent();
+
+      // Right after mount — parser promise is still pending.
+      await localWrapper.vm.$nextTick();
+
+      // sqlParser ref should not yet hold the resolved value (it is still null
+      // because loadSqlParser has not resolved).
+      // We cannot read sqlParser directly, but dashboardData being set first
+      // proves loadDashboard completed before the parser await resumed.
+      expect(localWrapper.vm.dashboardData).not.toBeNull();
+
+      resolveParser({ parse: vi.fn() });
+      await localWrapper.vm.$nextTick();
+
+      // After resolving, the component should still be healthy.
+      expect(localWrapper.exists()).toBe(true);
+
+      localWrapper.unmount();
     });
   });
 

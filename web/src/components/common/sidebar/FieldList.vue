@@ -353,8 +353,10 @@ export default defineComponent({
 
     // ─── SQL helper ──────────────────────────────────────────────────────
 
-    const buildSql = (streamName: string) =>
-      b64EncodeUnicode(`SELECT * FROM "${streamName}"`) || "";
+    const buildSql = (streamName: string, whereClause?: string) =>
+      b64EncodeUnicode(
+        `SELECT * FROM "${streamName}"${whereClause ? ` WHERE ${whereClause}` : ""}`,
+      ) || "";
 
     // ─── Field expand / collapse ─────────────────────────────────────────
 
@@ -383,7 +385,7 @@ export default defineComponent({
         end_time: props.timeStamp.endTime,
         stream_name: resolvedStream,
         stream_type: props.streamType,
-        sql: buildSql(resolvedStream),
+        sql: buildSql(resolvedStream, props.query || undefined),
         timeout: 30000,
         use_cache: (globalThis as any).use_cache ?? true,
       });
@@ -417,7 +419,7 @@ export default defineComponent({
         end_time: props.timeStamp.endTime,
         stream_name: resolvedStream,
         stream_type: props.streamType,
-        sql: buildSql(resolvedStream),
+        sql: buildSql(resolvedStream, props.query || undefined),
         keyword: term || undefined,
         timeout: 30000,
         use_cache: (globalThis as any).use_cache ?? true,
@@ -440,7 +442,7 @@ export default defineComponent({
         end_time: props.timeStamp.endTime,
         stream_name: resolvedStream,
         stream_type: props.streamType,
-        sql: buildSql(resolvedStream),
+        sql: buildSql(resolvedStream, props.query || undefined),
         keyword: currentKeyword.value[fieldName] || undefined,
         timeout: 30000,
         use_cache: (globalThis as any).use_cache ?? true,
