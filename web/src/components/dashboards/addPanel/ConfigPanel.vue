@@ -2328,13 +2328,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.drilldown = v;
         }
       "
-      label="Drilldown"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
       expand-icon="chevron_right"
       expanded-icon="keyboard_arrow_down"
       expand-icon-class="text-grey-6"
     >
+      <template #header>
+        <div style="display: flex; align-items: center; flex: 1; min-width: 0">
+          {{ t("dashboard.drilldown") }}
+          <q-btn
+            no-caps
+            padding="xs"
+            size="sm"
+            flat
+            icon="info_outline"
+            data-test="dashboard-addpanel-config-drilldown-info"
+          >
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="bottom middle"
+              self="top middle"
+              max-width="250px"
+            >
+              {{ t("dashboard.drilldownTooltip") }}
+            </q-tooltip>
+          </q-btn>
+        </div>
+      </template>
       <div class="config-section-body">
         <Drilldown :variablesData="variablesData" />
       </div>
@@ -2356,42 +2377,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.comparison = v;
         }
       "
-      label="Comparison"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
       expand-icon="chevron_right"
       expanded-icon="keyboard_arrow_down"
       expand-icon-class="text-grey-6"
     >
-      <div class="config-section-body">
-        <div class="flex items-center q-mr-sm">
-          <div
-            data-test="scheduled-dashboard-period-title"
-            class="tw:font-bold tw:flex tw:items-center"
-            style="width: 190px"
+      <template #header>
+        <div style="display: flex; align-items: center; flex: 1; min-width: 0">
+          {{ t("dashboard.comparisonAgainst") }}
+          <q-btn
+            no-caps
+            padding="xs"
+            size="sm"
+            flat
+            icon="info_outline"
+            data-test="dashboard-addpanel-config-time-shift-info"
           >
-            {{ t("dashboard.comparisonAgainst") }}
-            <q-btn
-              no-caps
-              padding="xs"
-              size="sm"
-              flat
-              icon="info_outline"
-              data-test="dashboard-addpanel-config-time-shift-info"
+            <q-tooltip
+              anchor="bottom middle"
+              self="top middle"
+              style="font-size: 10px"
+              max-width="250px"
             >
-              <q-tooltip
-                anchor="bottom middle"
-                self="top middle"
-                style="font-size: 10px"
-                max-width="250px"
-              >
-                <span>
-                  {{ t("dashboard.comparisonAgainstTooltip") }}
-                </span>
-              </q-tooltip>
-            </q-btn>
-          </div>
+              <span>
+                {{ t("dashboard.comparisonAgainstTooltip") }}
+              </span>
+            </q-tooltip>
+          </q-btn>
         </div>
+      </template>
+      <div class="config-section-body">
         <CustomDateTimePicker
           modelValue="0m"
           :isFirstEntry="true"
@@ -2440,13 +2456,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.markLines = v;
         }
       "
-      label="Mark Lines"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
       expand-icon="chevron_right"
       expanded-icon="keyboard_arrow_down"
       expand-icon-class="text-grey-6"
     >
+      <template #header>
+        <div style="display: flex; align-items: center; flex: 1; min-width: 0">
+          {{ t("dashboard.markLines") }}
+          <q-btn
+            no-caps
+            padding="xs"
+            size="sm"
+            flat
+            icon="info_outline"
+            data-test="dashboard-addpanel-config-markline-info"
+          >
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="bottom middle"
+              self="top middle"
+              max-width="250px"
+            >
+              {{ t("dashboard.markLinesTooltip") }}
+            </q-tooltip>
+          </q-btn>
+        </div>
+      </template>
       <div class="config-section-body">
         <MarkLineConfig />
       </div>
