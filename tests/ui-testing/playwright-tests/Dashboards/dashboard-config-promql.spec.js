@@ -286,6 +286,8 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await expect(visibleColsInput).toBeVisible();
 
     // Type a custom column name and press Enter (new-value-mode="add-unique")
+    // Explicit click ensures focus in headless CI before typing
+    await visibleColsInput.click();
     await visibleColsInput.pressSequentially("instance");
     await visibleColsInput.press("Enter");
     testLogger.info("Visible column 'instance' added");
@@ -320,6 +322,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelConfigs.scrollSidebarToElement(hiddenColsInput);
     await expect(hiddenColsInput).toBeVisible();
 
+    await hiddenColsInput.click();
     await hiddenColsInput.pressSequentially("job");
     await hiddenColsInput.press("Enter");
     testLogger.info("Hidden column 'job' added");
@@ -354,6 +357,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelConfigs.scrollSidebarToElement(stickyColsInput);
     await expect(stickyColsInput).toBeVisible();
 
+    await stickyColsInput.click();
     await stickyColsInput.pressSequentially("instance");
     await stickyColsInput.press("Enter");
     testLogger.info("Sticky column 'instance' added");
