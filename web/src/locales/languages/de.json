@@ -350,10 +350,6 @@
     "selectStreamForAI": "Wählen Sie zuerst einen Stream aus, um KI zu verwenden",
     "collapseFields": "Felder ausblenden",
     "openFields": "Felder öffnen",
-    "askAIFunctionPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Funktion...",
-    "enterFunctionPrompt": "Geben Sie eine Aufforderung ein, um eine Funktion zu generieren",
-    "recordsPerPage": "Datensätze pro Seite",
-    "searchDimension": "Dimensionen suchen",
     "createAlertFromPattern": "Warnung anhand dieses Musters erstellen",
     "aiBarSuccessPlaceholder": "Was möchtest du als Nächstes tun?",
     "nlpModeDisabledForVisualization": "Der Natural Language-Modus kann bei einer Visualisierung mit mehreren Streams nicht deaktiviert werden"

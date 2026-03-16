@@ -350,10 +350,6 @@
     "selectStreamForAI": "Selecione primeiro um stream para usar a IA",
     "collapseFields": "Colapsar campos",
     "openFields": "Campos abertos",
-    "askAIFunctionPlaceholder": "Peça ajuda à IA com sua função...",
-    "enterFunctionPrompt": "Insira um prompt para gerar a função",
-    "recordsPerPage": "Registros por página",
-    "searchDimension": "Dimensões de pesquisa",
     "createAlertFromPattern": "Crie um alerta a partir desse padrão",
     "aiBarSuccessPlaceholder": "O que você gostaria de fazer a seguir?",
     "nlpModeDisabledForVisualization": "O modo de linguagem natural não pode ser desativado durante a visualização com vários fluxos"

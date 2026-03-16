@@ -350,10 +350,6 @@
     "selectStreamForAI": "Sélectionnez d'abord un flux pour utiliser l'IA",
     "collapseFields": "Effondrer les champs",
     "openFields": "Champs ouverts",
-    "askAIFunctionPlaceholder": "Demandez à l'IA de vous aider dans votre fonction...",
-    "enterFunctionPrompt": "Entrez une invite pour générer une fonction",
-    "recordsPerPage": "Enregistrements par page",
-    "searchDimension": "Dimensions de recherche",
     "createAlertFromPattern": "Créer une alerte à partir de ce modèle",
     "aiBarSuccessPlaceholder": "Qu'aimerais-tu faire ensuite ?",
     "nlpModeDisabledForVisualization": "Le mode langage naturel ne peut pas être désactivé lors de la visualisation avec plusieurs flux"

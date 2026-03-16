@@ -350,10 +350,6 @@
     "selectStreamForAI": "Seleziona prima uno stream per utilizzare l'IA",
     "collapseFields": "Comprimi campi",
     "openFields": "Campi aperti",
-    "askAIFunctionPlaceholder": "Chiedi all'IA di aiutarti con la tua funzione...",
-    "enterFunctionPrompt": "Inserisci un prompt per generare la funzione",
-    "recordsPerPage": "Record per pagina",
-    "searchDimension": "Dimensioni di ricerca",
     "createAlertFromPattern": "Crea un avviso da questo modello",
     "aiBarSuccessPlaceholder": "Cosa vorresti fare dopo?",
     "nlpModeDisabledForVisualization": "La modalità Natural Language non può essere disabilitata durante la visualizzazione con più stream"

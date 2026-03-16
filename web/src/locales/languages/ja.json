@@ -350,10 +350,6 @@
     "selectStreamForAI": "AI を使用するには、まずストリームを選択してください",
     "collapseFields": "フィールドを折りたたむ",
     "openFields": "オープンフィールド",
-    "askAIFunctionPlaceholder": "AIに機能の支援を依頼してください...",
-    "enterFunctionPrompt": "関数を生成するプロンプトを入力してください",
-    "recordsPerPage": "1 ページあたりのレコード数",
-    "searchDimension": "ディメンション検索",
     "createAlertFromPattern": "このパターンからアラートを作成",
     "aiBarSuccessPlaceholder": "次は何をしたいですか？",
     "nlpModeDisabledForVisualization": "複数のストリームを含むビジュアライゼーションでは、自然言語モードを無効にすることはできません"

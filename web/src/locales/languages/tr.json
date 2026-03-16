@@ -350,10 +350,6 @@
     "selectStreamForAI": "Yapay zekayı kullanmak için önce bir akış seçin",
     "collapseFields": "Alanları Daralt",
     "openFields": "Açık Alanlar",
-    "askAIFunctionPlaceholder": "Yapay zekadan işlevinize yardım etmesini isteyin...",
-    "enterFunctionPrompt": "Fonksiyon oluşturmak için bir istem girin",
-    "recordsPerPage": "Sayfa başına kayıtlar",
-    "searchDimension": "Arama Boyutları",
     "createAlertFromPattern": "Bu modelden uyarı oluştur",
     "aiBarSuccessPlaceholder": "Bundan sonra ne yapmak istersin?",
     "nlpModeDisabledForVisualization": "Birden çok akışla görselleştirme sırasında Doğal Dil modu devre dışı bırakılamaz"
