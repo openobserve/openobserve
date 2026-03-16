@@ -1101,6 +1101,7 @@ async function extractFields() {
             showValues: !idFields[rowName],
             label: rowName === "duration" ? "duration (µs)" : rowName,
             dataType: schemaTypeMap.get(rowName),
+            isSchemaField: true,
           });
         }
       });
@@ -1116,6 +1117,7 @@ async function extractFields() {
               ftsKey: ftsKeys.has(row.name),
               showValues: !idFields[row.name],
               dataType: row.type,
+              isSchemaField: true,
             });
           }
         }

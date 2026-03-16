@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-badge
           data-test="traces-count-badge"
           rounded
-          :label="`${formatLargeNumber(props.errorCount!)} ${props.searchMode === 'spans' ? t('traces.errorTraces') : t('traces.errorSpans')}`"
+          :label="`${formatLargeNumber(props.errorCount ?? 0)} ${props.searchMode === 'spans' ? t('traces.errorTraces') : t('traces.errorSpans')}`"
           class="text-caption tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-field-type-boolean-bg)]! tw:mr-[0.85rem]"
         />
         <q-space />
@@ -113,12 +113,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :enable-column-reorder="true"
           :enable-row-expand="false"
           :enable-text-highlight="false"
-          :enable-cell-actions="false"
           :enable-status-bar="false"
           :default-columns="false"
           @click:data-row="(row: any) => emit('row-click', row)"
           @sort-change="(by, order) => emit('sort-change', by, order)"
         >
+          <template #cell-actions="{ row, column, active }">
+            <CellActions
+              v-if="active"
+              :column="column"
+              :row="row"
+              :selected-stream-fields="
+                searchObj.data.stream.selectedStreamFields
+              "
+              :hide-search-term-actions="false"
+              @copy="copyToClipboard"
+              @send-to-ai-chat="sendToAiChat"
+            />
+          </template>
+
           <!-- Loading banner: shown above rows while a new page is fetching -->
           <template #loading-banner>
             <div
@@ -246,7 +259,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import TenstackTable from "@/components/TenstackTable.vue";
+import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import { useTracesTableColumns } from "../composables/useTracesTableColumns";
+import useTraces from "@/composables/useTraces";
 import TraceTimestampCell from "./TraceTimestampCell.vue";
 import TraceServiceCell from "./TraceServiceCell.vue";
 import TraceLatencyCell from "./TraceLatencyCell.vue";
@@ -309,7 +324,12 @@ const emit = defineEmits<{
   "page-change": [page: number];
   "rows-per-page-change": [rowsPerPage: number];
   "sort-change": [sortBy: string, sortOrder: "asc" | "desc"];
+  copy: [value: any];
+  "send-to-ai-chat": [value: string];
 }>();
+
+const copyToClipboard = (value: any) => emit("copy", value);
+const sendToAiChat = (value: string) => emit("send-to-ai-chat", value);
 
 const rowsPerPageOptions = [10, 25, 50, 100];
 
@@ -320,6 +340,11 @@ const hasLlmTraces = computed(() =>
 const searchModeRef = computed(() => props.searchMode ?? "traces");
 
 const tracesColumns = useTracesTableColumns(hasLlmTraces, searchModeRef);
+
+const { searchObj } = useTraces();
+const selectedStreamFields = computed(
+  () => searchObj.data.stream.selectedStreamFields,
+);
 
 const traceRowClass = (row: any) => {
   if (props.searchMode === "spans") {
