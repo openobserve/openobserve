@@ -20,7 +20,12 @@ const testLogger = require('../../utils/test-logger.js');
  * @param {object} pm - PageManager instance
  */
 export async function reopenPanelConfig(page, pm) {
-  await page.locator('[data-test="dashboard-panel-bar"]').first().hover();
+  // savePanel() doesn't wait for navigation — ensure we're back on the dashboard view page first
+  await page.waitForURL(url => !url.toString().includes('/add_panel'), { timeout: 30000 });
+  // Wait for at least one panel bar to be rendered before hovering
+  const panelBar = page.locator('[data-test="dashboard-panel-bar"]').first();
+  await panelBar.waitFor({ state: 'visible', timeout: 30000 });
+  await panelBar.hover();
   await page.locator('[data-test*="dashboard-edit-panel"][data-test$="-dropdown"]').first().click();
   await page.locator('[data-test="dashboard-edit-panel"]').click();
   // Wait for the add_panel page to fully load before interacting with the config sidebar
