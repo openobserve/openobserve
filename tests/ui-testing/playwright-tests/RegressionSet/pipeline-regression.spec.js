@@ -1,8 +1,8 @@
-import { test, expect } from "../baseFixtures.js";
-import logData from "../../fixtures/log.json";
-import PageManager from "../../pages/page-manager.js";
-import { LoginPage } from "../../pages/generalPages/loginPage.js";
+const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const logData = require("../../fixtures/log.json");
+const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe.configure({ mode: "serial" });
 
@@ -26,7 +26,6 @@ test.use({
  */
 test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@all', '@pipelines', '@pipelineRegression', '@regression', '@smoke', '@P0'] }, () => {
   let pageManager;
-  let loginPage;
   const METRICS_STREAM_NAME = "e2e_test_cpu_usage";
   const TRACES_SERVICE_NAME = "e2e_test_trace_service"; // Service name used for ingestion
   const TRACES_STREAM_NAME = "e2e_test_traces"; // Custom stream name via "stream-name" header
@@ -34,12 +33,8 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
 
-    // Login
-    loginPage = new LoginPage(page);
-    await loginPage.gotoLoginPage();
-    await loginPage.loginAsInternalUser();
-    await loginPage.login();
-
+    // Login via enhanced-baseFixtures (handles both cloud and self-hosted)
+    await navigateToBase(page);
     pageManager = new PageManager(page);
 
     // Ingest metrics data for testing using page object method
@@ -55,7 +50,7 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     await page.waitForTimeout(2000);
 
     await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`
     );
 
     testLogger.info('Test setup completed');

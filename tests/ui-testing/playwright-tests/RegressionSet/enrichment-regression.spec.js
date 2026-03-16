@@ -7,6 +7,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe("Enrichment Table Regression Bugs", () => {
   test.describe.configure({ mode: 'serial' });
@@ -28,7 +29,7 @@ test.describe("Enrichment Table Regression Bugs", () => {
     testLogger.info('Test: Enrichment table color contrast (Bug #9193)');
 
     // Navigate to Functions page (where enrichment tables are)
-    await page.goto(`${process.env["ZO_BASE_URL"]}/web/functions?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${process.env["ZO_BASE_URL"]}/web/functions?org_identifier=${getOrgIdentifier()}`);
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(2000);
 

@@ -3,6 +3,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
 const { ingestTestData, getHeaders, getIngestionUrl, sendRequest } = require('../utils/data-ingestion.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe("Logs Regression Bugs", () => {
   test.describe.configure({ mode: 'parallel' });
@@ -99,7 +100,7 @@ test.describe("Logs Regression Bugs", () => {
     ).catch(() => {}); // Streams may already be indexed
 
     // Navigate to logs page
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
     await page.waitForURL(/.*logs.*/, { timeout: 30000 });
 
     // ===== STREAM A SETUP =====
@@ -839,7 +840,7 @@ test.describe("Logs Regression Bugs", () => {
   test('should display logs with apostrophes without truncation @bug-9475 @P1 @regression', async ({ page }) => {
     testLogger.info('Test: Validate log display with apostrophes and special characters (Bug #9475)');
 
-    const orgId = process.env["ORGNAME"];
+    const orgId = getOrgIdentifier();
     const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
     const streamName = `e2e_apostrophe_${uniqueId}`;
 
@@ -1033,7 +1034,7 @@ test.describe("Logs Regression Bugs", () => {
 
     // Run initial query
     testLogger.info('Running initial query');
-    const orgName = process.env.ORGNAME || 'default';
+    const orgName = getOrgIdentifier();
 
     const initialResponse = page.waitForResponse(
       (response) => response.url().includes(`/api/${orgName}/_search`) && response.status() === 200,

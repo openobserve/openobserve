@@ -9,6 +9,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe("UI Regression Bugs", () => {
   test.describe.configure({ mode: 'parallel' });
@@ -33,7 +34,7 @@ test.describe("UI Regression Bugs", () => {
     testLogger.info('Test: Favicon verification (Bug #9217)');
 
     // Navigate to home page
-    const homeUrl = `/web/?org_identifier=${process.env["ORGNAME"]}`;
+    const homeUrl = `/web/?org_identifier=${getOrgIdentifier()}`;
     await page.goto(homeUrl);
     await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
 
@@ -145,7 +146,7 @@ test.describe("UI Regression Bugs", () => {
   test("should preserve org_identifier across navigations @bug-9565 @P1 @navigation @regression", async ({ page }) => {
     testLogger.info('Test: Verify org_identifier preserved (Bug #9565)');
 
-    const orgName = process.env["ORGNAME"] || 'default';
+    const orgName = getOrgIdentifier() || 'default';
 
     // Start with org_identifier in URL
     const logsUrl = `/web/logs?org_identifier=${orgName}`;

@@ -16,6 +16,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
 const { ingestTestData } = require('../utils/data-ingestion.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe("Logs Regression Bug Fixes", () => {
   // Changed from serial to parallel - tests are independent (each gets own page/PM in beforeEach)
@@ -89,7 +90,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     });
 
     // Navigate to logs page
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     const initialCallCount = searchApiCalls.length;
     testLogger.info(`Initial API calls: ${initialCallCount}`);
@@ -159,7 +160,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   test("should display search bar with required UI elements @bug-8928 @P1 @ui @regression", async ({ page }) => {
     testLogger.info('Test: Verify search bar UI consistency (Bug #8928)');
 
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.selectStream('e2e_automate');
     await pm.logsPage.clickRefreshButton();
@@ -185,7 +186,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   test("should render histogram without cropping @bug-8928 @P1 @ui @histogram @regression", async ({ page }) => {
     testLogger.info('Test: Verify histogram renders correctly (Bug #8928)');
 
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.selectStream('e2e_automate');
     await pm.logsPage.clickRefreshButton();
@@ -220,7 +221,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('Test: Verify quick mode query is preserved when selecting new interesting field');
 
     // Navigate to logs page
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Select stream
@@ -269,7 +270,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('Test: Verify pagination shows when histogram and SQL mode are disabled');
 
     // Navigate to logs page
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Select stream
@@ -313,7 +314,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('Test: Verify error message correctly identifies the problematic field');
 
     // Navigate to logs page
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Select stream
