@@ -311,15 +311,9 @@ export class SearchJobInspectorPage {
     const viewQueryBtn = this.page.locator(this.viewQueryBtnText);
     await expect(viewQueryBtn).toBeVisible({ timeout: 5000 });
     await viewQueryBtn.click();
-    // Wait for Quasar dialog to be visible - try multiple selectors
-    await Promise.race([
-      this.page.waitForSelector('.q-dialog__inner', { state: 'visible', timeout: 10000 }),
-      this.page.waitForSelector('.q-dialog', { state: 'visible', timeout: 10000 }),
-      this.page.waitForSelector('[data-test="inspector-sql-query-content"]', { state: 'visible', timeout: 10000 }),
-      this.page.waitForSelector('pre.sql-query', { state: 'visible', timeout: 10000 })
-    ]).catch(() => {});
-    // Wait a bit for content to render
-    await this.page.waitForTimeout(500);
+    // Wait for SQL content element to be visible (primary selector)
+    const sqlContent = this.page.locator('[data-test="inspector-sql-query-content"]');
+    await sqlContent.waitFor({ state: 'visible', timeout: 10000 });
   }
 
   /**
@@ -341,39 +335,16 @@ export class SearchJobInspectorPage {
    * @returns {Promise<string>}
    */
   async getSqlQueryContent() {
-    // Wait for the SQL dialog to be visible first - Quasar dialogs use q-dialog__inner
-    await this.page.waitForSelector('.q-dialog__inner', { state: 'visible', timeout: 10000 }).catch(() => {});
+    // Wait for the SQL content element using data-test attribute
+    const sqlLocator = this.page.locator('[data-test="inspector-sql-query-content"]');
+    await sqlLocator.waitFor({ state: 'visible', timeout: 10000 });
 
-    // Wait a bit for the content to render
-    await this.page.waitForTimeout(500);
-
-    // Primary selector using data-test attribute (most reliable)
-    const primaryLocator = this.page.locator('[data-test="inspector-sql-query-content"]');
-    if (await primaryLocator.isVisible({ timeout: 5000 }).catch(() => false)) {
-      const content = await primaryLocator.textContent() || '';
-      if (content && content !== 'No SQL query available') {
-        return content;
-      }
+    const content = await sqlLocator.textContent() || '';
+    // Return empty string if showing fallback message (no SQL data available)
+    if (content === 'No SQL query available') {
+      return '';
     }
-
-    // Fallback selectors for older versions
-    const sqlLocators = [
-      this.page.locator('pre.sql-query'),
-      this.page.locator('.sql-query-container pre'),
-      this.page.locator('.q-dialog__inner pre').first(),
-      this.page.locator('.q-dialog__inner code').first()
-    ];
-
-    for (const locator of sqlLocators) {
-      if (await locator.isVisible({ timeout: 3000 }).catch(() => false)) {
-        const content = await locator.textContent() || '';
-        // Skip if it's the fallback message
-        if (content && content !== 'No SQL query available') {
-          return content;
-        }
-      }
-    }
-    return '';
+    return content;
   }
 
   /**

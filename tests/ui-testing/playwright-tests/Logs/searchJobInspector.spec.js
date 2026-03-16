@@ -223,13 +223,9 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
     testLogger.info(`SQL content length: ${sqlContent.length}`);
     testLogger.info(`SQL preview: ${sqlContent.substring(0, 100)}`);
 
-    // SQL content should exist and contain SQL keywords (only if profile data is available)
-    if (sqlContent.length > 0) {
-      expect(sqlContent.toLowerCase()).toContain('select');
-    } else {
-      // If no SQL content, at least verify the dialog opened (check for fallback message)
-      testLogger.warn('No SQL content available - profile data may not include SQL query');
-    }
+    // SQL content should exist and contain SQL keywords
+    expect(sqlContent.length).toBeGreaterThan(0);
+    expect(sqlContent.toLowerCase()).toContain('select');
 
     // Close dialog
     await inspectorPage.closeSqlDialog();
