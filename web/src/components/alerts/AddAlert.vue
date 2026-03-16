@@ -38,30 +38,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-icon name="arrow_back_ios_new" size="14px" />
           </div>
           <div
-            class="text-h6 tw:flex tw:items-center"
+            class="tw:flex tw:flex-wrap tw:items-center tw:gap-2"
             data-test="add-alert-title"
           >
-            <template v-if="beingUpdated">
-              {{ t("alerts.updateTitle") }}:
+            <template v-if="anomalyEditMode">
+              <span class="text-h6">{{ t("alerts.updateAnomalyDetection") }}</span>
               <span
                 :class="[
-                  'text-subtitle2 tw:font-medium tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block tw:ml-2',
+                  'text-subtitle2 tw:font-medium tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block',
+                  store.state.theme === 'dark'
+                    ? 'tw:text-blue-400 tw:bg-blue-900/50'
+                    : 'tw:text-blue-600 tw:bg-blue-50',
+                ]"
+              >
+                {{ anomalyConfig.name }}
+                <q-tooltip v-if="anomalyConfig.name?.length > 25" class="tw:text-sm">{{ anomalyConfig.name }}</q-tooltip>
+              </span>
+              <q-badge
+                v-if="anomalyConfig.status"
+                :color="anomalyStatusColor"
+                :label="anomalyConfig.status"
+                class="text-caption"
+              />
+              <span
+                v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
+                class="text-caption"
+                :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+              >
+                Last run: {{ anomalyFormatTs(anomalyConfig.last_detection_run) }}
+              </span>
+              <q-btn
+                v-if="anomalyConfig.status === 'failed'"
+                flat
+                no-caps
+                dense
+                size="sm"
+                color="negative"
+                icon="replay"
+                label="Retry Training"
+                :loading="anomalyRetraining"
+                @click="anomalyTriggerRetrain"
+              />
+              <span
+                v-if="anomalyConfig.status === 'failed' && anomalyConfig.last_error"
+                class="text-caption text-negative tw:max-w-xs tw:truncate tw:inline-block tw:cursor-default"
+              >
+                {{ anomalyConfig.last_error }}
+                <q-tooltip class="tw:text-sm" max-width="400px">{{ anomalyConfig.last_error }}</q-tooltip>
+              </span>
+            </template>
+            <template v-else-if="beingUpdated">
+              <span class="text-h6">{{ t("alerts.updateTitle") }}:</span>
+              <span
+                :class="[
+                  'text-subtitle2 tw:font-medium tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block',
                   store.state.theme === 'dark'
                     ? 'tw:text-blue-400 tw:bg-blue-900/50'
                     : 'tw:text-blue-600 tw:bg-blue-50',
                 ]"
               >
                 {{ formData.name }}
-                <q-tooltip
-                  v-if="formData?.name?.length > 25"
-                  class="tw:text-sm"
-                >
-                  {{ formData.name }}
-                </q-tooltip>
+                <q-tooltip v-if="formData?.name?.length > 25" class="tw:text-sm">{{ formData.name }}</q-tooltip>
               </span>
             </template>
             <template v-else>
-              {{ t("alerts.addTitle") }}
+              <span class="text-h6">{{ t("alerts.addTitle") }}</span>
             </template>
           </div>
         </div>
@@ -996,6 +1037,43 @@ export default defineComponent({
     const anomalyStep2Ref = ref<any>(null);
     const showAnomalySummary = ref(true);
     const anomalyEditMode = ref(false);
+    const anomalyRetraining = ref(false);
+
+    const anomalyStatusColor = computed(() => {
+      switch (anomalyConfig.value.status) {
+        case "active":
+          return "positive";
+        case "training":
+          return "info";
+        case "failed":
+          return "negative";
+        default:
+          return "grey";
+      }
+    });
+
+    const anomalyFormatTs = (ts: number) => {
+      const d = new Date(ts / 1000);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+
+    const anomalyTriggerRetrain = async () => {
+      const anomalyId = router.currentRoute.value.params.anomaly_id as string | undefined;
+      if (!anomalyId) return;
+      anomalyRetraining.value = true;
+      try {
+        await anomalyDetectionService.triggerTraining(
+          store.state.selectedOrganization.identifier,
+          anomalyId,
+        );
+        q.notify({ type: "positive", message: "Training triggered." });
+      } catch {
+        q.notify({ type: "negative", message: "Failed to trigger training." });
+      } finally {
+        anomalyRetraining.value = false;
+      }
+    };
 
     const isAnomalyMode = computed(
       () => formData.value.is_real_time === "anomaly",
@@ -3041,6 +3119,10 @@ export default defineComponent({
       saveAnomalyDetection,
       anomalySaving,
       anomalyEditMode,
+      anomalyRetraining,
+      anomalyStatusColor,
+      anomalyFormatTs,
+      anomalyTriggerRetrain,
     };
   },
 
