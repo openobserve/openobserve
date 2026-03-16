@@ -24,6 +24,15 @@ export default class DashboardDrilldownPage {
     this.drilldownMenuFirstItem = page.locator('.crosslink-drilldown-menu-item').first();
   }
 
+  generateUniqueDrilldownName(prefix = "u") {
+    return `${prefix}_${Date.now()}`;
+  }
+
+  // Backward-compatible alias for dashboard.spec.js (old signature: folderName, drilldownName, dashboardName, tabName)
+  async addDrilldownDashboard(folderName, drilldownName, dashboardName, tabName) {
+    return this.addDrilldownByDashboard(drilldownName, folderName, dashboardName, tabName);
+  }
+
   /**
    * Scroll the drilldown Add button into view inside the config sidebar,
    * then open the popup and fill the drilldown name.
