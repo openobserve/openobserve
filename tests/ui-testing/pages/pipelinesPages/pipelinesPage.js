@@ -918,11 +918,15 @@ export class PipelinesPage {
 
         const baseUrl = (process.env.INGESTION_URL || '').replace(/\/$/, '');
         const url = `${baseUrl}/api/${orgId}/${streamName}/_json`;
-        await fetch(url, {
+        const fetchResponse = await fetch(url, {
             method: 'POST',
             headers: headers,
             body: JSON.stringify(require('../../../test-data/logs_data.json'))
         });
+        if (!fetchResponse.ok) {
+            throw new Error(`Ingestion failed for stream ${streamName}: ${fetchResponse.status} ${fetchResponse.statusText}`);
+        }
+        testLogger.info('Stream ingestion response', { streamName, status: fetchResponse.status });
         await this.page.waitForTimeout(2000);
 
         // Navigate and explore
@@ -1485,18 +1489,17 @@ export class PipelinesPage {
         const baseUrl = (process.env.INGESTION_URL || '').replace(/\/$/, '');
 
         for (const streamName of streamNames) {
-            try {
-                const url = `${baseUrl}/api/${orgId}/${streamName}/_json`;
-                const fetchResponse = await fetch(url, {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify(data)
-                });
-                const response = await fetchResponse.json();
-                testLogger.debug('Bulk ingestion response', { streamName, response });
-            } catch (e) {
-                testLogger.warn(`Bulk ingestion failed for stream ${streamName}`, { error: e.message });
+            const url = `${baseUrl}/api/${orgId}/${streamName}/_json`;
+            const fetchResponse = await fetch(url, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(data)
+            });
+            if (!fetchResponse.ok) {
+                throw new Error(`Bulk ingestion failed for stream ${streamName}: ${fetchResponse.status} ${fetchResponse.statusText}`);
             }
+            const response = await fetchResponse.json();
+            testLogger.debug('Bulk ingestion response', { streamName, response });
         }
     }
 
@@ -1535,6 +1538,9 @@ export class PipelinesPage {
             headers: headers,
             body: JSON.stringify(metricsData)
         });
+        if (!fetchResponse.ok) {
+            throw new Error(`Metrics ingestion failed for ${streamName}: ${fetchResponse.status} ${fetchResponse.statusText}`);
+        }
         const response = {
             status: fetchResponse.status,
             data: await fetchResponse.json()
@@ -1644,6 +1650,9 @@ export class PipelinesPage {
             headers: requestHeaders,
             body: JSON.stringify(tracesData)
         });
+        if (!fetchResponse.ok) {
+            throw new Error(`Traces ingestion failed for ${serviceName}: ${fetchResponse.status} ${fetchResponse.statusText}`);
+        }
         const response = {
             status: fetchResponse.status,
             data: await fetchResponse.json().catch(() => ({}))
