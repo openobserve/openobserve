@@ -118,7 +118,9 @@ async function navigateToBase(page) {
   const baseUrlWithOrg = `${process.env["ZO_BASE_URL"]}?org_identifier=${process.env["ORGNAME"]}`;
   testLogger.info('Navigating to base URL with org identifier', { url: baseUrlWithOrg });
 
-  await page.goto(baseUrlWithOrg);
+  // Cloud with parallel workers needs a longer navigation timeout than the default 30s
+  const navTimeout = isCloudEnvironment() ? 60000 : undefined;
+  await page.goto(baseUrlWithOrg, navTimeout ? { timeout: navTimeout } : undefined);
   await page.waitForLoadState('domcontentloaded');
   // Cloud needs full hydration before sidebar clicks — without this, clicks trigger Dex redirect
   if (isCloudEnvironment()) {

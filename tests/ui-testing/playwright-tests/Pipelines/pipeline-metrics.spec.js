@@ -120,7 +120,7 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     // Click add pipeline button - routes to pipeline editor
     await pageManager.pipelinesPage.addPipeline();
     await page.waitForTimeout(1500);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle').catch(() => {});
 
     // Click on the Stream button and drag it to the canvas to open the stream form dialog
     await pageManager.pipelinesPage.selectStream();
