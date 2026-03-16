@@ -1700,13 +1700,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.valueTransformations = v;
         }
       "
-      :label="t('dashboard.configSectionValueTransformations')"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
       expand-icon="chevron_right"
       expanded-icon="keyboard_arrow_down"
       expand-icon-class="text-grey-6"
     >
+      <template #header>
+        <div style="display: flex; align-items: center; flex: 1; min-width: 0">
+          {{ t("dashboard.configSectionValueTransformations") }}
+          <q-btn
+            no-caps
+            padding="xs"
+            size="sm"
+            flat
+            icon="info_outline"
+            @click.stop
+          >
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="bottom middle"
+              self="top middle"
+              max-width="250px"
+            >
+              Enhance table readability by mapping values to custom text and
+              background colors for clearer data visualization.
+            </q-tooltip>
+          </q-btn>
+        </div>
+      </template>
       <div class="config-section-body">
         <ValueMapping />
       </div>
@@ -1722,13 +1744,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.fieldOverrides = v;
         }
       "
-      :label="t('dashboard.configSectionFieldOverrides')"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
       expand-icon="chevron_right"
       expanded-icon="keyboard_arrow_down"
       expand-icon-class="text-grey-6"
     >
+      <template #header>
+        <div style="display: flex; align-items: center; flex: 1; min-width: 0">
+          {{ t("dashboard.configSectionFieldOverrides") }}
+          <q-btn
+            no-caps
+            padding="xs"
+            size="sm"
+            flat
+            icon="info_outline"
+            @click.stop
+          >
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="bottom middle"
+              self="top middle"
+              max-width="250px"
+            >
+              Map units to the selected columns for enhanced data visualization.
+            </q-tooltip>
+          </q-btn>
+        </div>
+      </template>
       <div class="config-section-body hide-child-title">
         <OverrideConfig
           :dashboardPanelData="dashboardPanelData"
@@ -2332,6 +2375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             icon="info_outline"
             data-test="dashboard-addpanel-config-drilldown-info"
+            @click.stop
           >
             <q-tooltip
               class="bg-grey-8"
@@ -2381,6 +2425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             icon="info_outline"
             data-test="dashboard-addpanel-config-time-shift-info"
+            @click.stop
           >
             <q-tooltip
               anchor="bottom middle"
@@ -2460,6 +2505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             icon="info_outline"
             data-test="dashboard-addpanel-config-markline-info"
+            @click.stop
           >
             <q-tooltip
               class="bg-grey-8"
