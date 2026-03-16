@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+∩╗┐<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -44,19 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="toggleAllSections"
         >
         </q-btn>
-        <q-input
-          v-model="searchQuery"
-          dense
-          borderless
-          placeholder="Search config..."
-          class="col"
-          clearable
-          autofocus
-        >
-          <template #prepend>
-            <q-icon name="search" size="xs" class="q-ml-xs text-grey-6" />
-          </template>
-        </q-input>
+        <ConfigPanelSearch v-model="searchQuery" />
       </div>
     </div>
 
@@ -2527,6 +2515,13 @@ import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
 import BackGroundColorConfig from "./BackGroundColorConfig.vue";
 import OverrideConfig from "./OverrideConfig.vue";
+import ConfigPanelSearch from "./ConfigPanelSearch.vue";
+import { useConfigPanelSearch } from "../../../composables/dashboard/useConfigPanelSearch";
+import { useConfigOptions } from "../../../composables/dashboard/useConfigOptions";
+import {
+  ORDERED_SECTION_IDS,
+  SectionId,
+} from "../../../utils/dashboard/searchLabelsConfig";
 import LinearIcon from "@/components/icons/dashboards/LinearIcon.vue";
 import NoSymbol from "@/components/icons/dashboards/NoSymbol.vue";
 import Smooth from "@/components/icons/dashboards/Smooth.vue";
@@ -2564,6 +2559,7 @@ import {
 
 export default defineComponent({
   components: {
+    ConfigPanelSearch,
     Drilldown,
     ValueMapping,
     ColorBySeries,
@@ -3273,6 +3269,7 @@ export default defineComponent({
     // initialize pivot config values (undefined → false/0 defaults).
     // Without this, q-toggle shows undefined as OFF but conversion
     // may treat undefined differently — causing a mismatch.
+    
     watch(
       () => isPivotMode.value,
       (active) => {
@@ -3308,7 +3305,46 @@ export default defineComponent({
       { immediate: true },
     );
 
-    // Cancel (remove set time via X icon) → back to "+Set" button
+    // When pivot mode activates: disable conflicting features and
+    // initialize pivot config values (undefined → false/0 defaults).
+    // Without this, q-toggle shows undefined as OFF but conversion
+    // may treat undefined differently — causing a mismatch.
+    watch(
+      () => isPivotMode.value,
+      (active) => {
+        if (active) {
+          dashboardPanelData.data.config.table_transpose = false;
+          dashboardPanelData.data.config.table_dynamic_columns = false;
+          if (
+            dashboardPanelData.data.config.table_pivot_show_row_totals ===
+            undefined
+          ) {
+            dashboardPanelData.data.config.table_pivot_show_row_totals = false;
+          }
+          if (
+            dashboardPanelData.data.config.table_pivot_show_col_totals ===
+            undefined
+          ) {
+            dashboardPanelData.data.config.table_pivot_show_col_totals = false;
+          }
+          if (
+            dashboardPanelData.data.config.table_pivot_sticky_row_totals ===
+            undefined
+          ) {
+            dashboardPanelData.data.config.table_pivot_sticky_row_totals = false;
+          }
+          if (
+            dashboardPanelData.data.config.table_pivot_sticky_col_totals ===
+            undefined
+          ) {
+            dashboardPanelData.data.config.table_pivot_sticky_col_totals = false;
+          }
+        }
+      },
+      { immediate: true },
+    );
+
+    // Cancel (remove set time via X icon) ├óΓÇáΓÇÖ back to "+Set" button
     const onCancelPanelTime = () => {
       dashboardPanelData.data.config.panel_time_range = null;
       panelTimeRange.value = null;
@@ -3320,396 +3356,37 @@ export default defineComponent({
         relativeTimePeriod: "15m",
       };
     };
-    //Section + option metadata for label-driven
-    type SectionId =
-      | "general"
-      | "geographic"
-      | "legend"
-      | "data"
-      | "axis"
-      | "labels"
-      | "lineStyle"
-      | "table"
-      | "valueTransformations"
-      | "fieldOverrides"
-      | "map"
-      | "gauge"
-      | "layout"
-      | "colors"
-      | "drilldown"
-      | "comparison"
-      | "markLines"
-      | "background";
 
-    const configOptions = computed(() => ({
-      general: {
-        description: { label: t("dashboard.description") },
-        step: {
-          label: t("dashboard.stepValue"),
-          visible: !!promqlMode.value,
-        },
-        "panel-default-time": { label: t("dashboard.panelTimeEnabled") },
-        "promql-chart-config": {
-          label: t("dashboard.promqlChartConfig"),
-          visible:
-            !!promqlMode.value &&
-            dashboardPanelData.data.type !== "geomap" &&
-            dashboardPanelData.data.type !== "maps",
-        },
-      },
-      geographic: {
-        "geographic-config": {
-          label: t("dashboard.geographicConfig"),
-          visible:
-            !!promqlMode.value &&
-            (dashboardPanelData.data.type === "geomap" ||
-              dashboardPanelData.data.type === "maps"),
-        },
-      },
-      legend: {
-        "show-legends": {
-          label: t("dashboard.showLegendsLabel"),
-          visible: shouldShowLegendsToggle(dashboardPanelData),
-        },
-        "legend-position": {
-          label: t("dashboard.legendsPositionLabel"),
-          visible: shouldShowLegendPosition(dashboardPanelData),
-        },
-        "legend-type": {
-          label: t("dashboard.legendsType"),
-          visible: shouldShowLegendType(dashboardPanelData),
-        },
-        "legend-size": {
-          label: [t("common.legendWidth"), t("dashboard.legendHeight")],
-          visible:
-            shouldShowLegendWidth(dashboardPanelData) ||
-            shouldShowLegendHeight(dashboardPanelData),
-        },
-        "chart-align": {
-          label: t("dashboard.chartAlign"),
-          visible: shouldApplyChartAlign(dashboardPanelData),
-        },
-        "promql-legend": {
-          label: t("dashboard.query"),
-          visible:
-            !!promqlMode.value &&
-            dashboardPanelData.data.type !== "geomap" &&
-            dashboardPanelData.data.type !== "maps",
-        },
-        "promql-legend-label": {
-          label: [t("dashboard.legendLabel"), t("common.legend")],
-          visible:
-            !!promqlMode.value &&
-            dashboardPanelData.data.type !== "geomap" &&
-            dashboardPanelData.data.type !== "maps",
-        },
-      },
-      data: {
-        unit: {
-          label: t("dashboard.unitLabel"),
-        },
-        "custom-unit": {
-          label: t("dashboard.customunitLabel"),
-          visible: dashboardPanelData.data.config.unit === "custom",
-        },
-        decimals: {
-          label: t("dashboard.decimals"),
-        },
-        limit: {
-          label: t("dashboard.queryLimit"),
-          visible:
-            !promqlMode.value &&
-            !dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ]?.customQuery,
-        },
-        "top-results": {
-          label: t("dashboard.showTopNValues"),
-          visible: shouldShowTopResultsConfig(
-            dashboardPanelData,
-            promqlMode.value,
-          ),
-        },
-        "top-results-others": {
-          label: t("dashboard.addOthersSeries"),
-          visible: shouldShowTopResultsConfig(
-            dashboardPanelData,
-            promqlMode.value,
-          ),
-        },
-        "connect-nulls": {
-          label: t("dashboard.connectNullValues"),
-          visible: shouldShowAreaLineStyleConfig(dashboardPanelData),
-        },
-        "no-value-replacement": {
-          label: t("dashboard.noValueReplacement"),
-          visible: shouldShowNoValueReplacement(
-            dashboardPanelData,
-            promqlMode.value,
-          ),
-        },
-      },
-      axis: {
-        "axis-width": {
-          label: t("common.axisWidth"),
-          visible: shouldShowAxisConfig(dashboardPanelData),
-        },
-        "axis-border": {
-          label: t("dashboard.showBorder"),
-          visible: shouldShowAxisConfig(dashboardPanelData),
-        },
-        "y-axis": {
-          label: [t("common.yAxisMin"), t("common.yAxisMax")],
-          visible: shouldShowCartesianAxisConfig(dashboardPanelData),
-        },
-        gridlines: {
-          label: t("dashboard.showGridlines"),
-          visible: shouldShowGridlines(dashboardPanelData),
-        },
-      },
-      labels: {
-        "label-position": {
-          label: t("dashboard.labelPosition"),
-          visible: shouldShowCartesianAxisConfig(dashboardPanelData),
-        },
-        "label-rotate": {
-          label: t("dashboard.labelRotate"),
-          visible: shouldShowCartesianAxisConfig(dashboardPanelData),
-        },
-        "axis-label": {
-          label: [t("dashboard.labelRotate"), t("dashboard.labelTruncate")],
-          visible: shouldShowAxisLabelConfig(dashboardPanelData),
-        },
-      },
-      lineStyle: {
-        symbol: {
-          label: t("dashboard.showSymbol"),
-          visible: shouldShowAreaLineStyleConfig(dashboardPanelData),
-        },
-        interpolation: {
-          label: t("dashboard.lineInterpolation"),
-          visible: shouldShowAreaLineStyleConfig(dashboardPanelData),
-        },
-        "line-thickness": {
-          label: t("dashboard.lineThickness"),
-          visible: shouldShowLineThickness(
-            dashboardPanelData,
-            promqlMode.value,
-          ),
-        },
-      },
-      table: {
-        wrap: {
-          label: t("dashboard.wraptext"),
-        },
-        transpose: {
-          label: t("dashboard.tableTranspose"),
-          visible: !promqlMode.value,
-        },
-        "dynamic-columns": {
-          label: t("dashboard.tableDynamicColumns"),
-          visible: !promqlMode.value,
-        },
-        pagination: {
-          label: t("dashboard.pagination"),
-        },
-        "rows-per-page": {
-          label: t("dashboard.rowsPerPage"),
-          visible: !!dashboardPanelData.data.config.table_pagination,
-        },
-      },
-      valueTransformations: {
-        "value-transformations": {
-          label: t("dashboard.valueTransformations"),
-        },
-      },
-      fieldOverrides: {
-        "field-overrides": {
-          label: t("dashboard.fieldOverrides"),
-        },
-      },
-      map: {
-        "map-config": {
-          label: t("dashboard.map"),
-          visible:
-            dashboardPanelData.data.type === "geomap" ||
-            dashboardPanelData.data.type === "maps",
-        },
-      },
-      gauge: {
-        "gauge-min": {
-          label: t("dashboard.gaugeMinimum"),
-          visible: dashboardPanelData.data.type === "gauge",
-        },
-        "gauge-max": {
-          label: t("dashboard.gaugeMaximum"),
-          visible: dashboardPanelData.data.type === "gauge",
-        },
-      },
-      layout: {
-        "trellis-layout": {
-          label: t("dashboard.trellisLayout"),
-          visible: showTrellisConfig.value,
-        },
-        "trellis-columns": {
-          label: t("dashboard.trellisColumns"),
-          visible:
-            showTrellisConfig.value &&
-            dashboardPanelData.data.config.trellis?.layout === "custom",
-        },
-        "trellis-group-by": {
-          label: t("dashboard.trellisGroupBy"),
-          visible:
-            showTrellisConfig.value &&
-            dashboardPanelData.data.config.trellis?.layout != null,
-        },
-      },
-      colors: {
-        colors: {
-          label: t("dashboard.colors"),
-          visible: showColorPalette.value,
-        },
-      },
-      drilldown: {
-        drilldown: {
-          label: t("dashboard.drilldown"),
-          visible: shouldShowDrilldown(
-            dashboardPanelData,
-            dashboardPanelDataPageKey,
-          ),
-        },
-      },
-      comparison: {
-        comparison: {
-          label: t("dashboard.comparisonAgainst"),
-          visible: shouldShowTimeShift(
-            dashboardPanelData,
-            promqlMode.value,
-            dashboardPanelDataPageKey,
-          ),
-        },
-      },
-      markLines: {
-        "mark-lines": {
-          label: t("dashboard.markLines"),
-          visible: shouldShowCartesianAxisConfig(dashboardPanelData),
-        },
-      },
-      background: {
-        background: {
-          label: t("dashboard.background"),
-          visible: dashboardPanelData.data.type === "metric",
-        },
-      },
-    }));
-
-    const orderedSectionIds: SectionId[] = [
-      "general",
-      "geographic",
-      "legend",
-      "data",
-      "axis",
-      "labels",
-      "lineStyle",
-      "table",
-      "valueTransformations",
-      "fieldOverrides",
-      "map",
-      "gauge",
-      "layout",
-      "colors",
-      "drilldown",
-      "comparison",
-      "markLines",
-      "background",
-    ];
-
-    // Search and section expansion state
-    const searchQuery = ref("");
-    const expandedSections = ref<Record<string, boolean>>({
-      general: true,
-      geographic: true,
-      legend: true,
-      data: true,
-      axis: true,
-      labels: true,
-      lineStyle: true,
-      table: true,
-      valueTransformations: true,
-      fieldOverrides: true,
-      map: true,
-      gauge: true,
-      layout: true,
-      colors: true,
-      drilldown: true,
-      comparison: true,
-      markLines: true,
-      background: true,
-    });
-
-    // Simple substring match: query can match anywhere in the label (partial/middle-of-string)
-    const matchesSearch = (label: string, query: string): boolean => {
-      return label.toLowerCase().includes(query.toLowerCase());
-    };
-
-    const normalizedSearchQuery = computed(() =>
-      (searchQuery.value ?? "").trim().toLowerCase(),
+    const { configOptions } = useConfigOptions(
+      dashboardPanelData,
+      promqlMode,
+      dashboardPanelDataPageKey,
+      showTrellisConfig,
+      showColorPalette,
     );
 
+    const {
+      searchQuery,
+      expandedSections,
+      normalizedSearchQuery,
+      isConfigOptionVisible: composableIsConfigOptionVisible,
+      isSectionVisible: composableIsSectionVisible,
+      isExpanded,
+      toggleSection,
+      resetSearch,
+    } = useConfigPanelSearch();
+
     const isConfigOptionVisible = (sectionId: SectionId, optionId: string) => {
-      const option = configOptions.value[sectionId]?.[optionId] as any;
-
-      // 1. Check visibility
-      if (!option || (option.visible !== undefined && option.visible === false))
-        return false;
-
-      // 2. Check search query
-      const q = normalizedSearchQuery.value;
-      if (!q) return true;
-
-      const labels = Array.isArray(option.label)
-        ? option.label
-        : [option.label];
-
-      return labels.some((l: string) => matchesSearch(l, q));
-    };
-
-    const isSectionVisible = (sectionId: SectionId) => {
-      const sectionOptions = configOptions.value[sectionId];
-      if (!sectionOptions) return false;
-
-      // Check if any option in this section is visible
-      return Object.keys(sectionOptions).some((optionId) =>
-        isConfigOptionVisible(sectionId, optionId),
+      return composableIsConfigOptionVisible(
+        configOptions.value as any,
+        sectionId,
+        optionId,
       );
     };
 
-    const isExpanded = (key: string) => {
-      return expandedSections.value[key] ?? true;
+    const isSectionVisible = (sectionId: SectionId) => {
+      return composableIsSectionVisible(configOptions.value as any, sectionId);
     };
-
-    // Save/restore expansion state around search sessions
-    const beforeSearchExpandedSections = ref<Record<string, boolean> | null>(
-      null,
-    );
-    watch(searchQuery, (newQ, oldQ) => {
-      if (newQ && !oldQ) {
-        // Search just started — save state and expand all sections
-        beforeSearchExpandedSections.value = { ...expandedSections.value };
-        Object.keys(expandedSections.value).forEach((key) => {
-          expandedSections.value[key] = true;
-        });
-      } else if (!newQ && oldQ) {
-        // Search cleared — restore previous state
-        if (beforeSearchExpandedSections.value) {
-          expandedSections.value = { ...beforeSearchExpandedSections.value };
-          beforeSearchExpandedSections.value = null;
-        }
-      }
-    });
-
-    // Section visibility and empty-state computation are now fully driven by
-    // the option labels and their runtime visibility predicates.
 
     // Global expand / collapse toggle
     const allSectionsExpanded = computed(() =>
@@ -3723,19 +3400,17 @@ export default defineComponent({
       });
     };
 
-    // anySectionVisible – drives the "No results" empty state
+    // anySectionVisible - drives the "No results" empty state
     const anySectionVisible = computed(() => {
       const q = normalizedSearchQuery.value;
       if (!q) {
-        // When not searching, any enabled section with at least one renderable
-        // option counts as "visible".
-        return orderedSectionIds.some((sectionId) =>
+        return ORDERED_SECTION_IDS.some((sectionId) =>
           isSectionVisible(sectionId),
         );
       }
-      // When searching, only sections that actually have matching, renderable
-      // options should be considered visible.
-      return orderedSectionIds.some((sectionId) => isSectionVisible(sectionId));
+      return ORDERED_SECTION_IDS.some((sectionId) =>
+        isSectionVisible(sectionId),
+      );
     });
 
     // Clear legend width when switching away from plain type or when position is not right
