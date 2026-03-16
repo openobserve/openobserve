@@ -27,6 +27,7 @@ import Error404 from "@/views/Error404.vue";
 import ShortUrl from "@/views/ShortUrl.vue";
 
 const Search = () => import("@/plugins/logs/Index.vue");
+const SearchJobInspector = () => import("@/plugins/logs/SearchJobInspector.vue");
 const AppMetrics = () => import("@/plugins/metrics/Index.vue");
 const AppTraces = () => import("@/plugins/traces/Index.vue");
 const PromQLQueryBuilder = () => import("@/views/PromQL/QueryBuilder.vue");
@@ -122,6 +123,18 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         title: "Logs",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "logs/inspector",
+      name: "searchJobInspector",
+      component: SearchJobInspector,
+      meta: {
+        keepAlive: false,
+        title: "Search Job Inspector",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

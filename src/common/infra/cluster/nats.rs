@@ -55,7 +55,13 @@ pub(crate) async fn register_and_keep_alive() -> Result<()> {
         // after the node is online, keep alive
         let ttl_keep_alive = std::cmp::max(1, (get_config().limit.node_heartbeat_ttl / 4) as u64);
         loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
+            // add small random jitter (0..500ms) so nodes don't all fire set_status
+            // at the same time, which causes oscillating duplicate node IDs
+            let jitter_ms = config::utils::rand::get_rand_num_within(0, 500);
+            tokio::time::sleep(tokio::time::Duration::from_millis(
+                ttl_keep_alive * 1000 + jitter_ms,
+            ))
+            .await;
             loop {
                 if is_offline() {
                     break;
@@ -180,6 +186,9 @@ async fn register() -> Result<()> {
         dist_lock::unlock(&locker).await?;
         return Err(Error::Message(format!("register node error: {e}")));
     }
+
+    // 6.1 sleep for a while to wait for the node to be registered
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
     // 7. register ok, release lock
     dist_lock::unlock(&locker).await.map_err(|e| {

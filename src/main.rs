@@ -29,13 +29,11 @@ use config::{
     meta::triggers::{Trigger, TriggerModule, TriggerStatus},
     utils::size::bytes_to_human_readable,
 };
-use log::LevelFilter;
 use openobserve::{
     cli::basic::cli,
     common::{
         infra::{self as common_infra, cluster},
         meta,
-        utils::zo_logger,
     },
     handler::{
         grpc::{
@@ -174,14 +172,6 @@ async fn main() -> Result<(), anyhow::Error> {
     let enable_tokio_console = false;
     let mut tracer_provider = None;
     let _guard: Option<WorkerGuard> = if enable_tokio_console {
-        None
-    } else if cfg.log.events_enabled {
-        let logger = zo_logger::ZoLogger {
-            sender: zo_logger::EVENT_SENDER.clone(),
-        };
-        log::set_boxed_logger(Box::new(logger)).map(|()| {
-            log::set_max_level(LevelFilter::from_str(&cfg.log.level).unwrap_or(LevelFilter::Info))
-        })?;
         None
     } else if cfg.common.should_create_span() {
         log::info!("OpenTelemetry tracing enabled - initializing tracer provider");
@@ -388,9 +378,6 @@ async fn main() -> Result<(), anyhow::Error> {
         .await
         .expect("Deferred jobs failed to init");
 
-    if cfg.log.events_enabled {
-        tokio::task::spawn(zo_logger::send_logs());
-    }
     if cfg.common.telemetry_enabled {
         tokio::task::spawn(async move {
             meta::telemetry::Telemetry::new()

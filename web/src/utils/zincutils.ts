@@ -537,6 +537,8 @@ export const convertTimeFromMicroToMilli = (time: number) => {
 };
 
 export const formatLargeNumber = (number: number) => {
+  if (number === undefined || number === null) return "";
+
   if (number >= 1000000000) {
     return (number / 1000000000).toFixed(1) + "B";
   } else if (number >= 1000000) {
