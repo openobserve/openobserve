@@ -16,44 +16,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="full-width q-mx-lg q-pt-xs">
-    <div class="row items-center no-wrap card-container tw:mx-[0.625rem]  tw:mb-[0.625rem]">
-      <div class="flex items-center justify-between tw:w-full card-container tw:h-[68px] tw:px-2 tw:py-3">
+    <div
+      class="row items-center no-wrap card-container tw:mx-[0.625rem] tw:mb-[0.625rem]"
+    >
+      <div
+        class="flex items-center justify-between tw:w-full card-container tw:h-[68px] tw:px-2 tw:py-3"
+      >
         <div class="flex items-center">
           <div
-          data-test="add-alert-back-btn"
-          class="flex justify-center items-center q-mr-md cursor-pointer"
-          style="
-            border: 1.5px solid;
-            border-radius: 50%;
-            width: 22px;
-            height: 22px; 
-          "
-          title="Go Back"
-          @click="router.back()"
-        >
-          <q-icon name="arrow_back_ios_new" size="14px" />
-        </div>
-        <div class="text-h6 tw:flex tw:items-center" data-test="add-alert-title">
-          <template v-if="beingUpdated">
-            {{ t("alerts.updateTitle") }}:
-            <span
-              :class="[
-                'text-subtitle2 tw:font-medium tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block tw:ml-2',
-                store.state.theme === 'dark'
-                  ? 'tw:text-blue-400 tw:bg-blue-900/50'
-                  : 'tw:text-blue-600 tw:bg-blue-50'
-              ]"
-            >
-              {{ formData.name }}
-              <q-tooltip v-if="formData?.name?.length > 25" class="tw:text-sm">
+            data-test="add-alert-back-btn"
+            class="flex justify-center items-center q-mr-md cursor-pointer"
+            style="
+              border: 1.5px solid;
+              border-radius: 50%;
+              width: 22px;
+              height: 22px;
+            "
+            title="Go Back"
+            @click="router.back()"
+          >
+            <q-icon name="arrow_back_ios_new" size="14px" />
+          </div>
+          <div
+            class="text-h6 tw:flex tw:items-center"
+            data-test="add-alert-title"
+          >
+            <template v-if="beingUpdated">
+              {{ t("alerts.updateTitle") }}:
+              <span
+                :class="[
+                  'text-subtitle2 tw:font-medium tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block tw:ml-2',
+                  store.state.theme === 'dark'
+                    ? 'tw:text-blue-400 tw:bg-blue-900/50'
+                    : 'tw:text-blue-600 tw:bg-blue-50',
+                ]"
+              >
                 {{ formData.name }}
-              </q-tooltip>
-            </span>
-          </template>
-          <template v-else>
-            {{ t("alerts.addTitle") }}
-          </template>
-        </div>
+                <q-tooltip
+                  v-if="formData?.name?.length > 25"
+                  class="tw:text-sm"
+                >
+                  {{ formData.name }}
+                </q-tooltip>
+              </span>
+            </template>
+            <template v-else>
+              {{ t("alerts.addTitle") }}
+            </template>
+          </div>
         </div>
         <div class="flex items-center tw:gap-2">
           <q-btn
@@ -64,9 +74,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon="code"
             data-test="pipeline-json-edit-btn"
             @click="openJsonEditor"
-            >
-        <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
-        </q-btn>
+          >
+            <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
+          </q-btn>
         </div>
       </div>
     </div>
@@ -80,279 +90,581 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         scroll-behavior: smooth;
       "
     >
-      <div class="card-container tw:px-2 tw:mx-[0.675rem] tw:py-2" style="position: relative;">
+      <div
+        class="card-container tw:px-2 tw:mx-[0.675rem] tw:py-2"
+        style="position: relative"
+      >
         <!-- Stepper Header (Full Width) -->
-        <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
-        <q-stepper
-          v-model="wizardStep"
-          ref="wizardStepper"
-          color="primary"
-          flat
-          class="alert-wizard-stepper"
-          header-nav
-          keep-alive
-        >
-        <!-- Persistent Step Caption (Between Header and Content) -->
-        <template v-slot:message>
-          <div
-            v-if="currentStepCaption"
-            class="persistent-step-caption tw:px-3 tw:py-1 tw:mb-1 tw:mt-2"
-            :class="store.state.theme === 'dark' ? 'dark-mode-caption' : 'light-mode-caption'"
+        <q-form class="add-alert-form" ref="addAlertForm"
+@submit="onSubmit">
+          <q-stepper
+            v-model="wizardStep"
+            ref="wizardStepper"
+            color="primary"
+            flat
+            class="alert-wizard-stepper"
+            header-nav
+            keep-alive
           >
-            {{ currentStepCaption }}
-          </div>
-        </template>
+            <!-- Persistent Step Caption (Between Header and Content) -->
+            <template v-slot:message>
+              <div
+                v-if="currentStepCaption"
+                class="persistent-step-caption tw:px-3 tw:py-1 tw:mb-1 tw:mt-2"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'dark-mode-caption'
+                    : 'light-mode-caption'
+                "
+              >
+                {{ currentStepCaption }}
+              </div>
+            </template>
 
-        <!-- Step 1: Alert Setup -->
-        <q-step
-          :name="1"
-          :title="t('alerts.steps.alertSetup') + ' *'"
-          caption=""
-          icon="settings"
-          :done="wizardStep > 1"
-          :disable="1 > lastValidStep"
-        >
-          <!-- Wrapper with flex container -->
-          <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px);">
-            <!-- Left Column Only: Step Content (60%) -->
-            <div style="flex: 0 0 62%; display: flex; flex-direction: column; overflow: hidden;">
-              <div style="flex: 1; overflow: auto;">
-                <AlertSetup
-                  ref="step1Ref"
-                  :formData="formData"
-                  :beingUpdated="beingUpdated"
-                  :streamTypes="streamTypes"
-                  :filteredStreams="filteredStreams"
-                  :isFetchingStreams="isFetchingStreams"
-                  :activeFolderId="Array.isArray(activeFolderId) ? activeFolderId[0] : activeFolderId"
-                  :streamFieldRef="streamFieldRef"
-                  :streamTypeFieldRef="streamTypeFieldRef"
-                  @update:streams="updateStreams()"
-                  @filter:streams="filterStreams"
-                  @update:stream-name="updateStreamFields"
-                  @update:active-folder-id="updateActiveFolderId"
-                />
+            <!-- Step 1: Alert Setup -->
+            <q-step
+              :name="1"
+              :title="t('alerts.steps.alertSetup') + ' *'"
+              caption=""
+              icon="settings"
+              :done="wizardStep > 1"
+              :disable="1 > lastValidStep"
+            >
+              <!-- Wrapper with flex container -->
+              <div
+                style="
+                  display: flex;
+                  gap: 0.625rem;
+                  height: calc(100vh - 302px);
+                "
+              >
+                <!-- Left Column Only: Step Content (60%) -->
+                <div
+                  style="
+                    flex: 0 0 62%;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                  "
+                >
+                  <div style="flex: 1; overflow: auto">
+                    <AlertSetup
+                      ref="step1Ref"
+                      :formData="formData"
+                      :beingUpdated="beingUpdated"
+                      :streamTypes="streamTypes"
+                      :filteredStreams="filteredStreams"
+                      :isFetchingStreams="isFetchingStreams"
+                      :activeFolderId="
+                        Array.isArray(activeFolderId)
+                          ? activeFolderId[0]
+                          : activeFolderId
+                      "
+                      :streamFieldRef="streamFieldRef"
+                      :streamTypeFieldRef="streamTypeFieldRef"
+                      @update:streams="updateStreams()"
+                      @filter:streams="filterStreams"
+                      @update:stream-name="updateStreamFields"
+                      @update:active-folder-id="updateActiveFolderId"
+                    />
+                  </div>
+                </div>
+                <!-- Right column space (40%) - empty but reserves space -->
+                <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
+              </div>
+            </q-step>
+
+            <!-- Step 2: Query Configuration (Scheduled / Real-Time alerts only) -->
+            <q-step
+              v-if="!isAnomalyMode"
+              :name="2"
+              :title="t('alerts.steps.conditions') + ' *'"
+              caption=""
+              icon="search"
+              :done="wizardStep > 2"
+              :disable="2 > lastValidStep"
+            >
+              <!-- Wrapper with flex container -->
+              <div
+                style="
+                  display: flex;
+                  gap: 0.625rem;
+                  height: calc(100vh - 302px);
+                "
+              >
+                <!-- Left Column Only: Step Content (60%) -->
+                <div
+                  style="
+                    flex: 0 0 62%;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                  "
+                >
+                  <div style="flex: 1; overflow: auto">
+                    <QueryConfig
+                      ref="step2Ref"
+                      :tab="formData.query_condition.type || 'custom'"
+                      :multiTimeRange="
+                        formData.query_condition.multi_time_range
+                      "
+                      :columns="filteredColumns"
+                      :streamFieldsMap="streamFieldsMap"
+                      :generatedSqlQuery="generatedSqlQuery"
+                      :inputData="formData.query_condition"
+                      :streamType="formData.stream_type"
+                      :isRealTime="formData.is_real_time"
+                      :sqlQuery="formData.query_condition.sql"
+                      :promqlQuery="formData.query_condition.promql"
+                      :vrlFunction="decodedVrlFunction"
+                      :streamName="formData.stream_name"
+                      :sqlQueryErrorMsg="sqlQueryErrorMsg"
+                      :isAggregationEnabled="isAggregationEnabled"
+                      :promqlCondition="
+                        formData.query_condition.promql_condition
+                      "
+                      @update:tab="updateTab"
+                      @update-group="updateGroup"
+                      @remove-group="removeConditionGroup"
+                      @input:update="onInputUpdate"
+                      @update:sqlQuery="
+                        (value) => (formData.query_condition.sql = value)
+                      "
+                      @update:promqlQuery="
+                        (value) => (formData.query_condition.promql = value)
+                      "
+                      @update:vrlFunction="
+                        (value) =>
+                          (formData.query_condition.vrl_function = value)
+                      "
+                      @validate-sql="validateSqlQuery"
+                      @clear-multi-windows="clearMultiWindows"
+                      @editor-closed="handleEditorClosed"
+                      @editor-state-changed="handleEditorStateChanged"
+                      @update:isAggregationEnabled="
+                        (value) => (isAggregationEnabled = value)
+                      "
+                      @update:aggregation="
+                        (value) =>
+                          (formData.query_condition.aggregation = value)
+                      "
+                      @update:promqlCondition="
+                        (val) =>
+                          (formData.query_condition.promql_condition = val)
+                      "
+                    />
+                  </div>
+                </div>
+                <!-- Right column space (40%) - empty but reserves space -->
+                <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
+              </div>
+            </q-step>
+
+            <!-- Step 3: Compare with Past (Scheduled only) -->
+            <q-step
+              v-if="formData.is_real_time === 'false'"
+              :name="3"
+              :title="t('alerts.steps.compareWithPast')"
+              caption=""
+              icon="compare_arrows"
+              :done="wizardStep > 3"
+              :disable="3 > lastValidStep"
+            >
+              <!-- Wrapper with flex container -->
+              <div
+                style="
+                  display: flex;
+                  gap: 0.625rem;
+                  height: calc(100vh - 302px);
+                "
+              >
+                <!-- Left Column Only: Step Content (60%) -->
+                <div
+                  style="
+                    flex: 0 0 62%;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                  "
+                >
+                  <div style="flex: 1; overflow: auto">
+                    <CompareWithPast
+                      ref="step3Ref"
+                      :multiTimeRange="
+                        formData.query_condition.multi_time_range
+                      "
+                      :period="formData.trigger_condition.period"
+                      :frequency="formData.trigger_condition.frequency"
+                      :frequencyType="formData.trigger_condition.frequency_type"
+                      :cron="formData.trigger_condition.cron"
+                      :selectedTab="formData.query_condition.type || 'custom'"
+                      @update:multiTimeRange="
+                        (val) =>
+                          (formData.query_condition.multi_time_range = val)
+                      "
+                      @goToSqlEditor="handleGoToSqlEditor"
+                    />
+                  </div>
+                </div>
+                <!-- Right column space (40%) - empty but reserves space -->
+                <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
+              </div>
+            </q-step>
+
+            <!-- Step 4: Alert Settings (Scheduled / Real-Time alerts only) -->
+            <q-step
+              v-if="!isAnomalyMode"
+              :name="4"
+              :title="t('alerts.steps.alertSettings') + ' *'"
+              caption=""
+              icon="tune"
+              :done="wizardStep > 4"
+              :disable="4 > lastValidStep"
+            >
+              <!-- Wrapper with flex container -->
+              <div
+                style="
+                  display: flex;
+                  gap: 0.625rem;
+                  height: calc(100vh - 302px);
+                "
+              >
+                <!-- Left Column Only: Step Content (60%) -->
+                <div
+                  style="
+                    flex: 0 0 62%;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                  "
+                >
+                  <div style="flex: 1; overflow: auto">
+                    <AlertSettings
+                      ref="step4Ref"
+                      :formData="formData"
+                      :isRealTime="formData.is_real_time"
+                      :columns="filteredColumns"
+                      :isAggregationEnabled="isAggregationEnabled"
+                      :destinations="formData.destinations"
+                      :formattedDestinations="getFormattedDestinations"
+                      :template="formData.template"
+                      :templates="templates"
+                      @update:trigger="
+                        (val) => (formData.trigger_condition = val)
+                      "
+                      @update:aggregation="
+                        (val) => (formData.query_condition.aggregation = val)
+                      "
+                      @update:isAggregationEnabled="
+                        (val) => (isAggregationEnabled = val)
+                      "
+                      @update:promqlCondition="
+                        (val) =>
+                          (formData.query_condition.promql_condition = val)
+                      "
+                      @update:destinations="updateDestinations"
+                      @update:template="(val) => (formData.template = val)"
+                      @refresh:destinations="refreshDestinations"
+                      @refresh:templates="refreshTemplates"
+                    />
+                  </div>
+                </div>
+                <!-- Right column space (40%) - empty but reserves space -->
+                <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
+              </div>
+            </q-step>
+
+            <!-- Step 5: Deduplication (Scheduled only) -->
+            <q-step
+              v-if="formData.is_real_time === 'false'"
+              :name="5"
+              :title="t('alerts.steps.deduplication')"
+              caption=""
+              icon="filter_list"
+              :done="wizardStep > 5"
+              :disable="5 > lastValidStep"
+            >
+              <!-- Wrapper with flex container -->
+              <div
+                style="
+                  display: flex;
+                  gap: 0.625rem;
+                  height: calc(100vh - 302px);
+                "
+              >
+                <!-- Left Column Only: Step Content (60%) -->
+                <div
+                  style="
+                    flex: 0 0 62%;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                  "
+                >
+                  <div style="flex: 1; overflow: auto">
+                    <Deduplication
+                      :deduplication="formData.deduplication"
+                      :columns="filteredColumns"
+                      @update:deduplication="
+                        (val) => (formData.deduplication = val)
+                      "
+                    />
+                  </div>
+                </div>
+                <!-- Right column space (40%) - empty but reserves space -->
+                <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
+              </div>
+            </q-step>
+
+            <!-- Step 6: Advanced Settings (Scheduled / Real-Time alerts only) -->
+            <q-step
+              v-if="!isAnomalyMode"
+              :name="6"
+              :title="t('alerts.steps.advanced')"
+              caption=""
+              icon="settings_applications"
+              :done="false"
+              :disable="6 > lastValidStep"
+            >
+              <!-- Wrapper with flex container -->
+              <div
+                style="
+                  display: flex;
+                  gap: 0.625rem;
+                  height: calc(100vh - 302px);
+                "
+              >
+                <!-- Left Column Only: Step Content (60%) -->
+                <div
+                  style="
+                    flex: 0 0 62%;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                  "
+                >
+                  <div style="flex: 1; overflow: auto">
+                    <Advanced
+                      :contextAttributes="formData.context_attributes"
+                      :description="formData.description"
+                      :rowTemplate="formData.row_template"
+                      :rowTemplateType="formData.row_template_type"
+                      @update:contextAttributes="
+                        (val) => (formData.context_attributes = val)
+                      "
+                      @update:description="
+                        (val) => (formData.description = val)
+                      "
+                      @update:rowTemplate="
+                        (val) => (formData.row_template = val)
+                      "
+                      @update:rowTemplateType="
+                        (val) => (formData.row_template_type = val)
+                      "
+                    />
+                  </div>
+                </div>
+                <!-- Right column space (40%) - empty but reserves space -->
+                <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
+              </div>
+            </q-step>
+            <!-- Step 2: Anomaly Detection Config -->
+            <q-step
+              v-if="isAnomalyMode"
+              :name="2"
+              :title="t('alerts.anomalyDetectionConfig')"
+              caption=""
+              icon="manage_search"
+              :done="wizardStep > 2"
+              :disable="2 > lastValidStep"
+            >
+              <div
+                style="
+                  display: flex;
+                  gap: 0.625rem;
+                  height: calc(100vh - 302px);
+                "
+              >
+                <div
+                  style="
+                    flex: 0 0 62%;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                  "
+                >
+                  <div style="flex: 1; overflow: auto">
+                    <AnomalyDetectionConfig
+                      ref="anomalyStep2Ref"
+                      :config="anomalyConfig"
+                    />
+                  </div>
+                </div>
+                <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
+              </div>
+            </q-step>
+
+            <!-- Step 3: Anomaly Alerting -->
+            <q-step
+              v-if="isAnomalyMode"
+              :name="3"
+              :title="t('alerts.alerting')"
+              caption=""
+              icon="notifications"
+              :done="false"
+              :disable="3 > lastValidStep"
+            >
+              <div
+                style="
+                  display: flex;
+                  gap: 0.625rem;
+                  height: calc(100vh - 302px);
+                "
+              >
+                <div
+                  style="
+                    flex: 0 0 62%;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                  "
+                >
+                  <div style="flex: 1; overflow: auto">
+                    <AnomalyAlerting
+                      :config="anomalyConfig"
+                      :destinations="destinations"
+                      @refresh:destinations="$emit('refresh:destinations')"
+                    />
+                  </div>
+                </div>
+                <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
+              </div>
+            </q-step>
+          </q-stepper>
+
+          <!-- Persistent Right Column (Outside Stepper) -->
+          <div>
+            <!-- Standard alert right column -->
+            <div
+              v-if="!isAnomalyMode"
+              class="alert-wizard-right-column-persistent"
+              style="
+                position: absolute;
+                top: 86px;
+                right: 4px;
+                width: calc(39% - 1.5rem);
+                height: calc(100vh - 302px);
+                pointer-events: auto;
+                z-index: 10;
+              "
+            >
+              <AlertWizardRightColumn
+                ref="previewAlertRef"
+                :formData="formData"
+                :previewQuery="previewQuery"
+                :generatedSqlQuery="generatedSqlQuery"
+                :selectedTab="formData.query_condition.type || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
+                :destinations="formData.destinations"
+                :focusManager="focusManager"
+                :wizardStep="wizardStep"
+                :isUsingBackendSql="isUsingBackendSql"
+                :isEditorOpen="isEditorOpen"
+              />
+            </div>
+
+            <!-- Anomaly detection right column -->
+            <div
+              v-else
+              class="anomaly-right-column"
+              style="
+                position: absolute;
+                top: 86px;
+                right: 4px;
+                width: calc(39% - 1.5rem);
+                height: calc(100vh - 302px);
+                pointer-events: auto;
+                z-index: 10;
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+                overflow: hidden;
+              "
+            >
+              <!-- SQL Preview -->
+              <div
+                class="preview-box card-container"
+                style="
+                  flex: 1;
+                  min-height: 150px;
+                  overflow: hidden;
+                  display: flex;
+                  flex-direction: column;
+                "
+              >
+                <div
+                  class="preview-header tw:flex tw:items-center tw:px-3 tw:py-2"
+                >
+                  <span class="preview-title tw:text-sm tw:font-semibold">{{
+                    t("alerts.sqlPreview")
+                  }}</span>
+                </div>
+                <div style="flex: 1; overflow: hidden; min-height: 0">
+                  <QueryEditor
+                    editor-id="anomaly-sql-preview"
+                    language="sql"
+                    :read-only="true"
+                    :show-auto-complete="false"
+                    :hide-nl-toggle="true"
+                    :query="anomalyPreviewSql"
+                    style="height: 100%"
+                  />
+                </div>
+              </div>
+
+              <!-- Summary -->
+              <div
+                class="collapsible-section card-container"
+                :style="anomalySummarySectionStyle"
+              >
+                <div
+                  class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
+                  @click="showAnomalySummary = !showAnomalySummary"
+                >
+                  <span class="tw:text-sm tw:font-semibold">{{
+                    t("alerts.summary.title")
+                  }}</span>
+                  <q-btn
+                    flat
+                    dense
+                    round
+                    size="xs"
+                    :icon="showAnomalySummary ? 'expand_less' : 'expand_more'"
+                    @click.stop
+                  />
+                </div>
+                <div
+                  v-show="showAnomalySummary"
+                  style="overflow: auto; flex: 1"
+                >
+                  <AnomalySummary
+                    style="height: 100%; overflow: auto"
+                    :config="anomalyConfig"
+                    :destinations="destinations"
+                    :wizard-step="wizardStep"
+                  />
+                </div>
               </div>
             </div>
-            <!-- Right column space (40%) - empty but reserves space -->
-            <div style="flex: 0 0 calc(35% - 0.625rem);"></div>
           </div>
-        </q-step>
-
-        <!-- Step 2: Query Configuration -->
-        <q-step
-          :name="2"
-          :title="t('alerts.steps.conditions') + ' *'"
-          caption=""
-          icon="search"
-          :done="wizardStep > 2"
-          :disable="2 > lastValidStep"
-        >
-          <!-- Wrapper with flex container -->
-          <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px);">
-            <!-- Left Column Only: Step Content (60%) -->
-            <div style="flex: 0 0 62%; display: flex; flex-direction: column; overflow: hidden;">
-              <div style="flex: 1; overflow: auto;">
-                <QueryConfig
-                  ref="step2Ref"
-                  :tab="formData.query_condition.type || 'custom'"
-                  :multiTimeRange="formData.query_condition.multi_time_range"
-                  :columns="filteredColumns"
-                  :streamFieldsMap="streamFieldsMap"
-                  :generatedSqlQuery="generatedSqlQuery"
-                  :inputData="formData.query_condition"
-                  :streamType="formData.stream_type"
-                  :isRealTime="formData.is_real_time"
-                  :sqlQuery="formData.query_condition.sql"
-                  :promqlQuery="formData.query_condition.promql"
-                  :vrlFunction="decodedVrlFunction"
-                  :streamName="formData.stream_name"
-                  :sqlQueryErrorMsg="sqlQueryErrorMsg"
-                  :isAggregationEnabled="isAggregationEnabled"
-                  :promqlCondition="formData.query_condition.promql_condition"
-                  @update:tab="updateTab"
-                  @update-group="updateGroup"
-                  @remove-group="removeConditionGroup"
-                  @input:update="onInputUpdate"
-                  @update:sqlQuery="(value) => formData.query_condition.sql = value"
-                  @update:promqlQuery="(value) => formData.query_condition.promql = value"
-                  @update:vrlFunction="(value) => formData.query_condition.vrl_function = value"
-                  @validate-sql="validateSqlQuery"
-                  @clear-multi-windows="clearMultiWindows"
-                  @editor-closed="handleEditorClosed"
-                  @editor-state-changed="handleEditorStateChanged"
-                  @update:isAggregationEnabled="(value) => isAggregationEnabled = value"
-                  @update:aggregation="(value) => formData.query_condition.aggregation = value"
-                  @update:promqlCondition="(val) => formData.query_condition.promql_condition = val"
-                />
-              </div>
-            </div>
-            <!-- Right column space (40%) - empty but reserves space -->
-            <div style="flex: 0 0 calc(35% - 0.625rem);"></div>
-          </div>
-        </q-step>
-
-        <!-- Step 3: Compare with Past (Scheduled only) -->
-        <q-step
-          v-if="formData.is_real_time === 'false'"
-          :name="3"
-          :title="t('alerts.steps.compareWithPast')"
-          caption=""
-          icon="compare_arrows"
-          :done="wizardStep > 3"
-          :disable="3 > lastValidStep"
-        >
-          <!-- Wrapper with flex container -->
-          <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px);">
-            <!-- Left Column Only: Step Content (60%) -->
-            <div style="flex: 0 0 62%; display: flex; flex-direction: column; overflow: hidden;">
-              <div style="flex: 1; overflow: auto;">
-                <CompareWithPast
-                  ref="step3Ref"
-                  :multiTimeRange="formData.query_condition.multi_time_range"
-                  :period="formData.trigger_condition.period"
-                  :frequency="formData.trigger_condition.frequency"
-                  :frequencyType="formData.trigger_condition.frequency_type"
-                  :cron="formData.trigger_condition.cron"
-                  :selectedTab="formData.query_condition.type || 'custom'"
-                  @update:multiTimeRange="(val) => formData.query_condition.multi_time_range = val"
-                  @goToSqlEditor="handleGoToSqlEditor"
-                />
-              </div>
-            </div>
-            <!-- Right column space (40%) - empty but reserves space -->
-            <div style="flex: 0 0 calc(35% - 0.625rem);"></div>
-          </div>
-        </q-step>
-
-        <!-- Step 4: Alert Settings -->
-        <q-step
-          :name="4"
-          :title="t('alerts.steps.alertSettings') + ' *'"
-          caption=""
-          icon="tune"
-          :done="wizardStep > 4"
-          :disable="4 > lastValidStep"
-        >
-          <!-- Wrapper with flex container -->
-          <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px);">
-            <!-- Left Column Only: Step Content (60%) -->
-            <div style="flex: 0 0 62%; display: flex; flex-direction: column; overflow: hidden;">
-              <div style="flex: 1; overflow: auto;">
-                <AlertSettings
-                  ref="step4Ref"
-                  :formData="formData"
-                  :isRealTime="formData.is_real_time"
-                  :columns="filteredColumns"
-                  :isAggregationEnabled="isAggregationEnabled"
-                  :destinations="formData.destinations"
-                  :formattedDestinations="getFormattedDestinations"
-                  :template="formData.template"
-                  :templates="templates"
-                  @update:trigger="(val) => formData.trigger_condition = val"
-                  @update:aggregation="(val) => formData.query_condition.aggregation = val"
-                  @update:isAggregationEnabled="(val) => isAggregationEnabled = val"
-                  @update:promqlCondition="(val) => formData.query_condition.promql_condition = val"
-                  @update:destinations="updateDestinations"
-                  @update:template="(val) => formData.template = val"
-                  @refresh:destinations="refreshDestinations"
-                  @refresh:templates="refreshTemplates"
-                />
-              </div>
-            </div>
-            <!-- Right column space (40%) - empty but reserves space -->
-            <div style="flex: 0 0 calc(35% - 0.625rem);"></div>
-          </div>
-        </q-step>
-
-        <!-- Step 5: Deduplication (Scheduled only) -->
-        <q-step
-          v-if="formData.is_real_time === 'false'"
-          :name="5"
-          :title="t('alerts.steps.deduplication')"
-          caption=""
-          icon="filter_list"
-          :done="wizardStep > 5"
-          :disable="5 > lastValidStep"
-        >
-          <!-- Wrapper with flex container -->
-          <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px);">
-            <!-- Left Column Only: Step Content (60%) -->
-            <div style="flex: 0 0 62%; display: flex; flex-direction: column; overflow: hidden;">
-              <div style="flex: 1; overflow: auto;">
-                <Deduplication
-                  :deduplication="formData.deduplication"
-                  :columns="filteredColumns"
-                  @update:deduplication="(val) => formData.deduplication = val"
-                />
-              </div>
-            </div>
-            <!-- Right column space (40%) - empty but reserves space -->
-            <div style="flex: 0 0 calc(35% - 0.625rem);"></div>
-          </div>
-        </q-step>
-
-        <!-- Step 6: Advanced Settings -->
-        <q-step
-          :name="6"
-          :title="t('alerts.steps.advanced')"
-          caption=""
-          icon="settings_applications"
-          :done="false"
-          :disable="6 > lastValidStep"
-        >
-          <!-- Wrapper with flex container -->
-          <div style="display: flex; gap: 0.625rem; height: calc(100vh - 302px);">
-            <!-- Left Column Only: Step Content (60%) -->
-            <div style="flex: 0 0 62%; display: flex; flex-direction: column; overflow: hidden;">
-              <div style="flex: 1; overflow: auto;">
-                <Advanced
-                  :contextAttributes="formData.context_attributes"
-                  :description="formData.description"
-                  :rowTemplate="formData.row_template"
-                  :rowTemplateType="formData.row_template_type"
-                  @update:contextAttributes="(val) => formData.context_attributes = val"
-                  @update:description="(val) => formData.description = val"
-                  @update:rowTemplate="(val) => formData.row_template = val"
-                  @update:rowTemplateType="(val) => formData.row_template_type = val"
-                />
-              </div>
-            </div>
-            <!-- Right column space (40%) - empty but reserves space -->
-            <div style="flex: 0 0 calc(35% - 0.625rem);"></div>
-          </div>
-        </q-step>
-      </q-stepper>
-
-        <!-- Persistent Right Column (Outside Stepper) -->
-        <keep-alive>
-          <div
-            class="alert-wizard-right-column-persistent"
-            style="position: absolute; top: 86px; right: 4px; width: calc(39% - 1.5rem); height: calc(100vh - 302px); pointer-events: auto; z-index: 10;"
-          >
-            <AlertWizardRightColumn
-              ref="previewAlertRef"
-              :formData="formData"
-              :previewQuery="previewQuery"
-              :generatedSqlQuery="generatedSqlQuery"
-              :selectedTab="formData.query_condition.type || 'custom'"
-              :isAggregationEnabled="isAggregationEnabled"
-              :destinations="formData.destinations"
-              :focusManager="focusManager"
-              :wizardStep="wizardStep"
-              :isUsingBackendSql="isUsingBackendSql"
-              :isEditorOpen="isEditorOpen"
-            />
-          </div>
-        </keep-alive>
-      </q-form>
+        </q-form>
       </div>
     </div>
     <div class="tw:mx-2">
       <div
-          class="flex q-px-md full-width tw:py-3 card-container tw:justify-end"
-          style="position: sticky; bottom: 0px; z-index: 2"
-        >
+        class="flex q-px-md full-width tw:py-3 card-container tw:justify-end"
+        style="position: sticky; bottom: 0px; z-index: 2"
+      >
         <!-- All Buttons (Right Side) -->
         <div class="tw:flex tw:items-center tw:gap-2">
           <!-- Wizard Navigation Buttons -->
@@ -360,7 +672,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             :label="t('alerts.back')"
             class="o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
             :disable="wizardStep === 1"
             no-caps
             @click="goToPreviousStep"
@@ -369,12 +685,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             :label="t('alerts.continue')"
             class="o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
             :disable="isLastStep"
             no-caps
             @click="goToNextStep"
           />
-          <q-separator vertical class="tw:mx-2" style="height: 36px;" />
+          <q-separator vertical class="tw:mx-2"
+style="height: 36px" />
 
           <!-- Cancel and Save Buttons -->
           <q-btn
@@ -384,44 +705,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('alerts.cancel')"
             no-caps
             flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
             @click="$emit('cancel:hideform')"
           />
           <q-btn
             data-test="add-alert-submit-btn"
             class="o2-primary-button no-border tw:h-[36px]"
-            :label="t('alerts.save')"
-            type="submit"
+            :label="isAnomalyMode ? t('alerts.saveAndTrain') : t('alerts.save')"
             no-caps
             flat
+            :loading="anomalySaving"
             :disable="!canSaveAlert"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            @click="onSubmit"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
+            @click="handleSave"
           />
         </div>
       </div>
     </div>
-
   </div>
 
-    <q-dialog
-      v-model="showJsonEditorDialog"
-      position="right"
-      full-height
-      maximized
-      :persistent="true"
-    >
-      <JsonEditor
-        :data="formData"
-        :title="'Edit Alert JSON'"
-        :type="'alerts'"
-        :validation-errors="validationErrors"
-        @close="showJsonEditorDialog = false"
-        @saveJson="saveAlertJson"
-        :isEditing="beingUpdated"
-      />
-    </q-dialog>
-
+  <q-dialog
+    v-model="showJsonEditorDialog"
+    position="right"
+    full-height
+    maximized
+    :persistent="true"
+  >
+    <JsonEditor
+      :data="formData"
+      :title="'Edit Alert JSON'"
+      :type="'alerts'"
+      :validation-errors="validationErrors"
+      @close="showJsonEditorDialog = false"
+      @saveJson="saveAlertJson"
+      :isEditing="beingUpdated"
+    />
+  </q-dialog>
 </template>
 
 <script lang="ts">
@@ -458,9 +785,7 @@ import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import useFunctions from "@/composables/useFunctions";
 import useQuery from "@/composables/useQuery";
 import { convertDateToTimestamp } from "@/utils/date";
-import {
-  generateSqlQuery,
-} from "@/utils/alerts/alertQueryBuilder";
+import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
 import {
   validateInputs as validateInputsUtil,
   validateSqlQuery as validateSqlQueryUtil,
@@ -482,7 +807,10 @@ import {
 
 import JsonEditor from "../common/JsonEditor.vue";
 import { useReo } from "@/services/reodotdev_analytics";
-import { createAlertsContextProvider, contextRegistry } from "@/composables/contextProviders";
+import {
+  createAlertsContextProvider,
+  contextRegistry,
+} from "@/composables/contextProviders";
 import HorizontalStepper from "./HorizontalStepper.vue";
 import AlertSetup from "./steps/AlertSetup.vue";
 import QueryConfig from "./steps/QueryConfig.vue";
@@ -491,6 +819,11 @@ import CompareWithPast from "./steps/CompareWithPast.vue";
 import Deduplication from "./steps/Deduplication.vue";
 import Advanced from "./steps/Advanced.vue";
 import AlertWizardRightColumn from "./AlertWizardRightColumn.vue";
+import AnomalyDetectionConfig from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.vue";
+import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlerting.vue";
+import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
+import anomalyDetectionService from "@/services/anomaly_detection";
+import QueryEditor from "@/components/QueryEditor.vue";
 import {
   updateGroup as updateGroupUtil,
   removeConditionGroup as removeConditionGroupUtil,
@@ -512,13 +845,12 @@ const defaultValue: any = () => {
     stream_name: "",
     is_real_time: "false",
     query_condition: {
-      conditions:
-      {
+      conditions: {
         filterType: "group",
         logicalOperator: "AND",
         groupId: "",
-        conditions: []
-        },
+        conditions: [],
+      },
       sql: "",
       promql: "",
       type: "custom",
@@ -557,10 +889,39 @@ const defaultValue: any = () => {
     updatedAt: "",
     owner: "",
     lastEditedBy: "",
-    folder_id : "",
+    folder_id: "",
     creates_incident: false,
   };
 };
+const defaultAnomalyConfig = () => ({
+  name: "",
+  description: "",
+  stream_type: "logs",
+  stream_name: "",
+  query_mode: "filters" as const,
+  filters: [] as any[],
+  custom_sql: "",
+  detection_function: "count",
+  histogram_interval_value: 5,
+  histogram_interval_unit: "m" as "m" | "h",
+  schedule_interval_value: 1,
+  schedule_interval_unit: "h" as "m" | "h",
+  detection_window_value: 1,
+  detection_window_unit: "h" as "m" | "h",
+  training_window_days: 14,
+  retrain_interval_days: 7,
+  threshold: 97,
+  alert_enabled: true,
+  alert_destination_id: undefined as string | undefined,
+  folder_id: "default",
+  status: undefined as string | undefined,
+  is_trained: false,
+  enabled: true,
+  last_error: undefined as string | undefined,
+  last_detection_run: undefined as number | undefined,
+  next_run_at: undefined as number | undefined,
+});
+
 let callAlert: Promise<{ data: any }>;
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
@@ -582,7 +943,12 @@ export default defineComponent({
       default: () => [],
     },
   },
-  emits: ["update:list", "cancel:hideform", "refresh:destinations", "refresh:templates"],
+  emits: [
+    "update:list",
+    "cancel:hideform",
+    "refresh:destinations",
+    "refresh:templates",
+  ],
   components: {
     JsonEditor,
     HorizontalStepper,
@@ -593,6 +959,10 @@ export default defineComponent({
     Deduplication,
     Advanced,
     AlertWizardRightColumn,
+    AnomalyDetectionConfig,
+    AnomalyAlerting,
+    AnomalySummary,
+    QueryEditor,
   },
   setup(props, { emit }) {
     const store: any = useStore();
@@ -618,6 +988,83 @@ export default defineComponent({
     const originalStreamFields: any = ref([]);
     const isAggregationEnabled = ref(false);
     const isEditorOpen = ref(false);
+
+    // ── Anomaly Detection state ─────────────────────────────────────────────
+    const anomalyConfig = ref(defaultAnomalyConfig());
+    const anomalyStep2Ref = ref<any>(null);
+    const showAnomalySummary = ref(true);
+
+    const isAnomalyMode = computed(
+      () => formData.value.is_real_time === "anomaly",
+    );
+
+    const anomalyHistogramInterval = computed(
+      () =>
+        `${anomalyConfig.value.histogram_interval_value}${anomalyConfig.value.histogram_interval_unit}`,
+    );
+    const anomalyScheduleInterval = computed(
+      () =>
+        `${anomalyConfig.value.schedule_interval_value}${anomalyConfig.value.schedule_interval_unit}`,
+    );
+    const anomalyDetectionWindowSeconds = computed(() => {
+      const mult =
+        anomalyConfig.value.detection_window_unit === "h" ? 3600 : 60;
+      return anomalyConfig.value.detection_window_value * mult;
+    });
+
+    const anomalyPreviewSql = computed(() => {
+      const c = anomalyConfig.value;
+      if (c.query_mode === "custom_sql") {
+        return c.custom_sql || "-- Enter your SQL in Detection Config step";
+      }
+      const stream = c.stream_name || "<stream>";
+      const interval = anomalyHistogramInterval.value || "5m";
+      const fn =
+        c.detection_function === "count"
+          ? "count(*)"
+          : `${c.detection_function}(<field>)`;
+      const filterLines = (c.filters || [])
+        .filter((f: any) => f.field && f.value)
+        .map((f: any) => {
+          const op = f.operator;
+          if (op === "contains") return `  AND ${f.field} LIKE '%${f.value}%'`;
+          if (op === "not_contains")
+            return `  AND ${f.field} NOT LIKE '%${f.value}%'`;
+          return `  AND ${f.field} ${op} '${f.value}'`;
+        });
+      const where = filterLines.length
+        ? [
+            "WHERE",
+            ...filterLines.map((l: string, i: number) =>
+              i === 0 ? l.replace(/^\s+AND /, "  ") : l,
+            ),
+          ].join("\n")
+        : "";
+      const autoSeasonality = c.training_window_days >= 7 ? "week" : "day";
+      const seasonalSelect =
+        autoSeasonality === "week"
+          ? ",\n       date_part('hour', to_timestamp(_timestamp / 1000000)) AS hour,\n       date_part('dow', to_timestamp(_timestamp / 1000000)) AS dow"
+          : ",\n       date_part('hour', to_timestamp(_timestamp / 1000000)) AS hour";
+      const seasonalGroup =
+        autoSeasonality === "week" ? ", hour, dow" : ", hour";
+      return [
+        `SELECT histogram(_timestamp, '${interval}') AS time_bucket,`,
+        `       ${fn} AS value${seasonalSelect}`,
+        `FROM ${stream}`,
+        where,
+        `GROUP BY time_bucket${seasonalGroup}`,
+        `ORDER BY time_bucket`,
+      ]
+        .filter(Boolean)
+        .join("\n");
+    });
+
+    const anomalySummarySectionStyle = computed(() => {
+      if (!showAnomalySummary.value) return { flex: "0 0 auto" };
+      return { flex: "1", minHeight: "150px" };
+    });
+    // ── End Anomaly Detection state ─────────────────────────────────────────
+
     const expandState = ref({
       alertSetup: true,
       queryMode: true,
@@ -627,7 +1074,6 @@ export default defineComponent({
       multiWindowSelection: false,
     });
     var triggerOperators: any = ref([
-
       "=",
       "!=",
       ">=",
@@ -641,8 +1087,8 @@ export default defineComponent({
     const isFetchingStreams = ref(false);
     const streamTypes = ["logs", "metrics", "traces"];
     const rowTemplateTypeOptions = [
-      { label: 'String', value: 'String' },
-      { label: 'JSON', value: 'Json' }
+      { label: "String", value: "String" },
+      { label: "JSON", value: "Json" },
     ];
     const editorUpdate = (e: any) => {
       formData.value.sql = e.target.value;
@@ -689,7 +1135,9 @@ export default defineComponent({
 
     const { track } = useReo();
 
-    const activeFolderId = ref(router.currentRoute.value.query.folder || "default");
+    const activeFolderId = ref(
+      router.currentRoute.value.query.folder || "default",
+    );
 
     const updateActiveFolderId = (folderId: any) => {
       activeFolderId.value = folderId.value;
@@ -707,19 +1155,19 @@ export default defineComponent({
     // Computed property for step captions to avoid flickering
     const currentStepCaption = computed(() => {
       const captions: Record<number, string> = {
-        1: t('alerts.stepCaptions.alertSetup'),
-        2: t('alerts.stepCaptions.conditions'),
-        3: t('alerts.stepCaptions.compareWithPast'),
-        4: t('alerts.stepCaptions.alertSettings'),
-        5: t('alerts.stepCaptions.deduplication'),
-        6: t('alerts.stepCaptions.advanced'),
+        1: t("alerts.stepCaptions.alertSetup"),
+        2: t("alerts.stepCaptions.conditions"),
+        3: t("alerts.stepCaptions.compareWithPast"),
+        4: t("alerts.stepCaptions.alertSettings"),
+        5: t("alerts.stepCaptions.deduplication"),
+        6: t("alerts.stepCaptions.advanced"),
       };
-      return captions[wizardStep.value] || '';
+      return captions[wizardStep.value] || "";
     });
 
     const goToStep2 = async () => {
       // Validate step 1 before proceeding
-      if (step1Ref.value && typeof step1Ref.value.validate === 'function') {
+      if (step1Ref.value && typeof step1Ref.value.validate === "function") {
         const isValid = await step1Ref.value.validate();
         if (isValid) {
           wizardStep.value = 2;
@@ -728,6 +1176,44 @@ export default defineComponent({
         wizardStep.value = 2;
       }
     };
+
+    // Sync shared fields from alert formData into anomaly config whenever they change
+    watch(
+      () => [
+        formData.value.name,
+        formData.value.stream_type,
+        formData.value.stream_name,
+      ],
+      ([name, streamType, streamName]) => {
+        anomalyConfig.value.name = name as string;
+        anomalyConfig.value.stream_type = (streamType as string) || "logs";
+        anomalyConfig.value.stream_name = streamName as string;
+      },
+    );
+
+    watch(
+      () => activeFolderId.value,
+      (folderId) => {
+        anomalyConfig.value.folder_id = (folderId as string) || "default";
+      },
+    );
+
+    // When switching to anomaly mode, seed anomalyConfig with current formData values
+    watch(
+      () => formData.value.is_real_time,
+      (val) => {
+        if (val === "anomaly") {
+          anomalyConfig.value.name = formData.value.name || "";
+          anomalyConfig.value.stream_type =
+            formData.value.stream_type || "logs";
+          anomalyConfig.value.stream_name = formData.value.stream_name || "";
+          anomalyConfig.value.folder_id =
+            (activeFolderId.value as string) || "default";
+          // Reset to step 1 so stepper header is consistent
+          if (wizardStep.value > 3) wizardStep.value = 1;
+        }
+      },
+    );
 
     onBeforeMount(async () => {
       await importSqlParser();
@@ -753,9 +1239,9 @@ export default defineComponent({
     });
 
     const rowTemplatePlaceholder = computed(() => {
-      return formData.value.row_template_type === 'Json'
+      return formData.value.row_template_type === "Json"
         ? 'e.g - {"user": "{name}", "timestamp": "{timestamp}"}'
-        : 'e.g - Alert was triggered at {timestamp}';
+        : "e.g - Alert was triggered at {timestamp}";
     });
 
     const decodedVrlFunction = computed(() => {
@@ -779,40 +1265,40 @@ export default defineComponent({
         store,
         props.isUpdated,
         formData.value.stream_name,
-        formData.value.stream_type
+        formData.value.stream_type,
       );
-      contextRegistry.register('alerts', alertsProvider);
-      contextRegistry.setActive('alerts');
+      contextRegistry.register("alerts", alertsProvider);
+      contextRegistry.setActive("alerts");
 
       // Register fields with focus manager for clickable summary
       // Wait for next tick to ensure refs are available
       await nextTick();
-      focusManager.registerField('streamType', {
+      focusManager.registerField("streamType", {
         ref: streamTypeFieldRef,
         onBeforeFocus: () => {
           // Navigate to step 1 for wizard mode
           if (wizardStep.value !== 1) {
             wizardStep.value = 1;
           }
-        }
+        },
       });
-      focusManager.registerField('stream', {
+      focusManager.registerField("stream", {
         ref: streamFieldRef,
         onBeforeFocus: () => {
           // Navigate to step 1 for wizard mode
           if (wizardStep.value !== 1) {
             wizardStep.value = 1;
           }
-        }
+        },
       });
-      focusManager.registerField('alertType', {
+      focusManager.registerField("alertType", {
         ref: streamTypeFieldRef, // Use any ref, we just need navigation
         onBeforeFocus: () => {
           // Navigate to step 1 for wizard mode
           if (wizardStep.value !== 1) {
             wizardStep.value = 1;
           }
-        }
+        },
       });
       // Note: query, conditions, period, threshold, destinations, and silence fields
       // are registered in their respective component watchers (step2Ref, step4Ref)
@@ -823,147 +1309,171 @@ export default defineComponent({
     watch(
       () => [formData.value.stream_name, formData.value.stream_type],
       ([newStreamName, newStreamType]) => {
-        console.log('[AddAlert] Stream changed, updating context provider:', { newStreamName, newStreamType });
+        console.log("[AddAlert] Stream changed, updating context provider:", {
+          newStreamName,
+          newStreamType,
+        });
         const alertsProvider = createAlertsContextProvider(
           formData,
           store,
           props.isUpdated,
           newStreamName,
-          newStreamType
+          newStreamType,
         );
-        contextRegistry.register('alerts', alertsProvider);
+        contextRegistry.register("alerts", alertsProvider);
         // Keep alerts context active (don't need to re-set active)
-      }
+      },
     );
 
     // Watch for step4Ref (AlertSettings) to register wizard mode field refs
-    watch(step4Ref, (newVal) => {
-      if (newVal) {
-        nextTick(() => {
-          // Register wizard mode fields with proper navigation and highlighting
-          if (newVal.periodFieldRef) {
-            focusManager.registerField('period', {
-              ref: newVal.periodFieldRef,
-              onBeforeFocus: () => {
-                if (wizardStep.value !== 4) {
-                  wizardStep.value = 4;
-                }
-              }
-            });
-          }
-          if (newVal.thresholdFieldRef) {
-            focusManager.registerField('threshold', {
-              ref: newVal.thresholdFieldRef,
-              onBeforeFocus: () => {
-                if (wizardStep.value !== 4) {
-                  wizardStep.value = 4;
-                }
-              }
-            });
-          }
-          if (newVal.silenceFieldRef) {
-            focusManager.registerField('silence', {
-              ref: newVal.silenceFieldRef,
-              onBeforeFocus: () => {
-                if (wizardStep.value !== 4) {
-                  wizardStep.value = 4;
-                }
-              }
-            });
-          }
-          if (newVal.destinationsFieldRef) {
-            focusManager.registerField('destinations', {
-              ref: newVal.destinationsFieldRef,
-              onBeforeFocus: () => {
-                if (wizardStep.value !== 4) {
-                  wizardStep.value = 4;
-                }
-              }
-            });
-          }
-        });
-      }
-    }, { immediate: true });
-
-    // Watch for step2Ref to register query field
-    watch(step2Ref, (newVal) => {
-      if (newVal) {
-        nextTick(() => {
-          // Determine which ref to use based on query type
-          const queryType = formData.value.query_condition?.type || 'custom';
-
-          // Register the query field with appropriate ref based on query type
-          if (queryType === 'custom' && newVal.customPreviewRef) {
-            focusManager.registerField('query', {
-              ref: newVal.customPreviewRef,
-              onBeforeFocus: () => {
-                if (wizardStep.value !== 2) {
-                  wizardStep.value = 2;
-                }
-              }
-            });
-          } else if ((queryType === 'sql' || queryType === 'promql') && newVal.sqlPromqlPreviewRef) {
-            focusManager.registerField('query', {
-              ref: newVal.sqlPromqlPreviewRef,
-              onBeforeFocus: () => {
-                if (wizardStep.value !== 2) {
-                  wizardStep.value = 2;
-                }
-              }
-            });
-          }
-        });
-      }
-    }, { immediate: true });
-
-    // Watch for step3Ref (CompareWithPast) to register multiwindow field
-    watch(step3Ref, (newVal) => {
-      if (newVal && newVal.multiWindowContainerRef) {
-        nextTick(() => {
-          focusManager.registerField('multiwindow', {
-            ref: newVal.multiWindowContainerRef,
-            onBeforeFocus: () => {
-              if (wizardStep.value !== 3) {
-                wizardStep.value = 3;
-              }
+    watch(
+      step4Ref,
+      (newVal) => {
+        if (newVal) {
+          nextTick(() => {
+            // Register wizard mode fields with proper navigation and highlighting
+            if (newVal.periodFieldRef) {
+              focusManager.registerField("period", {
+                ref: newVal.periodFieldRef,
+                onBeforeFocus: () => {
+                  if (wizardStep.value !== 4) {
+                    wizardStep.value = 4;
+                  }
+                },
+              });
+            }
+            if (newVal.thresholdFieldRef) {
+              focusManager.registerField("threshold", {
+                ref: newVal.thresholdFieldRef,
+                onBeforeFocus: () => {
+                  if (wizardStep.value !== 4) {
+                    wizardStep.value = 4;
+                  }
+                },
+              });
+            }
+            if (newVal.silenceFieldRef) {
+              focusManager.registerField("silence", {
+                ref: newVal.silenceFieldRef,
+                onBeforeFocus: () => {
+                  if (wizardStep.value !== 4) {
+                    wizardStep.value = 4;
+                  }
+                },
+              });
+            }
+            if (newVal.destinationsFieldRef) {
+              focusManager.registerField("destinations", {
+                ref: newVal.destinationsFieldRef,
+                onBeforeFocus: () => {
+                  if (wizardStep.value !== 4) {
+                    wizardStep.value = 4;
+                  }
+                },
+              });
             }
           });
-        });
-      }
-    }, { immediate: true });
+        }
+      },
+      { immediate: true },
+    );
+
+    // Watch for step2Ref to register query field
+    watch(
+      step2Ref,
+      (newVal) => {
+        if (newVal) {
+          nextTick(() => {
+            // Determine which ref to use based on query type
+            const queryType = formData.value.query_condition?.type || "custom";
+
+            // Register the query field with appropriate ref based on query type
+            if (queryType === "custom" && newVal.customPreviewRef) {
+              focusManager.registerField("query", {
+                ref: newVal.customPreviewRef,
+                onBeforeFocus: () => {
+                  if (wizardStep.value !== 2) {
+                    wizardStep.value = 2;
+                  }
+                },
+              });
+            } else if (
+              (queryType === "sql" || queryType === "promql") &&
+              newVal.sqlPromqlPreviewRef
+            ) {
+              focusManager.registerField("query", {
+                ref: newVal.sqlPromqlPreviewRef,
+                onBeforeFocus: () => {
+                  if (wizardStep.value !== 2) {
+                    wizardStep.value = 2;
+                  }
+                },
+              });
+            }
+          });
+        }
+      },
+      { immediate: true },
+    );
+
+    // Watch for step3Ref (CompareWithPast) to register multiwindow field
+    watch(
+      step3Ref,
+      (newVal) => {
+        if (newVal && newVal.multiWindowContainerRef) {
+          nextTick(() => {
+            focusManager.registerField("multiwindow", {
+              ref: newVal.multiWindowContainerRef,
+              onBeforeFocus: () => {
+                if (wizardStep.value !== 3) {
+                  wizardStep.value = 3;
+                }
+              },
+            });
+          });
+        }
+      },
+      { immediate: true },
+    );
 
     // Watch for query type changes and re-register with correct ref
-    watch(() => formData.value.query_condition?.type, (newType) => {
-      if (step2Ref.value && newType) {
-        nextTick(() => {
-          // Re-register the query field with the correct ref for the new type
-          if (newType === 'custom' && step2Ref.value.customPreviewRef) {
-            focusManager.registerField('query', {
-              ref: step2Ref.value.customPreviewRef,
-              onBeforeFocus: () => {
-                if (wizardStep.value !== 2) {
-                  wizardStep.value = 2;
-                }
-              }
-            });
-          } else if ((newType === 'sql' || newType === 'promql') && step2Ref.value.sqlPromqlPreviewRef) {
-            focusManager.registerField('query', {
-              ref: step2Ref.value.sqlPromqlPreviewRef,
-              onBeforeFocus: () => {
-                if (wizardStep.value !== 2) {
-                  wizardStep.value = 2;
-                }
-              }
-            });
-          }
-        });
-      }
-    });
+    watch(
+      () => formData.value.query_condition?.type,
+      (newType) => {
+        if (step2Ref.value && newType) {
+          nextTick(() => {
+            // Re-register the query field with the correct ref for the new type
+            if (newType === "custom" && step2Ref.value.customPreviewRef) {
+              focusManager.registerField("query", {
+                ref: step2Ref.value.customPreviewRef,
+                onBeforeFocus: () => {
+                  if (wizardStep.value !== 2) {
+                    wizardStep.value = 2;
+                  }
+                },
+              });
+            } else if (
+              (newType === "sql" || newType === "promql") &&
+              step2Ref.value.sqlPromqlPreviewRef
+            ) {
+              focusManager.registerField("query", {
+                ref: step2Ref.value.sqlPromqlPreviewRef,
+                onBeforeFocus: () => {
+                  if (wizardStep.value !== 2) {
+                    wizardStep.value = 2;
+                  }
+                },
+              });
+            }
+          });
+        }
+      },
+    );
 
     onUnmounted(() => {
       // Clean up alerts-specific context provider
-      contextRegistry.unregister('alerts');
-      contextRegistry.setActive('');
+      contextRegistry.unregister("alerts");
+      contextRegistry.setActive("");
 
       // Clean up focus manager
       focusManager.clear();
@@ -1026,10 +1536,11 @@ export default defineComponent({
       ) {
         const definedFields = streams.settings.defined_schema_fields;
 
-        // get timestamp and all fields 
-        // why we need this because we need to show timestamp and all fields in defined schema fields 
+        // get timestamp and all fields
+        // why we need this because we need to show timestamp and all fields in defined schema fields
         // we dont get them in defined_schema_fields so if they are present in schema then we should keep them as it is
-        const timestampColumn = store.state.zoConfig?.timestamp_column || '_timestamp';
+        const timestampColumn =
+          store.state.zoConfig?.timestamp_column || "_timestamp";
         const allFieldsName = store.state.zoConfig?.all_fields_name;
 
         // Filter the columns to include:
@@ -1124,7 +1635,6 @@ export default defineComponent({
       filteredStreams.value = filterColumns(indexOptions.value, val, update);
     };
 
-
     const addVariable = () => {
       formData.value.context_attributes.push({
         name: "",
@@ -1149,44 +1659,57 @@ export default defineComponent({
     };
 
     // Watch for SQL query changes and update preview
-    watch(() => formData.value.query_condition?.sql, (newValue) => {
-      if (getSelectedTab.value === 'sql') {
-        previewQuery.value = newValue ? newValue.trim() : '';
-      }
-    });
+    watch(
+      () => formData.value.query_condition?.sql,
+      (newValue) => {
+        if (getSelectedTab.value === "sql") {
+          previewQuery.value = newValue ? newValue.trim() : "";
+        }
+      },
+    );
 
     // Watch for PromQL query changes and update preview
-    watch(() => formData.value.query_condition?.promql, (newValue) => {
-      if (getSelectedTab.value === 'promql') {
-        previewQuery.value = newValue ? newValue.trim() : '';
-      }
-    });
+    watch(
+      () => formData.value.query_condition?.promql,
+      (newValue) => {
+        if (getSelectedTab.value === "promql") {
+          previewQuery.value = newValue ? newValue.trim() : "";
+        }
+      },
+    );
 
     // Watch for tab changes and update preview query
-    watch(() => formData.value.query_condition?.type, (newType) => {
-      if (newType === 'sql') {
-        previewQuery.value = formData.value.query_condition?.sql ? formData.value.query_condition.sql.trim() : '';
-        isUsingBackendSql.value = false;
-      } else if (newType === 'promql') {
-        previewQuery.value = formData.value.query_condition?.promql ? formData.value.query_condition.promql.trim() : '';
-        isUsingBackendSql.value = false;
-        // Initialize promql_condition if it doesn't exist
-        if (!formData.value.query_condition.promql_condition) {
-          formData.value.query_condition.promql_condition = {
-            column: 'value',
-            operator: '>=',
-            value: 1,
-          };
+    watch(
+      () => formData.value.query_condition?.type,
+      (newType) => {
+        if (newType === "sql") {
+          previewQuery.value = formData.value.query_condition?.sql
+            ? formData.value.query_condition.sql.trim()
+            : "";
+          isUsingBackendSql.value = false;
+        } else if (newType === "promql") {
+          previewQuery.value = formData.value.query_condition?.promql
+            ? formData.value.query_condition.promql.trim()
+            : "";
+          isUsingBackendSql.value = false;
+          // Initialize promql_condition if it doesn't exist
+          if (!formData.value.query_condition.promql_condition) {
+            formData.value.query_condition.promql_condition = {
+              column: "value",
+              operator: ">=",
+              value: 1,
+            };
+          }
+        } else if (newType === "custom") {
+          // Clear preview query to avoid triggering search stream with old query
+          // The backend SQL generation will update it shortly
+          previewQuery.value = "";
+          isUsingBackendSql.value = false;
+          // Trigger backend SQL generation for preview
+          debouncedGenerateSql();
         }
-      } else if (newType === 'custom') {
-        // Clear preview query to avoid triggering search stream with old query
-        // The backend SQL generation will update it shortly
-        previewQuery.value = '';
-        isUsingBackendSql.value = false;
-        // Trigger backend SQL generation for preview
-        debouncedGenerateSql();
-      }
-    });
+      },
+    );
 
     // Watch for changes in conditions or stream to regenerate SQL
     watch(
@@ -1197,19 +1720,17 @@ export default defineComponent({
         isAggregationEnabled.value,
       ],
       () => {
-        if (formData.value.query_condition?.type === 'custom') {
+        if (formData.value.query_condition?.type === "custom") {
           debouncedGenerateSql();
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     const previewAlert = async () => {
-      if (getSelectedTab.value === "custom"){
+      if (getSelectedTab.value === "custom") {
         previewQuery.value = generateSqlQueryLocal();
-
-      }
-      else if (getSelectedTab.value === "sql")
+      } else if (getSelectedTab.value === "sql")
         previewQuery.value = formData.value.query_condition.sql.trim();
       else if (getSelectedTab.value === "promql")
         previewQuery.value = formData.value.query_condition.promql.trim();
@@ -1224,37 +1745,43 @@ export default defineComponent({
       }
     };
 
-
-
-
     const generateSqlQueryLocal = () => {
       return generateSqlQuery(
         formData.value,
         streamFieldsMap.value,
         isAggregationEnabled.value,
-        store.state.zoConfig.timestamp_column || "_timestamp"
+        store.state.zoConfig.timestamp_column || "_timestamp",
       );
     };
 
     // Generated SQL query for preview in FilterGroup
     // This will be updated via API call when conditions change
-    const generatedSqlQuery = ref('');
+    const generatedSqlQuery = ref("");
 
     // Helper function to check if all conditions have valid column and value
     const allConditionsValid = (conditions: any): boolean => {
-      if (!conditions || typeof conditions !== 'object') {
+      if (!conditions || typeof conditions !== "object") {
         return false;
       }
 
       // If it's a condition (not a group), check if column and value are filled
-      if (conditions.filterType === 'condition') {
-        return !!(conditions.column && conditions.value !== undefined && conditions.value !== '');
+      if (conditions.filterType === "condition") {
+        return !!(
+          conditions.column &&
+          conditions.value !== undefined &&
+          conditions.value !== ""
+        );
       }
 
       // If it's a group, recursively check all nested conditions
-      if (conditions.filterType === 'group' && Array.isArray(conditions.conditions)) {
+      if (
+        conditions.filterType === "group" &&
+        Array.isArray(conditions.conditions)
+      ) {
         // All conditions must be valid (using .every() instead of .some())
-        return conditions.conditions.every((cond: any) => allConditionsValid(cond));
+        return conditions.conditions.every((cond: any) =>
+          allConditionsValid(cond),
+        );
       }
 
       return false;
@@ -1278,7 +1805,7 @@ export default defineComponent({
       if (aggregation.having) {
         const { column, operator, value } = aggregation.having;
         // All having fields must be filled
-        return !!(column && operator && value !== undefined && value !== '');
+        return !!(column && operator && value !== undefined && value !== "");
       }
 
       // If no having clause but aggregation is enabled, it's still valid
@@ -1290,15 +1817,17 @@ export default defineComponent({
     const generateSqlFromBackend = async () => {
       try {
         // Only generate if we have conditions and stream info
-        if (!formData.value.stream_name ||
-            !formData.value.query_condition?.conditions ||
-            Object.keys(formData.value.query_condition.conditions).length === 0) {
+        if (
+          !formData.value.stream_name ||
+          !formData.value.query_condition?.conditions ||
+          Object.keys(formData.value.query_condition.conditions).length === 0
+        ) {
           // Don't clear SQL, just skip the API call
           return;
         }
 
         // Skip if not in custom mode
-        if (formData.value.query_condition.type !== 'custom') {
+        if (formData.value.query_condition.type !== "custom") {
           return;
         }
 
@@ -1318,9 +1847,9 @@ export default defineComponent({
         // Prepare payload
         const payload: any = {
           stream_name: formData.value.stream_name,
-          stream_type: formData.value.stream_type || 'logs',
+          stream_type: formData.value.stream_type || "logs",
           query_condition: {
-            type: 'custom',
+            type: "custom",
             conditions: {
               version: 2,
               conditions: formData.value.query_condition.conditions,
@@ -1329,10 +1858,16 @@ export default defineComponent({
         };
 
         // Only include aggregation if enabled
-        if (isAggregationEnabled.value && formData.value.query_condition.aggregation) {
+        if (
+          isAggregationEnabled.value &&
+          formData.value.query_condition.aggregation
+        ) {
           // Filter out empty strings from group_by array
-          const groupBy = formData.value.query_condition.aggregation.group_by || [];
-          const filteredGroupBy = groupBy.filter((field: string) => field && field.trim() !== '');
+          const groupBy =
+            formData.value.query_condition.aggregation.group_by || [];
+          const filteredGroupBy = groupBy.filter(
+            (field: string) => field && field.trim() !== "",
+          );
 
           payload.query_condition.aggregation = {
             ...formData.value.query_condition.aggregation,
@@ -1342,7 +1877,7 @@ export default defineComponent({
 
         const response = await alertsService.generate_sql(
           store.state.selectedOrganization.identifier,
-          payload
+          payload,
         );
 
         if (response.data && response.data.sql) {
@@ -1357,7 +1892,7 @@ export default defineComponent({
           previewAlertRef.value?.refreshData();
         }
       } catch (error) {
-        console.error('Error generating SQL from backend:', error);
+        console.error("Error generating SQL from backend:", error);
         // Fallback to local generation if API fails
         const localSql = generateSqlQueryLocal();
         generatedSqlQuery.value = localSql;
@@ -1378,7 +1913,7 @@ export default defineComponent({
     const onInputUpdate = async (name: string, value: any) => {
       // Trigger SQL generation when conditions change
       // SQL generation will automatically update previewQuery and trigger preview refresh
-      if (formData.value.query_condition.type === 'custom') {
+      if (formData.value.query_condition.type === "custom") {
         debouncedGenerateSql();
       } else if (showPreview.value) {
         // Only call preview directly if not in custom mode
@@ -1451,7 +1986,9 @@ export default defineComponent({
 
       // For scheduled alerts: Skip validation if query type is "sql" or "promql" - users write custom queries there
       // For real-time alerts: Always validate since they use the conditions UI
-      const isRealTime = formData.value.is_real_time === "true" || formData.value.is_real_time === true;
+      const isRealTime =
+        formData.value.is_real_time === "true" ||
+        formData.value.is_real_time === true;
       const isScheduled = !isRealTime;
       const queryType = formData.value.query_condition?.type;
 
@@ -1462,10 +1999,8 @@ export default defineComponent({
       // Use the already filtered fields from originalStreamFields
       // These are already filtered by UDS in updateStreamFields function
       const allowedFieldNames = new Set(
-        originalStreamFields.value.map((field: any) => field.value)
+        originalStreamFields.value.map((field: any) => field.value),
       );
-
-
 
       // Recursively collect all column names used in conditions
       const invalidFields: string[] = [];
@@ -1474,7 +2009,11 @@ export default defineComponent({
         if (!condition) return;
 
         // V2: If it's a condition group (has conditions array with filterType: "group")
-        if (condition.filterType === "group" && condition.conditions && Array.isArray(condition.conditions)) {
+        if (
+          condition.filterType === "group" &&
+          condition.conditions &&
+          Array.isArray(condition.conditions)
+        ) {
           condition.conditions.forEach((item: any) => {
             checkConditionFields(item);
           });
@@ -1489,7 +2028,11 @@ export default defineComponent({
         else if (condition.column) {
           // Check if the column is in the allowed fields
           // Skip empty columns
-          if (condition.column && condition.column !== "" && !allowedFieldNames.has(condition.column)) {
+          if (
+            condition.column &&
+            condition.column !== "" &&
+            !allowedFieldNames.has(condition.column)
+          ) {
             // Add to invalid fields if not already present
             if (!invalidFields.includes(condition.column)) {
               invalidFields.push(condition.column);
@@ -1519,8 +2062,13 @@ export default defineComponent({
           queryType === "custom" &&
           formData.value.query_condition?.aggregation?.having?.column
         ) {
-          const havingColumn = formData.value.query_condition.aggregation.having.column;
-          if (havingColumn && havingColumn !== "" && !allowedFieldNames.has(havingColumn)) {
+          const havingColumn =
+            formData.value.query_condition.aggregation.having.column;
+          if (
+            havingColumn &&
+            havingColumn !== "" &&
+            !allowedFieldNames.has(havingColumn)
+          ) {
             if (!invalidFields.includes(havingColumn)) {
               invalidFields.push(havingColumn);
             }
@@ -1534,19 +2082,21 @@ export default defineComponent({
           formData.value.query_condition?.aggregation?.group_by &&
           Array.isArray(formData.value.query_condition.aggregation.group_by)
         ) {
-          formData.value.query_condition.aggregation.group_by.forEach((field: string) => {
-            if (field && field !== "" && !allowedFieldNames.has(field)) {
-              if (!invalidFields.includes(field)) {
-                invalidFields.push(field);
+          formData.value.query_condition.aggregation.group_by.forEach(
+            (field: string) => {
+              if (field && field !== "" && !allowedFieldNames.has(field)) {
+                if (!invalidFields.includes(field)) {
+                  invalidFields.push(field);
+                }
               }
-            }
-          });
+            },
+          );
         }
       }
 
       return {
         isValid: invalidFields.length === 0,
-        invalidFields
+        invalidFields,
       };
     };
 
@@ -1566,7 +2116,7 @@ export default defineComponent({
       if (value) {
         formData.value.trigger_condition.silence = value;
       }
-    }
+    };
 
     const routeToCreateDestination = () => {
       const url = router.resolve({
@@ -1585,7 +2135,10 @@ export default defineComponent({
       if (err.response?.status !== HTTP_FORBIDDEN) {
         q.notify({
           type: "negative",
-          message: err.response?.data?.message || err.response?.data?.error || err.response?.data,
+          message:
+            err.response?.data?.message ||
+            err.response?.data?.error ||
+            err.response?.data,
         });
       }
     };
@@ -1595,29 +2148,29 @@ export default defineComponent({
 
     const refreshDestinations = () => {
       emit("refresh:destinations");
-    }
+    };
     const refreshTemplates = () => {
       emit("refresh:templates");
-    }
+    };
     const updateDestinations = (destinations: any[]) => {
       formData.value.destinations = destinations;
-    }
+    };
 
     const updateTab = (tab: string) => {
       // Save to formData so it persists when navigating between steps
       formData.value.query_condition.type = tab;
-    }
+    };
 
     const handleGoToSqlEditor = () => {
       // Switch to SQL mode
-      formData.value.query_condition.type = 'sql';
+      formData.value.query_condition.type = "sql";
       // Navigate to step 2 (Query Config)
       wizardStep.value = 2;
-    }
+    };
 
     const clearMultiWindows = () => {
       formData.value.query_condition.multi_time_range = [];
-    }
+    };
 
     // Handle editor state change - track if editor is open
     const handleEditorStateChanged = (isOpen: boolean) => {
@@ -1626,55 +2179,59 @@ export default defineComponent({
 
     // Handle editor closed event - refresh preview when SQL editor dialog closes
     const handleEditorClosed = () => {
-      if (previewAlertRef.value && typeof previewAlertRef.value.refreshData === 'function') {
+      if (
+        previewAlertRef.value &&
+        typeof previewAlertRef.value.refreshData === "function"
+      ) {
         previewAlertRef.value.refreshData();
       }
     };
 
+    // Method to handle the emitted changes and update the structure
+    const updateGroup = (updatedGroup: any) => {
+      const transformContext: TransformContext = { formData: formData.value };
+      updateGroupUtil(updatedGroup, transformContext);
+    };
+    const removeConditionGroup = (
+      targetGroupId: string,
+      currentGroup?: any,
+    ) => {
+      const transformContext: TransformContext = { formData: formData.value };
+      removeConditionGroupUtil(targetGroupId, currentGroup, transformContext);
+    };
 
-// Method to handle the emitted changes and update the structure
-  const updateGroup = (updatedGroup: any) => {
-    const transformContext: TransformContext = { formData: formData.value };
-    updateGroupUtil(updatedGroup, transformContext);
-  };
-  const removeConditionGroup = (targetGroupId: string, currentGroup?: any) => {
-    const transformContext: TransformContext = { formData: formData.value };
-    removeConditionGroupUtil(targetGroupId, currentGroup, transformContext);
-  };
+    // Method to transform the form data to the backend format
+    //so in the FE we are constructing the data like
+    //eg:
+    // {
+    //   groupId: '123',
+    //   label: 'and',
+    //   items: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
+    // }
+    // but in the BE we are expecting the data like
+    // {
+    //   and: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
+    // }
+    const transformFEToBE = (node: any) => {
+      return transformFEToBEUtil(node);
+    };
 
-
-  // Method to transform the form data to the backend format
-  //so in the FE we are constructing the data like 
-  //eg: 
-  // {
-  //   groupId: '123',
-  //   label: 'and',
-  //   items: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
-  // }
-  // but in the BE we are expecting the data like 
-  // {
-  //   and: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
-  // }
-  const transformFEToBE = (node: any) => {
-    return transformFEToBEUtil(node);
-  };
-
-  // Method to transform the backend data to the frontend format
-  //when we get response from the BE we need to transform it to the frontend format
-  //eg: 
-  // {
-  //   and: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
-  // }
-  // to
-  // {
-  //   groupId: '123',  
-  //   label: 'and',
-  //   items: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
-  // }
-  const retransformBEToFE = (data: any) => {
-    return retransformBEToFEUtil(data);
-  };
-  const validateFormAndNavigateToErrorField = async (formRef: any) => {
+    // Method to transform the backend data to the frontend format
+    //when we get response from the BE we need to transform it to the frontend format
+    //eg:
+    // {
+    //   and: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
+    // }
+    // to
+    // {
+    //   groupId: '123',
+    //   label: 'and',
+    //   items: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
+    // }
+    const retransformBEToFE = (data: any) => {
+      return retransformBEToFEUtil(data);
+    };
+    const validateFormAndNavigateToErrorField = async (formRef: any) => {
       const isValid = await formRef.validate().then(async (valid: any) => {
         return valid;
       });
@@ -1683,14 +2240,14 @@ export default defineComponent({
         return false;
       }
       return true;
-    }
+    };
 
     const navigateToErrorField = (formRef: any) => {
-      const errorField = formRef.$el.querySelector('.q-field--error');
+      const errorField = formRef.$el.querySelector(".q-field--error");
       if (errorField) {
-        errorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        errorField.scrollIntoView({ behavior: "smooth", block: "center" });
       }
-    }
+    };
 
     const loadPanelDataIfPresent = async () => {
       const route = router.currentRoute.value;
@@ -1698,7 +2255,9 @@ export default defineComponent({
       if (route.query.fromPanel === "true" && route.query.panelData) {
         isLoadingPanelData.value = true;
         try {
-          const panelData = JSON.parse(decodeURIComponent(route.query.panelData as string));
+          const panelData = JSON.parse(
+            decodeURIComponent(route.query.panelData as string),
+          );
 
           if (panelData.queries && panelData.queries.length > 0) {
             const query = panelData.queries[0];
@@ -1708,22 +2267,22 @@ export default defineComponent({
             // Collapse multiple underscores, trim leading/trailing underscores
             // Limit length to 200 characters (reasonable limit for alert names)
             const sanitizePanelTitle = (title: string | undefined): string => {
-              if (!title || title.trim() === '') {
-                return 'panel';
+              if (!title || title.trim() === "") {
+                return "panel";
               }
 
               // Replace invalid characters with underscores
-              let sanitized = title.replace(/[:#?&%'"\s]+/g, '_');
+              let sanitized = title.replace(/[:#?&%'"\s]+/g, "_");
 
               // Collapse multiple consecutive underscores into single underscore
-              sanitized = sanitized.replace(/_+/g, '_');
+              sanitized = sanitized.replace(/_+/g, "_");
 
               // Remove leading/trailing underscores
-              sanitized = sanitized.replace(/^_+|_+$/g, '');
+              sanitized = sanitized.replace(/^_+|_+$/g, "");
 
               // If empty after sanitization, use default
-              if (sanitized === '') {
-                return 'panel';
+              if (sanitized === "") {
+                return "panel";
               }
 
               // Truncate to reasonable length (leaving room for "Alert_from_" prefix)
@@ -1731,7 +2290,7 @@ export default defineComponent({
               if (sanitized.length > maxLength) {
                 sanitized = sanitized.substring(0, maxLength);
                 // Remove trailing underscore if truncation created one
-                sanitized = sanitized.replace(/_+$/, '');
+                sanitized = sanitized.replace(/_+$/, "");
               }
 
               return sanitized;
@@ -1742,7 +2301,9 @@ export default defineComponent({
             // Show notification that query was imported
             q.notify({
               type: "positive",
-              message: t("alerts.importedFromPanel", { panelTitle: panelData.panelTitle }),
+              message: t("alerts.importedFromPanel", {
+                panelTitle: panelData.panelTitle,
+              }),
               timeout: 3000,
             });
 
@@ -1767,9 +2328,14 @@ export default defineComponent({
 
                 // If threshold is provided and we have a SQL query with GROUP BY,
                 // add a HAVING clause to filter the aggregated column
-                if (panelData.threshold !== undefined && panelData.condition && panelData.yAxisColumn) {
+                if (
+                  panelData.threshold !== undefined &&
+                  panelData.condition &&
+                  panelData.yAxisColumn
+                ) {
                   const threshold = panelData.threshold;
-                  const operator = panelData.condition === 'above' ? '>=' : '<=';
+                  const operator =
+                    panelData.condition === "above" ? ">=" : "<=";
                   const yAxisColumn = panelData.yAxisColumn;
 
                   // Use node-sql-parser to properly insert HAVING clause in the correct position
@@ -1778,7 +2344,13 @@ export default defineComponent({
                   if (!parser) {
                     await importSqlParser();
                   }
-                  sqlQuery = addHavingClauseToQuery(sqlQuery, yAxisColumn, operator, threshold, parser);
+                  sqlQuery = addHavingClauseToQuery(
+                    sqlQuery,
+                    yAxisColumn,
+                    operator,
+                    threshold,
+                    parser,
+                  );
                 }
 
                 formData.value.query_condition.sql = sqlQuery;
@@ -1797,7 +2369,11 @@ export default defineComponent({
             }
 
             // Handle query builder fields for SQL panels
-            if (panelData.queryType === "sql" && query.customQuery === false && query.fields) {
+            if (
+              panelData.queryType === "sql" &&
+              query.customQuery === false &&
+              query.fields
+            ) {
               // Enable aggregation for query builder generated SQL
               isAggregationEnabled.value = true;
 
@@ -1813,7 +2389,8 @@ export default defineComponent({
                     },
                   };
                 }
-                formData.value.query_condition.aggregation.group_by = query.fields.x.map((x: any) => x.alias || x.column);
+                formData.value.query_condition.aggregation.group_by =
+                  query.fields.x.map((x: any) => x.alias || x.column);
               }
 
               if (query.fields.y && query.fields.y.length > 0) {
@@ -1830,25 +2407,31 @@ export default defineComponent({
                       },
                     };
                   }
-                  formData.value.query_condition.aggregation.function = yField.aggregationFunction.toLowerCase();
+                  formData.value.query_condition.aggregation.function =
+                    yField.aggregationFunction.toLowerCase();
                   // Set the having.column to the Y-axis field for threshold comparison
-                  formData.value.query_condition.aggregation.having.column = yField.alias || yField.column;
+                  formData.value.query_condition.aggregation.having.column =
+                    yField.alias || yField.column;
                 }
               }
 
               if (query.fields.filter && query.fields.filter.length > 0) {
                 const conditions: any[] = [];
                 query.fields.filter.forEach((filter: any) => {
-                  if (filter.type === 'list' && filter.values && filter.values.length > 0) {
+                  if (
+                    filter.type === "list" &&
+                    filter.values &&
+                    filter.values.length > 0
+                  ) {
                     // V2: Create condition with filterType and logicalOperator
                     conditions.push({
-                      filterType: 'condition',
+                      filterType: "condition",
                       column: filter.column,
                       operator: "=",
                       value: filter.values[0],
                       values: [],
-                      logicalOperator: 'AND',
-                      id: getUUID()
+                      logicalOperator: "AND",
+                      id: getUUID(),
                     });
                   }
                 });
@@ -1856,10 +2439,10 @@ export default defineComponent({
                 if (conditions.length > 0) {
                   // V2: Create group with filterType and conditions array
                   formData.value.query_condition.conditions = {
-                    filterType: 'group',
-                    logicalOperator: 'AND',
+                    filterType: "group",
+                    logicalOperator: "AND",
                     groupId: getUUID(),
-                    conditions: conditions
+                    conditions: conditions,
                   };
                 }
               }
@@ -1867,12 +2450,14 @@ export default defineComponent({
 
             if (query.vrlFunctionQuery) {
               showVrlFunction.value = true;
-              formData.value.query_condition.vrl_function = query.vrlFunctionQuery;
+              formData.value.query_condition.vrl_function =
+                query.vrlFunctionQuery;
             }
 
             if (panelData.timeRange?.value_type === "relative") {
               const relativeValue = panelData.timeRange.relative_value || 15;
-              const relativePeriod = panelData.timeRange.relative_period || "Minutes";
+              const relativePeriod =
+                panelData.timeRange.relative_period || "Minutes";
 
               let periodInMinutes = relativeValue;
               if (relativePeriod === "Hours") {
@@ -1892,22 +2477,26 @@ export default defineComponent({
               // For PromQL: use promql_condition for value comparison
               // In both cases, set trigger_condition.threshold to 1 (fire when any row/result is returned)
 
-              if (panelData.queryType === 'promql') {
+              if (panelData.queryType === "promql") {
                 // For PromQL: Set up promql_condition with the threshold
                 if (!formData.value.query_condition.promql_condition) {
                   formData.value.query_condition.promql_condition = {
-                    column: 'value',
-                    operator: '>=',
+                    column: "value",
+                    operator: ">=",
                     value: 1,
                   };
                 }
-                formData.value.query_condition.promql_condition.value = panelData.threshold;
+                formData.value.query_condition.promql_condition.value =
+                  panelData.threshold;
                 formData.value.query_condition.promql_condition.operator =
-                  panelData.condition === 'above' ? '>=' : '<=';
+                  panelData.condition === "above" ? ">=" : "<=";
               } else {
                 // For SQL: Set up aggregation HAVING clause with the threshold
                 // If aggregation is enabled, set the having clause
-                if (isAggregationEnabled.value && formData.value.query_condition.aggregation) {
+                if (
+                  isAggregationEnabled.value &&
+                  formData.value.query_condition.aggregation
+                ) {
                   if (!formData.value.query_condition.aggregation.having) {
                     formData.value.query_condition.aggregation.having = {
                       column: "",
@@ -1915,9 +2504,10 @@ export default defineComponent({
                       value: 1,
                     };
                   }
-                  formData.value.query_condition.aggregation.having.value = panelData.threshold;
+                  formData.value.query_condition.aggregation.having.value =
+                    panelData.threshold;
                   formData.value.query_condition.aggregation.having.operator =
-                    panelData.condition === 'above' ? '>=' : '<=';
+                    panelData.condition === "above" ? ">=" : "<=";
                 }
               }
 
@@ -1925,7 +2515,7 @@ export default defineComponent({
               // This means: fire the alert when ANY row is returned from the query
               // (The actual value comparison is done in HAVING clause for SQL or in PromQL query)
               formData.value.trigger_condition.threshold = 1;
-              formData.value.trigger_condition.operator = '>=';
+              formData.value.trigger_condition.operator = ">=";
             }
           }
 
@@ -1940,14 +2530,13 @@ export default defineComponent({
           q.notify({
             type: "negative",
             message: "Failed to load panel data",
-            timeout: 2000
+            timeout: 2000,
           });
         } finally {
           isLoadingPanelData.value = false;
         }
       }
     };
-
 
     const openJsonEditor = () => {
       showJsonEditorDialog.value = true;
@@ -1961,11 +2550,16 @@ export default defineComponent({
         emit,
         router,
         isAggregationEnabled,
-        activeFolderId: { value: Array.isArray(activeFolderId.value) ? activeFolderId.value[0] : activeFolderId.value },
+        activeFolderId: {
+          value: Array.isArray(activeFolderId.value)
+            ? activeFolderId.value[0]
+            : activeFolderId.value,
+        },
         handleAlertError,
       };
 
-      const prepareAndSaveAlertFunction = (data: any) => prepareAndSaveAlertUtil(data, saveContext);
+      const prepareAndSaveAlertFunction = (data: any) =>
+        prepareAndSaveAlertUtil(data, saveContext);
 
       const jsonValidationContext: JsonValidationContext = {
         q,
@@ -1994,21 +2588,22 @@ export default defineComponent({
         return; // Stop navigation if validation fails
       }
 
-      // Anomaly Detection selected: leave the alert wizard and go to the dedicated wizard,
-      // carrying stream_type and stream_name forward as query params.
-      if (formData.value.is_real_time === 'anomaly' && wizardStep.value === 1) {
-        router.push({
-          name: "addAnomalyDetection",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-            stream_type: formData.value.stream_type || undefined,
-            stream_name: formData.value.stream_name || undefined,
-          },
-        });
+      // Anomaly Detection: navigate within the same wizard (steps 1→2→3)
+      if (formData.value.is_real_time === "anomaly") {
+        if (wizardStep.value === 2 && anomalyStep2Ref.value) {
+          const valid = await anomalyStep2Ref.value.validate();
+          if (!valid) return;
+        }
+        if (wizardStep.value < 3) {
+          wizardStep.value = wizardStep.value + 1;
+          if (wizardStep.value > lastValidStep.value) {
+            lastValidStep.value = wizardStep.value;
+          }
+        }
         return;
       }
 
-      if (formData.value.is_real_time === 'true') {
+      if (formData.value.is_real_time === "true") {
         // For real-time alerts: 1 -> 2 -> 4 -> 6 (skip 3 and 5)
         if (wizardStep.value === 2) {
           wizardStep.value = 4;
@@ -2042,33 +2637,33 @@ export default defineComponent({
         }
       }
 
-
       // Step 2: Query Config
       if (stepNumber === 2) {
         if (step2Ref.value && (step2Ref.value as any).validate) {
           const validationResult = (step2Ref.value as any).validate();
 
           // Handle async validation
-          const isValid = validationResult instanceof Promise
-            ? await validationResult
-            : validationResult;
+          const isValid =
+            validationResult instanceof Promise
+              ? await validationResult
+              : validationResult;
 
           if (!isValid) {
             // Don't show toast notification for custom mode
             // The fields themselves should show validation errors
-            const queryType = formData.value.query_condition.type || 'custom';
+            const queryType = formData.value.query_condition.type || "custom";
 
             // Only show toast for SQL mode
-            if (queryType === 'sql') {
-              let errorMsg = '';
+            if (queryType === "sql") {
+              let errorMsg = "";
               if (sqlQueryErrorMsg.value) {
                 errorMsg = `SQL validation error: ${sqlQueryErrorMsg.value}`;
               } else {
-                errorMsg = 'Please provide a valid SQL query.';
+                errorMsg = "Please provide a valid SQL query.";
               }
 
               q.notify({
-                type: 'negative',
+                type: "negative",
                 message: errorMsg,
                 timeout: 2000,
               });
@@ -2085,20 +2680,22 @@ export default defineComponent({
           const validationResult = (step4Ref.value as any).validate();
 
           // Handle async validation
-          const result = validationResult instanceof Promise
-            ? await validationResult
-            : validationResult;
+          const result =
+            validationResult instanceof Promise
+              ? await validationResult
+              : validationResult;
 
           // Handle validation result - could be boolean (backward compat) or object
-          const isValid = typeof result === 'boolean' ? result : result.valid;
-          const errorMessage = typeof result === 'object' ? result.message : null;
+          const isValid = typeof result === "boolean" ? result : result.valid;
+          const errorMessage =
+            typeof result === "object" ? result.message : null;
 
           if (!isValid) {
             // Show toaster only if there's a specific error message
             // If message is null, it means inline validation errors are sufficient
             if (errorMessage) {
               q.notify({
-                type: 'negative',
+                type: "negative",
                 message: errorMessage,
                 timeout: 1500,
               });
@@ -2126,11 +2723,13 @@ export default defineComponent({
       // Use nextTick to ensure DOM is updated with error states
       nextTick(() => {
         // Find the first field with error class
-        const errorField = document.querySelector('.q-field--error input, .q-field--error .q-select__dropdown-icon');
+        const errorField = document.querySelector(
+          ".q-field--error input, .q-field--error .q-select__dropdown-icon",
+        );
         if (errorField) {
           (errorField as HTMLElement).focus();
           // Scroll to the error field
-          errorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          errorField.scrollIntoView({ behavior: "smooth", block: "center" });
         }
       });
     };
@@ -2139,7 +2738,12 @@ export default defineComponent({
     // This way we don't fight with Quasar's navigation system
 
     const goToPreviousStep = () => {
-      if (formData.value.is_real_time === 'true') {
+      if (formData.value.is_real_time === "anomaly") {
+        // Anomaly: 3 -> 2 -> 1
+        if (wizardStep.value > 1) wizardStep.value = wizardStep.value - 1;
+        return;
+      }
+      if (formData.value.is_real_time === "true") {
         // For real-time alerts: 6 -> 4 -> 2 -> 1 (skip 5 and 3)
         if (wizardStep.value === 6) {
           wizardStep.value = 4;
@@ -2155,21 +2759,83 @@ export default defineComponent({
     };
 
     const isLastStep = computed(() => {
-      if (formData.value.is_real_time === 'true') {
-        // For real-time alerts, step 6 is the last step
-        return wizardStep.value === 6;
-      } else {
-        // For scheduled alerts, step 6 is also the last step
-        return wizardStep.value === 6;
+      if (formData.value.is_real_time === "anomaly") {
+        return wizardStep.value === 3;
       }
+      // Both real-time and scheduled: step 6 is last
+      return wizardStep.value === 6;
     });
 
-    // Allow saving after completing all required steps (1, 2, 4)
+    // Allow saving after completing all required steps
     const canSaveAlert = computed(() => {
+      if (formData.value.is_real_time === "anomaly") {
+        // Anomaly: allow save from any step (save button always enabled)
+        return true;
+      }
       // Required steps: 1 (Alert Setup), 2 (Conditions), 4 (Alert Settings)
       // Optional steps: 3 (Compare Past), 5 (Deduplication), 6 (Advanced)
       return wizardStep.value >= 4;
     });
+
+    // ── Anomaly Detection save ──────────────────────────────────────────────
+    const anomalySaving = ref(false);
+
+    const saveAnomalyDetection = async () => {
+      anomalySaving.value = true;
+      try {
+        const orgId = store.state.selectedOrganization.identifier;
+        const c = anomalyConfig.value;
+        const payload: any = {
+          name: c.name,
+          description: c.description || undefined,
+          stream_name: c.stream_name,
+          stream_type: c.stream_type,
+          query_mode: c.query_mode,
+          filters: c.query_mode === "filters" ? c.filters : undefined,
+          custom_sql: c.query_mode === "custom_sql" ? c.custom_sql : undefined,
+          detection_function: c.detection_function,
+          histogram_interval: anomalyHistogramInterval.value,
+          schedule_interval: anomalyScheduleInterval.value,
+          detection_window_seconds: anomalyDetectionWindowSeconds.value,
+          training_window_days: c.training_window_days,
+          retrain_interval_days: c.retrain_interval_days,
+          percentile: c.threshold,
+          alert_enabled: c.alert_enabled,
+          alert_destination_id: c.alert_enabled
+            ? c.alert_destination_id
+            : undefined,
+          folder_id: (activeFolderId.value as string) || "default",
+        };
+
+        await anomalyDetectionService.create(orgId, payload);
+
+        q.notify({
+          type: "positive",
+          message:
+            t("alerts.anomalyCreated") ||
+            "Anomaly detection config created. Training will start shortly.",
+        });
+
+        emit("update:list");
+        router.push({
+          name: "alertList",
+          query: {
+            org_identifier: orgId,
+            tab: "anomalyDetection",
+          },
+        });
+      } catch (err: any) {
+        q.notify({
+          type: "negative",
+          message:
+            err?.response?.data?.message || "Failed to save anomaly config.",
+        });
+      } finally {
+        anomalySaving.value = false;
+      }
+    };
+
+    // ── End Anomaly Detection save ──────────────────────────────────────────
 
     return {
       t,
@@ -2288,6 +2954,15 @@ export default defineComponent({
       handleEditorClosed,
       handleEditorStateChanged,
       isEditorOpen,
+      // Anomaly Detection
+      isAnomalyMode,
+      anomalyConfig,
+      anomalyStep2Ref,
+      anomalyPreviewSql,
+      showAnomalySummary,
+      anomalySummarySectionStyle,
+      saveAnomalyDetection,
+      anomalySaving,
     };
   },
 
@@ -2298,12 +2973,13 @@ export default defineComponent({
 
     // Check if this is from a dashboard panel - if so, don't set default query type
     const route = this.router.currentRoute.value;
-    const isFromPanel = route.query.fromPanel === "true" && route.query.panelData;
+    const isFromPanel =
+      route.query.fromPanel === "true" && route.query.panelData;
 
-    if(!this.isUpdated){
-      this.formData.is_real_time = this.alertType === 'realTime'? true : false;
+    if (!this.isUpdated) {
+      this.formData.is_real_time = this.alertType === "realTime" ? true : false;
     }
-      this.formData.is_real_time = this.formData.is_real_time.toString();
+    this.formData.is_real_time = this.formData.is_real_time.toString();
 
     // If from panel, load panel data BEFORE initializing child components
     if (isFromPanel) {
@@ -2336,13 +3012,15 @@ export default defineComponent({
       // this makes sure that we dont pass any null values while creating or updating an existing alert
       if (this.formData.query_condition.promql_condition) {
         if (!this.formData.query_condition.promql_condition.column) {
-          this.formData.query_condition.promql_condition.column = 'value';
+          this.formData.query_condition.promql_condition.column = "value";
         }
         if (!this.formData.query_condition.promql_condition.operator) {
-          this.formData.query_condition.promql_condition.operator = '>=';
+          this.formData.query_condition.promql_condition.operator = ">=";
         }
-        if (this.formData.query_condition.promql_condition.value === undefined ||
-            this.formData.query_condition.promql_condition.value === null) {
+        if (
+          this.formData.query_condition.promql_condition.value === undefined ||
+          this.formData.query_condition.promql_condition.value === null
+        ) {
           this.formData.query_condition.promql_condition.value = 1;
         }
       }
@@ -2374,7 +3052,11 @@ export default defineComponent({
 
     this.formData.is_real_time = this.formData.is_real_time.toString();
     // Convert context_attributes from object to array format (only if it's an object)
-    if (this.formData.context_attributes && typeof this.formData.context_attributes === 'object' && !Array.isArray(this.formData.context_attributes)) {
+    if (
+      this.formData.context_attributes &&
+      typeof this.formData.context_attributes === "object" &&
+      !Array.isArray(this.formData.context_attributes)
+    ) {
       this.formData.context_attributes = Object.keys(
         this.formData.context_attributes,
       ).map((attr) => {
@@ -2396,47 +3078,81 @@ export default defineComponent({
 
     // Check for V2 format from backend
     // Backend sends: query_condition: { conditions: { version: 2, conditions: {...} } }
-    if (this.formData.query_condition.conditions?.version === "2" || this.formData.query_condition.conditions?.version === 2) {
+    if (
+      this.formData.query_condition.conditions?.version === "2" ||
+      this.formData.query_condition.conditions?.version === 2
+    ) {
       // V2: Extract the nested conditions object
       // Backend sends { version: 2, conditions: {...} }, we need just the inner conditions
-      this.formData.query_condition.conditions = ensureIds(this.formData.query_condition.conditions.conditions);
-    } else if(this.formData.query_condition.conditions && ( !Array.isArray(this.formData.query_condition.conditions) && Object.keys(this.formData.query_condition.conditions).length != 0)){
+      this.formData.query_condition.conditions = ensureIds(
+        this.formData.query_condition.conditions.conditions,
+      );
+    } else if (
+      this.formData.query_condition.conditions &&
+      !Array.isArray(this.formData.query_condition.conditions) &&
+      Object.keys(this.formData.query_condition.conditions).length != 0
+    ) {
       // No version field - could be V1 or old V2
       // Detect version by structure
-      const version = detectConditionsVersion(this.formData.query_condition.conditions);
+      const version = detectConditionsVersion(
+        this.formData.query_condition.conditions,
+      );
 
       if (version === 0) {
         // V0: Flat array format - convert to V2
         // V0 had implicit AND between all conditions (no groups)
-        this.formData.query_condition.conditions = ensureIds(convertV0ToV2(this.formData.query_condition.conditions));
+        this.formData.query_condition.conditions = ensureIds(
+          convertV0ToV2(this.formData.query_condition.conditions),
+        );
       } else if (version === 1) {
         // V1 format - need to convert to V2
         // First check if it's BE format ({and: [...]}) or FE format ({label, items, groupId})
-        if (this.formData.query_condition.conditions.and || this.formData.query_condition.conditions.or) {
+        if (
+          this.formData.query_condition.conditions.and ||
+          this.formData.query_condition.conditions.or
+        ) {
           // V1 Backend format - convert to V2
-          this.formData.query_condition.conditions = ensureIds(convertV1BEToV2(this.formData.query_condition.conditions));
-        } else if (this.formData.query_condition.conditions.label && this.formData.query_condition.conditions.items) {
+          this.formData.query_condition.conditions = ensureIds(
+            convertV1BEToV2(this.formData.query_condition.conditions),
+          );
+        } else if (
+          this.formData.query_condition.conditions.label &&
+          this.formData.query_condition.conditions.items
+        ) {
           // V1 Frontend format - convert to V2
-          // this wont be executed atleast once but we are keeping it incase any FE logics got saved already 
-          this.formData.query_condition.conditions = ensureIds(convertV1ToV2(this.formData.query_condition.conditions));
+          // this wont be executed atleast once but we are keeping it incase any FE logics got saved already
+          this.formData.query_condition.conditions = ensureIds(
+            convertV1ToV2(this.formData.query_condition.conditions),
+          );
         }
       } else {
         // V2 format - ensure all IDs exist
-        this.formData.query_condition.conditions = ensureIds(this.formData.query_condition.conditions);
+        this.formData.query_condition.conditions = ensureIds(
+          this.formData.query_condition.conditions,
+        );
       }
-    } else if (Array.isArray(this.formData.query_condition.conditions) && this.formData.query_condition.conditions.length > 0) {
+    } else if (
+      Array.isArray(this.formData.query_condition.conditions) &&
+      this.formData.query_condition.conditions.length > 0
+    ) {
       // V0: Flat array of conditions - convert to V2
       // This handles the case where conditions is directly an array at the top level
-      this.formData.query_condition.conditions = ensureIds(convertV0ToV2(this.formData.query_condition.conditions));
-    }
-    else if (this.formData.query_condition.conditions == null || this.formData.query_condition.conditions == undefined || this.formData.query_condition.conditions.length == 0 || Object.keys(this.formData.query_condition.conditions).length == 0){
+      this.formData.query_condition.conditions = ensureIds(
+        convertV0ToV2(this.formData.query_condition.conditions),
+      );
+    } else if (
+      this.formData.query_condition.conditions == null ||
+      this.formData.query_condition.conditions == undefined ||
+      this.formData.query_condition.conditions.length == 0 ||
+      Object.keys(this.formData.query_condition.conditions).length == 0
+    ) {
       // No conditions - create empty V2 group
       this.formData.query_condition.conditions = {
-        filterType: 'group',
-        logicalOperator: 'AND',
+        filterType: "group",
+        logicalOperator: "AND",
         conditions: [],
         groupId: getUUID(),
-      }
+      };
     }
   },
 
@@ -2453,6 +3169,14 @@ export default defineComponent({
         type: "negative",
         message: `${rejectedEntries.length} file(s) did not pass validation constraints`,
       });
+    },
+
+    handleSave() {
+      if ((this as any).formData.is_real_time === "anomaly") {
+        (this as any).saveAnomalyDetection();
+      } else {
+        this.onSubmit();
+      }
     },
 
     async onSubmit() {
@@ -2480,9 +3204,10 @@ export default defineComponent({
       // Validate Step 2: Query Config
       if (this.$refs.step2Ref && (this.$refs.step2Ref as any).validate) {
         const validationResult = (this.$refs.step2Ref as any).validate();
-        const isValid = validationResult instanceof Promise
-          ? await validationResult
-          : validationResult;
+        const isValid =
+          validationResult instanceof Promise
+            ? await validationResult
+            : validationResult;
         if (!isValid) {
           this.wizardStep = 2;
           this.q.notify({
@@ -2500,12 +3225,13 @@ export default defineComponent({
       // Validate Step 4: Alert Settings
       if (this.$refs.step4Ref && (this.$refs.step4Ref as any).validate) {
         const validationResult = (this.$refs.step4Ref as any).validate();
-        const result = validationResult instanceof Promise
-          ? await validationResult
-          : validationResult;
+        const result =
+          validationResult instanceof Promise
+            ? await validationResult
+            : validationResult;
 
         // Handle validation result - could be boolean (backward compat) or object
-        const isValid = typeof result === 'boolean' ? result : result.valid;
+        const isValid = typeof result === "boolean" ? result : result.valid;
 
         if (!isValid) {
           this.wizardStep = 4;
@@ -2531,7 +3257,6 @@ export default defineComponent({
         });
         return false;
       }
-
 
       if (
         this.formData.is_real_time == "false" &&
@@ -2562,150 +3287,153 @@ export default defineComponent({
 
         this.formData.tz_offset = convertedDateTime.offset;
       }
-              // Validate that conditions use only available fields (respects UDS filtering if configured)
-        // Only validates "custom" query type - skips "sql" and "promql" as users write custom queries
-        const udsValidation = this.validateConditionsAgainstUDS();
-        if (!udsValidation.isValid) {
-          const invalidCount = udsValidation.invalidFields.length;
-          let message = '';
+      // Validate that conditions use only available fields (respects UDS filtering if configured)
+      // Only validates "custom" query type - skips "sql" and "promql" as users write custom queries
+      const udsValidation = this.validateConditionsAgainstUDS();
+      if (!udsValidation.isValid) {
+        const invalidCount = udsValidation.invalidFields.length;
+        let message = "";
 
-          if (invalidCount === 1) {
-            // Single field - show the field name
-            message = `Field "${udsValidation.invalidFields[0]}" is not available. Please use only the available fields in your conditions.`;
-          } else if (invalidCount <= 3) {
-            // 2-3 fields - show all field names
-            message = `Fields ${udsValidation.invalidFields.map((f: string) => `"${f}"`).join(', ')} are not available. Please use only the available fields in your conditions.`;
-          } else {
-            // More than 3 fields - show count and first few fields
-            const firstThree = udsValidation.invalidFields.slice(0, 3).map((f: string) => `"${f}"`).join(', ');
-            const remaining = invalidCount - 3;
-            message = `${invalidCount} fields are not available (${firstThree} and ${remaining} more). Please use only the available fields in your conditions.`;
-          }
-
-          this.q.notify({
-            type: "negative",
-            message: message,
-            timeout: 6000,
-          });
-
-          // Navigate back to step 2 (Query) where fields can be corrected
-          this.wizardStep = 2;
-
-          return false;
+        if (invalidCount === 1) {
+          // Single field - show the field name
+          message = `Field "${udsValidation.invalidFields[0]}" is not available. Please use only the available fields in your conditions.`;
+        } else if (invalidCount <= 3) {
+          // 2-3 fields - show all field names
+          message = `Fields ${udsValidation.invalidFields.map((f: string) => `"${f}"`).join(", ")} are not available. Please use only the available fields in your conditions.`;
+        } else {
+          // More than 3 fields - show count and first few fields
+          const firstThree = udsValidation.invalidFields
+            .slice(0, 3)
+            .map((f: string) => `"${f}"`)
+            .join(", ");
+          const remaining = invalidCount - 3;
+          message = `${invalidCount} fields are not available (${firstThree} and ${remaining} more). Please use only the available fields in your conditions.`;
         }
+
+        this.q.notify({
+          type: "negative",
+          message: message,
+          timeout: 6000,
+        });
+
+        // Navigate back to step 2 (Query) where fields can be corrected
+        this.wizardStep = 2;
+
+        return false;
+      }
 
       const payload = this.getAlertPayload();
 
       const dismiss = this.q.notify({
-          spinner: true,
-          message: "Please wait...",
-          timeout: 2000,
-        });
+        spinner: true,
+        message: "Please wait...",
+        timeout: 2000,
+      });
 
-        if (
-          this.formData.is_real_time == "false" &&
-          this.formData.query_condition.type == "sql"
-        ) {
-          try {
-            // Wait for the promise to resolve
-            // Storing the SQL query validation promise in a variable
-            // Case: When user edits the query and directly saves it without waiting for the validation to complete
-            // So waiting here for sql validation to complete
-            await this.validateSqlQueryPromise;
-          } catch (error) {
+      if (
+        this.formData.is_real_time == "false" &&
+        this.formData.query_condition.type == "sql"
+      ) {
+        try {
+          // Wait for the promise to resolve
+          // Storing the SQL query validation promise in a variable
+          // Case: When user edits the query and directly saves it without waiting for the validation to complete
+          // So waiting here for sql validation to complete
+          await this.validateSqlQueryPromise;
+        } catch (error) {
+          dismiss();
+          this.q.notify({
+            type: "negative",
+            message:
+              "Error while validating sql query. Please check the query and try again.",
+            timeout: 1500,
+          });
+          console.error("Error while validating sql query", error);
+          return false;
+        }
+      }
 
+      // VERSION HANDLING
+      // All conditions are converted to V2 format during data loading,
+      // so we always wrap with version field for backend
+      // Backend expects: query_condition: { conditions: { version: 2, conditions: {...} } }
+      payload.query_condition.conditions = {
+        version: 2,
+        conditions: this.formData.query_condition.conditions,
+      };
+
+      if (this.beingUpdated) {
+        payload.folder_id =
+          this.router.currentRoute.value.query.folder || "default";
+        callAlert = alertsService.update_by_alert_id(
+          this.store.state.selectedOrganization.identifier,
+          payload,
+          this.activeFolderId,
+        );
+        callAlert
+          .then((res: { data: any }) => {
+            this.formData = { ...defaultValue() };
+            this.$emit("update:list", this.activeFolderId);
+            this.addAlertForm.resetValidation();
             dismiss();
             this.q.notify({
-              type: "negative",
-              message: "Error while validating sql query. Please check the query and try again.",
-              timeout: 1500,
+              type: "positive",
+              message: `Alert updated successfully.`,
             });
-            console.error("Error while validating sql query",error);
-            return false;
-          }
-        }
+          })
+          .catch((err: any) => {
+            dismiss();
+            this.handleAlertError(err);
+          });
+        this.track("Button Click", {
+          button: "Update Alert",
+          page: "Alerts",
+        });
+        segment.track("Button Click", {
+          button: "Update Alert",
+          user_org: this.store.state.selectedOrganization.identifier,
+          user_id: this.store.state.userInfo.email,
+          stream_name: this.formData.stream_name,
+          alert_name: this.formData.name,
+          page: "Add/Update Alert",
+        });
+        return;
+      } else {
+        payload.folder_id = this.activeFolderId;
+        callAlert = alertsService.create_by_alert_id(
+          this.store.state.selectedOrganization.identifier,
+          payload,
+          this.activeFolderId,
+        );
 
-        // VERSION HANDLING
-        // All conditions are converted to V2 format during data loading,
-        // so we always wrap with version field for backend
-        // Backend expects: query_condition: { conditions: { version: 2, conditions: {...} } }
-        payload.query_condition.conditions = {
-          version: 2,
-          conditions: this.formData.query_condition.conditions,
-        };
-
-        if (this.beingUpdated) {
-          payload.folder_id = this.router.currentRoute.value.query.folder || "default";
-          callAlert = alertsService.update_by_alert_id(
-            this.store.state.selectedOrganization.identifier,
-            payload,
-            this.activeFolderId
-          );
-          callAlert
-            .then((res: { data: any }) => {
-              this.formData = { ...defaultValue() };
-              this.$emit("update:list", this.activeFolderId);
-              this.addAlertForm.resetValidation();
-              dismiss();
-              this.q.notify({
-                type: "positive",
-                message: `Alert updated successfully.`,
-              });
-            })
-            .catch((err: any) => {
-              dismiss();
-              this.handleAlertError(err);
+        callAlert
+          .then((res: { data: any }) => {
+            this.formData = { ...defaultValue() };
+            this.$emit("update:list", this.activeFolderId);
+            this.addAlertForm.resetValidation();
+            dismiss();
+            this.q.notify({
+              type: "positive",
+              message: `Alert saved successfully.`,
             });
-          this.track("Button Click", {
-            button: "Update Alert",
-            page: "Alerts"
+          })
+          .catch((err: any) => {
+            dismiss();
+            this.handleAlertError(err);
           });
-          segment.track("Button Click", {
-            button: "Update Alert",
-            user_org: this.store.state.selectedOrganization.identifier,
-            user_id: this.store.state.userInfo.email,
-            stream_name: this.formData.stream_name,
-            alert_name: this.formData.name,
-            page: "Add/Update Alert",
-          });
-          return;
-        } else {
-          payload.folder_id = this.activeFolderId;
-          callAlert = alertsService.create_by_alert_id(
-            this.store.state.selectedOrganization.identifier,
-            payload,
-            this.activeFolderId
-          );
-
-          callAlert
-            .then((res: { data: any }) => {
-              this.formData = { ...defaultValue() };
-              this.$emit("update:list", this.activeFolderId);
-              this.addAlertForm.resetValidation();
-              dismiss();
-              this.q.notify({
-                type: "positive",
-                message: `Alert saved successfully.`,
-              });
-            })
-            .catch((err: any) => {
-              dismiss();
-              this.handleAlertError(err);
-            });
-          this.track("Button Click", {
-            button: "Create Alert",
-            page: "Alerts"
-          });
-          segment.track("Button Click", {
-            button: "Save Alert",
-            user_org: this.store.state.selectedOrganization.identifier,
-            user_id: this.store.state.userInfo.email,
-            stream_name: this.formData.stream_name,
-            alert_name: this.formData.name,
-            page: "Add/Update Alert",
-          });
-        }
-
+        this.track("Button Click", {
+          button: "Create Alert",
+          page: "Alerts",
+        });
+        segment.track("Button Click", {
+          button: "Save Alert",
+          user_org: this.store.state.selectedOrganization.identifier,
+          user_id: this.store.state.userInfo.email,
+          stream_name: this.formData.stream_name,
+          alert_name: this.formData.name,
+          page: "Add/Update Alert",
+        });
+      }
     },
   },
 });
@@ -2769,108 +3497,106 @@ export default defineComponent({
   }
 }
 
-.dark-mode{
-  .alert-setup-container{
-  background-color: #212121;
-  padding: 8px 16px;
-  margin-left: 8px;
-  border: 1px solid #343434;
-  border-top: 0px !important;
-  border-bottom-left-radius: 4px;
-  border-bottom-right-radius: 4px ;
+.dark-mode {
+  .alert-setup-container {
+    background-color: #212121;
+    padding: 8px 16px;
+    margin-left: 8px;
+    border: 1px solid #343434;
+    border-top: 0px !important;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+  }
+  .q-text-area-input > div > div {
+    background-color: rgb(30, 31, 31) !important;
+    border: 1px solid $input-border !important;
+  }
+  .dark-mode-row-template > div > div {
+    background-color: rgb(30, 31, 31) !important;
+    border: 1px solid $input-border !important;
+  }
+  .custom-input-label {
+    color: #bdbdbd;
+  }
 }
-.q-text-area-input > div > div  { 
-  background-color:rgb(30, 31, 31) !important;
-  border: 1px solid $input-border !important;
-}
-.dark-mode-row-template  > div > div  { 
-  background-color:rgb(30, 31, 31) !important;
-  border: 1px solid $input-border !important;
-}
-.custom-input-label{
-  color: #BDBDBD;
-}
-}
-.light-mode{
-  .alert-setup-container{
+.light-mode {
+  .alert-setup-container {
     background-color: #ffffff;
     padding: 8px 16px;
     margin-left: 8px;
     border: 1px solid #e6e6e6;
     border-top: 0px !important;
     border-bottom-left-radius: 4px;
-    border-bottom-right-radius: 4px ;
+    border-bottom-right-radius: 4px;
   }
-  .custom-input-label{
-    color: #5C5C5C;
+  .custom-input-label {
+    color: #5c5c5c;
   }
-  .q-field--labeled.showLabelOnTop.q-field .q-field__control{
+  .q-field--labeled.showLabelOnTop.q-field .q-field__control {
     border: 1px solid #d4d4d4;
   }
-  .add-folder-btn{
+  .add-folder-btn {
     border: 1px solid #d4d4d4;
   }
-  .dark-mode .q-text-area-input > div > div  { 
-  background-color: #181a1b !important;
-  border: 1px solid black !important;
-}
+  .dark-mode .q-text-area-input > div > div {
+    background-color: #181a1b !important;
+    border: 1px solid black !important;
+  }
 
-.light-mode .q-text-area-input > div > div  { 
-  background-color:#ffffff !important;
-  border: 1px solid #e0e0e0 !important;
+  .light-mode .q-text-area-input > div > div {
+    background-color: #ffffff !important;
+    border: 1px solid #e0e0e0 !important;
+  }
+  .dark-mode-row-template > div > div {
+    background-color: #181a1b !important;
+    border: 1px solid black !important;
+  }
+  .light-mode-row-template > div > div {
+    background-color: #ffffff !important;
+    border: 1px solid #e0e0e0 !important;
+  }
 }
-.dark-mode-row-template > div > div  { 
-  background-color: #181a1b !important;
-  border: 1px solid black !important;
+.q-text-area-input > div > div > div > textarea {
+  height: 80px !important;
+  resize: none !important;
 }
-.light-mode-row-template > div > div  { 
-  background-color:#ffffff !important;
-  border: 1px solid #e0e0e0 !important;
-}
-}
-.q-text-area-input > div > div > div > textarea{  
-    height: 80px !important;
-    resize: none !important;
-}
-.row-template-input > div > div > div > textarea{
+.row-template-input > div > div > div > textarea {
   height: 160px !important;
   resize: none !important;
 }
-.bottom-sticky-dark{
+.bottom-sticky-dark {
   background-color: #212121;
 }
-.bottom-sticky-light{
+.bottom-sticky-light {
   background-color: #ffffff;
-  border-top: 1px solid #d4d4d4
+  border-top: 1px solid #d4d4d4;
 }
-.input-box-bg-dark .q-field__control{
+.input-box-bg-dark .q-field__control {
   background-color: #181a1b !important;
 }
-.input-box-bg-light .q-field__control{
+.input-box-bg-light .q-field__control {
   background-color: #ffffff !important;
 }
-.input-border-dark .q-field__control{
+.input-border-dark .q-field__control {
   border: 1px solid #181a1b !important;
 }
-.input-border-light .q-field__control{
+.input-border-light .q-field__control {
   border: 1px solid #d4d4d4 !important;
 }
 
-
-.o2-alert-tab-border{
+.o2-alert-tab-border {
   border-top: 0.0625rem solid var(--o2-border-color);
 }
 
 // Wizard Stepper Styles
 .alert-wizard-stepper {
   box-shadow: none;
-  .q-stepper__step-inner{
+  .q-stepper__step-inner {
     padding: 0.375rem !important;
   }
-  .q-stepper__tab{
+  .q-stepper__tab {
     padding-left: 0.375rem !important;
     min-height: 30px !important;
-
   }
 
   :deep(.q-stepper__header) {
@@ -2965,5 +3691,4 @@ export default defineComponent({
   border-left: 3px solid #bdbdbd;
   padding-left: 12px !important;
 }
-
 </style>
