@@ -153,17 +153,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Custom SQL <span class="text-negative tw:ml-1">*</span>
           </div>
           <div style="width: calc(100% - 190px)">
-            <q-input
-              v-model="config.custom_sql"
-              dense
-              borderless
-              type="textarea"
-              rows="5"
-              placeholder="SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM stream_name GROUP BY time_bucket ORDER BY time_bucket"
-              :rules="[(v) => !!v || 'SQL is required in custom SQL mode']"
-              data-test="anomaly-custom-sql"
-              class="sql-input"
-            />
+            <div
+              class="custom-sql-editor-wrapper"
+              :class="store.state.theme === 'dark' ? 'dark-editor' : 'light-editor'"
+            >
+              <CodeQueryEditor
+                editor-id="anomaly-custom-sql-editor"
+                :query="config.custom_sql || ''"
+                language="sql"
+                :fields="allStreamFields"
+                :show-auto-complete="true"
+                class="tw:w-full tw:h-full"
+                data-test="anomaly-custom-sql"
+                @update:query="config.custom_sql = $event"
+              />
+            </div>
+            <div
+              v-if="!config.custom_sql"
+              class="text-red-8 q-pt-xs"
+              style="font-size: 11px; line-height: 12px"
+            >
+              SQL is required in custom SQL mode
+            </div>
             <div
               class="text-caption tw:mt-1"
               :class="
@@ -637,9 +648,12 @@ import {
   ANOMALY_FILTER_OPERATORS,
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
+import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 
 export default defineComponent({
   name: "AnomalyDetectionConfig",
+
+  components: { CodeQueryEditor },
 
   props: {
     config: {
@@ -756,7 +770,11 @@ export default defineComponent({
     };
 
     const validate = async (): Promise<boolean> => {
-      return formRef.value ? formRef.value.validate() : true;
+      const formValid = formRef.value ? await formRef.value.validate() : true;
+      if (props.config.query_mode === "custom_sql" && !props.config.custom_sql) {
+        return false;
+      }
+      return formValid;
     };
 
     return {
@@ -813,22 +831,18 @@ export default defineComponent({
   padding-bottom: 0 !important;
 }
 
-// SQL textarea — border applied directly to the Quasar field control
-.sql-input {
-  :deep(.q-field__control) {
+// Monaco SQL editor wrapper
+.custom-sql-editor-wrapper {
+  height: 140px;
+  border-radius: 0.25rem;
+  overflow: hidden;
+
+  &.light-editor {
     border: 1px solid rgba(0, 0, 0, 0.12);
-    border-radius: 0.25rem;
-    padding: 0;
   }
 
-  :deep(.q-field__native) {
-    font-family: monospace;
-    font-size: 0.75rem;
-    padding: 0.5rem 0.75rem;
-  }
-
-  .body--dark & :deep(.q-field__control) {
-    border-color: rgba(255, 255, 255, 0.18);
+  &.dark-editor {
+    border: 1px solid rgba(255, 255, 255, 0.18);
   }
 }
 
