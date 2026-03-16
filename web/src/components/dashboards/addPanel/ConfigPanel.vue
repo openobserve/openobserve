@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           borderless
           dense
           label-slot
-          placeholder="e.g., 30s, 1m, 5m, 1h"
+          :placeholder="t('dashboard.intervalInputPlaceholder')"
           data-test="dashboard-config-step-value"
           hide-bottom-space
         >
@@ -612,7 +612,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               label-slot
               :type="'number'"
-              placeholder="Auto"
+              :placeholder="t('dashboard.auto')"
               data-test="dashboard-config-legend-width"
               hide-bottom-space
             ></q-input>
@@ -673,7 +673,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               label-slot
               :type="'number'"
-              placeholder="Auto"
+              :placeholder="t('dashboard.auto')"
               data-test="dashboard-config-legend-height"
               hide-bottom-space
             ></q-input>
@@ -979,7 +979,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           borderless
           dense
           label-slot
-          placeholder="ALL"
+          :placeholder="t('dashboard.placeholderAll')"
           :type="'number'"
           :disable="
             dashboardPanelData.data.queries[
@@ -1155,7 +1155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           label-slot
           :type="'number'"
-          placeholder="Auto"
+          :placeholder="t('dashboard.auto')"
           @update:model-value="
             (value: any) =>
               (dashboardPanelData.data.config.axis_width =
@@ -1196,7 +1196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             label-slot
             :type="'number'"
-            placeholder="Auto"
+            :placeholder="t('dashboard.auto')"
             @update:model-value="
               (value: any) =>
                 (dashboardPanelData.data.config.y_axis_min =
@@ -1238,7 +1238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             label-slot
             :type="'number'"
-            placeholder="Auto"
+            :placeholder="t('dashboard.auto')"
             @update:model-value="
               (value: any) =>
                 (dashboardPanelData.data.config.y_axis_max =
@@ -1662,7 +1662,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           borderless
           hide-bottom-space
           type="number"
-          placeholder="Auto"
+          :placeholder="t('dashboard.auto')"
           min="1"
         >
           <template v-slot:label>
@@ -1723,8 +1723,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               self="top middle"
               max-width="250px"
             >
-              Enhance table readability by mapping values to custom text and
-              background colors for clearer data visualization.
+              {{ t("dashboard.configSectionValueTransformationsTooltip") }}
             </q-tooltip>
           </q-btn>
         </div>
@@ -1767,7 +1766,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               self="top middle"
               max-width="250px"
             >
-              Map units to the selected columns for enhanced data visualization.
+              {{ t("dashboard.configSectionFieldOverridesTooltip") }}
             </q-tooltip>
           </q-btn>
         </div>
@@ -1819,7 +1818,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("dashboard.mapsMapType") }}
               <q-icon class="q-ml-xs" size="20px" name="info" />
               <q-tooltip class="bg-grey-8" max-width="250px">
-                Map type to display. Default: "world"
+                {{ t("dashboard.mapsMapTypeTooltip") }}
               </q-tooltip>
             </div>
           </template>
@@ -2230,7 +2229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             stack-label
             dense
             :type="'number'"
-            placeholder="Auto"
+            :placeholder="t('dashboard.auto')"
             data-test="trellis-chart-num-of-columns"
             :disable="isBreakdownFieldEmpty || hasTimeShifts"
             :min="1"

@@ -21,8 +21,8 @@
       style="cursor: pointer; padding: 0px 5px"
       :label="
         dashboardPanelData.data.config.mappings.length
-          ? ' Edit Value Mapping'
-          : ' Add Value Mapping'
+          ? t('dashboard.editValueMapping')
+          : t('dashboard.addValueMapping')
       "
       no-caps
       data-test="dashboard-addpanel-config-drilldown-add-btn"
@@ -43,6 +43,7 @@
 
 <script lang="ts">
 import { defineComponent, inject, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ValueMappingPopUp from "./ValueMappingPopUp.vue";
@@ -53,6 +54,7 @@ export default defineComponent({
   components: { ValueMappingPopUp },
   props: [],
   setup() {
+    const { t } = useI18n();
     const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
@@ -81,6 +83,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       store,
       dashboardPanelData,
       showValueMappingPopUp,
