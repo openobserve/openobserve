@@ -157,13 +157,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="custom-sql-editor-wrapper"
               :class="store.state.theme === 'dark' ? 'dark-editor' : 'light-editor'"
             >
-              <CodeQueryEditor
-                editor-id="anomaly-custom-sql-editor"
+              <QueryEditor
+                data-test-prefix="anomaly-custom-sql"
                 :query="config.custom_sql || ''"
-                language="sql"
-                :fields="allStreamFields"
+                :keywords="allStreamFields"
                 :show-auto-complete="true"
-                class="tw:w-full tw:h-full"
+                :disable-ai="!config.stream_name"
+                :disable-ai-reason="!config.stream_name ? 'Select a stream first' : ''"
+                editor-height="100%"
                 data-test="anomaly-custom-sql"
                 @update:query="config.custom_sql = $event"
               />
@@ -648,12 +649,12 @@ import {
   ANOMALY_FILTER_OPERATORS,
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
-import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
+import QueryEditor from "@/components/QueryEditor.vue";
 
 export default defineComponent({
   name: "AnomalyDetectionConfig",
 
-  components: { CodeQueryEditor },
+  components: { QueryEditor },
 
   props: {
     config: {
@@ -687,6 +688,10 @@ export default defineComponent({
       { label: "7 days", value: 7 },
       { label: "14 days", value: 14 },
     ];
+
+    // Build default SQL template for a given stream name and histogram interval
+    const buildDefaultSql = (streamName: string, intervalValue: number, intervalUnit: string) =>
+      `SELECT histogram(_timestamp, '${intervalValue}${intervalUnit}') AS time_bucket, count(*) AS value\nFROM "${streamName}"\nGROUP BY time_bucket\nORDER BY time_bucket`;
 
     // Stream fields for filter field selector and detection function field
     const allStreamFields = ref<string[]>([]);
@@ -757,8 +762,36 @@ export default defineComponent({
 
     watch(
       () => [props.config.stream_name, props.config.stream_type],
-      () => loadStreamFields(),
+      ([streamName]) => {
+        loadStreamFields();
+        // Pre-fill default SQL when switching to custom_sql mode with a selected stream
+        if (
+          props.config.query_mode === "custom_sql" &&
+          streamName &&
+          !props.config.custom_sql
+        ) {
+          props.config.custom_sql = buildDefaultSql(
+            streamName as string,
+            props.config.histogram_interval_value ?? 5,
+            props.config.histogram_interval_unit ?? "m",
+          );
+        }
+      },
       { immediate: true },
+    );
+
+    // When switching to custom_sql mode, seed a default query if one isn't set
+    watch(
+      () => props.config.query_mode,
+      (mode) => {
+        if (mode === "custom_sql" && props.config.stream_name && !props.config.custom_sql) {
+          props.config.custom_sql = buildDefaultSql(
+            props.config.stream_name,
+            props.config.histogram_interval_value ?? 5,
+            props.config.histogram_interval_unit ?? "m",
+          );
+        }
+      },
     );
 
     const addFilter = () => {
