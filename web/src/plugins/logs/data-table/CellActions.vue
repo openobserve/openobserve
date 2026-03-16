@@ -1,13 +1,13 @@
 <template>
   <div
-    class="field_overlay tw:absolute tw:right-0 tw:top-[50%] table-cell-actions tw:translate-y-[-50%]"
+    class="field_overlay tw:absolute tw:right-0 tw:top-[50%] tw:translate-y-1/2 table-cell-actions tw:translate-y-[-50%] tw:h-full! tw:flex! tw:items-center tw:justify-center tw:rounded"
     :class="backgroundClass"
     :title="row[column.id]"
     :data-test="`log-add-data-from-column-${row[column.id]}`"
   >
     <q-btn
-      class="q-mr-xs"
-      size="6px"
+      class="q-mx-xs"
+      size="0.375rem"
       @click.prevent.stop="copyLogToClipboard(row[column.id])"
       title="Copy"
       round
@@ -16,7 +16,7 @@
     <q-btn
       v-if="isStreamField && !hideSearchTermActions"
       class="q-mr-xs"
-      size="6px"
+      size="0.375rem"
       @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'include')"
       :data-test="`log-details-include-field-${row[column.id]}`"
       title="Include Term"
@@ -28,11 +28,12 @@
     </q-btn>
     <q-btn
       v-if="isStreamField && !hideSearchTermActions"
-      size="6px"
+      size="0.375rem"
       @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'exclude')"
       title="Exclude Term"
       :data-test="`log-details-exclude-field-${row[column.id]}`"
       round
+      class="q-mr-xs"
     >
       <q-icon style="height: 8px; width: 8px">
         <NotEqualIcon></NotEqualIcon>
