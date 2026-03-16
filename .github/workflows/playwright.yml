@@ -182,6 +182,7 @@ jobs:
                 "dashboard-chartJson.spec.js",
                 "dashboard-promql-suggestions.spec.js",
                 "dashboard-share-link.spec.js",
+                "crossLinking.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
