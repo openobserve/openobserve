@@ -175,7 +175,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <!-- SQL Preview -->
-          <div class="preview-box" style="flex: 1; min-height: 150px;">
+          <div
+            class="preview-box"
+            :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'"
+            style="flex: 1; min-height: 150px;"
+          >
             <div class="preview-header tw:flex tw:items-center tw:px-3 tw:py-2">
               <span class="preview-title">{{ config.query_mode === 'custom_sql' ? t("alerts.sqlPreview") : t("alerts.sqlPreview") }}</span>
             </div>
@@ -688,22 +692,19 @@ export default defineComponent({
 }
 
 .preview-box {
-  border-radius: 0.375rem;
+  border-radius: 8px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
-  background-color: var(--o2-primary-background, #f5f5f5);
 
   .preview-header {
-    border-bottom: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
+    border-bottom: 1px solid;
     flex-shrink: 0;
-    background-color: var(--o2-card-bg, #ffffff);
   }
 
   .preview-title {
     font-weight: 600;
-    font-size: 0.875rem;
+    font-size: 14px;
   }
 
   .preview-content {
@@ -714,11 +715,46 @@ export default defineComponent({
 
   .preview-code {
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-    font-size: 0.75rem;
+    font-size: 12px;
     margin: 0;
     white-space: pre-wrap;
     word-wrap: break-word;
-    color: var(--o2-text-primary);
+  }
+
+  &.dark-mode-preview {
+    background-color: #181a1b;
+    border: 1px solid #343434;
+
+    .preview-header {
+      background-color: #212121;
+      border-bottom-color: #343434;
+    }
+
+    .preview-title {
+      color: #ffffff;
+    }
+
+    .preview-code {
+      color: #e0e0e0;
+    }
+  }
+
+  &.light-mode-preview {
+    background-color: #f5f5f5;
+    border: 1px solid #e6e6e6;
+
+    .preview-header {
+      background-color: #ffffff;
+      border-bottom-color: #e6e6e6;
+    }
+
+    .preview-title {
+      color: #3d3d3d;
+    }
+
+    .preview-code {
+      color: #3d3d3d;
+    }
   }
 }
 
