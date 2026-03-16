@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   header.column.getToggleSortingHandler(),
                 )
               "
-              class="tw:overflow-hidden tw:text-ellipsis tw:tracking-[0.06rem] tw:text-[var(--o2-text-2)] tw:text-[0.75rem]"
+              class="tw:overflow-hidden tw:text-ellipsis tw:tracking-[0.06rem] tw:text-[var(--o2-text-2)] tw:text-[0.85rem]"
               :style="{ height: wrap ? '100%' : rowHeight + 'px' }"
             >
               <FlexRender
