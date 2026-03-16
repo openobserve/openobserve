@@ -37,14 +37,14 @@ export function useTracesTableColumns(
       return [
         {
           id: "timestamp",
-          header: "TIMESTAMP",
+          header: "Timestamp",
           size: 160,
           meta: { sortable: true, slot: true },
           sortable: true,
         },
         {
           id: "service",
-          header: "SERVICE",
+          header: "Service",
           size: 160,
           meta: {
             cellClass: "tw:text-[var(--o2-text-1)]",
@@ -53,7 +53,7 @@ export function useTracesTableColumns(
         },
         {
           id: "operation_name",
-          header: "OPERATION NAME",
+          header: "Operation Name",
           size: 200,
           meta: {
             cellClass: "tw:text-[var(--o2-text-1)]",
@@ -62,26 +62,26 @@ export function useTracesTableColumns(
         },
         {
           id: "duration",
-          header: "DURATION",
+          header: "Duration",
           size: 120,
           meta: { sortable: true, slot: true },
           sortable: true,
         },
         {
           id: "status",
-          header: "STATUS",
+          header: "Status",
           size: 120,
           meta: { align: "center", slot: true },
         },
         {
           id: "status_code",
-          header: "STATUS CODE",
+          header: "Status Code",
           size: 140,
           meta: { align: "center", slot: true },
         },
         {
           id: "method",
-          header: "METHOD",
+          header: "Method",
           size: 140,
           meta: { align: "center", slot: true },
         },
@@ -91,13 +91,13 @@ export function useTracesTableColumns(
     const base: ColumnDef<Record<string, any>>[] = [
       {
         id: "timestamp",
-        header: "TIMESTAMP",
+        header: "Timestamp",
         size: 160,
         meta: { sortable: true, slot: true },
       },
       {
         id: "service",
-        header: "SERVICE",
+        header: "Service",
         size: 180,
         meta: {
           cellClass: "tw:text-[var(--o2-text-1)]",
@@ -106,7 +106,7 @@ export function useTracesTableColumns(
       },
       {
         id: "operation_name",
-        header: "OPERATION NAME",
+        header: "Operation Name",
         size: 200,
         meta: {
           cellClass: "tw:text-[var(--o2-text-1)]",
@@ -115,20 +115,29 @@ export function useTracesTableColumns(
       },
       {
         id: "duration",
-        header: "DURATION",
+        header: "Duration",
         size: 120,
-        meta: { sortable: true, slot: true },
+        meta: {
+          sortable: true,
+          slot: true,
+          cellClass: "tw:text-[var(--o2-text-4)]!",
+        },
       },
       {
         id: "spans",
-        header: "SPANS",
+        header: "Spans",
         size: 100,
-        meta: { align: "center", slot: false, closable: true },
+        meta: {
+          align: "center",
+          slot: false,
+          closable: true,
+          cellClass: "tw:text-[var(--o2-text-1)]!",
+        },
         accessorFn: (row: any) => row.spans,
       },
       {
         id: "status",
-        header: "STATUS",
+        header: "Status",
         size: 120,
         meta: { align: "center", slot: true },
       },
@@ -138,19 +147,19 @@ export function useTracesTableColumns(
       ? [
           {
             id: "input_tokens",
-            header: "INPUT TOKENS",
+            header: "Input Tokens",
             size: 130,
             meta: { align: "right", slot: true },
           },
           {
             id: "output_tokens",
-            header: "OUTPUT TOKENS",
+            header: "Output Tokens",
             size: 130,
             meta: { align: "right", slot: true },
           },
           {
             id: "cost",
-            header: "COST",
+            header: "Cost",
             size: 130,
             meta: { align: "right", slot: true },
           },
@@ -160,7 +169,7 @@ export function useTracesTableColumns(
     const tail: ColumnDef<Record<string, any>>[] = [
       {
         id: "service_latency",
-        header: "SERVICE LATENCY",
+        header: "Service Latency",
         size: 160,
         meta: { slot: true },
       },
