@@ -4,6 +4,8 @@
  * by inspecting canvas pixel data directly.
  */
 
+const testLogger = require('../../utils/test-logger.js');
+
 /**
  * Verify that a specific RGB color appears on any canvas element via pixel analysis.
  * Scans every canvas in the page and counts pixels matching the target color (within tolerance).
@@ -63,11 +65,11 @@ export async function verifyColorOnCanvas(page, { r, g, b }, minPixels = 5) {
  * @param {number} [settleMs=2000] - Extra ms to wait after rAF for ECharts to finish
  */
 export async function waitForChartRepaint(page, pm, settleMs = 2000) {
-  await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+  await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartRepaint: waitForChartToRender failed", e.message));
   await page.waitForFunction(
     () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
     { timeout: 5000 }
-  ).catch(() => {});
+  ).catch((e) => testLogger.warn("waitForChartRepaint: rAF timeout", e.message));
   if (settleMs > 0) {
     await page.waitForTimeout(settleMs);
   }

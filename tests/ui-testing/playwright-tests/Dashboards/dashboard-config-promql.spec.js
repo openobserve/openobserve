@@ -290,6 +290,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await visibleColsInput.click();
     await visibleColsInput.pressSequentially("instance");
     await visibleColsInput.press("Enter");
+    await visibleColsInput.press("Escape"); // close dropdown so it doesn't intercept Apply button
     testLogger.info("Visible column 'instance' added");
 
     // Display-value in the q-field wrapper should now show "instance"
@@ -325,6 +326,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await hiddenColsInput.click();
     await hiddenColsInput.pressSequentially("job");
     await hiddenColsInput.press("Enter");
+    await hiddenColsInput.press("Escape"); // close dropdown so it doesn't intercept Apply button
     testLogger.info("Hidden column 'job' added");
 
     await expect(hiddenColsWrapper).toContainText("job");
@@ -360,6 +362,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await stickyColsInput.click();
     await stickyColsInput.pressSequentially("instance");
     await stickyColsInput.press("Enter");
+    await stickyColsInput.press("Escape"); // close dropdown so it doesn't intercept Apply button
     testLogger.info("Sticky column 'instance' added");
 
     await expect(stickyColsWrapper).toContainText("instance");
