@@ -747,7 +747,7 @@ const onFunctionClear = () => {
 };
 
 // Build multi-window query - includes all multi-windows automatically
-const buildMultiWindowQuery = (sql: string, fn: boolean, periodInMicroseconds: number) => {
+const buildMultiWindowQuery = (sql: string, periodInMicroseconds: number) => {
   const queryToSend: any[] = [];
 
   // Guard: If multiTimeRange is null, undefined, or empty, return empty array
@@ -783,7 +783,6 @@ const buildMultiWindowQuery = (sql: string, fn: boolean, periodInMicroseconds: n
       individualQuery.start_time = startTime - periodInMicroseconds;
       individualQuery.end_time = startTime;
       individualQuery.sql = sql;
-      individualQuery.query_fn = fn ? b64EncodeUnicode(vrlFunctionContent.value) : null;
       queryToSend.push(individualQuery);
     } else {
       console.warn("Invalid format:", date);
@@ -812,28 +811,22 @@ const triggerQuery = async (fn = false) => {
     const startTime = endTime - periodInMicroseconds;
     console.log('[QueryEditorDialog] Time range:', { startTime, endTime, periodInMicroseconds });
 
-    queryReq.query.query_fn = null;
+    queryReq.query.query_fn = fn ? b64EncodeUnicode(vrlFunctionContent.value) : null;
     queryReq.query.sql_mode = true;
     queryReq.query.per_query_response = true;
 
     console.log('[QueryEditorDialog] Step 4: Building query to send...');
-    //initial query to send like with period for suppose we have 10minutes of period then we will send 10 minutes of data
-    //so we will send 10 minutes of data in initial query
-    //and then if any multi window offset is selected then we will call buildMultiWindowQuery function to get the query to send
-    //and then we will push the query to send to the queryReq.query.sql
-
     let queryToSend = [
       {
         start_time: startTime,
         end_time: endTime,
         sql: queryReq.query.sql,
-        query_fn: fn ? b64EncodeUnicode(vrlFunctionContent.value) : null
       }
     ];
     console.log('[QueryEditorDialog] Initial queryToSend:', queryToSend);
 
     console.log('[QueryEditorDialog] Step 5: Calling buildMultiWindowQuery...');
-    const multiWindowQueries = buildMultiWindowQuery(queryReq.query.sql, fn, periodInMicroseconds);
+    const multiWindowQueries = buildMultiWindowQuery(queryReq.query.sql, periodInMicroseconds);
     console.log('[QueryEditorDialog] Multi-window queries:', multiWindowQueries);
 
     queryToSend.push(...multiWindowQueries);
