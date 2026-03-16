@@ -23,11 +23,14 @@ const mockUseDashboardPanelData = {
                 treatAsNonTimestamp: false,
                 args: [
                   { value: "5m" },
-                  { type: "field", value: { field: "field1", streamAlias: "" } }
+                  {
+                    type: "field",
+                    value: { field: "field1", streamAlias: "" },
+                  },
                 ],
                 isDerived: false,
-                havingConditions: []
-              }
+                havingConditions: [],
+              },
             ],
             y: [
               {
@@ -35,13 +38,16 @@ const mockUseDashboardPanelData = {
                 label: "Field 2",
                 functionName: "sum",
                 args: [
-                  { type: "field", value: { field: "field2", streamAlias: "" } }
+                  {
+                    type: "field",
+                    value: { field: "field2", streamAlias: "" },
+                  },
                 ],
                 color: "#ff0000",
                 treatAsNonTimestamp: false,
                 isDerived: false,
-                havingConditions: []
-              }
+                havingConditions: [],
+              },
             ],
             z: [
               {
@@ -49,12 +55,15 @@ const mockUseDashboardPanelData = {
                 label: "Field 3",
                 functionName: "avg",
                 args: [
-                  { type: "field", value: { field: "field3", streamAlias: "" } }
+                  {
+                    type: "field",
+                    value: { field: "field3", streamAlias: "" },
+                  },
                 ],
                 color: "#00ff00",
                 isDerived: false,
-                havingConditions: []
-              }
+                havingConditions: [],
+              },
             ],
             breakdown: [
               {
@@ -62,18 +71,21 @@ const mockUseDashboardPanelData = {
                 label: "Field 4",
                 functionName: "count",
                 args: [
-                  { type: "field", value: { field: "field4", streamAlias: "" } }
+                  {
+                    type: "field",
+                    value: { field: "field4", streamAlias: "" },
+                  },
                 ],
                 isDerived: false,
-                havingConditions: []
-              }
-            ]
-          }
-        }
-      ]
+                havingConditions: [],
+              },
+            ],
+          },
+        },
+      ],
     },
     layout: {
-      currentQueryIndex: 0
+      currentQueryIndex: 0,
     },
     meta: {
       dragAndDrop: {
@@ -82,12 +94,12 @@ const mockUseDashboardPanelData = {
         dragSourceIndex: -1,
         dragElement: null,
         targetDragIndex: -1,
-        currentDragArea: null
+        currentDragArea: null,
       },
       stream: {
-        customQueryFields: []
-      }
-    }
+        customQueryFields: [],
+      },
+    },
   },
   addXAxisItem: vi.fn(),
   addYAxisItem: vi.fn(),
@@ -110,79 +122,79 @@ const mockUseDashboardPanelData = {
       { name: "field1", type: "text" },
       { name: "field2", type: "number" },
       { name: "field3", type: "number" },
-      { name: "field4", type: "text" }
-    ]
-  }
+      { name: "field4", type: "text" },
+    ],
+  },
 };
 
 const mockUseNotifications = {
-  showErrorNotification: vi.fn()
+  showErrorNotification: vi.fn(),
 };
 
 const mockStore = {
   state: {
     zoConfig: {
-      timestamp_column: "_timestamp"
-    }
-  }
+      timestamp_column: "_timestamp",
+    },
+  },
 };
 
-vi.mock("../../../composables/useDashboardPanel", () => ({
-  default: () => mockUseDashboardPanelData
+vi.mock("../../../composables/dashboard/useDashboardPanel", () => ({
+  default: () => mockUseDashboardPanelData,
 }));
 
 vi.mock("@/composables/useNotifications", () => ({
-  default: () => mockUseNotifications
+  default: () => mockUseNotifications,
 }));
 
 vi.mock("vuex", () => ({
-  useStore: () => mockStore
+  useStore: () => mockStore,
 }));
 
 // Mock child components
 vi.mock("./DashboardGeoMapsQueryBuilder.vue", () => ({
-  default: { name: "DashboardGeoMapsQueryBuilder", template: "<div></div>" }
+  default: { name: "DashboardGeoMapsQueryBuilder", template: "<div></div>" },
 }));
 
 vi.mock("./DashboardMapsQueryBuilder.vue", () => ({
-  default: { name: "DashboardMapsQueryBuilder", template: "<div></div>" }
+  default: { name: "DashboardMapsQueryBuilder", template: "<div></div>" },
 }));
 
 vi.mock("./DashboardSankeyChartBuilder.vue", () => ({
-  default: { name: "DashboardSankeyChartBuilder", template: "<div></div>" }
+  default: { name: "DashboardSankeyChartBuilder", template: "<div></div>" },
 }));
 
 vi.mock("./SortByBtnGrp.vue", () => ({
-  default: { name: "SortByBtnGrp", template: "<div></div>" }
+  default: { name: "SortByBtnGrp", template: "<div></div>" },
 }));
 
 vi.mock("./HistogramIntervalDropDown.vue", () => ({
-  default: { 
-    name: "HistogramIntervalDropDown", 
+  default: {
+    name: "HistogramIntervalDropDown",
     template: "<div></div>",
     props: ["modelValue"],
-    emits: ["update:modelValue"]
-  }
+    emits: ["update:modelValue"],
+  },
 }));
 
 vi.mock("./CommonAutoComplete.vue", () => ({
-  default: { name: "CommonAutoComplete", template: "<div></div>" }
+  default: { name: "CommonAutoComplete", template: "<div></div>" },
 }));
 
 vi.mock("@/components/SanitizedHtmlRenderer.vue", () => ({
-  default: { name: "SanitizedHtmlRenderer", template: "<div></div>" }
+  default: { name: "SanitizedHtmlRenderer", template: "<div></div>" },
 }));
 
 vi.mock("@/views/Dashboards/addPanel/DashboardFiltersOption.vue", () => ({
-  default: { name: "DashboardFiltersOption", template: "<div></div>" }
+  default: { name: "DashboardFiltersOption", template: "<div></div>" },
 }));
 
 vi.mock("@/views/Dashboards/addPanel/DashboardJoinsOption.vue", () => ({
-  default: { name: "DashboardJoinsOption", template: "<div></div>" }
+  default: { name: "DashboardJoinsOption", template: "<div></div>" },
 }));
 
 vi.mock("@/views/Dashboards/addPanel/DynamicFunctionPopUp.vue", () => ({
-  default: { name: "DynamicFunctionPopUp", template: "<div></div>" }
+  default: { name: "DynamicFunctionPopUp", template: "<div></div>" },
 }));
 
 const i18n = createI18n({
@@ -197,7 +209,7 @@ const i18n = createI18n({
         zAxis: "Z Axis",
         breakdown: "Breakdown",
         joins: "Joins",
-        addJoin: "Add Join"
+        addJoin: "Add Join",
       },
       dashboard: {
         count: "Count",
@@ -218,30 +230,32 @@ const i18n = createI18n({
         oneFieldMessage: "Add one field here",
         maxtwofieldMessage: "Add maximum two fields here",
         zeroOrOneFieldMessage: "Add zero or one field here",
-        oneValueFieldMessage: "Add one value field here"
+        oneValueFieldMessage: "Add one value field here",
       },
       common: {
         aggregation: "Aggregation",
-        label: "Label"
-      }
-    }
-  }
+        label: "Label",
+      },
+    },
+  },
 });
 
 describe("DashboardQueryBuilder", () => {
   let wrapper: any;
   const dashboardData = {
     id: "test-dashboard",
-    title: "Test Dashboard"
+    title: "Test Dashboard",
   };
 
   const createWrapper = (overrides = {}) => {
-    const defaultMockData = JSON.parse(JSON.stringify(mockUseDashboardPanelData.dashboardPanelData));
-    
+    const defaultMockData = JSON.parse(
+      JSON.stringify(mockUseDashboardPanelData.dashboardPanelData),
+    );
+
     if (overrides) {
-      Object.keys(overrides).forEach(key => {
-        if (key.includes('.')) {
-          const keys = key.split('.');
+      Object.keys(overrides).forEach((key) => {
+        if (key.includes(".")) {
+          const keys = key.split(".");
           let target = defaultMockData;
           for (let i = 0; i < keys.length - 1; i++) {
             if (!target[keys[i]]) {
@@ -260,28 +274,28 @@ describe("DashboardQueryBuilder", () => {
 
     return mount(DashboardQueryBuilder, {
       props: {
-        dashboardData
+        dashboardData,
       },
       global: {
         plugins: [Quasar, i18n],
         provide: {
-          dashboardPanelDataPageKey: "dashboard"
+          dashboardPanelDataPageKey: "dashboard",
         },
         stubs: {
-          DashboardGeoMapsQueryBuilder: { 
-            name: "DashboardGeoMapsQueryBuilder", 
+          DashboardGeoMapsQueryBuilder: {
+            name: "DashboardGeoMapsQueryBuilder",
             template: "<div class='geo-maps-builder'></div>",
-            props: ["dashboardData"]
+            props: ["dashboardData"],
           },
-          DashboardMapsQueryBuilder: { 
-            name: "DashboardMapsQueryBuilder", 
+          DashboardMapsQueryBuilder: {
+            name: "DashboardMapsQueryBuilder",
             template: "<div class='maps-builder'></div>",
-            props: ["dashboardData"] 
+            props: ["dashboardData"],
           },
-          DashboardSankeyChartBuilder: { 
-            name: "DashboardSankeyChartBuilder", 
+          DashboardSankeyChartBuilder: {
+            name: "DashboardSankeyChartBuilder",
             template: "<div class='sankey-builder'></div>",
-            props: ["dashboardData"]
+            props: ["dashboardData"],
           },
           SortByBtnGrp: true,
           HistogramIntervalDropDown: true,
@@ -290,16 +304,16 @@ describe("DashboardQueryBuilder", () => {
           DashboardFiltersOption: {
             name: "DashboardFiltersOption",
             template: "<div class='filters-option'></div>",
-            props: ["dashboardData"]
+            props: ["dashboardData"],
           },
           DashboardJoinsOption: {
             name: "DashboardJoinsOption",
             template: "<div class='joins-option'></div>",
-            props: ["dashboardData"]
+            props: ["dashboardData"],
           },
           DynamicFunctionPopUp: {
             name: "DynamicFunctionPopUp",
-            template: "<div class='dynamic-function-popup'></div>"
+            template: "<div class='dynamic-function-popup'></div>",
           },
           QIcon: true,
           QTooltip: true,
@@ -309,9 +323,9 @@ describe("DashboardQueryBuilder", () => {
           QMenu: true,
           QSelect: true,
           QInput: true,
-          QCheckbox: true
-        }
-      }
+          QCheckbox: true,
+        },
+      },
     });
   };
 
@@ -335,11 +349,14 @@ describe("DashboardQueryBuilder", () => {
                   treatAsNonTimestamp: false,
                   args: [
                     { value: "5m" },
-                    { type: "field", value: { field: "field1", streamAlias: "" } }
+                    {
+                      type: "field",
+                      value: { field: "field1", streamAlias: "" },
+                    },
                   ],
                   isDerived: false,
-                  havingConditions: []
-                }
+                  havingConditions: [],
+                },
               ],
               y: [
                 {
@@ -347,13 +364,16 @@ describe("DashboardQueryBuilder", () => {
                   label: "Field 2",
                   functionName: "sum",
                   args: [
-                    { type: "field", value: { field: "field2", streamAlias: "" } }
+                    {
+                      type: "field",
+                      value: { field: "field2", streamAlias: "" },
+                    },
                   ],
                   color: "#ff0000",
                   treatAsNonTimestamp: false,
                   isDerived: false,
-                  havingConditions: []
-                }
+                  havingConditions: [],
+                },
               ],
               z: [
                 {
@@ -361,12 +381,15 @@ describe("DashboardQueryBuilder", () => {
                   label: "Field 3",
                   functionName: "avg",
                   args: [
-                    { type: "field", value: { field: "field3", streamAlias: "" } }
+                    {
+                      type: "field",
+                      value: { field: "field3", streamAlias: "" },
+                    },
                   ],
                   color: "#00ff00",
                   isDerived: false,
-                  havingConditions: []
-                }
+                  havingConditions: [],
+                },
               ],
               breakdown: [
                 {
@@ -374,18 +397,21 @@ describe("DashboardQueryBuilder", () => {
                   label: "Field 4",
                   functionName: "count",
                   args: [
-                    { type: "field", value: { field: "field4", streamAlias: "" } }
+                    {
+                      type: "field",
+                      value: { field: "field4", streamAlias: "" },
+                    },
                   ],
                   isDerived: false,
-                  havingConditions: []
-                }
-              ]
-            }
-          }
-        ]
+                  havingConditions: [],
+                },
+              ],
+            },
+          },
+        ],
       },
       layout: {
-        currentQueryIndex: 0
+        currentQueryIndex: 0,
       },
       meta: {
         dragAndDrop: {
@@ -394,14 +420,14 @@ describe("DashboardQueryBuilder", () => {
           dragSourceIndex: -1,
           dragElement: null,
           targetDragIndex: -1,
-          currentDragArea: null
+          currentDragArea: null,
         },
         stream: {
-          customQueryFields: []
-        }
-      }
+          customQueryFields: [],
+        },
+      },
     };
-    
+
     mockUseDashboardPanelData.promqlMode = false;
     mockUseDashboardPanelData.isAddXAxisNotAllowed.value = false;
     mockUseDashboardPanelData.isAddYAxisNotAllowed.value = false;
@@ -433,19 +459,27 @@ describe("DashboardQueryBuilder", () => {
     it("should not render main content for geomap type", () => {
       wrapper = createWrapper({ "data.type": "geomap" });
       // Should render child components like DashboardGeoMapsQueryBuilder
-      expect(wrapper.findComponent({ name: "DashboardGeoMapsQueryBuilder" }).exists()).toBe(true);
+      expect(
+        wrapper
+          .findComponent({ name: "DashboardGeoMapsQueryBuilder" })
+          .exists(),
+      ).toBe(true);
     });
 
     it("should not render main content for maps type", () => {
       wrapper = createWrapper({ "data.type": "maps" });
       // Should render child components like DashboardMapsQueryBuilder
-      expect(wrapper.findComponent({ name: "DashboardMapsQueryBuilder" }).exists()).toBe(true);
+      expect(
+        wrapper.findComponent({ name: "DashboardMapsQueryBuilder" }).exists(),
+      ).toBe(true);
     });
 
     it("should not render main content for sankey type", () => {
       wrapper = createWrapper({ "data.type": "sankey" });
       // Should render child components like DashboardSankeyChartBuilder
-      expect(wrapper.findComponent({ name: "DashboardSankeyChartBuilder" }).exists()).toBe(true);
+      expect(
+        wrapper.findComponent({ name: "DashboardSankeyChartBuilder" }).exists(),
+      ).toBe(true);
     });
 
     it("should render for supported chart types", () => {
@@ -460,8 +494,12 @@ describe("DashboardQueryBuilder", () => {
     });
 
     it("should have x-axis data in component", () => {
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.x).toBeDefined();
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.x).toHaveLength(1);
+      expect(
+        wrapper.vm.dashboardPanelData.data.queries[0].fields.x,
+      ).toBeDefined();
+      expect(
+        wrapper.vm.dashboardPanelData.data.queries[0].fields.x,
+      ).toHaveLength(1);
     });
 
     it("should display x-axis field data", () => {
@@ -485,7 +523,9 @@ describe("DashboardQueryBuilder", () => {
 
     it("should handle x-axis field removal", async () => {
       mockUseDashboardPanelData.removeXAxisItem("field1");
-      expect(mockUseDashboardPanelData.removeXAxisItem).toHaveBeenCalledWith("field1");
+      expect(mockUseDashboardPanelData.removeXAxisItem).toHaveBeenCalledWith(
+        "field1",
+      );
     });
 
     it("should show x-axis hint when no fields", () => {
@@ -529,8 +569,12 @@ describe("DashboardQueryBuilder", () => {
     });
 
     it("should have y-axis data in component", () => {
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.y).toBeDefined();
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.y).toHaveLength(1);
+      expect(
+        wrapper.vm.dashboardPanelData.data.queries[0].fields.y,
+      ).toBeDefined();
+      expect(
+        wrapper.vm.dashboardPanelData.data.queries[0].fields.y,
+      ).toHaveLength(1);
     });
 
     it("should display y-axis field data", () => {
@@ -554,7 +598,9 @@ describe("DashboardQueryBuilder", () => {
 
     it("should handle y-axis field removal", async () => {
       mockUseDashboardPanelData.removeYAxisItem("field2");
-      expect(mockUseDashboardPanelData.removeYAxisItem).toHaveBeenCalledWith("field2");
+      expect(mockUseDashboardPanelData.removeYAxisItem).toHaveBeenCalledWith(
+        "field2",
+      );
     });
 
     it("should handle aggregation function for y-axis", () => {
@@ -570,13 +616,13 @@ describe("DashboardQueryBuilder", () => {
     it("should handle color display for supported charts", () => {
       const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
       expect(field.color).toBe("#ff0000");
-      
+
       // Test table type doesn't show color
       wrapper.unmount();
       wrapper = createWrapper({ "data.type": "table" });
       expect(wrapper.vm.dashboardPanelData.data.type).toBe("table");
 
-      // Test pie type doesn't show color  
+      // Test pie type doesn't show color
       wrapper.unmount();
       wrapper = createWrapper({ "data.type": "pie" });
       expect(wrapper.vm.dashboardPanelData.data.type).toBe("pie");
@@ -585,7 +631,7 @@ describe("DashboardQueryBuilder", () => {
     it("should handle histogram configuration for y-axis", () => {
       wrapper = createWrapper({
         "data.queries.0.fields.y.0.functionName": "histogram",
-        "data.queries.0.fields.y.0.args": [{ value: "10m" }]
+        "data.queries.0.fields.y.0.args": [{ value: "10m" }],
       });
       const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
       expect(field.functionName).toBe("histogram");
@@ -599,8 +645,12 @@ describe("DashboardQueryBuilder", () => {
     });
 
     it("should have z-axis data for heatmap", () => {
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.z).toBeDefined();
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.z).toHaveLength(1);
+      expect(
+        wrapper.vm.dashboardPanelData.data.queries[0].fields.z,
+      ).toBeDefined();
+      expect(
+        wrapper.vm.dashboardPanelData.data.queries[0].fields.z,
+      ).toHaveLength(1);
       expect(wrapper.vm.dashboardPanelData.data.type).toBe("heatmap");
     });
 
@@ -612,7 +662,9 @@ describe("DashboardQueryBuilder", () => {
 
     it("should handle z-axis field removal", async () => {
       mockUseDashboardPanelData.removeZAxisItem("field3");
-      expect(mockUseDashboardPanelData.removeZAxisItem).toHaveBeenCalledWith("field3");
+      expect(mockUseDashboardPanelData.removeZAxisItem).toHaveBeenCalledWith(
+        "field3",
+      );
     });
 
     it("should handle aggregation function for z-axis", () => {
@@ -630,7 +682,9 @@ describe("DashboardQueryBuilder", () => {
       wrapper = createWrapper({ "data.type": "bar" });
       expect(wrapper.vm.dashboardPanelData.data.type).toBe("bar");
       // Z-axis should still exist in data but not be rendered
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.z).toBeDefined();
+      expect(
+        wrapper.vm.dashboardPanelData.data.queries[0].fields.z,
+      ).toBeDefined();
     });
   });
 
@@ -640,31 +694,48 @@ describe("DashboardQueryBuilder", () => {
     });
 
     it("should have breakdown data for supported charts", () => {
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown).toBeDefined();
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown).toHaveLength(1);
+      expect(
+        wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown,
+      ).toBeDefined();
+      expect(
+        wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown,
+      ).toHaveLength(1);
       expect(wrapper.vm.dashboardPanelData.data.type).toBe("area");
     });
 
     it("should display breakdown field data", () => {
-      const breakdownField = wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown[0];
+      const breakdownField =
+        wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown[0];
       expect(breakdownField.args[0].value.field).toBe("field4");
       expect(breakdownField.label).toBe("Field 4");
     });
 
     it("should handle breakdown field removal", async () => {
       mockUseDashboardPanelData.removeBreakdownItem("field4");
-      expect(mockUseDashboardPanelData.removeBreakdownItem).toHaveBeenCalledWith("field4");
+      expect(
+        mockUseDashboardPanelData.removeBreakdownItem,
+      ).toHaveBeenCalledWith("field4");
     });
 
     it("should handle aggregation function for breakdown", () => {
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown[0];
+      const field =
+        wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown[0];
       expect(field.functionName).toBe("count");
     });
 
     it("should render breakdown for supported chart types", () => {
-      const supportedTypes = ["area", "bar", "line", "h-bar", "h-stacked", "scatter", "area-stacked", "stacked"];
-      
-      supportedTypes.forEach(type => {
+      const supportedTypes = [
+        "area",
+        "bar",
+        "line",
+        "h-bar",
+        "h-stacked",
+        "scatter",
+        "area-stacked",
+        "stacked",
+      ];
+
+      supportedTypes.forEach((type) => {
         wrapper.unmount();
         wrapper = createWrapper({ "data.type": type });
         expect(wrapper.vm.dashboardPanelData.data.type).toBe(type);
@@ -673,13 +744,15 @@ describe("DashboardQueryBuilder", () => {
 
     it("should handle unsupported chart types", () => {
       const unsupportedTypes = ["pie", "donut", "metric", "table"];
-      
-      unsupportedTypes.forEach(type => {
+
+      unsupportedTypes.forEach((type) => {
         wrapper.unmount();
         wrapper = createWrapper({ "data.type": type });
         expect(wrapper.vm.dashboardPanelData.data.type).toBe(type);
         // Breakdown data still exists but may not be rendered
-        expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown).toBeDefined();
+        expect(
+          wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown,
+        ).toBeDefined();
       });
     });
   });
@@ -691,12 +764,18 @@ describe("DashboardQueryBuilder", () => {
 
     it("should handle drag start for x-axis field", async () => {
       const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
-      
+
       wrapper.vm.onFieldDragStart(mockEvent, { column: "field1" }, "x", 0);
-      
-      expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragging).toBe(true);
-      expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragSource).toBe("x");
-      expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragSourceIndex).toBe(0);
+
+      expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragging).toBe(
+        true,
+      );
+      expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragSource).toBe(
+        "x",
+      );
+      expect(
+        wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragSourceIndex,
+      ).toBe(0);
     });
 
     it("should handle drag over", () => {
@@ -708,14 +787,20 @@ describe("DashboardQueryBuilder", () => {
     it("should handle drag enter", () => {
       const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
       wrapper.vm.onDragEnter(mockEvent, "x", 1);
-      
-      expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.targetDragIndex).toBe(1);
-      expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.currentDragArea).toBe("x");
+
+      expect(
+        wrapper.vm.dashboardPanelData.meta.dragAndDrop.targetDragIndex,
+      ).toBe(1);
+      expect(
+        wrapper.vm.dashboardPanelData.meta.dragAndDrop.currentDragArea,
+      ).toBe("x");
     });
 
     it("should handle drag end", () => {
       wrapper.vm.onDragEnd();
-      expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
+      expect(
+        mockUseDashboardPanelData.cleanupDraggingFields,
+      ).toHaveBeenCalled();
     });
 
     it("should handle drop for reordering within same axis", () => {
@@ -727,15 +812,17 @@ describe("DashboardQueryBuilder", () => {
           functionName: "histogram",
           args: [
             { value: "5m" },
-            { type: "field", value: { field: "field1", streamAlias: "" } }
-          ]
-        }
+            { type: "field", value: { field: "field1", streamAlias: "" } },
+          ],
+        },
       };
 
       const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
       wrapper.vm.onDrop(mockEvent, "x", 1);
 
-      expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
+      expect(
+        mockUseDashboardPanelData.cleanupDraggingFields,
+      ).toHaveBeenCalled();
     });
 
     it("should handle drop from field list to axis", () => {
@@ -744,9 +831,9 @@ describe("DashboardQueryBuilder", () => {
         dragElement: {
           type: "build",
           args: [
-            { type: "field", value: { field: "newField", streamAlias: "" } }
-          ]
-        }
+            { type: "field", value: { field: "newField", streamAlias: "" } },
+          ],
+        },
       };
 
       const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
@@ -759,17 +846,17 @@ describe("DashboardQueryBuilder", () => {
       wrapper = createWrapper({
         "meta.dragAndDrop.dragging": true,
         "meta.dragAndDrop.currentDragArea": "x",
-        "meta.dragAndDrop.targetDragIndex": 0
+        "meta.dragAndDrop.targetDragIndex": 0,
       });
-      
+
       expect(wrapper.find(".dragItem").exists()).toBe(true);
     });
 
     it("should apply drop target styling during drag", () => {
       wrapper = createWrapper({
-        "meta.dragAndDrop.dragging": true
+        "meta.dragAndDrop.dragging": true,
       });
-      
+
       const xAxis = wrapper.find('[data-test="dashboard-x-layout"]');
       expect(xAxis.classes()).toContain("drop-target");
     });
@@ -777,9 +864,9 @@ describe("DashboardQueryBuilder", () => {
     it("should apply drop entered styling", () => {
       wrapper = createWrapper({
         "meta.dragAndDrop.dragging": true,
-        "meta.dragAndDrop.currentDragArea": "x"
+        "meta.dragAndDrop.currentDragArea": "x",
       });
-      
+
       const xAxis = wrapper.find('[data-test="dashboard-x-layout"]');
       expect(xAxis.classes()).toContain("drop-entered");
     });
@@ -791,9 +878,8 @@ describe("DashboardQueryBuilder", () => {
     });
 
     it("should check if having filter exists", () => {
-      wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0].havingConditions = [
-        { operator: ">=", value: 10 }
-      ];
+      wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0].havingConditions =
+        [{ operator: ">=", value: 10 }];
 
       const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
       expect(field.havingConditions).toHaveLength(1);
@@ -810,9 +896,8 @@ describe("DashboardQueryBuilder", () => {
     });
 
     it("should handle having filter removal", () => {
-      wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0].havingConditions = [
-        { operator: ">=", value: 10 }
-      ];
+      wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0].havingConditions =
+        [{ operator: ">=", value: 10 }];
 
       const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
       field.havingConditions = [];
@@ -834,7 +919,7 @@ describe("DashboardQueryBuilder", () => {
 
     it("should not show having conditions for heatmap charts", () => {
       wrapper = createWrapper({ "data.type": "heatmap" });
-      
+
       const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
       expect(wrapper.text()).not.toContain("Having");
     });
@@ -865,19 +950,26 @@ describe("DashboardQueryBuilder", () => {
 
     it("should show field data for custom query", () => {
       wrapper = createWrapper({
-        "data.queries.0.customQuery": true
+        "data.queries.0.customQuery": true,
       });
       // For custom queries, fields should still be defined
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.x).toBeDefined();
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.y).toBeDefined();
+      expect(
+        wrapper.vm.dashboardPanelData.data.queries[0].fields.x,
+      ).toBeDefined();
+      expect(
+        wrapper.vm.dashboardPanelData.data.queries[0].fields.y,
+      ).toBeDefined();
     });
 
     it("should compute axis hints correctly for different chart types", () => {
       const chartTypes = [
         { type: "pie", xHint: "Add one label field here" },
-        { type: "metric", xHint: "X-axis field is not applicable for metric chart" },
+        {
+          type: "metric",
+          xHint: "X-axis field is not applicable for metric chart",
+        },
         { type: "table", xHint: "Add one or more fields here" },
-        { type: "heatmap", xHint: "Add one field here" }
+        { type: "heatmap", xHint: "Add one field here" },
       ];
 
       chartTypes.forEach(({ type, xHint }) => {
@@ -913,18 +1005,28 @@ describe("DashboardQueryBuilder", () => {
 
     it("should provide standard trigger operators", () => {
       const expectedOperators = [
-        "count", "count-distinct", "sum", "avg", "min", "max", 
-        "p50", "p90", "p95", "p99"
+        "count",
+        "count-distinct",
+        "sum",
+        "avg",
+        "min",
+        "max",
+        "p50",
+        "p90",
+        "p95",
+        "p99",
       ];
-      
-      expectedOperators.forEach(op => {
-        expect(wrapper.vm.triggerOperators.some(item => item.value === op)).toBe(true);
+
+      expectedOperators.forEach((op) => {
+        expect(
+          wrapper.vm.triggerOperators.some((item) => item.value === op),
+        ).toBe(true);
       });
     });
 
     it("should provide histogram operator", () => {
       expect(wrapper.vm.triggerOperatorsWithHistogram).toEqual([
-        { label: "Histogram", value: "histogram" }
+        { label: "Histogram", value: "histogram" },
       ]);
     });
 
@@ -937,16 +1039,16 @@ describe("DashboardQueryBuilder", () => {
 
   describe("TreatAsNonTimestamp Initialization", () => {
     it("should initialize treatAsNonTimestamp for new panel", async () => {
-      wrapper = createWrapper({ 
+      wrapper = createWrapper({
         "data.id": null, // New panel
-        "data.type": "table"
+        "data.type": "table",
       });
-      
+
       await wrapper.vm.$nextTick();
-      
+
       const xField = wrapper.vm.dashboardPanelData.data.queries[0].fields.x[0];
       const yField = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
-      
+
       // field1 is not timestamp column, should be true
       expect(xField.treatAsNonTimestamp).toBe(true);
       // field2 is not timestamp column, should be true
@@ -958,14 +1060,14 @@ describe("DashboardQueryBuilder", () => {
         "data.id": "existing-panel",
         "data.type": "table",
         "data.queries.0.fields.x.0.treatAsNonTimestamp": true,
-        "data.queries.0.fields.y.0.treatAsNonTimestamp": false
+        "data.queries.0.fields.y.0.treatAsNonTimestamp": false,
       });
-      
+
       await wrapper.vm.$nextTick();
-      
+
       const xField = wrapper.vm.dashboardPanelData.data.queries[0].fields.x[0];
       const yField = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
-      
+
       expect(xField.treatAsNonTimestamp).toBe(true);
       expect(yField.treatAsNonTimestamp).toBe(false);
     });
@@ -974,11 +1076,11 @@ describe("DashboardQueryBuilder", () => {
       wrapper = createWrapper({
         "data.id": null,
         "data.type": "table",
-        "data.queries.0.fields.x.0.column": "_timestamp"
+        "data.queries.0.fields.x.0.column": "_timestamp",
       });
-      
+
       await wrapper.vm.$nextTick();
-      
+
       const xField = wrapper.vm.dashboardPanelData.data.queries[0].fields.x[0];
       expect(xField.treatAsNonTimestamp).toBe(false);
     });
@@ -992,10 +1094,10 @@ describe("DashboardQueryBuilder", () => {
     it("should handle chart type changes", async () => {
       const originalType = wrapper.vm.dashboardPanelData.data.type;
       expect(originalType).toBe("bar");
-      
+
       wrapper.vm.dashboardPanelData.data.type = "table";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.dashboardPanelData.data.type).toBe("table");
     });
 
@@ -1004,12 +1106,13 @@ describe("DashboardQueryBuilder", () => {
       expect(wrapper.vm.expansionItems).toBeDefined();
       expect(wrapper.vm.expansionItems.x).toBe(true);
       expect(wrapper.vm.expansionItems.y).toBe(true);
-      
+
       // Test dragging state changes
-      const oldDragging = wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragging;
+      const oldDragging =
+        wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragging;
       wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragging = true;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.expansionItems.x).toBe(true);
       expect(wrapper.vm.expansionItems.y).toBe(true);
       expect(wrapper.vm.expansionItems.z).toBe(true);
@@ -1031,18 +1134,19 @@ describe("DashboardQueryBuilder", () => {
         dragging: true,
         dragSourceIndex: 0,
         targetDragIndex: 0,
-        currentDragArea: "x"
+        currentDragArea: "x",
       };
-      
-      mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value = [
-        { name: "field1", type: "text" }
-      ];
-      
+
+      mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value =
+        [{ name: "field1", type: "text" }];
+
       const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
       wrapper.vm.onDrop(mockEvent, "x", 0);
-      
+
       // Should call cleanup regardless of outcome
-      expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
+      expect(
+        mockUseDashboardPanelData.cleanupDraggingFields,
+      ).toHaveBeenCalled();
     });
 
     it("should handle field limit validation", () => {
@@ -1058,8 +1162,9 @@ describe("DashboardQueryBuilder", () => {
       const xAxis = wrapper.vm.dashboardPanelData.data.queries[0].fields.x;
       const yAxis = wrapper.vm.dashboardPanelData.data.queries[0].fields.y;
       const zAxis = wrapper.vm.dashboardPanelData.data.queries[0].fields.z;
-      const breakdown = wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown;
-      
+      const breakdown =
+        wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown;
+
       expect(xAxis).toBeDefined();
       expect(yAxis).toBeDefined();
       expect(zAxis).toBeDefined();
@@ -1075,22 +1180,22 @@ describe("DashboardQueryBuilder", () => {
     it("should handle missing dragElement in onDrop", () => {
       mockUseDashboardPanelData.dashboardPanelData.meta.dragAndDrop = {
         dragSource: "fieldList",
-        dragElement: null
+        dragElement: null,
       };
-      
+
       const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
       wrapper.vm.onDrop(mockEvent, "x", 0);
-      
+
       expect(mockUseDashboardPanelData.addXAxisItem).not.toHaveBeenCalled();
     });
 
     it("should handle drag operations safely", () => {
       // Test various drag operations
       const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
-      
+
       wrapper.vm.onDragStart(mockEvent, { column: "test" });
       expect(mockEvent.preventDefault).toHaveBeenCalled();
-      
+
       wrapper.vm.onDragOver(mockEvent, "x");
       expect(mockEvent.preventDefault).toHaveBeenCalled();
     });
@@ -1100,24 +1205,33 @@ describe("DashboardQueryBuilder", () => {
       const testItem = {
         type: "build",
         args: [
-          { type: "field", value: { field: "testField", streamAlias: "" } }
-        ]
+          { type: "field", value: { field: "testField", streamAlias: "" } },
+        ],
       };
 
       wrapper.vm.onFieldDragStart(mockEvent, testItem, "x", 0);
 
-      expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragging).toBe(true);
-      expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragElement).toBe(testItem);
-      expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragSource).toBe("x");
-      expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragSourceIndex).toBe(0);
+      expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragging).toBe(
+        true,
+      );
+      expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragElement).toBe(
+        testItem,
+      );
+      expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragSource).toBe(
+        "x",
+      );
+      expect(
+        wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragSourceIndex,
+      ).toBe(0);
     });
 
     it("should prevent invalid drag operations", () => {
-      mockUseDashboardPanelData.dashboardPanelData.meta.dragAndDrop.dragSource = "x";
-      
+      mockUseDashboardPanelData.dashboardPanelData.meta.dragAndDrop.dragSource =
+        "x";
+
       const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
       wrapper.vm.onDragEnter(mockEvent, "f", 0);
-      
+
       expect(mockEvent.preventDefault).toHaveBeenCalled();
     });
   });
@@ -1138,9 +1252,9 @@ describe("DashboardQueryBuilder", () => {
       wrapper = createWrapper({
         "data.queries.0.fields.x": [],
         "data.queries.0.fields.y": [],
-        "data.queries.0.fields.breakdown": []
+        "data.queries.0.fields.breakdown": [],
       });
-      
+
       expect(wrapper.vm.xAxisHint).toContain("Add");
       expect(wrapper.vm.yAxisHint).toContain("Add");
     });
@@ -1156,7 +1270,7 @@ describe("DashboardQueryBuilder", () => {
   describe("Performance Optimizations", () => {
     it("should use computed properties for labels", () => {
       wrapper = createWrapper();
-      
+
       // Verify that labels are computed properties
       expect(typeof wrapper.vm.xLabel).toBe("object"); // computed returns ref object
       expect(typeof wrapper.vm.yLabel).toBe("object");
@@ -1166,7 +1280,7 @@ describe("DashboardQueryBuilder", () => {
 
     it("should efficiently handle axis hint computations", () => {
       wrapper = createWrapper();
-      
+
       const hint1 = wrapper.vm.xAxisHint;
       const hint2 = wrapper.vm.xAxisHint;
       expect(hint1).toBe(hint2); // Should be same reference due to computed caching
@@ -1179,18 +1293,26 @@ describe("DashboardQueryBuilder", () => {
     });
 
     it("should render all required child components", () => {
-      expect(wrapper.find('.geo-maps-builder').exists()).toBe(true);
-      expect(wrapper.find('.maps-builder').exists()).toBe(true);
-      expect(wrapper.find('.sankey-builder').exists()).toBe(true);
-      expect(wrapper.find('.filters-option').exists()).toBe(true);
+      expect(wrapper.find(".geo-maps-builder").exists()).toBe(true);
+      expect(wrapper.find(".maps-builder").exists()).toBe(true);
+      expect(wrapper.find(".sankey-builder").exists()).toBe(true);
+      expect(wrapper.find(".filters-option").exists()).toBe(true);
     });
 
     it("should pass dashboard data to child components", () => {
-      const geoMapsComponent = wrapper.findComponent({ name: "DashboardGeoMapsQueryBuilder" });
-      const mapsComponent = wrapper.findComponent({ name: "DashboardMapsQueryBuilder" });
-      const sankeyComponent = wrapper.findComponent({ name: "DashboardSankeyChartBuilder" });
-      const filtersComponent = wrapper.findComponent({ name: "DashboardFiltersOption" });
-      
+      const geoMapsComponent = wrapper.findComponent({
+        name: "DashboardGeoMapsQueryBuilder",
+      });
+      const mapsComponent = wrapper.findComponent({
+        name: "DashboardMapsQueryBuilder",
+      });
+      const sankeyComponent = wrapper.findComponent({
+        name: "DashboardSankeyChartBuilder",
+      });
+      const filtersComponent = wrapper.findComponent({
+        name: "DashboardFiltersOption",
+      });
+
       expect(geoMapsComponent.exists()).toBe(true);
       expect(mapsComponent.exists()).toBe(true);
       expect(sankeyComponent.exists()).toBe(true);
@@ -1202,8 +1324,8 @@ describe("DashboardQueryBuilder", () => {
         "data.queries.0.fields.x.0.functionName": "histogram",
         "data.queries.0.fields.x.0.args": [
           { value: "5m" },
-          { type: "field", value: { field: "field1", streamAlias: "" } }
-        ]
+          { type: "field", value: { field: "field1", streamAlias: "" } },
+        ],
       });
 
       const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.x[0];

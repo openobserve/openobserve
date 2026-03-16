@@ -28,9 +28,9 @@
         <span data-test="dashboard-drilldown-title" v-if="isEditMode"
           >{{ t("dashboard.editDrilldown") }}
         </span>
-        <span data-test="dashboard-drilldown-title" v-else
-          >{{ t("dashboard.createDrilldown") }}</span
-        >
+        <span data-test="dashboard-drilldown-title" v-else>{{
+          t("dashboard.createDrilldown")
+        }}</span>
       </div>
       <div class="flex q-gutter-sm items-center">
         <DrilldownUserGuide />
@@ -110,7 +110,10 @@
           </q-btn>
         </q-btn-group>
       </div>
-      <div v-if="drilldownData.data.logsMode === 'custom'" style="margin-top: 10px">
+      <div
+        v-if="drilldownData.data.logsMode === 'custom'"
+        style="margin-top: 10px"
+      >
         <label>{{ t("dashboard.enterCustomQuery") }}</label>
         <query-editor
           data-test="scheduled-alert-sql-editor"
@@ -168,7 +171,8 @@
             :loading="getFoldersListLoading.isLoading.value"
             :disable="getFoldersListLoading.isLoading.value"
             data-test="dashboard-drilldown-folder-select"
-           hide-bottom-space>
+            hide-bottom-space
+          >
             <!-- template when on options -->
             <template v-slot:no-option>
               <q-item>
@@ -195,7 +199,8 @@
             :loading="getDashboardListLoading.isLoading.value"
             :disable="getDashboardListLoading.isLoading.value"
             data-test="dashboard-drilldown-dashboard-select"
-           hide-bottom-space>
+            hide-bottom-space
+          >
             <!-- template when on options -->
             <template v-slot:no-option>
               <q-item
@@ -224,7 +229,8 @@
             :loading="getTabListLoading.isLoading.value"
             :disable="getTabListLoading.isLoading.value"
             data-test="dashboard-drilldown-tab-select"
-           hide-bottom-space>
+            hide-bottom-space
+          >
             <!-- template when on options -->
             <template v-slot:no-option>
               <q-item data-test="dashboard-drilldown-no-tab-available-option">
@@ -277,14 +283,16 @@
                 searchRegex="(.*)"
                 :items="variableNamesFn"
                 style="width: auto !important; padding-top: 3px !important"
-              ></CommonAutoComplete>
+              >
+              </CommonAutoComplete>
               <CommonAutoComplete
                 :placeholder="t('panel.value')"
                 searchRegex="(.*)"
                 v-model="variable.value"
                 :items="options.selectedValue"
                 style="width: auto !important; padding-top: 3px !important"
-              ></CommonAutoComplete>
+              >
+              </CommonAutoComplete>
 
               <q-icon
                 class="q-mr-xs"
@@ -307,7 +315,11 @@
           data-test="dashboard-drilldown-pass-all-variables"
           class="tw:h-[36px] tw:ml-1 o2-toggle-button-lg"
           size="lg"
-          :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
         />
       </div>
     </div>
@@ -321,7 +333,11 @@
         data-test="dashboard-drilldown-open-in-new-tab"
         class="tw:h-[36px] tw:ml-1 o2-toggle-button-lg"
         size="lg"
-        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+        :class="
+          store.state.theme === 'dark'
+            ? 'o2-toggle-button-lg-dark'
+            : 'o2-toggle-button-lg-light'
+        "
       />
     </div>
 
@@ -330,7 +346,11 @@
         unelevated
         no-caps
         class="o2-secondary-button tw:h-[36px] el-border"
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+        :class="
+          store.state.theme === 'dark'
+            ? 'o2-secondary-button-dark'
+            : 'o2-secondary-button-light'
+        "
         flat
         @click="$emit('close')"
         data-test="cancel-button"
@@ -341,7 +361,11 @@
         unelevated
         no-caps
         class="o2-primary-button tw:h-[36px] q-ml-md el-border"
-        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+        :class="
+          store.state.theme === 'dark'
+            ? 'o2-primary-button-dark'
+            : 'o2-primary-button-light'
+        "
         flat
         @click="saveDrilldown"
         style="min-width: 60px"
@@ -371,7 +395,7 @@ import {
   getFoldersList,
 } from "../../../utils/commons";
 import { onMounted, onUnmounted } from "vue";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import { useLoading } from "@/composables/useLoading";
@@ -409,10 +433,10 @@ export default defineComponent({
     const route = useRoute();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
     const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey
+      dashboardPanelDataPageKey,
     );
 
     // Inject variablesManager to access all dashboard variables
@@ -420,7 +444,7 @@ export default defineComponent({
 
     // Get current dashboard data to access tabs
     const currentDashboardData = inject<any>("currentDashboardData", null);
-    
+
     const getDefaultDrilldownData = () => ({
       name: "",
       type: "byDashboard",
@@ -448,10 +472,10 @@ export default defineComponent({
             JSON.stringify(
               dashboardPanelData.data.config.drilldown[
                 props?.drilldownDataIndex
-              ]
-            )
+              ],
+            ),
           )
-        : getDefaultDrilldownData()
+        : getDefaultDrilldownData(),
     );
     const dashboardList: any = ref([]);
     const tabList: any = ref([]);
@@ -499,7 +523,7 @@ export default defineComponent({
             dashboardList?.value[0]?.value ?? "";
           drilldownData.value.data.tab = tabList?.value[0]?.value ?? "";
         }
-      }
+      },
     );
 
     // on dashboard change, reset tab value
@@ -511,7 +535,7 @@ export default defineComponent({
           // take first value from new options list
           drilldownData.value.data.tab = tabList?.value[0]?.value ?? "";
         }
-      }
+      },
     );
 
     const folderList = computed(() => {
@@ -534,7 +558,7 @@ export default defineComponent({
       // get folder data
       // by using folder name, find folder data
       const folderData = store.state.organizationData.folders?.find(
-        (folder: any) => folder.name === drilldownData.value.data.folder
+        (folder: any) => folder.name === drilldownData.value.data.folder,
       );
 
       // if no folder with same forder name found, return
@@ -546,7 +570,7 @@ export default defineComponent({
       // get all dashboards from folder
       const allDashboardList = await getAllDashboardsByFolderId(
         store,
-        folderData?.folderId
+        folderData?.folderId,
       );
 
       // make list of dashboards
@@ -561,9 +585,9 @@ export default defineComponent({
 
     const getTabList = async () => {
       // get folder data
-      // by using folder name, find folder data      
+      // by using folder name, find folder data
       const folderData = store.state.organizationData.folders?.find(
-        (folder: any) => folder.name === drilldownData.value.data.folder
+        (folder: any) => folder.name === drilldownData.value.data.folder,
       );
 
       // if no folder with same forder name found, return
@@ -572,28 +596,32 @@ export default defineComponent({
         return;
       }
       // want dashboardId from dashboard name
-      // by using dashboard name, find dashboard data      
+      // by using dashboard name, find dashboard data
       // get all dashboards from folder
       const allDashboardList = await getAllDashboardsByFolderId(
         store,
-        folderData?.folderId
+        folderData?.folderId,
       );
-      
+
       // get dashboardId from allDashboardList by dashboard name
       const dashboardId = allDashboardList?.find(
         (dashboard: any) =>
-          dashboard.title === drilldownData.value.data.dashboard
+          dashboard.title === drilldownData.value.data.dashboard,
       )?.dashboardId;
-            
-      if (!dashboardId) {  
-        tabList.value = [];  
-        return;  
-      }  
+
+      if (!dashboardId) {
+        tabList.value = [];
+        return;
+      }
 
       // get dashboard data
       // by using dashboard name, find dashboard data
-      const dashboardData = await getDashboard(store, dashboardId, folderData?.folderId);
-      
+      const dashboardData = await getDashboard(
+        store,
+        dashboardId,
+        folderData?.folderId,
+      );
+
       // if no dashboard with same dashboard name found, return
       if (!dashboardData) {
         tabList.value = [];
@@ -636,7 +664,7 @@ export default defineComponent({
       } else if (drilldownData.value.type == "logs") {
         if (drilldownData.value.data.logsMode === "custom") {
           return !drilldownData.value.data.logsQuery.trim();
-        } else if (drilldownData.value.data.logsMode === "auto") {          
+        } else if (drilldownData.value.data.logsMode === "auto") {
           return false;
         }
       } else {
@@ -654,10 +682,10 @@ export default defineComponent({
     const saveDrilldown = () => {
       // if editmode then made changes
       // else add new drilldown
-      if (props?.isEditMode) {        
+      if (props?.isEditMode) {
         dashboardPanelData.data.config.drilldown[props?.drilldownDataIndex] =
           drilldownData.value;
-      } else {        
+      } else {
         dashboardPanelData.data.config.drilldown.push(drilldownData.value);
       }
       emit("close");
@@ -682,7 +710,6 @@ export default defineComponent({
       let allVariables: any[] = [];
 
       if (variablesManager && variablesManager.variablesData) {
-        
         // Get the current panel ID and tab ID
         const currentPanelId = dashboardPanelData.data.id;
         // Get current tab ID from route query or first tab in dashboard
@@ -693,12 +720,21 @@ export default defineComponent({
 
         // Use getAllVisibleVariables to get only global + current tab + current panel variables
         if (variablesManager.getAllVisibleVariables) {
-          allVariables = variablesManager.getAllVisibleVariables(currentTabId, currentPanelId);
+          allVariables = variablesManager.getAllVisibleVariables(
+            currentTabId,
+            currentPanelId,
+          );
         } else {
           // Fallback: manually merge global + current tab + current panel
           const globalVars = variablesManager.variablesData.global || [];
-          const tabVars = (currentTabId && variablesManager.variablesData.tabs?.[currentTabId]) || [];
-          const panelVars = (currentPanelId && variablesManager.variablesData.panels?.[currentPanelId]) || [];
+          const tabVars =
+            (currentTabId &&
+              variablesManager.variablesData.tabs?.[currentTabId]) ||
+            [];
+          const panelVars =
+            (currentPanelId &&
+              variablesManager.variablesData.panels?.[currentPanelId]) ||
+            [];
 
           allVariables = [...globalVars, ...tabVars, ...panelVars];
         }
@@ -707,12 +743,13 @@ export default defineComponent({
         allVariables = props?.variablesData?.values || [];
       }
 
-      const variableListName = allVariables
-        ?.filter((variable: any) => variable.type !== "dynamic_filters")
-        ?.map((variable: any) => ({
-          label: variable.name,
-          value: "${" + variable.name + "}",
-        })) ?? [];
+      const variableListName =
+        allVariables
+          ?.filter((variable: any) => variable.type !== "dynamic_filters")
+          ?.map((variable: any) => ({
+            label: variable.name,
+            value: "${" + variable.name + "}",
+          })) ?? [];
 
       if (dashboardPanelData.data.type === "sankey") {
         selectedValues = [
@@ -767,37 +804,41 @@ export default defineComponent({
 
     const variableNamesFn = ref([]);
 
-    const getvariableNames = async () => {      
+    const getvariableNames = async () => {
       if (
         drilldownData.value.data.folder &&
         drilldownData.value.data.dashboard
       ) {
         const folder = store.state.organizationData.folders.find(
-          (folder: any) => folder.name === drilldownData.value.data.folder
+          (folder: any) => folder.name === drilldownData.value.data.folder,
         );
 
         const allDashboardData = await getAllDashboardsByFolderId(
           store,
-          folder.folderId
+          folder.folderId,
         );
 
         const dashboardId = allDashboardData?.find(
-        (dashboard: any) =>
-          dashboard.title === drilldownData.value.data.dashboard
-      )?.dashboardId;
-      
-      if (!dashboardId) {  
-        variableNamesFn.value = [];  
-        return;  
-      } 
-        const dashboardData = await getDashboard(store, dashboardId, folder?.folderId);
+          (dashboard: any) =>
+            dashboard.title === drilldownData.value.data.dashboard,
+        )?.dashboardId;
+
+        if (!dashboardId) {
+          variableNamesFn.value = [];
+          return;
+        }
+        const dashboardData = await getDashboard(
+          store,
+          dashboardId,
+          folder?.folderId,
+        );
 
         if (dashboardData) {
           const optionsList = dashboardData.variables.list.map(
             (variable: any) => ({
               label: variable.name,
               value: variable.name,
-            })
+            }),
           );
           variableNamesFn.value = optionsList;
         } else {
@@ -849,6 +890,7 @@ export default defineComponent({
   font-weight: bold;
   color: white;
 }
+
 .dropdownDiv {
   display: flex;
   align-items: center;

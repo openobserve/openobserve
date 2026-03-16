@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,6 +16,7 @@
 use serde_json::value::{Map, Value};
 
 const KEY_SEPARATOR: &str = "_";
+const TOKEN_NUMBER: &str = "$serde_json::private::Number";
 
 #[inline]
 pub fn flatten(to_flatten: Value) -> Result<Value, anyhow::Error> {
@@ -102,12 +103,24 @@ fn flatten_object(
         flatten_value(v, parent_key.to_string(), max_level, depth, flattened)?;
         return Ok(());
     }
-    for (mut k, v) in current.into_iter() {
-        format_key(&mut k);
-        let parent_key = if depth > 0 {
-            format!("{parent_key}{KEY_SEPARATOR}{k}")
+    for (mut k, mut v) in current.into_iter() {
+        let parent_key = if k == TOKEN_NUMBER {
+            v = if let Some(Some(n)) = v
+                .as_str()
+                .and_then(|v| v.parse::<f64>().ok().map(super::json::Number::from_f64))
+            {
+                Value::Number(n)
+            } else {
+                Value::Null
+            };
+            parent_key.to_string()
         } else {
-            k
+            format_key(&mut k);
+            if depth > 0 {
+                format!("{parent_key}{KEY_SEPARATOR}{k}")
+            } else {
+                k
+            }
         };
         flatten_value(v, parent_key, max_level, depth + 1, flattened)?;
     }

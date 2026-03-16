@@ -67,7 +67,7 @@
 import { defineComponent, inject, ref, computed, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ColorBySeriesPopUp from "./ColorBySeriesPopUp.vue";
 export default defineComponent({
   name: "ColorBySeries",
