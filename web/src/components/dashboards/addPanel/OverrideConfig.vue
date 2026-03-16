@@ -3,7 +3,7 @@
     <q-btn
       @click="openOverrideConfigPopup"
       style="cursor: pointer; padding: 0px 5px"
-      :label="' Add field override'"
+      :label="t('dashboard.addFieldOverride')"
       no-caps
       data-test="dashboard-addpanel-config-override-config-add-btn"
       class="el-border"
@@ -25,6 +25,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, inject, onBeforeMount } from "vue";
+import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OverrideConfigPopup from "../OverrideConfigPopup.vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
@@ -49,6 +50,7 @@ export default defineComponent({
     },
   },
   setup(props) {
+    const { t } = useI18n();
     const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
@@ -177,6 +179,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       store,
       dashboardPanelData,
       showOverrideConfigPopup,

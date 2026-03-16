@@ -1,4 +1,8 @@
 <script lang="ts" setup>
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
+
 interface Props {
   modelValue: string;
   isSearchActive?: boolean;
@@ -23,7 +27,7 @@ const clearSearch = () => {
     @update:model-value="$emit('update:modelValue', String($event || ''))"
     dense
     borderless
-    placeholder="Search config..."
+    :placeholder="t('dashboard.configPanelSearchPlaceholder')"
     class="col config-panel-search"
     clearable
     autofocus
