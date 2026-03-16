@@ -628,7 +628,9 @@ async fn handle_alert_triggers(
     }
 
     // send notification
-    if let Some(data) = trigger_results.data {
+    if let Some(data) = trigger_results.data
+        && !data.is_empty()
+    {
         // Check if grouping is enabled BEFORE deduplication (enterprise-only feature)
         #[cfg(feature = "enterprise")]
         let grouping_enabled = alert
@@ -748,8 +750,8 @@ async fn handle_alert_triggers(
             )
             .await
             {
-                Ok(deduplicated_data) => {
-                    if deduplicated_data.is_empty() {
+                Ok((deduplicated_data, deduplicated)) => {
+                    if deduplicated_data.is_empty() && deduplicated {
                         log::debug!(
                             "[SCHEDULER trace_id {scheduler_trace_id}] All alert results deduplicated for org: {}, module_key: {}",
                             &new_trigger.org,
