@@ -11,7 +11,7 @@
 # GNU Affero General Public License for more details.
 #
 # You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 
 """
 API tests for dashboard multi-window (Comparison Against) with VRL #ResultArray# functions.
