@@ -2,8 +2,6 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { LogoManagementPage } = require('../../pages/generalPages/logoManagementPage.js');
-const { isCloudEnvironment } = require('../utils/cloud-auth.js');
-
 const path = require('path');
 
 // Function to generate a random 5-character alphabetic name
@@ -18,9 +16,6 @@ function generateRandomLogoName() {
 
 
 test('Logo Upload on Management', { tag: '@enterprise' }, async ({ page }) => {
-    // Logo management requires _meta org access which is not available on cloud
-    test.skip(isCloudEnvironment(), 'Logo management requires _meta org access not available on cloud');
-
     testLogger.testStart('Logo Upload on Management', __filename);
     await navigateToBase(page);
 
