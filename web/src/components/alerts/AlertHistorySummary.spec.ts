@@ -45,27 +45,27 @@ describe("AlertHistorySummary.vue", () => {
       {
         alert_name: "CPU Alert",
         timestamp: 1699900000000000,
-        status: "firing",
+        status: "completed",
       },
       {
         alert_name: "CPU Alert",
         timestamp: 1699890000000000,
-        status: "ok",
+        status: "condition_not_satisfied",
       },
       {
         alert_name: "Memory Alert",
         timestamp: 1699880000000000,
-        status: "ok",
+        status: "condition_not_satisfied",
       },
       {
         alert_name: "Disk Alert",
         timestamp: 1699870000000000,
-        status: "error",
+        status: "completed",
       },
       {
         alert_name: "Disk Alert",
         timestamp: 1699860000000000,
-        status: "firing",
+        status: "completed",
       },
     ],
     total: 5,
@@ -158,12 +158,12 @@ describe("AlertHistorySummary.vue", () => {
       const cpuAlert = vm.historyRows.find(
         (row: any) => row.alert_name === "CPU Alert",
       );
-      expect(cpuAlert.firing_count).toBe(1); // One firing status
+      expect(cpuAlert.firing_count).toBe(1); // One completed status
 
       const diskAlert = vm.historyRows.find(
         (row: any) => row.alert_name === "Disk Alert",
       );
-      expect(diskAlert.firing_count).toBe(2); // One error + one firing
+      expect(diskAlert.firing_count).toBe(2); // Two completed statuses
     });
 
     it("should show current state from most recent evaluation", async () => {
@@ -173,12 +173,12 @@ describe("AlertHistorySummary.vue", () => {
       const cpuAlert = vm.historyRows.find(
         (row: any) => row.alert_name === "CPU Alert",
       );
-      expect(cpuAlert.current_state).toBe("firing"); // Most recent status
+      expect(cpuAlert.current_state).toBe("completed"); // Most recent status
 
       const memoryAlert = vm.historyRows.find(
         (row: any) => row.alert_name === "Memory Alert",
       );
-      expect(memoryAlert.current_state).toBe("ok");
+      expect(memoryAlert.current_state).toBe("condition_not_satisfied");
     });
 
     it("should display last evaluation timestamp", async () => {
@@ -456,8 +456,8 @@ describe("AlertHistorySummary.vue", () => {
       vi.mocked(alertsService.getHistory).mockResolvedValueOnce({
         data: {
           hits: [
-            { alert_name: null, timestamp: 1699900000000000, status: "ok" },
-            { alert_name: "Valid Alert", timestamp: 1699890000000000, status: "firing" },
+            { alert_name: null, timestamp: 1699900000000000, status: "condition_not_satisfied" },
+            { alert_name: "Valid Alert", timestamp: 1699890000000000, status: "completed" },
           ],
           total: 2,
         },
