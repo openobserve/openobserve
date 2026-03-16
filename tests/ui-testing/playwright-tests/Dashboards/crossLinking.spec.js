@@ -419,21 +419,16 @@ test.describe("Cross-Linking testcases", () => {
 
         testLogger.info('Cross-link created and saved');
 
-        // Step 2: Navigate to logs, run query first, then add interesting field
+        // Step 2: Navigate to logs, disable Quick Mode so all fields are visible, then run query
         await pm.logsPage.navigateToLogs();
         await pm.logsPage.selectStream(STREAM_NAME);
         await page.waitForTimeout(2000);
 
-        // Run query first so field list gets populated
-        await pm.logsPage.runQueryAndWaitForResults();
-        await page.waitForTimeout(2000);
-
-        // Now add kubernetes_container_name as an interesting field so it appears as a table column
-        await pm.logsPage.fillIndexFieldSearchInput('kubernetes_container_name');
-        await pm.logsPage.clickInterestingFieldButton('kubernetes_container_name');
+        // Disable Quick Mode so all fields show in expanded log rows without needing interesting fields
+        await pm.logsPage.ensureQuickModeState(false);
         await page.waitForTimeout(1000);
 
-        // Run query again to refresh results with the interesting field column
+        // Run query to get results
         await pm.logsPage.runQueryAndWaitForResults();
         await page.waitForTimeout(2000);
 
@@ -1237,21 +1232,16 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.clickOrgSettingsSave();
         await page.waitForTimeout(2000);
 
-        // Step 2: Navigate to logs, run query first, then add interesting field
+        // Step 2: Navigate to logs, disable Quick Mode so all fields are visible, then run query
         await pm.logsPage.navigateToLogs();
         await pm.logsPage.selectStream(STREAM_NAME);
         await page.waitForTimeout(2000);
 
-        // Run query first so field list gets populated
-        await pm.logsPage.runQueryAndWaitForResults();
-        await page.waitForTimeout(2000);
-
-        // Now add kubernetes_container_name as an interesting field so it appears as a table column
-        await pm.logsPage.fillIndexFieldSearchInput('kubernetes_container_name');
-        await pm.logsPage.clickInterestingFieldButton('kubernetes_container_name');
+        // Disable Quick Mode so all fields show in expanded log rows without needing interesting fields
+        await pm.logsPage.ensureQuickModeState(false);
         await page.waitForTimeout(1000);
 
-        // Run query again to refresh results and ensure result_schema picks up the org cross-links
+        // Run query to get results and ensure result_schema picks up the org cross-links
         await pm.logsPage.runQueryAndWaitForResults();
         await page.waitForTimeout(2000);
 
