@@ -188,21 +188,25 @@ export function useConfigOptions(
     table: {
       wrap: {
         label: t("dashboard.wraptext"),
+        visible: dashboardPanelData.data.type === "table",
       },
       transpose: {
         label: t("dashboard.tableTranspose"),
-        visible: !promqlMode.value,
+        visible: !promqlMode.value && dashboardPanelData.data.type === "table",
       },
       "dynamic-columns": {
         label: t("dashboard.tableDynamicColumns"),
-        visible: !promqlMode.value,
+        visible: !promqlMode.value && dashboardPanelData.data.type === "table",
       },
       pagination: {
         label: t("dashboard.pagination"),
+        visible: dashboardPanelData.data.type === "table",
       },
       "rows-per-page": {
         label: t("dashboard.rowsPerPage"),
-        visible: !!dashboardPanelData.data.config.table_pagination,
+        visible:
+          !!dashboardPanelData.data.config.table_pagination &&
+          dashboardPanelData.data.type === "table",
       },
     },
     valueTransformations: {

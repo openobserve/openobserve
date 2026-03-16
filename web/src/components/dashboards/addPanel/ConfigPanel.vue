@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.general = v;
         }
       "
-      label="General"
+      :label="t('dashboard.configSectionGeneral')"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
       expand-icon="chevron_right"
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.geographic = v;
         }
       "
-      label="Geographic Configuration"
+      :label="t('dashboard.configSectionGeographic')"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
       expand-icon="chevron_right"
@@ -275,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.legend = v;
         }
       "
-      label="Legend"
+      :label="t('dashboard.configSectionLegend')"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
       expand-icon="chevron_right"
@@ -832,7 +832,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.data = v;
         }
       "
-      label="Data"
+      :label="t('dashboard.configSectionData')"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
       expand-icon="chevron_right"
@@ -1134,7 +1134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.axis = v;
         }
       "
-      label="Axis"
+      :label="t('dashboard.configSectionAxis')"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
       expand-icon="chevron_right"
@@ -1297,7 +1297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.labels = v;
         }
       "
-      label="Labels"
+      :label="t('dashboard.configSectionLabels')"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
       expand-icon="chevron_right"
@@ -1464,7 +1464,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.lineStyle = v;
         }
       "
-      label="Line Style"
+      :label="t('dashboard.configSectionLineStyle')"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
       expand-icon="chevron_right"
@@ -1580,7 +1580,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.table = v;
         }
       "
-      label="Table"
+      :label="t('dashboard.configSectionTable')"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
       expand-icon="chevron_right"
@@ -1700,7 +1700,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.valueTransformations = v;
         }
       "
-      label="Value Transformations"
+      :label="t('dashboard.configSectionValueTransformations')"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
       expand-icon="chevron_right"
@@ -1722,7 +1722,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.fieldOverrides = v;
         }
       "
-      label="Field Overrides"
+      :label="t('dashboard.configSectionFieldOverrides')"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
       expand-icon="chevron_right"
@@ -1750,7 +1750,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.map = v;
         }
       "
-      label="Map"
+      :label="t('dashboard.configSectionMap')"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
       expand-icon="chevron_right"
@@ -2037,7 +2037,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.gauge = v;
         }
       "
-      label="Gauge"
+      :label="t('dashboard.configSectionGauge')"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
       expand-icon="chevron_right"
@@ -2121,7 +2121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.layout = v;
         }
       "
-      label="Layout"
+      :label="t('dashboard.configSectionLayout')"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
       expand-icon="chevron_right"
@@ -2293,7 +2293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.colors = v;
         }
       "
-      label="Colors"
+      :label="t('dashboard.configSectionColors')"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
       expand-icon="chevron_right"
@@ -2487,7 +2487,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.background = v;
         }
       "
-      label="Background"
+      :label="t('dashboard.configSectionBackground')"
       header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
       switch-toggle-side
       expand-icon="chevron_right"
@@ -3344,7 +3344,86 @@ export default defineComponent({
       { immediate: true },
     );
 
-    // Cancel (remove set time via X icon) ├óΓÇáΓÇÖ back to "+Set" button
+    // When pivot mode activates: disable conflicting features and
+    // initialize pivot config values (undefined → false/0 defaults).
+    // Without this, q-toggle shows undefined as OFF but conversion
+    // may treat undefined differently — causing a mismatch.
+
+    watch(
+      () => isPivotMode.value,
+      (active) => {
+        if (active) {
+          dashboardPanelData.data.config.table_transpose = false;
+          dashboardPanelData.data.config.table_dynamic_columns = false;
+          if (
+            dashboardPanelData.data.config.table_pivot_show_row_totals ===
+            undefined
+          ) {
+            dashboardPanelData.data.config.table_pivot_show_row_totals = false;
+          }
+          if (
+            dashboardPanelData.data.config.table_pivot_show_col_totals ===
+            undefined
+          ) {
+            dashboardPanelData.data.config.table_pivot_show_col_totals = false;
+          }
+          if (
+            dashboardPanelData.data.config.table_pivot_sticky_row_totals ===
+            undefined
+          ) {
+            dashboardPanelData.data.config.table_pivot_sticky_row_totals = false;
+          }
+          if (
+            dashboardPanelData.data.config.table_pivot_sticky_col_totals ===
+            undefined
+          ) {
+            dashboardPanelData.data.config.table_pivot_sticky_col_totals = false;
+          }
+        }
+      },
+      { immediate: true },
+    );
+
+    // When pivot mode activates: disable conflicting features and
+    // initialize pivot config values (undefined → false/0 defaults).
+    // Without this, q-toggle shows undefined as OFF but conversion
+    // may treat undefined differently — causing a mismatch.
+    watch(
+      () => isPivotMode.value,
+      (active) => {
+        if (active) {
+          dashboardPanelData.data.config.table_transpose = false;
+          dashboardPanelData.data.config.table_dynamic_columns = false;
+          if (
+            dashboardPanelData.data.config.table_pivot_show_row_totals ===
+            undefined
+          ) {
+            dashboardPanelData.data.config.table_pivot_show_row_totals = false;
+          }
+          if (
+            dashboardPanelData.data.config.table_pivot_show_col_totals ===
+            undefined
+          ) {
+            dashboardPanelData.data.config.table_pivot_show_col_totals = false;
+          }
+          if (
+            dashboardPanelData.data.config.table_pivot_sticky_row_totals ===
+            undefined
+          ) {
+            dashboardPanelData.data.config.table_pivot_sticky_row_totals = false;
+          }
+          if (
+            dashboardPanelData.data.config.table_pivot_sticky_col_totals ===
+            undefined
+          ) {
+            dashboardPanelData.data.config.table_pivot_sticky_col_totals = false;
+          }
+        }
+      },
+      { immediate: true },
+    );
+
+    // Cancel (remove set time via X icon) back to "+Set" button
     const onCancelPanelTime = () => {
       dashboardPanelData.data.config.panel_time_range = null;
       panelTimeRange.value = null;
@@ -3390,7 +3469,7 @@ export default defineComponent({
 
     // Global expand / collapse toggle
     const allSectionsExpanded = computed(() =>
-      Object.values(expandedSections.value).some((v) => v === true),
+      Object.values(expandedSections.value).every((v) => v === true),
     );
 
     const toggleAllSections = () => {
@@ -3402,12 +3481,6 @@ export default defineComponent({
 
     // anySectionVisible - drives the "No results" empty state
     const anySectionVisible = computed(() => {
-      const q = normalizedSearchQuery.value;
-      if (!q) {
-        return ORDERED_SECTION_IDS.some((sectionId) =>
-          isSectionVisible(sectionId),
-        );
-      }
       return ORDERED_SECTION_IDS.some((sectionId) =>
         isSectionVisible(sectionId),
       );
@@ -3626,6 +3699,7 @@ export default defineComponent({
   top: 0;
   z-index: 10;
   background-color: var(--o2-card-bg-solid);
+  border-bottom: 1px solid var(--o2-border-color);
 }
 
 :deep(.q-expansion-item--collapsed),
