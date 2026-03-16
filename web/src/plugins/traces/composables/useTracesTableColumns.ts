@@ -39,7 +39,7 @@ export function useTracesTableColumns(
           id: "timestamp",
           header: "TIMESTAMP",
           size: 160,
-          meta: { sortable: true },
+          meta: { sortable: true, slot: true },
           sortable: true,
         },
         {
@@ -48,6 +48,7 @@ export function useTracesTableColumns(
           size: 160,
           meta: {
             cellClass: "tw:text-[var(--o2-text-1)]",
+            slot: true,
           },
         },
         {
@@ -56,32 +57,33 @@ export function useTracesTableColumns(
           size: 200,
           meta: {
             cellClass: "tw:text-[var(--o2-text-1)]",
+            slot: true,
           },
         },
         {
           id: "duration",
           header: "DURATION",
           size: 120,
-          meta: { sortable: true },
+          meta: { sortable: true, slot: true },
           sortable: true,
         },
         {
           id: "status",
           header: "STATUS",
           size: 120,
-          meta: { align: "center" },
+          meta: { align: "center", slot: true },
         },
         {
           id: "status_code",
           header: "STATUS CODE",
           size: 140,
-          meta: { align: "center" },
+          meta: { align: "center", slot: true },
         },
         {
           id: "method",
           header: "METHOD",
           size: 140,
-          meta: { align: "center" },
+          meta: { align: "center", slot: true },
         },
       ];
     }
@@ -91,7 +93,7 @@ export function useTracesTableColumns(
         id: "timestamp",
         header: "TIMESTAMP",
         size: 160,
-        meta: { sortable: true },
+        meta: { sortable: true, slot: true },
       },
       {
         id: "service",
@@ -99,6 +101,7 @@ export function useTracesTableColumns(
         size: 180,
         meta: {
           cellClass: "tw:text-[var(--o2-text-1)]",
+          slot: true,
         },
       },
       {
@@ -107,25 +110,27 @@ export function useTracesTableColumns(
         size: 200,
         meta: {
           cellClass: "tw:text-[var(--o2-text-1)]",
+          slot: true,
         },
       },
       {
         id: "duration",
         header: "DURATION",
         size: 120,
-        meta: { sortable: true },
+        meta: { sortable: true, slot: true },
       },
       {
         id: "spans",
         header: "SPANS",
         size: 100,
-        meta: { align: "center" },
+        meta: { align: "center", slot: false, closable: true },
+        accessorFn: (row: any) => row.spans,
       },
       {
         id: "status",
         header: "STATUS",
-        size: 160,
-        meta: { align: "center" },
+        size: 120,
+        meta: { align: "center", slot: true },
       },
     ];
 
@@ -134,20 +139,20 @@ export function useTracesTableColumns(
           {
             id: "input_tokens",
             header: "INPUT TOKENS",
-            size: 160,
-            meta: { align: "right" },
+            size: 130,
+            meta: { align: "right", slot: true },
           },
           {
             id: "output_tokens",
             header: "OUTPUT TOKENS",
-            size: 160,
-            meta: { align: "right" },
+            size: 130,
+            meta: { align: "right", slot: true },
           },
           {
             id: "cost",
             header: "COST",
-            size: 80,
-            meta: { align: "right" },
+            size: 130,
+            meta: { align: "right", slot: true },
           },
         ]
       : [];
@@ -157,6 +162,7 @@ export function useTracesTableColumns(
         id: "service_latency",
         header: "SERVICE LATENCY",
         size: 160,
+        meta: { slot: true },
       },
     ];
 
