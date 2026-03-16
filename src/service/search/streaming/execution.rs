@@ -55,7 +55,6 @@ pub async fn do_partitioned_search(
     user_id: &str,
     accumulated_results: &mut Vec<SearchResultType>,
     max_query_range: i64, // hours
-    start_timer: &mut Instant,
     req_order_by: &OrderBy,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     values_ctx: Option<ValuesEventContext>,
@@ -66,6 +65,8 @@ pub async fn do_partitioned_search(
     stream_name: &str,
     is_multi_stream_search: bool,
 ) -> Result<(), infra::errors::Error> {
+    let start_timer = Instant::now();
+
     // limit the search by max_query_range
     let mut range_error = String::new();
     if max_query_range > 0
@@ -192,8 +193,6 @@ pub async fn do_partitioned_search(
 
         // set took
         search_res.set_took(start_timer.elapsed().as_millis() as usize);
-        // reset start time
-        *start_timer = Instant::now();
 
         // check range error
         if !range_error.is_empty() {
@@ -424,7 +423,6 @@ pub async fn process_delta(
     user_id: &str,
     remaining_query_range: &mut f64,
     cache_req_duration: i64,
-    start_timer: &mut Instant,
     cache_order_by: &OrderBy,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     values_ctx: Option<ValuesEventContext>,
@@ -480,6 +478,7 @@ pub async fn process_delta(
         }
 
         // use cache for delta search
+        let start_timer = Instant::now();
         let trace_id = format!("{trace_id}-{}", req_no + idx);
         let mut search_res = do_search(
             &trace_id,
@@ -520,8 +519,6 @@ pub async fn process_delta(
 
         // set took
         search_res.set_took(start_timer.elapsed().as_millis() as usize);
-        // reset start timer
-        *start_timer = Instant::now();
 
         // when searching with limit queries
         // the limit in sql takes precedence over the requested size

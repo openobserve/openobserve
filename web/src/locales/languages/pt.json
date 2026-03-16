@@ -1648,7 +1648,13 @@
     "discountTag": "Com desconto",
     "enterpriseNote": "Necessidades de alto volume? Vamos falar de escala! Entre em contato conosco para obter soluções personalizadas.",
     "contactSupport": "Contate o suporte",
-    "totalUsage": "Uso total"
+    "totalUsage": "Uso total",
+    "aiCredits": "Créditos de IA",
+    "aiModeFree": "Gratuito",
+    "aiModePayAsYouGo": "Pague conforme o uso",
+    "aiModeExhausted": "Exausta",
+    "aiExhaustedMessage": "Inscreva-se para continuar usando os recursos de IA",
+    "aiPaygMessage": "Créditos gratuitos esgotados — uso cobrado na assinatura"
   },
   "message": {
     "ServerInternalError": "Erro: Algo deu errado. Erro interno do servidor.",
@@ -2925,7 +2931,8 @@
     "rateLabel": "Tarifa:",
     "timeRangeLabel": "Intervalo de tempo:",
     "analyzeTooltipTraces": "Analise as dimensões do rastreamento para padrões de taxa, latência e erro",
-    "insightsButtonLabel": "Percepções"
+    "insightsButtonLabel": "Percepções",
+    "searchInspectionsLabel": "Inspecione os detalhes da execução do trabalho de pesquisa"
   },
   "errorInsights": {
     "title": "Percepções",

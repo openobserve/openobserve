@@ -1648,7 +1648,13 @@
     "discountTag": "İndirimli",
     "enterpriseNote": "Yüksek hacimli ihtiyaçlar? Ölçekten bahsedelim! Özel çözümler için bizimle iletişime geçin.",
     "contactSupport": "Destek ile iletişime geçin",
-    "totalUsage": "Toplam Kullanım"
+    "totalUsage": "Toplam Kullanım",
+    "aiCredits": "AI Kredileri",
+    "aiModeFree": "Bedava",
+    "aiModePayAsYouGo": "Kullandıkça öde",
+    "aiModeExhausted": "Yorgun",
+    "aiExhaustedMessage": "Yapay zeka özelliklerini kullanmaya devam etmek için abone olun",
+    "aiPaygMessage": "Ücretsiz krediler tükendi — kullanım aboneliğe faturalandırılır"
   },
   "message": {
     "ServerInternalError": "Hata: Bir şeyler ters gitti. Dahili sunucu hatası.",
@@ -2925,7 +2931,8 @@
     "rateLabel": "Oranı:",
     "timeRangeLabel": "Zaman Aralığı:",
     "analyzeTooltipTraces": "Hız, gecikme süresi ve hata kalıpları için izleme boyutlarını analiz edin",
-    "insightsButtonLabel": "İçgörüler"
+    "insightsButtonLabel": "İçgörüler",
+    "searchInspectionsLabel": "Arama işi yürütme ayrıntılarını inceleyin"
   },
   "errorInsights": {
     "title": "İçgörüler",

@@ -138,8 +138,15 @@ pub async fn search(
     let started_at = now_micros();
     let cfg = get_config();
 
+    #[allow(unused_mut)]
+    let mut search_role = "leader".to_string();
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        search_role = "super".to_string();
+    }
+
     let trace_id = if trace_id.is_empty() {
-        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
+        if cfg.common.should_create_span() {
             let ctx = tracing::Span::current().context();
             ctx.span().span_context().trace_id().to_string()
         } else {
@@ -148,6 +155,19 @@ pub async fn search(
     } else {
         trace_id.to_string()
     };
+
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!("[trace_id {trace_id}] in leader task start"),
+            SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
+                .node_name(LOCAL_NODE.name.clone())
+                .component("service:search leader start".to_string())
+                .search_role(search_role.to_string())
+                .build()
+        )
+    );
 
     #[cfg(not(feature = "enterprise"))]
     let req_regions = vec![];
@@ -218,14 +238,6 @@ pub async fn search(
         Ok(Err(e)) => Err(e),
         Err(e) => Err(Error::Message(e.to_string())),
     };
-
-    #[allow(unused_mut)]
-    let mut search_role = "leader".to_string();
-
-    #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {
-        search_role = "super".to_string();
-    }
 
     log::info!(
         "{}",
@@ -361,7 +373,7 @@ pub async fn search_multi(
     let started_at = Utc::now().timestamp_micros();
     let cfg = get_config();
     let trace_id = if trace_id.is_empty() {
-        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
+        if cfg.common.should_create_span() {
             let ctx = tracing::Span::current().context();
             ctx.span().span_context().trace_id().to_string()
         } else {

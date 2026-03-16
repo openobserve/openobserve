@@ -1648,7 +1648,13 @@
     "discountTag": "In sconto",
     "enterpriseNote": "Esigenze di volume elevato? Parliamo di scala! Contattaci per soluzioni su misura.",
     "contactSupport": "Contatta l'assistenza",
-    "totalUsage": "Utilizzo totale"
+    "totalUsage": "Utilizzo totale",
+    "aiCredits": "Crediti AI",
+    "aiModeFree": "Gratuito",
+    "aiModePayAsYouGo": "Paga in base al tuo uso",
+    "aiModeExhausted": "Esausto",
+    "aiExhaustedMessage": "Abbonati per continuare a utilizzare le funzionalità AI",
+    "aiPaygMessage": "Crediti gratuiti esauriti: utilizzo fatturato all'abbonamento"
   },
   "message": {
     "ServerInternalError": "Errore: qualcosa è andato storto. Errore interno del server.",
@@ -2923,7 +2929,8 @@
     "rateLabel": "Tariffa:",
     "timeRangeLabel": "Intervallo di tempo:",
     "analyzeTooltipTraces": "Analizza le dimensioni delle tracce per individuare velocità, latenza e modelli di errore",
-    "insightsButtonLabel": "Approfondimenti"
+    "insightsButtonLabel": "Approfondimenti",
+    "searchInspectionsLabel": "Ispeziona i dettagli di esecuzione del lavoro di ricerca"
   },
   "errorInsights": {
     "title": "Approfondimenti",

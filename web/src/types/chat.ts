@@ -80,4 +80,5 @@ export interface ChatHistoryEntry {
   title: string;
   messages: ChatMessage[];
   sessionId?: string; // UUID v7 for tracking all API calls in this chat session
+  userOrgKey?: string; // SHA-256 hash of "email:orgIdentifier" for per-user/org isolation
 } 

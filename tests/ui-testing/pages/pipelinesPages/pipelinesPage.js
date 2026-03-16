@@ -2,6 +2,7 @@
 const { expect } = require('@playwright/test')
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const fetch = require('node-fetch');
+const { getAuthHeaders } = require('../../playwright-tests/utils/cloud-auth.js');
 
 const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
 
@@ -246,7 +247,7 @@ export class PipelinesPage {
      */
     async clickStreamTypeSelect() {
         // Wait for the add pipeline dialog to be visible
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle').catch(() => {});
         await this.page.waitForTimeout(1000);
 
         // The data-test attribute is on a wrapper div, the q-select is inside
@@ -277,7 +278,7 @@ export class PipelinesPage {
      */
     async clickInputNodeStreamTypeSelect() {
         // Wait for the stream form dialog to be visible
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle').catch(() => {});
         await this.page.waitForTimeout(500);
 
         // The data-test attribute is on a wrapper div, the q-select is inside
@@ -525,7 +526,7 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} - True if pipeline exists, false otherwise
      */
     async verifyPipelineExists(pipelineName) {
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle').catch(() => {});
         await this.page.waitForTimeout(2000);
         await this.searchPipeline(pipelineName);
         await this.page.waitForTimeout(2000);
@@ -913,13 +914,8 @@ export class PipelinesPage {
     async exploreStreamAndNavigateToPipeline(streamName) {
         // Ingestion for the specific stream
         const orgId = process.env["ORGNAME"];
-        const headers = {
-            "Authorization": `Basic ${Buffer.from(
-              `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-            ).toString('base64')}`,
-            "Content-Type": "application/json",
-        };
-        
+        const headers = getAuthHeaders();
+
         const url = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
         await this.page.evaluate(async ({ url, headers, logsdata }) => {
             const response = await fetch(url, {
@@ -1390,6 +1386,26 @@ export class PipelinesPage {
         testLogger.info('Creating pipeline via API', { pipelineName, sourceStream, destStream });
 
         try {
+            if (process.env.IS_CLOUD === 'true') {
+                // Cloud: use browser context (sends OIDC session cookies)
+                const result = await this.page.evaluate(async ({ orgId, payload }) => {
+                    const r = await fetch(`/api/${orgId}/pipelines`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await r.json();
+                    return { status: r.status, data };
+                }, { orgId, payload: pipelinePayload });
+
+                if (result.status === 200 && result.data.code === 200) {
+                    testLogger.info('Pipeline created successfully', { pipelineName });
+                } else {
+                    testLogger.warn('Pipeline creation returned non-200', { pipelineName, status: result.status, data: result.data });
+                }
+                return result;
+            }
+
             const response = await fetch(`${process.env.ZO_BASE_URL}/api/${orgId}/pipelines`, {
                 method: 'POST',
                 headers: headers,
@@ -1471,14 +1487,7 @@ export class PipelinesPage {
      */
     async bulkIngestToStreams(streamNames, data) {
         const orgId = process.env["ORGNAME"];
-        const basicAuthCredentials = Buffer.from(
-            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-        ).toString('base64');
-
-        const headers = {
-            "Authorization": `Basic ${basicAuthCredentials}`,
-            "Content-Type": "application/json",
-        };
+        const headers = getAuthHeaders();
 
         for (const streamName of streamNames) {
             const response = await this.page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
@@ -1508,9 +1517,7 @@ export class PipelinesPage {
      */
     async ingestMetricsData(streamName, recordCount = 10) {
         const orgId = process.env["ORGNAME"];
-        const basicAuthCredentials = Buffer.from(
-            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-        ).toString('base64');
+        const headers = getAuthHeaders();
 
         const timestamp = Math.floor(Date.now() / 1000);
 
@@ -1532,10 +1539,7 @@ export class PipelinesPage {
         const response = await this.page.evaluate(async ({ url, headers, orgId, metricsData }) => {
             const fetchResponse = await fetch(`${url}/api/${orgId}/ingest/metrics/_json`, {
                 method: 'POST',
-                headers: {
-                    "Authorization": `Basic ${headers}`,
-                    "Content-Type": "application/json",
-                },
+                headers: headers,
                 body: JSON.stringify(metricsData)
             });
             return {
@@ -1544,7 +1548,7 @@ export class PipelinesPage {
             };
         }, {
             url: process.env.INGESTION_URL,
-            headers: basicAuthCredentials,
+            headers: headers,
             orgId: orgId,
             metricsData: metricsData
         });
@@ -1568,9 +1572,7 @@ export class PipelinesPage {
      */
     async ingestTracesData(serviceName, spanCount = 5, streamName = null) {
         const orgId = process.env["ORGNAME"];
-        const basicAuthCredentials = Buffer.from(
-            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-        ).toString('base64');
+        const authHeaders = getAuthHeaders();
 
         // Generate current timestamps in nanoseconds
         const baseTimeNano = BigInt(Date.now()) * BigInt(1000000);
@@ -1646,10 +1648,7 @@ export class PipelinesPage {
         };
 
         const response = await this.page.evaluate(async ({ url, headers, orgId, tracesData, streamName }) => {
-            const requestHeaders = {
-                "Authorization": `Basic ${headers}`,
-                "Content-Type": "application/json",
-            };
+            const requestHeaders = { ...headers };
             // Add custom stream header if streamName is provided
             if (streamName) {
                 requestHeaders["stream-name"] = streamName;
@@ -1665,7 +1664,7 @@ export class PipelinesPage {
             };
         }, {
             url: process.env.INGESTION_URL,
-            headers: basicAuthCredentials,
+            headers: authHeaders,
             orgId: orgId,
             tracesData: tracesData,
             streamName: streamName
@@ -2538,7 +2537,7 @@ export class PipelinesPage {
     async navigateToBackfillPage(orgName) {
         const backfillUrl = `${process.env.ZO_BASE_URL}/web/pipeline/pipelines/backfill?org_identifier=${orgName}`;
         await this.page.goto(backfillUrl);
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle').catch(() => {});
         testLogger.info('Navigated to backfill jobs page', { url: backfillUrl });
     }
 
@@ -2616,7 +2615,7 @@ export class PipelinesPage {
         } else {
             await this.page.goBack();
         }
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle').catch(() => {});
         testLogger.info('Navigated back from backfill page');
     }
 
@@ -2700,7 +2699,7 @@ export class PipelinesPage {
     async navigateToHistoryPage(orgName) {
         const historyUrl = `${process.env.ZO_BASE_URL}/web/pipeline/pipelines/history?org_identifier=${orgName}`;
         await this.page.goto(historyUrl);
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle').catch(() => {});
         testLogger.info('Navigated to pipeline history page', { url: historyUrl });
     }
 
@@ -2759,7 +2758,7 @@ export class PipelinesPage {
         } else {
             await this.page.goBack();
         }
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('networkidle').catch(() => {});
         testLogger.info('Navigated back from history page');
     }
 
@@ -3035,7 +3034,7 @@ export class PipelinesPage {
         const backBtn = this.page.locator('[data-test*="back-btn"], [data-test*="back"], button:has-text("Back"), .back-btn').first();
         if (await backBtn.isVisible().catch(() => false)) {
             await backBtn.click();
-            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForLoadState('networkidle').catch(() => {});
             testLogger.info('Clicked history back button');
         } else {
             await this.page.goBack();

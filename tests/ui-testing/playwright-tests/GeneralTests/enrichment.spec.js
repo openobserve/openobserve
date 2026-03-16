@@ -2,6 +2,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const { v4: uuidv4 } = require('uuid');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe.configure({ mode: "parallel" });
 
@@ -12,12 +13,12 @@ test.describe("Enrichment data testcases", () => {
     async function setupLogsData(page, pm) {
         await pm.ingestionPage.ingestion();
 
-        const logsUrl = `${process.env["ZO_BASE_URL"]}/web/logs?org_identifier=${process.env["ORGNAME"]}`;
+        const logsUrl = `${process.env["ZO_BASE_URL"]}/web/logs?org_identifier=${getOrgIdentifier()}`;
         testLogger.navigation('Navigating to logs page', { url: logsUrl });
 
         try {
             await page.goto(logsUrl);
-            const searchPattern = `**/api/${process.env["ORGNAME"]}/_search**`;
+            const searchPattern = `**/api/${getOrgIdentifier()}/_search**`;
             const allsearch = page.waitForResponse(searchPattern, { timeout: 30000 });
             await pm.logsPage.selectStream("e2e_automate");
             await pm.enrichmentPage.applyQuery();

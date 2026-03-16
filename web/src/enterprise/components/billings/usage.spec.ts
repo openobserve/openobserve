@@ -163,7 +163,8 @@ describe("Usage Component", () => {
       dataretention: "0.00",
       functions: "2.75",
       pipeline: "0.00",
-      remotepipeline: "0.00"
+      remotepipeline: "0.00",
+      ai_credits: "0.00"
     });
   });
 
@@ -309,7 +310,8 @@ describe("Usage Component", () => {
       functions: "2.75",
       pipeline: "0.00",
       remotepipeline: "0.00",
-      dataretention: "0.00"
+      dataretention: "0.00",
+      ai_credits: "0.00"
     });
   });
 

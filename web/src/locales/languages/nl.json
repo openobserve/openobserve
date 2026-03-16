@@ -1648,7 +1648,13 @@
     "discountTag": "Met korting",
     "enterpriseNote": "Heeft u grote hoeveelheden nodig? Laten we het over schaal hebben! Neem contact met ons op voor oplossingen op maat.",
     "contactSupport": "Contact opnemen met de klantenservice",
-    "totalUsage": "Totaal gebruik"
+    "totalUsage": "Totaal gebruik",
+    "aiCredits": "AI-kredieten",
+    "aiModeFree": "Gratis",
+    "aiModePayAsYouGo": "Betaal terwijl je onderweg bent",
+    "aiModeExhausted": "Uitgeput",
+    "aiExhaustedMessage": "Schrijf je in om AI-functies te blijven gebruiken",
+    "aiPaygMessage": "Gratis credits uitgeput — gebruik wordt gefactureerd op het abonnement"
   },
   "message": {
     "ServerInternalError": "Fout: er is iets misgegaan. Interne serverfout.",
@@ -2925,7 +2931,8 @@
     "rateLabel": "Tarief:",
     "timeRangeLabel": "Tijdbereik:",
     "analyzeTooltipTraces": "Analyseer de traceerdimensies voor snelheid, latentie en foutpatronen",
-    "insightsButtonLabel": "Inzichten"
+    "insightsButtonLabel": "Inzichten",
+    "searchInspectionsLabel": "Bekijk de details van de uitvoering van de zoekopdracht"
   },
   "errorInsights": {
     "title": "Inzichten",
