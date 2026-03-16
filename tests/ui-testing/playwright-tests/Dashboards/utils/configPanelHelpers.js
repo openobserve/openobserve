@@ -270,6 +270,16 @@ export async function setupPromQLPiePanelWithConfig(page, pm, dashboardName, pan
 }
 
 /**
+ * PromQL donut chart panel — config sidebar opened and ready.
+ * Used for aggregation function tests (only visible on pie/donut/geomap/maps in PromQL mode).
+ */
+export async function setupPromQLDonutPanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPromQLPanel(page, pm, dashboardName, { chartType: "donut", panelName });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("PromQL donut panel with config ready", { dashboardName, panelName });
+}
+
+/**
  * PromQL table panel — config sidebar opened and ready.
  * Used for PromQL table mode, column visibility, sticky columns tests.
  */

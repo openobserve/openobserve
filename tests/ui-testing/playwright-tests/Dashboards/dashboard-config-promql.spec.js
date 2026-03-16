@@ -9,6 +9,7 @@ import {
   generateDashboardName,
   setupPromQLPanelWithConfig,
   setupPromQLPiePanelWithConfig,
+  setupPromQLDonutPanelWithConfig,
   setupPromQLTablePanelWithConfig,
   setupPromQLGeomapPanelWithConfig,
   setupPromQLMapsPanelWithConfig,
@@ -623,6 +624,99 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     const mapTypeWrapper = mapTypeAfter.locator('xpath=ancestor::div[contains(@class,"q-field")][1]');
     await expect(mapTypeWrapper).toContainText("world");
     testLogger.info("Maps name label and map type persisted after save");
+
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Donut aggregation — same option as pie, different chart type
+  // ---------------------------------------------------------------------------
+
+  test("aggregation function: visible for PromQL donut → change to Min → apply → persists", async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupPromQLDonutPanelWithConfig(page, pm, dashboardName);
+
+    const aggregationDropdown = page.locator('[data-test="dashboard-config-aggregation"]');
+    await expect(aggregationDropdown).toBeVisible();
+    testLogger.info("Aggregation dropdown visible for donut chart");
+
+    await aggregationDropdown.click();
+    await page.getByRole("option", { name: /^Min/i }).first().click();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    testLogger.info("Aggregation set to Min on donut");
+    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+    await pm.dashboardPanelActions.savePanel();
+    testLogger.info("Verifying aggregation Min persists after save");
+    await reopenPanelConfig(page, pm);
+    await expect(page.locator('[data-test="dashboard-config-aggregation"]')).toContainText("Min");
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Query tab switching + per-query legend persistence (PromQL multi-query)
+  // ---------------------------------------------------------------------------
+
+  test("multi-query: set legend per query → save → reopen → each query legend persists on correct tab", async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupPromQLPanelWithConfig(page, pm, dashboardName);
+
+    // Set legend for Query 1 (currentQueryIndex = 0 by default)
+    const legendInput = page.locator('[data-test="common-auto-complete"]');
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(legendInput);
+    await legendInput.fill("Legend Q1");
+    testLogger.info("Legend set for Query 1");
+
+    // Add a second query via query editor add button (data-test has literal backticks — use *=)
+    const addQueryBtn = page.locator('[data-test*="query-tab-add"]');
+    await addQueryBtn.waitFor({ state: 'visible', timeout: 10000 });
+    await addQueryBtn.click();
+    testLogger.info("Second query added");
+
+    // Config panel now shows 2 tabs — switch to Query 2
+    const tab0 = page.locator('[data-test="dashboard-config-query-tab-0"]');
+    const tab1 = page.locator('[data-test="dashboard-config-query-tab-1"]');
+    await tab1.waitFor({ state: 'visible', timeout: 5000 });
+    await expect(tab0).toBeVisible();
+    await expect(tab1).toBeVisible();
+    await tab1.click();
+    await expect(tab1).toHaveAttribute("aria-selected", "true");
+    testLogger.info("Switched to Query 2 tab");
+
+    // Set legend for Query 2
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(legendInput);
+    await legendInput.fill("Legend Q2");
+    testLogger.info("Legend set for Query 2");
+
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+    await pm.dashboardPanelActions.savePanel();
+    testLogger.info("Verifying per-query legends persist after save");
+    await reopenPanelConfig(page, pm);
+
+    // Query 1 tab should show "Legend Q1"
+    const tab0After = page.locator('[data-test="dashboard-config-query-tab-0"]');
+    const tab1After = page.locator('[data-test="dashboard-config-query-tab-1"]');
+    await tab0After.waitFor({ state: 'visible', timeout: 5000 });
+    await tab0After.click();
+    await expect(tab0After).toHaveAttribute("aria-selected", "true");
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(legendInput);
+    await expect(legendInput).toHaveValue("Legend Q1");
+    testLogger.info("Query 1 legend persisted");
+
+    // Query 2 tab should show "Legend Q2"
+    await tab1After.click();
+    await expect(tab1After).toHaveAttribute("aria-selected", "true");
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(legendInput);
+    await expect(legendInput).toHaveValue("Legend Q2");
+    testLogger.info("Query 2 legend persisted");
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
