@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <AlertSetup
                       ref="step1Ref"
                       :formData="formData"
-                      :beingUpdated="beingUpdated"
+                      :beingUpdated="beingUpdated || anomalyEditMode"
                       :streamTypes="streamTypes"
                       :filteredStreams="filteredStreams"
                       :isFetchingStreams="isFetchingStreams"
@@ -995,6 +995,7 @@ export default defineComponent({
     const anomalyConfig = ref(defaultAnomalyConfig());
     const anomalyStep2Ref = ref<any>(null);
     const showAnomalySummary = ref(true);
+    const anomalyEditMode = ref(false);
 
     const isAnomalyMode = computed(
       () => formData.value.is_real_time === "anomaly",
@@ -1255,6 +1256,73 @@ export default defineComponent({
     const alertType = ref(router.currentRoute.value.query.alert_type || "all");
 
     onMounted(async () => {
+      // Load anomaly detection config when editing via editAnomalyDetection route
+      const routeAnomalyId = router.currentRoute.value.params
+        .anomaly_id as string | undefined;
+      if (routeAnomalyId) {
+        try {
+          const res = await anomalyDetectionService.get(
+            store.state.selectedOrganization.identifier,
+            routeAnomalyId,
+          );
+          const data = res.data;
+          const parseInterval = (
+            raw: string,
+            defaultValue: number,
+            defaultUnit: "m" | "h",
+          ) => {
+            if (!raw) return { value: defaultValue, unit: defaultUnit };
+            if (raw.endsWith("h"))
+              return { value: parseInt(raw) || defaultValue, unit: "h" as const };
+            return { value: parseInt(raw) || defaultValue, unit: "m" as const };
+          };
+          const parseSeconds = (secs: number) => {
+            if (secs >= 3600 && secs % 3600 === 0)
+              return { value: secs / 3600, unit: "h" as const };
+            return { value: Math.round(secs / 60), unit: "m" as const };
+          };
+          const histInterval = parseInterval(
+            data.histogram_interval || "5m",
+            5,
+            "m",
+          );
+          const sched = parseInterval(
+            data.schedule_interval || "1h",
+            1,
+            "h",
+          );
+          const win = data.detection_window_seconds
+            ? parseSeconds(data.detection_window_seconds)
+            : parseSeconds(
+                sched.value * (sched.unit === "h" ? 3600 : 60),
+              );
+          anomalyConfig.value = {
+            ...defaultAnomalyConfig(),
+            ...data,
+            threshold: data.threshold ?? data.percentile ?? 97,
+            filters: data.filters ?? [],
+            histogram_interval_value: histInterval.value,
+            histogram_interval_unit: histInterval.unit,
+            schedule_interval_value: sched.value,
+            schedule_interval_unit: sched.unit,
+            detection_window_value: win.value,
+            detection_window_unit: win.unit,
+          };
+          formData.value.is_real_time = "anomaly";
+          formData.value.name = data.name;
+          formData.value.stream_name = data.stream_name;
+          formData.value.stream_type = data.stream_type;
+          if (data.folder_id) activeFolderId.value = data.folder_id;
+          anomalyEditMode.value = true;
+          lastValidStep.value = 6;
+        } catch {
+          q.notify({
+            type: "negative",
+            message: "Failed to load anomaly detection config.",
+          });
+        }
+      }
+
       // Set up alerts context provider with stream information
       const alertsProvider = createAlertsContextProvider(
         formData,
@@ -2807,14 +2875,23 @@ export default defineComponent({
           folder_id: (activeFolderId.value as string) || "default",
         };
 
-        await anomalyDetectionService.create(orgId, payload);
-
-        q.notify({
-          type: "positive",
-          message:
-            t("alerts.anomalyCreated") ||
-            "Anomaly detection config created. Training will start shortly.",
-        });
+        const routeAnomalyId = router.currentRoute.value.params
+          .anomaly_id as string | undefined;
+        if (routeAnomalyId) {
+          await anomalyDetectionService.update(orgId, routeAnomalyId, payload);
+          q.notify({
+            type: "positive",
+            message: "Anomaly detection config updated.",
+          });
+        } else {
+          await anomalyDetectionService.create(orgId, payload);
+          q.notify({
+            type: "positive",
+            message:
+              t("alerts.anomalyCreated") ||
+              "Anomaly detection config created. Training will start shortly.",
+          });
+        }
 
         emit("update:list");
         router.push({
@@ -2963,6 +3040,7 @@ export default defineComponent({
       anomalySummarySectionStyle,
       saveAnomalyDetection,
       anomalySaving,
+      anomalyEditMode,
     };
   },
 
