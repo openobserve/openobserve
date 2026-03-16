@@ -403,7 +403,10 @@ export default defineComponent({
       const query = searchObj.data.query;
       if (!query) return result;
       try {
-        const parsed = fnParsedSQL(query);
+        const queryToParse = searchObj.meta.sqlMode
+          ? query
+          : `select * from stream where ${query}`;
+        const parsed = fnParsedSQL(queryToParse);
         if (!parsed?.where) return result;
         const walkNode = (node: any) => {
           if (!node) return;
@@ -451,7 +454,10 @@ export default defineComponent({
       const query = searchObj.data.query;
       if (!query) return result;
       try {
-        const parsed = fnParsedSQL(query);
+        const queryToParse = searchObj.meta.sqlMode
+          ? query
+          : `select * from stream where ${query}`;
+        const parsed = fnParsedSQL(queryToParse);
         if (!parsed?.where) return result;
         const walkNode = (node: any) => {
           if (!node) return;
