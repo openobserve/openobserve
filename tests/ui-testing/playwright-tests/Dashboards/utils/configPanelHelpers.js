@@ -245,7 +245,7 @@ async function buildPromQLPanel(page, pm, dashboardName, {
 
   await pm.dashboardPanelActions.addPanelName(panelName);
   await pm.dashboardPanelActions.applyDashboardBtn();
-  await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+  await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
   testLogger.info("PromQL panel built", { chartType, dashboardName, panelName });
 }
 

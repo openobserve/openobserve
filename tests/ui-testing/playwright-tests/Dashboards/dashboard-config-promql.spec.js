@@ -45,7 +45,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await stepValueInput.fill("5m");
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Step value set to 5m");
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     // Save and verify persistence
     await pm.dashboardPanelActions.savePanel();
@@ -84,14 +84,14 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await page.getByRole("option", { name: /^Max/i }).first().click();
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Aggregation set to Max");
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     // Change aggregation to Avg — full option label is "Avg (average)"
     await aggregationDropdown.click();
     await page.getByRole("option", { name: /^Avg/i }).first().click();
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Aggregation set to Avg");
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying aggregation Avg persists after save");
@@ -116,14 +116,14 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await page.getByRole("option", { name: "Expanded Time series" }).click();
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("PromQL table mode set to Expanded Time series");
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     // Switch to "Aggregate"
     await tableModeDropdown.click();
     await page.getByRole("option", { name: "Aggregate" }).click();
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("PromQL table mode set to Aggregate");
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying PromQL table mode 'Aggregate' persists after save");
@@ -158,7 +158,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await stickyFirstCol.click();
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Sticky first column enabled");
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying sticky first column toggle persists after save");
@@ -186,7 +186,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await connectNullToggle.click();
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Connect null values enabled");
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying connect null values persists after save");
@@ -212,7 +212,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await wrapToggle.click();
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Wrap table cells enabled");
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying wrap table cells persists after save");
@@ -259,7 +259,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     testLogger.info("Table aggregations: added Avg (now last + avg)");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying table aggregations persist after save");
@@ -298,7 +298,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await expect(visibleColsWrapper).toContainText("instance");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying visible columns persist after save");
@@ -333,7 +333,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await expect(hiddenColsWrapper).toContainText("job");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying hidden columns persist after save");
@@ -369,7 +369,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await expect(stickyColsWrapper).toContainText("instance");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying sticky columns persist after save");
@@ -457,7 +457,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
 
     // Apply to load chart data so available columns are populated
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     await pm.dashboardPanelConfigs.openColumnOrderDialog();
 
@@ -488,7 +488,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await reopenPanelConfig(page, pm);
     await switchToAggregateMode(page, pm);
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     await pm.dashboardPanelConfigs.openColumnOrderDialog();
     await pm.dashboardPanelConfigs.columnOrderRow(0).waitFor({ state: 'visible', timeout: 10000 });
@@ -510,7 +510,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await switchToAggregateMode(page, pm);
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     await pm.dashboardPanelConfigs.openColumnOrderDialog();
 
@@ -562,7 +562,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     testLogger.info("Geo lat/lon/weight labels set");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying geo labels persist after save");
@@ -608,7 +608,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     testLogger.info("Maps map type set to 'world'");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying maps config persists after save");
@@ -647,7 +647,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await page.getByRole("option", { name: /^Min/i }).first().click();
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Aggregation set to Min on donut");
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying aggregation Min persists after save");
@@ -695,7 +695,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     testLogger.info("Legend set for Query 2");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying per-query legends persist after save");

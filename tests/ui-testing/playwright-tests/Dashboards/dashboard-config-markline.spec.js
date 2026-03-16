@@ -57,7 +57,7 @@ test.describe("ConfigPanel — Mark Line Settings", () => {
     testLogger.info("Mark line configured: yAxis, value=100, label=threshold");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying mark line persists after save");
@@ -114,7 +114,7 @@ test.describe("ConfigPanel — Mark Line Settings", () => {
     testLogger.info("First mark line removed, second shifted to index 0");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
