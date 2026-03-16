@@ -95,9 +95,8 @@
             dense
             label-slot
             style="width: 100%"
-            :data-test="`dashboard-config-markline-name-${index}`"
-            hide-bottom-space
-          />
+            :data-test="`dashboard-config-markline-value-${index}`"
+           hide-bottom-space/>
         </div>
 
         <q-icon

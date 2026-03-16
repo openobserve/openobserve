@@ -336,6 +336,7 @@ jobs:
                 "dashboard-config-trellis.spec.js",
                 "dashboard-config-drilldown.spec.js",
                 "dashboard-config-promql.spec.js",
+                "dashboard-config-markline.spec.js",
               ]
     steps:
       - name: Clone the current repo
