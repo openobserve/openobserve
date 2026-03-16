@@ -350,6 +350,7 @@
     "selectStreamForAI": "Wählen Sie zuerst einen Stream aus, um KI zu verwenden",
     "collapseFields": "Felder ausblenden",
     "openFields": "Felder öffnen",
+    "createAlertFromPattern": "Warnung anhand dieses Musters erstellen",
     "aiBarSuccessPlaceholder": "Was möchtest du als Nächstes tun?",
     "nlpModeDisabledForVisualization": "Der Natural Language-Modus kann bei einer Visualisierung mit mehreren Streams nicht deaktiviert werden"
   },
@@ -2076,6 +2077,8 @@
     "resultsIncludeAllWindows": "Die Ergebnisse beinhalten alle Ergänzungen mit mehreren Fenstern",
     "runQueryForOutput": "Bitte klicken Sie auf Abfrage ausführen, um die Ausgabe zu sehen",
     "applyVRLForOutput": "Bitte klicken Sie auf VRL anwenden, um die kombinierte Ausgabe zu sehen",
+    "importedFromPattern": "Warnung aus dem Protokollmuster vorab ausgefüllt",
+    "importedFromAnomalyPattern": "Warnung aufgrund eines anomalen Protokollmusters vorab ausgefüllt — Dringlichkeitseinstellungen überprüfen",
     "anomalyDetection": "Erkennung von Anomalien",
     "newAnomalyDetection": "Erkennung neuer Anomalien",
     "editAnomalyDetection": "Anomalieerkennung bearbeiten",
