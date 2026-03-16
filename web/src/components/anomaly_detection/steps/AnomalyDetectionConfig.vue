@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alerts.detectionFunction") }}
             <span class="text-negative tw:ml-1">*</span>
           </div>
-          <div style="width: calc(100% - 190px)">
+          <div class="tw:flex tw:items-center tw:gap-2">
             <q-select
               v-model="config.detection_function"
               :options="detectionFunctions"
@@ -197,8 +197,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               hide-bottom-space
               :rules="[(v) => !!v || 'Detection function is required']"
               data-test="anomaly-detection-function"
-              style="max-width: 200px; background: none"
+              style="width: 110px; background: none"
+              @update:model-value="onDetectionFunctionChange"
             />
+            <q-select
+              v-if="config.detection_function && config.detection_function !== 'count'"
+              v-model="config.detection_function_field"
+              :options="filteredDetectionFields"
+              dense
+              borderless
+              use-input
+              input-debounce="200"
+              :placeholder="config.detection_function_field ? '' : 'Field'"
+              :loading="loadingFields"
+              :rules="[(v) => !!v || 'Field is required']"
+              hide-bottom-space
+              data-test="anomaly-detection-function-field"
+              style="width: 180px; background: none"
+              @filter="filterDetectionFieldOptions"
+            >
+              <template #no-option>
+                <q-item>
+                  <q-item-section class="text-grey">
+                    {{
+                      config.stream_name
+                        ? "No fields found"
+                        : "Select a stream first"
+                    }}
+                  </q-item-section>
+                </q-item>
+              </template>
+            </q-select>
           </div>
         </div>
 
@@ -643,9 +672,10 @@ export default defineComponent({
       { label: "14 days", value: 14 },
     ];
 
-    // Stream fields for filter field selector
+    // Stream fields for filter field selector and detection function field
     const allStreamFields = ref<string[]>([]);
     const filteredStreamFields = ref<string[]>([]);
+    const filteredDetectionFields = ref<string[]>([]);
     const loadingFields = ref(false);
 
     const loadStreamFields = async () => {
@@ -654,6 +684,7 @@ export default defineComponent({
       if (!streamName || !streamType) {
         allStreamFields.value = [];
         filteredStreamFields.value = [];
+        filteredDetectionFields.value = [];
         return;
       }
       loadingFields.value = true;
@@ -670,9 +701,11 @@ export default defineComponent({
             : schema.schema || schema.fields || [];
         allStreamFields.value = fieldsArray.map((f: any) => f.name).sort();
         filteredStreamFields.value = allStreamFields.value;
+        filteredDetectionFields.value = allStreamFields.value;
       } catch {
         allStreamFields.value = [];
         filteredStreamFields.value = [];
+        filteredDetectionFields.value = [];
       } finally {
         loadingFields.value = false;
       }
@@ -687,6 +720,23 @@ export default defineComponent({
             )
           : allStreamFields.value;
       });
+    };
+
+    const filterDetectionFieldOptions = (val: string, update: any) => {
+      update(() => {
+        const needle = val.toLowerCase();
+        filteredDetectionFields.value = needle
+          ? allStreamFields.value.filter((f) =>
+              f.toLowerCase().includes(needle),
+            )
+          : allStreamFields.value;
+      });
+    };
+
+    const onDetectionFunctionChange = (fn: string) => {
+      if (fn === "count") {
+        props.config.detection_function_field = "";
+      }
     };
 
     watch(
@@ -718,8 +768,11 @@ export default defineComponent({
       retrainIntervalOptions,
       allStreamFields,
       filteredStreamFields,
+      filteredDetectionFields,
       loadingFields,
       filterFieldOptions,
+      filterDetectionFieldOptions,
+      onDetectionFunctionChange,
       addFilter,
       removeFilter,
       validate,

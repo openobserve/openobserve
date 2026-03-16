@@ -903,6 +903,7 @@ const defaultAnomalyConfig = () => ({
   filters: [] as any[],
   custom_sql: "",
   detection_function: "count",
+  detection_function_field: "",
   histogram_interval_value: 5,
   histogram_interval_unit: "m" as "m" | "h",
   schedule_interval_value: 1,
@@ -1023,7 +1024,7 @@ export default defineComponent({
       const fn =
         c.detection_function === "count"
           ? "count(*)"
-          : `${c.detection_function}(<field>)`;
+          : `${c.detection_function}(${c.detection_function_field || "<field>"})`;
       const filterLines = (c.filters || [])
         .filter((f: any) => f.field && (operatorNeedsValue(f.operator) ? f.value : true))
         .map((f: any) => `  AND ${buildAnomalyFilterExpression(f.field, f.operator, f.value)}`);
@@ -2789,6 +2790,10 @@ export default defineComponent({
           filters: c.query_mode === "filters" ? c.filters : undefined,
           custom_sql: c.query_mode === "custom_sql" ? c.custom_sql : undefined,
           detection_function: c.detection_function,
+          detection_function_field:
+            c.detection_function !== "count"
+              ? c.detection_function_field || undefined
+              : undefined,
           histogram_interval: anomalyHistogramInterval.value,
           schedule_interval: anomalyScheduleInterval.value,
           detection_window_seconds: anomalyDetectionWindowSeconds.value,
