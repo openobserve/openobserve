@@ -17,8 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="anomaly-wizard full-width q-mx-lg q-pt-xs">
     <!-- Header -->
-    <div class="row items-center no-wrap card-container tw:mx-[0.625rem] tw:mb-[0.625rem]">
-      <div class="flex items-center justify-between tw:w-full card-container tw:h-[68px] tw:px-2 tw:py-3">
+    <div
+      class="row items-center no-wrap card-container tw:mx-[0.625rem] tw:mb-[0.625rem]"
+    >
+      <div
+        class="flex items-center justify-between tw:w-full card-container tw:h-[68px] tw:px-2 tw:py-3"
+      >
         <div class="flex items-center tw:gap-3">
           <div
             class="flex justify-center items-center q-mr-xs cursor-pointer"
@@ -35,18 +39,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex items-center tw:gap-2 tw:flex-wrap">
             <div class="text-h6 tw:flex tw:items-center tw:gap-2">
-              {{ isEdit ? t("alerts.updateAnomalyDetection") : t("alerts.newAnomalyDetection") }}
+              {{
+                isEdit
+                  ? t("alerts.updateAnomalyDetection")
+                  : t("alerts.newAnomalyDetection")
+              }}
               <span
                 v-if="isEdit && config.name"
                 class="anomaly-name-chip text-subtitle2"
-              >{{ config.name }}</span>
+                >{{ config.name }}</span
+              >
             </div>
             <!-- Status badge inline beside name (edit mode only) -->
-            <q-badge v-if="isEdit && config.status" :color="statusColor" :label="config.status" class="text-caption" />
-            <span
-              v-if="isEdit && config.last_detection_run && config.last_detection_run > 0"
+            <q-badge
+              v-if="isEdit && config.status"
+              :color="statusColor"
+              :label="config.status"
               class="text-caption"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+            />
+            <span
+              v-if="
+                isEdit &&
+                config.last_detection_run &&
+                config.last_detection_run > 0
+              "
+              class="text-caption"
+              :class="
+                store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+              "
             >
               Last run: {{ formatTs(config.last_detection_run) }}
             </span>
@@ -68,7 +88,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="isEdit && config.status === 'failed' && config.last_error"
           class="tw:mt-1 tw:rounded tw:px-3 tw:py-2 text-caption text-negative"
-          style="background: rgba(244, 67, 54, 0.08); border: 1px solid rgba(244, 67, 54, 0.3); max-width: 600px"
+          style="
+            background: rgba(244, 67, 54, 0.08);
+            border: 1px solid rgba(244, 67, 54, 0.3);
+            max-width: 600px;
+          "
         >
           <strong>Training error:</strong> {{ config.last_error }}
         </div>
@@ -84,7 +108,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         scroll-behavior: smooth;
       "
     >
-      <div class="card-container tw:px-2 tw:mx-[0.675rem] tw:py-2" style="position: relative">
+      <div
+        class="card-container tw:px-2 tw:mx-[0.675rem] tw:py-2"
+        style="position: relative"
+      >
         <q-stepper
           v-model="step"
           ref="wizardStepper"
@@ -99,17 +126,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="currentStepCaption"
               class="persistent-step-caption tw:px-3 tw:py-1 tw:mb-1 tw:mt-2"
-              :class="store.state.theme === 'dark' ? 'dark-mode-caption' : 'light-mode-caption'"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'dark-mode-caption'
+                  : 'light-mode-caption'
+              "
             >
               {{ currentStepCaption }}
             </div>
           </template>
 
           <!-- Step 1: Setup -->
-          <q-step :name="1" :title="t('alerts.steps.alertSetup')" icon="settings" :done="step > 1">
-            <div style="display: flex; gap: 0.625rem; height: calc(100vh - 305px);">
-              <div style="flex: 0 0 61.5%; display: flex; flex-direction: column; overflow: hidden;">
-                <div style="flex: 1; overflow: auto;">
+          <q-step
+            :name="1"
+            :title="t('alerts.steps.alertSetup')"
+            icon="settings"
+            :done="step > 1"
+          >
+            <div
+              style="display: flex; gap: 0.625rem; height: calc(100vh - 305px)"
+            >
+              <div
+                style="
+                  flex: 0 0 61.5%;
+                  display: flex;
+                  flex-direction: column;
+                  overflow: hidden;
+                "
+              >
+                <div style="flex: 1; overflow: auto">
                   <AnomalySetup
                     ref="step1Ref"
                     :config="config"
@@ -119,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </div>
-              <div style="flex: 0 0 calc(35% - 0.625rem);"></div>
+              <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
             </div>
           </q-step>
 
@@ -130,21 +175,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon="manage_search"
             :done="step > 2"
           >
-            <div style="display: flex; gap: 0.625rem; height: calc(100vh - 305px);">
-              <div style="flex: 0 0 61.5%; display: flex; flex-direction: column; overflow: hidden;">
-                <div style="flex: 1; overflow: auto;">
+            <div
+              style="display: flex; gap: 0.625rem; height: calc(100vh - 305px)"
+            >
+              <div
+                style="
+                  flex: 0 0 61.5%;
+                  display: flex;
+                  flex-direction: column;
+                  overflow: hidden;
+                "
+              >
+                <div style="flex: 1; overflow: auto">
                   <AnomalyDetectionConfig ref="step2Ref" :config="config" />
                 </div>
               </div>
-              <div style="flex: 0 0 calc(35% - 0.625rem);"></div>
+              <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
             </div>
           </q-step>
 
           <!-- Step 3: Alerting -->
-          <q-step :name="3" :title="t('alerts.alerting')" icon="notifications">
-            <div style="display: flex; gap: 0.625rem; height: calc(100vh - 305px);">
-              <div style="flex: 0 0 61.5%; display: flex; flex-direction: column; overflow: hidden;">
-                <div style="flex: 1; overflow: auto;">
+          <q-step :name="3" :title="t('alerts.alerting')"
+icon="notifications">
+            <div
+              style="display: flex; gap: 0.625rem; height: calc(100vh - 305px)"
+            >
+              <div
+                style="
+                  flex: 0 0 61.5%;
+                  display: flex;
+                  flex-direction: column;
+                  overflow: hidden;
+                "
+              >
+                <div style="flex: 1; overflow: auto">
                   <AnomalyAlerting
                     :config="config"
                     :destinations="destinations"
@@ -152,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </div>
-              <div style="flex: 0 0 calc(35% - 0.625rem);"></div>
+              <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
             </div>
           </q-step>
         </q-stepper>
@@ -177,11 +241,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- SQL Preview -->
           <div
             class="preview-box"
-            :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'"
-            style="flex: 1; min-height: 150px;"
+            :class="
+              store.state.theme === 'dark'
+                ? 'dark-mode-preview'
+                : 'light-mode-preview'
+            "
+            style="flex: 1; min-height: 150px"
           >
             <div class="preview-header tw:flex tw:items-center tw:px-3 tw:py-2">
-              <span class="preview-title">{{ config.query_mode === 'custom_sql' ? t("alerts.sqlPreview") : t("alerts.sqlPreview") }}</span>
+              <span class="preview-title">{{
+                config.query_mode === "custom_sql"
+                  ? t("alerts.sqlPreview")
+                  : t("alerts.sqlPreview")
+              }}</span>
             </div>
             <div class="preview-content tw:px-3 tw:py-2">
               <pre class="preview-code">{{ previewSql }}</pre>
@@ -189,12 +261,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Summary -->
-          <div class="collapsible-section card-container" :style="summarySectionStyle">
+          <div
+            class="collapsible-section card-container"
+            :style="summarySectionStyle"
+          >
             <div
               class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
               @click="showSummary = !showSummary"
             >
-              <span class="tw:text-sm tw:font-semibold">{{ t("alerts.summary.title") }}</span>
+              <span class="tw:text-sm tw:font-semibold">{{
+                t("alerts.summary.title")
+              }}</span>
               <q-btn
                 flat
                 dense
@@ -207,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div v-show="showSummary" class="summary-section-content">
               <AnomalySummary
-                style="height: 100%; overflow: auto;"
+                style="height: 100%; overflow: auto"
                 :config="config"
                 :destinations="destinations"
                 :wizard-step="step"
@@ -228,7 +305,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             :label="t('alerts.back')"
             class="o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
             :disable="step === 1"
             no-caps
             @click="step--"
@@ -237,27 +318,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             :label="t('alerts.continue')"
             class="o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
             :disable="step === 3"
             no-caps
             @click="goNext"
           />
-          <q-separator vertical class="tw:mx-2" style="height: 36px;" />
+          <q-separator vertical class="tw:mx-2"
+style="height: 36px" />
           <q-btn
             flat
             class="o2-secondary-button tw:h-[36px]"
             :label="t('alerts.cancel')"
             no-caps
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
             @click="goBack"
           />
           <q-btn
             flat
             class="o2-primary-button no-border tw:h-[36px]"
-            :label="isEdit ? (t('common.save') || 'Save') : t('alerts.saveAndTrain')"
+            :label="
+              isEdit ? t('common.save') || 'Save' : t('alerts.saveAndTrain')
+            "
             no-caps
             :loading="saving"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
             @click="save"
           />
         </div>
@@ -276,6 +372,10 @@ import AnomalySetup from "./steps/AnomalySetup.vue";
 import AnomalyDetectionConfig from "./steps/AnomalyDetectionConfig.vue";
 import AnomalyAlerting from "./steps/AnomalyAlerting.vue";
 import AnomalySummary from "./AnomalySummary.vue";
+import {
+  buildAnomalyFilterExpression,
+  operatorNeedsValue,
+} from "@/utils/alerts/anomalyFilterOperators";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import { getFoldersListByType } from "@/utils/commons";
 
@@ -354,10 +454,14 @@ export default defineComponent({
 
     const statusColor = computed(() => {
       switch (config.value.status) {
-        case "active":   return "positive";
-        case "training": return "info";
-        case "failed":   return "negative";
-        default:         return "grey";
+        case "active":
+          return "positive";
+        case "training":
+          return "info";
+        case "failed":
+          return "negative";
+        default:
+          return "grey";
       }
     });
 
@@ -384,10 +488,12 @@ export default defineComponent({
       date.formatDate(ts / 1000, "YYYY-MM-DD HH:mm");
 
     const histogramInterval = computed(
-      () => `${config.value.histogram_interval_value}${config.value.histogram_interval_unit}`,
+      () =>
+        `${config.value.histogram_interval_value}${config.value.histogram_interval_unit}`,
     );
     const scheduleInterval = computed(
-      () => `${config.value.schedule_interval_value}${config.value.schedule_interval_unit}`,
+      () =>
+        `${config.value.schedule_interval_value}${config.value.schedule_interval_unit}`,
     );
     // Returns seconds (i64) — mirrors alerts' trigger_period_seconds
     const detectionWindowSeconds = computed(() => {
@@ -402,29 +508,36 @@ export default defineComponent({
       }
       const stream = c.stream_name || "<stream>";
       const interval = histogramInterval.value || "5m";
-      const fn = c.detection_function === "count"
-        ? "count(*)"
-        : `${c.detection_function}(<field>)`;
+      const fn =
+        c.detection_function === "count"
+          ? "count(*)"
+          : `${c.detection_function}(<field>)`;
       const filterLines = (c.filters || [])
-        .filter((f: any) => f.field && f.value)
-        .map((f: any) => {
-          const op = f.operator;
-          if (op === "contains")
-            return `  AND ${f.field} LIKE '%${f.value}%'`;
-          if (op === "not_contains")
-            return `  AND ${f.field} NOT LIKE '%${f.value}%'`;
-          return `  AND ${f.field} ${op} '${f.value}'`;
-        });
+        .filter(
+          (f: any) =>
+            f.field && (operatorNeedsValue(f.operator) ? f.value : true),
+        )
+        .map(
+          (f: any) =>
+            `  AND ${buildAnomalyFilterExpression(f.field, f.operator, f.value)}`,
+        );
       const where = filterLines.length
-        ? ["WHERE", ...filterLines.map((l: string, i: number) => i === 0 ? l.replace(/^\s+AND /, "  ") : l)].join("\n")
+        ? [
+            "WHERE",
+            ...filterLines.map((l: string, i: number) =>
+              i === 0 ? l.replace(/^\s+AND /, "  ") : l,
+            ),
+          ].join("\n")
         : "";
 
       // Seasonality is auto-determined from training_window_days (same logic as backend)
       const autoSeasonality = c.training_window_days >= 7 ? "week" : "day";
-      const seasonalSelect = autoSeasonality === "week"
-        ? ",\n       date_part('hour', to_timestamp(_timestamp / 1000000)) AS hour,\n       date_part('dow', to_timestamp(_timestamp / 1000000)) AS dow"
-        : ",\n       date_part('hour', to_timestamp(_timestamp / 1000000)) AS hour";
-      const seasonalGroup = autoSeasonality === "week" ? ", hour, dow" : ", hour";
+      const seasonalSelect =
+        autoSeasonality === "week"
+          ? ",\n       date_part('hour', to_timestamp(_timestamp / 1000000)) AS hour,\n       date_part('dow', to_timestamp(_timestamp / 1000000)) AS dow"
+          : ",\n       date_part('hour', to_timestamp(_timestamp / 1000000)) AS hour";
+      const seasonalGroup =
+        autoSeasonality === "week" ? ", hour, dow" : ", hour";
 
       return [
         `SELECT histogram(_timestamp, '${interval}') AS time_bucket,`,
@@ -433,7 +546,9 @@ export default defineComponent({
         where,
         `GROUP BY time_bucket${seasonalGroup}`,
         `ORDER BY time_bucket`,
-      ].filter(Boolean).join("\n");
+      ]
+        .filter(Boolean)
+        .join("\n");
     });
 
     const goBack = () => {
@@ -468,8 +583,14 @@ export default defineComponent({
           stream_name: config.value.stream_name,
           stream_type: config.value.stream_type,
           query_mode: config.value.query_mode,
-          filters: config.value.query_mode === "filters" ? config.value.filters : undefined,
-          custom_sql: config.value.query_mode === "custom_sql" ? config.value.custom_sql : undefined,
+          filters:
+            config.value.query_mode === "filters"
+              ? config.value.filters
+              : undefined,
+          custom_sql:
+            config.value.query_mode === "custom_sql"
+              ? config.value.custom_sql
+              : undefined,
           detection_function: config.value.detection_function,
           histogram_interval: histogramInterval.value,
           schedule_interval: scheduleInterval.value,
@@ -485,24 +606,32 @@ export default defineComponent({
         };
 
         if (isEdit.value) {
-          await anomalyDetectionService.update(orgId, route.params.anomaly_id as string, {
-            name: payload.name,
-            description: payload.description,
-            detection_function: payload.detection_function,
-            histogram_interval: payload.histogram_interval,
-            schedule_interval: payload.schedule_interval,
-            detection_window_seconds: payload.detection_window_seconds,
-            percentile: payload.percentile,
-            retrain_interval_days: payload.retrain_interval_days,
-            alert_enabled: payload.alert_enabled,
-            alert_destination_id: payload.alert_destination_id,
+          await anomalyDetectionService.update(
+            orgId,
+            route.params.anomaly_id as string,
+            {
+              name: payload.name,
+              description: payload.description,
+              detection_function: payload.detection_function,
+              histogram_interval: payload.histogram_interval,
+              schedule_interval: payload.schedule_interval,
+              detection_window_seconds: payload.detection_window_seconds,
+              percentile: payload.percentile,
+              retrain_interval_days: payload.retrain_interval_days,
+              alert_enabled: payload.alert_enabled,
+              alert_destination_id: payload.alert_destination_id,
+            },
+          );
+          $q.notify({
+            type: "positive",
+            message: "Anomaly detection config updated.",
           });
-          $q.notify({ type: "positive", message: "Anomaly detection config updated." });
         } else {
           await anomalyDetectionService.create(orgId, payload);
           $q.notify({
             type: "positive",
-            message: "Anomaly detection config created. Training will start shortly.",
+            message:
+              "Anomaly detection config created. Training will start shortly.",
           });
         }
 
@@ -527,7 +656,10 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           configId,
         );
-        $q.notify({ type: "positive", message: "Training started. Status will update shortly." });
+        $q.notify({
+          type: "positive",
+          message: "Training started. Status will update shortly.",
+        });
         // Reload to pick up the cleared last_error + status = 'training'
         await loadConfig();
       } catch {
@@ -556,16 +688,26 @@ export default defineComponent({
         );
         const data = res.data;
 
-        const parseInterval = (raw: string, defaultValue: number, defaultUnit: "m" | "h") => {
+        const parseInterval = (
+          raw: string,
+          defaultValue: number,
+          defaultUnit: "m" | "h",
+        ) => {
           if (!raw) return { value: defaultValue, unit: defaultUnit };
-          if (raw.endsWith("h")) return { value: parseInt(raw) || defaultValue, unit: "h" as const };
+          if (raw.endsWith("h"))
+            return { value: parseInt(raw) || defaultValue, unit: "h" as const };
           return { value: parseInt(raw) || defaultValue, unit: "m" as const };
         };
 
-        const histInterval = parseInterval(data.histogram_interval || "5m", 5, "m");
+        const histInterval = parseInterval(
+          data.histogram_interval || "5m",
+          5,
+          "m",
+        );
         const sched = parseInterval(data.schedule_interval || "1h", 1, "h");
         const parseSeconds = (secs: number) => {
-          if (secs >= 3600 && secs % 3600 === 0) return { value: secs / 3600, unit: "h" as const };
+          if (secs >= 3600 && secs % 3600 === 0)
+            return { value: secs / 3600, unit: "h" as const };
           return { value: Math.round(secs / 60), unit: "m" as const };
         };
         const win = data.detection_window_seconds
@@ -631,7 +773,11 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .anomaly-name-chip {
-  background-color: color-mix(in srgb, var(--o2-primary-color) 12%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--o2-primary-color) 12%,
+    transparent
+  );
   color: var(--o2-primary-color);
   border-radius: 0.25rem;
   padding: 0.125rem 0.5rem;
@@ -714,7 +860,7 @@ export default defineComponent({
   }
 
   .preview-code {
-    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
     font-size: 12px;
     margin: 0;
     white-space: pre-wrap;
@@ -792,7 +938,6 @@ export default defineComponent({
       margin-top: 4px;
     }
   }
-
 
   .q-stepper--horizontal .q-stepper__step-inner {
     padding: 8px !important;
@@ -875,108 +1020,106 @@ export default defineComponent({
   }
 }
 
-.dark-mode{
-  .alert-setup-container{
-  background-color: #212121;
-  padding: 8px 16px;
-  margin-left: 8px;
-  border: 1px solid #343434;
-  border-top: 0px !important;
-  border-bottom-left-radius: 4px;
-  border-bottom-right-radius: 4px ;
+.dark-mode {
+  .alert-setup-container {
+    background-color: #212121;
+    padding: 8px 16px;
+    margin-left: 8px;
+    border: 1px solid #343434;
+    border-top: 0px !important;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+  }
+  .q-text-area-input > div > div {
+    background-color: rgb(30, 31, 31) !important;
+    border: 1px solid $input-border !important;
+  }
+  .dark-mode-row-template > div > div {
+    background-color: rgb(30, 31, 31) !important;
+    border: 1px solid $input-border !important;
+  }
+  .custom-input-label {
+    color: #bdbdbd;
+  }
 }
-.q-text-area-input > div > div  { 
-  background-color:rgb(30, 31, 31) !important;
-  border: 1px solid $input-border !important;
-}
-.dark-mode-row-template  > div > div  { 
-  background-color:rgb(30, 31, 31) !important;
-  border: 1px solid $input-border !important;
-}
-.custom-input-label{
-  color: #BDBDBD;
-}
-}
-.light-mode{
-  .alert-setup-container{
+.light-mode {
+  .alert-setup-container {
     background-color: #ffffff;
     padding: 8px 16px;
     margin-left: 8px;
     border: 1px solid #e6e6e6;
     border-top: 0px !important;
     border-bottom-left-radius: 4px;
-    border-bottom-right-radius: 4px ;
+    border-bottom-right-radius: 4px;
   }
-  .custom-input-label{
-    color: #5C5C5C;
+  .custom-input-label {
+    color: #5c5c5c;
   }
-  .q-field--labeled.showLabelOnTop.q-field .q-field__control{
+  .q-field--labeled.showLabelOnTop.q-field .q-field__control {
     border: 1px solid #d4d4d4;
   }
-  .add-folder-btn{
+  .add-folder-btn {
     border: 1px solid #d4d4d4;
   }
-  .dark-mode .q-text-area-input > div > div  { 
-  background-color: #181a1b !important;
-  border: 1px solid black !important;
-}
+  .dark-mode .q-text-area-input > div > div {
+    background-color: #181a1b !important;
+    border: 1px solid black !important;
+  }
 
-.light-mode .q-text-area-input > div > div  { 
-  background-color:#ffffff !important;
-  border: 1px solid #e0e0e0 !important;
+  .light-mode .q-text-area-input > div > div {
+    background-color: #ffffff !important;
+    border: 1px solid #e0e0e0 !important;
+  }
+  .dark-mode-row-template > div > div {
+    background-color: #181a1b !important;
+    border: 1px solid black !important;
+  }
+  .light-mode-row-template > div > div {
+    background-color: #ffffff !important;
+    border: 1px solid #e0e0e0 !important;
+  }
 }
-.dark-mode-row-template > div > div  { 
-  background-color: #181a1b !important;
-  border: 1px solid black !important;
+.q-text-area-input > div > div > div > textarea {
+  height: 80px !important;
+  resize: none !important;
 }
-.light-mode-row-template > div > div  { 
-  background-color:#ffffff !important;
-  border: 1px solid #e0e0e0 !important;
-}
-}
-.q-text-area-input > div > div > div > textarea{  
-    height: 80px !important;
-    resize: none !important;
-}
-.row-template-input > div > div > div > textarea{
+.row-template-input > div > div > div > textarea {
   height: 160px !important;
   resize: none !important;
 }
-.bottom-sticky-dark{
+.bottom-sticky-dark {
   background-color: #212121;
 }
-.bottom-sticky-light{
+.bottom-sticky-light {
   background-color: #ffffff;
-  border-top: 1px solid #d4d4d4
+  border-top: 1px solid #d4d4d4;
 }
-.input-box-bg-dark .q-field__control{
+.input-box-bg-dark .q-field__control {
   background-color: #181a1b !important;
 }
-.input-box-bg-light .q-field__control{
+.input-box-bg-light .q-field__control {
   background-color: #ffffff !important;
 }
-.input-border-dark .q-field__control{
+.input-border-dark .q-field__control {
   border: 1px solid #181a1b !important;
 }
-.input-border-light .q-field__control{
+.input-border-light .q-field__control {
   border: 1px solid #d4d4d4 !important;
 }
 
-
-.o2-alert-tab-border{
+.o2-alert-tab-border {
   border-top: 0.0625rem solid var(--o2-border-color);
 }
 
 // Wizard Stepper Styles
 .anomaly-wizard-stepper {
   box-shadow: none;
-  .q-stepper__step-inner{
+  .q-stepper__step-inner {
     padding: 0.375rem !important;
   }
-  .q-stepper__tab{
+  .q-stepper__tab {
     padding-left: 0.375rem !important;
     min-height: 30px !important;
-
   }
 
   :deep(.q-stepper__header) {
@@ -1071,5 +1214,4 @@ export default defineComponent({
   border-left: 3px solid #bdbdbd;
   padding-left: 12px !important;
 }
-
 </style>

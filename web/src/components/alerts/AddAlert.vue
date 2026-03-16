@@ -824,6 +824,7 @@ import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlertin
 import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import QueryEditor from "@/components/QueryEditor.vue";
+import { buildAnomalyFilterExpression, operatorNeedsValue } from "@/utils/alerts/anomalyFilterOperators";
 import {
   updateGroup as updateGroupUtil,
   removeConditionGroup as removeConditionGroupUtil,
@@ -1024,14 +1025,8 @@ export default defineComponent({
           ? "count(*)"
           : `${c.detection_function}(<field>)`;
       const filterLines = (c.filters || [])
-        .filter((f: any) => f.field && f.value)
-        .map((f: any) => {
-          const op = f.operator;
-          if (op === "contains") return `  AND ${f.field} LIKE '%${f.value}%'`;
-          if (op === "not_contains")
-            return `  AND ${f.field} NOT LIKE '%${f.value}%'`;
-          return `  AND ${f.field} ${op} '${f.value}'`;
-        });
+        .filter((f: any) => f.field && (operatorNeedsValue(f.operator) ? f.value : true))
+        .map((f: any) => `  AND ${buildAnomalyFilterExpression(f.field, f.operator, f.value)}`);
       const where = filterLines.length
         ? [
             "WHERE",
