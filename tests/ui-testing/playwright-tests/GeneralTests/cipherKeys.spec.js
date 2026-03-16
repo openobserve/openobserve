@@ -1,12 +1,11 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
-const PageManager = require('../../pages/page-manager.js');
 const { CipherKeys } = require('../../pages/generalPages/cipherKeys.js');
 const { getOrgIdentifier, isCloudEnvironment } = require('../utils/cloud-auth.js');
 
 test.describe("Cipher Keys for security", { tag: '@enterprise' }, () => {
 
-  let cipherKeys, pm;
+  let cipherKeys;
   const cipherName = `c${Date.now()}-${Math.random().toString(36).substring(7)}`;
   const simpleSecret = process.env['SIMPLE_KEYS'];
   const simpleSecretUp = process.env['SIMPLE_KEYS_UP'];
@@ -82,7 +81,6 @@ test.describe("Cipher Keys for security", { tag: '@enterprise' }, () => {
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
-    pm = new PageManager(page);
     cipherKeys = new CipherKeys(page);
     await page.waitForLoadState('domcontentloaded');
     testLogger.info('Cipher keys test setup completed');
