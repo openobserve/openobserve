@@ -101,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div
               v-if="!header.isPlaceholder"
+              :data-test="`log-search-result-table-th-sort-${header.id}`"
               :class="[
                 'text-left',
                 header.column.getCanSort() ||
@@ -293,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               !wrap &&
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? 'tw:table-row'
-                : 'tw:flex',
+                : 'tw:block',
               (tableRows[virtualRow.index] as any)[
                 store.state.zoConfig.timestamp_column
               ] === highlightTimestamp &&
@@ -343,7 +344,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :index="calculateActualIndex(virtualRow.index - 1)"
                 :highlight-query="highlightQuery"
                 :hide-view-related="hideViewRelatedButton"
-                :hide-search-term-actions="hideSearchTermActions"
                 @copy="copyLogToClipboard"
                 @add-field-to-table="addFieldToTable"
                 @add-search-term="addSearchTerm"
@@ -408,28 +408,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="table-row-expand-menu"
                   @click.capture.stop="handleExpandRow(virtualRow.index)"
                 ></q-btn>
-
-                <template
-                  v-if="
-                    enableCellActions &&
+                <slot
+                  name="cell-actions"
+                  :row="cell.row.original"
+                  :column="cell.column"
+                  :active="
                     activeCellActionId === `${cell.id}_${cell.column.id}`
                   "
-                >
-                  <cell-actions
-                    v-if="
-                      (cell.column.columnDef.meta as any)?.closable &&
-                      (cell.row.original as any)[cell.column.id]
-                    "
-                    :column="cell.column"
-                    :row="cell.row.original as any"
-                    :selectedStreamFields="selectedStreamFields"
-                    :hide-search-term-actions="hideSearchTermActions"
-                    @copy="copyLogToClipboard"
-                    @add-search-term="addSearchTerm"
-                    @add-field-to-table="addFieldToTable"
-                    @send-to-ai-chat="sendToAiChat"
-                  />
-                </template>
+                />
                 <!-- If column.meta.slot is set, delegate to the named cell slot -->
                 <slot
                   v-if="(cell.column.columnDef.meta as any)?.slot"
@@ -506,7 +492,6 @@ import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
-import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import { debounce } from "quasar";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
@@ -573,14 +558,6 @@ const props = defineProps({
     type: Array as PropType<StreamField[]>,
     default: () => [],
   },
-  selectedStreamFields: {
-    type: Array as PropType<StreamField[]>,
-    default: () => [],
-  },
-  hideSearchTermActions: {
-    type: Boolean,
-    default: false,
-  },
   hideViewRelatedButton: {
     type: Boolean,
     default: false,
@@ -630,11 +607,6 @@ const props = defineProps({
   },
   /** Run FTS text highlighting (processHitsInChunks). Default: true */
   enableTextHighlight: {
-    type: Boolean,
-    default: true,
-  },
-  /** Show hover cell-actions (copy / add-search-term buttons). Default: true */
-  enableCellActions: {
     type: Boolean,
     default: true,
   },
