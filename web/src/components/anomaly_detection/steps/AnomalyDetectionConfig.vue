@@ -201,7 +201,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="onDetectionFunctionChange"
             />
             <q-select
-              v-if="config.detection_function && config.detection_function !== 'count'"
+              v-if="
+                config.detection_function &&
+                config.detection_function !== 'count'
+              "
               v-model="config.detection_function_field"
               :options="filteredDetectionFields"
               dense
@@ -562,8 +565,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="anomaly-threshold-dec"
               />
               <div class="tw:text-center" style="min-width: 140px">
-                <span class="tw:font-semibold"
-style="font-size: 13px"
+                <span class="tw:font-semibold" style="font-size: 13px"
                   >~{{ 100 - config.threshold }}%</span
                 >
                 <span class="text-caption text-grey-6 q-ml-xs"
