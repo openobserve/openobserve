@@ -105,9 +105,6 @@ fn flatten_object(
     }
     for (mut k, mut v) in current.into_iter() {
         let parent_key = if k == TOKEN_NUMBER {
-            let v1 = v.as_str().and_then(|v| v.parse::<f64>().ok());
-            let v2 = v1.and_then(|v| super::json::Number::from_f64(v));
-            dbg!(&v1, &v2);
             v = if let Some(Some(n)) = v
                 .as_str()
                 .and_then(|v| v.parse::<f64>().ok().map(super::json::Number::from_f64))
