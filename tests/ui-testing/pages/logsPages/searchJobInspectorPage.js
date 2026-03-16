@@ -91,6 +91,18 @@ export class SearchJobInspectorPage {
   }
 
   /**
+   * Wait for inspector data to be loaded (tiles show values or error state)
+   */
+  async waitForInspectorDataLoaded() {
+    // Wait for either the Results tile text or error banner to be visible
+    // This indicates the API call has completed
+    await Promise.race([
+      this.page.locator(this.resultsTileText).waitFor({ state: 'visible', timeout: 15000 }),
+      this.page.locator(this.inspectorErrorBanner).waitFor({ state: 'visible', timeout: 15000 })
+    ]);
+  }
+
+  /**
    * Check if on inspector page
    * @returns {Promise<boolean>}
    */
@@ -311,7 +323,9 @@ export class SearchJobInspectorPage {
     const viewQueryBtn = this.page.locator(this.viewQueryBtnText);
     await expect(viewQueryBtn).toBeVisible({ timeout: 5000 });
     await viewQueryBtn.click();
-    await this.page.waitForLoadState('domcontentloaded');
+    // Wait for SQL content element to be visible (primary selector)
+    const sqlContent = this.page.locator('[data-test="inspector-sql-query-content"]');
+    await sqlContent.waitFor({ state: 'visible', timeout: 10000 });
   }
 
   /**
@@ -333,19 +347,16 @@ export class SearchJobInspectorPage {
    * @returns {Promise<string>}
    */
   async getSqlQueryContent() {
-    // Look for SQL content in dialog (pre/code elements or SQL keywords)
-    const sqlLocators = [
-      this.page.locator('pre').first(),
-      this.page.locator('code').first(),
-      this.page.locator('text=/SELECT.*FROM/i').first()
-    ];
+    // Wait for the SQL content element using data-test attribute
+    const sqlLocator = this.page.locator('[data-test="inspector-sql-query-content"]');
+    await sqlLocator.waitFor({ state: 'visible', timeout: 10000 });
 
-    for (const locator of sqlLocators) {
-      if (await locator.isVisible({ timeout: 2000 }).catch(() => false)) {
-        return await locator.textContent() || '';
-      }
+    const content = await sqlLocator.textContent() || '';
+    // Return empty string if showing fallback message (no SQL data available)
+    if (content === 'No SQL query available') {
+      return '';
     }
-    return '';
+    return content;
   }
 
   /**

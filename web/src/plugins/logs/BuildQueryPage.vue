@@ -46,9 +46,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, defineAsyncComponent, provide, defineExpose } from "vue";
+import {
+  ref,
+  onMounted,
+  watch,
+  defineAsyncComponent,
+  provide,
+  defineExpose,
+} from "vue";
 import { useRouter } from "vue-router";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import {
   parseSQL,
   shouldUseCustomMode,
@@ -119,8 +126,13 @@ const panelEditorRef = ref<any>(null);
 const showAddToDashboardDialog = ref(false);
 
 // Get dashboard panel data for build page
-const { dashboardPanelData, resetDashboardPanelData, updateGroupedFields, makeAutoSQLQuery, validatePanel } =
-  useDashboardPanelData("build");
+const {
+  dashboardPanelData,
+  resetDashboardPanelData,
+  updateGroupedFields,
+  makeAutoSQLQuery,
+  validatePanel,
+} = useDashboardPanelData("build");
 
 const { showErrorNotification } = useNotifications();
 
@@ -144,7 +156,9 @@ const restoreConfigFromUrl = (): {
   customQuery?: boolean;
   query?: string;
 } => {
-  const buildData = router.currentRoute.value?.query?.build_data as string | undefined;
+  const buildData = router.currentRoute.value?.query?.build_data as
+    | string
+    | undefined;
   if (!buildData) {
     return {};
   }
@@ -191,7 +205,10 @@ const initializeFromQuery = async () => {
 
   // Always restore config from URL (for settings like table_dynamic_columns, etc.)
   if (urlConfig.config) {
-    dashboardPanelData.data.config = { ...dashboardPanelData.data.config, ...urlConfig.config };
+    dashboardPanelData.data.config = {
+      ...dashboardPanelData.data.config,
+      ...urlConfig.config,
+    };
   }
   // Only restore chart type from URL on FIRST toggle (shared link scenario)
   // On subsequent toggles, always re-parse and auto-select chart type
@@ -202,17 +219,27 @@ const initializeFromQuery = async () => {
 
   // On FIRST toggle (shared link): if URL has saved fields, restore them directly
   // instead of parsing searchQuery. This preserves the exact builder/custom state.
-  if (props.isFirstToggle && urlConfig.fields && (urlConfig.fields.x?.length || urlConfig.fields.y?.length || urlConfig.customQuery)) {
+  if (
+    props.isFirstToggle &&
+    urlConfig.fields &&
+    (urlConfig.fields.x?.length ||
+      urlConfig.fields.y?.length ||
+      urlConfig.customQuery)
+  ) {
     const savedFields = urlConfig.fields;
-    dashboardPanelData.data.queries[0].fields.stream = savedFields.stream || props.selectedStream || "";
-    dashboardPanelData.data.queries[0].fields.stream_type = savedFields.stream_type || "logs";
+    dashboardPanelData.data.queries[0].fields.stream =
+      savedFields.stream || props.selectedStream || "";
+    dashboardPanelData.data.queries[0].fields.stream_type =
+      savedFields.stream_type || "logs";
     dashboardPanelData.data.queries[0].fields.x = savedFields.x || [];
     dashboardPanelData.data.queries[0].fields.y = savedFields.y || [];
-    dashboardPanelData.data.queries[0].fields.breakdown = savedFields.breakdown || [];
+    dashboardPanelData.data.queries[0].fields.breakdown =
+      savedFields.breakdown || [];
     if (savedFields.filter) {
       dashboardPanelData.data.queries[0].fields.filter = savedFields.filter;
     }
-    dashboardPanelData.data.queries[0].customQuery = urlConfig.customQuery || false;
+    dashboardPanelData.data.queries[0].customQuery =
+      urlConfig.customQuery || false;
     if (urlConfig.joins) {
       dashboardPanelData.data.queries[0].joins = urlConfig.joins;
     }
@@ -272,7 +299,8 @@ const initializeFromQuery = async () => {
       if (parsed.customQuery) {
         // Parsing failed or complex query detected
         if (props.selectedStream) {
-          dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
+          dashboardPanelData.data.queries[0].fields.stream =
+            props.selectedStream;
           dashboardPanelData.data.queries[0].fields.stream_type = "logs";
         }
         dashboardPanelData.data.queries[0].query = props.searchQuery;
@@ -295,7 +323,8 @@ const initializeFromQuery = async () => {
         // Apply parsed fields to builder
         dashboardPanelData.data.queries[0].fields.x = panelFields.x;
         dashboardPanelData.data.queries[0].fields.y = panelFields.y;
-        dashboardPanelData.data.queries[0].fields.breakdown = panelFields.breakdown;
+        dashboardPanelData.data.queries[0].fields.breakdown =
+          panelFields.breakdown;
         dashboardPanelData.data.queries[0].fields.filter = panelFields.filter;
         dashboardPanelData.data.queries[0].customQuery = false;
 
@@ -312,7 +341,11 @@ const initializeFromQuery = async () => {
             dashboardPanelData.data.type = "table";
           } else if (panelFields.y.length === 0) {
             dashboardPanelData.data.type = "table";
-          } else if (panelFields.x.length === 0 && panelFields.y.length > 0 && panelFields.breakdown.length === 0) {
+          } else if (
+            panelFields.x.length === 0 &&
+            panelFields.y.length > 0 &&
+            panelFields.breakdown.length === 0
+          ) {
             dashboardPanelData.data.type = "metric";
           }
         }
@@ -374,7 +407,6 @@ const addPanelToDashboard = () => {
 // ============================================================================
 // Watchers
 // ============================================================================
-
 
 // Watch for field, filter, join, and customQuery changes to sync URL params via parent
 watch(

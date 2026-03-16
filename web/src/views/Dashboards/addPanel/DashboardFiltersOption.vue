@@ -39,7 +39,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, computed, inject } from "vue";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
@@ -89,8 +89,8 @@ export default defineComponent({
         const defaultCondition = {
           type: "list",
           column: {
-            field: firstOption?.value || '',
-            streamAlias: firstOption?.streamAlias
+            field: firstOption?.value || "",
+            streamAlias: firstOption?.streamAlias,
           },
           filterType: "condition",
           operator: null,
@@ -105,8 +105,8 @@ export default defineComponent({
             {
               type: "list",
               column: {
-                field: schemaOptions.value[0]?.value || '',
-                streamAlias: schemaOptions.value[0]?.streamAlias
+                field: schemaOptions.value[0]?.value || "",
+                streamAlias: schemaOptions.value[0]?.streamAlias,
               },
               filterType: "condition",
               operator: null,
@@ -127,8 +127,8 @@ export default defineComponent({
       group.conditions.push({
         type: "list",
         column: {
-          field: firstOption?.value || '',
-          streamAlias: firstOption?.streamAlias
+          field: firstOption?.value || "",
+          streamAlias: firstOption?.streamAlias,
         },
         filterType: "condition",
         operator: null,
@@ -144,8 +144,8 @@ export default defineComponent({
           {
             type: "list",
             column: {
-              field: schemaOptions.value[0]?.value || '',
-              streamAlias: schemaOptions.value[0]?.streamAlias
+              field: schemaOptions.value[0]?.value || "",
+              streamAlias: schemaOptions.value[0]?.streamAlias,
             },
             filterType: "condition",
             operator: null,

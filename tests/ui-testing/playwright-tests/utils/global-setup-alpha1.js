@@ -224,7 +224,8 @@ async function globalSetup() {
 
     // Step 9: Perform global data ingestion (same as self-hosted global-setup.js)
     // This creates streams that tests expect to find in dropdowns
-    const isCleanupOnly = process.argv.some(arg => /cleanup\.spec\.(js|ts)$/.test(arg));
+    const specFiles = process.argv.filter(arg => /\.spec\.(js|ts)$/.test(arg));
+    const isCleanupOnly = specFiles.length === 1 && /cleanup\.spec\.(js|ts)$/.test(specFiles[0]);
     if (isCleanupOnly || process.env.SKIP_INGESTION === 'true') {
       testLogger.info('[alpha1] Skipping data ingestion (cleanup-only run or SKIP_INGESTION=true)');
     } else {

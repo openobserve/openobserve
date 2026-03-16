@@ -139,7 +139,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Picker visible (time set or "+Set" was clicked) -->
         <div
-          v-if="showTimePicker || (panelTimeRange !== null && panelTimeRange !== undefined)"
+          v-if="
+            showTimePicker ||
+            (panelTimeRange !== null && panelTimeRange !== undefined)
+          "
           class="flex items-center no-wrap panel-time-picker-container"
         >
           <div class="panel-time-picker-btn">
@@ -1846,7 +1849,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { computed, defineComponent, inject, onBeforeMount, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
@@ -2589,7 +2592,11 @@ export default defineComponent({
     watch(
       pickerValue,
       (newValue) => {
-        if (newValue && useDefaultTime.value && (showTimePicker.value || panelTimeRange.value !== null)) {
+        if (
+          newValue &&
+          useDefaultTime.value &&
+          (showTimePicker.value || panelTimeRange.value !== null)
+        ) {
           const timeRange = buildPanelTimeRange(newValue as any);
           dashboardPanelData.data.config.panel_time_range = timeRange;
           panelTimeRange.value = timeRange;
@@ -2610,7 +2617,6 @@ export default defineComponent({
         relativeTimePeriod: "15m",
       };
     };
-
 
     // Clear legend width when switching away from plain type or when position is not right
     watchEffect(() => {
@@ -2769,6 +2775,7 @@ export default defineComponent({
   font-weight: bold;
   color: white;
 }
+
 .unit-container {
   display: flex;
   height: 36px;
