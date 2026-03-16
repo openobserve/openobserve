@@ -78,7 +78,7 @@ const mockDashboardPanelData = reactive({
   },
 });
 
-vi.mock("@/composables/useDashboardPanel", () => ({
+vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: () => ({
     dashboardPanelData: mockDashboardPanelData,
     resetAggregationFunction: vi.fn(),
@@ -242,7 +242,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -268,7 +269,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -293,7 +295,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -318,7 +321,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -344,7 +348,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -369,7 +374,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -394,7 +400,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -424,7 +431,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -450,7 +458,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -474,7 +483,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -498,7 +508,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -522,7 +533,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -546,7 +558,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -573,7 +586,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -599,7 +613,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -624,7 +639,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -650,7 +666,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -675,7 +692,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -700,7 +718,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -724,7 +743,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -748,7 +768,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -772,7 +793,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -796,7 +818,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -820,7 +843,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -844,7 +868,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -872,7 +897,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -896,7 +922,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -922,7 +949,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -947,7 +975,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -972,7 +1001,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -996,7 +1026,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -1024,7 +1055,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -1035,7 +1067,9 @@ describe("PanelEditor.vue", () => {
         },
       });
 
-      expect(wrapper.find(".field-list-sidebar-header-collapsed").exists()).toBe(true);
+      expect(
+        wrapper.find(".field-list-sidebar-header-collapsed").exists(),
+      ).toBe(true);
 
       // Restore
       mockDashboardPanelData.layout.showFieldList = true;
@@ -1053,7 +1087,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -1064,7 +1099,9 @@ describe("PanelEditor.vue", () => {
         },
       });
 
-      expect(wrapper.find(".field-list-sidebar-header-collapsed").exists()).toBe(false);
+      expect(
+        wrapper.find(".field-list-sidebar-header-collapsed").exists(),
+      ).toBe(false);
     });
 
     it("should show HTML editor section when type is html", async () => {
@@ -1079,7 +1116,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -1109,7 +1147,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -1139,7 +1178,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -1169,7 +1209,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,
@@ -1193,7 +1234,8 @@ describe("PanelEditor.vue", () => {
           stubs: {
             QSeparator: true,
             QSplitter: {
-              template: '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+              template:
+                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             },
             QIcon: true,
             QBtn: true,

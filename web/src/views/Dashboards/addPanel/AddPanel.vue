@@ -210,7 +210,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :editMode="editMode"
       :dashboardData="dashboardDataForPanelEditor"
       :variablesData="updatedVariablesData"
-      :selectedDateTime="dateTimeForVariables || dashboardPanelData.meta.dateTime"
+      :selectedDateTime="
+        dateTimeForVariables || dashboardPanelData.meta.dateTime
+      "
       @variablesDataUpdated="variablesDataUpdated"
       @openAddVariable="handleOpenAddVariable"
       @chartApiError="handleChartApiError"
@@ -220,10 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Query Inspector Dialog -->
     <q-dialog v-model="showViewPanel">
-      <QueryInspector
-        :metaData="metaData"
-        :data="panelTitle"
-      ></QueryInspector>
+      <QueryInspector :metaData="metaData" :data="panelTitle"></QueryInspector>
     </q-dialog>
 
     <!-- Add Variable Drawer -->
@@ -273,7 +272,7 @@ import {
 } from "../../../utils/commons";
 import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import DateTimePickerDashboard from "../../../components/DateTimePickerDashboard.vue";
 import AddSettingVariable from "../../../components/dashboards/settings/AddSettingVariable.vue";
 import { useLoading } from "@/composables/useLoading";
@@ -400,13 +399,17 @@ export default defineComponent({
           currentTabId.value || "",
         );
 
-        updatedVariablesData.isVariablesLoading = variablesManager.isLoading.value;
+        updatedVariablesData.isVariablesLoading =
+          variablesManager.isLoading.value;
         // IMPORTANT: Deep copy to prevent reactive updates from live state
         updatedVariablesData.values = JSON.parse(JSON.stringify(mergedVars));
       } else {
         // Fallback: deep copy from variablesData
-        updatedVariablesData.isVariablesLoading = variablesData.isVariablesLoading;
-        updatedVariablesData.values = JSON.parse(JSON.stringify(variablesData.values));
+        updatedVariablesData.isVariablesLoading =
+          variablesData.isVariablesLoading;
+        updatedVariablesData.values = JSON.parse(
+          JSON.stringify(variablesData.values),
+        );
       }
     };
 
@@ -463,7 +466,9 @@ export default defineComponent({
           // Trigger chart update with loaded variables
           if (editMode.value || !isInitialDashboardPanelData()) {
             // Copy the panel data to trigger chart render with initial variables
-            chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+            chartData.value = JSON.parse(
+              JSON.stringify(dashboardPanelData.data),
+            );
             panelEditorRef.value?.initChartData(dashboardPanelData.data);
           }
         }
@@ -645,12 +650,16 @@ export default defineComponent({
     // Watch for stream or query type changes and update context provider
     watch(
       () => [
-        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.stream,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.stream,
         dashboardPanelData.data.queryType,
         dashboardPanelData.layout.currentQueryIndex,
       ],
       () => {
-        console.log('[AddPanel] Stream or query changed, updating context provider');
+        console.log(
+          "[AddPanel] Stream or query changed, updating context provider",
+        );
         const dashboardProvider = createDashboardsContextProvider(
           route,
           store,
@@ -659,7 +668,7 @@ export default defineComponent({
         );
         contextRegistry.register("dashboards", dashboardProvider);
         // Keep dashboards context active (don't need to re-set active)
-      }
+      },
     );
 
     let list = computed(function () {
@@ -760,7 +769,8 @@ export default defineComponent({
       // Capture initial variable names on first load (only once during mount)
       if (initialVariableNames.value.length === 0) {
         initialVariableNames.value =
-          currentDashboardData.data?.variables?.list?.map((v: any) => v.name) || [];
+          currentDashboardData.data?.variables?.list?.map((v: any) => v.name) ||
+          [];
       }
 
       // check if route has time related query params
@@ -816,13 +826,21 @@ export default defineComponent({
           };
         } else if (dashboardPanelData.data.config?.panel_time_range) {
           // Priority 2: Panel's saved config time
-          const panelTimeRange = dashboardPanelData.data.config.panel_time_range;
-          if (panelTimeRange.type === 'relative' && panelTimeRange.relativeTimePeriod) {
+          const panelTimeRange =
+            dashboardPanelData.data.config.panel_time_range;
+          if (
+            panelTimeRange.type === "relative" &&
+            panelTimeRange.relativeTimePeriod
+          ) {
             selectedDate.value = {
               valueType: "relative",
               relativeTimePeriod: panelTimeRange.relativeTimePeriod,
             };
-          } else if (panelTimeRange.type === 'absolute' && panelTimeRange.startTime && panelTimeRange.endTime) {
+          } else if (
+            panelTimeRange.type === "absolute" &&
+            panelTimeRange.startTime &&
+            panelTimeRange.endTime
+          ) {
             selectedDate.value = {
               valueType: "absolute",
               startTime: panelTimeRange.startTime,
@@ -960,13 +978,20 @@ export default defineComponent({
         // Update URL with panel time parameters
         const query = { ...route.query };
 
-        if (newPanelTime.type === 'relative' && newPanelTime.relativeTimePeriod) {
+        if (
+          newPanelTime.type === "relative" &&
+          newPanelTime.relativeTimePeriod
+        ) {
           // Relative time: pt-period.{panelId}={relativeTimePeriod}
           query[`pt-period.${panelId}`] = newPanelTime.relativeTimePeriod;
           // Remove absolute time params if they exist
           delete query[`pt-from.${panelId}`];
           delete query[`pt-to.${panelId}`];
-        } else if (newPanelTime.type === 'absolute' && newPanelTime.startTime && newPanelTime.endTime) {
+        } else if (
+          newPanelTime.type === "absolute" &&
+          newPanelTime.startTime &&
+          newPanelTime.endTime
+        ) {
           // Absolute time: pt-from.{panelId}={startTime}&pt-to.{panelId}={endTime}
           query[`pt-from.${panelId}`] = newPanelTime.startTime.toString();
           query[`pt-to.${panelId}`] = newPanelTime.endTime.toString();
@@ -976,9 +1001,8 @@ export default defineComponent({
 
         router.replace({ query });
       },
-      { deep: true }
+      { deep: true },
     );
-
 
     // resize the chart when config panel is opened and closed
     watch(
@@ -987,7 +1011,6 @@ export default defineComponent({
         window.dispatchEvent(new Event("resize"));
       },
     );
-
 
     // resize the chart when query editor is opened and closed
     watch(
@@ -1092,10 +1115,14 @@ export default defineComponent({
     const goBack = async () => {
       // Clean up variables created during this session (on discard)
       // Remove variables that were created in this session from the dashboard data
-      if (variablesCreatedInSession.value.length > 0 && currentDashboardData.data?.variables?.list) {
-        currentDashboardData.data.variables.list = currentDashboardData.data.variables.list.filter(
-          (v: any) => !variablesCreatedInSession.value.includes(v.name)
-        );
+      if (
+        variablesCreatedInSession.value.length > 0 &&
+        currentDashboardData.data?.variables?.list
+      ) {
+        currentDashboardData.data.variables.list =
+          currentDashboardData.data.variables.list.filter(
+            (v: any) => !variablesCreatedInSession.value.includes(v.name),
+          );
       }
 
       // Clear the tracking arrays
@@ -1152,10 +1179,14 @@ export default defineComponent({
         const confirmMessage = t("dashboard.unsavedMessage");
         if (window.confirm(confirmMessage)) {
           // User confirmed navigation - clean up variables created during this session
-          if (variablesCreatedInSession.value.length > 0 && currentDashboardData.data?.variables?.list) {
-            currentDashboardData.data.variables.list = currentDashboardData.data.variables.list.filter(
-              (v: any) => !variablesCreatedInSession.value.includes(v.name)
-            );
+          if (
+            variablesCreatedInSession.value.length > 0 &&
+            currentDashboardData.data?.variables?.list
+          ) {
+            currentDashboardData.data.variables.list =
+              currentDashboardData.data.variables.list.filter(
+                (v: any) => !variablesCreatedInSession.value.includes(v.name),
+              );
           }
           variablesCreatedInSession.value = [];
           variablesWithCurrentPanel.value = [];
@@ -1303,23 +1334,32 @@ export default defineComponent({
               );
               if (variable && variable.panels) {
                 variable.panels = variable.panels.map((id: string) =>
-                  id === "current_panel" ? panelId : id
+                  id === "current_panel" ? panelId : id,
                 );
               }
             });
           }
 
           // Prepare variables to update (if any were created during this session)
-          const variablesToUpdate = variablesCreatedInSession.value.length > 0
-            ? { variableNames: variablesCreatedInSession.value, newPanelId: panelId }
-            : undefined;
+          const variablesToUpdate =
+            variablesCreatedInSession.value.length > 0
+              ? {
+                  variableNames: variablesCreatedInSession.value,
+                  newPanelId: panelId,
+                }
+              : undefined;
 
           // Prepare list of new variable objects to add to dashboard
-          const newVariablesList = variablesCreatedInSession.value.length > 0
-            ? variablesCreatedInSession.value.map((name: string) =>
-                currentDashboardData.data?.variables?.list?.find((v: any) => v.name === name)
-              ).filter((v: any) => v !== undefined)
-            : undefined;
+          const newVariablesList =
+            variablesCreatedInSession.value.length > 0
+              ? variablesCreatedInSession.value
+                  .map((name: string) =>
+                    currentDashboardData.data?.variables?.list?.find(
+                      (v: any) => v.name === name,
+                    ),
+                  )
+                  .filter((v: any) => v !== undefined)
+              : undefined;
 
           const errorMessageOnSave = await addPanel(
             store,
@@ -1328,7 +1368,7 @@ export default defineComponent({
             route.query.folder ?? "default",
             route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
             variablesToUpdate,
-            newVariablesList
+            newVariablesList,
           );
           if (errorMessageOnSave instanceof Error) {
             errorData.errors.push(
@@ -1713,7 +1753,9 @@ export default defineComponent({
       isPanelLoading.value = data;
     };
 
-    const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (data: boolean) => {
+    const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (
+      data: boolean,
+    ) => {
       isCachedDataDifferWithCurrentTimeRange.value = data;
     };
 

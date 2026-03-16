@@ -56,7 +56,7 @@ const mockStreamSchema = {
   ],
 };
 
-vi.mock("@/composables/useDashboardPanel", () => ({
+vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(() => ({
     dashboardPanelData: mockDashboardPanelData,
   })),
@@ -178,9 +178,7 @@ describe("StreamFieldSelect", () => {
     });
 
     it("should handle streams with aliases", async () => {
-      const streamsWithAlias = [
-        { stream: "logs", streamAlias: "log_alias" },
-      ];
+      const streamsWithAlias = [{ stream: "logs", streamAlias: "log_alias" }];
       wrapper = createWrapper({ streams: streamsWithAlias });
       await flushPromises();
       // Options should be populated automatically
