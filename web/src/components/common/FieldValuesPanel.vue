@@ -71,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="showMultiSelect"
               v-model="selectedValues"
               :val="value.key"
+              :color="checkboxColor(value.key)"
               size="xs"
               dense
               class="q-mr-xs"
@@ -255,6 +256,8 @@ interface Props {
   showMultiSelect?: boolean;
   defaultValuesCount?: number;
   theme?: string;
+  activeIncludeValues?: string[];
+  activeExcludeValues?: string[];
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -274,9 +277,18 @@ const emit = defineEmits<{
   "search-field-values": [fieldName: string, searchTerm: string];
 }>();
 
-const selectedValues = ref<string[]>([]);
+const allActiveValues = computed(() => [
+  ...(props.activeIncludeValues ?? []),
+  ...(props.activeExcludeValues ?? []),
+]);
+
+const selectedValues = ref<string[]>(allActiveValues.value);
 const valueSearchTerm = ref("");
 const cachedValues = ref<{ key: string; count: number; label?: string }[]>([]);
+
+watch(allActiveValues, (newVals) => {
+  selectedValues.value = newVals;
+});
 
 // Cache original values whenever they arrive with no active search term.
 watch(
@@ -286,6 +298,7 @@ watch(
       cachedValues.value = [...newVals];
     }
   },
+  { immediate: true },
 );
 
 // Show interim locally-filtered cache while the API responds to a search term.
@@ -327,8 +340,13 @@ const handleApplyMultiSelect = (action: string) => {
   selectedValues.value = [];
 };
 
+const checkboxColor = (key: string): string => {
+  if (props.activeExcludeValues?.includes(key)) return "negative";
+  return "primary";
+};
+
 const reset = () => {
-  selectedValues.value = [];
+  selectedValues.value = allActiveValues.value;
   valueSearchTerm.value = "";
   cachedValues.value = [];
 };

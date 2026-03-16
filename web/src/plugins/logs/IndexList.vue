@@ -112,6 +112,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :timestamp-column="store.state.zoConfig.timestamp_column"
         :show-quick-mode="searchObj.meta.quickMode"
         :field-values="fieldValues"
+        :active-include-field-values="activeIncludeFilterValues"
+        :active-exclude-field-values="activeExcludeFilterValues"
+        :expanded-fields="expandedFields"
         :selected-streams-count="searchObj.data.stream.selectedStream.length"
         :default-values-count="store.state.zoConfig?.query_values_default_num || 10"
         :show-user-defined-schema-toggle="showUserDefinedSchemaToggle"
@@ -322,6 +325,7 @@ export default defineComponent({
     }> = ref({});
 
     const openedFilterFields = ref<string[]>([]);
+    const expandedFields = ref<Record<string, boolean>>({});
 
     // Stores the last fetch payloads per field so value-search can reuse them
     const lastFieldFetchPayloads = ref<Record<string, any[]>>({});
@@ -373,6 +377,92 @@ export default defineComponent({
       );
     });
 
+    // Helper: extract column name from a column_ref node's .column field
+    const extractColName = (col: any): string | null => {
+      if (typeof col === "string") return col.replace(/^"|"$/g, "");
+      if (col?.expr?.value != null) return String(col.expr.value);
+      return null;
+    };
+
+    const activeIncludeFilterValues = computed((): Record<string, string[]> => {
+      const result: Record<string, string[]> = {};
+      const query = searchObj.data.query;
+      if (!query) return result;
+      try {
+        const parsed = fnParsedSQL(query);
+        if (!parsed?.where) return result;
+        const walkNode = (node: any) => {
+          if (!node) return;
+          const op = node.operator?.toUpperCase();
+          if (op === "OR" || op === "AND") {
+            walkNode(node.left);
+            walkNode(node.right);
+          } else if (op === "=") {
+            if (node.left?.type === "column_ref") {
+              const colName = extractColName(node.left.column);
+              if (colName && node.right?.value != null) {
+                const val = String(node.right.value);
+                if (!result[colName]) result[colName] = [];
+                if (!result[colName].includes(val)) result[colName].push(val);
+              }
+            }
+          } else if (op === "IS") {
+            if (node.left?.type === "column_ref") {
+              const colName = extractColName(node.left.column);
+              if (colName) {
+                if (!result[colName]) result[colName] = [];
+                if (!result[colName].includes("")) result[colName].push("");
+              }
+            }
+          }
+        };
+        walkNode(parsed.where);
+      } catch {
+        // ignore parse errors
+      }
+      return result;
+    });
+
+    // Exclude values: fields with != / <> (or IS NOT NULL → empty-string key)
+    const activeExcludeFilterValues = computed((): Record<string, string[]> => {
+      const result: Record<string, string[]> = {};
+      const query = searchObj.data.query;
+      if (!query) return result;
+      try {
+        const parsed = fnParsedSQL(query);
+        if (!parsed?.where) return result;
+        const walkNode = (node: any) => {
+          if (!node) return;
+          const op = node.operator?.toUpperCase();
+          if (op === "OR" || op === "AND") {
+            walkNode(node.left);
+            walkNode(node.right);
+          } else if (op === "!=" || op === "<>") {
+            if (node.left?.type === "column_ref") {
+              const colName = extractColName(node.left.column);
+              if (colName && node.right?.value != null) {
+                const val = String(node.right.value);
+                if (!result[colName]) result[colName] = [];
+                if (!result[colName].includes(val)) result[colName].push(val);
+              }
+            }
+          } else if (op === "IS NOT") {
+            if (node.left?.type === "column_ref") {
+              const colName = extractColName(node.left.column);
+              if (colName) {
+                if (!result[colName]) result[colName] = [];
+                if (!result[colName].includes("")) result[colName].push("");
+              }
+            }
+          }
+        };
+        walkNode(parsed.where);
+      } catch {
+        // ignore parse errors
+      }
+      return result;
+    });
+
     watch(
       () => streamList.value,
       () => {
@@ -416,6 +506,9 @@ export default defineComponent({
 
     const resetPagination = () => {
       pagination.value.page = 1;
+
+      // Tell FieldList to skip its scroll-preserve logic for this intentional reset.
+      (fieldListRef.value as any)?.prepareScrollReset?.();
 
       // Reset scroll position when changing tabs
       nextTick(() => {
@@ -630,6 +723,7 @@ export default defineComponent({
       try {
         //maintaing  the opened fields
         openedFilterFields.value.push(name);
+        expandedFields.value[name] = true;
         let timestamps: any =
           searchObj.data.datetime.type === "relative"
             ? getConsumableRelativeTime(
@@ -1519,6 +1613,7 @@ export default defineComponent({
     const cancelFilterCreator = (row: any) => {
       //if it is websocker based then cancel the trace id
       //else cancel the further value api calls using the openedFilterFields
+      expandedFields.value[row.name] = false;
       cancelValueApi(row.name);
       delete lastFieldFetchPayloads.value[row.name];
       delete cachedFieldValues.value[row.name];
@@ -1683,6 +1778,9 @@ export default defineComponent({
       setPage,
       resetPagination,
       removeFieldFromWhereAST,
+      activeIncludeFilterValues,
+      activeExcludeFilterValues,
+      expandedFields,
     };
   },
 });

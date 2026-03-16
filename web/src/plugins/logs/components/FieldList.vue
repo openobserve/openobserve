@@ -111,6 +111,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <FieldExpansion
                 :field="field"
                 :field-values="fieldValues[field.name]"
+                :active-include-values="activeIncludeFieldValues?.[field.name] ?? []"
+                :active-exclude-values="activeExcludeFieldValues?.[field.name] ?? []"
+                :expanded="expandedFields?.[field.name] ?? false"
                 :selected-fields="selectedFields"
                 :selected-streams-count="selectedStreamsCount"
                 :theme="theme"
@@ -200,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import FieldRow from "./FieldRow.vue";
 import FieldExpansion from "./FieldExpansion.vue";
@@ -225,6 +228,9 @@ interface Props {
   timestampColumn: string;
   showQuickMode: boolean;
   fieldValues: Record<string, any>;
+  activeIncludeFieldValues?: Record<string, string[]>;
+  activeExcludeFieldValues?: Record<string, string[]>;
+  expandedFields?: Record<string, boolean>;
   selectedStreamsCount: number;
   defaultValuesCount: number;
   showUserDefinedSchemaToggle: boolean;
@@ -234,7 +240,7 @@ interface Props {
   totalFieldsCount: number;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 defineEmits<{
   "update:pagination": [value: { page: number; rowsPerPage: number }];
@@ -262,15 +268,60 @@ defineEmits<{
 // Refs
 const fieldListRef = ref<HTMLElement | null>(null);
 
+// Scroll position preservation
+let _skipScrollRestore = false;
+let _restoreRafId: number | null = null;
+
+const getScrollContainer = (): HTMLElement | null =>
+  fieldListRef?.value?.$el?.querySelector(".q-table__middle.scroll") ?? null;
+
+// Watch the rows prop specifically — this is what causes q-table to re-render
+// and reset scroll. Save the position BEFORE the DOM update (flush: "pre"),
+// then restore it after Quasar's own post-render work via nextTick +
+// requestAnimationFrame.
+watch(
+  () => props.streamFieldsRows,
+  () => {
+    if (_skipScrollRestore) {
+      _skipScrollRestore = false;
+      return;
+    }
+    const c = getScrollContainer();
+    const saved = c ? c.scrollTop : 0;
+    if (saved === 0) return; // nothing to preserve
+
+    if (_restoreRafId !== null) cancelAnimationFrame(_restoreRafId);
+
+    nextTick(() => {
+      _restoreRafId = requestAnimationFrame(() => {
+        _restoreRafId = null;
+        if (_skipScrollRestore) return;
+        const container = getScrollContainer();
+        if (container) container.scrollTop = saved;
+      });
+    });
+  },
+  { flush: "pre" },
+);
+
 // Methods
 const scrollToTop = () => {
-  if (fieldListRef.value) {
-    const scrollContainer = fieldListRef?.value?.$el?.querySelector(
-      ".q-table__middle.scroll",
-    );
-    if (scrollContainer) {
-      scrollContainer.scrollTop = 0;
-    }
+  _skipScrollRestore = true;
+  if (_restoreRafId !== null) {
+    cancelAnimationFrame(_restoreRafId);
+    _restoreRafId = null;
+  }
+  const c = getScrollContainer();
+  if (c) c.scrollTop = 0;
+};
+
+// Called synchronously by parent before an intentional scroll reset so that
+// any in-flight restore is cancelled before the rows change fires the watcher.
+const prepareScrollReset = () => {
+  _skipScrollRestore = true;
+  if (_restoreRafId !== null) {
+    cancelAnimationFrame(_restoreRafId);
+    _restoreRafId = null;
   }
 };
 
@@ -278,6 +329,7 @@ const scrollToTop = () => {
 defineExpose({
   fieldListRef,
   scrollToTop,
+  prepareScrollReset,
 });
 </script>
 

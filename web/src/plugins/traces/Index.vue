@@ -76,6 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-show="searchObj.meta.showFields"
                 ref="indexListRef"
                 :field-list="searchObj.data.stream.selectedStreamFields"
+                :active-include-field-values="activeIncludeFilterValues"
+                :active-exclude-field-values="activeExcludeFilterValues"
                 data-test="traces-search-index-list"
                 class="card-container"
                 :key="searchObj.data.stream.streamLists"
@@ -274,6 +276,7 @@ import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
@@ -295,6 +298,7 @@ const {
   copyTracesUrl,
   formatTracesMetaData,
 } = useTraces();
+const { fnParsedSQL } = logsUtils();
 let refreshIntervalID = 0;
 const searchResultRef = ref(null);
 const searchBarRef = ref(null);
@@ -1463,6 +1467,100 @@ const onFiltersReset = () => {
 
 const isStreamSelected = computed(() => {
   return searchObj.data.stream.selectedStream.value.trim().length > 0;
+});
+
+const extractTracesColName = (col: any): string | null => {
+  if (typeof col === "string") return col.replace(/^"|"$/g, "");
+  if (col?.expr?.value != null) return String(col.expr.value);
+  return null;
+};
+
+const buildTracesWhereSQL = (): string => {
+  const query = searchObj.data.editorValue?.trim();
+  if (!query) return "";
+  const parts = query.split("|");
+  const whereClause = (parts.length > 1 ? parts[1] : parts[0]).trim();
+  if (!whereClause) return "";
+  const streamName = searchObj.data.stream.selectedStream?.value || "stream";
+  return `SELECT * FROM "${streamName}" WHERE ${whereClause}`;
+};
+
+const activeIncludeFilterValues = computed((): Record<string, string[]> => {
+  const result: Record<string, string[]> = {};
+  try {
+    const fullSql = buildTracesWhereSQL();
+    if (!fullSql) return result;
+    const parsed = fnParsedSQL(fullSql);
+    if (!parsed?.where) return result;
+    const walkNode = (node: any) => {
+      if (!node) return;
+      const op = node.operator?.toUpperCase();
+      if (op === "OR" || op === "AND") {
+        walkNode(node.left);
+        walkNode(node.right);
+      } else if (op === "=") {
+        if (node.left?.type === "column_ref") {
+          const colName = extractTracesColName(node.left.column);
+          if (colName && node.right?.value != null) {
+            const val = String(node.right.value);
+            if (!result[colName]) result[colName] = [];
+            if (!result[colName].includes(val)) result[colName].push(val);
+          }
+        }
+      } else if (op === "IS") {
+        if (node.left?.type === "column_ref") {
+          const colName = extractTracesColName(node.left.column);
+          if (colName) {
+            if (!result[colName]) result[colName] = [];
+            if (!result[colName].includes("null")) result[colName].push("null");
+          }
+        }
+      }
+    };
+    walkNode(parsed.where);
+  } catch {
+    // ignore parse errors
+  }
+  return result;
+});
+
+const activeExcludeFilterValues = computed((): Record<string, string[]> => {
+  const result: Record<string, string[]> = {};
+  try {
+    const fullSql = buildTracesWhereSQL();
+    if (!fullSql) return result;
+    const parsed = fnParsedSQL(fullSql);
+    if (!parsed?.where) return result;
+    const walkNode = (node: any) => {
+      if (!node) return;
+      const op = node.operator?.toUpperCase();
+      if (op === "OR" || op === "AND") {
+        walkNode(node.left);
+        walkNode(node.right);
+      } else if (op === "!=" || op === "<>") {
+        if (node.left?.type === "column_ref") {
+          const colName = extractTracesColName(node.left.column);
+          if (colName && node.right?.value != null) {
+            const val = String(node.right.value);
+            if (!result[colName]) result[colName] = [];
+            if (!result[colName].includes(val)) result[colName].push(val);
+          }
+        }
+      } else if (op === "IS NOT") {
+        if (node.left?.type === "column_ref") {
+          const colName = extractTracesColName(node.left.column);
+          if (colName) {
+            if (!result[colName]) result[colName] = [];
+            if (!result[colName].includes("null")) result[colName].push("null");
+          }
+        }
+      }
+    };
+    walkNode(parsed.where);
+  } catch {
+    // ignore parse errors
+  }
+  return result;
 });
 
 const searchData = () => {
