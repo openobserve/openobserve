@@ -430,11 +430,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @send-to-ai-chat="sendToAiChat"
                   />
                 </template>
+                <!-- If column.meta.slot is set, delegate to the named cell slot -->
                 <slot
+                  v-if="(cell.column.columnDef.meta as any)?.slot"
                   :name="`cell-${cell.column.id}`"
                   :item="cell.row.original"
                   :cell="cell"
-                >
+                />
+                <!-- Otherwise render the default cell content inline -->
+                <template v-else>
                   <span
                     v-if="
                       processedResults[
@@ -462,7 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       sendToAiChat(JSON.stringify(cell.row.original), true)
                     "
                   />
-                </slot>
+                </template>
               </td>
             </template>
           </tr>
