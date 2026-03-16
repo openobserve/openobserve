@@ -1,26 +1,5 @@
 <template>
   <div>
-    <div class="q-mb-sm" style="font-weight: 600">
-      <span>Override Config</span>
-      <q-btn
-        no-caps
-        padding="xs"
-        size="sm"
-        flat
-        icon="info_outline"
-        data-test="dashboard-addpanel-config-drilldown-info"
-      >
-        <q-tooltip
-          class="bg-grey-8"
-          anchor="bottom middle"
-          self="top middle"
-          max-width="250px"
-        >
-          Map units to the selected columns for enhanced data visualization.
-        </q-tooltip>
-      </q-btn>
-    </div>
-
     <q-btn
       @click="openOverrideConfigPopup"
       style="cursor: pointer; padding: 0px 5px"
