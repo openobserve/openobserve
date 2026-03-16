@@ -268,10 +268,30 @@ defineEmits<{
 // Refs
 const fieldListRef = ref<HTMLElement | null>(null);
 
+// ---------------------------------------------------------------------------
 // Scroll position preservation
+//
+// Problem: Quasar's q-table resets the scroll position to 0 after every
+// reactive row update (it does this in a requestAnimationFrame callback of
+// its own). A plain onBeforeUpdate / onUpdated pair runs too early and gets
+// overridden.
+//
+// Solution:
+//   1. Watch `streamFieldsRows` with flush:"pre" to capture scrollTop
+//      synchronously before the DOM mutates.
+//   2. Schedule a restore via nextTick + requestAnimationFrame so we run
+//      AFTER Quasar's own reset RAF.
+//   3. When the parent wants an intentional reset (stream change), it calls
+//      prepareScrollReset() which sets _skipScrollRestore = true so the
+//      watcher skips the restore for that one update.
+// ---------------------------------------------------------------------------
+
+/** When true, the next watcher invocation will skip scroll restoration. */
 let _skipScrollRestore = false;
+/** RAF handle for a pending scroll-restore; cancelled on intentional resets. */
 let _restoreRafId: number | null = null;
 
+/** Returns the scrollable q-table container element, or null if not mounted. */
 const getScrollContainer = (): HTMLElement | null =>
   fieldListRef?.value?.$el?.querySelector(".q-table__middle.scroll") ?? null;
 
@@ -304,7 +324,10 @@ watch(
   { flush: "pre" },
 );
 
-// Methods
+/**
+ * Imperatively scrolls the field list to the top and prevents the next
+ * watcher cycle from overriding that position (e.g. after stream change).
+ */
 const scrollToTop = () => {
   _skipScrollRestore = true;
   if (_restoreRafId !== null) {
@@ -315,8 +338,12 @@ const scrollToTop = () => {
   if (c) c.scrollTop = 0;
 };
 
-// Called synchronously by parent before an intentional scroll reset so that
-// any in-flight restore is cancelled before the rows change fires the watcher.
+/**
+ * Called synchronously by the parent before an intentional scroll reset
+ * (e.g. stream change) so that any in-flight restore RAF is cancelled before
+ * the rows change fires the watcher. Without this the restore would run after
+ * the parent's scroll-to-top and undo it.
+ */
 const prepareScrollReset = () => {
   _skipScrollRestore = true;
   if (_restoreRafId !== null) {

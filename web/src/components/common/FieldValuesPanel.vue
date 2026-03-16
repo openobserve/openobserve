@@ -277,15 +277,27 @@ const emit = defineEmits<{
   "search-field-values": [fieldName: string, searchTerm: string];
 }>();
 
+/**
+ * Union of all values that are currently active in the query (both included
+ * and excluded). Used to initialise selectedValues and keep it in sync when
+ * the parent query changes.
+ */
 const allActiveValues = computed(() => [
   ...(props.activeIncludeValues ?? []),
   ...(props.activeExcludeValues ?? []),
 ]);
 
+/**
+ * Drives the multi-select checkboxes. Initialised from allActiveValues so
+ * previously filtered values appear pre-checked when the panel opens.
+ * Kept in sync via the watcher below as the parent query changes.
+ */
 const selectedValues = ref<string[]>(allActiveValues.value);
 const valueSearchTerm = ref("");
 const cachedValues = ref<{ key: string; count: number; label?: string }[]>([]);
 
+// Sync selectedValues whenever the parent's active query changes so that
+// checkboxes always reflect the current filter state.
 watch(allActiveValues, (newVals) => {
   selectedValues.value = newVals;
 });
@@ -340,11 +352,21 @@ const handleApplyMultiSelect = (action: string) => {
   selectedValues.value = [];
 };
 
+/**
+ * Returns the Quasar colour token for a value's checkbox.
+ * Excluded values (!=) render red ("negative") to visually distinguish them
+ * from included values (=) which render the default blue ("primary").
+ */
 const checkboxColor = (key: string): string => {
   if (props.activeExcludeValues?.includes(key)) return "negative";
   return "primary";
 };
 
+/**
+ * Resets the panel to match the current active filter state.
+ * Called by the parent (via defineExpose) when the expansion panel closes, so
+ * stale user selections don't persist the next time the panel is opened.
+ */
 const reset = () => {
   selectedValues.value = allActiveValues.value;
   valueSearchTerm.value = "";

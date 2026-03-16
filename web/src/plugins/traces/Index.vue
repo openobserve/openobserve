@@ -1469,12 +1469,27 @@ const isStreamSelected = computed(() => {
   return searchObj.data.stream.selectedStream.value.trim().length > 0;
 });
 
+/**
+ * Extracts a plain column name from a DataFusion SQL AST column node.
+ * The parser can represent column names as either a plain string or a nested
+ * object ({ expr: { value: "name" } }), so we handle both shapes.
+ */
 const extractTracesColName = (col: any): string | null => {
   if (typeof col === "string") return col.replace(/^"|"$/g, "");
   if (col?.expr?.value != null) return String(col.expr.value);
   return null;
 };
 
+/**
+ * Wraps the traces WHERE clause (stored in editorValue) into a full SQL
+ * statement so that fnParsedSQL can parse it.
+ *
+ * The traces query editor only stores the WHERE portion of the query,
+ * optionally pipe-separated (e.g. "| status='200' and duration>100").
+ * fnParsedSQL requires a complete SELECT statement, so we synthesise one.
+ *
+ * Returns an empty string when there is no active WHERE clause.
+ */
 const buildTracesWhereSQL = (): string => {
   const query = searchObj.data.editorValue?.trim();
   if (!query) return "";
@@ -1485,6 +1500,15 @@ const buildTracesWhereSQL = (): string => {
   return `SELECT * FROM "${streamName}" WHERE ${whereClause}`;
 };
 
+/**
+ * Derives which field values are currently *included* in the active query.
+ * Returns a map of { fieldName: [value, ...] } by walking the SQL WHERE AST
+ * and collecting:
+ *   - equality conditions  (field = 'value')
+ *   - IS NULL conditions   (field IS NULL  → sentinel key "null")
+ *
+ * Used to pre-check the corresponding checkboxes (blue) in the field sidebar.
+ */
 const activeIncludeFilterValues = computed((): Record<string, string[]> => {
   const result: Record<string, string[]> = {};
   try {
@@ -1508,6 +1532,7 @@ const activeIncludeFilterValues = computed((): Record<string, string[]> => {
           }
         }
       } else if (op === "IS") {
+        // IS NULL — the field values API returns null rows with key "null"
         if (node.left?.type === "column_ref") {
           const colName = extractTracesColName(node.left.column);
           if (colName) {
@@ -1524,6 +1549,15 @@ const activeIncludeFilterValues = computed((): Record<string, string[]> => {
   return result;
 });
 
+/**
+ * Derives which field values are currently *excluded* from the active query.
+ * Returns a map of { fieldName: [value, ...] } by walking the SQL WHERE AST
+ * and collecting:
+ *   - inequality conditions  (field != 'value' / field <> 'value')
+ *   - IS NOT NULL conditions (field IS NOT NULL → sentinel key "null")
+ *
+ * Used to pre-check the corresponding checkboxes (red) in the field sidebar.
+ */
 const activeExcludeFilterValues = computed((): Record<string, string[]> => {
   const result: Record<string, string[]> = {};
   try {
@@ -1547,6 +1581,7 @@ const activeExcludeFilterValues = computed((): Record<string, string[]> => {
           }
         }
       } else if (op === "IS NOT") {
+        // IS NOT NULL — the field values API returns null rows with key "null"
         if (node.left?.type === "column_ref") {
           const colName = extractTracesColName(node.left.column);
           if (colName) {

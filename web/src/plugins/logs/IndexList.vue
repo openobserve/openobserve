@@ -377,13 +377,27 @@ export default defineComponent({
       );
     });
 
-    // Helper: extract column name from a column_ref node's .column field
+    /**
+     * Extracts a plain column name from a DataFusion SQL AST column node.
+     * The parser represents column names as either a plain string or a nested
+     * object ({ expr: { value: "name" } }), so we handle both shapes and
+     * strip surrounding double-quotes when present.
+     */
     const extractColName = (col: any): string | null => {
       if (typeof col === "string") return col.replace(/^"|"$/g, "");
       if (col?.expr?.value != null) return String(col.expr.value);
       return null;
     };
 
+    /**
+     * Derives which field values are currently *included* in the active query.
+     * Returns a map of { fieldName: [value, ...] } by walking the SQL WHERE AST
+     * and collecting:
+     *   - equality conditions  (field = 'value')
+     *   - IS NULL conditions   (field IS NULL  → sentinel key "")
+     *
+     * Used to pre-check the corresponding checkboxes (blue) in the field sidebar.
+     */
     const activeIncludeFilterValues = computed((): Record<string, string[]> => {
       const result: Record<string, string[]> = {};
       const query = searchObj.data.query;
@@ -423,7 +437,15 @@ export default defineComponent({
       return result;
     });
 
-    // Exclude values: fields with != / <> (or IS NOT NULL → empty-string key)
+    /**
+     * Derives which field values are currently *excluded* from the active query.
+     * Returns a map of { fieldName: [value, ...] } by walking the SQL WHERE AST
+     * and collecting:
+     *   - inequality conditions  (field != 'value' / field <> 'value')
+     *   - IS NOT NULL conditions (field IS NOT NULL → sentinel key "")
+     *
+     * Used to pre-check the corresponding checkboxes (red) in the field sidebar.
+     */
     const activeExcludeFilterValues = computed((): Record<string, string[]> => {
       const result: Record<string, string[]> = {};
       const query = searchObj.data.query;
