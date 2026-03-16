@@ -76,7 +76,7 @@ const mockDashboardPanelData: any = reactive({
   },
 });
 
-vi.mock("../../composables/useDashboardPanel", () => ({
+vi.mock("../../composables/dashboard/useDashboardPanel", () => ({
   default: () => ({
     dashboardPanelData: mockDashboardPanelData,
     resetDashboardPanelData: mockResetDashboardPanelData,
