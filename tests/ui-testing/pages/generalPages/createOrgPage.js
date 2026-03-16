@@ -114,6 +114,34 @@ export class CreateOrgPage {
         await expect(this.page.locator('tbody')).toContainText(orgName);
     }
 
+    async getAdminOrgs(orgId = '_meta') {
+        const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+            "Content-Type": "application/json",
+        };
+
+        const fetchResponse = await fetch(
+            `${process.env.INGESTION_URL}/api/${orgId}/organizations?page_size=1000000`,
+            {
+                method: "GET",
+                headers: headers,
+            }
+        );
+
+        const status = fetchResponse.status;
+        const contentType = fetchResponse.headers.get("content-type");
+        let data = null;
+
+        if (contentType && contentType.includes("application/json")) {
+            data = await fetchResponse.json();
+        } else {
+            data = await fetchResponse.text();
+        }
+
+        return { status, data };
+    }
+
     async deleteOrgViaAPI(orgIdentifier) {
         console.log(`⚠️  WARNING: Organization deletion may not be supported in this environment`);
         

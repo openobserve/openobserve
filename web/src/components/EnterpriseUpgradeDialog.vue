@@ -64,24 +64,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Loaded State: Show actual data -->
               <template v-else>
-                <q-circular-progress
-                  v-if="dialogConfig.showUsageIndicator"
-                  :value="dialogConfig.usagePercentage"
-                  size="40px"
-                  :thickness="0.18"
-                  :color="getProgressColor(dialogConfig.usagePercentage)"
-                  track-color="rgba(255, 255, 255, 0.3)"
-                  class="usage-indicator"
-                  show-value
-                  font-size="10px"
-                >
-                  <span style="color: white; font-weight: 700; font-size: 10px;">{{ Math.round(dialogConfig.usagePercentage) }}%</span>
-                </q-circular-progress>
                 <div class="offer-badge" :class="{ 'licensed-badge': dialogConfig.isLicensed }">
                   <q-icon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="20px" class="q-mr-xs" />
                   <span>{{ dialogConfig.badgeText }}</span>
                 </div>
               </template>
+            </div>
+
+            <!-- Usage Chart (only for Enterprise with license) -->
+            <div v-if="dialogConfig.isLicensed && chartData" class="usage-chart-section">
+              <div class="chart-wrapper">
+                <div class="usage-chart-container" style="height: 150px; width: 100%;">
+                  <ChartRenderer
+                    :key="dashboardRenderKey"
+                    :data="chartData"
+                  />
+                </div>
+                <div v-if="isIngestionUnlimited" class="text-caption" style="color: rgba(255, 255, 255, 0.7); font-size: 10px; text-align: center; margin-top: 4px;">
+                  {{ t('about.usage_shows_zero_unlimited') }}
+                </div>
+              </div>
             </div>
 
             <!-- License Limit Note (only for Enterprise without license) -->
@@ -167,6 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="feature-name">
                   {{ feature.name }}
                   <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
+                  <span v-if="feature.beta" class="beta-badge">BETA</span>
                 </div>
                 <div class="feature-desc">{{ feature.note }}</div>
               </div>
@@ -189,6 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="feature-name">
                   {{ feature.name }}
                   <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
+                  <span v-if="feature.beta" class="beta-badge">BETA</span>
                   <span v-if="feature.requiresHA" class="ha-badge">
                     HA
                     <q-tooltip anchor="top middle" self="bottom middle" :offset="[0, 8]">
@@ -207,13 +211,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, PropType, watch } from "vue";
+import { defineComponent, ref, computed, PropType, watch, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
+
+const ChartRenderer = defineAsyncComponent(
+  () => import("@/components/dashboards/panels/ChartRenderer.vue")
+);
 
 // Feature documentation links configuration
 const FEATURE_DOCS_BASE_URL = "https://o2.ws/";
@@ -258,6 +266,9 @@ const FEATURE_LINKS = {
 
 export default defineComponent({
   name: "EnterpriseUpgradeDialog",
+  components: {
+    ChartRenderer,
+  },
   props: {
     modelValue: {
       type: Boolean,
@@ -273,6 +284,8 @@ export default defineComponent({
     const { t } = useI18n();
     const licenseData = ref<any>(null);
     const isLoadingLicense = ref(false);
+    const chartData = ref<any>(null);
+    const dashboardRenderKey = ref(0);
 
     // Fetch license data when dialog opens for Enterprise with license
     const fetchLicenseData = async () => {
@@ -286,6 +299,8 @@ export default defineComponent({
         try {
           const response = await licenseServer.get_license();
           licenseData.value = response.data;
+          // Generate dashboard after license data is fetched
+          generateUsageDashboard();
         } catch (error) {
           console.error("Failed to fetch license data:", error);
           // On error, set default values (0% usage, unlimited)
@@ -541,6 +556,7 @@ export default defineComponent({
         note: t("about.enterprise_offer.enterprise_features.incident_management.note"),
         icon: "emergency",
         requiresHA: true,
+        beta: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.incident_management,
       },
       {
@@ -548,6 +564,7 @@ export default defineComponent({
         note: t("about.enterprise_offer.enterprise_features.sre_agent.note"),
         icon: "smart_toy",
         requiresHA: true,
+        beta: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.sre_agent,
       },
       {
@@ -555,6 +572,7 @@ export default defineComponent({
         note: t("about.enterprise_offer.enterprise_features.ai_assistant.note"),
         icon: "psychology",
         requiresHA: true,
+        beta: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.ai_assistant,
       },
       {
@@ -562,6 +580,7 @@ export default defineComponent({
         note: t("about.enterprise_offer.enterprise_features.anomaly_detection.note"),
         icon: "query_stats",
         requiresHA: false,
+        beta: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.anomaly_detection,
       },
       {
@@ -725,6 +744,248 @@ export default defineComponent({
       }
     };
 
+    // Check if ingestion is unlimited
+    const isIngestionUnlimited = computed(() => {
+      return licenseData.value?.license?.limits?.Ingestion?.typ === "Unlimited";
+    });
+
+    // Get ingestion limit value for threshold
+    const ingestionLimitGB = computed(() => {
+      if (isIngestionUnlimited.value) {
+        return null; // No limit for unlimited plans
+      }
+      return licenseData.value?.license?.limits?.Ingestion?.value || 100;
+    });
+
+    // Generate usage chart data for ChartRenderer
+    const generateUsageDashboard = async () => {
+      try {
+        // Get ingestion history from store
+        const ingestionHistory = store.state.zoConfig?.ingestion_history || [];
+
+        // Don't generate chart if there's no ingestion history data
+        if (!ingestionHistory || ingestionHistory.length === 0) {
+          chartData.value = null;
+          return;
+        }
+
+        const dates = [];
+        let values = [];
+        let dataUnit = 'GB'; // Default unit
+        let unitDivisor = 1024; // Default: MB to GB
+
+        // Use actual ingestion history data
+        // Data format: [{ ts: "2026-02-27T00:00:00", value: 202.90125079791258 }]
+        // Values are in MB, determine best unit based on data range
+        if (ingestionHistory.length > 0) {
+          // Sort by timestamp to ensure chronological order
+          const sortedHistory = [...ingestionHistory].sort((a, b) =>
+            new Date(a.ts).getTime() - new Date(b.ts).getTime()
+          );
+
+          // Find max value to determine appropriate unit
+          const maxValueMB = Math.max(...sortedHistory.map((item: any) => item.value));
+
+          // Determine best unit based on max value
+          if (maxValueMB >= 1024 * 1024) {
+            // Use TB if max value is >= 1 TB
+            dataUnit = 'TB';
+            unitDivisor = 1024 * 1024;
+          } else if (maxValueMB >= 1024) {
+            // Use GB if max value is >= 1 GB
+            dataUnit = 'GB';
+            unitDivisor = 1024;
+          } else {
+            // Use MB for smaller values
+            dataUnit = 'MB';
+            unitDivisor = 1;
+          }
+
+          sortedHistory.forEach((item: any) => {
+            const date = new Date(item.ts);
+            const day = date.getDate();
+            dates.push(`${day}`);
+            // Convert MB to appropriate unit
+            values.push(item.value / unitDivisor);
+          });
+        }
+
+        // Calculate Y-axis max and interval based on ingestion limit
+        const thresholdGB = ingestionLimitGB.value;
+        const maxDataValue = values.length > 0 ? Math.max(...values) : 0;
+
+        // Convert threshold to the same unit as data
+        let thresholdInDataUnit = 0;
+        if (thresholdGB && thresholdGB > 0) {
+          if (dataUnit === 'TB') {
+            thresholdInDataUnit = thresholdGB / 1024; // GB to TB
+          } else if (dataUnit === 'GB') {
+            thresholdInDataUnit = thresholdGB; // Already in GB
+          } else {
+            thresholdInDataUnit = thresholdGB * 1024; // GB to MB
+          }
+        }
+
+        // Determine Y-axis max: use the greater of (threshold * 1.2) or (maxData * 1.2)
+        let yAxisMax;
+        if (thresholdInDataUnit > 0) {
+          yAxisMax = Math.max(thresholdInDataUnit * 1.2, maxDataValue * 1.2);
+        } else {
+          yAxisMax = maxDataValue * 1.2;
+        }
+
+        // Calculate nice interval for Y-axis (aim for 4-5 grid lines)
+        const calculateInterval = (max: number) => {
+          const targetIntervals = 4;
+          const rawInterval = max / targetIntervals;
+
+          // Round to nice numbers (1, 2, 5, 10, 20, 50, 100, etc.)
+          const magnitude = Math.pow(10, Math.floor(Math.log10(rawInterval)));
+          const normalized = rawInterval / magnitude;
+
+          let niceInterval;
+          if (normalized <= 1) niceInterval = 1 * magnitude;
+          else if (normalized <= 2) niceInterval = 2 * magnitude;
+          else if (normalized <= 5) niceInterval = 5 * magnitude;
+          else niceInterval = 10 * magnitude;
+
+          return niceInterval;
+        };
+
+        const yAxisInterval = yAxisMax > 0 ? calculateInterval(yAxisMax) : undefined;
+
+        // Create mark line for threshold if limit exists
+        const markLine: any = thresholdGB && thresholdGB > 0 ? {
+          silent: true,
+          symbol: 'none',
+          label: {
+            show: false
+          },
+          lineStyle: {
+            color: '#FF0000',
+            width: 2,
+            type: 'solid'
+          },
+          data: [{
+            yAxis: thresholdInDataUnit
+          }]
+        } : undefined;
+
+        // Simple echarts configuration for bar chart
+        // ChartRenderer expects data in format: { options: { ... } }
+        chartData.value = {
+          options: {
+            backgroundColor: 'transparent',
+            grid: {
+              left: '10%',
+              right: '5%',
+              top: '10%',
+              bottom: '15%',
+              containLabel: true
+            },
+            xAxis: {
+              type: 'category',
+              data: dates,
+              axisLine: {
+                show: true,
+                lineStyle: { color: 'rgba(255, 255, 255, 0.3)' }
+              },
+              axisTick: {
+                show: true,
+                lineStyle: { color: 'rgba(255, 255, 255, 0.3)' }
+              },
+              axisLabel: {
+                show: true,
+                color: 'rgba(255, 255, 255, 0.8)',
+                fontSize: 10,
+                interval: Math.floor(dates.length / 6) // Show ~6 labels based on actual data length
+              }
+            },
+            yAxis: {
+              type: 'value',
+              min: 0,
+              max: yAxisMax,
+              interval: yAxisInterval,
+              axisLine: {
+                show: true,
+                lineStyle: { color: 'rgba(255, 255, 255, 0.3)' }
+              },
+              axisTick: {
+                show: true,
+                lineStyle: { color: 'rgba(255, 255, 255, 0.3)' }
+              },
+              axisLabel: {
+                show: true,
+                color: 'rgba(255, 255, 255, 0.8)',
+                fontSize: 10,
+                formatter: (value: number) => {
+                  return value.toFixed(0) + dataUnit;
+                }
+              },
+              splitLine: {
+                show: true,
+                lineStyle: {
+                  color: 'rgba(255, 255, 255, 0.1)',
+                  type: 'dashed'
+                }
+              }
+            },
+            series: [{
+              type: 'bar',
+              data: values.map((value, index) => {
+                // Color bars red if they exceed threshold, otherwise green
+                const exceeds = thresholdInDataUnit > 0 && value > thresholdInDataUnit;
+                return {
+                  value: value,
+                  itemStyle: {
+                    color: exceeds ? '#FF6B6B' : '#22c55e' // Red if exceeds, green if within limit
+                  }
+                };
+              }),
+              barWidth: '60%',
+              markLine: markLine
+            }],
+            tooltip: {
+              show: true,
+              trigger: 'axis',
+              backgroundColor: 'rgba(0, 0, 0, 0.8)',
+              borderColor: 'rgba(255, 255, 255, 0.2)',
+              borderWidth: 1,
+              textStyle: {
+                color: '#fff',
+                fontSize: 12
+              },
+              formatter: (params: any) => {
+                const dayNum = params[0].name;
+                const value = params[0].value;
+                const formattedValue = value.toFixed(2) + ' ' + dataUnit;
+
+                // Get the actual date from ingestion history for this day
+                const ingestionHistory = store.state.zoConfig?.ingestion_history || [];
+                const matchingEntry = ingestionHistory.find((item: any) => {
+                  const date = new Date(item.ts);
+                  return date.getDate() === parseInt(dayNum);
+                });
+
+                if (matchingEntry) {
+                  const fullDate = new Date(matchingEntry.ts);
+                  const monthName = fullDate.toLocaleString('default', { month: 'short' });
+                  return `${monthName} ${dayNum}<br/>Usage: ${formattedValue}`;
+                }
+
+                return `Day ${dayNum}<br/>Usage: ${formattedValue}`;
+              }
+            },
+            animation: true
+          }
+        };
+
+        dashboardRenderKey.value++;
+      } catch (error) {
+        console.error("Failed to generate chart data:", error);
+      }
+    };
+
     // Watch for dialog opening to fetch license data
     watch(showDialog, (newVal) => {
       if (newVal) {
@@ -746,6 +1007,10 @@ export default defineComponent({
       handlePrimaryButtonClick,
       getProgressColor,
       isLoadingLicense,
+      licenseData,
+      chartData,
+      dashboardRenderKey,
+      isIngestionUnlimited,
       t,
       Math,
     };
@@ -889,6 +1154,34 @@ export default defineComponent({
         .q-icon {
           color: white;
         }
+      }
+    }
+  }
+
+  .usage-chart-section {
+    width: 100%;
+    margin-bottom: 24px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 16px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+
+    .chart-wrapper {
+      position: relative;
+      width: 100%;
+    }
+
+    .usage-chart-container {
+      width: 100%;
+      overflow: visible;
+      padding: 0;
+      margin: 0 auto;
+      min-height: 150px;
+      max-height: 150px;
+
+      .grid-stack-item-content {
+        border: 0px !important;
       }
     }
   }
@@ -1106,6 +1399,20 @@ export default defineComponent({
       margin-left: 4px;
     }
 
+    .beta-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 4px;
+      color: var(--q-primary);
+      border: 1px solid var(--q-primary);
+      border-radius: 10px;
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      line-height: 1.4;
+      text-transform: uppercase;
+    }
+
     .feature-desc {
       font-size: 11px;
       color: rgba(0, 0, 0, 0.55);
@@ -1165,6 +1472,11 @@ body.body--dark {
       .ha-badge {
         background: rgba(var(--q-primary-rgb), 0.2);
         color: var(--q-primary);
+      }
+
+      .beta-badge {
+        color: var(--q-primary);
+        border-color: var(--q-primary);
       }
 
       .feature-desc {

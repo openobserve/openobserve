@@ -153,6 +153,21 @@
                           font-weight: bolder;
                         "
                       />
+                      <q-btn
+                        v-if="config.isEnterprise == 'true' && config.isCloud == 'false'"
+                        @click.stop="goToInspector(props.row)"
+                        size="xs"
+                        label="Inspect"
+                        dense
+                        class="copy-btn tw:py-2 tw:px-2"
+                        icon="analytics"
+                        flat
+                        style="
+                          color: #5960b2;
+                          border: #5960b2 1px solid;
+                          font-weight: bolder;
+                        "
+                      />
                     </div>
                     <div class="tw:flex tw:items-start tw:justify-center">
                       <div class="scrollable-content expanded-sql">
@@ -272,6 +287,7 @@ import { date, QTable, useQuasar } from "quasar";
 import type { Ref } from "vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
+import config from "@/aws-exports";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 
@@ -686,6 +702,22 @@ export default defineComponent({
         query: queryObject,
       });
     };
+
+    const goToInspector = (row) => {
+      const rawTraceId = row.trace_id as string;
+      const trace_id = rawTraceId.includes("-")
+        ? rawTraceId.split("-")[0]
+        : rawTraceId;
+      const queryObject = {
+        trace_id,
+        org_identifier: row.org_id,
+      };
+
+      router.push({
+        path: "/logs/inspector",
+        query: queryObject,
+      });
+    };
     const changePagination = (val: { label: string; value: any }) => {
       if (val.label == "All") {
         val.value = dataToBeLoaded.value.length;
@@ -741,6 +773,7 @@ export default defineComponent({
       searchDateTimeRef,
       expandedRow,
       goToLogs,
+      goToInspector,
       triggerExpand,
       copyToClipboard,
       formatTime,
@@ -754,6 +787,7 @@ export default defineComponent({
       tabs,
       moreDetailsToDisplay,
       wrapText,
+      config,
     };
     // Watch the searchObj for changes
   },

@@ -241,9 +241,13 @@ export const DEFAULT_LOGS_CONFIG = {
     functionError: "",
     searchRequestTraceIds: [] as string[],
     searchWebSocketTraceIds: [] as string[],
+    lastSearchTraceId: "" as string,
     isOperationCancelled: false,
     searchRetriesCount: {} as { [key: string]: number },
     actionId: null,
+    crossLinks: { stream_links: [], org_links: [] },
+    crossLinkQuery: "",
+    highlightQuery: "",
   },
 } as const;
 

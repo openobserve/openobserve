@@ -5,21 +5,30 @@ import logsdata from "../../../test-data/logs_data.json";
 import PageManager from '../../pages/page-manager.js';
 // (unused CommonActions import removed)
 const testLogger = require('../utils/test-logger.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe.configure({ mode: "serial" });
 const streamName = `stream${Date.now()}`;
 
 async function login(page) {
+  const { isCloudEnvironment } = require('../utils/cloud-auth.js');
+  if (isCloudEnvironment()) {
+    // Cloud uses saved auth state (cookies from storageState)
+    await page.goto(`${process.env["ZO_BASE_URL"]}/web/`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000
+    });
+    await page.waitForTimeout(2000);
+    return;
+  }
   await page.goto(process.env["ZO_BASE_URL"]);
   if (await page.getByText('Login as internal user').isVisible()) {
     await page.getByText('Login as internal user').click();
-}
-  // Strategic 500ms wait for operation completion - this is functionally necessary
+  }
   await page.waitForTimeout(500);
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
-  //Enter Password
   await page.locator("label").filter({ hasText: "Password *" }).click();
   await page
     .locator('[data-cy="login-password"]')
@@ -27,52 +36,27 @@ async function login(page) {
   await page.locator('[data-cy="login-sign-in"]').click();
 }
 async function toggleQuickModeIfOff(page) {
-  
-  const toggleButton = await page.$(
-    '[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner'
+  // Quick mode is now inside the utilities hamburger menu
+  await page.locator('[data-test="logs-search-bar-utilities-menu-btn"]').click();
+  await page.waitForTimeout(200);
+  const toggleInner = await page.$(
+    '[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner'
   );
-  const isSwitchedOff = await toggleButton.evaluate((node) =>
-    node.classList.contains("q-toggle__inner--falsy")
-  );
-
-  if (isSwitchedOff) {
-    await toggleButton.click();
+  if (toggleInner) {
+    const isSwitchedOff = await toggleInner.evaluate((node) =>
+      node.classList.contains("q-toggle__inner--falsy")
+    );
+    if (isSwitchedOff) {
+      await toggleInner.click();
+    } else {
+      await page.keyboard.press('Escape');
+    }
+  } else {
+    await page.keyboard.press('Escape');
   }
 }
 
-async function ingestion(page) {
-  const orgId = process.env["ORGNAME"];
-  const streamName = "e2e_automate";
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString("base64");
-
-  const headers = {
-    Authorization: `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-  const response = await page.evaluate(
-    async ({ url, headers, orgId, streamName, logsdata }) => {
-      const fetchResponse = await fetch(
-        `${url}/api/${orgId}/${streamName}/_json`,
-        {
-          method: "POST",
-          headers: headers,
-          body: JSON.stringify(logsdata),
-        }
-      );
-      return await fetchResponse.json();
-    },
-    {
-      url: process.env.INGESTION_URL,
-      headers: headers,
-      orgId: orgId,
-      streamName: streamName,
-      logsdata: logsdata,
-    }
-  );
-  testLogger.debug('API response received', { response });
-}
+const { ingestTestData: ingestion } = require('../utils/data-ingestion.js');
 
 test.describe("Unflattened testcases", () => {
   let pageManager;
@@ -82,16 +66,16 @@ test.describe("Unflattened testcases", () => {
     return text.replace(/[^\x00-\x7F]/g, " ");
   }
   async function applyQueryButton(page) {
-    // click on the run query button
-    // Type the value of a variable into an input field
-    const search = page.waitForResponse(logData.applyQuery);
-    // Strategic 1000ms wait for complex operation completion - this is functionally necessary
-  await page.waitForTimeout(1000);
-    await pageManager.unflattenedPage.logsSearchBarRefreshButton.click({
-      force: true,
-    });
-    // get the data from the search variable
-    await expect.poll(async () => (await search).status()).toBe(200);
+    await page.waitForTimeout(1000);
+    await Promise.all([
+      page.waitForResponse(
+        resp => resp.url().includes('/_search') && resp.status() === 200,
+        { timeout: 60000 }
+      ),
+      pageManager.unflattenedPage.logsSearchBarRefreshButton.click({
+        force: true,
+      }),
+    ]);
   }
 
   test.beforeEach(async ({ page }) => {
@@ -141,9 +125,9 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(500);
 
     await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`
     );
-    const orgName = process.env.ORGNAME || 'default';
+    const orgName = getOrgIdentifier();
     const allsearch = page.waitForResponse(`**/api/${orgName}/_search**`);
     await pageManager.logsPage.selectStream("e2e_automate");
     await applyQueryButton(page);
@@ -153,7 +137,9 @@ test.describe("Unflattened testcases", () => {
     // await pageManager.commonActions.flipStreaming();
   });
 
-  test("stream to toggle store original data toggle and display o2 id", async ({ page }) => {
+  test("stream to toggle store original data toggle and display o2 id", {
+    tag: ['@unflattened', '@logs', '@all']
+  }, async ({ page }) => {
     testLogger.info('Starting test: toggle store original data and display o2 id');
 
     // Navigate to Streams Menu
@@ -212,7 +198,7 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(5000);
 
     testLogger.info('Navigating to logs page to verify _o2_id field');
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
     await page.waitForTimeout(1000);
 
     testLogger.info('Selecting e2e_automate stream in logs');
@@ -294,7 +280,9 @@ test.describe("Unflattened testcases", () => {
   });
 
 
-  test("stream to display o2 id when quick mode is on and select * query is added", async ({ page }) => {
+  test("stream to display o2 id when quick mode is on and select * query is added", {
+    tag: ['@unflattened', '@logs', '@all']
+  }, async ({ page }) => {
     testLogger.info('Starting test: display o2 id with quick mode and SELECT * query');
 
     testLogger.info('Navigating to Streams menu');
@@ -344,7 +332,7 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(5000);
 
     testLogger.info('Navigating to logs page to verify _o2_id field');
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
     await page.waitForTimeout(1000);
 
     testLogger.info('Selecting e2e_automate stream in logs');

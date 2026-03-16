@@ -70,7 +70,7 @@ vi.mock("@/services/search", () => ({
         data: {
           hits: [
             {
-              error_id: "error_1",
+              latest_error_id: "error_1",
               error_message: "Test error message",
               events: 5,
               view_url: "https://example.com",
@@ -80,7 +80,7 @@ vi.mock("@/services/search", () => ({
               service: "test-service",
             },
             {
-              error_id: "error_2",
+              latest_error_id: "error_2",
               error_message: "Another error",
               events: 3,
               view_url: "https://example2.com",
@@ -96,10 +96,14 @@ vi.mock("@/services/search", () => ({
   },
 }));
 
-vi.mock("@/utils/zincutils", () => ({
-  b64DecodeUnicode: vi.fn((str) => decodeURIComponent(str)),
-  b64EncodeUnicode: vi.fn((str) => encodeURIComponent(str)),
-}));
+vi.mock("@/utils/zincutils", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    b64DecodeUnicode: vi.fn((str) => decodeURIComponent(str)),
+    b64EncodeUnicode: vi.fn((str) => encodeURIComponent(str)),
+  };
+});
 
 // Mock async components
 const MockQueryEditor = {
@@ -118,7 +122,7 @@ const MockAppTable = {
   setup() {
     return {
       mockRow: {
-        error_id: "test_error",
+        latest_error_id: "test_error",
         error_message: "Test error",
         events: 5,
       },

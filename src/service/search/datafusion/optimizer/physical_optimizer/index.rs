@@ -21,6 +21,7 @@ use std::{
     },
 };
 
+use config::utils::tantivy::tokenizer::o2_collect_search_tokens;
 use datafusion::{
     common::{
         Result,
@@ -44,7 +45,7 @@ use parking_lot::Mutex;
 use crate::service::search::{
     datafusion::{
         optimizer::physical_optimizer::utils::{
-            get_column_name, is_column, is_only_timestamp_filter, is_value,
+            extract_string_literal, get_column_name, is_column, is_only_timestamp_filter, is_value,
         },
         udf::{
             MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
@@ -95,6 +96,12 @@ impl PhysicalOptimizerRule for IndexRule {
             IndexOptimizer::new(self.index_fields.clone(), self.index_condition.clone());
         let plan = plan.rewrite(&mut rewriter).data()?;
 
+        // If no filter was found at all (e.g., SELECT count(*) FROM table),
+        // and optimizer is enabled, we can still optimize
+        if !rewriter.has_filter && rewriter.optimizer_enabled {
+            rewriter.can_optimize = true;
+        }
+
         // if all filter can be used in index, we can
         // use index optimizer rule to optimize the query
         if self.index_condition.lock().is_none() && rewriter.can_optimize {
@@ -124,6 +131,8 @@ struct IndexOptimizer {
     index_condition: Arc<Mutex<Option<IndexCondition>>>,
     // set to true when the filter only have _timestamp filter
     can_optimize: bool,
+    // set to true when the plan contains a FilterExec
+    has_filter: bool,
     is_remove_filter: bool,
     optimizer_enabled: bool,
 }
@@ -137,6 +146,7 @@ impl IndexOptimizer {
             index_fields,
             index_condition,
             can_optimize: false,
+            has_filter: false,
             is_remove_filter: config::get_config()
                 .common
                 .feature_query_remove_filter_with_index,
@@ -157,6 +167,7 @@ impl IndexOptimizer {
             index_fields,
             index_condition,
             can_optimize: false,
+            has_filter: false,
             is_remove_filter,
             optimizer_enabled,
         }
@@ -168,6 +179,7 @@ impl TreeNodeRewriter for IndexOptimizer {
 
     fn f_up(&mut self, node: Self::Node) -> Result<Transformed<Self::Node>> {
         if let Some(filter) = node.as_any().downcast_ref::<FilterExec>() {
+            self.has_filter = true;
             let mut index_conditions = IndexCondition::new();
             let mut other_conditions = Vec::new();
             for expr in split_conjunction(filter.predicate()) {
@@ -274,7 +286,12 @@ fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<
     } else if let Some(expr) = expr.as_any().downcast_ref::<ScalarFunctionExpr>() {
         let name = expr.name();
         return match name {
-            MATCH_ALL_UDF_NAME => expr.args().len() == 1,
+            MATCH_ALL_UDF_NAME => {
+                expr.args().len() == 1
+                    && extract_string_literal(&expr.args()[0])
+                        .map(|s| !o2_collect_search_tokens(&s).is_empty())
+                        .unwrap_or(false)
+            }
             FUZZY_MATCH_ALL_UDF_NAME => expr.args().len() == 2,
             STR_MATCH_UDF_NAME
             | STR_MATCH_UDF_IGNORE_CASE_NAME
@@ -494,6 +511,10 @@ mod tests {
                     Box::new(Condition::MatchAll("error".to_string())),
                 )),
             ),
+            // match_all('c') should be invalid because tokens are empty
+            (match_all("c"), false, None),
+            // match_all('a') should be invalid because tokens are empty
+            (match_all("a"), false, None),
             // status = 'test'
             (eq(column("status"), literal("test")), false, None),
         ];
@@ -670,6 +691,82 @@ mod tests {
 
             assert_eq!(index_condition.lock().clone(), except_condition);
             assert_eq!(rewriter.can_optimize, can_optimizer);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_index_optimizer_no_filter_count_star() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+            Field::new("id", DataType::Utf8, false),
+            Field::new("status", DataType::Utf8, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1])),
+                Arc::new(StringArray::from(vec!["openobserve"])),
+                Arc::new(StringArray::from(vec!["1"])),
+                Arc::new(StringArray::from(vec!["success"])),
+            ],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        // sql, optimizer_enabled, can_optimize, expected_condition
+        let cases = vec![
+            // SELECT count(*) with no filter should be optimizable
+            (
+                "SELECT count(*) from t",
+                true,
+                true,
+                Some(IndexCondition {
+                    conditions: vec![Condition::All()],
+                }),
+            ),
+            // SELECT count(*) with no filter but optimizer disabled
+            ("SELECT count(*) from t", false, false, None),
+        ];
+
+        for (sql, optimizer_enabled, expected_can_optimize, expected_condition) in cases {
+            let plan = ctx.state().create_logical_plan(sql).await.unwrap();
+            let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+            let index_fields = HashSet::from(["name".to_string(), "id".to_string()]);
+            let index_condition = Arc::new(Mutex::new(None));
+            let mut rewriter = IndexOptimizer::new_with_config(
+                index_fields,
+                index_condition.clone(),
+                false,
+                optimizer_enabled,
+            );
+            let _physical_plan = physical_plan.rewrite(&mut rewriter).unwrap().data;
+
+            // Apply the same post-rewrite logic as IndexRule::optimize
+            if !rewriter.has_filter && rewriter.optimizer_enabled {
+                rewriter.can_optimize = true;
+            }
+            if index_condition.lock().is_none() && rewriter.can_optimize {
+                *index_condition.lock() = Some(IndexCondition {
+                    conditions: vec![Condition::All()],
+                });
+            }
+
+            assert_eq!(
+                index_condition.lock().clone(),
+                expected_condition,
+                "Failed for sql: {}",
+                sql
+            );
+            assert_eq!(
+                rewriter.can_optimize, expected_can_optimize,
+                "Failed for sql: {}",
+                sql
+            );
         }
     }
 }

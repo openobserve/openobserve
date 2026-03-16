@@ -1,18 +1,15 @@
 
 import logsdata from "../../../test-data/logs_data.json";
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 export class IngestionPage {
   constructor(page) {
     this.page = page;
   }
   async ingestion() {
-    const orgId = process.env["ORGNAME"];
+    const orgId = getOrgIdentifier();
     const streamName = "e2e_automate";
-    const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
-    const headers = {
-      "Authorization": `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
+    const headers = getAuthHeaders();
     const fetchResponse = await fetch(
       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
       {
@@ -38,12 +35,8 @@ export class IngestionPage {
   }
 
   async ingestionJoin() {
-    const orgId = process.env["ORGNAME"];
-    const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
-    const headers = {
-      "Authorization": `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
+    const orgId = getOrgIdentifier();
+    const headers = getAuthHeaders();
 
     // Ingest to both default and e2e_automate streams for join queries
     const streams = ["default", "e2e_automate"];
@@ -76,11 +69,7 @@ export class IngestionPage {
 
   async ingestionMultiOrg(orgId) {
     const streamName = "e2e_automate";
-    const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
-    const headers = {
-      "Authorization": `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
+    const headers = getAuthHeaders();
     const fetchResponse = await fetch(
       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
       {
@@ -106,11 +95,7 @@ export class IngestionPage {
   }
 
   async ingestionMultiOrgStream(orgId, streamName) {
-    const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
-    const headers = {
-      "Authorization": `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
+    const headers = getAuthHeaders();
     const fetchResponse = await fetch(
       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
       {
@@ -142,18 +127,14 @@ export class IngestionPage {
    * @returns {Promise<{streamA: string, streamB: string, results: object}>} Stream names and ingestion results
    */
   async ingestionJoinUnion(testRunId = null) {
-    const orgId = process.env["ORGNAME"];
+    const orgId = getOrgIdentifier();
     const ingestionUrl = process.env["INGESTION_URL"];
-    const email = process.env["ZO_ROOT_USER_EMAIL"];
-    const password = process.env["ZO_ROOT_USER_PASSWORD"];
 
     // Validate environment variables
-    if (!orgId || !ingestionUrl || !email || !password) {
+    if (!orgId || !ingestionUrl) {
       const missing = [];
       if (!orgId) missing.push("ORGNAME");
       if (!ingestionUrl) missing.push("INGESTION_URL");
-      if (!email) missing.push("ZO_ROOT_USER_EMAIL");
-      if (!password) missing.push("ZO_ROOT_USER_PASSWORD");
       throw new Error(`ingestionJoinUnion: Missing required environment variables: ${missing.join(", ")}`);
     }
 
@@ -163,11 +144,7 @@ export class IngestionPage {
     const streamB = `e2e_join_b_${runId}`;
     const streams = [streamA, streamB];
 
-    const basicAuthCredentials = Buffer.from(`${email}:${password}`).toString('base64');
-    const headers = {
-      "Authorization": `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
+    const headers = getAuthHeaders();
 
     const results = { success: [], failed: [] };
 

@@ -18,14 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     data-test="trace-row-status-pill"
     class="tw:rounded-xl tw:py-[0.125rem] tw:px-[0.625rem] tw:inline-flex tw:items-center tw:w-fit"
-    :style="{ background: pillBg, color: pillColor }"
+    :class="hasErrors ? 'o2-status-pill--error' : 'o2-status-pill--success'"
   >
     <span
-      class="q-mr-xs tw:inline-block tw:w-[0.4375rem] tw:h-[0.4375rem] tw:rounded-full tw:shrink-0"
-      :style="{ backgroundColor: dotColor }"
+      class="q-mr-xs tw:inline-block tw:w-[0.4375rem] tw:h-[0.4375rem] tw:rounded-full tw:shrink-0 o2-status-pill__dot"
     />
     <span
-      class="tw:text-[0.7rem] tw:tracking-[0.03em] tw:uppercase tw:font-bold"
+      class="tw:text-[0.7rem] tw:tracking-[0.03em] tw:leading-[1.0625rem] tw:uppercase tw:font-bold"
     >
       {{ label }}
     </span>
@@ -46,23 +45,25 @@ const hasErrors = computed(() => (props.item.errors ?? 0) > 0);
 
 const label = computed(() =>
   hasErrors.value
-    ? `${props.item.errors} ${props.item.errors !== 1 ? t('traces.errors') : t('traces.error')}`
-    : t('traces.success'),
-);
-
-const pillBg = computed(() =>
-  hasErrors.value ? "rgba(244, 67, 54, 0.12)" : "rgba(76, 175, 80, 0.12)",
-);
-
-const pillColor = computed(() =>
-  hasErrors.value
-    ? "var(--q-negative, #c62828)"
-    : "var(--q-positive, #388e3c)",
-);
-
-const dotColor = computed(() =>
-  hasErrors.value
-    ? "var(--q-negative, #f44336)"
-    : "var(--q-positive, #4caf50)",
+    ? `${props.item.errors} ${props.item.errors !== 1 ? t("traces.errors") : t("traces.error")}`
+    : t("traces.success"),
 );
 </script>
+
+<style scoped>
+.o2-status-pill--success {
+  color: var(--o2-status-success-text);
+  background: var(--o2-status-success-bg);
+}
+.o2-status-pill--success .o2-status-pill__dot {
+  background-color: var(--o2-status-success-text);
+}
+
+.o2-status-pill--error {
+  color: var(--o2-status-error-text);
+  background: var(--o2-status-error-bg);
+}
+.o2-status-pill--error .o2-status-pill__dot {
+  background-color: var(--o2-status-error-text);
+}
+</style>

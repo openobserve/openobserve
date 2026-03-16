@@ -1,0 +1,507 @@
+/**
+ * VRL Encoding E2E Tests
+ *
+ * Tests that VRL (Vector Remap Language) functions are correctly:
+ * 1. Stored without double-encoding
+ * 2. Displayed correctly in the UI (not URL-encoded)
+ * 3. Sent correctly on updates (not double-encoded)
+ *
+ * Module: Alerts
+ * Priority: P1
+ * Tags: @vrl @alerts @encoding
+ */
+
+const { test, expect } = require('../utils/enhanced-baseFixtures.js');
+const testLogger = require('../utils/test-logger.js');
+const PageManager = require('../../pages/page-manager.js');
+const logData = require("../../fixtures/log.json");
+const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
+
+// ============================================================================
+// TEST DATA CONFIGURATION
+// ============================================================================
+
+// These are set in test.beforeAll to ensure stability across retries
+let RUN_ID;
+let TEMPLATE_NAME;
+let DESTINATION_NAME;
+let ALERT_NAME;
+
+const STREAM_NAME = 'e2e_automate';
+
+// Test VRL function - contains special chars that could be double-encoded
+const TEST_VRL_FUNCTION = `.test_field = "hello world"
+.encoded_chars = "test/path?query=value&other=123"
+.special = "quotes\\"and\\nescapes"`;
+
+// ============================================================================
+// API HELPER FUNCTIONS
+// ============================================================================
+
+async function apiCall(page, method, path, body = null) {
+  const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+  const headers = getAuthHeaders();
+
+  return page.evaluate(async ({ url, method, headers, body }) => {
+    const opts = {
+      method,
+      headers,
+    };
+    if (body) opts.body = JSON.stringify(body);
+    const resp = await fetch(url, opts);
+    const data = await resp.json().catch(() => ({}));
+    return { status: resp.status, data };
+  }, { url: `${baseUrl}${path}`, method, headers, body });
+}
+
+// ============================================================================
+// SETUP FUNCTIONS
+// ============================================================================
+
+async function ensureTemplate(page) {
+  const org = getOrgIdentifier();
+  const resp = await apiCall(page, 'POST', `/api/${org}/alerts/templates`, {
+    name: TEMPLATE_NAME,
+    body: JSON.stringify({ text: "VRL Test Alert: {alert_name}" }),
+    isDefault: false
+  });
+  testLogger.info('Created template', { name: TEMPLATE_NAME, status: resp.status });
+  // 200 = created, 400/409 = already exists (API may return either)
+  return resp.status === 200 || resp.status === 400 || resp.status === 409;
+}
+
+async function ensureDestination(page) {
+  const org = getOrgIdentifier();
+  const resp = await apiCall(page, 'POST', `/api/${org}/alerts/destinations`, {
+    name: DESTINATION_NAME,
+    url: 'https://httpbin.org/post',
+    method: 'post',
+    skip_tls_verify: false,
+    template: TEMPLATE_NAME,
+    headers: {}
+  });
+  testLogger.info('Created destination', { name: DESTINATION_NAME, status: resp.status });
+  // 200 = created, 400/409 = already exists (API may return either)
+  return resp.status === 200 || resp.status === 400 || resp.status === 409;
+}
+
+async function createAlertWithVrl(page) {
+  const org = getOrgIdentifier();
+
+  // VRL function needs to be base64 encoded for the API
+  const vrlBase64 = Buffer.from(TEST_VRL_FUNCTION).toString('base64');
+
+  const payload = {
+    name: ALERT_NAME,
+    stream_type: 'logs',
+    stream_name: STREAM_NAME,
+    is_real_time: false,
+    query_condition: {
+      conditions: null,
+      sql: `SELECT COUNT(*) as cnt FROM "${STREAM_NAME}"`,
+      promql: null,
+      type: 'sql',
+      aggregation: null,
+      vrl_function: vrlBase64  // Base64 encoded VRL
+    },
+    trigger_condition: {
+      threshold: 1,
+      operator: '>=',
+      frequency: 1,
+      silence: 0,
+      period: 5,
+      frequency_type: 'minutes'
+    },
+    destinations: [DESTINATION_NAME],
+    enabled: false,  // Disabled to avoid triggering
+    description: `E2E VRL encoding test alert [${RUN_ID}]`,
+    context_attributes: {}
+  };
+
+  const resp = await apiCall(page, 'POST', `/api/v2/${org}/alerts?folder=default`, payload);
+  testLogger.info('Created alert with VRL', {
+    name: ALERT_NAME,
+    status: resp.status,
+    response: JSON.stringify(resp.data)
+  });
+  // The alert_id might be in different fields or we need to use the alert name
+  resp.alertName = ALERT_NAME;
+  return resp;
+}
+
+async function getAlertByName(page, alertName, maxRetries = 3) {
+  const org = getOrgIdentifier();
+  // Retry loop for API propagation delay
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const listResp = await apiCall(page, 'GET', `/api/v2/${org}/alerts?folder=default`);
+    if (listResp.status === 200) {
+      const alerts = listResp.data?.list || listResp.data || [];
+      const alert = alerts.find(a => a.name === alertName);
+      if (alert) {
+        const alertId = alert.id || alert.alert_id;
+        // Fetch full alert details
+        const detailResp = await apiCall(page, 'GET', `/api/v2/${org}/alerts/${alertId}`);
+        return { ...detailResp, alertId };
+      }
+    }
+    if (attempt < maxRetries) {
+      testLogger.info('Alert not found, retrying...', { attempt, alertName });
+      await new Promise(r => setTimeout(r, 1000)); // Wait 1s before retry
+    }
+  }
+  return { status: 404, data: null };
+}
+
+// ============================================================================
+// CLEANUP FUNCTIONS
+// ============================================================================
+
+async function cleanup(page, alertId) {
+  const org = getOrgIdentifier();
+
+  // Delete alert
+  if (alertId) {
+    const alertResp = await apiCall(page, 'DELETE', `/api/v2/${org}/alerts/${alertId}?folder=default`);
+    testLogger.info('Deleted alert', { alertId, status: alertResp.status });
+  }
+
+  // Delete destination
+  const destResp = await apiCall(page, 'DELETE', `/api/${org}/alerts/destinations/${DESTINATION_NAME}`);
+  testLogger.info('Deleted destination', { name: DESTINATION_NAME, status: destResp.status });
+
+  // Delete template
+  const tmplResp = await apiCall(page, 'DELETE', `/api/${org}/alerts/templates/${TEMPLATE_NAME}`);
+  testLogger.info('Deleted template', { name: TEMPLATE_NAME, status: tmplResp.status });
+}
+
+// ============================================================================
+// TESTS
+// ============================================================================
+
+test.describe("VRL Encoding Tests @vrl @alerts", () => {
+  // Run tests serially since they share test data identifiers
+  test.describe.configure({ mode: 'serial' });
+
+  let pm;
+  let createdAlertId;
+  let putCapture; // Track PUT request capture for cleanup
+
+  // Initialize RUN_ID once per describe block to ensure stability across retries
+  test.beforeAll(() => {
+    RUN_ID = Date.now().toString(36).slice(-4) + Math.random().toString(36).substring(2, 5);
+    TEMPLATE_NAME = `e2e_vrl_${RUN_ID}_tmpl`;
+    DESTINATION_NAME = `e2e_vrl_${RUN_ID}_dest`;
+    ALERT_NAME = `e2e_vrl_test_${RUN_ID}`;
+    testLogger.info('Initialized test identifiers', { RUN_ID, TEMPLATE_NAME, DESTINATION_NAME, ALERT_NAME });
+  });
+
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+    pm = new PageManager(page);
+    // Navigate to base URL first so page context is ready for API calls
+    await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`);
+    await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+  });
+
+  test("VRL function should not be double-encoded in API @vrl @P1 @all @alerts", async ({ page }) => {
+    test.setTimeout(120000);
+
+    // Setup: Create template, destination, and alert with VRL
+    testLogger.info('Setting up test infrastructure...');
+    expect(await ensureTemplate(page)).toBe(true);
+    expect(await ensureDestination(page)).toBe(true);
+
+    const createResp = await createAlertWithVrl(page);
+    expect(createResp.status).toBe(200);
+
+    // Test: Fetch the alert and verify VRL is not double-encoded
+    testLogger.info('Fetching alert to verify VRL encoding...');
+    const getResp = await getAlertByName(page, ALERT_NAME);
+    expect(getResp.status).toBe(200);
+    createdAlertId = getResp.alertId;
+
+    const vrlFromApi = getResp.data?.query_condition?.vrl_function;
+    testLogger.info('VRL from API (base64)', { vrl: vrlFromApi });
+
+    // Ensure VRL was returned before decoding
+    expect(vrlFromApi).toBeTruthy();
+
+    // API returns VRL as base64 - decode it to verify content
+    const decodedVrl = Buffer.from(vrlFromApi, 'base64').toString('utf-8');
+    testLogger.info('VRL decoded', { decoded: decodedVrl });
+
+    // Verify decoded VRL matches what we originally sent (not double-encoded)
+    // Note: There might be a trailing character from encoding, so we check contains
+    expect(decodedVrl).toContain('.test_field = "hello world"');
+    expect(decodedVrl).toContain('.encoded_chars = "test/path?query=value&other=123"');
+
+    testLogger.info('VRL encoding test passed - VRL correctly base64 encoded, no double-encoding');
+
+    // Cleanup
+    await cleanup(page, createdAlertId);
+    createdAlertId = null;
+  });
+
+  test("VRL should display correctly in UI editor @vrl @P1 @all @alerts", async ({ page }) => {
+    test.setTimeout(180000);
+
+    // Setup
+    testLogger.info('Setting up test infrastructure...');
+    expect(await ensureTemplate(page)).toBe(true);
+    expect(await ensureDestination(page)).toBe(true);
+
+    const createResp = await createAlertWithVrl(page);
+    expect(createResp.status).toBe(200);
+
+    // Fetch alert to get the ID (createAlertWithVrl doesn't return alert_id)
+    const getResp = await getAlertByName(page, ALERT_NAME);
+    expect(getResp.status).toBe(200);
+    createdAlertId = getResp.alertId;
+
+    // Navigate to alerts page
+    await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`);
+    await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+
+    // Use page object methods - search and select alert
+    await pm.alertsPage.searchAlert(ALERT_NAME);
+    await pm.alertsPage.clickAlertRow(ALERT_NAME);
+
+    // Click Edit button using page object
+    await pm.alertsPage.clickAlertDetailsEditButton();
+    await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(5000);
+
+    // Navigate to Advanced tab using page object
+    const navResult = await pm.alertsPage.navigateToAdvancedTab();
+    if (!navResult) {
+      testLogger.warn('Could not navigate to VRL editor - wizard may not have loaded');
+      await page.screenshot({ path: `test-results/vrl-editor-nav-failure-${Date.now()}.png` }).catch(() => {});
+    }
+    expect(navResult).toBe(true);
+
+    // Verify VRL editor container is visible in the UI
+    const vrlEditor = page.locator('[data-test="scheduled-alert-vrl-function-editor"]');
+    await expect(vrlEditor).toBeVisible({ timeout: 5000 });
+    testLogger.info('VRL editor is visible in Advanced tab');
+
+    // Verify VRL content via API (Monaco content not readable in headless Chromium)
+    const verifyResp = await getAlertByName(page, ALERT_NAME);
+    expect(verifyResp.status).toBe(200);
+    const vrlFromApi = verifyResp.data?.query_condition?.vrl_function;
+    expect(vrlFromApi).toBeTruthy();
+
+    // Decode base64 and verify content is correct (not double-encoded)
+    const decoded = Buffer.from(vrlFromApi, 'base64').toString('utf-8');
+    expect(decoded).not.toContain('%2F');
+    expect(decoded).not.toContain('%3D');
+    expect(decoded).not.toContain('%25');
+    expect(decoded).toContain('test_field');
+    expect(decoded).toContain('hello world');
+
+    testLogger.info('VRL editor visible and API content verified', { decoded: decoded.substring(0, 100) });
+
+    // Cleanup
+    await cleanup(page, createdAlertId);
+    createdAlertId = null;
+  });
+
+  test("VRL should not be double-encoded on alert update @vrl @P1 @all @alerts", async ({ page }) => {
+    test.setTimeout(180000);
+
+    // Setup
+    expect(await ensureTemplate(page)).toBe(true);
+    expect(await ensureDestination(page)).toBe(true);
+
+    const createResp = await createAlertWithVrl(page);
+    expect(createResp.status).toBe(200);
+
+    // Fetch alert to get the ID (createAlertWithVrl doesn't return alert_id)
+    const getResp = await getAlertByName(page, ALERT_NAME);
+    expect(getResp.status).toBe(200);
+    createdAlertId = getResp.alertId;
+
+    // Navigate to alerts and edit
+    await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`);
+    await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+
+    // Use page object methods
+    await pm.alertsPage.searchAlert(ALERT_NAME);
+    await pm.alertsPage.clickAlertRow(ALERT_NAME);
+    await pm.alertsPage.clickAlertDetailsEditButton();
+    await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(5000);
+
+    // Navigate to Advanced tab using page object
+    expect(await pm.alertsPage.navigateToAdvancedTab()).toBe(true);
+
+    // Verify VRL editor container is visible in the UI
+    const vrlEditor = page.locator('[data-test="scheduled-alert-vrl-function-editor"]');
+    await expect(vrlEditor).toBeVisible({ timeout: 5000 });
+    testLogger.info('VRL editor visible in edit mode');
+
+    // Verify VRL content via API (Monaco content not readable in headless Chromium)
+    const verifyResp = await getAlertByName(page, ALERT_NAME);
+    expect(verifyResp.status).toBe(200);
+    const vrlFromApi = verifyResp.data?.query_condition?.vrl_function;
+    expect(vrlFromApi).toBeTruthy();
+
+    const decoded = Buffer.from(vrlFromApi, 'base64').toString('utf-8');
+    expect(decoded).not.toContain('%2F');
+    expect(decoded).not.toContain('%3D');
+    expect(decoded).not.toContain('%25');
+    expect(decoded).not.toContain('%22');
+
+    testLogger.info('VRL not double-encoded on update', { decoded: decoded.substring(0, 100) });
+
+    // Cleanup
+    await cleanup(page, createdAlertId);
+    createdAlertId = null;
+  });
+
+  test("Backward compatibility - plain text VRL should be accepted or converted @vrl @P2 @all @alerts", async ({ page }) => {
+    test.setTimeout(120000);
+
+    // This test verifies that if old alerts had plain text VRL (not base64),
+    // the system can still handle them
+
+    expect(await ensureTemplate(page)).toBe(true);
+    expect(await ensureDestination(page)).toBe(true);
+
+    const org = getOrgIdentifier();
+    const plainTextAlertName = `e2e_vrl_plaintext_${RUN_ID}`;
+    const plainTextVrl = '.plain_text_vrl = "test"';
+
+    // Try to create alert with PLAIN TEXT VRL (old format - not base64)
+    const payload = {
+      name: plainTextAlertName,
+      stream_type: 'logs',
+      stream_name: STREAM_NAME,
+      is_real_time: false,
+      query_condition: {
+        conditions: null,
+        sql: `SELECT COUNT(*) as cnt FROM "${STREAM_NAME}"`,
+        promql: null,
+        type: 'sql',
+        aggregation: null,
+        vrl_function: plainTextVrl  // Plain text, NOT base64
+      },
+      trigger_condition: {
+        threshold: 1, operator: '>=', frequency: 1, silence: 0, period: 5, frequency_type: 'minutes'
+      },
+      destinations: [DESTINATION_NAME],
+      enabled: false,
+      description: `Plain text VRL test [${RUN_ID}]`,
+      context_attributes: {}
+    };
+
+    const resp = await apiCall(page, 'POST', `/api/v2/${org}/alerts?folder=default`, payload);
+    testLogger.info('Create with plain text VRL', { status: resp.status, response: JSON.stringify(resp.data) });
+
+    if (resp.status === 200) {
+      // Set alertId from create response immediately to ensure cleanup
+      createdAlertId = resp.data?.id;
+
+      // If API accepts plain text, verify it's converted to base64 or stored correctly
+      testLogger.info('API accepts plain text VRL (backward compatible)', { alertId: createdAlertId });
+
+      // Fetch and verify
+      const getResp = await getAlertByName(page, plainTextAlertName);
+      expect(getResp.status).toBe(200);
+      const vrlFromApi = getResp.data?.query_condition?.vrl_function;
+      testLogger.info('VRL returned from API', { vrl: vrlFromApi });
+
+      // Check if it's base64 or plain text
+      const isBase64 = /^[A-Za-z0-9+/]+=*$/.test(vrlFromApi);
+      if (isBase64) {
+        const decoded = Buffer.from(vrlFromApi, 'base64').toString('utf-8');
+        expect(decoded).toContain('plain_text_vrl');
+        testLogger.info('API converted plain text to base64');
+      } else {
+        expect(vrlFromApi).toContain('plain_text_vrl');
+        testLogger.info('API stored as plain text');
+      }
+    } else if (resp.status === 400 && resp.data?.message?.includes('base64')) {
+      // API requires base64 - this is the new format
+      testLogger.info('API requires base64 format (new format only)');
+      // This is still acceptable - just means no backward compatibility needed
+    } else {
+      // Fail explicitly on unexpected API responses (e.g., 500 errors)
+      testLogger.error('Unexpected response', { status: resp.status, data: resp.data });
+      expect([200, 400]).toContain(resp.status);
+    }
+
+    // Cleanup - always clean up template/destination, even if no alert was created
+    await cleanup(page, createdAlertId);
+    createdAlertId = null;
+  });
+
+  test("Update alert - verify PUT request encoding @vrl @P1 @all @alerts", async ({ page }) => {
+    test.setTimeout(180000);
+
+    // This test captures the actual PUT request to verify VRL encoding
+
+    expect(await ensureTemplate(page)).toBe(true);
+    expect(await ensureDestination(page)).toBe(true);
+
+    const createResp = await createAlertWithVrl(page);
+    expect(createResp.status).toBe(200);
+
+    const getResp = await getAlertByName(page, ALERT_NAME);
+    expect(getResp.status).toBe(200);
+    createdAlertId = getResp.alertId;
+
+    // Setup PUT request capture using page object (returns { getCaptured, dispose })
+    putCapture = pm.alertsPage.setupPutRequestCapture();
+
+    // Navigate to alerts and edit
+    await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`);
+    await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+
+    // Use page object methods
+    await pm.alertsPage.searchAlert(ALERT_NAME);
+    await pm.alertsPage.clickAlertRow(ALERT_NAME);
+    await pm.alertsPage.clickAlertDetailsEditButton();
+    await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(5000);
+
+    // Navigate through steps using page object
+    await pm.alertsPage.navigateThroughWizardSteps(5);
+
+    // Try to save using page object
+    const submitted = await pm.alertsPage.clickSubmitButton();
+
+    // Fail explicitly if form submission was not possible
+    expect(submitted).toBe(true);
+
+    // Verify PUT request using page object
+    const capturedRequest = putCapture.getCaptured();
+    expect(capturedRequest).toBeTruthy();
+
+    testLogger.info('PUT Request Body (first 500 chars)', {
+      body: capturedRequest.body?.substring(0, 500)
+    });
+
+    // Verify no double-encoding using page object
+    const isValid = pm.alertsPage.verifyPutRequestNotDoubleEncoded(capturedRequest);
+    expect(isValid).toBe(true);
+
+    testLogger.info('PUT request does not have double-encoded VRL');
+
+    // Cleanup
+    await cleanup(page, createdAlertId);
+    createdAlertId = null;
+  });
+
+  // Cleanup in case test fails
+  test.afterEach(async ({ page }) => {
+    // Dispose PUT request listener if it wasn't already disposed
+    if (putCapture) {
+      putCapture.dispose();
+      putCapture = null;
+    }
+    if (createdAlertId) {
+      testLogger.info('Cleaning up after test failure...');
+      await cleanup(page, createdAlertId);
+    }
+  });
+});

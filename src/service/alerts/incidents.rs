@@ -424,6 +424,47 @@ pub async fn correlate_alert_to_incident(
     )
     .await?;
 
+    // AI credit deduction for incident creation (cloud only).
+    // Only deduct when a NEW incident is created — alerts joining an existing
+    // incident or repeated firings must not consume credits or post usage events.
+    #[cfg(feature = "cloud")]
+    if matches!(
+        outcome,
+        IncidentCorrelationOutcome::NewIncidentCreated { .. }
+    ) {
+        let deduction = crate::service::trial_quota::try_deduct(
+            &alert.org_id,
+            crate::service::trial_quota::TrialQuotaFeature::NewIncident,
+        )
+        .await;
+
+        let usage_ctx = crate::service::trial_quota::AiUsageContext {
+            user_email: "system@openobserve.ai".to_string(),
+            incident_id: Some(outcome.incident_id().to_string()),
+            ..Default::default()
+        };
+        match &deduction {
+            Ok(_) => {
+                crate::service::trial_quota::record_free_ai_usage(
+                    &alert.org_id,
+                    &usage_ctx,
+                    crate::service::trial_quota::TrialQuotaFeature::NewIncident,
+                );
+            }
+            Err(_) => {
+                if crate::service::trial_quota::org_has_active_subscription(&alert.org_id).await {
+                    crate::service::trial_quota::record_billable_ai_usage(
+                        &alert.org_id,
+                        &usage_ctx,
+                        crate::service::trial_quota::TrialQuotaFeature::NewIncident,
+                    );
+                }
+                // Note: incident is already created at this point — we don't roll it
+                // back on quota exhaustion. The deduction failure is logged by try_deduct.
+            }
+        }
+    }
+
     // Send incident notification unless rows are empty (manual trigger path)
     // or the outcome is a repeated alert (suppressed by design).
     if !notify_rows.is_empty() {
@@ -727,24 +768,46 @@ async fn find_or_create_incident(
             triggered_at,
         );
 
-        // Retry RCA if it's empty (failed in the past due to infra issues or errors)
-        #[cfg(feature = "enterprise")]
-        {
-            let org_id_rca = org_id.to_string();
-            let incident_id_rca = existing.id.clone();
-
-            tokio::spawn(async move {
-                if let Err(e) =
-                    trigger_rca_for_incident(org_id_rca.clone(), incident_id_rca.clone()).await
-                {
+        if is_new_alert_type {
+            #[cfg(feature = "enterprise")]
+            {
+                let org_id_rca = org_id.to_string();
+                let incident_id_rca = existing.id.clone();
+                let cooldown = o2_enterprise::enterprise::common::config::get_config()
+                    .incidents
+                    .reanalysis_cooldown_minutes;
+                let events = infra::table::incident_events::get(&org_id_rca, &incident_id_rca)
+                    .await
+                    .unwrap_or_default();
+                if !is_analysis_in_flight(&events, cooldown * 2) {
+                    // Emit Begin synchronously so the frontend sees it on the next poll
+                    let _ = infra::table::incident_events::append(
+                        &org_id_rca,
+                        &incident_id_rca,
+                        config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+                    )
+                    .await;
+                    tokio::spawn(async move {
+                        if let Err(e) = trigger_rca_for_incident(
+                            org_id_rca.clone(),
+                            incident_id_rca.clone(),
+                            true, // reanalysis — deduct credits and report usage
+                            true, // begin already emitted above
+                            "system@openobserve.ai".to_string(),
+                        )
+                        .await
+                        {
+                            log::debug!(
+                                "[INCIDENTS::RCA] Reanalysis trigger failed for {incident_id_rca}: {e}"
+                            );
+                        }
+                    });
+                } else {
                     log::debug!(
-                        "[INCIDENTS::RCA] Retry attempt failed for existing incident {incident_id_rca}: {e}"
+                        "[INCIDENTS::RCA] Analysis already in-flight for {incident_id_rca}, skipping NewAlertTypeJoined trigger"
                     );
                 }
-            });
-        }
-
-        if is_new_alert_type {
+            }
             return Ok(IncidentCorrelationOutcome::NewAlertTypeJoined {
                 incident_id: existing.id,
                 service_name: service_name.to_string(),
@@ -846,6 +909,46 @@ async fn find_or_create_incident(
                 triggered_at,
             );
 
+            #[cfg(feature = "enterprise")]
+            {
+                let org_id_rca = org_id.to_string();
+                let incident_id_rca = upgradeable_incident.id.clone();
+                let cooldown = o2_enterprise::enterprise::common::config::get_config()
+                    .incidents
+                    .reanalysis_cooldown_minutes;
+                let events = infra::table::incident_events::get(&org_id_rca, &incident_id_rca)
+                    .await
+                    .unwrap_or_default();
+                if !is_analysis_in_flight(&events, cooldown * 2) {
+                    // Emit Begin synchronously so the frontend sees it on the next poll
+                    let _ = infra::table::incident_events::append(
+                        &org_id_rca,
+                        &incident_id_rca,
+                        config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+                    )
+                    .await;
+                    tokio::spawn(async move {
+                        if let Err(e) = trigger_rca_for_incident(
+                            org_id_rca,
+                            incident_id_rca.clone(),
+                            true, // reanalysis — deduct credits and report usage
+                            true, // begin already emitted above
+                            "system@openobserve.ai".to_string(),
+                        )
+                        .await
+                        {
+                            log::debug!(
+                                "[INCIDENTS::RCA] Reanalysis trigger failed after DimensionsUpgraded: {e}"
+                            );
+                        }
+                    });
+                } else {
+                    log::debug!(
+                        "[INCIDENTS::RCA] Analysis already in-flight for {incident_id_rca}, skipping DimensionsUpgraded trigger"
+                    );
+                }
+            }
+
             return Ok(IncidentCorrelationOutcome::NewAlertTypeJoined {
                 incident_id: upgradeable_incident.id,
                 service_name: service_name.to_string(),
@@ -918,6 +1021,9 @@ async fn find_or_create_incident(
         severity
     );
 
+    // Usage reporting for incident creation is handled by the try_deduct
+    // quota block in correlate_alert_to_incident (paid orgs only).
+
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
@@ -945,22 +1051,52 @@ async fn find_or_create_incident(
         triggered_at,
     );
 
-    // Trigger immediate RCA for new incident
+    // Trigger immediate RCA for new incident.
+    // AIAnalysisBegin is emitted here synchronously (same DB context as init/record_alert) to
+    // avoid a race where the spawned task hits a fresh connection that can't yet see the
+    // just-committed events row and silently drops the append.
     #[cfg(feature = "enterprise")]
     {
-        let org_id_rca = org_id.to_string();
-        let incident_id_rca = incident.id.clone();
+        use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+        let o2_cfg = get_o2_config();
 
-        tokio::spawn(async move {
-            if let Err(e) =
-                trigger_rca_for_incident(org_id_rca.clone(), incident_id_rca.clone()).await
+        if o2_cfg.incidents.enabled
+            && o2_cfg.incidents.rca_enabled
+            && !o2_cfg.ai.agent_url.is_empty()
+        {
+            if let Err(e) = infra::table::incident_events::append(
+                org_id,
+                &incident.id,
+                config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+            )
+            .await
             {
-                log::debug!(
-                    "[INCIDENTS::RCA] Immediate trigger failed for incident {incident_id_rca}: {e}"
+                log::error!(
+                    "[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {}: {e}",
+                    incident.id
                 );
-                // Error is logged but not propagated
             }
-        });
+
+            let org_id_rca = org_id.to_string();
+            let incident_id_rca = incident.id.clone();
+            tokio::spawn(async move {
+                // begin_already_emitted=true: Begin was emitted synchronously above; the spawn
+                // skips the in-flight guard + cooldown check and goes straight to the agent.
+                if let Err(e) = trigger_rca_for_incident(
+                    org_id_rca.clone(),
+                    incident_id_rca.clone(),
+                    false,
+                    true,
+                    "system@openobserve.ai".to_string(),
+                )
+                .await
+                {
+                    log::debug!(
+                        "[INCIDENTS::RCA] Immediate trigger failed for incident {incident_id_rca}: {e}"
+                    );
+                }
+            });
+        }
     }
 
     Ok(IncidentCorrelationOutcome::NewIncidentCreated {
@@ -1285,10 +1421,73 @@ pub async fn enrich_with_topology(
 ///
 /// # Note
 /// Errors are logged but not propagated to caller.
+///
+/// Returns true if an analysis is currently in-flight (started but not yet completed).
+///
+/// An in-flight analysis is detected by finding an `AIAnalysisBegin` event with no
+/// subsequent `AIAnalysisComplete`. Begins older than `stale_threshold_minutes` are
+/// treated as stale (the run died) and do not block new runs.
+#[cfg(feature = "enterprise")]
+pub(crate) fn is_analysis_in_flight(
+    events: &[config::meta::alerts::incidents::IncidentEvent],
+    stale_threshold_minutes: u64,
+) -> bool {
+    use config::meta::alerts::incidents::IncidentEventType;
+
+    let stale_cutoff =
+        chrono::Utc::now().timestamp_micros() - (stale_threshold_minutes as i64 * 60 * 1_000_000);
+
+    // Walk backwards: find last AIAnalysisComplete, then check if a
+    // non-stale AIAnalysisBegin comes after it.
+    let last_complete_pos = events
+        .iter()
+        .rposition(|e| matches!(e.event_type, IncidentEventType::AIAnalysisComplete));
+
+    let search_from = last_complete_pos.map(|p| p + 1).unwrap_or(0);
+
+    events[search_from..].iter().any(|e| {
+        matches!(e.event_type, IncidentEventType::AIAnalysisBegin) && e.timestamp > stale_cutoff
+    })
+}
+
+/// Returns true if enough time has passed since the last completed analysis.
+///
+/// If no analysis has ever completed, returns `true` (proceed freely).
+#[cfg(feature = "enterprise")]
+fn cooldown_elapsed(
+    events: &[config::meta::alerts::incidents::IncidentEvent],
+    cooldown_minutes: u64,
+) -> bool {
+    use config::meta::alerts::incidents::IncidentEventType;
+
+    let cooldown_micros = cooldown_minutes as i64 * 60 * 1_000_000;
+    let now = chrono::Utc::now().timestamp_micros();
+
+    let last_complete = events
+        .iter()
+        .rposition(|e| matches!(e.event_type, IncidentEventType::AIAnalysisComplete))
+        .map(|pos| events[pos].timestamp);
+
+    match last_complete {
+        None => true, // never analyzed (or all prior runs failed) — proceed
+        Some(ts) => now - ts >= cooldown_micros,
+    }
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn trigger_rca_for_incident(
     org_id: String,
     incident_id: String,
+    reanalysis: bool,
+    // When `true`, the caller has already:
+    //  - verified RCA is enabled and the agent URL is set
+    //  - checked cooldown / in-flight guards
+    //  - emitted `AIAnalysisBegin` synchronously (same DB context as `init`)
+    // The function skips those steps and goes straight to the agent call.
+    begin_already_emitted: bool,
+    // Email of the user who triggered the analysis, used for AI usage tracking.
+    // For automated/system-initiated calls, use "system@openobserve.ai".
+    _user_email: String,
 ) -> Result<(), anyhow::Error> {
     use config::{get_config, meta::alerts::incidents::IncidentTopology};
     use o2_enterprise::enterprise::{
@@ -1308,6 +1507,30 @@ pub async fn trigger_rca_for_incident(
         return Ok(());
     }
 
+    // When the caller already emitted Begin synchronously, skip the guards and Begin emission
+    // to avoid a DB race where the spawned task can't yet see the freshly-init'd events row.
+    if !begin_already_emitted {
+        let cooldown = config.incidents.reanalysis_cooldown_minutes;
+        // Use 2× cooldown as the stale-begin threshold
+        let stale_threshold = cooldown * 2;
+
+        let events = infra::table::incident_events::get(&org_id, &incident_id)
+            .await
+            .unwrap_or_default();
+
+        // In-flight guard: always enforced, even for user-initiated reanalysis
+        if is_analysis_in_flight(&events, stale_threshold) {
+            log::debug!("[INCIDENTS::RCA] Analysis already in-flight for {incident_id}, skipping");
+            return Ok(());
+        }
+
+        // Cooldown gate: skip for user-initiated reanalysis (reanalysis=true bypasses it)
+        if !reanalysis && !cooldown_elapsed(&events, cooldown) {
+            log::debug!("[INCIDENTS::RCA] Cooldown not elapsed for {incident_id}, skipping");
+            return Ok(());
+        }
+    }
+
     // Get incident from database
     let incident = match infra::table::alert_incidents::get(&org_id, &incident_id).await? {
         Some(inc) => inc,
@@ -1317,16 +1540,58 @@ pub async fn trigger_rca_for_incident(
         }
     };
 
-    // Check if RCA already exists (race condition prevention)
-    if let Some(ref ctx) = incident.topology_context
-        && let Ok(topology) = serde_json::from_value::<IncidentTopology>(ctx.clone())
-        && topology.suggested_root_cause.is_some()
+    log::info!(
+        "[INCIDENTS::RCA] Triggering RCA for incident {incident_id} (reanalysis={reanalysis})"
+    );
+
+    // Emit AIAnalysisBegin only when the caller hasn't already done so
+    if !begin_already_emitted
+        && let Err(e) = infra::table::incident_events::append(
+            &org_id,
+            &incident_id,
+            config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+        )
+        .await
     {
-        log::debug!("[INCIDENTS::RCA] Incident {incident_id} already has RCA, skipping");
-        return Ok(()); // Already analyzed
+        log::error!("[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {incident_id}: {e}");
     }
 
-    log::info!("[INCIDENTS::RCA] Triggering immediate RCA for incident {incident_id}");
+    // AI credit check for reanalysis (cloud only)
+    #[cfg(feature = "cloud")]
+    if reanalysis {
+        let deduction = crate::service::trial_quota::try_deduct(
+            &org_id,
+            crate::service::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
+        )
+        .await;
+
+        let usage_ctx = crate::service::trial_quota::AiUsageContext {
+            user_email: _user_email.clone(),
+            incident_id: Some(incident_id.clone()),
+            ..Default::default()
+        };
+        match &deduction {
+            Ok(_) => {
+                crate::service::trial_quota::record_free_ai_usage(
+                    &org_id,
+                    &usage_ctx,
+                    crate::service::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
+                );
+            }
+            Err(e) => {
+                if crate::service::trial_quota::org_has_active_subscription(&org_id).await {
+                    crate::service::trial_quota::record_billable_ai_usage(
+                        &org_id,
+                        &usage_ctx,
+                        crate::service::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
+                    );
+                } else {
+                    log::info!("[INCIDENTS::RCA] Skipping reanalysis for org {org_id}: {e}");
+                    return Ok(());
+                }
+            }
+        }
+    }
 
     // Create RCA agent client with root credentials
     let zo_config = get_config();
@@ -1345,7 +1610,7 @@ pub async fn trigger_rca_for_incident(
     match client.analyze_incident(&incident).await {
         Ok(rca_result) => {
             log::info!(
-                "[INCIDENTS::RCA] Immediate RCA completed for {incident_id}: {} chars",
+                "[INCIDENTS::RCA] RCA completed for {incident_id}: {} chars",
                 rca_result.len()
             );
 
@@ -1361,16 +1626,30 @@ pub async fn trigger_rca_for_incident(
                 infra::table::alert_incidents::update_topology(&org_id, &incident_id, &topology)
                     .await
             {
-                log::error!(
-                    "[INCIDENTS::RCA] Failed to save immediate RCA result for {incident_id}: {e}"
-                );
+                log::error!("[INCIDENTS::RCA] Failed to save RCA result for {incident_id}: {e}");
                 return Err(e.into());
             }
+
+            // Emit AIAnalysisComplete on success
+            if let Err(e) = infra::table::incident_events::append(
+                &org_id,
+                &incident_id,
+                config::meta::alerts::incidents::IncidentEvent::ai_analysis_complete(),
+            )
+            .await
+            {
+                log::error!(
+                    "[INCIDENTS::RCA] Failed to emit AIAnalysisComplete for {incident_id}: {e}"
+                );
+            }
+
+            // Reanalysis usage reporting is handled by the try_deduct
+            // quota block earlier in this function (paid orgs only).
 
             Ok(())
         }
         Err(e) => {
-            log::warn!("[INCIDENTS::RCA] Immediate RCA failed for {incident_id}: {e}");
+            log::warn!("[INCIDENTS::RCA] RCA failed for {incident_id}: {e}");
             Err(e)
         }
     }
@@ -1431,6 +1710,48 @@ pub async fn update_status(
         && let Err(e) = infra::table::incident_events::append(org_id, incident_id, evt).await
     {
         log::error!("[Incidents] Failed to record status event: {e}");
+    }
+
+    // Trigger RCA reanalysis when incident is reopened — context is fresh,
+    // cooldown is bypassed, but in-flight guard still applies.
+    #[cfg(feature = "enterprise")]
+    if status == "open" {
+        let org_id_rca = org_id.to_string();
+        let incident_id_rca = incident_id.to_string();
+        let cooldown = o2_enterprise::enterprise::common::config::get_config()
+            .incidents
+            .reanalysis_cooldown_minutes;
+        let events = infra::table::incident_events::get(&org_id_rca, &incident_id_rca)
+            .await
+            .unwrap_or_default();
+        if !is_analysis_in_flight(&events, cooldown * 2) {
+            // Emit Begin synchronously so the frontend sees it on the next poll
+            let _ = infra::table::incident_events::append(
+                &org_id_rca,
+                &incident_id_rca,
+                config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+            )
+            .await;
+            tokio::spawn(async move {
+                // reanalysis on reopen: deduct credits and report usage;
+                // begin_already_emitted=true skips cooldown/in-flight guards
+                if let Err(e) = trigger_rca_for_incident(
+                    org_id_rca,
+                    incident_id_rca.clone(),
+                    true, // reanalysis — deduct credits and report usage
+                    true, // begin already emitted above
+                    "system@openobserve.ai".to_string(),
+                )
+                .await
+                {
+                    log::debug!("[INCIDENTS::RCA] Reanalysis trigger failed after Reopened: {e}");
+                }
+            });
+        } else {
+            log::debug!(
+                "[INCIDENTS::RCA] Analysis already in-flight for {incident_id_rca}, skipping Reopened trigger"
+            );
+        }
     }
 
     #[cfg(feature = "enterprise")]

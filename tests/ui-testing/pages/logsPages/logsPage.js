@@ -8,6 +8,7 @@ import * as path from 'path';
 
 // Import testLogger for proper logging
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('../../playwright-tests/utils/cloud-auth.js');
 
 export class LogsPage {
     constructor(page) {
@@ -72,8 +73,7 @@ export class LogsPage {
         this.exploreButtonRole = { role: 'button', name: 'Explore' };
         this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
-        this.listSavedViewsButton = '[data-test="logs-search-bar-list-saved-views-btn"]';
-        this.createSavedViewButton = '[data-test="logs-search-bar-create-saved-view-btn"]';
+        this.savedViewsDropdownBtn = '[data-test="logs-search-saved-views-btn"]';
         this.includeExcludeFieldButton = ':nth-child(1) > [data-test="log-details-include-exclude-field-btn"] > .q-btn__content > .q-icon';
         this.includeFieldButton = '[data-test="log-details-include-field-btn"]';
         this.closeDialog = '[data-test="close-dialog"] > .q-btn__content';
@@ -334,9 +334,9 @@ export class LogsPage {
 
     // Navigation methods
     async navigateToLogs(orgIdentifier) {
-        const logsUrl = '/web/logs'; // Using the same pattern as in test files
-        const orgId = orgIdentifier || process.env["ORGNAME"];
-        const fullUrl = `${logsUrl}?org_identifier=${orgId}&fn_editor=true`;
+        const baseUrl = process.env.ZO_BASE_URL;
+        const orgId = orgIdentifier || getOrgIdentifier();
+        const fullUrl = `${baseUrl}/web/logs?org_identifier=${orgId}&fn_editor=true`;
 
 
         // Include fn_editor=true to ensure VRL editor is available for tests that need it
@@ -431,22 +431,25 @@ export class LogsPage {
         // Wait for both streams to be available via API before attempting UI selection
         testLogger.debug(`selectIndexAndStreamJoinUnion: Waiting for streams to be available via API...`);
 
-        const streamAAvailable = await this.waitForStreamAvailable(streamA, 30000, 3000);
+        // Cloud environments need longer for streams to be indexed after ingestion
+        const streamWaitMs = isCloudEnvironment() ? 90000 : 30000;
+
+        const streamAAvailable = await this.waitForStreamAvailable(streamA, streamWaitMs, 3000);
         if (!streamAAvailable) {
-            testLogger.error(`selectIndexAndStreamJoinUnion: Stream '${streamA}' NOT FOUND via API after 30s`);
+            testLogger.error(`selectIndexAndStreamJoinUnion: Stream '${streamA}' NOT FOUND via API after ${streamWaitMs / 1000}s`);
             throw new Error(`Stream '${streamA}' not available. Ingestion may have failed.`);
         }
         testLogger.info(`selectIndexAndStreamJoinUnion: Stream '${streamA}' confirmed available`);
 
-        const streamBAvailable = await this.waitForStreamAvailable(streamB, 30000, 3000);
+        const streamBAvailable = await this.waitForStreamAvailable(streamB, streamWaitMs, 3000);
         if (!streamBAvailable) {
-            testLogger.error(`selectIndexAndStreamJoinUnion: Stream '${streamB}' NOT FOUND via API after 30s`);
+            testLogger.error(`selectIndexAndStreamJoinUnion: Stream '${streamB}' NOT FOUND via API after ${streamWaitMs / 1000}s`);
             throw new Error(`Stream '${streamB}' not available. Ingestion may have failed.`);
         }
         testLogger.info(`selectIndexAndStreamJoinUnion: Stream '${streamB}' confirmed available`);
 
         // Navigate to logs page to ensure fresh stream list
-        const orgId = process.env.ORGNAME;
+        const orgId = getOrgIdentifier();
         const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
         testLogger.debug(`selectIndexAndStreamJoinUnion: Navigating to logs page: ${logsUrl}`);
         await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch((e) => {
@@ -534,32 +537,29 @@ export class LogsPage {
         testLogger.debug(`waitForStreamAvailable: Waiting for stream ${streamName} to be available`);
         const startTime = Date.now();
 
-        // Get credentials from env
-        const apiUrl = process.env.INGESTION_URL;
-        const orgId = process.env.ORGNAME;
-        const authHeader = `Basic ${Buffer.from(`${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`).toString('base64')}`;
+        const apiUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL;
+        const orgId = getOrgIdentifier();
 
         while (Date.now() - startTime < maxWaitMs) {
             try {
-                // Use dynamic import for node-fetch
-                const fetchModule = await import('node-fetch');
-                const fetch = fetchModule.default;
+                // Use page.request which automatically includes browser session cookies
+                // This works on both cloud (cookie auth) and self-hosted (Basic Auth via storageState)
+                const response = await this.page.request.get(
+                    `${apiUrl}/api/${orgId}/streams`,
+                    { headers: getAuthHeaders() }
+                );
 
-                const response = await fetch(`${apiUrl}/api/${orgId}/streams`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': authHeader,
-                        'Content-Type': 'application/json'
+                if (response.ok()) {
+                    const data = await response.json();
+                    if (data.list) {
+                        const streamExists = data.list.some(s => s.name === streamName);
+                        if (streamExists) {
+                            testLogger.debug(`waitForStreamAvailable: Stream ${streamName} found after ${Date.now() - startTime}ms`);
+                            return true;
+                        }
                     }
-                });
-
-                const data = await response.json();
-                if (response.status === 200 && data.list) {
-                    const streamExists = data.list.some(s => s.name === streamName);
-                    if (streamExists) {
-                        testLogger.debug(`waitForStreamAvailable: Stream ${streamName} found after ${Date.now() - startTime}ms`);
-                        return true;
-                    }
+                } else {
+                    testLogger.debug(`waitForStreamAvailable: API returned ${response.status()}, retrying...`);
                 }
 
                 testLogger.debug(`waitForStreamAvailable: Stream ${streamName} not found yet, waiting ${pollIntervalMs}ms...`);
@@ -590,7 +590,7 @@ export class LogsPage {
         }
 
         // Navigate to logs page via URL to ensure fresh stream list (no page.reload which can cause issues)
-        const orgId = process.env.ORGNAME;
+        const orgId = getOrgIdentifier();
         const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
         testLogger.info(`selectStream: Navigating to logs page: ${logsUrl}`);
         await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
@@ -1033,9 +1033,9 @@ export class LogsPage {
         }
     }
 
-    async waitForSearchResultAndCheckText(expectedText) {
-        await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]');
-        await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toContainText(expectedText);
+    async waitForSearchResultAndCheckText(expectedText, timeout = 30000) {
+        await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { timeout });
+        await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toContainText(expectedText, { timeout });
     }
 
     async expectLogsTableRowCount(count) {
@@ -1110,17 +1110,24 @@ export class LogsPage {
         await this.page.locator(this.sqlModeToggle).first().click();
     }
 
-    // Quick Mode methods
+    // Quick Mode methods (now inside the utilities hamburger menu)
     async verifyQuickModeToggle() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
+        await this.page.keyboard.press('Escape');
     }
 
     async clickQuickModeToggle() {
-        await this.page.locator(this.quickModeToggle).click();
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
+        await this.page.locator(this.quickModeToggle).locator('[role="switch"]').click();
     }
 
     // Histogram methods
     async toggleHistogram() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         await this.page.locator(this.histogramToggle).click();
     }
 
@@ -1150,8 +1157,12 @@ export class LogsPage {
     }
 
     async verifyHistogramState() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         const isHistogramOff = await this.page.locator(this.histogramToggle)
+            .locator('[role="switch"]')
             .evaluate(el => el.getAttribute('aria-checked') === 'false');
+        await this.page.keyboard.press('Escape');
         expect(isHistogramOff).toBeTruthy();
     }
 
@@ -1170,7 +1181,7 @@ export class LogsPage {
     }
 
     async verifySearchPartitionResponse() {
-        const orgName = process.env.ORGNAME || 'default';
+        const orgName = getOrgIdentifier() || 'default';
         const searchPartitionPromise = this.page.waitForResponse(response =>
             response.url().includes(`/api/${orgName}/_search_partition`) &&
             response.request().method() === 'POST'
@@ -1188,7 +1199,7 @@ export class LogsPage {
 
     async captureSearchCalls() {
         const searchCalls = [];
-        const orgName = process.env.ORGNAME || 'default';
+        const orgName = getOrgIdentifier() || 'default';
 
         // Create the event listener function
         const responseHandler = async response => {
@@ -1216,7 +1227,7 @@ export class LogsPage {
     }
 
         async verifyStreamingModeResponse() {
-        const orgName = process.env.ORGNAME || 'default';
+        const orgName = getOrgIdentifier() || 'default';
         testLogger.debug("[DEBUG] Waiting for search response...");
         const searchPromise = this.page.waitForResponse(response => {
             const url = response.url();
@@ -1250,7 +1261,7 @@ export class LogsPage {
     }
 
     async clickRunQueryButtonAndVerifyStreamingResponse() {
-        const orgName = process.env.ORGNAME || 'default';
+        const orgName = getOrgIdentifier() || 'default';
         testLogger.debug("[DEBUG] Setting up response listener before clicking run query button");
         const searchPromise = this.page.waitForResponse(response => {
             const url = response.url();
@@ -1676,14 +1687,7 @@ export class LogsPage {
 
     // Ingestion methods - using page.request API to keep credentials in Node.js context
     async ingestLogs(orgId, streamName, logData) {
-        const basicAuthCredentials = Buffer.from(
-            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-        ).toString('base64');
-
-        const headers = {
-            "Authorization": `Basic ${basicAuthCredentials}`,
-            "Content-Type": "application/json",
-        };
+        const headers = getAuthHeaders();
 
         const baseUrl = process.env.INGESTION_URL.endsWith('/')
             ? process.env.INGESTION_URL.slice(0, -1)
@@ -1797,15 +1801,8 @@ export class LogsPage {
      * @param {number} maxRetries - Maximum retry attempts (default: 5)
      */
     async ingestMultipleFields(streamName, dataObjects, maxRetries = 5) {
-        const orgId = process.env["ORGNAME"];
-        const basicAuthCredentials = Buffer.from(
-            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-        ).toString('base64');
-
-        const headers = {
-            "Authorization": `Basic ${basicAuthCredentials}`,
-            "Content-Type": "application/json",
-        };
+        const orgId = getOrgIdentifier();
+        const headers = getAuthHeaders();
 
         const baseUrl = process.env.INGESTION_URL.endsWith('/')
             ? process.env.INGESTION_URL.slice(0, -1)
@@ -1886,12 +1883,7 @@ export class LogsPage {
     }
 
     async clickSavedViewsButton() {
-        // This method is used to create a new saved view
-        // It should open the utilities menu and click "Create Saved View"
-        // This is the same as clickSaveViewButton but without the dialog cleanup
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(300);
-        return await this.page.locator(this.createSavedViewButton).click();
+        return await this.clickSaveViewButton();
     }
 
     async clickSavedViewsExpand() {
@@ -1934,29 +1926,20 @@ export class LogsPage {
             // This is expected on first load or when no data exists
         }
 
-        // Now it's safe to open the saved views dialog
-        // Open the utilities menu
-        await this.page.locator(this.utilitiesMenuButton).click();
-        // Wait for menu animation to complete and be visible
-        await this.page.waitForTimeout(300);
-        // Click list saved views button to show the saved views panel
-        await this.page.locator(this.listSavedViewsButton).click();
-        // Wait for dialog to open, render, and stabilize
-        await this.page.waitForTimeout(500);
+        // Now it's safe to open the saved views dropdown
+        await this.clickSavedViewsDropdownArrow();
     }
 
     async clickSaveViewButton() {
-        // Close any open dialogs first (e.g., saved views list dialog)
-        const escapeKey = 'Escape';
-        await this.page.keyboard.press(escapeKey);
+        // Close any open dialogs/menus first (e.g., saved views dropdown)
+        await this.page.keyboard.press('Escape');
         await this.page.waitForTimeout(200);
 
-        // Open the utilities menu
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(300);
-
-        // Click create saved view button
-        return await this.page.locator(this.createSavedViewButton).click();
+        // Saved views is now a split dropdown button on the toolbar.
+        // The left (first) button triggers the save dialog (fnSavedView).
+        const savedViewsGroup = this.page.locator(this.savedViewsDropdownBtn);
+        const saveButton = savedViewsGroup.locator('button').first();
+        return await saveButton.click();
     }
 
     async fillSavedViewName(name) {
@@ -2109,11 +2092,7 @@ export class LogsPage {
     }
 
     async clickResetFiltersButton() {
-        // First open the utilities menu
-        await this.page.locator(this.utilitiesMenuButton).click();
-        // Wait for menu to be visible
-        await this.page.waitForTimeout(300);
-        // Then click reset filters button
+        // Reset filters button is now directly on the toolbar
         return await this.page.locator(this.resetFiltersButton).click({ force: true });
     }
 
@@ -2814,6 +2793,10 @@ export class LogsPage {
         return true;
     }
 
+    async isVrlEditorInputVisible() {
+        return await this.page.locator(this.fnEditor).locator('.inputarea').isVisible().catch(() => false);
+    }
+
     async clickPast6DaysButton() {
         return await this.page.locator(this.relative6DaysBtn).click();
     }
@@ -2866,6 +2849,10 @@ export class LogsPage {
     async isPaginationPageActive(pageNumber) {
         const classes = await this.getPaginationPageClasses(pageNumber);
         return classes && (classes.includes('bg-primary') || classes.includes('unelevated'));
+    }
+
+    async getActivePaginationPageText() {
+        return await this.page.locator(`${this.resultPagination} .q-btn--unelevated`).first().textContent({ timeout: 5000 }).catch(() => 'unknown');
     }
 
     async expectSQLPaginationNotVisible() {
@@ -3117,7 +3104,9 @@ export class LogsPage {
     }
 
     async clickHistogramToggleDiv() {
-        return await this.page.locator(this.histogramToggleDiv).nth(2).click();
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
+        return await this.page.locator(this.histogramToggle).click();
     }
 
     async expectQueryEditorContainsExpectedQuery(expectedQuery) {
@@ -3360,14 +3349,19 @@ export class LogsPage {
     }
 
     async enableQuickModeIfDisabled() {
-        // Enable quick mode toggle if it's not already enabled
-        const toggleButton = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner');
-        if (toggleButton) {
-            // Evaluate the class attribute to determine if the toggle is in the off state
-            const isSwitchedOff = await toggleButton.evaluate(node => node.classList.contains('q-toggle__inner--falsy'));
+        // Quick mode is now inside the utilities hamburger menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
+        const toggleInner = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
+        if (toggleInner) {
+            const isSwitchedOff = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--falsy'));
             if (isSwitchedOff) {
-                await toggleButton.click();
+                await toggleInner.click();
+            } else {
+                await this.page.keyboard.press('Escape');
             }
+        } else {
+            await this.page.keyboard.press('Escape');
         }
     }
 
@@ -3473,16 +3467,21 @@ export class LogsPage {
 
     async addIncludeSearchTermFromLogDetails() {
         // Ensure Quick Mode is OFF for include/exclude buttons to work
-        const quickModeToggle = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] div').nth(1);
-        const quickModeClass = await quickModeToggle.getAttribute('class');
-        const isQuickModeOn = quickModeClass && quickModeClass.includes('text-primary');
+        // Quick mode is now inside the utilities hamburger menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
+        const toggleInner = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
+        const isQuickModeOn = toggleInner
+            ? await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy'))
+            : false;
 
         if (isQuickModeOn) {
             testLogger.info('Quick Mode is ON - turning it OFF for include/exclude functionality');
-            await quickModeToggle.click();
+            await this.page.locator(this.quickModeToggle).locator('[role="switch"]').click();
             await this.page.waitForTimeout(1000);
         } else {
             testLogger.info('Quick Mode is already OFF');
+            await this.page.keyboard.press('Escape');
         }
 
         // Check if there's a direct include button (newer UI)
@@ -3697,36 +3696,54 @@ export class LogsPage {
     }
 
     async ensureQuickModeState(desiredState) {
-        const quickModeToggle = this.page.locator(this.quickModeToggle);
-        const isEnabled = await quickModeToggle.getAttribute('aria-pressed');
-        
-        if ((desiredState && isEnabled !== 'true') || (!desiredState && isEnabled === 'true')) {
-            await quickModeToggle.click();
+        // Quick mode is now inside the utilities hamburger menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
+        const toggleInner = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
+        const isOn = toggleInner
+            ? await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy'))
+            : false;
+
+        if (desiredState !== isOn) {
+            await this.page.locator(this.quickModeToggle).locator('[role="switch"]').click();
             await this.page.waitForTimeout(500);
+        } else {
+            await this.page.keyboard.press('Escape');
         }
     }
 
     async ensureHistogramToggleState(desiredState) {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         const histogramToggle = this.page.locator(this.histogramToggle);
         const isEnabled = await histogramToggle.getAttribute('aria-pressed');
-        
+
         if ((desiredState && isEnabled !== 'true') || (!desiredState && isEnabled === 'true')) {
             await histogramToggle.click();
             await this.page.waitForTimeout(500);
             return true; // State was changed
         }
+        await this.page.keyboard.press('Escape');
         return false; // State was already correct
     }
 
     async getQuickModeToggleAttributes() {
+        // Quick mode is now inside the utilities hamburger menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         const quickModeToggle = this.page.locator(this.quickModeToggle);
         const ariaPressed = await quickModeToggle.getAttribute('aria-pressed');
         const classNames = await quickModeToggle.getAttribute('class');
+        await this.page.keyboard.press('Escape');
         return { ariaPressed, classNames };
     }
 
     async expectQuickModeToggleVisible() {
+        // Quick mode is now inside the utilities hamburger menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
+        await this.page.keyboard.press('Escape');
     }
 
     async waitForUI(timeout = 500) {
@@ -4294,10 +4311,8 @@ export class LogsPage {
      */
     async ingestData(streamName, data) {
         const fetch = (await import('node-fetch')).default;
-        const orgId = process.env["ORGNAME"];
-        const basicAuthCredentials = Buffer.from(
-            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-        ).toString('base64');
+        const orgId = getOrgIdentifier();
+        const authHeaders = getAuthHeaders();
 
         testLogger.info('Ingesting data', { streamName, recordCount: data.length });
 
@@ -4311,10 +4326,7 @@ export class LogsPage {
             try {
                 const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`, {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Basic ${basicAuthCredentials}`,
-                        'Content-Type': 'application/json'
-                    },
+                    headers: authHeaders,
                     body: JSON.stringify([record])  // Send as single-element array
                 });
 
@@ -4474,15 +4486,8 @@ export class LogsPage {
      */
     async severityColorIngestionToStream(streamName) {
         const severityColorData = require('../../../test-data/severity_color_data.json');
-        const orgId = process.env["ORGNAME"];
-        const basicAuthCredentials = Buffer.from(
-            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-        ).toString('base64');
-
-        const headers = {
-            "Authorization": `Basic ${basicAuthCredentials}`,
-            "Content-Type": "application/json",
-        };
+        const orgId = getOrgIdentifier();
+        const headers = getAuthHeaders();
 
         const url = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
 
@@ -4511,14 +4516,8 @@ export class LogsPage {
      * @returns {Promise<Object>} Response with status
      */
     async deleteStream(streamName) {
-        const orgId = process.env["ORGNAME"];
-        const basicAuthCredentials = Buffer.from(
-            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-        ).toString('base64');
-
-        const headers = {
-            "Authorization": `Basic ${basicAuthCredentials}`,
-        };
+        const orgId = getOrgIdentifier();
+        const headers = getAuthHeaders();
 
         const url = `${process.env.INGESTION_URL}/api/${orgId}/streams/${streamName}`;
 
@@ -5400,6 +5399,25 @@ export class LogsPage {
     }
 
     /**
+     * Click the widest available relative time range for pagination tests.
+     * Tries: Last 1 hour → Last 12 hours → Last 15 minutes (fallback)
+     */
+    async clickWideRelativeTimeRangeOrFallback() {
+        const oneHourButton = this.page.getByText('Last 1 hour');
+        const twelveHourButton = this.page.getByText('Last 12 hours');
+        if (await oneHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await oneHourButton.click();
+            return 'Last 1 hour';
+        } else if (await twelveHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await twelveHourButton.click();
+            return 'Last 12 hours';
+        } else {
+            await this.clickRelative15MinButton();
+            return 'Last 15 minutes';
+        }
+    }
+
+    /**
      * Disable auto refresh by clicking the off button
      */
     async disableAutoRefresh() {
@@ -5459,12 +5477,16 @@ export class LogsPage {
      * Bug #8928 - Histogram rendering
      */
     async enableHistogram() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         const histogramToggle = this.page.locator(this.histogramToggle);
         const isPressed = await histogramToggle.getAttribute('aria-pressed').catch(() => 'false');
         if (isPressed === 'false') {
             await histogramToggle.click();
             await this.page.waitForTimeout(500);
             testLogger.info('Histogram enabled');
+        } else {
+            await this.page.keyboard.press('Escape');
         }
     }
 
@@ -5473,6 +5495,8 @@ export class LogsPage {
      * Bug #8928 - Histogram rendering
      */
     async toggleHistogram() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         const histogramToggle = this.page.locator(this.histogramToggle);
         await histogramToggle.click();
         await this.page.waitForTimeout(500);
@@ -5626,11 +5650,11 @@ export class LogsPage {
     }
 
     /**
-     * Get the saved views button locator (now utilities menu button)
-     * @returns {import('@playwright/test').Locator} Utilities menu button locator
+     * Get the saved views button group locator
+     * @returns {import('@playwright/test').Locator} Saved views split dropdown button locator
      */
     getSavedViewsButtonLocator() {
-        return this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
+        return this.page.locator(this.savedViewsDropdownBtn);
     }
 
     /**
@@ -5638,15 +5662,14 @@ export class LogsPage {
      * This opens the utilities menu (replaces old dropdown arrow)
      */
     async clickSavedViewsDropdownArrow() {
-        const menuButton = this.page.locator(this.utilitiesMenuButton);
-        await menuButton.waitFor({ state: 'visible', timeout: 10000 });
-        await menuButton.click();
-        // Wait for menu to appear
-        await this.page.waitForTimeout(300);
-        // Click list saved views
-        await this.page.locator(this.listSavedViewsButton).click();
+        // Saved views are now a split dropdown button on the toolbar.
+        // Click the dropdown arrow (second button) to expand the saved views list.
+        const savedViewsGroup = this.page.locator(this.savedViewsDropdownBtn);
+        await savedViewsGroup.waitFor({ state: 'visible', timeout: 10000 });
+        const dropdownArrow = savedViewsGroup.locator('button[aria-label="Expand"], button[aria-haspopup="true"]').first();
+        await dropdownArrow.click();
         await this.page.waitForTimeout(500);
-        testLogger.info('Opened utilities menu and clicked List Saved Views');
+        testLogger.info('Clicked saved views dropdown arrow');
     }
 
     /**
@@ -5664,9 +5687,10 @@ export class LogsPage {
             testLogger.debug('Arrow click did not show search input, trying main button');
         }
 
-        // Fallback: try clicking the main button
+        // Fallback: retry the dropdown arrow click on the saved views button
         const btn = this.getSavedViewsButtonLocator();
-        await btn.click();
+        const dropdownArrow = btn.locator('button[aria-label="Expand"], button[aria-haspopup="true"]').first();
+        await dropdownArrow.click();
         await this.page.waitForTimeout(500);
     }
 

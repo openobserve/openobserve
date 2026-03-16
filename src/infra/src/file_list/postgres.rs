@@ -20,7 +20,8 @@ use chrono::{DateTime, Duration, NaiveDate, TimeZone, Timelike, Utc};
 use config::{
     RwHashSet, get_config,
     meta::stream::{
-        FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType,
+        FileKey, FileListBookKeepMode, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats,
+        StreamType,
     },
     metrics::{DB_QUERY_NUMS, DB_QUERY_TIME},
     utils::{
@@ -650,7 +651,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
                 .inc();
                 let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
                 let (date_from, date_to) = derive_date_range(time_start, time_end);
-                let query = "SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND date >= $5 AND date < $6;";
+                let query = "SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts < $4 AND date >= $5 AND date < $6;";
                 sqlx::query_as::<_, super::FileId>(query)
                 .bind(stream_key)
                 .bind(time_start)
@@ -2099,7 +2100,14 @@ async fn precreate_partitions(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     let start_date = today - Duration::days(past_days);
     let end_date = today + Duration::days(FILE_LIST_POST_PARTITION_DAYS);
 
-    let tables = ["file_list", "file_list_history", "file_list_dump_stats"];
+    let mut tables = vec!["file_list", "file_list_dump_stats"];
+    if cfg
+        .compact
+        .file_list_deleted_mode
+        .eq(&FileListBookKeepMode::History.to_string())
+    {
+        tables.push("file_list_history");
+    }
     let mut date = start_date;
     while date <= end_date {
         let date_key = format!(

@@ -69,6 +69,9 @@ const defaultObject = {
       wrapCells: false,
       manualRemoveFields: false,
       rowsPerPage: 25,
+      showPagination: false,
+      sortBy: "start_time" as string,
+      sortOrder: "desc" as "asc" | "desc",
       chartInterval: "1 second",
       chartKeyFormat: "HH:mm:ss",
       navigation: {
@@ -85,6 +88,7 @@ const defaultObject = {
     >(),
     showErrorOnly: false,
     queryEditorPlaceholderFlag: true,
+    searchMode: "traces" as "traces" | "spans",
   },
   data: {
     query: "",
@@ -218,6 +222,10 @@ const useTraces = () => {
     query["org_identifier"] = store.state.selectedOrganization.identifier;
 
     query["trace_id"] = router.currentRoute.value.query.trace_id;
+
+    if (searchObj.meta.searchMode === "spans") {
+      query["search_mode"] = "spans";
+    }
 
     if (router.currentRoute.value.query.span_id)
       query["span_id"] = router.currentRoute.value.query.span_id;
@@ -354,11 +362,11 @@ const useTraces = () => {
         duration: trace.duration || 0,
         services: {} as Record<string, { count: number; duration: number }>,
         zo_sql_timestamp: new Date(trace.start_time / 1000).getTime(),
-        _o2_llm_usage_details_input: trace._o2_llm_usage_details_input,
-        _o2_llm_usage_details_output: trace._o2_llm_usage_details_output,
-        _o2_llm_usage_details_total: trace._o2_llm_usage_details_total,
-        _o2_llm_cost_details_total: trace._o2_llm_cost_details_total,
-        _o2_llm_input: trace._o2_llm_input || {},
+        llm_usage_details_input: trace.llm_usage_tokens_input,
+        llm_usage_details_output: trace.llm_usage_tokens_output,
+        llm_usage_details_total: trace.llm_usage_tokens_total,
+        llm_cost_details_total: trace.llm_usage_cost_total,
+        llm_input: trace.llm_input || {},
       };
 
       // Assign colors to services

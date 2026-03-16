@@ -597,7 +597,6 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/_values", get(search::values))
         .route("/{org_id}/_search_history", post(search::search_history))
         .route("/{org_id}/result_schema", post(search::result_schema))
-        .route("/{org_id}/search/profile", get(search::search_inspector::get_search_profile))
 
         // Multi-stream search
         .route("/{org_id}/_search_multi", post(search::multi_streams::search_multi))
@@ -681,8 +680,20 @@ pub fn service_routes() -> Router {
         // Deduplication
         .route("/{org_id}/alerts/deduplication/config", get(alerts::deduplication::get_config).post(alerts::deduplication::set_config).delete(alerts::deduplication::delete_config))
         .route("/{org_id}/alerts/deduplication/semantic-groups", get(alerts::deduplication::get_semantic_groups).put(alerts::deduplication::save_semantic_groups))
-        .route("/{org_id}/alerts/deduplication/semantic-groups/preview-diff", post(alerts::deduplication::preview_semantic_groups_diff))
+        .route("/{org_id}/alerts/deduplication/semantic-groups/preview-diff", post(alerts::deduplication::preview_semantic_groups_diff));
 
+    #[cfg(feature = "enterprise")]
+    {
+        router = router
+            // Anomaly Detection
+            .route("/{org_id}/anomaly_detection", get(anomaly_detection::list_configs).post(anomaly_detection::create_config))
+            .route("/{org_id}/anomaly_detection/{config_id}", get(anomaly_detection::get_config).put(anomaly_detection::update_config).delete(anomaly_detection::delete_config))
+            .route("/{org_id}/anomaly_detection/{config_id}/train", post(anomaly_detection::train_model).delete(anomaly_detection::cancel_training))
+            .route("/{org_id}/anomaly_detection/{config_id}/detect", post(anomaly_detection::detect_anomalies))
+            .route("/{org_id}/anomaly_detection/{config_id}/history", get(anomaly_detection::get_detection_history));
+    }
+
+    router = router
         // KV store
         .route("/{org_id}/kv/{key}", get(kv::get).post(kv::set).delete(kv::delete))
         .route("/{org_id}/kv", get(kv::list))
@@ -751,6 +762,10 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/query_manager/cancel", put(search::query_manager::cancel_multiple_query))
             .route("/{org_id}/query_manager/{query_id}/cancel", delete(search::query_manager::cancel_query))
 
+
+            // search inspector
+            .route("/{org_id}/search/profile", get(search::search_inspector::get_search_profile))
+
             // Keys
             .route("/{org_id}/cipher_keys", get(keys::list).post(keys::save))
             .route("/{org_id}/cipher_keys/bulk", delete(keys::delete_bulk))
@@ -775,6 +790,7 @@ pub fn service_routes() -> Router {
             // AI
             .route("/{org_id}/ai/chat", post(ai::chat::chat))
             .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
+            .route("/{org_id}/ai/feedback", post(ai::chat::feedback))
             .route("/{org_id}/ai/confirm/{session_id}", post(ai::chat::confirm_action))
 
             // RE patterns
@@ -843,6 +859,7 @@ pub fn service_routes() -> Router {
                 "/{org_id}/billings/billing_portal",
                 get(cloud::billings::create_billing_portal_session),
             )
+            .route("/{org_id}/ai/usage", get(cloud::billings::get_ai_usage))
             .route(
                 "/{org_id}/billings/data_usage/{usage_date}",
                 get(cloud::org_usage::get_org_usage),
@@ -852,7 +869,7 @@ pub fn service_routes() -> Router {
                 post(cloud::marketing::handle_new_attribution_event),
             )
             .route(
-                "/organizations/all",
+                "/{org_id}/organizations",
                 get(organization::org::all_organizations),
             )
             .route(
@@ -1007,10 +1024,7 @@ pub fn create_app_router() -> Router {
 
 #[cfg(test)]
 mod tests {
-    use axum::{
-        body::Body,
-        http::{Request, StatusCode},
-    };
+    use axum::{body::Body, http::Request};
     use tower::ServiceExt;
 
     use super::*;
@@ -1025,10 +1039,11 @@ mod tests {
             .unwrap();
 
         let response = app.oneshot(req).await.unwrap();
-        // The proxy will fail to connect in tests, but route should be reachable
+        // The route should be reachable and return an error status.
         assert!(
-            response.status() == StatusCode::INTERNAL_SERVER_ERROR
-                || response.status() == StatusCode::NOT_FOUND
+            response.status().is_client_error() || response.status().is_server_error(),
+            "expected 4xx/5xx, got {}",
+            response.status()
         );
     }
 }

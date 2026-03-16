@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -30,6 +30,7 @@ use config::{
     stats::MemorySize,
     utils::hash::{Sum64, gxhash},
 };
+use infra::runtime::WAL_RUNTIME;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::{RwLock, mpsc};
@@ -52,26 +53,6 @@ static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
         writers.push(RwMap::default());
     }
     writers
-});
-
-static WAL_RUNTIME: Lazy<Option<Arc<tokio::runtime::Runtime>>> = Lazy::new(|| {
-    let cfg = get_config();
-    if !cfg.common.wal_dedicated_runtime_enabled {
-        return None;
-    }
-
-    match create_shared_wal_runtime() {
-        Some(rt) => {
-            log::info!("[INGESTER:RUNTIME] Created single shared WAL runtime successfully");
-            Some(rt)
-        }
-        None => {
-            log::warn!(
-                "[INGESTER:RUNTIME] Failed to create shared WAL runtime, falling back to default runtime"
-            );
-            None
-        }
-    }
 });
 
 pub struct Writer {
@@ -488,9 +469,9 @@ impl Writer {
             let _ = std::mem::take(&mut entry.data);
         }
 
-        let _start_preprocess_batch_duration = _start_preprocess_batch.elapsed();
-        if _start_preprocess_batch_duration.as_millis() > 100 {
-            log::warn!("_start_preprocess_batch: {_start_preprocess_batch_duration:?}");
+        let start_preprocess_batch_duration = _start_preprocess_batch.elapsed();
+        if start_preprocess_batch_duration.as_millis() > 100 {
+            log::warn!("start_preprocess_batch_duration: {start_preprocess_batch_duration:?}");
         }
         Ok(crate::ProcessedBatch {
             entries,
@@ -526,9 +507,9 @@ impl Writer {
             tokio::task::coop::consume_budget().await;
         }
         drop(wal);
-        let _start_wal_processed_duration = _start_wal_processed.elapsed();
-        if _start_wal_processed_duration.as_millis() > 50 {
-            log::warn!("_start_wal_processed_duration: {_start_wal_processed_duration:?}");
+        let start_wal_processed_duration = _start_wal_processed.elapsed();
+        if start_wal_processed_duration.as_millis() > 100 {
+            log::warn!("start_wal_processed_duration: {start_wal_processed_duration:?}");
         }
 
         // Write into Memtable - pure IO, no CPU-intensive processing
@@ -547,9 +528,9 @@ impl Writer {
             tokio::task::coop::consume_budget().await;
         }
         drop(mem);
-        let _start_mem_processed_duration = _start_mem_processed.elapsed();
-        if _start_mem_processed_duration.as_millis() > 50 {
-            log::warn!("_start_mem_processed_duration: {_start_mem_processed_duration:?}");
+        let start_mem_processed_duration = _start_mem_processed.elapsed();
+        if start_mem_processed_duration.as_millis() > 100 {
+            log::warn!("start_mem_processed_duration: {start_mem_processed_duration:?}");
         }
 
         // Check fsync
@@ -559,9 +540,9 @@ impl Writer {
             drop(wal);
         }
 
-        let _start_consume_processed_duration = _start_consume_processed.elapsed();
-        if _start_consume_processed_duration.as_millis() > 500 {
-            log::warn!("_start_consume_processed_duration: {_start_consume_processed_duration:?}");
+        let start_consume_processed_duration = _start_consume_processed.elapsed();
+        if start_consume_processed_duration.as_millis() > 500 {
+            log::warn!("start_consume_processed_duration: {start_consume_processed_duration:?}");
         }
 
         Ok(())
@@ -703,95 +684,6 @@ impl Writer {
     }
 }
 
-fn create_shared_wal_runtime() -> Option<Arc<tokio::runtime::Runtime>> {
-    let cfg = get_config();
-
-    if !cfg.common.wal_dedicated_runtime_enabled {
-        return None;
-    }
-
-    let total_cpus = cfg.limit.cpu_num;
-    // Security Check: At least 2 CPU cores are required for isolation (1 for HTTP, 1 for WAL)
-    if total_cpus < 2 {
-        log::warn!(
-            "[INGESTER:RUNTIME] Cannot enable dedicated runtime: need at least 2 CPUs, got {total_cpus}"
-        );
-        return None;
-    }
-
-    // CPU reservation strategy for shared runtime:
-    // - Small systems (<= 8 CPU cores): Reserve 1 CPU core with 1 worker thread
-    // - Medium systems (9-32 CPU cores): Reserve max(1, total_cpus / 8) CPU cores
-    // - Large systems (> 32 CPU cores): Reserve max(4, total_cpus / 8) CPU cores
-    let reserved_cpus_for_wal = if total_cpus <= 8 {
-        1
-    } else if total_cpus <= 32 {
-        std::cmp::max(1, total_cpus / 8)
-    } else {
-        std::cmp::max(4, total_cpus / 8)
-    };
-    // Ensure the number of reserved CPU cores is reasonable (no more than half of the total)
-    let reserved_cpus_for_wal = std::cmp::min(reserved_cpus_for_wal, total_cpus / 2);
-
-    // WAL runtime uses the last few CPU cores
-    // Example: 8-core system with 1 reserved core -> WAL uses CPU 7
-    // 32-core system with 4 reserved cores -> WAL uses CPUs 28-31
-    let wal_cpu_start = total_cpus - reserved_cpus_for_wal;
-
-    log::info!(
-        "[INGESTER:RUNTIME] Creating shared WAL runtime with {} worker threads on CPU cores {}-{} (total CPUs: {}, HTTP can use: 0-{})",
-        reserved_cpus_for_wal,
-        wal_cpu_start,
-        total_cpus - 1,
-        total_cpus,
-        wal_cpu_start - 1
-    );
-
-    // Create CPU affinity list for the worker threads
-    let cpu_ids: Vec<usize> = (wal_cpu_start..total_cpus).collect();
-    let cpu_ids_for_log = cpu_ids.clone();
-
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(reserved_cpus_for_wal)
-        .thread_name("wal-runtime")
-        .on_thread_start(move || {
-            if let Some(core_ids) = core_affinity::get_core_ids() {
-                // Get current thread index by parsing thread name or use round-robin
-                // Since we can't easily get thread index here, bind to the first available CPU in the range
-                // The OS scheduler will distribute threads across the reserved CPUs
-                for &cpu_id in &cpu_ids {
-                    if cpu_id < core_ids.len()
-                        && core_affinity::set_for_current(core_ids[cpu_id]) {
-                            log::info!(
-                                "[INGESTER:RUNTIME] Successfully bound WAL worker thread to CPU core {cpu_id}"
-                            );
-                            break;
-                        }
-                }
-            } else {
-                log::warn!("[INGESTER:RUNTIME] Failed to get CPU core IDs for binding");
-            }
-        })
-        .enable_all()
-        .build();
-
-    match runtime {
-        Ok(rt) => {
-            log::info!(
-                "[INGESTER:RUNTIME] Created shared WAL runtime successfully with {} threads on CPUs: {:?}",
-                reserved_cpus_for_wal,
-                cpu_ids_for_log
-            );
-            Some(Arc::new(rt))
-        }
-        Err(e) => {
-            log::error!(
-                "[INGESTER:RUNTIME] Failed to create shared WAL runtime: {e}, falling back to default runtime"
-            );
-            None
-        }
-    }
-}
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub(crate) struct WriterKey {
     pub(crate) org_id: Arc<str>,

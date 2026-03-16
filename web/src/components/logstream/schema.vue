@@ -243,6 +243,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     label="Configuration"
                     no-caps
                   />
+                  <!-- LLM Evaluation Tab (enterprise + ai_enabled + traces only) -->
+                  <q-tab
+                    v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled && indexData.stream_type === 'traces'"
+                    name="llmEvaluation"
+                    icon="psychology"
+                    :label="t('pipeline.llmEvaluation')"
+                    no-caps
+                    data-test="stream-llm-evaluation-tab"
+                  />
+
+                  <!-- Cross-Linking Tab -->
+                  <q-tab
+                    v-if="store.state.zoConfig?.enable_cross_linking"
+                    name="crossLinking"
+                    icon="link"
+                    :label="t('crossLinks.header')"
+                    no-caps
+                  />
                 </q-tabs>
               </div>
             </div>
@@ -861,6 +879,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
+
+            <!-- LLM Evaluation tab -->
+            <LlmEvaluationSettings
+              v-if="activeMainTab == 'llmEvaluation'"
+              ref="llmEvalSettingsRef"
+              :stream-name="indexData.name"
+              :stream-fields="llmEvalStreamFields"
+              @dirty="llmEvalFormDirty = true"
+            />
+
+            <!-- cross-linking tab -->
+            <div v-if="activeMainTab == 'crossLinking'">
+              <div class="tw:p-4">
+                <!-- Stream-level cross-links (editable) -->
+                <CrossLinkManager
+                  v-model="streamCrossLinks"
+                  :title="t('crossLinks.streamCrossLinks')"
+                  :subtitle="t('crossLinks.streamCrossLinksSubtitle')"
+                  :availableFields="streamFieldNames"
+                  @change="formDirtyFlag = true"
+                />
+
+                <!-- Organization-level cross-links (read-only, hidden when empty) -->
+                <template v-if="orgCrossLinks.length > 0">
+                  <q-separator class="tw:my-4" />
+                  <CrossLinkManager
+                    :modelValue="orgCrossLinks"
+                    :title="t('crossLinks.orgCrossLinks')"
+                    :subtitle="t('crossLinks.orgCrossLinksSubtitle')"
+                    readonly
+                  />
+                </template>
+              </div>
+            </div>
+
             <!-- floating footer for the table -->
             <div
               :class="
@@ -870,8 +923,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               class="floating-buttons q-px-sm q-py-xs"
             >
+              <!-- LLM Evaluation tab footer -->
               <div
-                v-if="indexData.schema.length > 0"
+                v-if="activeMainTab === 'llmEvaluation'"
+                class="flex items-center justify-end"
+              >
+                <q-btn
+                  v-close-popup="true"
+                  data-test="schema-cancel-button"
+                  class="q-ml-md o2-secondary-button tw:h-[36px]"
+                  :label="t('logStream.cancel')"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                  no-caps
+                  flat
+                  @click="llmEvalFormDirty = false"
+                />
+                <q-btn
+                  v-bind:disable="!llmEvalFormDirty"
+                  data-test="schema-update-settings-button"
+                  :label="t('logStream.updateSettings')"
+                  class="no-border q-ml-md o2-primary-button tw:h-[36px]"
+                  :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                  no-caps
+                  flat
+                  @click="llmEvalSettingsRef?.save()"
+                />
+              </div>
+
+              <div
+                v-else-if="indexData.schema.length > 0"
                 class="flex items-center justify-between"
               >
                 <div class="flex items-center">
@@ -901,7 +981,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}
                   </q-btn>
                   <q-btn
-                    v-if="activeMainTab != 'configuration'"
+                    v-if="activeMainTab != 'configuration' && activeMainTab != 'crossLinking'"
                     v-bind:disable="
                       !selectedFields.length && !selectedDateFields.length
                     "
@@ -1012,6 +1092,7 @@ import StreamFieldsInputs from "@/components/logstream/StreamFieldInputs.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import {
   outlinedSchema,
   outlinedPerson,
@@ -1022,6 +1103,7 @@ import DateTime from "@/components/DateTime.vue";
 
 import AssociatedRegexPatterns from "./AssociatedRegexPatterns.vue";
 import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
+import LlmEvaluationSettings from "./LlmEvaluationSettings.vue";
 
 const defaultValue: any = () => {
   return {
@@ -1050,6 +1132,8 @@ export default defineComponent({
     DateTime,
     AssociatedRegexPatterns,
     PerformanceFieldsDialog,
+    LlmEvaluationSettings,
+    CrossLinkManager,
   },
   setup({ modelValue }) {
     type PatternAssociation = {
@@ -1092,6 +1176,19 @@ export default defineComponent({
     const activeMainTab = ref("schemaSettings");
     let previousSchemaVersion: any = null;
     const approxPartition = ref(false);
+
+    const llmEvalStreamFields = computed(() =>
+      (indexData.value.schema || []).map((f: any) => ({ label: f.name, value: f.name }))
+    );
+    const llmEvalSettingsRef = ref<any>(null);
+    const llmEvalFormDirty = ref(false);
+    const streamCrossLinks = ref<any[]>([]);
+    const orgCrossLinks = computed(() =>
+      store.state?.organizationData?.organizationSettings?.cross_links || [],
+    );
+    const streamFieldNames = computed(() =>
+      (indexData.value.schema || []).map((f: any) => f.name).sort(),
+    );
     const isDialogOpen = ref(false);
     const patternAssociations = ref([]);
     const redDaysList = ref([]);
@@ -1396,6 +1493,9 @@ export default defineComponent({
       indexData.value.defined_schema_fields =
         streamResponse.settings.defined_schema_fields || [];
 
+      // Populate stream-level cross-links
+      streamCrossLinks.value = streamResponse.settings?.cross_links || [];
+
       if (showDataRetention.value)
         dataRetentionDays.value =
           streamResponse.settings.data_retention ||
@@ -1618,6 +1718,34 @@ export default defineComponent({
         previousSchemaVersion,
         settings,
       );
+
+      // Add cross_links diff
+      const prevCrossLinks = previousSchemaVersion?.cross_links || [];
+      const currCrossLinks = streamCrossLinks.value || [];
+      const prevCrossLinkNames = new Set(prevCrossLinks.map((l: any) => l.name));
+      const currCrossLinkNames = new Set(currCrossLinks.map((l: any) => l.name));
+
+      const crossLinksToAdd = currCrossLinks.filter((l: any) => !prevCrossLinkNames.has(l.name));
+      const crossLinksToRemove = prevCrossLinks.filter((l: any) => !currCrossLinkNames.has(l.name));
+
+      // Check for modified links (same name but different url or fields)
+      for (const curr of currCrossLinks) {
+        if (prevCrossLinkNames.has(curr.name)) {
+          const prev = prevCrossLinks.find((l: any) => l.name === curr.name);
+          if (prev && JSON.stringify(prev) !== JSON.stringify(curr)) {
+            crossLinksToRemove.push(prev);
+            crossLinksToAdd.push(curr);
+          }
+        }
+      }
+
+      if (crossLinksToAdd.length > 0 || crossLinksToRemove.length > 0) {
+        modifiedSettings.cross_links = {
+          add: crossLinksToAdd,
+          remove: crossLinksToRemove,
+        };
+      }
+
       await streamService
         .updateSettings(
           store.state.selectedOrganization.identifier,
@@ -1907,6 +2035,7 @@ export default defineComponent({
 
     const updateActiveMainTab = (tab) => {
       activeMainTab.value = tab;
+      if (tab !== "llmEvaluation") llmEvalFormDirty.value = false;
     };
 
     // Function to get missing FTS and Secondary Index fields
@@ -2383,9 +2512,6 @@ export default defineComponent({
         : getImageURL("images/streams/timeline.svg");
     });
 
-
-
-
     return {
       t,
       q,
@@ -2461,6 +2587,9 @@ export default defineComponent({
       updateActiveMainTab,
       redBtnColumns,
       redBtnRows,
+      streamCrossLinks,
+      orgCrossLinks,
+      streamFieldNames,
       selectedDateFields,
       redDaysList,
       deleteDates,
@@ -2486,6 +2615,9 @@ export default defineComponent({
       quickModeIcon,
       getConfigIcon,
       getTimelineIcon,
+      llmEvalStreamFields,
+      llmEvalSettingsRef,
+      llmEvalFormDirty,
     };
   },
   created() {

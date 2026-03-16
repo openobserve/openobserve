@@ -166,6 +166,7 @@ jobs:
                 "alerts-import.spec.js",
                 "alerts-advanced.spec.js",
                 "alerts-destinations-prebuilt.spec.js",
+                "alerts-vrl-encoding.spec.js",
               ]
           - testfolder: "Dashboards-Core"
             browser: "chrome"
@@ -205,6 +206,7 @@ jobs:
                 "visualize.spec.js",
                 "visualize-vrl.spec.js",
                 "dashboard-create-alert.spec.js",
+                "dashboard-sankey.spec.js",
               ]
           - testfolder: "Dashboards-Streaming"
             browser: "chrome"
@@ -304,7 +306,8 @@ jobs:
             browser: "chrome"
             run_files: 
               [
-                "dashboard-table-pagination.spec.js"
+                "dashboard-table-pagination.spec.js",
+                "dashboard-series-color-multiwindow.spec.js",
               ]
           - testfolder: "Dashboards-Panel-Level-DateTime-Config"
             browser: "chrome"

@@ -4,6 +4,9 @@ const path = require('path');
 const dotenv = require('dotenv');
 const testLogger = require('./playwright-tests/utils/test-logger.js');
 
+// Mark this as a cloud environment for page objects and auth helpers
+process.env.IS_CLOUD = 'true';
+
 // Load environment variables from .env file
 const envResult = dotenv.config();
 if (envResult.error) {
@@ -21,13 +24,44 @@ if (!process.env.ALPHA1_USER_EMAIL || !process.env.ALPHA1_USER_PASSWORD) {
   testLogger.warn('ALPHA1_USER_EMAIL and ALPHA1_USER_PASSWORD must be set for Dex email login');
 }
 
+// Set ZO_ROOT_USER_* as fallbacks from ALPHA1_* env vars so that spec files
+// and utility modules that reference ZO_ROOT_USER_EMAIL/PASSWORD work on cloud
+if (!process.env.ZO_ROOT_USER_EMAIL && process.env.ALPHA1_USER_EMAIL) {
+  process.env.ZO_ROOT_USER_EMAIL = process.env.ALPHA1_USER_EMAIL;
+}
+if (!process.env.ZO_ROOT_USER_PASSWORD && process.env.ALPHA1_USER_PASSWORD) {
+  process.env.ZO_ROOT_USER_PASSWORD = process.env.ALPHA1_USER_PASSWORD;
+}
+
+// Ensure INGESTION_URL is set — on cloud, it's the same as the base URL
+if (!process.env.INGESTION_URL) {
+  process.env.INGESTION_URL = process.env.ZO_BASE_URL;
+  testLogger.info(`INGESTION_URL defaulted to ZO_BASE_URL: ${process.env.ZO_BASE_URL}`);
+}
+
+// Override ORGNAME with the correct org identifier from cloud-config.json
+// (written by global-setup-alpha1.js after Dex login)
+const fs = require('fs');
+const cloudConfigFile = path.join(__dirname, 'playwright-tests/utils/auth/cloud-config.json');
+try {
+  if (fs.existsSync(cloudConfigFile)) {
+    const cloudConfig = JSON.parse(fs.readFileSync(cloudConfigFile, 'utf-8'));
+    if (cloudConfig.orgIdentifier) {
+      process.env.ORGNAME = cloudConfig.orgIdentifier;
+      testLogger.info(`ORGNAME overridden from cloud-config: ${cloudConfig.orgIdentifier}`);
+    }
+  }
+} catch (e) {
+  testLogger.debug('cloud-config.json not yet available (will be created by global setup)');
+}
+
 /**
  * Alpha1 Cloud Playwright Configuration
  * Uses Dex "Continue with Email" login flow
  */
 module.exports = defineConfig({
   testDir: './playwright-tests',
-  testMatch: ['**/Cloud/**/*.spec.js'],
+  testMatch: ['**/*.spec.js'],
   outputDir: './test-results',
   testIgnore: ['**/test-archives/**', '**/*_old.js'],
 
@@ -37,8 +71,8 @@ module.exports = defineConfig({
 
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 3 : 0,
-  workers: process.env.CI ? 2 : 5,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 3 : 5,
 
   reporter: process.env.CI
     ? [

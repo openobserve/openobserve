@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { test: baseTest } = require('@playwright/test');
 const testLogger = require('./test-logger.js');
 const { waitUtils } = require('./wait-helpers.js');
+const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 
 const istanbulCLIOutput = path.join(process.cwd(), '.nyc_output');
 const authFile = path.join(__dirname, 'auth', 'user.json');
@@ -80,15 +81,6 @@ const test = baseTest.extend({
   page: async ({ context }, use) => {
     const page = await context.newPage();
     
-    // Add console logging for CI debugging
-    if (process.env.CI) {
-      page.on('console', (msg) => {
-        if (msg.type() === 'error') {
-          testLogger.error('Browser console error', { message: msg.text() });
-        }
-      });
-    }
-    
     // Add wait helpers to page
     page.waitHelpers = waitUtils.create(page);
     
@@ -126,8 +118,14 @@ async function navigateToBase(page) {
   const baseUrlWithOrg = `${process.env["ZO_BASE_URL"]}?org_identifier=${process.env["ORGNAME"]}`;
   testLogger.info('Navigating to base URL with org identifier', { url: baseUrlWithOrg });
 
-  await page.goto(baseUrlWithOrg);
+  // Cloud with parallel workers needs a longer navigation timeout than the default 30s
+  const navTimeout = isCloudEnvironment() ? 60000 : undefined;
+  await page.goto(baseUrlWithOrg, navTimeout ? { timeout: navTimeout } : undefined);
   await page.waitForLoadState('domcontentloaded');
+  // Cloud needs full hydration before sidebar clicks — without this, clicks trigger Dex redirect
+  if (isCloudEnvironment()) {
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+  }
   
   const isAuthenticated = await verifyAuthentication(page);
   

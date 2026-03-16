@@ -23,7 +23,7 @@ use config::{
         stream::StreamType,
     },
     metrics,
-    utils::json,
+    utils::{json, time::now_micros},
 };
 use futures::stream::StreamExt;
 use hashbrown::HashMap;
@@ -298,7 +298,7 @@ pub async fn get_latest_traces(
 
     if start_time_from_trace_id > 0 {
         start_time = start_time_from_trace_id - 60 * 1_000_000; //60 seconds earlier
-        end_time = start_time_from_trace_id + 3600 * 1_000_000; //1 hour later
+        end_time = std::cmp::min(now_micros(), start_time_from_trace_id + 3600 * 1_000_000); //1 hour later
     }
 
     let max_query_range = crate::common::utils::stream::get_max_query_range(
@@ -340,11 +340,11 @@ pub async fn get_latest_traces(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration, \
-            sum(_o2_llm_usage_details_input) as llm_usage_details_input, \
-            sum(_o2_llm_usage_details_output) as llm_usage_details_output, \
-            sum(_o2_llm_usage_details_total) as llm_usage_details_total, \
-            sum(_o2_llm_cost_details_total) as llm_cost_details_total, \
-            FIRST_VALUE(_o2_llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
+            sum(llm_usage_tokens_input) as llm_usage_details_input, \
+            sum(llm_usage_tokens_output) as llm_usage_details_output, \
+            sum(llm_usage_tokens_total) as llm_usage_details_total, \
+            sum(llm_usage_cost_total) as llm_cost_details_total, \
+            FIRST_VALUE(llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
             FROM \"{stream_name}\""
         )
     } else {
@@ -463,7 +463,8 @@ pub async fn get_latest_traces(
             start_time = trace_start_time / 1000;
         }
         if trace_end_time / 1000 > end_time {
-            end_time = trace_end_time / 1000;
+            // becuase we search with < end_time, so we need to add 1 to the end_time
+            end_time = trace_end_time / 1000 + 1;
         }
         traces_data.insert(
             trace_id.clone(),
@@ -475,19 +476,19 @@ pub async fn get_latest_traces(
                 spans: [0, 0],
                 service_name: Vec::new(),
                 first_event: serde_json::Value::Null,
-                _o2_llm_usage_details_input: json::get_int_value(
+                llm_usage_tokens_input: json::get_int_value(
                     item.get("llm_usage_details_input").unwrap_or_default(),
                 ),
-                _o2_llm_usage_details_output: json::get_int_value(
+                llm_usage_tokens_output: json::get_int_value(
                     item.get("llm_usage_details_output").unwrap_or_default(),
                 ),
-                _o2_llm_usage_details_total: json::get_int_value(
+                llm_usage_tokens_total: json::get_int_value(
                     item.get("llm_usage_details_total").unwrap_or_default(),
                 ),
-                _o2_llm_cost_details_total: json::get_float_value(
+                llm_usage_cost_total: json::get_float_value(
                     item.get("llm_cost_details_total").unwrap_or_default(),
                 ),
-                _o2_llm_input: item.get("llm_input").cloned(),
+                llm_input: item.get("llm_input").cloned(),
             },
         );
     }
@@ -587,10 +588,14 @@ pub async fn get_latest_traces(
             if trace.end_time < trace_end_time {
                 trace.end_time = trace_end_time;
             }
+            // update the duration if the duration is not correct
+            if trace.end_time - trace.start_time > trace.duration * 1000 {
+                trace.duration = (trace.end_time - trace.start_time) / 1000;
+            }
             let service_name_map = traces_service_name.entry(trace_id.clone()).or_default();
             let entry = service_name_map.entry(service_name.clone()).or_default();
             entry.0 += 1;
-            entry.1 += duration;
+            entry.1 = entry.1.max(duration);
         }
         if resp_size < req.query.size {
             break;
@@ -971,11 +976,11 @@ async fn process_latest_traces_stream(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration, \
-            sum(_o2_llm_usage_details_input) as llm_usage_details_input, \
-            sum(_o2_llm_usage_details_output) as llm_usage_details_output, \
-            sum(_o2_llm_usage_details_total) as llm_usage_details_total, \
-            sum(_o2_llm_cost_details_total) as llm_cost_details_total, \
-            FIRST_VALUE(_o2_llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
+            sum(llm_usage_tokens_input) as llm_usage_details_input, \
+            sum(llm_usage_tokens_output) as llm_usage_details_output, \
+            sum(llm_usage_tokens_total) as llm_usage_details_total, \
+            sum(llm_usage_cost_total) as llm_cost_details_total, \
+            FIRST_VALUE(llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
             FROM \"{stream_name}\""
         )
     } else {
@@ -1026,7 +1031,7 @@ async fn process_latest_traces_stream(
 
     // Get time partitions
     let partition_req = SearchPartitionRequest {
-        sql: query_sql.clone(),
+        sql: format!("SELECT * FROM \"{stream_name}\""),
         start_time,
         end_time,
         encoding: config::meta::search::RequestEncoding::Empty,
@@ -1228,7 +1233,8 @@ async fn process_latest_traces_stream(
                 p_start_actual = trace_start_time / 1000;
             }
             if trace_end_time > 0 && trace_end_time / 1000 > p_end_actual {
-                p_end_actual = trace_end_time / 1000;
+                // becuase we search with < end_time, so we need to add 1 to the end_time
+                p_end_actual = trace_end_time / 1000 + 1;
             }
             traces_data.insert(
                 tid.clone(),
@@ -1240,19 +1246,19 @@ async fn process_latest_traces_stream(
                     spans: [0, 0],
                     service_name: Vec::new(),
                     first_event: serde_json::Value::Null,
-                    _o2_llm_usage_details_input: json::get_int_value(
+                    llm_usage_tokens_input: json::get_int_value(
                         item.get("llm_usage_details_input").unwrap_or_default(),
                     ),
-                    _o2_llm_usage_details_output: json::get_int_value(
+                    llm_usage_tokens_output: json::get_int_value(
                         item.get("llm_usage_details_output").unwrap_or_default(),
                     ),
-                    _o2_llm_usage_details_total: json::get_int_value(
+                    llm_usage_tokens_total: json::get_int_value(
                         item.get("llm_usage_details_total").unwrap_or_default(),
                     ),
-                    _o2_llm_cost_details_total: json::get_float_value(
+                    llm_usage_cost_total: json::get_float_value(
                         item.get("llm_cost_details_total").unwrap_or_default(),
                     ),
-                    _o2_llm_input: item.get("llm_input").cloned(),
+                    llm_input: item.get("llm_input").cloned(),
                 },
             );
         }
@@ -1348,10 +1354,14 @@ async fn process_latest_traces_stream(
                     if trace.end_time < trace_end_time {
                         trace.end_time = trace_end_time;
                     }
+                    // update the duration if the duration is not correct
+                    if trace.end_time - trace.start_time > trace.duration * 1000 {
+                        trace.duration = (trace.end_time - trace.start_time) / 1000;
+                    }
                     let svc_map = traces_service_name.entry(tid).or_default();
                     let entry = svc_map.entry(service_name).or_default();
                     entry.0 += 1;
-                    entry.1 += duration;
+                    entry.1 = entry.1.max(duration);
                 }
             }
 
@@ -1450,11 +1460,11 @@ struct TraceResponseItem {
     spans: [u16; 2],
     service_name: Vec<TraceServiceNameItem>,
     first_event: serde_json::Value,
-    _o2_llm_usage_details_input: i64,
-    _o2_llm_usage_details_output: i64,
-    _o2_llm_usage_details_total: i64,
-    _o2_llm_cost_details_total: f64,
-    _o2_llm_input: Option<serde_json::Value>,
+    llm_usage_tokens_input: i64,
+    llm_usage_tokens_output: i64,
+    llm_usage_tokens_total: i64,
+    llm_usage_cost_total: f64,
+    llm_input: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Default, Serialize)]

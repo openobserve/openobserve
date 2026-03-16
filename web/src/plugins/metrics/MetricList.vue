@@ -421,6 +421,12 @@ export default defineComponent({
                 });
             }
           })
+          .catch(() => {
+            quasar.notify({
+              type: "negative",
+              message: "Error while fetching field values",
+            });
+          })
           .finally(() => {
             metricLabelValues.value[name]["isLoading"] = false;
           });

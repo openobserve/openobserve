@@ -16,39 +16,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="traces-search-result-list tw:h-full tw:flex tw:flex-col">
-    <!-- ════════════════════ Loading State ════════════════════ -->
-    <div
-      v-if="loading"
-      class="full-height flex justify-center items-center tw:pt-[4rem]"
-    >
-      <div class="q-pb-lg">
-        <q-spinner-hourglass
-          color="primary"
-          size="40px"
-          class="tw:mx-auto tw:block"
-        />
-        <span class="text-center">
-          {{ t('traces.fetchingTraces') }}
-        </span>
-      </div>
-    </div>
-
     <!-- ════════════════════ Empty State ════════════════════ -->
     <div
-      v-else-if="noResults"
+      v-if="noResults"
       class="text-center tw:mx-[10%] tw:my-[2.5rem] tw:text-[1.25rem]"
     >
-      <q-icon name="info" color="primary" size="md" /> {{ t('traces.noTracesFoundAdjust') }}
+      <q-icon name="info" color="primary" size="md" />
+      {{ t("traces.noTracesFoundAdjust") }}
     </div>
 
     <!-- ════════════════════ Traces List Section ════════════════════ -->
     <div
       v-else
-      v-show="hasResults"
+      v-show="hasResults || loading"
       data-test="traces-table-wrapper"
       class="column tw:h-full tw:flex-1 tw:min-h-0"
     >
-      <!-- Section header: title + count badge -->
+      <!-- Section header: title + count badge + pagination -->
       <div
         v-if="showHeader"
         data-test="traces-section-header"
@@ -58,14 +42,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-section-title"
           class="tw:text-[0.75rem] tw:font-bold tw:tracking-[0.0625rem]! tw:text-[var(--o2-text-1)]! tw:mr-[0.85rem]"
         >
-          {{ t('traces.tracesTitle') }}
+          {{
+            props.searchMode === "spans"
+              ? t("traces.spansTitle")
+              : t("traces.tracesTitle")
+          }}
         </span>
         <q-badge
           data-test="traces-count-badge"
           rounded
-          :label="`${props.total != null ? props.total : hits.length} ${t('traces.tracesFound')}`"
+          :label="`${formatLargeNumber(props.total != null ? props.total : hits.length)} ${props.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}`"
           class="text-caption tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-2)]! tw:mr-[0.85rem]"
         />
+        <div
+          v-if="props.errorCount != null && props.errorCount > 0"
+          data-test="traces-error-count-badge"
+          class="tw:rounded-xl tw:py-[0.25rem] tw:px-[0.625rem] tw:inline-flex tw:items-center tw:w-fit tw:mr-[0.85rem]"
+          style="
+            background: rgba(244, 67, 54, 0.12);
+            color: var(--q-negative, #c62828);
+          "
+        >
+          <span class="tw:text-[0.75rem] tw:tracking-[0.03em] tw:font-bold">
+            {{ formatLargeNumber(props.errorCount!) }}
+            {{ t("traces.errorsFound") }}
+          </span>
+        </div>
+
+        <q-space />
+
+        <!-- Pagination -->
+        <template v-if="showPagination">
+          <q-select
+            :model-value="rowsPerPage"
+            :options="rowsPerPageOptions"
+            class="select-pagination tw:mr-[0.25rem]"
+            size="sm"
+            dense
+            borderless
+            data-test="traces-search-result-records-per-page"
+            @update:model-value="emit('rows-per-page-change', $event)"
+          />
+          <q-pagination
+            :disable="loading"
+            :model-value="currentPage"
+            :max="totalPages"
+            :input="false"
+            direction-links
+            :boundary-numbers="false"
+            :max-pages="5"
+            :ellipses="false"
+            icon-first="skip_previous"
+            icon-last="skip_next"
+            icon-prev="fast_rewind"
+            icon-next="fast_forward"
+            class="float-right paginator-section"
+            data-test="traces-search-result-pagination"
+            @update:model-value="emit('page-change', $event)"
+          />
+        </template>
       </div>
 
       <!-- Table scroll area -->
@@ -76,16 +111,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <TracesTable
           :columns="tracesColumns"
           :rows="hits"
+          :loading="loading"
           :row-class="traceRowClass"
+          :sort-by="props.sortBy"
+          :sort-order="props.sortOrder"
           @row-click="(row: any) => emit('row-click', row)"
-          @load-more="emit('load-more')"
+          @sort-change="(by, order) => emit('sort-change', by, order)"
         >
-          <template #cell-timestamp="{ item }">
-            <TraceTimestampCell :item="item" />
+          <!-- Loading banner: shown above rows while a new page is fetching -->
+          <template #loading-banner>
+            <div
+              data-test="traces-table-loading-banner-row"
+              class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
+            >
+              <q-spinner-hourglass
+                color="primary"
+                size="1.25rem"
+                class="tw:mx-[0.25rem]"
+              />
+              <span
+                class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
+                >{{ t("traces.fetchingTraces") }}</span
+              >
+            </div>
           </template>
 
-          <template #cell-service_operation="{ item }">
+          <!-- Loading row: shown when no rows exist yet (first fetch) -->
+          <template #loading>
+            <div
+              data-test="traces-table-loading-row"
+              class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
+            >
+              <q-spinner-hourglass
+                color="primary"
+                size="1.25rem"
+                class="tw:mr-[0.25rem]"
+              />
+              <span
+                class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
+                >{{ t("traces.fetchingTraces") }}</span
+              >
+            </div>
+          </template>
+
+          <template #cell-timestamp="{ item }">
+            <TraceTimestampCell :item="item" :search-mode="props.searchMode" />
+          </template>
+
+          <template #cell-service="{ item }">
             <TraceServiceCell :item="item" />
+          </template>
+
+          <template #cell-operation_name="{ item }">
+            <span
+              class="text-caption ellipsis tw:text-[var(--o2-text-1)]!"
+              data-test="trace-row-operation-name"
+            >
+              {{ item.operation_name }}
+              <q-tooltip anchor="bottom middle" self="top middle">
+                {{ item.operation_name }}
+              </q-tooltip>
+            </span>
           </template>
 
           <template #cell-duration="{ item }">
@@ -102,8 +188,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
+          <template #cell-method="{ item }">
+            {{ item.http_method || item.rpc_method || "—" }}
+          </template>
+
+          <template #cell-status_code="{ item }">
+            <SpanStatusCodeBadge
+              :code="item.http_status_code"
+              :grpc-code="item.rpc_grpc_status_code"
+            />
+          </template>
+
           <template #cell-status="{ item }">
-            <TraceStatusCell :item="item" />
+            <TraceStatusCell v-if="props.searchMode !== 'spans'" :item="item" />
+            <SpanStatusPill v-else :status="item.span_status" />
           </template>
 
           <template #cell-input_tokens="{ item }">
@@ -148,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import TracesTable from "@/components/traces/TracesTable.vue";
 import { useTracesTableColumns } from "../composables/useTracesTableColumns";
@@ -156,13 +254,18 @@ import TraceTimestampCell from "./TraceTimestampCell.vue";
 import TraceServiceCell from "./TraceServiceCell.vue";
 import TraceLatencyCell from "./TraceLatencyCell.vue";
 import TraceStatusCell from "./TraceStatusCell.vue";
+import SpanStatusPill from "./SpanStatusPill.vue";
+import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
 import {
   isLLMTrace,
   extractLLMData,
   formatCost,
   formatTokens,
 } from "../../../utils/llmUtils";
-import { formatTimeWithSuffix } from "../../../utils/zincutils";
+import {
+  formatTimeWithSuffix,
+  formatLargeNumber,
+} from "../../../utils/zincutils";
 
 interface Props {
   hits: any[];
@@ -171,8 +274,22 @@ interface Props {
   searchPerformed?: boolean;
   /** Show the "TRACES X Traces Found" section header. Default: true */
   showHeader?: boolean;
-  /** Server-side total record count. When provided, the badge shows this instead of hits.length. */
+  /** Server-side total record count (distinct trace_ids from count query). */
   total?: number;
+  /** Current page number (1-indexed). */
+  currentPage?: number;
+  /** Rows displayed per page. */
+  rowsPerPage?: number;
+  /** Whether to show the pagination controls. */
+  showPagination?: boolean;
+  /** Error trace count from the count query. */
+  errorCount?: number;
+  /** Active sort field (backend field name, e.g. "zo_sql_timestamp") */
+  sortBy?: string;
+  /** Active sort direction */
+  sortOrder?: "asc" | "desc";
+  /** Current search mode */
+  searchMode?: "traces" | "spans";
 }
 
 const { t } = useI18n();
@@ -181,21 +298,38 @@ const props = withDefaults(defineProps<Props>(), {
   searchPerformed: true,
   showHeader: true,
   total: undefined,
+  currentPage: 1,
+  rowsPerPage: 25,
+  showPagination: false,
+  errorCount: undefined,
+  sortBy: undefined,
+  sortOrder: undefined,
+  searchMode: "traces",
 });
 
 const emit = defineEmits<{
   "row-click": [row: any];
-  "load-more": [];
+  "page-change": [page: number];
+  "rows-per-page-change": [rowsPerPage: number];
+  "sort-change": [sortBy: string, sortOrder: "asc" | "desc"];
 }>();
+
+const rowsPerPageOptions = [10, 25, 50, 100];
 
 const hasLlmTraces = computed(() =>
   props.hits.some((hit: any) => isLLMTrace(hit)),
 );
 
-const tracesColumns = useTracesTableColumns(hasLlmTraces);
+const searchModeRef = computed(() => props.searchMode ?? "traces");
 
-const traceRowClass = (row: any) =>
-  (row.errors ?? 0) > 0 ? "oz-table__row--error" : "";
+const tracesColumns = useTracesTableColumns(hasLlmTraces, searchModeRef);
+
+const traceRowClass = (row: any) => {
+  if (props.searchMode === "spans") {
+    return row.span_status === "ERROR" ? "oz-table__row--error" : "";
+  }
+  return (row.errors ?? 0) > 0 ? "oz-table__row--error" : "";
+};
 
 const noResults = computed(
   () => props.searchPerformed && !props.loading && props.hits.length === 0,
@@ -204,4 +338,14 @@ const noResults = computed(
 const hasResults = computed(
   () => props.searchPerformed && props.hits.length > 0,
 );
+
+const totalPages = computed(() =>
+  props.total && props.rowsPerPage
+    ? Math.max(1, Math.ceil(props.total / props.rowsPerPage))
+    : 1,
+);
 </script>
+
+<style lang="scss" scoped>
+@import "@/styles/pagination.scss";
+</style>

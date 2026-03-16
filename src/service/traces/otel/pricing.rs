@@ -19,7 +19,7 @@
 //! costs from token usage when cost information is not provided by the client.
 //!
 //! Pricing is based on publicly available information from model providers and
-//! is updated as of January 2025.
+//! is updated as of March 2026.
 
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -37,7 +37,7 @@ pub fn calculate_token_count(model_name: &str, prompt: &str) -> i64 {
 /// Calculate cost from token usage
 ///
 /// # Arguments
-/// * `model_name` - Name of the model (e.g., "gpt-4", "claude-sonnet-4-5")
+/// * `model_name` - Name of the model (e.g., "gpt-4", "claude-sonnet-4-6")
 /// * `input_tokens` - Number of input tokens
 /// * `output_tokens` - Number of output tokens
 ///
@@ -134,24 +134,69 @@ impl ModelPricing {
 pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
     vec![
         // OpenAI Models
-        // Reference: https://openai.com/api/pricing/
-        ModelPricing::simple("gpt-4o", 2.50, 10.00),
+        // Reference: https://developers.openai.com/api/docs/pricing/
+        ModelPricing::simple("gpt-5\\.2-pro", 21.00, 168.00),
+        ModelPricing::simple("gpt-5\\.2", 1.75, 14.00),
+        ModelPricing::simple("gpt-5\\.1", 1.25, 10.00),
+        ModelPricing::simple("gpt-5-pro", 15.00, 120.00),
+        ModelPricing::simple("gpt-5-mini", 0.25, 2.00),
+        ModelPricing::simple("gpt-5-nano", 0.05, 0.40),
+        ModelPricing::simple("gpt-5", 1.25, 10.00),
+        ModelPricing::simple("gpt-4\\.1-mini", 0.40, 1.60),
+        ModelPricing::simple("gpt-4\\.1", 2.00, 8.00),
         ModelPricing::simple("gpt-4o-mini", 0.15, 0.60),
+        ModelPricing::simple("gpt-4o", 2.50, 10.00),
+        ModelPricing::simple("o1-pro", 150.00, 600.00),
+        ModelPricing::simple("o1", 15.00, 60.00),
+        ModelPricing::simple("o3-pro", 20.00, 80.00),
+        ModelPricing::simple("o3-mini", 1.10, 4.40),
+        ModelPricing::simple("o3", 2.00, 8.00),
+        ModelPricing::simple("o4-mini", 1.10, 4.40),
+        ModelPricing::simple("gpt-image-1\\.5", 8.00, 32.00),
+        ModelPricing::simple("gpt-image-1-mini", 2.50, 8.00),
+        ModelPricing::simple("gpt-image-1", 10.00, 40.00),
         ModelPricing::simple("gpt-4-turbo", 10.00, 30.00),
         ModelPricing::simple("gpt-4-32k", 60.00, 120.00),
         ModelPricing::simple("gpt-4-0125-preview", 10.00, 30.00),
         ModelPricing::simple("gpt-4-1106-preview", 10.00, 30.00),
         ModelPricing::simple("gpt-4", 30.00, 60.00),
-        ModelPricing::simple("gpt-3.5-turbo", 0.50, 1.50),
-        ModelPricing::simple("gpt-3.5", 0.50, 1.50),
+        ModelPricing::simple("gpt-3\\.5-turbo", 0.50, 1.50),
+        ModelPricing::simple("gpt-3\\.5", 0.50, 1.50),
         ModelPricing::simple("text-embedding-3-large", 0.13, 0.0),
         ModelPricing::simple("text-embedding-3-small", 0.02, 0.0),
         ModelPricing::simple("text-embedding-ada-002", 0.10, 0.0),
         // Anthropic Models
-        // Reference: https://docs.anthropic.com/en/docs/about-claude/models#model-comparison-table
-        ModelPricing::simple("claude-opus-4", 15.00, 75.00),
-        ModelPricing::simple("claude-3-opus", 15.00, 75.00),
-        // Claude Sonnet 4.5 with tiered pricing (extended context > 200k tokens)
+        // Reference: https://platform.claude.com/docs/en/about-claude/pricing
+        ModelPricing::tiered(
+            "claude-opus-4-6",
+            vec![
+                PricingTier {
+                    min_input_tokens: Some(200_000),
+                    input_price_per_million: 10.00,
+                    output_price_per_million: 37.50,
+                },
+                PricingTier {
+                    min_input_tokens: None,
+                    input_price_per_million: 5.00,
+                    output_price_per_million: 25.00,
+                },
+            ],
+        ),
+        ModelPricing::tiered(
+            "claude-sonnet-4-6",
+            vec![
+                PricingTier {
+                    min_input_tokens: Some(200_000),
+                    input_price_per_million: 6.00,
+                    output_price_per_million: 22.50,
+                },
+                PricingTier {
+                    min_input_tokens: None,
+                    input_price_per_million: 3.00,
+                    output_price_per_million: 15.00,
+                },
+            ],
+        ),
         ModelPricing::tiered(
             "claude-sonnet-4-5",
             vec![
@@ -167,17 +212,74 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
                 },
             ],
         ),
+        ModelPricing::tiered(
+            "claude-sonnet-4",
+            vec![
+                PricingTier {
+                    min_input_tokens: Some(200_000),
+                    input_price_per_million: 6.00,
+                    output_price_per_million: 22.50,
+                },
+                PricingTier {
+                    min_input_tokens: None,
+                    input_price_per_million: 3.00,
+                    output_price_per_million: 15.00,
+                },
+            ],
+        ),
+        ModelPricing::simple("claude-opus-4-5", 5.00, 25.00),
+        ModelPricing::simple("claude-haiku-4-5", 1.00, 5.00),
+        ModelPricing::simple("claude-opus-4-1", 15.00, 75.00),
+        ModelPricing::simple("claude-opus-4", 15.00, 75.00),
+        ModelPricing::simple("claude-3-opus", 15.00, 75.00),
+        ModelPricing::simple("claude-3-7-sonnet", 3.00, 15.00),
         ModelPricing::simple("claude-3-5-sonnet", 3.00, 15.00),
         ModelPricing::simple("claude-3-sonnet", 3.00, 15.00),
-        ModelPricing::simple("claude-haiku-4", 0.80, 4.00),
+        ModelPricing::simple("claude-haiku-3-5", 0.80, 4.00),
         ModelPricing::simple("claude-3-5-haiku", 0.80, 4.00),
         ModelPricing::simple("claude-3-haiku", 0.25, 1.25),
         // Google Gemini Models
         // Reference: https://ai.google.dev/pricing
-        ModelPricing::simple("gemini-2.0-flash-exp", 0.0, 0.0), // Free during preview
-        ModelPricing::simple("gemini-1.5-pro", 1.25, 5.00),
-        ModelPricing::simple("gemini-1.5-flash", 0.075, 0.30),
+        ModelPricing::tiered(
+            "gemini-3\\.1-pro",
+            vec![
+                PricingTier {
+                    min_input_tokens: Some(200_000),
+                    input_price_per_million: 4.00,
+                    output_price_per_million: 18.00,
+                },
+                PricingTier {
+                    min_input_tokens: None,
+                    input_price_per_million: 2.00,
+                    output_price_per_million: 12.00,
+                },
+            ],
+        ),
+        ModelPricing::simple("gemini-3\\.1-flash-lite", 0.25, 1.50),
+        ModelPricing::simple("gemini-3-flash", 0.50, 3.00),
+        ModelPricing::tiered(
+            "gemini-2\\.5-pro",
+            vec![
+                PricingTier {
+                    min_input_tokens: Some(200_000),
+                    input_price_per_million: 2.50,
+                    output_price_per_million: 15.00,
+                },
+                PricingTier {
+                    min_input_tokens: None,
+                    input_price_per_million: 1.25,
+                    output_price_per_million: 10.00,
+                },
+            ],
+        ),
+        ModelPricing::simple("gemini-2\\.5-flash-lite", 0.10, 0.40),
+        ModelPricing::simple("gemini-2\\.5-flash", 0.30, 2.50),
+        ModelPricing::simple("gemini-2\\.0-flash-lite", 0.075, 0.30),
+        ModelPricing::simple("gemini-2\\.0-flash", 0.10, 0.40),
+        ModelPricing::simple("gemini-1\\.5-pro", 1.25, 5.00),
+        ModelPricing::simple("gemini-1\\.5-flash", 0.075, 0.30),
         ModelPricing::simple("gemini-pro", 0.50, 1.50),
+        ModelPricing::simple("gemini-embedding-001", 0.15, 0.0),
     ]
 });
 
@@ -194,20 +296,20 @@ mod tests {
     }
 
     #[test]
-    fn test_calculate_cost_claude_sonnet_default_tier() {
+    fn test_calculate_cost_claude_sonnet_tiered_default_tier() {
         // Test with < 200k tokens (default tier)
         let (input_cost, output_cost, total_cost) =
-            calculate_cost("claude-sonnet-4-5", 50_000, 10_000).unwrap();
+            calculate_cost("claude-sonnet-4-6", 50_000, 10_000).unwrap();
         assert!((input_cost - 0.15).abs() < 1e-10); // 50k / 1M * $3.00
         assert!((output_cost - 0.15).abs() < 1e-10); // 10k / 1M * $15.00
         assert!((total_cost - 0.30).abs() < 1e-10);
     }
 
     #[test]
-    fn test_calculate_cost_claude_sonnet_extended_tier() {
+    fn test_calculate_cost_claude_sonnet_tiered_extended_tier() {
         // Test with > 200k tokens (extended context tier)
         let (input_cost, output_cost, total_cost) =
-            calculate_cost("claude-sonnet-4-5", 250_000, 10_000).unwrap();
+            calculate_cost("claude-sonnet-4-6", 250_000, 10_000).unwrap();
         assert!((input_cost - 1.5).abs() < 1e-10); // 250k / 1M * $6.00
         assert!((output_cost - 0.225).abs() < 1e-10); // 10k / 1M * $22.50
         assert!((total_cost - 1.725).abs() < 1e-10);
@@ -241,6 +343,64 @@ mod tests {
         assert_eq!(input_cost, 0.0);
         assert_eq!(output_cost, 0.0);
         assert_eq!(total_cost, 0.0);
+    }
+
+    #[test]
+    fn test_dot_escape_matches_exact_version() {
+        // gpt-5.2 pattern uses \\. to match literal dot — should NOT match "gpt-512"
+        let pricing = ModelPricing::simple("gpt-5\\.2", 1.75, 14.00);
+        assert!(pricing.matches("gpt-5.2"));
+        assert!(pricing.matches("gpt-5.2-something"));
+        assert!(!pricing.matches("gpt-512"));
+        assert!(!pricing.matches("gpt-5x2"));
+    }
+
+    #[test]
+    fn test_dot_escape_gemini_versions() {
+        // Gemini patterns use \\. for version dots
+        let pricing = ModelPricing::simple("gemini-2\\.5-flash", 0.30, 2.50);
+        assert!(pricing.matches("gemini-2.5-flash"));
+        assert!(pricing.matches("gemini-2.5-flash-001"));
+        assert!(!pricing.matches("gemini-225-flash"));
+        assert!(!pricing.matches("gemini-2x5-flash"));
+    }
+
+    #[test]
+    fn test_dot_escape_gpt_3_5() {
+        // gpt-3.5 uses \\. — should not match gpt-315 or gpt-3X5
+        let pricing = ModelPricing::simple("gpt-3\\.5-turbo", 0.50, 1.50);
+        assert!(pricing.matches("gpt-3.5-turbo"));
+        assert!(pricing.matches("gpt-3.5-turbo-0125"));
+        assert!(!pricing.matches("gpt-315-turbo"));
+    }
+
+    #[test]
+    fn test_claude_hyphen_not_dot() {
+        // Anthropic model IDs use hyphens, not dots — no \\. needed
+        assert!(calculate_cost("claude-3-5-haiku", 1000, 500).is_some());
+        assert!(calculate_cost("claude-haiku-3-5", 1000, 500).is_some());
+        assert!(calculate_cost("claude-haiku-4-5", 1000, 500).is_some());
+        assert!(calculate_cost("claude-opus-4-6", 1000, 500).is_some());
+    }
+
+    #[test]
+    fn test_new_openai_models() {
+        // Verify new models are matched
+        assert!(calculate_cost("gpt-5.1", 1000, 500).is_some());
+        assert!(calculate_cost("gpt-5-pro", 1000, 500).is_some());
+        assert!(calculate_cost("gpt-5-nano", 1000, 500).is_some());
+        assert!(calculate_cost("o1", 1000, 500).is_some());
+        assert!(calculate_cost("o1-pro", 1000, 500).is_some());
+        assert!(calculate_cost("o3-pro", 1000, 500).is_some());
+        assert!(calculate_cost("o3-mini", 1000, 500).is_some());
+    }
+
+    #[test]
+    fn test_new_gemini_models() {
+        assert!(calculate_cost("gemini-3.1-pro-preview", 1000, 500).is_some());
+        assert!(calculate_cost("gemini-3.1-flash-lite-preview", 1000, 500).is_some());
+        assert!(calculate_cost("gemini-3-flash-preview", 1000, 500).is_some());
+        assert!(calculate_cost("gemini-embedding-001", 1000, 500).is_some());
     }
 
     #[test]

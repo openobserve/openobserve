@@ -42,7 +42,7 @@ import {
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { usePanelCache } from "./usePanelCache";
 import { isEqual, omit } from "lodash-es";
-import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitValue";
+import { convertOffsetToSeconds } from "@/utils/dashboard/dateTimeUtils";
 import { useAnnotations } from "./useAnnotations";
 import useHttpStreamingSearch from "../useStreamingSearch";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";

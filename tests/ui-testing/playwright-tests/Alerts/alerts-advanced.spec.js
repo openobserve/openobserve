@@ -14,6 +14,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 const TEST_STREAM = 'e2e_automate';
 
@@ -31,7 +32,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         await navigateToBase(page);
         pm = new PageManager(page);
 
-        const alertsUrl = `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`;
+        const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
         await page.goto(alertsUrl);
         await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
         await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
@@ -61,7 +62,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         await pm.alertDestinationsPage.createDestination(destinationName, webhookUrl, templateName);
         testLogger.info('Destination created', { destinationName });
 
-        const alertsUrl = `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`;
+        const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
         await page.goto(alertsUrl);
         await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
@@ -98,18 +99,15 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         testLogger.info('Destination created', { destinationName });
 
         // Navigate back to alerts page
-        const alertsUrl = `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`;
+        const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
         await page.goto(alertsUrl);
         await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
         // Verifies: multiple conditions can be added, AND is default, can toggle to OR
         const result = await pm.alertsPage.testConditionOperatorToggle(TEST_STREAM, uniqueSuffix);
 
-        if (result.toggleSuccessful) {
-            testLogger.info('Successfully toggled condition operator from AND to OR');
-        } else {
-            testLogger.warn('Toggle operator test completed with warnings', { message: result.message });
-        }
+        expect(result.toggleSuccessful, `Condition operator toggle failed: ${result.message || 'unknown reason'}`).toBe(true);
+        testLogger.info('Successfully toggled condition operator from AND to OR');
     });
 
     // ==================== BULK OPERATIONS TESTS ====================
@@ -134,7 +132,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         await pm.alertDestinationsPage.createDestination(destinationName, webhookUrl, templateName);
         testLogger.info('Destination created', { destinationName });
 
-        const alertsUrl = `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`;
+        const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
         await page.goto(alertsUrl);
         await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
@@ -189,7 +187,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         await pm.alertDestinationsPage.createDestination(destinationName, webhookUrl, templateName);
         testLogger.info('Destination created', { destinationName });
 
-        const alertsUrl = `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`;
+        const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
         await page.goto(alertsUrl);
         await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 

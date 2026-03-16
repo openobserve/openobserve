@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 33;
+pub const DB_SCHEMA_VERSION: u64 = 34;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1026,6 +1026,12 @@ pub struct Common {
         default = "Basic cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM="
     )]
     pub tracing_header_value: String,
+    #[env_config(
+        name = "ZO_TRACING_EXTRA_ENVS",
+        default = "",
+        help = "Comma-separated list of environment variable names to include as resource attributes in traces."
+    )]
+    pub tracing_extra_envs: String,
     #[env_config(name = "ZO_TELEMETRY", default = true)]
     pub telemetry_enabled: bool,
     #[env_config(name = "ZO_TELEMETRY_URL", default = "https://e1.zinclabs.dev")]
@@ -1309,6 +1315,12 @@ pub struct Common {
         help = "enable ingestion error logs reporting"
     )]
     pub ingestion_log_enabled: bool,
+    #[env_config(
+        name = "ZO_ENABLE_CROSS_LINKING",
+        default = false,
+        help = "Enable cross-linking feature for drill-down links on log/trace records"
+    )]
+    pub enable_cross_linking: bool,
 }
 
 impl Common {
@@ -1487,6 +1499,8 @@ pub struct Limit {
     pub job_runtime_blocking_worker_num: usize, // equals to 512 if 0
     #[env_config(name = "ZO_JOB_RUNTIME_SHUTDOWN_TIMEOUT", default = 10)] // seconds
     pub job_runtime_shutdown_timeout: u64,
+    #[env_config(name = "ZO_WAL_RUNTIME_WORKER_NUM", default = 0)]
+    pub wal_runtime_worker_num: usize, // equals to mem_table_bucket_num if 0
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // seconds
     pub calculate_stats_interval: u64,
     #[env_config(name = "ZO_CALCULATE_STATS_STEP_LIMIT_SECS", default = 600)] // seconds
@@ -1880,20 +1894,6 @@ pub struct Log {
     // logger timestamp local setup, eg: %Y-%m-%dT%H:%M:%SZ
     #[env_config(name = "ZO_LOG_LOCAL_TIME_FORMAT", default = "")]
     pub local_time_format: String,
-    #[env_config(name = "ZO_EVENTS_ENABLED", default = false)]
-    pub events_enabled: bool,
-    #[env_config(
-        name = "ZO_EVENTS_AUTH",
-        default = "cm9vdEBleGFtcGxlLmNvbTpUZ0ZzZFpzTUZQdzg2SzRK"
-    )]
-    pub events_auth: String,
-    #[env_config(
-        name = "ZO_EVENTS_EP",
-        default = "https://api.openobserve.ai/api/debug/events/_json"
-    )]
-    pub events_url: String,
-    #[env_config(name = "ZO_EVENTS_BATCH_SIZE", default = 10)]
-    pub events_batch_size: usize,
 }
 
 #[derive(Serialize, Debug, EnvConfig, Default)]
@@ -2621,6 +2621,13 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!(
             "Either grpc or http url should be set when enabling tracing"
         ));
+    }
+
+    // If tracing_extra_envs is empty, reset to default value
+    if cfg.common.tracing_extra_envs.is_empty() {
+        cfg.common.tracing_extra_envs =
+            "K8S_CLUSTER,K8S_NAMESPACE_NAME,K8S_NODE_NAME,K8S_CONTAINER_NAME,K8S_POD_NAME"
+                .to_string();
     }
 
     // HACK instance_name

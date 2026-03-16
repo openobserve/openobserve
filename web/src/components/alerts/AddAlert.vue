@@ -447,6 +447,7 @@ import {
   getUUID,
   getTimezoneOffset,
   b64DecodeUnicode,
+  smartDecodeVrlFunction,
   isValidResourceName,
   getTimezonesByOffset,
 } from "@/utils/zincutils";
@@ -761,11 +762,9 @@ export default defineComponent({
       if (!formData.value.query_condition.vrl_function) {
         return "";
       }
-      try {
-        return b64DecodeUnicode(formData.value.query_condition.vrl_function);
-      } catch (e) {
-        return formData.value.query_condition.vrl_function;
-      }
+      // formData already has decoded VRL (decoded at load time in created() hook)
+      // Just return it directly, no need to decode again
+      return formData.value.query_condition.vrl_function;
     });
 
     const editorData = ref("");
@@ -2115,6 +2114,20 @@ export default defineComponent({
         return; // Stop navigation if validation fails
       }
 
+      // Anomaly Detection selected: leave the alert wizard and go to the dedicated wizard,
+      // carrying stream_type and stream_name forward as query params.
+      if (formData.value.is_real_time === 'anomaly' && wizardStep.value === 1) {
+        router.push({
+          name: "addAnomalyDetection",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+            stream_type: formData.value.stream_type || undefined,
+            stream_name: formData.value.stream_name || undefined,
+          },
+        });
+        return;
+      }
+
       if (formData.value.is_real_time === 'true') {
         // For real-time alerts: 1 -> 2 -> 4 -> 6 (skip 3 and 5)
         if (wizardStep.value === 2) {
@@ -2480,7 +2493,8 @@ export default defineComponent({
 
       if (this.formData.query_condition.vrl_function) {
         this.showVrlFunction = true;
-        this.formData.query_condition.vrl_function = b64DecodeUnicode(
+        // Use smart decoder to handle both single and double-encoded VRL (backwards compatibility)
+        this.formData.query_condition.vrl_function = smartDecodeVrlFunction(
           this.formData.query_condition.vrl_function,
         );
       }

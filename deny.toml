@@ -21,6 +21,7 @@ ignore = [
 exceptions = [
     # We should probably NOT bundle CA certs but use the OS ones.
     { name = "webpki-roots", allow = ["MPL-2.0","CDLA-Permissive-2.0"] },
+    { name = "webpki-root-certs", allow = ["CDLA-Permissive-2.0"] }, # transitive dep via rustls-platform-verifier
     { name = "openobserve", allow = ["AGPL-3.0"] },
     { name = "config", allow = ["AGPL-3.0"] },
     { name = "infra", allow = ["AGPL-3.0"] },
@@ -28,6 +29,7 @@ exceptions = [
     { name = "wal", allow = ["AGPL-3.0"] },
     { name = "proto", allow = ["AGPL-3.0"] },
     { name = "flight", allow = ["AGPL-3.0"] },
+    { name = "tantivy_utils", allow = ["AGPL-3.0"] },
     { name = "report_server", allow = ["AGPL-3.0"] },
     { name = "arrayref", allow = ["BSD-2-Clause"] },
     { name = "mach", allow = ["BSD-2-Clause"] },

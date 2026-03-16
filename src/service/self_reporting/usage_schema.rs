@@ -20,6 +20,7 @@ use config::{
         self_reporting::usage::{self},
         stream::StreamType,
     },
+    utils::schema::schema_eq,
 };
 use dashmap::DashSet;
 use infra;
@@ -113,7 +114,7 @@ async fn initialize_usage_stream_schema(org_id: &str) -> Result<()> {
 
     if infra::schema::get(org_id, stream_name, stream_type)
         .await
-        .is_ok_and(|ref schema| schema.eq(&expected_schema))
+        .is_ok_and(|ref schema| schema_eq(schema, &expected_schema))
     {
         // Stream already exists with all fields
         log::debug!(
@@ -122,7 +123,7 @@ async fn initialize_usage_stream_schema(org_id: &str) -> Result<()> {
         return Ok(());
     }
     // Create the schema using merge (which creates if doesn't exist)
-    match infra::schema::merge(
+    match crate::service::db::schema::merge(
         org_id,
         stream_name,
         stream_type,

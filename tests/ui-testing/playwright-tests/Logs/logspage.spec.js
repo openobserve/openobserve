@@ -4,50 +4,25 @@ const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
 const logsdata = require("../../../test-data/logs_data.json");
 const { waitUtils } = require('../utils/wait-helpers.js');
+const { ingestTestData: _ingestData } = require('../utils/data-ingestion.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 // Utility Functions
 
 // Legacy login function replaced by global authentication via navigateToBase
 
 async function ingestTestData(page) {
-  const orgId = process.env["ORGNAME"];
-  const streamName = "e2e_automate";
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
-
-  const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(logsdata)
-    });
-    return await fetchResponse.json();
-  }, {
-    url: process.env.INGESTION_URL,
-    headers: headers,
-    orgId: orgId,
-    streamName: streamName,
-    logsdata: logsdata
-  });
-  testLogger.debug('API response received', { response });
+  await _ingestData(page);
 }
 
-async function applyQueryButton(page) {
-  // click on the run query button
-  // Type the value of a variable into an input field
-  const search = page.waitForResponse(logData.applyQuery);
-  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace 3000ms hard wait
-  await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
-    force: true,
-  });
-  // get the data from the search variable
-  await expect.poll(async () => (await search).status()).toBe(200);
-  // await search.hits.FIXME_should("be.an", "array");
+async function applyQueryButton(pm) {
+  await Promise.all([
+    pm.page.waitForResponse(
+      resp => resp.url().includes('/_search') && resp.status() === 200,
+      { timeout: 60000 }
+    ),
+    pm.logsPage.clickRefreshButton(),
+  ]);
 }
 
 function removeUTFCharacters(text) {
@@ -75,10 +50,10 @@ test.describe("Logs Page testcases", () => {
 
     // Navigate to logs page and setup for testing
     await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`
     );
     await pm.logsPage.selectStream("e2e_automate");
-    await applyQueryButton(page);
+    await applyQueryButton(pm);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     testLogger.info('Logs page test setup completed');
@@ -122,13 +97,13 @@ test.describe("Logs Page testcases", () => {
     // Strategic 500ms wait for date picker DOM stabilization - this is functionally necessary
     await page.waitForTimeout(500);
     await pm.logsPage.clickRelative6WeeksButton();
-    await applyQueryButton(page);
+    await applyQueryButton(pm);
 
     await pm.logsPage.toggleVrlEditor();
     await pm.logsPage.clickVrlEditor();
     // Strategic 500ms wait for VRL editor DOM stabilization - this is functionally necessary
     await page.waitForTimeout(500);
-    await applyQueryButton(page);
+    await applyQueryButton(pm);
     await pm.logsPage.expectWarningElementHidden();
   
     await pm.logsPage.clickTableRowExpandMenu();
@@ -190,7 +165,7 @@ test.describe("Logs Page testcases", () => {
     // Strategic 500ms wait for date picker DOM stabilization - this is functionally necessary
     await page.waitForTimeout(500);
     await pm.logsPage.clickRelative6WeeksButton();
-    await applyQueryButton(page);
+    await applyQueryButton(pm);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace long hard wait
     await pm.logsPage.expectSearchListVisible();
     // Strategic 500ms wait for UI stabilization - this is functionally necessary
@@ -220,7 +195,7 @@ test.describe("Logs Page testcases", () => {
     // Strategic 500ms wait for live mode dropdown DOM stabilization - this is functionally necessary
     await page.waitForTimeout(500);
     await pm.logsPage.clickLiveMode5Sec();
-    await applyQueryButton(page);
+    await applyQueryButton(pm);
     
     testLogger.info('Live mode functionality test completed');
   });
@@ -231,8 +206,7 @@ test.describe("Logs Page testcases", () => {
     testLogger.info('Testing VRL toggle field visibility');
 
     // Check initial state of VRL editor
-    const fnEditorInput = page.locator('[data-test="logs-vrl-function-editor"]').locator('.inputarea');
-    const isInitiallyVisible = await fnEditorInput.isVisible().catch(() => false);
+    const isInitiallyVisible = await pm.logsPage.isVrlEditorInputVisible();
 
     if (isInitiallyVisible) {
       // VRL toggle is ON - verify field is visible, then turn it OFF and verify not visible
@@ -280,13 +254,13 @@ test.describe("Logs Page testcases", () => {
     await page.waitForTimeout(500);
     await pm.logsPage.clickRelative6WeeksButton();
     await pm.logsPage.expectTextVisible("Past 6 Weeks");
-    await applyQueryButton(page);
+    await applyQueryButton(pm);
     await pm.logsPage.clickDateTimeButton();
     // Strategic 500ms wait for date picker DOM stabilization - this is functionally necessary
     await page.waitForTimeout(500);
     await pm.logsPage.clickPast6DaysButton();
     await pm.logsPage.expectTextVisible("Past 6 Days");
-    await applyQueryButton(page);
+    await applyQueryButton(pm);
     
     testLogger.info('Date-time UI switching test completed');
   });
@@ -317,7 +291,7 @@ test.describe("Logs Page testcases", () => {
     // Strategic 500ms wait for date picker DOM stabilization - this is functionally necessary
     await page.waitForTimeout(500);
     await pm.logsPage.clickRelative15MinButton();
-    await applyQueryButton(page);
+    await applyQueryButton(pm);
     await pm.logsPage.clickMenuLinkTracesItem();
     // Strategic 1000ms wait for navigation to traces - this is functionally necessary
     await page.waitForTimeout(1000);

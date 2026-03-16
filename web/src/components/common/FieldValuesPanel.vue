@@ -62,10 +62,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-for="value in displayValues" :key="value.key">
         <q-list dense>
           <q-item
-              tag="label"
-              class="q-pr-none"
-              :data-test="`logs-search-subfield-add-${fieldName}-${value.key}`"
-            >
+            tag="label"
+            class="q-pr-none"
+            :data-test="`logs-search-subfield-add-${fieldName}-${value.key}`"
+          >
             <!-- Checkbox for multi-select -->
             <q-checkbox
               v-if="showMultiSelect"
@@ -79,14 +79,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div
               class="flex row wrap justify-between"
-              :style="showMultiSelect ? 'width: calc(100% - 4.25rem)' : 'width: 100%'"
+              :style="
+                showMultiSelect ? 'width: calc(100% - 4.25rem)' : 'width: 100%'
+              "
             >
               <div
                 :title="value.key"
                 class="ellipsis q-pr-xs"
                 style="width: calc(100% - 3.125rem)"
               >
-                {{ value.key }}
+                {{ value.label ?? value.key }}
               </div>
               <div
                 :title="String(value.count)"
@@ -107,24 +109,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
                 size="0.25rem"
-                @click.stop="emit('add-search-term', fieldName, value.key, 'include')"
+                @click.stop="
+                  emit('add-search-term', fieldName, value.key, 'include')
+                "
                 title="Include Term"
                 round
                 :data-test="`log-search-subfield-list-equal-${fieldName}-field-btn`"
               >
-                <q-icon class="tw:h-[0.5rem]! tw:w-[0.5rem]! tw:m-[0.15rem]!">
+                <q-icon
+                  v-if="fieldName === 'duration'"
+                  :name="outlinedArrowForwardIos"
+                  class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
+                />
+                <q-icon
+                  v-else
+                  class="tw:h-[0.5rem]! tw:w-[0.5rem]! tw:m-[0.15rem]!"
+                >
                   <EqualIcon />
                 </q-icon>
               </q-btn>
               <q-btn
                 class="o2-custom-button-hover tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
                 size="0.25rem"
-                @click.stop="emit('add-search-term', fieldName, value.key, 'exclude')"
+                @click.stop="
+                  emit('add-search-term', fieldName, value.key, 'exclude')
+                "
                 title="Exclude Term"
                 round
                 :data-test="`log-search-subfield-list-not-equal-${fieldName}-field-btn`"
               >
-                <q-icon class="tw:h-[0.5rem]! tw:w-[0.5rem]! tw:m-[0.15rem]!">
+                <q-icon
+                  v-if="fieldName === 'duration'"
+                  :name="outlinedArrowBackIos"
+                  class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
+                />
+                <q-icon
+                  v-else
+                  class="tw:h-[0.5rem]! tw:w-[0.5rem]! tw:m-[0.15rem]!"
+                >
                   <NotEqualIcon />
                 </q-icon>
               </q-btn>
@@ -214,11 +236,15 @@ import { computed, ref, watch } from "vue";
 import { watchDebounced } from "@vueuse/core";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import {
+  outlinedArrowBackIos,
+  outlinedArrowForwardIos,
+} from "@quasar/extras/material-icons-outlined";
 import { formatLargeNumber } from "@/utils/zincutils";
 
 interface FieldValues {
   isLoading: boolean;
-  values: { key: string; count: number }[];
+  values: { key: string; count: number; label?: string }[];
   errMsg?: string;
   hasMore?: boolean;
 }
@@ -250,7 +276,7 @@ const emit = defineEmits<{
 
 const selectedValues = ref<string[]>([]);
 const valueSearchTerm = ref("");
-const cachedValues = ref<{ key: string; count: number }[]>([]);
+const cachedValues = ref<{ key: string; count: number; label?: string }[]>([]);
 
 // Cache original values whenever they arrive with no active search term.
 watch(

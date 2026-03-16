@@ -70,10 +70,10 @@ use crate::{
                     "end_time": 1234567900,
                     "duration": 10,
                     "trace_count": 3,
-                    "_o2_llm_usage_details_input": 100,
-                    "_o2_llm_usage_details_output": 50,
-                    "_o2_llm_usage_details_total": 150,
-                    "_o2_llm_cost_details_total": 0.005
+                    "llm_usage_tokens_input": 100,
+                    "llm_usage_tokens_output": 50,
+                    "llm_usage_tokens_total": 150,
+                    "llm_usage_cost_total": 0.005
                 }
             ]
         })),
@@ -315,10 +315,10 @@ pub async fn get_latest_sessions(
         "SELECT trace_id, \
         min(start_time) as trace_start_time, \
         max(end_time) as trace_end_time, \
-        sum(_o2_llm_usage_details_input) as llm_usage_details_input, \
-        sum(_o2_llm_usage_details_output) as llm_usage_details_output, \
-        sum(_o2_llm_usage_details_total) as llm_usage_details_total, \
-        sum(_o2_llm_cost_details_total) as llm_cost_details_total \
+        sum(llm_usage_tokens_input) as llm_usage_details_input, \
+        sum(llm_usage_tokens_output) as llm_usage_details_output, \
+        sum(llm_usage_tokens_total) as llm_usage_details_total, \
+        sum(llm_usage_cost_total) as llm_cost_details_total \
         FROM \"{stream_name}\" \
         WHERE trace_id IN ('{trace_ids_sql}') \
         GROUP BY trace_id"
@@ -433,10 +433,10 @@ pub async fn get_latest_sessions(
             end_time: session_end_time,
             duration,
             trace_count: trace_ids.len() as u16,
-            _o2_llm_usage_details_input: usage_input,
-            _o2_llm_usage_details_output: usage_output,
-            _o2_llm_usage_details_total: usage_total,
-            _o2_llm_cost_details_total: cost_total,
+            llm_usage_tokens_input: usage_input,
+            llm_usage_tokens_output: usage_output,
+            llm_usage_tokens_total: usage_total,
+            llm_usage_cost_total: cost_total,
         });
     }
     sessions_data.sort_by(|a, b| b.start_time.cmp(&a.start_time));
@@ -492,8 +492,8 @@ struct SessionResponseItem {
     end_time: i64,
     duration: i64,
     trace_count: u16,
-    _o2_llm_usage_details_input: i64,
-    _o2_llm_usage_details_output: i64,
-    _o2_llm_usage_details_total: i64,
-    _o2_llm_cost_details_total: f64,
+    llm_usage_tokens_input: i64,
+    llm_usage_tokens_output: i64,
+    llm_usage_tokens_total: i64,
+    llm_usage_cost_total: f64,
 }

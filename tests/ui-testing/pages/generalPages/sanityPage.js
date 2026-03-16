@@ -1,6 +1,7 @@
 import { expect } from '@playwright/test';
 const { waitUtils } = require('../../playwright-tests/utils/wait-helpers.js');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
 export class SanityPage {
     constructor(page) {
@@ -8,7 +9,7 @@ export class SanityPage {
         
         // Quick Mode locators
         this.quickModeToggleButton = '[data-test="logs-search-bar-quick-mode-toggle-btn"]';
-        this.quickModeToggleInner = '[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner';
+        this.quickModeToggleInner = '[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner';
         
         // Fields and Query Editor locators
         this.allFieldsButton = '[data-test="logs-all-fields-btn"]';
@@ -169,8 +170,9 @@ export class SanityPage {
 
     // Pagination Methods
     async displayResultTextAndPagination() {
+        const searchPromise = this.page.waitForResponse(resp => resp.url().includes('/_search'), { timeout: 30000 });
         await this.page.locator(this.refreshButton).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await searchPromise;
 
         await expect(this.page.getByText("Showing 1 to 50")).toBeVisible({ timeout: 15000 });
         await this.page.waitForTimeout(1000);
@@ -186,13 +188,20 @@ export class SanityPage {
     }
 
     // Histogram Methods
-    async toggleHistogramOffAndOn() {
+    async clickHistogramToggle() {
+        // Histogram toggle is now inside the utilities hamburger menu
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
         await this.page.locator(this.histogramToggleButton).click();
+    }
+
+    async toggleHistogramOffAndOn() {
+        await this.clickHistogramToggle();
         await this.page.getByText("Showing 1").click();
         expect(
             await this.page.locator('[data-test="logs-search-result-bar-chart"]').isVisible()
         ).toBe(false);
-        await this.page.locator(this.histogramToggleDiv).nth(2).click();
+        await this.clickHistogramToggle();
         await this.page.waitForTimeout(2000);
         await expect(this.page.getByRole('heading', { name: 'No data found for histogram.' })).toBeVisible();
     }
@@ -273,8 +282,9 @@ export class SanityPage {
 
     // Query Limit Methods
     async displayLimitedResults() {
+        const initialSearchPromise = this.page.waitForResponse(resp => resp.url().includes('/_search'), { timeout: 30000 });
         await this.page.locator(this.refreshButton).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await initialSearchPromise;
         
         await this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name }).locator('div').nth(2).click();
         
@@ -288,13 +298,13 @@ export class SanityPage {
         await queryEditor.locator('.inputarea').fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
         
         await this.page.waitForLoadState('domcontentloaded');
+        const limitSearchPromise = this.page.waitForResponse(resp => resp.url().includes('/_search'), { timeout: 30000 });
         await this.page.locator(this.refreshButton).click({ force: true });
-        
+        await limitSearchPromise;
+
         await expect(this.page.getByText(/Showing 1 to 5/)).toBeVisible({ timeout: 15000 });
 
-        // Reset filters is now inside utilities menu, so open menu first
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(300);
+        // Reset filters button is now directly on the toolbar
         await this.page.locator(this.resetFiltersButton).click();
         await this.page.waitForLoadState('domcontentloaded');
     }
@@ -610,10 +620,11 @@ export class SanityPage {
 
     // Result Summary Methods
     async displayPaginationAfterResultSummary() {
+        const searchPromise = this.page.waitForResponse(resp => resp.url().includes('/_search'), { timeout: 30000 });
         await this.page.locator(this.refreshButton).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        
-        await expect(this.page.locator(this.resultColumnSource)).toBeVisible({ timeout: 10000 });
+        await searchPromise;
+
+        await expect(this.page.locator(this.resultColumnSource)).toBeVisible({ timeout: 15000 });
         await this.page.locator(this.resultColumnSource).click();
         
         await expect(this.page.locator(this.closeDialog)).toBeVisible({ timeout: 10000 });
@@ -659,9 +670,8 @@ export class SanityPage {
     async ingest70FieldsData() {
         testLogger.step('Ingesting 70 fields data for schema pagination test');
 
-        const orgId = process.env["ORGNAME"];
+        const orgId = getOrgIdentifier();
         const streamName = "e2e_automate";
-        const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
 
         // Read the 70 fields JSON data
         const fs = require('fs');
@@ -673,11 +683,11 @@ export class SanityPage {
         testLogger.debug(`Ingesting data with ${Object.keys(data70Fields[0]).length} fields`);
 
         const headers = {
-            "Authorization": `Basic ${basicAuthCredentials}`,
+            ...getAuthHeaders(),
             "Content-Type": "application/json",
         };
 
-        const fetchResponse = await fetch(
+        const response = await fetch(
             `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
             {
                 method: "POST",
@@ -687,10 +697,9 @@ export class SanityPage {
         );
 
         try {
-            const response = await fetchResponse;
             const contentType = response.headers.get("content-type");
             if (contentType && contentType.includes("application/json")) {
-                const jsonData = await response.json();
+                await response.json();
                 testLogger.info(`70 fields data ingestion status: ${response.status}`);
             } else {
                 const textData = await response.text();
@@ -833,30 +842,14 @@ export class SanityPage {
         const refreshButton = this.page.locator(this.refreshButton);
         await expect(refreshButton).toBeVisible({ timeout: 15000 });
         await expect(refreshButton).toBeEnabled({ timeout: 10000 });
-        
-        try {
-            await refreshButton.click({ timeout: 10000 });
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
-            await this.page.waitForTimeout(2000);
-        } catch (error) {
-            console.warn('Refresh button click failed, retrying:', error.message);
-            await this.page.waitForTimeout(2000);
-            await refreshButton.click({ timeout: 10000 });
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
-            await this.page.waitForTimeout(2000);
-        }
 
-        // Turn off histogram with error handling
-        try {
-            const histogramToggle = this.page.locator(this.histogramToggleDiv).nth(2);
-            await expect(histogramToggle).toBeVisible({ timeout: 15000 });
-            await histogramToggle.click({ timeout: 10000 });
-            await this.page.waitForTimeout(1000); // Brief wait for toggle effect
-        } catch (error) {
-            console.warn('Histogram toggle click failed, retrying:', error.message);
-            await this.page.waitForTimeout(2000);
-            await this.page.locator(this.histogramToggleDiv).nth(2).click({ timeout: 10000 });
-        }
+        const searchPromise = this.page.waitForResponse(resp => resp.url().includes('/_search'), { timeout: 30000 });
+        await refreshButton.click({ timeout: 10000 });
+        await searchPromise;
+
+        // Turn off histogram (now inside utilities hamburger menu)
+        await this.clickHistogramToggle();
+        await this.page.waitForTimeout(1000);
         
         // Click on result column with error handling
         try {
@@ -898,8 +891,8 @@ export class SanityPage {
     }
 
     async displayPaginationWhenOnlySQLWithResult() {
-        // Turn off histogram
-        await this.page.locator(this.histogramToggleDiv).nth(2).click();
+        // Turn off histogram (now inside utilities hamburger menu)
+        await this.clickHistogramToggle();
         await this.page.waitForTimeout(1000);
 
         // Enable SQL mode
@@ -907,11 +900,13 @@ export class SanityPage {
         await this.page.waitForTimeout(1000);
 
         // Click run query button
+        const sqlSearchPromise = this.page.waitForResponse(resp => resp.url().includes('/_search'), { timeout: 30000 });
         await this.page.locator(this.refreshButton).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
-        await this.page.waitForTimeout(2000);
+        await sqlSearchPromise;
+        await this.page.waitForTimeout(1000);
 
         // Click on result column
+        await expect(this.page.locator(this.timestampColumn)).toBeVisible({ timeout: 15000 });
         await this.page.locator(this.timestampColumn).click();
         await this.page.waitForTimeout(2000);
 

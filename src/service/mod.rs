@@ -19,6 +19,8 @@ use opentelemetry::trace::TraceContextExt;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 pub mod alerts;
+#[cfg(feature = "enterprise")]
+pub mod anomaly_detection;
 pub mod cluster_info;
 pub mod compact;
 pub mod dashboards;
@@ -48,6 +50,8 @@ pub mod runtime_metrics;
 pub mod schema;
 pub mod search;
 pub mod tantivy;
+#[cfg(feature = "cloud")]
+pub mod trial_quota;
 
 #[cfg(feature = "enterprise")]
 pub mod search_jobs;

@@ -201,7 +201,7 @@ pub async fn get_incident(Path((org_id, incident_id)): Path<(String, String)>) -
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update an incident's title, severity, or status", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"description": "Update an incident's title or severity. Status changes (resolve, acknowledge, reopen) are NOT supported via this tool — they must be performed by a human in the UI.", "category": "alerts"}))
     )
 )]
 pub async fn update_incident(
@@ -248,7 +248,21 @@ pub async fn update_incident(
             )
             .await
             {
-                Ok(incident) => MetaHttpResponse::json(incident),
+                Ok(incident) => {
+                    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+                    let cooldown = get_o2_config().incidents.reanalysis_cooldown_minutes;
+                    let events = infra::table::incident_events::get(&org_id, &incident_id)
+                        .await
+                        .unwrap_or_default();
+                    let in_flight = crate::service::alerts::incidents::is_analysis_in_flight(
+                        &events,
+                        cooldown * 2,
+                    );
+                    MetaHttpResponse::json(UpdateSeverityResponse {
+                        incident,
+                        analysis_in_flight: in_flight,
+                    })
+                }
                 Err(e) => {
                     if e.to_string().contains("not found") {
                         MetaHttpResponse::not_found("Incident not found")
@@ -322,6 +336,14 @@ pub async fn get_incident_stats(Path(org_id): Path<String>) -> Response {
     MetaHttpResponse::json(stats)
 }
 
+/// Response for severity update — wraps Incident and signals whether analysis is running
+#[derive(Debug, Serialize, ToSchema)]
+pub struct UpdateSeverityResponse {
+    #[serde(flatten)]
+    pub incident: config::meta::alerts::incidents::Incident,
+    pub analysis_in_flight: bool,
+}
+
 /// Response for RCA analysis
 #[derive(Debug, Serialize, ToSchema)]
 pub struct RcaResponse {
@@ -334,6 +356,9 @@ pub struct TriggerRcaQuery {
     /// Use streaming response (default: false)
     #[serde(default)]
     pub stream: bool,
+    /// Treat this as a user-initiated reanalysis — bypasses cooldown (default: false)
+    #[serde(default)]
+    pub reanalysis: bool,
 }
 
 #[cfg(feature = "enterprise")]
@@ -364,6 +389,7 @@ pub struct TriggerRcaQuery {
 )]
 pub async fn trigger_incident_rca(
     Path((org_id, incident_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
     Query(query): Query<TriggerRcaQuery>,
 ) -> Response {
     use o2_enterprise::enterprise::{
@@ -391,20 +417,66 @@ pub async fn trigger_incident_rca(
             .unwrap();
     }
 
+    // In-flight guard
+    {
+        let cooldown = o2_config.incidents.reanalysis_cooldown_minutes;
+        let events = infra::table::incident_events::get(&org_id, &incident_id)
+            .await
+            .unwrap_or_default();
+        if crate::service::alerts::incidents::is_analysis_in_flight(&events, cooldown * 2) {
+            return MetaHttpResponse::bad_request("Analysis already in progress");
+        }
+    }
+
+    // AI credit deduction is handled inside trigger_rca_for_incident at the service layer
+    // (cloud-only). Do NOT deduct here — it would cause double charging.
+
+    // Emit AIAnalysisBegin — all error paths below this point must emit Complete to
+    // clear the in-flight guard, otherwise it stays locked until the stale threshold.
+    let _ = infra::table::incident_events::append(
+        &org_id,
+        &incident_id,
+        config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+    )
+    .await;
+
+    // Helper to emit AIAnalysisComplete on error paths.
+    macro_rules! clear_inflight_and_return {
+        ($resp:expr) => {{
+            let _ = infra::table::incident_events::append(
+                &org_id,
+                &incident_id,
+                config::meta::alerts::incidents::IncidentEvent::ai_analysis_complete(),
+            )
+            .await;
+            return $resp;
+        }};
+    }
+
     // Get incident with alerts
     let incident =
         match crate::service::alerts::incidents::get_incident_with_alerts(&org_id, &incident_id)
             .await
         {
             Ok(Some(i)) => i,
-            Ok(None) => return MetaHttpResponse::not_found("Incident not found"),
-            Err(e) => return MetaHttpResponse::internal_error(e),
+            Ok(None) => {
+                clear_inflight_and_return!(MetaHttpResponse::not_found("Incident not found"))
+            }
+            Err(e) => clear_inflight_and_return!(MetaHttpResponse::internal_error(e)),
         };
 
-    // Build RCA context
+    // Build RCA context — include previous analysis so the agent can build on it
+    let previous_analysis = incident
+        .incident
+        .topology_context
+        .as_ref()
+        .and_then(|t| t.suggested_root_cause.as_deref())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
     let context = IncidentRcaContext {
         incident_id: incident.incident.id.clone(),
         org_id: incident.incident.org_id.clone(),
+        previous_analysis,
     };
 
     // Create RCA agent client
@@ -416,30 +488,68 @@ pub async fn trigger_incident_rca(
     ) {
         Ok(c) => c,
         Err(e) => {
-            return MetaHttpResponse::internal_error(format!("Failed to create RCA client: {e}"));
+            clear_inflight_and_return!(MetaHttpResponse::internal_error(format!(
+                "Failed to create RCA client: {e}"
+            )))
         }
     };
 
     // Check agent health
     if let Err(e) = client.health().await {
+        clear_inflight_and_return!(
+            axum::response::Response::builder()
+                .status(axum::http::StatusCode::SERVICE_UNAVAILABLE)
+                .header(axum::http::header::CONTENT_TYPE, "application/json")
+                .body(axum::body::Body::from(
+                    serde_json::json!({"error": format!("RCA agent not available: {e}")})
+                        .to_string(),
+                ))
+                .unwrap()
+        )
+    }
+
+    // User-initiated reanalysis: fire-and-forget — spawn agent in background, return 202
+    // immediately. Begin was already emitted above; the spawn passes begin_already_emitted=true
+    // to skip duplicate emission and the in-flight/cooldown guards.
+    if query.reanalysis {
+        let org_id_bg = org_id.clone();
+        let incident_id_bg = incident_id.clone();
+        let user_email_bg = user_email.user_id.clone();
+        tokio::spawn(async move {
+            if let Err(e) = crate::service::alerts::incidents::trigger_rca_for_incident(
+                org_id_bg.clone(),
+                incident_id_bg.clone(),
+                true,
+                true,
+                user_email_bg,
+            )
+            .await
+            {
+                log::warn!(
+                    "[INCIDENTS::RCA] Background reanalysis failed for {incident_id_bg}: {e}"
+                );
+            }
+        });
+
         return axum::response::Response::builder()
-            .status(axum::http::StatusCode::SERVICE_UNAVAILABLE)
+            .status(axum::http::StatusCode::ACCEPTED)
             .header(axum::http::header::CONTENT_TYPE, "application/json")
             .body(axum::body::Body::from(
-                serde_json::json!({"error": format!("RCA agent not available: {e}")}).to_string(),
+                serde_json::json!({"message": "Analysis started"}).to_string(),
             ))
             .unwrap();
     }
 
     // Choose streaming or non-streaming based on query parameter
     if query.stream {
-        // Start streaming RCA
+        // AIAnalysisComplete is emitted inside the stream closure (rca_service.rs)
+        // after the stream is fully drained, not here.
         let stream = match rca_service::analyze_incident_stream(client, context).await {
             Ok(s) => s,
             Err(e) => {
-                return MetaHttpResponse::internal_error(format!(
+                clear_inflight_and_return!(MetaHttpResponse::internal_error(format!(
                     "Failed to start RCA stream: {e}"
-                ));
+                )))
             }
         };
 
@@ -453,9 +563,19 @@ pub async fn trigger_incident_rca(
         let rca_content = match rca_service::analyze_incident(client, context).await {
             Ok(content) => content,
             Err(e) => {
-                return MetaHttpResponse::internal_error(format!("Failed to perform RCA: {e}"));
+                clear_inflight_and_return!(MetaHttpResponse::internal_error(format!(
+                    "Failed to perform RCA: {e}"
+                )))
             }
         };
+
+        // Emit AIAnalysisComplete on success
+        let _ = infra::table::incident_events::append(
+            &org_id,
+            &incident_id,
+            config::meta::alerts::incidents::IncidentEvent::ai_analysis_complete(),
+        )
+        .await;
 
         MetaHttpResponse::json(RcaResponse { rca_content })
     }

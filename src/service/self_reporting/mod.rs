@@ -177,9 +177,23 @@ pub async fn report_request_usage_stats(
         ),
         org_id: org_id.to_owned(),
         request_body: request_body.to_owned(),
-        size: stats.size,
+        size: if matches!(
+            event,
+            UsageEvent::NewIncident | UsageEvent::IncidentReAnalysis
+        ) {
+            stats.records as f64
+        } else {
+            stats.size
+        },
         scan_files: stats.scan_files,
-        unit: "MB".to_owned(),
+        unit: if matches!(
+            event,
+            UsageEvent::NewIncident | UsageEvent::IncidentReAnalysis
+        ) {
+            "Count".to_owned()
+        } else {
+            "MB".to_owned()
+        },
         user_email,
         response_time: stats.response_time,
         function: stats.function,
@@ -205,6 +219,13 @@ pub async fn report_request_usage_stats(
     if !usage.is_empty() {
         publish_usage(usage).await;
     }
+}
+
+/// Public entry point for publishing usage data from other services
+/// (e.g. AI credits billing). Enqueues UsageData records for background
+/// ingestion into the _usage stream.
+pub fn report_usage(usages: Vec<UsageData>) {
+    tokio::spawn(publish_usage(usages));
 }
 
 async fn publish_usage(usages: Vec<UsageData>) {

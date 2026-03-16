@@ -65,7 +65,10 @@ const billings = {
   },
   submit_new_user_info: async ( org_identifier: string, payload: any,) => {
     return http().post(`/api/${org_identifier}/billings/new_user_attribution`, payload);
-  }
+  },
+  get_ai_usage: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/ai/usage`);
+  },
 };
 
 export default billings;

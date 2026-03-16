@@ -510,7 +510,10 @@ export default defineComponent({
           filteredFields.value = [...props.columns];
         } else {
           const needle = val.toLowerCase();
-          filteredFields.value = props.columns.filter((v: any) => v.toLowerCase().indexOf(needle) > -1);
+          filteredFields.value = props.columns.filter((v: any) => {
+            const label = typeof v === "string" ? v : v.label || v.value || "";
+            return label.toLowerCase().indexOf(needle) > -1;
+          });
         }
       });
     };
@@ -523,7 +526,10 @@ export default defineComponent({
           filteredNumericColumns.value = [...props.columns];
         } else {
           const needle = val.toLowerCase();
-          filteredNumericColumns.value = props.columns.filter((v: any) => v.toLowerCase().indexOf(needle) > -1);
+          filteredNumericColumns.value = props.columns.filter((v: any) => {
+            const label = typeof v === "string" ? v : v.label || v.value || "";
+            return label.toLowerCase().indexOf(needle) > -1;
+          });
         }
       });
     };
@@ -673,9 +679,9 @@ export default defineComponent({
 
 
     // Handler for VRL function updates from QueryEditorDialog
-    // The dialog emits the encoded value, so we just pass it through
-    const handleVrlFunctionUpdate = (encodedValue: string) => {
-      emit("update:vrlFunction", encodedValue);
+    // The dialog now emits plain text VRL (encoding happens once at save time)
+    const handleVrlFunctionUpdate = (vrlValue: string) => {
+      emit("update:vrlFunction", vrlValue);
     };
 
     // Handler for SQL validation from QueryEditorDialog
@@ -745,6 +751,15 @@ export default defineComponent({
         emit("editor-closed");
       }
     });
+
+    // Sync filtered lists when columns prop changes (async stream load)
+    watch(
+      () => props.columns,
+      (newCols) => {
+        filteredFields.value = [...newCols];
+        filteredNumericColumns.value = [...newCols];
+      }
+    );
 
     // Watch for isAggregationEnabled prop changes
     watch(

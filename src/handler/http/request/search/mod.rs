@@ -79,6 +79,7 @@ pub(crate) mod error_utils;
 pub mod multi_streams;
 pub mod query_manager;
 pub mod saved_view;
+#[cfg(feature = "enterprise")]
 pub mod search_inspector;
 pub mod search_job;
 pub mod search_stream;
@@ -179,9 +180,10 @@ async fn can_use_distinct_stream(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("is_ui_histogram" = bool, Query, description = "Whether to return histogram data for UI"),
-        ("is_multi_stream_search" = bool, Query, description = "Indicate is search is for multi stream"),
-        ("validate" = bool, Query, description = "Validate query fields against stream schema and User-Defined Schema (UDS). When enabled, returns error if queried fields are not in schema or not allowed by UDS"),
+        ("type" = Option<String>, Query, description = "Stream type. Must be one of: logs, metrics, traces. Defaults to logs if not specified."),
+        ("is_ui_histogram" = Option<bool>, Query, description = "Whether to return histogram data for UI (default: false)"),
+        ("is_multi_stream_search" = Option<bool>, Query, description = "Indicate is search is for multi stream (default: false)"),
+        ("validate" = Option<bool>, Query, description = "Validate query fields against stream schema and User-Defined Schema (UDS). When enabled, returns error if queried fields are not in schema or not allowed by UDS (default: false)"),
     ),
     request_body(content = inline(Request), description = "Search query", content_type = "application/json", example = json!({
         "query": {
@@ -524,6 +526,7 @@ pub async fn search(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "stream_name name"),
+        ("type" = Option<String>, Query, description = "Stream type. Must be one of: logs, metrics, traces. Defaults to logs if not specified."),
         ("key" = i64, Query, description = "around key"),
         ("size" = i64, Query, description = "around size"),
         ("regions" = Option<String>, Query, description = "regions, split by comma"),
@@ -758,6 +761,7 @@ pub async fn around_v2(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "stream_name name"),
+        ("type" = Option<String>, Query, description = "Stream type. Must be one of: logs, metrics, traces. Defaults to logs if not specified."),
         ("fields" = String, Query, description = "fields, split by comma"),
         ("filter" = Option<String>, Query, description = "filter, eg: a=b"),
         ("keyword" = Option<String>, Query, description = "keyword, eg: abc"),
@@ -1424,8 +1428,9 @@ async fn values_v1(
         ("Authorization"= [])
     ),
     params(
-        ("enable_align_histogram" = bool, Query, description = "Enable align histogram"),
         ("org_id" = String, Path, description = "Organization name"),
+        ("type" = Option<String>, Query, description = "Stream type. Must be one of: logs, metrics, traces. Defaults to logs if not specified."),
+        ("enable_align_histogram" = bool, Query, description = "Enable align histogram"),
     ),
     request_body(content = inline(config::meta::search::SearchPartitionRequest), description = "Search query", content_type = "application/json", example = json!({
         "sql": "select * from k8s ",
@@ -1985,11 +1990,103 @@ pub async fn result_schema(
         }
     };
 
+    // Cross-linking: if enabled and requested, load and filter cross-links
+    let cross_links = if get_config().common.enable_cross_linking
+        && url_query
+            .get("cross_linking")
+            .map(|v| v == "true")
+            .unwrap_or(false)
+    {
+        use std::collections::HashSet as StdHashSet;
+
+        use crate::service::db::organization::get_org_setting;
+
+        let field_alias_map = &res_schema.field_alias_map;
+
+        // Build set of all known field names (original + alias)
+        let all_field_names: StdHashSet<String> = field_alias_map
+            .keys()
+            .cloned()
+            .chain(field_alias_map.values().cloned())
+            .collect();
+
+        // Load org-level cross-links
+        let org_links = match get_org_setting(&org_id).await {
+            Ok(settings) => settings.cross_links,
+            Err(_) => vec![],
+        };
+
+        // Load stream-level cross-links (use first stream name)
+        let stream_links = if let Some(stream_name) = resolve_stream_names(&req.query.sql)
+            .ok()
+            .and_then(|names| names.into_iter().next())
+        {
+            infra::schema::get_settings(&org_id, &stream_name, stream_type)
+                .await
+                .map(|s| s.cross_links.clone())
+                .unwrap_or_default()
+        } else {
+            vec![]
+        };
+
+        // Filter and populate alias for stream cross-links
+        let filtered_stream: Vec<_> = stream_links
+            .into_iter()
+            .filter_map(|mut link| {
+                if !link.fields.is_empty() {
+                    let matched = link
+                        .fields
+                        .iter()
+                        .any(|f| all_field_names.contains(&f.name));
+                    if !matched {
+                        return None;
+                    }
+                }
+                for field in &mut link.fields {
+                    if let Some(alias) = field_alias_map.get(&field.name) {
+                        field.alias = Some(alias.to_string());
+                    }
+                }
+                Some(link)
+            })
+            .collect();
+
+        // Filter and populate alias for org cross-links
+        let filtered_org: Vec<_> = org_links
+            .into_iter()
+            .filter_map(|mut link| {
+                if !link.fields.is_empty() {
+                    let matched = link
+                        .fields
+                        .iter()
+                        .any(|f| all_field_names.contains(&f.name));
+                    if !matched {
+                        return None;
+                    }
+                }
+                for field in &mut link.fields {
+                    if let Some(alias) = field_alias_map.get(&field.name) {
+                        field.alias = Some(alias.to_string());
+                    }
+                }
+                Some(link)
+            })
+            .collect();
+
+        Some(config::meta::search::CrossLinksResponse {
+            stream_links: filtered_stream,
+            org_links: filtered_org,
+        })
+    } else {
+        None
+    };
+
     Json(ResultSchemaResponse {
         projections: res_schema.projections,
         group_by: res_schema.group_by.into_iter().collect(),
         having: res_schema.having,
         timeseries_field: res_schema.timeseries,
+        cross_links,
     })
     .into_response()
 }

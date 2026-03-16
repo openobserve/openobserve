@@ -2,51 +2,13 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
-const logsdata = require("../../../test-data/logs_data.json");
-
-// Utility Functions
-
-// Legacy login function replaced by global authentication via navigateToBase
-
-async function ingestTestData(page) {
-  const orgId = process.env["ORGNAME"];
-  const streamName = "e2e_automate";
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
-
-  const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(logsdata)
-    });
-    return await fetchResponse.json();
-  }, {
-    url: process.env.INGESTION_URL,
-    headers: headers,
-    orgId: orgId,
-    streamName: streamName,
-    logsdata: logsdata
-  });
-  testLogger.debug('API response received', { response });
-}
-async function applyQueryButton(page) {
-  // click on the run query button
-  // Type the value of a variable into an input field
-  const search = page.waitForResponse(logData.applyQuery);
+const { ingestTestData } = require('../utils/data-ingestion.js');
+async function applyQueryButton(pm) {
+  const search = pm.page.waitForResponse(logData.applyQuery);
   // Strategic 1000ms wait for query button DOM stabilization - this is functionally necessary
-  await page.waitForTimeout(1000);
-  await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
-    force: true,
-  });
-  // get the data from the search variable
+  await pm.page.waitForTimeout(1000);
+  await pm.logsPage.clickRefreshButton();
   await expect.poll(async () => (await search).status()).toBe(200);
-  // await search.hits.FIXME_should("be.an", "array");
 }
 
 function removeUTFCharacters(text) {
@@ -79,7 +41,7 @@ test.describe("Logs Queries testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     await pm.logsPage.selectStream("e2e_automate");
-    await applyQueryButton(page);
+    await applyQueryButton(pm);
 
     testLogger.info('Logs queries test setup completed');
   });
@@ -168,7 +130,11 @@ test.describe("Logs Queries testcases", () => {
     await pm.logsPage.waitForTimeout(1000);
     await pm.logsPage.waitForSavedViewText(randomSavedViewName);
     await pm.logsPage.clickSavedViewByText(randomSavedViewName);
+    // Wait for saved view to be applied and page to settle before re-expanding
+    await page.waitForLoadState('domcontentloaded');
+    await pm.logsPage.waitForTimeout(2000);
     await pm.logsPage.clickSavedViewsExpand();
+    await pm.logsPage.waitForTimeout(1000);
     await pm.logsPage.clickSavedViewSearchInput();
     await pm.logsPage.clickSavedViewByTitle(randomSavedViewName); // Use the random name here
     
@@ -332,17 +298,15 @@ test.describe("Logs Queries testcases", () => {
     await pm.logsPage.clickExpandCode();
     await pm.logsPage.waitForTimeout(4000);
 
-    // Click refresh and wait for network to settle
+    // Click refresh and wait for results
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {})
-      .catch((e) => testLogger.debug('networkidle timeout (non-blocking)', { error: e.message }));
+    await page.waitForLoadState('domcontentloaded');
     await pm.logsPage.waitForTimeout(2000);
 
     // Toggle SQL mode and refresh
     await pm.logsPage.clickSQLModeToggle();
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {})
-      .catch((e) => testLogger.debug('networkidle timeout (non-blocking)', { error: e.message }));
+    await page.waitForLoadState('domcontentloaded');
     await pm.logsPage.waitForTimeout(2000);
 
     // Verify bar chart is visible in SQL mode then click
@@ -352,8 +316,7 @@ test.describe("Logs Queries testcases", () => {
     // Toggle SQL mode off and refresh
     await pm.logsPage.clickSQLModeToggle();
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {})
-      .catch((e) => testLogger.debug('networkidle timeout (non-blocking)', { error: e.message }));
+    await page.waitForLoadState('domcontentloaded');
     await pm.logsPage.waitForTimeout(2000);
 
     // Verify bar chart is visible in non-SQL mode then click
@@ -493,19 +456,8 @@ test.describe("Logs Queries testcases", () => {
     await pm.logsPage.waitForTimeout(1000);
 
     // Use wider time range to capture ingested data
-    const oneHourButton = page.getByText('Last 1 hour');
-    const twelveHourButton = page.getByText('Last 12 hours');
-
-    if (await oneHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await oneHourButton.click();
-      testLogger.info('Set time range to Last 1 hour to capture ingested data');
-    } else if (await twelveHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await twelveHourButton.click();
-      testLogger.info('Set time range to Last 12 hours to capture ingested data');
-    } else {
-      await pm.logsPage.clickRelative15MinButton();
-      testLogger.info('Fallback to 15 minute time range');
-    }
+    const selectedRange = await pm.logsPage.clickWideRelativeTimeRangeOrFallback();
+    testLogger.info(`Set time range to ${selectedRange} to capture ingested data`);
 
     // Run initial query to get results
     await pm.logsPage.clickRefreshButton();
@@ -555,7 +507,7 @@ test.describe("Logs Queries testcases", () => {
       expect(isBackToPage1).toBeTruthy();
     } else {
       testLogger.info('Using fallback method to check pagination state');
-      const activePage = await page.locator('[data-test="logs-search-result-pagination"] .q-btn--unelevated').first().textContent({ timeout: 5000 }).catch(() => 'unknown');
+      const activePage = await pm.logsPage.getActivePaginationPageText();
       testLogger.info(`Active page (fallback): ${activePage}`);
 
       if (activePage === '4') {

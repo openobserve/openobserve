@@ -22,57 +22,29 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
-const logsdata = require('../../../test-data/logs_data.json');
+const { ingestTestData } = require('../utils/data-ingestion.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 // ============================================================================
 // Utility Functions
 // ============================================================================
 
-async function ingestTestData(page) {
-    const orgId = process.env["ORGNAME"];
-    const streamName = "e2e_automate";
-    const basicAuthCredentials = Buffer.from(
-        `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-    ).toString('base64');
-
-    const headers = {
-        "Authorization": `Basic ${basicAuthCredentials}`,
-        "Content-Type": "application/json",
-    };
-
-    const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-        const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify(logsdata)
-        });
-        return await fetchResponse.json();
-    }, {
-        url: process.env.INGESTION_URL,
-        headers: headers,
-        orgId: orgId,
-        streamName: streamName,
-        logsdata: logsdata
-    });
-
-    testLogger.debug('API response received', { response });
-}
-
-async function applyQueryButton(page) {
-    const searchPromise = page.waitForResponse(
+async function applyQueryButton(pm) {
+    const searchPromise = pm.page.waitForResponse(
         response => response.url().includes('/_search') && response.status() === 200,
         { timeout: 60000 }
     );
 
-    await page.waitForLoadState('networkidle');
-    await page.locator("[data-test='logs-search-bar-refresh-btn']").click({ force: true });
+    // Strategic 1000ms wait for query preparation - this is functionally necessary
+    await pm.page.waitForTimeout(1000);
+    await pm.logsPage.clickRefreshButton();
 
     try {
         await searchPromise;
         testLogger.info('Search query completed successfully');
     } catch (error) {
         testLogger.warn('Search response wait timed out, continuing test');
-        await page.waitForLoadState('networkidle', { timeout: 30000 });
+        await pm.page.waitForTimeout(3000);
     }
 }
 
@@ -82,7 +54,7 @@ async function applyQueryButton(page) {
  */
 async function setupQueryAndSwitchToBuild(pm, page, query) {
     await pm.logsPage.enableSqlModeIfNeeded();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForLoadState('domcontentloaded');
     await pm.logsPage.setQueryEditorContent(query);
     await pm.logsPage.runQueryAndWaitForResults();
     await pm.logsPage.clickBuildToggle();
@@ -102,14 +74,13 @@ test.describe("Logs Query Builder - P0 Critical Tests", () => {
         await navigateToBase(page);
         pm = new PageManager(page);
 
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
         await ingestTestData(page);
         await page.waitForLoadState('domcontentloaded');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
         await pm.logsPage.selectStream("e2e_automate");
-        await applyQueryButton(page);
-        await page.waitForLoadState('networkidle');
+        await applyQueryButton(pm);
 
         testLogger.info('Query Builder test setup completed');
     });
@@ -198,14 +169,13 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
         await navigateToBase(page);
         pm = new PageManager(page);
 
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
         await ingestTestData(page);
         await page.waitForLoadState('domcontentloaded');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
         await pm.logsPage.selectStream("e2e_automate");
-        await applyQueryButton(page);
-        await page.waitForLoadState('networkidle');
+        await applyQueryButton(pm);
 
         testLogger.info('Tab Navigation test setup completed');
     });
@@ -231,7 +201,7 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
         await pm.logsPage.clickBuildToggle();
         await pm.logsPage.waitForBuildTabLoaded();
         await pm.logsPage.clickLogsToggle();
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
         await pm.logsPage.expectLogsTableVisible();
 
         testLogger.info('Switch from Build to Logs tab - PASSED');
@@ -266,7 +236,7 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
         testLogger.info('Testing Build tab preserves query state');
 
         await pm.logsPage.enableSqlModeIfNeeded();
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await page.waitForLoadState('domcontentloaded');
         const testQuery = 'SELECT count(*) as total FROM "e2e_automate"';
         await pm.logsPage.setQueryEditorContent(testQuery);
 
@@ -274,7 +244,7 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
         await pm.logsPage.waitForBuildTabLoaded();
 
         await pm.logsPage.clickLogsToggle();
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
 
         const queryText = await pm.logsPage.getQueryEditorText();
         expect(queryText.toLowerCase()).toContain('e2e_automate');
@@ -299,14 +269,13 @@ test.describe("Logs Query Builder - Chart Type on Tab Switch", () => {
         await navigateToBase(page);
         pm = new PageManager(page);
 
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
         await ingestTestData(page);
         await page.waitForLoadState('domcontentloaded');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
         await pm.logsPage.selectStream("e2e_automate");
-        await applyQueryButton(page);
-        await page.waitForLoadState('networkidle');
+        await applyQueryButton(pm);
 
         testLogger.info('Chart Type on Tab Switch test setup completed');
     });

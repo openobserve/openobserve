@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="searchObj.data.countErrorMsg"
           />
         </div>
-        <div v-else class="col-7 text-left q-pl-lg warning flex items-center">
+        <div v-else class="col-8 text-left q-pl-lg warning flex items-center">
           {{
             searchObj.meta.logsVisualizeToggle === "patterns"
               ? patternSummaryText
@@ -78,6 +78,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ searchObj.data.histogram.errorMsg }}
             </q-tooltip>
           </div>
+          <!-- Inspect Button -->
+          <q-btn
+            v-if="
+              searchObj.data?.queryResults?.hits?.length > 0 &&
+              searchObj.data.lastSearchTraceId &&
+              config.isEnterprise == 'true' &&
+              config.isCloud == 'false'
+            "
+            outline
+            no-caps
+            dense
+            color="primary"
+            icon="troubleshoot"
+            label="Inspect"
+            class="analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
+            size="sm"
+            @click="openSearchJobInspector"
+            data-test="logs-inspect-button"
+          >
+            <q-tooltip>
+              {{ t("volumeInsights.searchInspectionsLabel") }}
+            </q-tooltip>
+          </q-btn>
           <!-- Volume Analysis Button -->
           <q-btn
             v-if="
@@ -90,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="primary"
             icon="timeline"
             :label="t('volumeInsights.insightsButtonLabel')"
-            class="tw:ml-[0.5rem]! analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
+            class="analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
             size="sm"
             @click="openVolumeAnalysisDashboard"
             data-test="logs-analyze-dimensions-button"
@@ -101,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-btn>
         </div>
 
-        <div class="col-5 text-right q-pr-sm q-gutter-xs pagination-block">
+        <div class="col-4 text-right q-pr-sm q-gutter-xs pagination-block">
           <q-pagination
             v-if="
               searchObj.meta.resultGrid.showPagination &&
@@ -480,6 +503,7 @@ import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "SearchResult",
@@ -1471,6 +1495,30 @@ export default defineComponent({
       showVolumeAnalysisDashboard.value = false;
     };
 
+    // Search Job Inspector functions
+    const openSearchJobInspector = () => {
+      // Get the last search trace_id
+      const traceId = searchObj.data.lastSearchTraceId;
+
+      if (!traceId) {
+        $q.notify({
+          type: "warning",
+          message: "No trace ID available for inspection",
+          timeout: 2000,
+        });
+        return;
+      }
+
+      // Navigate to the search job inspector page
+      router.push({
+        name: "searchJobInspector",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          trace_id: traceId
+        },
+      });
+    };
+
     const resetPlotChart = computed(() => {
       return searchObj.meta.resetPlotChart;
     });
@@ -1572,6 +1620,7 @@ export default defineComponent({
     return {
       t,
       store,
+      config,
       plotChart,
       searchObj,
       patternsState,
@@ -1632,6 +1681,7 @@ export default defineComponent({
       extractConstantsFromPattern,
       openVolumeAnalysisDashboard,
       closeVolumeAnalysisDashboard,
+      openSearchJobInspector,
       showCorrelation,
       correlationContext,
       correlationDashboardProps,

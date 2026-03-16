@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -222,6 +222,14 @@ pub async fn get_opts(account: &str, path: &Path, options: GetOptions) -> Result
 
 pub async fn get_range(account: &str, location: &Path, range: Range<u64>) -> Result<bytes::Bytes> {
     DEFAULT.get_range(account, location, range).await
+}
+
+pub async fn get_ranges(
+    account: &str,
+    location: &Path,
+    ranges: &[Range<u64>],
+) -> Result<Vec<bytes::Bytes>> {
+    DEFAULT.get_ranges(account, location, ranges).await
 }
 
 pub async fn head(account: &str, location: &Path) -> Result<ObjectMeta> {

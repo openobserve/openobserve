@@ -68,7 +68,6 @@ use crate::{
     service::{
         search::{self as SearchService, streaming::process_search_stream_request_multi},
         self_reporting::report_request_usage_stats,
-        setup_tracing_with_trace_id,
     },
 };
 
@@ -602,8 +601,10 @@ pub async fn search_multi(
                                             .collect::<Vec<_>>();
                                         serde_json::Value::Array(flattened_array)
                                     })
-                                } else {
+                                } else if !v.is_null() && v.is_object() {
                                     config::utils::flatten::flatten(v.clone()).ok()
+                                } else {
+                                    None
                                 }
                             })
                             .collect(),
@@ -1430,16 +1431,6 @@ pub async fn search_multi_stream(
     #[cfg(not(feature = "enterprise"))]
     let audit_ctx = None;
 
-    // Create search_span as a child of http_span by entering http_span first
-    let search_span = {
-        let _guard = http_span.enter();
-        setup_tracing_with_trace_id(
-            &trace_id,
-            tracing::info_span!("service::search::search_multi_stream_h2"),
-        )
-        .await
-    };
-
     // Spawn the multi-stream search task
     tokio::spawn(process_search_stream_request_multi(
         org_id.clone(),
@@ -1447,7 +1438,7 @@ pub async fn search_multi_stream(
         trace_id.clone(),
         queries,
         stream_type,
-        search_span.clone(),
+        http_span,
         tx,
         fallback_order_by_col,
         audit_ctx,
