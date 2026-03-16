@@ -311,7 +311,15 @@ export class SearchJobInspectorPage {
     const viewQueryBtn = this.page.locator(this.viewQueryBtnText);
     await expect(viewQueryBtn).toBeVisible({ timeout: 5000 });
     await viewQueryBtn.click();
-    await this.page.waitForLoadState('domcontentloaded');
+    // Wait for Quasar dialog to be visible - try multiple selectors
+    await Promise.race([
+      this.page.waitForSelector('.q-dialog__inner', { state: 'visible', timeout: 10000 }),
+      this.page.waitForSelector('.q-dialog', { state: 'visible', timeout: 10000 }),
+      this.page.waitForSelector('[data-test="inspector-sql-query-content"]', { state: 'visible', timeout: 10000 }),
+      this.page.waitForSelector('pre.sql-query', { state: 'visible', timeout: 10000 })
+    ]).catch(() => {});
+    // Wait a bit for content to render
+    await this.page.waitForTimeout(500);
   }
 
   /**
@@ -333,19 +341,31 @@ export class SearchJobInspectorPage {
    * @returns {Promise<string>}
    */
   async getSqlQueryContent() {
-    // Wait for the SQL dialog to be visible first
-    await this.page.waitForSelector('.q-dialog', { state: 'visible', timeout: 5000 }).catch(() => {});
+    // Wait for the SQL dialog to be visible first - Quasar dialogs use q-dialog__inner
+    await this.page.waitForSelector('.q-dialog__inner', { state: 'visible', timeout: 10000 }).catch(() => {});
 
-    // Look for SQL content using specific selector from SearchJobInspector.vue
+    // Wait a bit for the content to render
+    await this.page.waitForTimeout(500);
+
+    // Primary selector using data-test attribute (most reliable)
+    const primaryLocator = this.page.locator('[data-test="inspector-sql-query-content"]');
+    if (await primaryLocator.isVisible({ timeout: 5000 }).catch(() => false)) {
+      const content = await primaryLocator.textContent() || '';
+      if (content && content !== 'No SQL query available') {
+        return content;
+      }
+    }
+
+    // Fallback selectors for older versions
     const sqlLocators = [
       this.page.locator('pre.sql-query'),
       this.page.locator('.sql-query-container pre'),
-      this.page.locator('.q-dialog pre').first(),
-      this.page.locator('.q-dialog code').first()
+      this.page.locator('.q-dialog__inner pre').first(),
+      this.page.locator('.q-dialog__inner code').first()
     ];
 
     for (const locator of sqlLocators) {
-      if (await locator.isVisible({ timeout: 5000 }).catch(() => false)) {
+      if (await locator.isVisible({ timeout: 3000 }).catch(() => false)) {
         const content = await locator.textContent() || '';
         // Skip if it's the fallback message
         if (content && content !== 'No SQL query available') {
