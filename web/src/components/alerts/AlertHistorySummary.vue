@@ -226,7 +226,7 @@ const fetchHistorySummary = async () => {
         const summary = aggregated.get(alertName)!;
         summary.total_evaluations++;
 
-        if (hit.status === "firing" || hit.status === "error") {
+        if (hit.status === "completed") {
           summary.firing_count++;
         }
 
