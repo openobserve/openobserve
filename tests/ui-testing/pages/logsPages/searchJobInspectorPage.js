@@ -91,6 +91,18 @@ export class SearchJobInspectorPage {
   }
 
   /**
+   * Wait for inspector data to be loaded (tiles show values or error state)
+   */
+  async waitForInspectorDataLoaded() {
+    // Wait for either the Results tile text or error banner to be visible
+    // This indicates the API call has completed
+    await Promise.race([
+      this.page.locator(this.resultsTileText).waitFor({ state: 'visible', timeout: 15000 }),
+      this.page.locator(this.inspectorErrorBanner).waitFor({ state: 'visible', timeout: 15000 })
+    ]);
+  }
+
+  /**
    * Check if on inspector page
    * @returns {Promise<boolean>}
    */

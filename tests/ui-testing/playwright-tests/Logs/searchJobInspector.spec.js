@@ -196,8 +196,8 @@ test.describe("Search Job Inspector UI Tests", { tag: ['@enterprise', '@searchJo
     await inspectorPage.clickInspectButton();
     await inspectorPage.assertInspectorPageVisible();
 
-    // Wait for inspector data to load
-    await page.waitForTimeout(2000);
+    // Wait for inspector data to load by checking for tiles visibility
+    await inspectorPage.waitForInspectorDataLoaded();
 
     // Check if inspector has valid data (not showing NA/error state)
     const hasError = await inspectorPage.hasError();
