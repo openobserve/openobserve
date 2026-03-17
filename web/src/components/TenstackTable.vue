@@ -971,18 +971,7 @@ const handleDragStart = (event: any) => {
   }
 };
 
-const handleDragEnd = async () => {
-  if (
-    columnOrder.value.includes(store.state.zoConfig.timestamp_column) &&
-    columnOrder.value[0] !== store.state.zoConfig.timestamp_column
-  ) {
-    const newColumnOrder = columnOrder.value.filter(
-      (column: any) => column !== store.state.zoConfig.timestamp_column,
-    );
-    newColumnOrder.unshift(store.state.zoConfig.timestamp_column);
-    columnOrder.value = [...newColumnOrder];
-  }
-  await nextTick();
+const handleDragEnd = () => {
   emits("update:columnOrder", columnOrder.value, props.columns);
 };
 
