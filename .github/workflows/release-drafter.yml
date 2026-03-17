@@ -20,6 +20,6 @@ jobs:
       pull-requests: write
     runs-on: ubicloud-standard-8
     steps:
-      - uses: release-drafter/release-drafter@v6
+      - uses: release-drafter/release-drafter@v7
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
