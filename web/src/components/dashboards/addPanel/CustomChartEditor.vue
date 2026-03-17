@@ -17,41 +17,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="markdown-editor card-container"
-    style="width: 100%; height: 100%; overflow: hidden; display: flex; flex-direction: column;"
+    style="
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    "
   >
-    <div style="width: 100%; height: 100%; display: flex; flex-direction: column;">
-          <div class="col" style="height: 100%; display: flex; flex-direction: column;">
-            <QueryEditor
-              v-model:query="javascriptCodeContent"
-              :debounceTime="500"
-              @update:query="onEditorValueChange"
-              data-test="dashboard-markdown-editor-query-editor"
-              language="javascript"
-              class="javascript-query-editor "
-              style="padding-left: 20px; height: 100%; flex: 1;"
-              :style="{
-                backgroundColor:
-                  store.state.theme == 'dark'
-                    ? '#1e1e1e'
-                    : '#fafafa',
-              }"
-
-            />
-          </div>
+    <div
+      style="width: 100%; height: 100%; display: flex; flex-direction: column"
+    >
+      <div
+        class="col"
+        style="height: 100%; display: flex; flex-direction: column"
+      >
+        <QueryEditor
+          v-model:query="javascriptCodeContent"
+          :debounceTime="500"
+          @update:query="onEditorValueChange"
+          data-test="dashboard-markdown-editor-query-editor"
+          language="javascript"
+          class="javascript-query-editor"
+          style="padding-left: 20px; height: 100%; flex: 1"
+          :style="{
+            backgroundColor:
+              store.state.theme == 'dark' ? '#1e1e1e' : '#fafafa',
+          }"
+        />
+      </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  watch,
-} from "vue";
+import { defineComponent, ref, watch } from "vue";
 import { defineAsyncComponent } from "vue";
-const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
+const QueryEditor = defineAsyncComponent(
+  () => import("@/components/CodeQueryEditor.vue"),
+);
 import { useStore } from "vuex";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 
 export default defineComponent({
   components: {
@@ -73,11 +79,14 @@ export default defineComponent({
     const { dashboardPanelData } = useDashboardPanelData("dashboard");
 
     // Watch for prop changes and update the editor content
-    watch(() => props.modelValue, (newValue) => {
-      if (newValue !== javascriptCodeContent.value) {
-        javascriptCodeContent.value = newValue;
-      }
-    });
+    watch(
+      () => props.modelValue,
+      (newValue) => {
+        if (newValue !== javascriptCodeContent.value) {
+          javascriptCodeContent.value = newValue;
+        }
+      },
+    );
 
     const layoutSplitterUpdated = () => {
       window.dispatchEvent(new Event("resize"));
@@ -115,10 +124,12 @@ export default defineComponent({
   height: 4px;
   width: 100%;
 }
+
 .splitter-vertical {
   width: 4px;
   height: 100%;
 }
+
 .splitter-enabled {
   background-color: #ffffff00;
   transition: 0.3s;
@@ -132,6 +143,7 @@ export default defineComponent({
 :deep(.query-editor-splitter .q-splitter__separator) {
   background-color: transparent !important;
 }
+
 .javascript-query-editor {
 }
 </style>

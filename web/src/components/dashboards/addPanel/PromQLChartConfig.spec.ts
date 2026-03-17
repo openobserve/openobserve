@@ -26,7 +26,7 @@ installQuasar({
 });
 
 // Mock useDashboardPanel
-vi.mock("../../../composables/useDashboardPanel", () => ({
+vi.mock("../../../composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(() => ({
     dashboardPanelData: {
       data: {
@@ -64,7 +64,7 @@ describe("PromQLChartConfig", () => {
 
     // Setup mock to return the mock data
     const useDashboardPanel = vi.mocked(
-      await import("../../../composables/useDashboardPanel"),
+      await import("../../../composables/dashboard/useDashboardPanel"),
     ).default;
     useDashboardPanel.mockReturnValue({
       dashboardPanelData: mockDashboardPanelData,
@@ -157,7 +157,9 @@ describe("PromQLChartConfig", () => {
         wrapper.find('[data-test="dashboard-config-geo-lon-label"]').exists(),
       ).toBe(true);
       expect(
-        wrapper.find('[data-test="dashboard-config-geo-weight-label"]').exists(),
+        wrapper
+          .find('[data-test="dashboard-config-geo-weight-label"]')
+          .exists(),
       ).toBe(true);
     });
 
@@ -233,7 +235,9 @@ describe("PromQLChartConfig", () => {
       wrapper = createWrapper({ chartType: "table" });
 
       expect(
-        wrapper.find('[data-test="dashboard-config-promql-table-mode"]').exists(),
+        wrapper
+          .find('[data-test="dashboard-config-promql-table-mode"]')
+          .exists(),
       ).toBe(true);
     });
 
@@ -272,7 +276,9 @@ describe("PromQLChartConfig", () => {
       await flushPromises();
 
       expect(
-        wrapper.find('[data-test="dashboard-config-table-aggregations"]').exists(),
+        wrapper
+          .find('[data-test="dashboard-config-table-aggregations"]')
+          .exists(),
       ).toBe(true);
     });
 
@@ -283,7 +289,9 @@ describe("PromQLChartConfig", () => {
       await flushPromises();
 
       expect(
-        wrapper.find('[data-test="dashboard-config-table-aggregations"]').exists(),
+        wrapper
+          .find('[data-test="dashboard-config-table-aggregations"]')
+          .exists(),
       ).toBe(false);
     });
 
@@ -314,7 +322,11 @@ describe("PromQLChartConfig", () => {
       wrapper.unmount();
 
       // Test multiple aggregations - recreate wrapper with new data
-      mockDashboardPanelData.data.config.table_aggregations = ["last", "min", "max"];
+      mockDashboardPanelData.data.config.table_aggregations = [
+        "last",
+        "min",
+        "max",
+      ];
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.getTableAggregationsDisplay).toBe("last (+2 more)");
@@ -338,7 +350,8 @@ describe("PromQLChartConfig", () => {
     });
 
     it("should show column filters in expanded_timeseries mode", async () => {
-      mockDashboardPanelData.data.config.promql_table_mode = "expanded_timeseries";
+      mockDashboardPanelData.data.config.promql_table_mode =
+        "expanded_timeseries";
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
       await flushPromises();
@@ -396,7 +409,11 @@ describe("PromQLChartConfig", () => {
       wrapper.unmount();
 
       // Test multiple columns
-      mockDashboardPanelData.data.config.visible_columns = ["job", "instance", "status"];
+      mockDashboardPanelData.data.config.visible_columns = [
+        "job",
+        "instance",
+        "status",
+      ];
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.getVisibleColumnsDisplay).toBe("job (+2 more)");
@@ -418,7 +435,11 @@ describe("PromQLChartConfig", () => {
       wrapper.unmount();
 
       // Test multiple columns
-      mockDashboardPanelData.data.config.hidden_columns = ["__name__", "le", "quantile"];
+      mockDashboardPanelData.data.config.hidden_columns = [
+        "__name__",
+        "le",
+        "quantile",
+      ];
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.getHiddenColumnsDisplay).toBe("__name__ (+2 more)");
@@ -434,7 +455,9 @@ describe("PromQLChartConfig", () => {
 
       expect(wrapper.text()).toContain("Sticky Columns");
       expect(
-        wrapper.find('[data-test="dashboard-config-sticky-first-column"]').exists(),
+        wrapper
+          .find('[data-test="dashboard-config-sticky-first-column"]')
+          .exists(),
       ).toBe(true);
       expect(
         wrapper.find('[data-test="dashboard-config-sticky-columns"]').exists(),
@@ -442,7 +465,8 @@ describe("PromQLChartConfig", () => {
     });
 
     it("should show sticky columns config in expanded_timeseries mode", async () => {
-      mockDashboardPanelData.data.config.promql_table_mode = "expanded_timeseries";
+      mockDashboardPanelData.data.config.promql_table_mode =
+        "expanded_timeseries";
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
       await flushPromises();
@@ -457,7 +481,9 @@ describe("PromQLChartConfig", () => {
       await flushPromises();
 
       expect(
-        wrapper.find('[data-test="dashboard-config-sticky-first-column"]').exists(),
+        wrapper
+          .find('[data-test="dashboard-config-sticky-first-column"]')
+          .exists(),
       ).toBe(false);
     });
 
@@ -486,7 +512,9 @@ describe("PromQLChartConfig", () => {
       wrapper.vm.stickyColumns = ["job"];
       await flushPromises();
 
-      expect(mockDashboardPanelData.data.config.sticky_columns).toEqual(["job"]);
+      expect(mockDashboardPanelData.data.config.sticky_columns).toEqual([
+        "job",
+      ]);
     });
 
     it("should disable sticky columns selector when sticky first column is enabled", async () => {
@@ -499,9 +527,11 @@ describe("PromQLChartConfig", () => {
 
       const stickyColumnsSelect = wrapper.findComponent({ name: "QSelect" });
       // Check if the component exists and has the disable prop
-      const disabledSelect = wrapper.findAll('[data-test="dashboard-config-sticky-columns"]').find(el => {
-        return el.attributes('disable') !== undefined;
-      });
+      const disabledSelect = wrapper
+        .findAll('[data-test="dashboard-config-sticky-columns"]')
+        .find((el) => {
+          return el.attributes("disable") !== undefined;
+        });
       expect(disabledSelect || stickyColumnsSelect.exists()).toBeTruthy();
     });
 
@@ -536,18 +566,23 @@ describe("PromQLChartConfig", () => {
       await flushPromises();
 
       expect(
-        wrapper.find('[data-test="dashboard-config-column-order-button"]').exists(),
+        wrapper
+          .find('[data-test="dashboard-config-column-order-button"]')
+          .exists(),
       ).toBe(true);
     });
 
     it("should show column order config in expanded_timeseries mode", async () => {
-      mockDashboardPanelData.data.config.promql_table_mode = "expanded_timeseries";
+      mockDashboardPanelData.data.config.promql_table_mode =
+        "expanded_timeseries";
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
       await flushPromises();
 
       expect(
-        wrapper.find('[data-test="dashboard-config-column-order-button"]').exists(),
+        wrapper
+          .find('[data-test="dashboard-config-column-order-button"]')
+          .exists(),
       ).toBe(true);
     });
 
@@ -558,7 +593,9 @@ describe("PromQLChartConfig", () => {
       await flushPromises();
 
       expect(
-        wrapper.find('[data-test="dashboard-config-column-order-button"]').exists(),
+        wrapper
+          .find('[data-test="dashboard-config-column-order-button"]')
+          .exists(),
       ).toBe(false);
     });
 
@@ -568,7 +605,9 @@ describe("PromQLChartConfig", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      const button = wrapper.find('[data-test="dashboard-config-column-order-button"]');
+      const button = wrapper.find(
+        '[data-test="dashboard-config-column-order-button"]',
+      );
       await button.trigger("click");
       await wrapper.vm.$nextTick();
       await flushPromises();
@@ -620,7 +659,11 @@ describe("PromQLChartConfig", () => {
       wrapper.unmount();
 
       // Test multiple columns
-      mockDashboardPanelData.data.config.column_order = ["job", "instance", "status"];
+      mockDashboardPanelData.data.config.column_order = [
+        "job",
+        "instance",
+        "status",
+      ];
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.columnOrder).toEqual(["job", "instance", "status"]);
@@ -735,17 +778,11 @@ describe("PromQLChartConfig", () => {
 
   describe("Filter Functions", () => {
     it("should filter visible columns", async () => {
-      mockDashboardPanelData.data.queries = [
-        { fields: { stream: "stream1" } },
-      ];
+      mockDashboardPanelData.data.queries = [{ fields: { stream: "stream1" } }];
       mockDashboardPanelData.meta.streamFields.groupedFields = [
         {
           name: "stream1",
-          schema: [
-            { name: "job" },
-            { name: "instance" },
-            { name: "status" },
-          ],
+          schema: [{ name: "job" }, { name: "instance" }, { name: "status" }],
         },
       ];
 
@@ -757,20 +794,17 @@ describe("PromQLChartConfig", () => {
 
       expect(updateFn).toHaveBeenCalled();
       expect(wrapper.vm.visibleColumnsFilteredOptions).toContain("job");
-      expect(wrapper.vm.visibleColumnsFilteredOptions).not.toContain("instance");
+      expect(wrapper.vm.visibleColumnsFilteredOptions).not.toContain(
+        "instance",
+      );
     });
 
     it("should filter hidden columns", async () => {
-      mockDashboardPanelData.data.queries = [
-        { fields: { stream: "stream1" } },
-      ];
+      mockDashboardPanelData.data.queries = [{ fields: { stream: "stream1" } }];
       mockDashboardPanelData.meta.streamFields.groupedFields = [
         {
           name: "stream1",
-          schema: [
-            { name: "job" },
-            { name: "__name__" },
-          ],
+          schema: [{ name: "job" }, { name: "__name__" }],
         },
       ];
 
@@ -786,16 +820,11 @@ describe("PromQLChartConfig", () => {
     });
 
     it("should filter sticky columns", async () => {
-      mockDashboardPanelData.data.queries = [
-        { fields: { stream: "stream1" } },
-      ];
+      mockDashboardPanelData.data.queries = [{ fields: { stream: "stream1" } }];
       mockDashboardPanelData.meta.streamFields.groupedFields = [
         {
           name: "stream1",
-          schema: [
-            { name: "job" },
-            { name: "instance" },
-          ],
+          schema: [{ name: "job" }, { name: "instance" }],
         },
       ];
 
@@ -811,16 +840,11 @@ describe("PromQLChartConfig", () => {
     });
 
     it("should show all options when filter is empty", async () => {
-      mockDashboardPanelData.data.queries = [
-        { fields: { stream: "stream1" } },
-      ];
+      mockDashboardPanelData.data.queries = [{ fields: { stream: "stream1" } }];
       mockDashboardPanelData.meta.streamFields.groupedFields = [
         {
           name: "stream1",
-          schema: [
-            { name: "job" },
-            { name: "instance" },
-          ],
+          schema: [{ name: "job" }, { name: "instance" }],
         },
       ];
 
@@ -856,17 +880,11 @@ describe("PromQLChartConfig", () => {
 
   describe("Filtered Available Columns", () => {
     it("should return filtered columns based on visible_columns", () => {
-      mockDashboardPanelData.data.queries = [
-        { fields: { stream: "stream1" } },
-      ];
+      mockDashboardPanelData.data.queries = [{ fields: { stream: "stream1" } }];
       mockDashboardPanelData.meta.streamFields.groupedFields = [
         {
           name: "stream1",
-          schema: [
-            { name: "field1" },
-            { name: "field2" },
-            { name: "field3" },
-          ],
+          schema: [{ name: "field1" }, { name: "field2" }, { name: "field3" }],
         },
       ];
 
@@ -877,17 +895,11 @@ describe("PromQLChartConfig", () => {
     });
 
     it("should return filtered columns based on hidden_columns", () => {
-      mockDashboardPanelData.data.queries = [
-        { fields: { stream: "stream1" } },
-      ];
+      mockDashboardPanelData.data.queries = [{ fields: { stream: "stream1" } }];
       mockDashboardPanelData.meta.streamFields.groupedFields = [
         {
           name: "stream1",
-          schema: [
-            { name: "field1" },
-            { name: "field2" },
-            { name: "field3" },
-          ],
+          schema: [{ name: "field1" }, { name: "field2" }, { name: "field3" }],
         },
       ];
 
@@ -901,17 +913,11 @@ describe("PromQLChartConfig", () => {
     });
 
     it("should prioritize visible_columns over hidden_columns", () => {
-      mockDashboardPanelData.data.queries = [
-        { fields: { stream: "stream1" } },
-      ];
+      mockDashboardPanelData.data.queries = [{ fields: { stream: "stream1" } }];
       mockDashboardPanelData.meta.streamFields.groupedFields = [
         {
           name: "stream1",
-          schema: [
-            { name: "field1" },
-            { name: "field2" },
-            { name: "field3" },
-          ],
+          schema: [{ name: "field1" }, { name: "field2" }, { name: "field3" }],
         },
       ];
 
@@ -923,16 +929,11 @@ describe("PromQLChartConfig", () => {
     });
 
     it("should return all columns when no filters", () => {
-      mockDashboardPanelData.data.queries = [
-        { fields: { stream: "stream1" } },
-      ];
+      mockDashboardPanelData.data.queries = [{ fields: { stream: "stream1" } }];
       mockDashboardPanelData.meta.streamFields.groupedFields = [
         {
           name: "stream1",
-          schema: [
-            { name: "field1" },
-            { name: "field2" },
-          ],
+          schema: [{ name: "field1" }, { name: "field2" }],
         },
       ];
 
@@ -969,11 +970,15 @@ describe("PromQLChartConfig", () => {
 
       wrapper.vm.visibleColumns = ["field1"];
       await flushPromises();
-      expect(mockDashboardPanelData.data.config.visible_columns).toEqual(["field1"]);
+      expect(mockDashboardPanelData.data.config.visible_columns).toEqual([
+        "field1",
+      ]);
 
       wrapper.vm.visibleColumns = [];
       await flushPromises();
-      expect(mockDashboardPanelData.data.config.visible_columns).toBeUndefined();
+      expect(
+        mockDashboardPanelData.data.config.visible_columns,
+      ).toBeUndefined();
     });
   });
 

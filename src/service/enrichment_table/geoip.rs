@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -334,13 +334,13 @@ impl Table for Geoip {
         select: Option<&[String]>,
         _wildcard: Option<&Value>, // Use not known yet
         index: Option<IndexHandle>,
-    ) -> Result<ObjectMap, String> {
+    ) -> Result<ObjectMap, vector_enrichment::Error> {
         let mut rows = self.find_table_rows(case, condition, select, _wildcard, index)?;
 
         match rows.pop() {
             Some(row) if rows.is_empty() => Ok(row),
-            Some(_) => Err("More than 1 row found".to_string()),
-            None => Err("IP not found".to_string()),
+            Some(_) => Err(vector_enrichment::Error::MoreThanOneRowFound),
+            None => Err(vector_enrichment::Error::NoRowsFound),
         }
     }
 
@@ -354,21 +354,23 @@ impl Table for Geoip {
         select: Option<&[String]>,
         _wildcard: Option<&Value>, // Use not known yet
         _: Option<IndexHandle>,
-    ) -> Result<Vec<ObjectMap>, String> {
+    ) -> Result<Vec<ObjectMap>, vector_enrichment::Error> {
         match condition.first() {
-            Some(_) if condition.len() > 1 => Err("Only one condition is allowed".to_string()),
+            Some(_) if condition.len() > 1 => {
+                Err(vector_enrichment::Error::OnlyOneConditionAllowed)
+            }
             Some(Condition::Equals { value, .. }) => {
                 let ip = value
                     .to_string_lossy()
                     .parse::<IpAddr>()
-                    .map_err(|_| "Invalid IP address".to_string())?;
+                    .map_err(|e| vector_enrichment::Error::InvalidAddress { source: e })?;
                 Ok(self
                     .lookup(ip, select)
                     .map(|values| vec![values])
                     .unwrap_or_default())
             }
-            Some(_) => Err("Only equality condition is allowed".to_string()),
-            None => Err("IP condition must be specified".to_string()),
+            Some(_) => Err(vector_enrichment::Error::OnlyEqualityConditionAllowed),
+            None => Err(vector_enrichment::Error::MissingCondition { kind: "IP" }),
         }
     }
 
@@ -377,11 +379,15 @@ impl Table for Geoip {
     ///
     /// # Errors
     /// Errors if the fields are not in the table.
-    fn add_index(&mut self, _: Case, fields: &[&str]) -> Result<IndexHandle, String> {
+    fn add_index(
+        &mut self,
+        _: Case,
+        fields: &[&str],
+    ) -> Result<IndexHandle, vector_enrichment::Error> {
         match fields.len() {
-            0 => Err("IP field is required".to_string()),
+            0 => Err(vector_enrichment::Error::MissingRequiredField { field: "IP" }),
             1 => Ok(IndexHandle(0)),
-            _ => Err("Only one field is allowed".to_string()),
+            _ => Err(vector_enrichment::Error::OnlyOneFieldAllowed),
         }
     }
 
