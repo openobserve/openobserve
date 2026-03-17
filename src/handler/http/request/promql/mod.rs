@@ -642,7 +642,56 @@ async fn query_range(
 pub async fn metadata(
     Path(org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestMetadata>,
+    Headers(_user_email): Headers<UserEmail>,
 ) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use crate::common::utils::auth::{AuthExtractor, is_root_user};
+
+        if !is_root_user(&_user_email.user_id) {
+            use crate::service::db::org_users::get_cached_user_org;
+            let user = match get_cached_user_org(&org_id, &_user_email.user_id) {
+                Some(u) => u,
+                None => return MetaHttpResponse::forbidden("Unauthorized Access"),
+            };
+            let stream_type_str = StreamType::Metrics.as_str();
+            // When filtering to a specific metric, check that stream; otherwise check org-level
+            let o2_type = match &req.metric {
+                Some(metric_name) => format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(stream_type_str)
+                        .map_or(stream_type_str, |model| model.key),
+                    metric_name
+                ),
+                None => format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(stream_type_str)
+                        .map_or(stream_type_str, |model| model.key),
+                    org_id
+                ),
+            };
+            if !crate::handler::http::auth::validator::check_permissions(
+                &_user_email.user_id,
+                AuthExtractor {
+                    auth: "".to_string(),
+                    method: "GET".to_string(),
+                    o2_type,
+                    org_id: org_id.clone(),
+                    bypass_check: false,
+                    parent_id: "".to_string(),
+                },
+                user.role,
+                user.is_external,
+            )
+            .await
+            {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
+        }
+    }
+
     match metrics::prom::get_metadata(&org_id, req).await {
         Ok(resp) => (
             StatusCode::OK,
@@ -885,13 +934,15 @@ async fn series(
 pub async fn labels_get(
     Path(org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestLabels>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    labels(&org_id, req).await
+    labels(&org_id, req, &user_email.user_id).await
 }
 
 pub async fn labels_post(
     Path(org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestLabels>,
+    Headers(user_email): Headers<UserEmail>,
     axum::Form(form): axum::Form<config::meta::promql::RequestLabels>,
 ) -> Response {
     let req = if form.matcher.is_some() || form.start.is_some() || form.end.is_some() {
@@ -899,10 +950,51 @@ pub async fn labels_post(
     } else {
         req
     };
-    labels(&org_id, req).await
+    labels(&org_id, req, &user_email.user_id).await
 }
 
-async fn labels(org_id: &str, req: config::meta::promql::RequestLabels) -> Response {
+async fn labels(
+    org_id: &str,
+    req: config::meta::promql::RequestLabels,
+    _user_email: &str,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use crate::common::utils::auth::{AuthExtractor, is_root_user};
+
+        if !is_root_user(_user_email) {
+            use crate::service::db::org_users::get_cached_user_org;
+            let user = match get_cached_user_org(org_id, _user_email) {
+                Some(u) => u,
+                None => return MetaHttpResponse::forbidden("Unauthorized Access"),
+            };
+            let stream_type_str = StreamType::Metrics.as_str();
+            if !crate::handler::http::auth::validator::check_permissions(
+                _user_email,
+                AuthExtractor {
+                    auth: "".to_string(),
+                    method: "GET".to_string(),
+                    o2_type: format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(stream_type_str)
+                            .map_or(stream_type_str, |model| model.key),
+                        org_id
+                    ),
+                    org_id: org_id.to_string(),
+                    bypass_check: false,
+                    parent_id: "".to_string(),
+                },
+                user.role,
+                user.is_external,
+            )
+            .await
+            {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
+        }
+    }
+
     let config::meta::promql::RequestLabels {
         matcher,
         start,
@@ -979,7 +1071,45 @@ async fn labels(org_id: &str, req: config::meta::promql::RequestLabels) -> Respo
 pub async fn label_values(
     Path((org_id, label_name)): Path<(String, String)>,
     Query(req): Query<config::meta::promql::RequestLabelValues>,
+    Headers(_user_email): Headers<UserEmail>,
 ) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use crate::common::utils::auth::{AuthExtractor, is_root_user};
+
+        if !is_root_user(&_user_email.user_id) {
+            use crate::service::db::org_users::get_cached_user_org;
+            let user = match get_cached_user_org(&org_id, &_user_email.user_id) {
+                Some(u) => u,
+                None => return MetaHttpResponse::forbidden("Unauthorized Access"),
+            };
+            let stream_type_str = StreamType::Metrics.as_str();
+            if !crate::handler::http::auth::validator::check_permissions(
+                &_user_email.user_id,
+                AuthExtractor {
+                    auth: "".to_string(),
+                    method: "GET".to_string(),
+                    o2_type: format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(stream_type_str)
+                            .map_or(stream_type_str, |model| model.key),
+                        org_id
+                    ),
+                    org_id: org_id.clone(),
+                    bypass_check: false,
+                    parent_id: "".to_string(),
+                },
+                user.role,
+                user.is_external,
+            )
+            .await
+            {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
+        }
+    }
+
     let config::meta::promql::RequestLabelValues {
         matcher,
         start,
