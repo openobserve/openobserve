@@ -1627,7 +1627,8 @@
       "variablesTooltip": "변수는 알림에서 대상으로 데이터를 전달하는 데 사용됩니다.",
       "rowTemplateTooltip": "행 템플릿은 경고 메시지의 형식을 지정하는 데 사용됩니다.",
       "templateType": "템플릿 유형:"
-    }
+    },
+    "editJson": "알림 JSON 편집"
   },
   "alert_templates": {
     "header": "템플릿",

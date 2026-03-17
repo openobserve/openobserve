@@ -1118,30 +1118,6 @@ export default defineComponent({
           style: "width: 150px",
         },
         {
-          name: "total_evaluations",
-          field: "total_evaluations",
-          label: t("alerts.totalEvaluations"),
-          align: "center",
-          sortable: true,
-          style: "width: 150px",
-        },
-        {
-          name: "firing_count",
-          field: "firing_count",
-          label: t("alerts.firingCount"),
-          align: "center",
-          sortable: true,
-          style: "width: 150px",
-        },
-        {
-          name: "dedup_status",
-          field: "dedup_status",
-          label: "Dedup",
-          align: "center",
-          sortable: false,
-          style: "width: 80px",
-        },
-        {
           name: "actions",
           field: "actions",
           label: t("alerts.actions"),
@@ -1230,58 +1206,6 @@ export default defineComponent({
             };
           });
 
-          // Fetch alert history data and aggregate by alert name
-          try {
-            // Get history for last 12 hours
-            const endTime = Date.now() * 1000; // Convert to microseconds
-            const startTime = endTime - (12 * 60 * 60 * 1000000); // 12 hours ago in microseconds
-
-            const historyRes = await alertsService.getHistory(
-              store?.state?.selectedOrganization?.identifier,
-              {
-                size: 10000,
-                start_time: startTime,
-                end_time: endTime
-              }
-            );
-
-            // Aggregate history data by alert name
-            const historyByAlert: any = {};
-            if (historyRes.data && historyRes.data.hits) {
-              historyRes.data.hits.forEach((entry: any) => {
-                const alertName = entry.alert_name;
-                if (!historyByAlert[alertName]) {
-                  historyByAlert[alertName] = {
-                    total: 0,
-                    firing: 0,
-                  };
-                }
-                historyByAlert[alertName].total++;
-                const status = (entry.status || "").toLowerCase();
-                if (status === "firing" || status === "error") {
-                  historyByAlert[alertName].firing++;
-                }
-              });
-            }
-
-            // Merge history data with alerts
-            localAllAlerts = localAllAlerts.map((alert: any) => {
-              const history = historyByAlert[alert.name] || { total: 0, firing: 0 };
-              return {
-                ...alert,
-                total_evaluations: history.total,
-                firing_count: history.firing,
-              };
-            });
-          } catch (historyError) {
-            console.warn("Failed to fetch alert history:", historyError);
-            // If history fetch fails, still show alerts with 0 counts
-            localAllAlerts = localAllAlerts.map((alert: any) => ({
-              ...alert,
-              total_evaluations: 0,
-              firing_count: 0,
-            }));
-          }
           //general alerts that we use to display (formatting the alerts into the table format)
           //localAllAlerts is the alerts that we use to store
           // PERFORMANCE OPTIMIZATION: Store raw condition data without conversion
@@ -1323,8 +1247,6 @@ export default defineComponent({
                 id: data.folder_id,
               },
               is_real_time: data.is_real_time,
-              total_evaluations: data.total_evaluations || 0,
-              firing_count: data.firing_count || 0,
             };
           });
           //this is the condition where we are setting the alertStateLoadingMap

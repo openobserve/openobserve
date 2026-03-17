@@ -1627,7 +1627,8 @@
       "variablesTooltip": "Değişkenler, verileri uyarıdan hedefe iletmek için kullanılır.",
       "rowTemplateTooltip": "Satır Şablonu uyarı mesajını biçimlendirmek için kullanılır.",
       "templateType": "Şablon Türü:"
-    }
+    },
+    "editJson": "Uyarı JSON'unu Düzenle"
   },
   "alert_templates": {
     "header": "Şablonlar",

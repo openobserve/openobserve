@@ -1627,7 +1627,8 @@
       "variablesTooltip": "Las variables se utilizan para pasar datos de la alerta al destino.",
       "rowTemplateTooltip": "La plantilla de fila se utiliza para dar formato al mensaje de alerta.",
       "templateType": "Tipo de plantilla:"
-    }
+    },
+    "editJson": "Editar alerta JSON"
   },
   "alert_templates": {
     "header": "Plantillas",

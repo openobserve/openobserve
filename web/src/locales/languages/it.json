@@ -1627,7 +1627,8 @@
       "variablesTooltip": "Le variabili vengono utilizzate per passare i dati dall'avviso alla destinazione.",
       "rowTemplateTooltip": "Il modello di riga viene utilizzato per formattare il messaggio di avviso.",
       "templateType": "Tipo di modello:"
-    }
+    },
+    "editJson": "Modifica avviso JSON"
   },
   "alert_templates": {
     "header": "Modelli",
