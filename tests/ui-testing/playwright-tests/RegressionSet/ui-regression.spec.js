@@ -34,7 +34,7 @@ test.describe("UI Regression Bugs", () => {
     testLogger.info('Test: Favicon verification (Bug #9217)');
 
     // Navigate to home page
-    const homeUrl = `/web/?org_identifier=${getOrgIdentifier()}`;
+    const homeUrl = `/web/?org_identifier=${getOrgIdentifier() || 'default'}`;
     await page.goto(homeUrl);
     await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
 

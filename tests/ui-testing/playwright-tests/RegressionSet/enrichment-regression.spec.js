@@ -29,7 +29,7 @@ test.describe("Enrichment Table Regression Bugs", () => {
     testLogger.info('Test: Enrichment table color contrast (Bug #9193)');
 
     // Navigate to Functions page (where enrichment tables are)
-    await page.goto(`${process.env["ZO_BASE_URL"]}/web/functions?org_identifier=${getOrgIdentifier()}`);
+    await page.goto(`${process.env["ZO_BASE_URL"]}/web/functions?org_identifier=${getOrgIdentifier() || 'default'}`);
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(2000);
 

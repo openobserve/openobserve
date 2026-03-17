@@ -50,7 +50,7 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     await page.waitForTimeout(2000);
 
     await page.goto(
-      `${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`
+      `${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`
     );
 
     testLogger.info('Test setup completed');
