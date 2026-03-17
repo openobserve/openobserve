@@ -778,7 +778,7 @@ export default defineComponent({
       fetchPromQLLabels,
       currentXLabel,
       currentYLabel,
-      isPivotMode,,
+      isPivotMode,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     const { parsePromQlQuery } = usePromqlSuggestions();
