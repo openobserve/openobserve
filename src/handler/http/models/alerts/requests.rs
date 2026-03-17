@@ -102,37 +102,47 @@ pub struct AnomalyAlertFields {
 
 /// HTTP request body for `UpdateAlert` endpoint.
 ///
-/// Updates an existing alert. Provide the full alert configuration - this replaces
+/// Updates an existing alert. Provide the full alert configuration — this replaces
 /// the existing alert entirely (not a partial update). The request body is the same
 /// structure as Alert.
 ///
-/// ## Example
-///
-/// ```json
-/// {
-///     "name": "Updated Alert Name",
-///     "stream_type": "logs",
-///     "stream_name": "default",
-///     "is_real_time": false,
-///     "query_condition": {
-///         "type": "sql",
-///         "sql": "SELECT count(*) as count FROM \"default\" WHERE level = 'error'"
-///     },
-///     "trigger_condition": {
-///         "period": 15,
-///         "operator": ">=",
-///         "threshold": 100,
-///         "frequency": 5,
-///         "frequency_type": "minutes",
-///         "silence": 60
-///     },
-///     "destinations": ["slack-alerts"],
-///     "enabled": true,
-///     "description": "Updated description"
-/// }
-/// ```
+/// For anomaly detection configs, set `alert_type = "anomaly_detection"` and supply
+/// anomaly-specific changes in the `anomaly_config` object. Only fields present in
+/// `anomaly_config` will be updated (partial update semantics for anomaly fields).
 #[derive(Clone, Debug, Deserialize, ToSchema)]
-pub struct UpdateAlertRequestBody(#[schema(inline)] pub Alert);
+pub struct UpdateAlertRequestBody {
+    /// Discriminates the alert type. When `"anomaly_detection"`, delegates to the
+    /// anomaly config update path.
+    pub alert_type: Option<meta_alerts::AlertTypeFilter>,
+
+    /// Anomaly-detection-specific fields to update (partial — only supplied fields
+    /// are changed). Required when `alert_type` is `"anomaly_detection"`.
+    pub anomaly_config: Option<UpdateAnomalyAlertFields>,
+
+    /// Alert configuration fields (used for scheduled/realtime alerts).
+    #[serde(flatten)]
+    #[schema(inline)]
+    pub alert: Alert,
+}
+
+/// Anomaly-detection-specific fields for `UpdateAlertRequestBody` (all optional).
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
+pub struct UpdateAnomalyAlertFields {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub detection_function: Option<String>,
+    pub histogram_interval: Option<String>,
+    pub schedule_interval: Option<String>,
+    pub detection_window_seconds: Option<i64>,
+    pub training_window_days: Option<i32>,
+    pub retrain_interval_days: Option<i32>,
+    pub percentile: Option<f64>,
+    pub alert_enabled: Option<bool>,
+    pub alert_destination_id: Option<String>,
+    pub enabled: Option<bool>,
+    pub folder_id: Option<String>,
+    pub owner: Option<String>,
+}
 
 /// HTTP request body for `MoveAlerts` endpoint.
 #[derive(Clone, Debug, Deserialize, ToSchema)]
@@ -202,7 +212,7 @@ impl From<CreateAlertRequestBody> for meta_alerts::Alert {
 
 impl From<UpdateAlertRequestBody> for meta_alerts::Alert {
     fn from(value: UpdateAlertRequestBody) -> Self {
-        value.0.into()
+        value.alert.into()
     }
 }
 

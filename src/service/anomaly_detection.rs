@@ -329,6 +329,12 @@ pub async fn update_config(
     if let Some(alert_destination_id) = req.alert_destination_id {
         active_model.alert_destination_id = Set(Some(alert_destination_id));
     }
+    if let Some(folder_id_str) = req.folder_id {
+        active_model.folder_id = Set(folder_id_str.parse::<i64>().ok());
+    }
+    if let Some(owner) = req.owner {
+        active_model.owner = Set(Some(owner));
+    }
 
     active_model.updated_at = Set(Utc::now().timestamp_micros());
 
