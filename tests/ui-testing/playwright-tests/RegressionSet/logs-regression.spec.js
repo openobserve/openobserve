@@ -100,7 +100,7 @@ test.describe("Logs Regression Bugs", () => {
     ).catch(() => {}); // Streams may already be indexed
 
     // Navigate to logs page
-    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
     await page.waitForURL(/.*logs.*/, { timeout: 30000 });
 
     // ===== STREAM A SETUP =====
