@@ -177,9 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon="psychology"
             :title="span.llm_model_name"
           >
-            <span class="chip-value text-bold">{{
-              span.llm_model_name
-            }}</span>
+            <span class="chip-value text-bold">{{ span.llm_model_name }}</span>
           </q-chip>
 
           <!-- Token Usage Group -->
@@ -348,10 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="llm-content-box">
-                <div
-                  v-if="!hasContent(span.llm_input)"
-                  class="no-data-message"
-                >
+                <div v-if="!hasContent(span.llm_input)" class="no-data-message">
                   No data available
                 </div>
                 <LLMContentRenderer
