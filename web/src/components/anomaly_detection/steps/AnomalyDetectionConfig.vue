@@ -658,11 +658,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Vertical dual-handle range slider -->
                 <div
-                  class="sensitivity-slider-col tw:flex tw:flex-col tw:items-center tw:gap-1"
+                  class="sensitivity-slider-col tw:flex tw:flex-col tw:items-center"
                 >
-                  <span class="text-caption text-grey-6" style="font-size: 10px"
-                    >100</span
-                  >
                   <q-range
                     v-model="thresholdRange"
                     :min="0"
@@ -671,24 +668,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     vertical
                     reverse
                     color="primary"
+                    label-always
+                    markers
+                    :marker-labels="[{ value: 0, label: '0' }, { value: 25, label: '25' }, { value: 50, label: '50' }, { value: 75, label: '75' }, { value: 100, label: '100' }]"
                     class="sensitivity-range-slider"
                     data-test="anomaly-threshold-range"
                     @update:model-value="onThresholdRangeChange"
                   />
-                  <span class="text-caption text-grey-6" style="font-size: 10px"
-                    >0</span
-                  >
-                  <div class="tw:flex tw:flex-col tw:items-center tw:mt-1">
-                    <span
-                      class="text-caption text-grey-5"
-                      style="
-                        font-size: 9px;
-                        writing-mode: vertical-lr;
-                        transform: rotate(180deg);
-                      "
-                      >Score</span
-                    >
-                  </div>
                 </div>
               </div>
             </div>
@@ -1152,13 +1138,55 @@ export default defineComponent({
 }
 
 .sensitivity-slider-col {
-  width: 40px;
+  width: 60px;
   flex-shrink: 0;
 }
 
 .sensitivity-range-slider {
-  flex: 1;
-  height: 140px;
+  height: 180px;
+
+  --slider-accent: color-mix(
+    in srgb,
+    var(--o2-primary-color) 55%,
+    var(--o2-primary-background)
+  );
+
+  // Selection track
+  :deep(.q-slider__selection) {
+    background: var(--slider-accent) !important;
+  }
+
+  // Thumbs
+  :deep(.q-slider__thumb) {
+    color: var(--slider-accent) !important;
+
+    circle {
+      stroke: var(--slider-accent) !important;
+      fill: var(--slider-accent) !important;
+    }
+  }
+
+  // Value labels (number plates)
+  :deep(.q-slider__pin-value-marker-bg) {
+    background: var(--slider-accent) !important;
+  }
+
+  :deep(.q-slider__pin-value-marker) {
+    color: white !important;
+    font-size: 10px !important;
+  }
+
+  // Ruler tick marks — light grey
+  :deep(.q-slider__marker) {
+    background: var(--o2-border) !important;
+    opacity: 0.6;
+  }
+
+  // Marker labels (scale numbers)
+  :deep(.q-slider__marker-labels-container) {
+    color: var(--o2-text-secondary);
+    font-size: 9px;
+  }
 }
 
 // Reuse alerts wizard frequency toggle button styles
