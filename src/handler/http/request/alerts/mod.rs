@@ -969,26 +969,48 @@ pub async fn move_alerts(
     Headers(user_email): Headers<UserEmail>,
     Json(req_body): Json<MoveAlertsRequestBody>,
 ) -> Response {
+    use crate::handler::http::request::anomaly_detection::UpdateAnomalyConfigRequest;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    match alert::move_to_folder(
-        client,
-        &org_id,
-        &req_body.alert_ids,
-        &req_body.dst_folder_id,
-        &user_email.user_id,
-    )
-    .await
-    {
-        Ok(_) => {
-            let message = if req_body.alert_ids.len() == 1 {
-                "Alert moved"
-            } else {
-                "Alerts moved"
-            };
-            MetaHttpResponse::ok(message)
+
+    // Separate IDs into regular alerts and anomaly configs
+    let mut alert_ids: Vec<Ksuid> = Vec::new();
+    let mut anomaly_ids: Vec<Ksuid> = Vec::new();
+    for id in &req_body.alert_ids {
+        match alert::get_by_id(client, &org_id, *id).await {
+            Ok(_) => alert_ids.push(*id),
+            Err(AlertError::AlertNotFound) => anomaly_ids.push(*id),
+            Err(e) => return e.into(),
         }
-        Err(e) => e.into(),
     }
+
+    // Move regular alerts in one batch
+    if !alert_ids.is_empty() {
+        if let Err(e) =
+            alert::move_to_folder(client, &org_id, &alert_ids, &req_body.dst_folder_id, &user_email.user_id).await
+        {
+            return e.into();
+        }
+    }
+
+    // Move anomaly configs individually
+    for id in anomaly_ids {
+        let req = UpdateAnomalyConfigRequest {
+            folder_id: Some(req_body.dst_folder_id.clone()),
+            ..Default::default()
+        };
+        if let Err(e) =
+            crate::service::anomaly_detection::update_config(&org_id, &id.to_string(), req).await
+        {
+            return MetaHttpResponse::not_found(e.to_string());
+        }
+    }
+
+    let message = if req_body.alert_ids.len() == 1 {
+        "Alert moved"
+    } else {
+        "Alerts moved"
+    };
+    MetaHttpResponse::ok(message)
 }
 
 /// GenerateSql
