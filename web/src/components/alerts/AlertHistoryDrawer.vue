@@ -509,6 +509,7 @@ const activeTab = ref("history");
 const alertHistory: Ref<any[]> = ref([]);
 const isLoadingHistory = ref(false);
 const qTableRef: Ref<any> = ref(null);
+const isInitialized = ref(false);
 
 // Date time - default to last 15 minutes (relative)
 const dateTimeRef = ref<any>(null);
@@ -764,6 +765,9 @@ const updateDateTime = (value: any) => {
     };
   }
 
+  // Skip fetch on initial DateTime mount — the watch handles the first load
+  if (!isInitialized.value) return;
+
   pagination.value.page = 1;
   currentPage.value = 1;
   if (props.alertId) {
@@ -814,6 +818,7 @@ watch(
           pagination: pagination.value,
         });
       }
+      isInitialized.value = true;
     }
   },
   { immediate: true },

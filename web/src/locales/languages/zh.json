@@ -1623,7 +1623,8 @@
       "variablesTooltip": "变量用于将数据从警报传递到目标。",
       "rowTemplateTooltip": "行模板用于格式化警报消息。",
       "templateType": "模板类型："
-    }
+    },
+    "editJson": "编辑警报 JSON"
   },
   "alert_templates": {
     "header": "模板",
