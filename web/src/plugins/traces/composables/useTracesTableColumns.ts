@@ -85,7 +85,6 @@ const KNOWN_COLUMN_META: Record<
     meta: {
       align: "center",
       slot: false,
-      closable: true,
       cellClass: "tw:text-[var(--o2-text-1)]!",
     },
     accessorFn: (row: any) => row.spans,
