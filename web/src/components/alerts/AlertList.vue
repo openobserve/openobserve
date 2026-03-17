@@ -249,27 +249,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ props.row[col.field].name }}
                         </div>
                       </template>
-                      <template v-else-if="col.name === 'dedup_status'">
-                        <div class="tw:flex tw:items-center tw:justify-center">
-                          <q-icon
-                            v-if="props.row.deduplication?.enabled"
-                            name="check_circle"
-                            size="sm"
-                            color="positive"
-                          >
-                            <q-tooltip class="bg-grey-8">
-                              Deduplication: Enabled
-                              <div v-if="props.row.deduplication.fingerprint_fields?.length">
-                                Fields: {{ props.row.deduplication.fingerprint_fields.join(', ') }}
-                              </div>
-                              <div v-if="props.row.deduplication.grouping?.enabled">
-                                Grouping: {{ props.row.deduplication.grouping.group_wait_seconds }}s wait
-                              </div>
-                            </q-tooltip>
-                          </q-icon>
-                          <span v-else class="text-grey-5">-</span>
-                        </div>
-                      </template>
                       <template v-else-if="col.name == 'actions'">
                         <div class="tw:flex tw:items-center actions-container"
                         >
@@ -1054,30 +1033,6 @@ export default defineComponent({
           align: "left",
           sortable: true,
           style: "width: 150px",
-        },
-        {
-          name: "total_evaluations",
-          field: "total_evaluations",
-          label: t("alerts.totalEvaluations"),
-          align: "center",
-          sortable: true,
-          style: "width: 150px",
-        },
-        {
-          name: "firing_count",
-          field: "firing_count",
-          label: t("alerts.firingCount"),
-          align: "center",
-          sortable: true,
-          style: "width: 150px",
-        },
-        {
-          name: "dedup_status",
-          field: "dedup_status",
-          label: "Dedup",
-          align: "center",
-          sortable: false,
-          style: "width: 80px",
         },
         {
           name: "actions",
