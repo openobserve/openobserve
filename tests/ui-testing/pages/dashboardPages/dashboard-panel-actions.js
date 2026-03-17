@@ -31,7 +31,7 @@ export default class DashboardactionPage {
   async savePanel() {
     await this.panelSaveBtn.waitFor({ state: "visible" });
     await this.panelSaveBtn.click();
-
+    
     // Wait for save to complete
     // await this.page.waitForLoadState("networkidle");
   }
@@ -137,6 +137,48 @@ export default class DashboardactionPage {
    */
   async verifyChartRenders(expect) {
     await expect(this.chartRenderer.first()).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Verify that actual data is plotted on the chart canvas.
+   * Checks two things:
+   *   1. No "no-data" placeholder is visible
+   *   2. At least one canvas has colored (non-background, non-transparent) pixels
+   *
+   * Uses the same canvas pixel-scan approach as the multiwindow color spec.
+   * @param {Function} expect - Playwright expect function
+   */
+  async verifyChartHasData(expect) {
+    // 1. No "no data" placeholder
+    const noDataVisible = await this.noDataElement.isVisible().catch(() => false);
+    expect(noDataVisible).toBe(false);
+
+    // 2. Canvas has non-background pixels
+    const hasData = await this.page.evaluate(() => {
+      const canvases = document.querySelectorAll("canvas");
+      for (const canvas of canvases) {
+        if (canvas.width < 10 || canvas.height < 10) continue;
+        try {
+          const ctx = canvas.getContext("2d");
+          if (!ctx) continue;
+          const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          let coloredPixels = 0;
+          // Sample every 4th pixel for performance
+          for (let i = 0; i < data.length; i += 16) {
+            const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+            // Skip transparent and near-white (background) pixels
+            if (a > 200 && !(r > 240 && g > 240 && b > 240)) {
+              coloredPixels++;
+            }
+          }
+          if (coloredPixels > 10) return true;
+        } catch (_) {
+          // Cross-origin canvas — skip
+        }
+      }
+      return false;
+    });
+    expect(hasData).toBe(true);
   }
 
   /**
