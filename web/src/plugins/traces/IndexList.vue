@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="log-search-index-list-fields-table"
         v-model="searchObj.data.stream.selectedFields"
         :visible-columns="['name']"
-        :rows="fieldList"
+        :rows="normalizedFieldList"
         row-key="name"
         :filter="searchObj.data.stream.filterField"
         :filter-method="filterFieldFn"
@@ -73,35 +73,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : ''
               "
             >
-              <!-- TODO OK : Repeated code make separate component to display field  -->
-              <div
-                v-if="(props.row.ftsKey && !showFtsFieldValues) || !props.row.showValues"
-                class="field-container flex content-center ellipsis hover:tw:bg-[var(--o2-hover-accent)]!"
-                :title="props.row.label || props.row.name"
+              <FieldRow
+                :field="props.row"
+                :selected-fields="searchObj.data.stream.selectedFields"
+                timestamp-column="_timestamp"
+                :theme="store.state.appTheme"
+                :show-quick-mode="false"
+                @add-to-filter="addToFilter(`${props.row.name}=''`)"
+                @toggle-field="toggleField"
               >
-                <div class="field_label ellipsis tw:flex tw:items-center tw:pl-[calc(1.5rem+3px)]" style="font-size: 14px">
-                  {{ props.row.label || props.row.name }}
-                </div>
-                <div
-                  class="field_overlay hover:tw:bg-[var(--o2-hover-accent)]!"
-                >
-                  <q-btn
-                    :icon="outlinedAdd"
-                    :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
-                    style="margin-right: 0.375rem"
-                    size="0.4rem"
-                    class="q-mr-sm tw:text-[var(--o2-text-primary)]!"
-                    @click.stop="addToFilter(`${props.row.name}=''`)"
-                    round
+                <template #expansion="{ field }">
+                  <basic-values-filter
+                    :row="field"
+                    :active-include-values="
+                      activeIncludeFieldValues?.[props.row.name] ?? []
+                    "
+                    :active-exclude-values="
+                      activeExcludeFieldValues?.[props.row.name] ?? []
+                    "
+                    :selected-fields="searchObj.data.stream.selectedFields"
+                    @toggle-field="toggleField"
                   />
-                </div>
-              </div>
-              <basic-values-filter
-                v-else
-                :row="props.row"
-                :active-include-values="activeIncludeFieldValues?.[props.row.name] ?? []"
-                :active-exclude-values="activeExcludeFieldValues?.[props.row.name] ?? []"
-              />
+                </template>
+              </FieldRow>
             </q-td>
           </q-tr>
         </template>
@@ -126,8 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="searchObj.loadingStream"
             class="tw:flex tw:items-center tw:justify-center tw:w-full tw:pt-[2rem]"
           >
-            <q-td colspan="100%" class="text-bold"
-style="opacity: 0.7">
+            <q-td colspan="100%" class="text-bold" style="opacity: 0.7">
               <div
                 class="text-subtitle2 text-weight-bold tw:w-fit tw:mx-auto tw:my-0 tw:flex-col tw:justify-items-center"
               >
@@ -149,13 +142,15 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useTraces from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
-import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import BasicValuesFilter from "./fields-sidebar/BasicValuesFilter.vue";
+import FieldRow from "@/components/common/FieldRow.vue";
+import { computed } from "vue";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
   components: {
     BasicValuesFilter,
+    FieldRow,
   },
   emits: ["update:changeStream"],
   props: {
@@ -176,7 +171,7 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const { searchObj } = useTraces();
+    const { searchObj, updatedLocalLogFilterField } = useTraces();
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
 
     const duration = ref({
@@ -248,6 +243,23 @@ export default defineComponent({
       emit("update:changeStream");
     };
 
+    const normalizedFieldList = computed(() =>
+      (props.fieldList as any[]).map((f: any) => ({
+        ...f,
+        isSchemaField: true,
+      })),
+    );
+
+    const toggleField = (field: any) => {
+      const idx = searchObj.data.stream.selectedFields.indexOf(field.name);
+      if (idx === -1) {
+        searchObj.data.stream.selectedFields.push(field.name);
+      } else {
+        searchObj.data.stream.selectedFields.splice(idx, 1);
+      }
+      updatedLocalLogFilterField();
+    };
+
     return {
       t,
       store,
@@ -259,11 +271,12 @@ export default defineComponent({
       getImageURL,
       filterStreamFn,
       addSearchTerm,
-      outlinedAdd,
       fnMarkerLabel,
       duration,
       onStreamChange,
       showFtsFieldValues,
+      normalizedFieldList,
+      toggleField,
     };
   },
 });
