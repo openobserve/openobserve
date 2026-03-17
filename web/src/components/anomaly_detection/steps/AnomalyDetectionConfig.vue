@@ -1147,7 +1147,7 @@ export default defineComponent({
 
   --slider-accent: color-mix(
     in srgb,
-    var(--o2-primary-color) 55%,
+    var(--q-primary) 55%,
     var(--o2-primary-background)
   );
 
@@ -1177,9 +1177,9 @@ export default defineComponent({
   }
 
   // Ruler tick marks — light grey
-  :deep(.q-slider__marker) {
-    background: var(--o2-border) !important;
-    opacity: 0.6;
+  :deep(.q-slider__markers) {
+    color: var(--o2-border) !important;
+    opacity: 0.8;
   }
 
   // Marker labels (scale numbers)
