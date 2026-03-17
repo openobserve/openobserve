@@ -13,9 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Adds folder_id, owner, total_evaluations, and firing_count columns to the
-//! anomaly_detection_config table so that anomaly configs can be managed
-//! alongside alerts (folders, ownership, and evaluation statistics).
+//! Adds folder_id and owner columns to the anomaly_detection_config table so
+//! that anomaly configs can be organised into folders and attributed to an owner,
+//! consistent with the alerts table.
+//!
+//! folder_id is stored as a varchar slug (e.g. "default"), matching how the rest
+//! of the codebase identifies folders. Existing rows are backfilled to "default".
 
 use sea_orm_migration::prelude::*;
 
@@ -37,7 +40,7 @@ impl MigrationTrait for Migration {
                         .table(AnomalyDetectionConfig::Table)
                         .add_column_if_not_exists(
                             ColumnDef::new(AnomalyDetectionConfig::FolderId)
-                                .big_integer()
+                                .string_len(256)
                                 .null(),
                         )
                         .to_owned(),
@@ -52,34 +55,6 @@ impl MigrationTrait for Migration {
                             ColumnDef::new(AnomalyDetectionConfig::Owner)
                                 .string_len(256)
                                 .null(),
-                        )
-                        .to_owned(),
-                )
-                .await?;
-
-            manager
-                .alter_table(
-                    Table::alter()
-                        .table(AnomalyDetectionConfig::Table)
-                        .add_column_if_not_exists(
-                            ColumnDef::new(AnomalyDetectionConfig::TotalEvaluations)
-                                .big_integer()
-                                .not_null()
-                                .default(0),
-                        )
-                        .to_owned(),
-                )
-                .await?;
-
-            manager
-                .alter_table(
-                    Table::alter()
-                        .table(AnomalyDetectionConfig::Table)
-                        .add_column_if_not_exists(
-                            ColumnDef::new(AnomalyDetectionConfig::FiringCount)
-                                .big_integer()
-                                .not_null()
-                                .default(0),
                         )
                         .to_owned(),
                 )
@@ -92,7 +67,7 @@ impl MigrationTrait for Migration {
                         .table(AnomalyDetectionConfig::Table)
                         .add_column_if_not_exists(
                             ColumnDef::new(AnomalyDetectionConfig::FolderId)
-                                .big_integer()
+                                .string_len(256)
                                 .null(),
                         )
                         .add_column_if_not_exists(
@@ -100,22 +75,18 @@ impl MigrationTrait for Migration {
                                 .string_len(256)
                                 .null(),
                         )
-                        .add_column_if_not_exists(
-                            ColumnDef::new(AnomalyDetectionConfig::TotalEvaluations)
-                                .big_integer()
-                                .not_null()
-                                .default(0),
-                        )
-                        .add_column_if_not_exists(
-                            ColumnDef::new(AnomalyDetectionConfig::FiringCount)
-                                .big_integer()
-                                .not_null()
-                                .default(0),
-                        )
                         .to_owned(),
                 )
                 .await?;
         }
+
+        // Backfill existing rows: any config without a folder gets the default folder.
+        manager
+            .get_connection()
+            .execute_unprepared(
+                "UPDATE anomaly_detection_config SET folder_id = 'default' WHERE folder_id IS NULL",
+            )
+            .await?;
 
         // Index on folder_id for fast folder-based filtering.
         manager
@@ -134,11 +105,7 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_index(
-                Index::drop()
-                    .name(ANOMALY_CONFIG_FOLDER_ID_IDX)
-                    .to_owned(),
-            )
+            .drop_index(Index::drop().name(ANOMALY_CONFIG_FOLDER_ID_IDX).to_owned())
             .await?;
 
         manager
@@ -147,8 +114,6 @@ impl MigrationTrait for Migration {
                     .table(AnomalyDetectionConfig::Table)
                     .drop_column(AnomalyDetectionConfig::FolderId)
                     .drop_column(AnomalyDetectionConfig::Owner)
-                    .drop_column(AnomalyDetectionConfig::TotalEvaluations)
-                    .drop_column(AnomalyDetectionConfig::FiringCount)
                     .to_owned(),
             )
             .await?;
@@ -162,6 +127,4 @@ enum AnomalyDetectionConfig {
     Table,
     FolderId,
     Owner,
-    TotalEvaluations,
-    FiringCount,
 }

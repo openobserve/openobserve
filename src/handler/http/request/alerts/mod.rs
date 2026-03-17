@@ -42,9 +42,9 @@ use crate::{
         extractors::Headers,
         models::alerts::{
             requests::{
-                AlertBulkEnableRequest, CloneAlertRequestBody,
-                CreateAlertRequestBody, EnableAlertQuery, GenerateSqlRequestBody, ListAlertsQuery,
-                MoveAlertsRequestBody, UpdateAlertRequestBody, UpdateAnomalyAlertFields,
+                AlertBulkEnableRequest, CloneAlertRequestBody, CreateAlertRequestBody,
+                EnableAlertQuery, GenerateSqlRequestBody, ListAlertsQuery, MoveAlertsRequestBody,
+                UpdateAlertRequestBody, UpdateAnomalyAlertFields,
             },
             responses::{
                 AlertBulkEnableResponse, EnableAlertResponseBody, GenerateSqlMetadata,
@@ -347,8 +347,6 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
                             "last_processed_timestamp",
                             "current_model_version",
                             "status",
-                            "total_evaluations",
-                            "firing_count",
                             "last_error",
                             "retries",
                         ] {

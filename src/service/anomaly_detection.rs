@@ -185,10 +185,8 @@ pub async fn create_config(
         )),
         alert_enabled: Set(req.alert_enabled.unwrap_or(true)),
         alert_destination_id: Set(req.alert_destination_id.clone()),
-        folder_id: Set(req.folder_id.as_deref().and_then(|s| s.parse::<i64>().ok())),
+        folder_id: Set(req.folder_id.clone()),
         owner: Set(req.owner.clone()),
-        total_evaluations: Set(0),
-        firing_count: Set(0),
         status: Set(0i32), // 0 = waiting
         retries: Set(0),
         last_updated: Set(now_us),
@@ -330,7 +328,7 @@ pub async fn update_config(
         active_model.alert_destination_id = Set(Some(alert_destination_id));
     }
     if let Some(folder_id_str) = req.folder_id {
-        active_model.folder_id = Set(folder_id_str.parse::<i64>().ok());
+        active_model.folder_id = Set(Some(folder_id_str));
     }
     if let Some(owner) = req.owner {
         active_model.owner = Set(Some(owner));
@@ -467,10 +465,7 @@ pub async fn clone_config(
     let new_id = svix_ksuid::Ksuid::new(None, None).to_string();
     let now_us = Utc::now().timestamp_micros();
 
-    let resolved_folder_id = folder_id
-        .as_deref()
-        .and_then(|s| s.parse::<i64>().ok())
-        .or(src.folder_id);
+    let resolved_folder_id = folder_id.or_else(|| src.folder_id.clone());
 
     let cloned = anomaly_detection_config::ActiveModel {
         anomaly_id: Set(new_id.clone()),
@@ -504,8 +499,6 @@ pub async fn clone_config(
         alert_destination_id: Set(src.alert_destination_id.clone()),
         folder_id: Set(resolved_folder_id),
         owner: Set(src.owner.clone()),
-        total_evaluations: Set(0),
-        firing_count: Set(0),
         status: Set(0i32),
         retries: Set(0),
         last_updated: Set(now_us),
@@ -532,7 +525,9 @@ pub async fn clone_config(
         }
     }
 
-    Ok(model_to_api_json(serde_json::to_value(result).unwrap_or_default()))
+    Ok(model_to_api_json(
+        serde_json::to_value(result).unwrap_or_default(),
+    ))
 }
 
 /// Cancel an in-progress training run.
