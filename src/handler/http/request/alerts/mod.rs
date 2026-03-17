@@ -248,6 +248,7 @@ async fn create_anomaly_alert(
     )
 )]
 pub async fn get_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+    let alert_id_str = alert_id.clone();
     let alert_id = match Ksuid::from_str(&alert_id) {
         Ok(id) => id,
         Err(_) => {
@@ -263,6 +264,23 @@ pub async fn get_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Resp
                 .ok();
             let resp_body: GetAlertResponseBody = (alert, scheduled_job).into();
             MetaHttpResponse::json(resp_body)
+        }
+        Err(AlertError::AlertNotFound) => {
+            // Fall back to anomaly detection config lookup.
+            match crate::service::anomaly_detection::get_config(&org_id, &alert_id_str).await {
+                Ok(Some(mut v)) => {
+                    // Tag with alert_type so the caller can discriminate.
+                    if let Some(obj) = v.as_object_mut() {
+                        obj.insert(
+                            "alert_type".to_string(),
+                            serde_json::Value::String("anomaly_detection".to_string()),
+                        );
+                    }
+                    MetaHttpResponse::json(v)
+                }
+                Ok(None) => MetaHttpResponse::not_found(format!("alert {alert_id_str} not found")),
+                Err(e) => MetaHttpResponse::internal_error(e.to_string()),
+            }
         }
         Err(e) => e.into(),
     }
