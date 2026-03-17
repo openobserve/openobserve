@@ -483,6 +483,7 @@ async fn build_and_run_anomaly_update(
     )
 )]
 pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+    let alert_id_str = alert_id.clone();
     let alert_id = match Ksuid::from_str(&alert_id) {
         Ok(id) => id,
         Err(_) => {
@@ -492,6 +493,12 @@ pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::delete_by_id(client, &org_id, alert_id).await {
         Ok(_) => MetaHttpResponse::ok("Alert deleted"),
+        Err(AlertError::AlertNotFound) => {
+            match crate::service::anomaly_detection::delete_config(&org_id, &alert_id_str).await {
+                Ok(_) => MetaHttpResponse::ok("Alert deleted"),
+                Err(e) => MetaHttpResponse::not_found(e.to_string()),
+            }
+        }
         Err(e) => e.into(),
     }
 }
@@ -557,14 +564,22 @@ pub async fn delete_alert_bulk(
     for id in req.ids {
         // already checked this is valid, so ok to unwrap
         let alert_id = Ksuid::from_str(&id).unwrap();
-        match alert::delete_by_id(client, &org_id, alert_id).await {
-            Ok(_) => {
-                successful.push(id);
+        let result = match alert::delete_by_id(client, &org_id, alert_id).await {
+            Ok(_) => Ok(()),
+            Err(AlertError::AlertNotFound) => {
+                // Fall back to anomaly config delete.
+                crate::service::anomaly_detection::delete_config(&org_id, &id)
+                    .await
+                    .map_err(|e| e.to_string())
             }
+            Err(e) => Err(e.to_string()),
+        };
+        match result {
+            Ok(_) => successful.push(id),
             Err(e) => {
                 log::error!("error deleting alert {org_id}/{id} : {e}");
                 unsuccessful.push(id);
-                err = Some(e.to_string())
+                err = Some(e);
             }
         }
     }
