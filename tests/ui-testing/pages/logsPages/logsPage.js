@@ -534,43 +534,47 @@ export class LogsPage {
      * @returns {Promise<boolean>} True if stream exists, false if timeout
      */
     async waitForStreamAvailable(streamName, maxWaitMs = 30000, pollIntervalMs = 3000, streamType = 'logs') {
-        testLogger.debug(`waitForStreamAvailable: Waiting for stream ${streamName} (type=${streamType}) to be available`);
+        testLogger.info(`waitForStreamAvailable: Waiting for stream ${streamName} (type=${streamType}, timeout=${maxWaitMs}ms)`);
         const startTime = Date.now();
 
         const apiUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL;
         const orgId = getOrgIdentifier();
+        const url = `${apiUrl}/api/${orgId}/streams?type=${streamType}&keyword=${streamName}`;
+        let pollCount = 0;
 
         while (Date.now() - startTime < maxWaitMs) {
+            pollCount++;
             try {
-                // Use filtered list endpoint with keyword param — avoids pagination issues
-                // that occur with unfiltered GET /streams (which may return only first N results)
-                const response = await this.page.request.get(
-                    `${apiUrl}/api/${orgId}/streams?type=${streamType}&keyword=${streamName}`,
-                    { headers: getAuthHeaders() }
-                );
+                const response = await this.page.request.get(url, { headers: getAuthHeaders() });
+                const status = response.status();
 
                 if (response.ok()) {
                     const data = await response.json();
-                    if (data.list) {
-                        const streamExists = data.list.some(s => s.name === streamName);
-                        if (streamExists) {
-                            testLogger.info(`waitForStreamAvailable: Stream ${streamName} found after ${Date.now() - startTime}ms`);
-                            return true;
-                        }
+                    const listCount = data.list ? data.list.length : 0;
+                    const streamExists = data.list && data.list.some(s => s.name === streamName);
+                    if (streamExists) {
+                        testLogger.info(`waitForStreamAvailable: Stream ${streamName} found after ${Date.now() - startTime}ms (poll #${pollCount})`);
+                        return true;
+                    }
+                    // Log first few polls and then every 10th to diagnose CI failures
+                    if (pollCount <= 3 || pollCount % 10 === 0) {
+                        const names = data.list ? data.list.map(s => s.name).join(', ') : 'none';
+                        testLogger.info(`waitForStreamAvailable: poll #${pollCount} — HTTP ${status}, list=${listCount}, names=[${names}]`);
                     }
                 } else {
-                    testLogger.debug(`waitForStreamAvailable: API returned ${response.status()}, retrying...`);
+                    // Always log non-200 responses at info level for CI visibility
+                    const bodyText = await response.text().catch(() => 'unreadable');
+                    testLogger.info(`waitForStreamAvailable: poll #${pollCount} — HTTP ${status}, body=${bodyText.substring(0, 200)}`);
                 }
 
-                testLogger.debug(`waitForStreamAvailable: Stream ${streamName} not found yet, waiting ${pollIntervalMs}ms...`);
                 await this.page.waitForTimeout(pollIntervalMs);
             } catch (e) {
-                testLogger.debug(`waitForStreamAvailable: Error checking stream: ${e.message}`);
+                testLogger.info(`waitForStreamAvailable: poll #${pollCount} — error: ${e.message}`);
                 await this.page.waitForTimeout(pollIntervalMs);
             }
         }
 
-        testLogger.warn(`waitForStreamAvailable: Stream ${streamName} not found after ${maxWaitMs}ms`);
+        testLogger.warn(`waitForStreamAvailable: Stream ${streamName} not found after ${maxWaitMs}ms (${pollCount} polls)`);
         return false;
     }
 
