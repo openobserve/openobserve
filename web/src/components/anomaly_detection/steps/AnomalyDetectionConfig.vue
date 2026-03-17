@@ -155,7 +155,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div style="width: calc(100% - 190px)">
             <div
               class="custom-sql-editor-wrapper"
-              :class="store.state.theme === 'dark' ? 'dark-editor' : 'light-editor'"
+              :class="
+                store.state.theme === 'dark' ? 'dark-editor' : 'light-editor'
+              "
             >
               <QueryEditor
                 data-test-prefix="anomaly-custom-sql"
@@ -163,7 +165,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :keywords="allStreamFields"
                 :show-auto-complete="true"
                 :disable-ai="!config.stream_name"
-                :disable-ai-reason="!config.stream_name ? 'Select a stream first' : ''"
+                :disable-ai-reason="
+                  !config.stream_name ? 'Select a stream first' : ''
+                "
                 editor-height="100%"
                 data-test="anomaly-custom-sql"
                 @update:query="config.custom_sql = $event"
@@ -538,7 +542,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-start alert-settings-row">
           <div
             class="tw:font-semibold flex items-center"
-            style="width: 190px; height: 36px"
+            style="width: 190px; padding-top: 4px"
           >
             Sensitivity
             <q-icon
@@ -555,83 +559,138 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 max-width="300px"
               >
                 <span style="font-size: 14px"
-                  >Higher sensitivity flags more data points as anomalies. Lower
-                  sensitivity only flags the most extreme outliers. Internally
-                  stored as the {{ config.threshold }}th percentile
-                  cutoff.</span
+                  >Adjust the anomaly score range to control sensitivity. Points
+                  with scores outside this range will not trigger alerts. Use
+                  the chart to visualize historical data and tune
+                  accordingly.</span
                 >
               </q-tooltip>
             </q-icon>
           </div>
           <div style="width: calc(100% - 190px)">
-            <!-- +/- stepper row -->
-            <div class="tw:flex tw:items-center tw:gap-2 tw:mb-1">
-              <q-btn
-                flat
-                dense
-                round
-                icon="remove"
-                size="sm"
-                :disable="config.threshold <= 90"
-                @click="config.threshold = Math.max(90, config.threshold - 1)"
-                data-test="anomaly-threshold-dec"
-              />
-              <div class="tw:text-center" style="min-width: 140px">
-                <span class="tw:font-semibold" style="font-size: 13px"
-                  >~{{ 100 - config.threshold }}%</span
+            <!-- Chart + Slider container -->
+            <div class="sensitivity-chart-container">
+              <!-- Header row: range labels + load button -->
+              <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
+                <div class="tw:flex tw:items-center tw:gap-2">
+                  <span class="text-caption text-grey-6"
+                    >Anomaly Score Range:</span
+                  >
+                  <span
+                    class="tw:font-semibold text-caption"
+                    data-test="anomaly-threshold-range-label"
+                    >{{ config.threshold_min ?? 0 }} –
+                    {{ config.threshold }}</span
+                  >
+                </div>
+                <q-btn
+                  flat
+                  dense
+                  no-caps
+                  size="sm"
+                  icon="refresh"
+                  :loading="historyLoading"
+                  :disable="!config.id || historyLoading"
+                  class="text-caption"
+                  data-test="anomaly-sensitivity-load-btn"
+                  @click="loadSensitivityHistory"
                 >
-                <span class="text-caption text-grey-6 q-ml-xs"
-                  >of data flagged</span
-                >
+                  <q-tooltip v-if="!config.id"
+                    >Available after saving</q-tooltip
+                  >
+                  <span v-else class="q-ml-xs">Load Data</span>
+                </q-btn>
               </div>
-              <q-btn
-                flat
-                dense
-                round
-                icon="add"
-                size="sm"
-                :disable="config.threshold >= 99"
-                @click="config.threshold = Math.min(99, config.threshold + 1)"
-                data-test="anomaly-threshold-inc"
-              />
-              <q-badge
-                :color="
-                  config.threshold <= 92
-                    ? 'negative'
-                    : config.threshold <= 95
-                      ? 'warning'
-                      : 'positive'
-                "
-                :label="
-                  config.threshold <= 92
-                    ? 'High'
-                    : config.threshold <= 95
-                      ? 'Medium'
-                      : 'Low'
-                "
-                class="q-ml-xs"
-              />
-            </div>
-            <!-- slider for fine-grained control -->
-            <q-slider
-              v-model="config.threshold"
-              :min="90"
-              :max="99"
-              :step="1"
-              snap
-              color="primary"
-              style="max-width: 280px"
-              data-test="anomaly-threshold"
-            />
-            <div
-              class="tw:flex tw:justify-between text-caption"
-              style="max-width: 280px"
-              :class="
-                store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
-              "
-            >
-              <span>← More sensitive</span>
-              <span>Less sensitive →</span>
+
+              <!-- Chart + Vertical Slider row -->
+              <div class="tw:flex tw:gap-3">
+                <!-- ECharts time series chart -->
+                <div class="sensitivity-chart-wrapper tw:flex-1">
+                  <div
+                    v-if="!config.id"
+                    class="sensitivity-empty-state"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'text-grey-5'
+                        : 'text-grey-6'
+                    "
+                  >
+                    <q-icon
+                      name="bar_chart"
+                      size="2rem"
+                      class="tw:mb-2 tw:opacity-40"
+                    />
+                    <span class="text-caption"
+                      >Save first to load historical data</span
+                    >
+                  </div>
+                  <div
+                    v-else-if="historyLoading"
+                    class="sensitivity-empty-state"
+                  >
+                    <q-spinner size="1.5rem" color="primary" />
+                  </div>
+                  <div
+                    v-else-if="historyPoints.length === 0"
+                    class="sensitivity-empty-state"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'text-grey-5'
+                        : 'text-grey-6'
+                    "
+                  >
+                    <q-icon
+                      name="timeline"
+                      size="2rem"
+                      class="tw:mb-2 tw:opacity-40"
+                    />
+                    <span class="text-caption"
+                      >No history data yet. Click Load Data.</span
+                    >
+                  </div>
+                  <div
+                    v-else
+                    ref="chartRef"
+                    class="sensitivity-chart"
+                    data-test="anomaly-sensitivity-chart"
+                  />
+                </div>
+
+                <!-- Vertical dual-handle range slider -->
+                <div
+                  class="sensitivity-slider-col tw:flex tw:flex-col tw:items-center tw:gap-1"
+                >
+                  <span class="text-caption text-grey-6" style="font-size: 10px"
+                    >100</span
+                  >
+                  <q-range
+                    v-model="thresholdRange"
+                    :min="0"
+                    :max="100"
+                    :step="1"
+                    vertical
+                    reverse
+                    color="primary"
+                    class="sensitivity-range-slider"
+                    data-test="anomaly-threshold-range"
+                    @update:model-value="onThresholdRangeChange"
+                  />
+                  <span class="text-caption text-grey-6" style="font-size: 10px"
+                    >0</span
+                  >
+                  <div class="tw:flex tw:flex-col tw:items-center tw:mt-1">
+                    <span
+                      class="text-caption text-grey-5"
+                      style="
+                        font-size: 9px;
+                        writing-mode: vertical-lr;
+                        transform: rotate(180deg);
+                      "
+                      >Score</span
+                    >
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -641,10 +700,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, type PropType } from "vue";
+import { defineComponent, ref, watch, onUnmounted, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import * as echarts from "echarts";
 import streamService from "@/services/stream";
+import anomalyDetectionService from "@/services/anomaly_detection";
 import {
   ANOMALY_FILTER_OPERATORS,
   operatorNeedsValue,
@@ -690,7 +751,11 @@ export default defineComponent({
     ];
 
     // Build default SQL template for a given stream name and histogram interval
-    const buildDefaultSql = (streamName: string, intervalValue: number, intervalUnit: string) =>
+    const buildDefaultSql = (
+      streamName: string,
+      intervalValue: number,
+      intervalUnit: string,
+    ) =>
       `SELECT histogram(_timestamp, '${intervalValue}${intervalUnit}') AS time_bucket, count(*) AS value\nFROM "${streamName}"\nGROUP BY time_bucket\nORDER BY time_bucket`;
 
     // Stream fields for filter field selector and detection function field
@@ -784,7 +849,11 @@ export default defineComponent({
     watch(
       () => props.config.query_mode,
       (mode) => {
-        if (mode === "custom_sql" && props.config.stream_name && !props.config.custom_sql) {
+        if (
+          mode === "custom_sql" &&
+          props.config.stream_name &&
+          !props.config.custom_sql
+        ) {
           props.config.custom_sql = buildDefaultSql(
             props.config.stream_name,
             props.config.histogram_interval_value ?? 5,
@@ -804,11 +873,182 @@ export default defineComponent({
 
     const validate = async (): Promise<boolean> => {
       const formValid = formRef.value ? await formRef.value.validate() : true;
-      if (props.config.query_mode === "custom_sql" && !props.config.custom_sql) {
+      if (
+        props.config.query_mode === "custom_sql" &&
+        !props.config.custom_sql
+      ) {
         return false;
       }
       return formValid;
     };
+
+    // ── Sensitivity chart ───────────────────────────────────────────────────
+    const chartRef = ref<HTMLElement | null>(null);
+    const historyLoading = ref(false);
+    const historyPoints = ref<
+      Array<{ ts: number; value: number; score: number }>
+    >([]);
+    const thresholdRange = ref<{ min: number; max: number }>({
+      min: props.config.threshold_min ?? 0,
+      max: props.config.threshold ?? 97,
+    });
+
+    let chartInstance: echarts.ECharts | null = null;
+
+    const isDark = () => store.state.theme === "dark";
+
+    const buildChartOption = () => {
+      const pts = historyPoints.value;
+      const scatterData = pts.map((p) => [p.ts, p.value, p.score]);
+      const lineData = pts.map((p) => [p.ts, p.value]);
+      const scores = pts.map((p) => p.score);
+      const minScore = scores.length ? Math.min(...scores) : 0;
+      const maxScore = scores.length ? Math.max(...scores) : 100;
+
+      return {
+        backgroundColor: "transparent",
+        animation: false,
+        grid: { left: 50, right: 90, top: 10, bottom: 30 },
+        xAxis: {
+          type: "time",
+          axisLabel: {
+            color: isDark() ? "#9e9e9e" : "#666",
+            fontSize: 10,
+            formatter: (val: number) => {
+              const d = new Date(val);
+              return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+            },
+          },
+          axisLine: { lineStyle: { color: isDark() ? "#444" : "#ddd" } },
+          splitLine: { show: false },
+        },
+        yAxis: {
+          type: "value",
+          name: "Value",
+          nameTextStyle: { color: isDark() ? "#9e9e9e" : "#666", fontSize: 10 },
+          axisLabel: { color: isDark() ? "#9e9e9e" : "#666", fontSize: 10 },
+          axisLine: { lineStyle: { color: isDark() ? "#444" : "#ddd" } },
+          splitLine: { lineStyle: { color: isDark() ? "#333" : "#eee" } },
+        },
+        visualMap: {
+          min: minScore,
+          max: maxScore,
+          dimension: 2,
+          orient: "vertical",
+          right: 0,
+          top: "center",
+          text: ["High", "Low"],
+          textStyle: { color: isDark() ? "#9e9e9e" : "#666", fontSize: 10 },
+          calculable: false,
+          inRange: {
+            color: ["#5470c6", "#91cc75", "#fac858", "#ee6666"],
+          },
+          width: 12,
+          itemHeight: 100,
+        },
+        tooltip: {
+          trigger: "item",
+          formatter: (params: any) => {
+            if (params.seriesIndex === 0) {
+              const [ts, val, score] = params.data;
+              const d = new Date(ts);
+              return `${d.toLocaleString()}<br/>Value: ${Number(val).toFixed(4)}<br/>Score: ${Number(score).toFixed(2)}`;
+            }
+            return "";
+          },
+        },
+        series: [
+          {
+            name: "Data",
+            type: "scatter",
+            data: scatterData,
+            symbolSize: 6,
+            encode: { x: 0, y: 1, tooltip: [0, 1, 2] },
+          },
+          {
+            name: "Baseline",
+            type: "line",
+            data: lineData,
+            lineStyle: { color: isDark() ? "#555" : "#ccc", width: 1 },
+            symbol: "none",
+            z: 0,
+          },
+        ],
+      };
+    };
+
+    const renderChart = () => {
+      if (!chartRef.value || historyPoints.value.length === 0) return;
+      if (!chartInstance) {
+        chartInstance = echarts.init(
+          chartRef.value,
+          isDark() ? "dark" : undefined,
+        );
+      }
+      chartInstance.setOption(buildChartOption(), true);
+    };
+
+    watch(historyPoints, () => {
+      setTimeout(renderChart, 50);
+    });
+
+    watch(
+      () => store.state.theme,
+      () => {
+        if (chartInstance) {
+          chartInstance.dispose();
+          chartInstance = null;
+        }
+        setTimeout(renderChart, 50);
+      },
+    );
+
+    const loadSensitivityHistory = async () => {
+      const orgId = store.state.selectedOrganization?.identifier;
+      if (!orgId || !props.config.id) return;
+      historyLoading.value = true;
+      try {
+        const res = await anomalyDetectionService.getHistory(
+          orgId,
+          props.config.id,
+          200,
+        );
+        const raw: any[] = res.data?.history ?? res.data?.list ?? [];
+        historyPoints.value = raw
+          .map((r: any) => ({
+            ts: r.timestamp ?? r._timestamp ?? r.ts ?? 0,
+            value: r.actual_value ?? r.value ?? 0,
+            score: r.anomaly_score ?? r.score ?? 0,
+          }))
+          .filter((p) => p.ts > 0)
+          .sort((a, b) => a.ts - b.ts);
+      } catch {
+        historyPoints.value = [];
+      } finally {
+        historyLoading.value = false;
+      }
+    };
+
+    const onThresholdRangeChange = (val: { min: number; max: number }) => {
+      props.config.threshold_min = val.min;
+      props.config.threshold = val.max;
+    };
+
+    // init range from config
+    watch(
+      () => [props.config.threshold, props.config.threshold_min],
+      ([max, min]) => {
+        thresholdRange.value = {
+          min: (min as number) ?? 0,
+          max: (max as number) ?? 97,
+        };
+      },
+    );
+
+    onUnmounted(() => {
+      chartInstance?.dispose();
+      chartInstance = null;
+    });
 
     return {
       t,
@@ -829,6 +1069,12 @@ export default defineComponent({
       addFilter,
       removeFilter,
       validate,
+      chartRef,
+      historyLoading,
+      historyPoints,
+      thresholdRange,
+      loadSensitivityHistory,
+      onThresholdRangeChange,
     };
   },
 });
@@ -877,6 +1123,42 @@ export default defineComponent({
   &.dark-editor {
     border: 1px solid rgba(255, 255, 255, 0.18);
   }
+}
+
+// Sensitivity chart
+.sensitivity-chart-container {
+  width: 100%;
+}
+
+.sensitivity-chart-wrapper {
+  min-height: 180px;
+  position: relative;
+}
+
+.sensitivity-chart {
+  width: 100%;
+  height: 180px;
+}
+
+.sensitivity-empty-state {
+  width: 100%;
+  height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.25rem;
+  border: 1px dashed var(--o2-border);
+}
+
+.sensitivity-slider-col {
+  width: 40px;
+  flex-shrink: 0;
+}
+
+.sensitivity-range-slider {
+  flex: 1;
+  height: 140px;
 }
 
 // Reuse alerts wizard frequency toggle button styles
