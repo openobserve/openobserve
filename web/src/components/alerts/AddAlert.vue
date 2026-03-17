@@ -101,6 +101,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-tooltip v-if="formData?.name?.length > 25" class="tw:text-sm">{{ formData.name }}</q-tooltip>
               </span>
             </template>
+            <template v-else-if="$route.name === 'addAnomalyDetection'">
+              <span class="text-h6">{{ t("alerts.newAnomalyDetection") }}</span>
+            </template>
             <template v-else>
               <span class="text-h6">{{ t("alerts.addTitle") }}</span>
             </template>
@@ -1334,6 +1337,11 @@ export default defineComponent({
     const alertType = ref(router.currentRoute.value.query.alert_type || "all");
 
     onMounted(async () => {
+      // Pre-set anomaly mode when navigating to the create-new-anomaly route
+      if (router.currentRoute.value.name === "addAnomalyDetection") {
+        formData.value.is_real_time = "anomaly";
+      }
+
       // Load anomaly detection config when editing via editAnomalyDetection route
       const routeAnomalyId = router.currentRoute.value.params
         .anomaly_id as string | undefined;
