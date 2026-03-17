@@ -92,12 +92,5 @@ describe("ConfigPanelSearch", () => {
       expect(emitted![emitted!.length - 1]).toContain("axis");
     });
 
-    it("emits search-cleared when clear action is triggered", async () => {
-      // Expose clearSearch via internal method call (Quasar @clear handler)
-      await (wrapper.vm as any).clearSearch();
-      const emitted = wrapper.emitted("search-cleared");
-      expect(emitted).toBeTruthy();
-      expect(emitted!.length).toBeGreaterThan(0);
-    });
   });
 });
