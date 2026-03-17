@@ -248,6 +248,25 @@ const alerts = {
       data,
     );
   },
+  // POST /api/v2/{org}/alerts/{id}/clone — clones regular alert or anomaly config
+  clone_by_id: (
+    org_identifier: string,
+    alert_id: string,
+    data: { name?: string; folder_id?: string },
+  ) => {
+    return http().post(
+      `/api/v2/${org_identifier}/alerts/${alert_id}/clone`,
+      data,
+    );
+  },
+  // POST /api/v2/{org}/alerts/{id}/export — returns config with runtime fields stripped
+  export_by_id: (org_identifier: string, alert_id: string) => {
+    return http().post(`/api/v2/${org_identifier}/alerts/${alert_id}/export`);
+  },
+  // PATCH /api/v2/{org}/alerts/{id}/retrain — triggers model retrain (anomaly configs only)
+  retrain_by_id: (org_identifier: string, alert_id: string) => {
+    return http().patch(`/api/v2/${org_identifier}/alerts/${alert_id}/retrain`);
+  },
 };
 
 export default alerts;

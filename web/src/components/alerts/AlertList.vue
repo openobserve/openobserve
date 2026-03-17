@@ -364,7 +364,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   <q-item-section>Export</q-item-section>
                                 </q-item>
                                 <q-separator />
+                                <!-- Anomaly Detection: Retrain (status=failed) or Trigger Detection (other statuses) -->
+                                <template v-if="props.row.type === 'anomaly'">
+                                  <q-item
+                                    v-if="props.row.status === 'failed'"
+                                    class="flex items-center justify-center"
+                                    clickable
+                                    v-close-popup
+                                    :data-test="`alert-list-${props.row.name}-retrain-anomaly`"
+                                    @click="retrainAnomaly(props.row)"
+                                  >
+                                    <q-item-section dense avatar>
+                                      <q-icon size="16px" name="replay" />
+                                    </q-item-section>
+                                    <q-item-section>Retrain</q-item-section>
+                                  </q-item>
+                                  <q-item
+                                    v-else
+                                    class="flex items-center justify-center"
+                                    clickable
+                                    v-close-popup
+                                    :data-test="`alert-list-${props.row.name}-trigger-detection`"
+                                    @click="triggerAlert(props.row)"
+                                  >
+                                    <q-item-section dense avatar>
+                                      <q-icon size="16px" :name="symOutlinedSoundSampler" />
+                                    </q-item-section>
+                                    <q-item-section>Trigger Detection</q-item-section>
+                                  </q-item>
+                                </template>
+                                <!-- Regular alerts: existing Trigger Alert item -->
                                 <q-item
+                                  v-else
                                   class="flex items-center justify-center"
                                   clickable
                                   v-close-popup
@@ -617,33 +648,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 borderless
                 dense
               />
-              <q-select
-                data-test="to-be-clone-stream-type"
-                v-model="toBeClonestreamType"
-                label="Stream Type"
-                :options="streamTypes"
-                @update:model-value="updateStreams()"
-                borderless
-                dense
-                class="showLabelOnTop no-case tw:mt-[1px]"
-              />
-              <q-select
-                data-test="to-be-clone-stream-name"
-                v-model="toBeClonestreamName"
-                :loading="isFetchingStreams"
-                :disable="!toBeClonestreamType"
-                label="Stream Name"
-                :options="streamNames"
-                @change="updateStreamName"
-                @filter="filterStreams"
-                use-input
-                fill-input
-                hide-selected
-                :input-debounce="400"
-                borderless
-                dense
-                class="showLabelOnTop no-case tw:mt-[1px] q-mb-sm"
-              />
+              <template v-if="!toBeClonedIsAnomaly">
+                <q-select
+                  data-test="to-be-clone-stream-type"
+                  v-model="toBeClonestreamType"
+                  label="Stream Type"
+                  :options="streamTypes"
+                  @update:model-value="updateStreams()"
+                  borderless
+                  dense
+                  class="showLabelOnTop no-case tw:mt-[1px]"
+                />
+                <q-select
+                  data-test="to-be-clone-stream-name"
+                  v-model="toBeClonestreamName"
+                  :loading="isFetchingStreams"
+                  :disable="!toBeClonestreamType"
+                  label="Stream Name"
+                  :options="streamNames"
+                  @change="updateStreamName"
+                  @filter="filterStreams"
+                  use-input
+                  fill-input
+                  hide-selected
+                  :input-debounce="400"
+                  borderless
+                  dense
+                  class="showLabelOnTop no-case tw:mt-[1px] q-mb-sm"
+                />
+              </template>
               <div class="q-mb-lg">
                 <SelectFolderDropDown
                   :type="'alerts'"
@@ -819,6 +852,7 @@ export default defineComponent({
 
     const toBeCloneAlertName = ref("");
     const toBeClonedID = ref("");
+    const toBeClonedIsAnomaly = ref(false);
     const toBeClonestreamType = ref("");
     const toBeClonestreamName = ref("");
     const streamTypes = ref(["logs", "metrics", "traces"]);
@@ -1547,13 +1581,56 @@ export default defineComponent({
     const duplicateAlert = async (row: any) => {
       toBeClonedID.value = row.alert_id;
       toBeCloneAlertName.value = row.name;
+      toBeClonedIsAnomaly.value = row.type === "anomaly";
       toBeClonestreamName.value = "";
       toBeClonestreamType.value = "";
       showForm.value = true;
-      toBeClonedAlert.value = await getAlertById(row.alert_id);
+      // Anomaly rows use the /clone endpoint — no need to pre-fetch full data
+      if (!toBeClonedIsAnomaly.value) {
+        toBeClonedAlert.value = await getAlertById(row.alert_id);
+      }
     };
     const submitForm = async () => {
 
+
+      // Anomaly rows: use the dedicated /clone endpoint (no fetch+mutate dance needed)
+      if (toBeClonedIsAnomaly.value) {
+        isSubmitting.value = true;
+        const dismiss = $q.notify({
+          spinner: true,
+          message: "Please wait...",
+          timeout: 2000,
+        });
+        try {
+          await alertsService.clone_by_id(
+            store.state.selectedOrganization.identifier,
+            toBeClonedID.value,
+            {
+              name: toBeCloneAlertName.value,
+              folder_id: (folderIdToBeCloned.value as string) || "default",
+            },
+          );
+          dismiss();
+          $q.notify({
+            type: "positive",
+            message: "Anomaly detection cloned successfully",
+            timeout: 2000,
+          });
+          showForm.value = false;
+          await getAlertsFn(store, folderIdToBeCloned.value);
+          activeFolderId.value = folderIdToBeCloned.value;
+        } catch (e: any) {
+          dismiss();
+          $q.notify({
+            type: "negative",
+            message: e?.response?.data?.message || "Failed to clone anomaly detection",
+            timeout: 2000,
+          });
+        } finally {
+          isSubmitting.value = false;
+        }
+        return;
+      }
 
       if (!toBeClonedAlert.value) {
         $q.notify({
@@ -1903,8 +1980,12 @@ export default defineComponent({
     };
 
     const exportAlert = async (row: any) => {
-      // Find the alert based on uuid
-      const alertToBeExported = await getAlertById(row.alert_id);
+      // Use the /export endpoint — strips runtime fields for anomaly configs, works for regular alerts too
+      const res = await alertsService.export_by_id(
+        store.state.selectedOrganization.identifier,
+        row.alert_id,
+      );
+      const alertToBeExported = res.data;
 
       if (alertToBeExported.hasOwnProperty("id")) {
         delete alertToBeExported.id;
@@ -1955,6 +2036,26 @@ export default defineComponent({
         $q.notify({
           type: "negative",
           message: error?.response?.data?.message || "Failed to trigger alert",
+          timeout: 2000,
+        });
+      }
+    };
+
+    const retrainAnomaly = async (row: any) => {
+      try {
+        await alertsService.retrain_by_id(
+          store.state.selectedOrganization.identifier,
+          row.alert_id,
+        );
+        $q.notify({
+          type: "positive",
+          message: "Retraining triggered",
+          timeout: 2000,
+        });
+      } catch (error: any) {
+        $q.notify({
+          type: "negative",
+          message: error?.response?.data?.message || "Failed to trigger retraining",
           timeout: 2000,
         });
       }
@@ -2173,11 +2274,11 @@ export default defineComponent({
 
         const alertsData = await Promise.all(
           selectedAlertsToExport.map(async (alertId: string) => {
-            const alertData = await getAlertById(alertId);
-            if (alertData.hasOwnProperty("id")) {
-              delete alertData.id;
-            }
-            return alertData;
+            const res = await alertsService.export_by_id(
+              store.state.selectedOrganization.identifier,
+              alertId,
+            );
+            return res.data;
           }),
         );
         alertToBeExported.push(...alertsData);
@@ -2479,6 +2580,7 @@ export default defineComponent({
       showAddAlertDialog,
       showForm,
       toBeCloneAlertName,
+      toBeClonedIsAnomaly,
       toBeClonestreamType,
       toBeClonestreamName,
       streamTypes,
@@ -2524,6 +2626,7 @@ export default defineComponent({
       getTemplates,
       exportAlert,
       triggerAlert,
+      retrainAnomaly,
       updateActiveFolderId,
       activeFolderId,
       editAlert,
