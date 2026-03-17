@@ -437,6 +437,104 @@ pub async fn delete_config(org_id: &str, anomaly_id: &str) -> Result<()> {
     Ok(())
 }
 
+/// Clone an anomaly detection configuration.
+///
+/// Copies all configuration fields from the source config to a new config with a new
+/// KSUID. Runtime/training state is reset: `is_trained=false`, all training timestamps
+/// cleared, `status=0` (waiting), and counters zeroed.
+///
+/// If `new_name` is provided it is used as the cloned config's name; otherwise the
+/// source name is suffixed with `"_copy"`.
+///
+/// If `folder_id` is provided the clone is placed in that folder; otherwise the same
+/// folder as the source is used.
+pub async fn clone_config(
+    org_id: &str,
+    anomaly_id: &str,
+    new_name: Option<String>,
+    folder_id: Option<String>,
+) -> Result<serde_json::Value> {
+    let db = ORM_CLIENT
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+
+    let src = anomaly_detection_config::Entity::find_by_id(anomaly_id)
+        .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
+        .one(db)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
+
+    let new_id = svix_ksuid::Ksuid::new(None, None).to_string();
+    let now_us = Utc::now().timestamp_micros();
+
+    let resolved_folder_id = folder_id
+        .as_deref()
+        .and_then(|s| s.parse::<i64>().ok())
+        .or(src.folder_id);
+
+    let cloned = anomaly_detection_config::ActiveModel {
+        anomaly_id: Set(new_id.clone()),
+        org_id: Set(src.org_id.clone()),
+        stream_name: Set(src.stream_name.clone()),
+        stream_type: Set(src.stream_type.clone()),
+        enabled: Set(src.enabled),
+        name: Set(new_name.unwrap_or_else(|| format!("{}_copy", src.name))),
+        description: Set(src.description.clone()),
+        query_mode: Set(src.query_mode.clone()),
+        filters: Set(src.filters.clone()),
+        custom_sql: Set(src.custom_sql.clone()),
+        detection_function: Set(src.detection_function.clone()),
+        histogram_interval: Set(src.histogram_interval.clone()),
+        schedule_interval: Set(src.schedule_interval.clone()),
+        detection_window_seconds: Set(src.detection_window_seconds),
+        training_window_days: Set(src.training_window_days),
+        retrain_interval_days: Set(src.retrain_interval_days),
+        threshold: Set(src.threshold),
+        seasonality: Set("none".to_string()),
+        is_trained: Set(false),
+        training_started_at: Set(None),
+        training_completed_at: Set(None),
+        last_error: Set(None),
+        last_processed_timestamp: Set(None),
+        current_model_version: Set(0),
+        rcf_num_trees: Set(src.rcf_num_trees),
+        rcf_tree_size: Set(src.rcf_tree_size),
+        rcf_shingle_size: Set(src.rcf_shingle_size),
+        alert_enabled: Set(src.alert_enabled),
+        alert_destination_id: Set(src.alert_destination_id.clone()),
+        folder_id: Set(resolved_folder_id),
+        owner: Set(src.owner.clone()),
+        total_evaluations: Set(0),
+        firing_count: Set(0),
+        status: Set(0i32),
+        retries: Set(0),
+        last_updated: Set(now_us),
+        created_at: Set(now_us),
+        updated_at: Set(now_us),
+    };
+
+    let result = cloned.insert(db).await?;
+
+    // Register detection trigger for the new config
+    {
+        use config::{meta::triggers::TriggerModule, utils::time::now_micros};
+        let trigger = crate::service::db::scheduler::Trigger {
+            org: org_id.to_string(),
+            module: TriggerModule::AnomalyDetection,
+            module_key: new_id.clone(),
+            next_run_at: now_micros(),
+            is_realtime: false,
+            is_silenced: false,
+            ..Default::default()
+        };
+        if let Err(e) = crate::service::db::scheduler::push(trigger).await {
+            log::warn!("[anomaly_detection {new_id}] failed to push detection trigger: {e}");
+        }
+    }
+
+    Ok(model_to_api_json(serde_json::to_value(result).unwrap_or_default()))
+}
+
 /// Cancel an in-progress training run.
 ///
 /// Resets the config status to `Waiting` and clears `training_started_at` so the

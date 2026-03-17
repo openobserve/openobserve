@@ -241,6 +241,16 @@ pub struct AlertBulkEnableRequest {
     pub ids: Vec<Ksuid>,
 }
 
+/// HTTP request body for `CloneAlert` endpoint.
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+pub struct CloneAlertRequestBody {
+    /// Optional new name for the cloned alert. Defaults to `<source_name>_copy`.
+    pub name: Option<String>,
+
+    /// Optional folder ID to place the clone in. Defaults to the source folder.
+    pub folder_id: Option<String>,
+}
+
 /// HTTP request body for `GenerateSql` endpoint.
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct GenerateSqlRequestBody {

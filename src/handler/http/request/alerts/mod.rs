@@ -42,9 +42,9 @@ use crate::{
         extractors::Headers,
         models::alerts::{
             requests::{
-                AlertBulkEnableRequest, AnomalyAlertFields, CreateAlertRequestBody,
-                EnableAlertQuery, GenerateSqlRequestBody, ListAlertsQuery, MoveAlertsRequestBody,
-                UpdateAlertRequestBody, UpdateAnomalyAlertFields,
+                AlertBulkEnableRequest, AnomalyAlertFields, CloneAlertRequestBody,
+                CreateAlertRequestBody, EnableAlertQuery, GenerateSqlRequestBody, ListAlertsQuery,
+                MoveAlertsRequestBody, UpdateAlertRequestBody, UpdateAnomalyAlertFields,
             },
             responses::{
                 AlertBulkEnableResponse, EnableAlertResponseBody, GenerateSqlMetadata,
@@ -312,6 +312,7 @@ pub async fn get_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Resp
     )
 )]
 pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+    let alert_id_str = alert_id.clone();
     let alert_id = match Ksuid::from_str(&alert_id) {
         Ok(id) => id,
         Err(_) => {
@@ -327,6 +328,113 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
                 .ok();
             let resp_body: GetAlertResponseBody = (alert, scheduled_job).into();
             MetaHttpResponse::json(resp_body)
+        }
+        Err(AlertError::AlertNotFound) => {
+            // Fall back to anomaly detection config export
+            match crate::service::anomaly_detection::get_config(&org_id, &alert_id_str).await {
+                Ok(Some(mut v)) => {
+                    // Inject alert_type so consumers know what kind this is
+                    if let Some(obj) = v.as_object_mut() {
+                        obj.insert(
+                            "alert_type".to_string(),
+                            serde_json::Value::String("anomaly_detection".to_string()),
+                        );
+                        // Strip runtime/training state from the export payload
+                        for key in &[
+                            "is_trained",
+                            "training_started_at",
+                            "training_completed_at",
+                            "last_processed_timestamp",
+                            "current_model_version",
+                            "status",
+                            "total_evaluations",
+                            "firing_count",
+                            "last_error",
+                            "retries",
+                        ] {
+                            obj.remove(*key);
+                        }
+                    }
+                    MetaHttpResponse::json(v)
+                }
+                Ok(None) => MetaHttpResponse::not_found("alert not found"),
+                Err(e) => MetaHttpResponse::not_found(e.to_string()),
+            }
+        }
+        Err(e) => e.into(),
+    }
+}
+
+/// CloneAlert
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/alerts/{alert_id}/clone",
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "CloneAlert",
+    summary = "Clone an alert or anomaly detection config",
+    description = "Creates a copy of an existing alert or anomaly detection config. For anomaly configs, the clone starts untrained with counters reset. Provide an optional name and folder_id in the request body.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("alert_id" = String, Path, description = "Source alert or anomaly config ID"),
+    ),
+    request_body(content = inline(CloneAlertRequestBody), description = "Clone options", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
+    )
+)]
+pub async fn clone_alert(
+    Path((org_id, alert_id)): Path<(String, String)>,
+    Json(req_body): Json<CloneAlertRequestBody>,
+) -> Response {
+    let alert_id_str = alert_id.clone();
+    let alert_id = match Ksuid::from_str(&alert_id) {
+        Ok(id) => id,
+        Err(_) => {
+            return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
+        }
+    };
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    // Check if this is a regular alert first
+    match alert::get_by_id(client, &org_id, alert_id).await {
+        Ok((folder, mut src_alert)) => {
+            // Clone the alert: copy fields, generate new name
+            let new_name = req_body
+                .name
+                .unwrap_or_else(|| format!("{}_copy", src_alert.name));
+            let dst_folder = req_body
+                .folder_id
+                .unwrap_or_else(|| folder.folder_id.clone());
+            src_alert.name = new_name;
+            // Clear the ID so a new one is assigned on insert
+            src_alert.id = None;
+            match alert::create(client, &org_id, &dst_folder, src_alert, false).await {
+                Ok(saved) => MetaHttpResponse::json(saved),
+                Err(e) => e.into(),
+            }
+        }
+        Err(AlertError::AlertNotFound) => {
+            // Fall back to anomaly detection config clone
+            match crate::service::anomaly_detection::clone_config(
+                &org_id,
+                &alert_id_str,
+                req_body.name,
+                req_body.folder_id,
+            )
+            .await
+            {
+                Ok(v) => MetaHttpResponse::json(v),
+                Err(e) => MetaHttpResponse::not_found(e.to_string()),
+            }
         }
         Err(e) => e.into(),
     }
