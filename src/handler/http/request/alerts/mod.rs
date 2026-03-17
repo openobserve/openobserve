@@ -43,8 +43,8 @@ use crate::{
         models::alerts::{
             requests::{
                 AlertBulkEnableRequest, AnomalyAlertFields, CreateAlertRequestBody,
-                EnableAlertQuery, GenerateSqlRequestBody, ListAlertsQuery,
-                MoveAlertsRequestBody, UpdateAlertRequestBody, UpdateAnomalyAlertFields,
+                EnableAlertQuery, GenerateSqlRequestBody, ListAlertsQuery, MoveAlertsRequestBody,
+                UpdateAlertRequestBody, UpdateAnomalyAlertFields,
             },
             responses::{
                 AlertBulkEnableResponse, EnableAlertResponseBody, GenerateSqlMetadata,
@@ -193,8 +193,7 @@ async fn create_anomaly_alert(
         name: req_body.alert.name,
         description: Some(req_body.alert.description).filter(|d| !d.is_empty()),
         stream_name: req_body.alert.stream_name,
-        stream_type: config::meta::stream::StreamType::from(req_body.alert.stream_type)
-            .to_string(),
+        stream_type: config::meta::stream::StreamType::from(req_body.alert.stream_type).to_string(),
         query_mode: anomaly_fields.query_mode,
         filters: anomaly_fields.filters,
         custom_sql: anomaly_fields.custom_sql,
@@ -722,6 +721,26 @@ pub async fn enable_alert(
             };
             MetaHttpResponse::json(resp_body)
         }
+        Err(AlertError::AlertNotFound) => {
+            // Fall back to anomaly detection config
+            use crate::handler::http::request::anomaly_detection::UpdateAnomalyConfigRequest;
+            let req = UpdateAnomalyConfigRequest {
+                enabled: Some(should_enable),
+                ..Default::default()
+            };
+            match crate::service::anomaly_detection::update_config(
+                &org_id,
+                &alert_id.to_string(),
+                req,
+            )
+            .await
+            {
+                Ok(_) => MetaHttpResponse::json(EnableAlertResponseBody {
+                    enabled: should_enable,
+                }),
+                Err(e) => MetaHttpResponse::not_found(e.to_string()),
+            }
+        }
         Err(e) => e.into(),
     }
 }
@@ -781,6 +800,22 @@ pub async fn enable_alert_bulk(
         match alert::enable_by_id(client, &org_id, id, should_enable).await {
             Ok(_) => {
                 successful.push(id);
+            }
+            Err(AlertError::AlertNotFound) => {
+                // Fall back to anomaly detection config
+                use crate::handler::http::request::anomaly_detection::UpdateAnomalyConfigRequest;
+                let req = UpdateAnomalyConfigRequest {
+                    enabled: Some(should_enable),
+                    ..Default::default()
+                };
+                match crate::service::anomaly_detection::update_config(&org_id, &id.to_string(), req).await {
+                    Ok(_) => successful.push(id),
+                    Err(e) => {
+                        log::error!("error in enabling anomaly config {id} : {e}");
+                        unsuccessful.push(id);
+                        err = Some(e.to_string());
+                    }
+                }
             }
             Err(e) => {
                 log::error!("error in enabling alert {id} : {e}");
