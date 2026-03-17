@@ -1627,7 +1627,8 @@
       "variablesTooltip": "Variabelen worden gebruikt om gegevens van de waarschuwing naar de bestemming door te geven.",
       "rowTemplateTooltip": "Rijsjabloon wordt gebruikt om het waarschuwingsbericht op te maken.",
       "templateType": "Sjabloontype:"
-    }
+    },
+    "editJson": "Waarschuwings-JSON bewerken"
   },
   "alert_templates": {
     "header": "Sjablonen",

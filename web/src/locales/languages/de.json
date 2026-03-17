@@ -1627,7 +1627,8 @@
       "variablesTooltip": "Variablen werden verwendet, um Daten von der Warnung an das Ziel zu übergeben.",
       "rowTemplateTooltip": "Die Zeilenvorlage wird verwendet, um die Warnmeldung zu formatieren.",
       "templateType": "Vorlagentyp:"
-    }
+    },
+    "editJson": "Alert-JSON bearbeiten"
   },
   "alert_templates": {
     "header": "Vorlagen",

@@ -1637,7 +1637,8 @@
       "variablesTooltip": "変数は、アラートから宛先にデータを渡すために使用されます。",
       "rowTemplateTooltip": "行テンプレートはアラートメッセージのフォーマットに使用されます。",
       "templateType": "テンプレートタイプ:"
-    }
+    },
+    "editJson": "アラート JSON の編集"
   },
   "alert_templates": {
     "header": "テンプレート",
