@@ -80,11 +80,20 @@ impl MigrationTrait for Migration {
                 .await?;
         }
 
-        // Backfill existing rows: any config without a folder gets the default folder.
+        // Backfill existing rows: resolve the "default" folder slug to its PK (folders.id)
+        // so folder_id stores the same FK value as the alerts table.
+        // If no default folder exists for an org the row is left NULL (acceptable).
         manager
             .get_connection()
             .execute_unprepared(
-                "UPDATE anomaly_detection_config SET folder_id = 'default' WHERE folder_id IS NULL",
+                "UPDATE anomaly_detection_config \
+                 SET folder_id = (\
+                   SELECT id FROM folders \
+                   WHERE folders.org = anomaly_detection_config.org_id \
+                   AND folders.folder_id = 'default' \
+                   AND folders.type = 1\
+                 ) \
+                 WHERE folder_id IS NULL",
             )
             .await?;
 

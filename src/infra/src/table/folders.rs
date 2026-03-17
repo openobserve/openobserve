@@ -159,6 +159,29 @@ pub async fn delete(
     Ok(())
 }
 
+/// Returns the primary-key `id` of the folder identified by its slug and type.
+///
+/// Service-layer code that needs to store a proper FK (consistent with the alerts
+/// table, which stores `folders.id` not `folders.folder_id`) should use this instead
+/// of the `pub(crate)` `get_model` helper.
+pub async fn get_pk_by_slug(
+    org_id: &str,
+    slug: &str,
+    folder_type: FolderType,
+) -> Result<Option<String>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(get_model(client, org_id, slug, folder_type).await?.map(|m| m.id))
+}
+
+/// Returns the folder slug (`folder_id` column) for the given primary-key `id`.
+///
+/// Used to translate the stored PK back to the user-visible slug when building
+/// API responses for anomaly detection configs.
+pub async fn get_slug_by_pk(pk: &str) -> Result<Option<String>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(Entity::find_by_id(pk).one(client).await?.map(|m| m.folder_id))
+}
+
 /// Gets a folder ORM entity by its `folder_id`.
 pub(crate) async fn get_model<C: ConnectionTrait>(
     db: &C,
