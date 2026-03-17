@@ -969,27 +969,26 @@ async fn labels(
                 None => return MetaHttpResponse::forbidden("Unauthorized Access"),
             };
             let stream_type_str = StreamType::Metrics.as_str();
-            if user.is_external
-                && !crate::handler::http::auth::validator::check_permissions(
-                    user_email,
-                    AuthExtractor {
-                        auth: "".to_string(),
-                        method: "GET".to_string(),
-                        o2_type: format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(stream_type_str)
-                                .map_or(stream_type_str, |model| model.key),
-                            org_id
-                        ),
-                        org_id: org_id.to_string(),
-                        bypass_check: false,
-                        parent_id: "".to_string(),
-                    },
-                    user.role,
-                    user.is_external,
-                )
-                .await
+            if !crate::handler::http::auth::validator::check_permissions(
+                user_email,
+                AuthExtractor {
+                    auth: "".to_string(),
+                    method: "GET".to_string(),
+                    o2_type: format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(stream_type_str)
+                            .map_or(stream_type_str, |model| model.key),
+                        org_id
+                    ),
+                    org_id: org_id.to_string(),
+                    bypass_check: false,
+                    parent_id: "".to_string(),
+                },
+                user.role,
+                user.is_external,
+            )
+            .await
             {
                 return MetaHttpResponse::forbidden("Unauthorized Access");
             }
@@ -1085,27 +1084,26 @@ pub async fn label_values(
                 None => return MetaHttpResponse::forbidden("Unauthorized Access"),
             };
             let stream_type_str = StreamType::Metrics.as_str();
-            if user.is_external
-                && !crate::handler::http::auth::validator::check_permissions(
-                    &user_email.user_id,
-                    AuthExtractor {
-                        auth: "".to_string(),
-                        method: "GET".to_string(),
-                        o2_type: format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(stream_type_str)
-                                .map_or(stream_type_str, |model| model.key),
-                            org_id
-                        ),
-                        org_id: org_id.clone(),
-                        bypass_check: false,
-                        parent_id: "".to_string(),
-                    },
-                    user.role,
-                    user.is_external,
-                )
-                .await
+            if !crate::handler::http::auth::validator::check_permissions(
+                &user_email.user_id,
+                AuthExtractor {
+                    auth: "".to_string(),
+                    method: "GET".to_string(),
+                    o2_type: format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(stream_type_str)
+                            .map_or(stream_type_str, |model| model.key),
+                        org_id
+                    ),
+                    org_id: org_id.clone(),
+                    bypass_check: false,
+                    parent_id: "".to_string(),
+                },
+                user.role,
+                user.is_external,
+            )
+            .await
             {
                 return MetaHttpResponse::forbidden("Unauthorized Access");
             }
