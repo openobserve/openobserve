@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:w-full tw:flex-1 tw:overflow-y-auto tw:overflow-x-auto tw:relative"
       >
         <TenstackTable
-          :columns="tracesColumns"
+          :columns="searchObj.data.resultGrid.columns"
           :rows="hits"
           :loading="loading"
           :row-class="traceRowClass"
@@ -117,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :default-columns="false"
           @click:data-row="(row: any) => emit('row-click', row)"
           @sort-change="(by, order) => emit('sort-change', by, order)"
+          @update:columnOrder="onColumnReorder"
         >
           <template #cell-actions="{ row, column, active }">
             <CellActions
@@ -168,11 +169,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
-          <template #cell-timestamp="{ item }">
+          <template
+            #[`cell-${store.state.zoConfig.timestamp_column}`]="{ item }"
+          >
             <TraceTimestampCell :item="item" :search-mode="props.searchMode" />
           </template>
 
-          <template #cell-service="{ item }">
+          <template #cell-service_name="{ item }">
             <TraceServiceCell :item="item" />
           </template>
 
@@ -256,11 +259,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import TenstackTable from "@/components/TenstackTable.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
-import { useTracesTableColumns } from "../composables/useTracesTableColumns";
+import {
+  useTracesTableColumns,
+  LLM_COLUMN_IDS,
+} from "../composables/useTracesTableColumns";
 import useTraces from "@/composables/useTraces";
 import TraceTimestampCell from "./TraceTimestampCell.vue";
 import TraceServiceCell from "./TraceServiceCell.vue";
@@ -278,6 +284,7 @@ import {
   formatTimeWithSuffix,
   formatLargeNumber,
 } from "../../../utils/zincutils";
+import store from "@/test/unit/helpers/store";
 
 interface Props {
   hits: any[];
@@ -333,18 +340,46 @@ const sendToAiChat = (value: string) => emit("send-to-ai-chat", value);
 
 const rowsPerPageOptions = [10, 25, 50, 100];
 
-const hasLlmTraces = computed(() =>
-  props.hits.some((hit: any) => isLLMTrace(hit)),
-);
-
-const searchModeRef = computed(() => props.searchMode ?? "traces");
-
-const tracesColumns = useTracesTableColumns(hasLlmTraces, searchModeRef);
-
-const { searchObj } = useTraces();
+const { searchObj, updatedLocalLogFilterField } = useTraces();
 const selectedStreamFields = computed(
   () => searchObj.data.stream.selectedStreamFields,
 );
+
+// const rebuildColumns = () => {
+//   buildColumns(
+//     hasLlmTraces.value,
+//     props.searchMode ?? "traces",
+//     searchObj.data.stream.selectedFields,
+//   );
+// };
+
+// // Rebuild columns whenever any of the inputs change.
+// watch(
+//   [
+//     hasLlmTraces,
+//     () => props.searchMode,
+//     () => searchObj.data.stream.selectedFields,
+//   ],
+//   rebuildColumns,
+//   { immediate: true, deep: false },
+// );
+
+/**
+ * Fired by TenstackTable when the user drags columns to a new order.
+ * LLM columns are injected dynamically by the composable and are not stored
+ * in selectedFields, so we strip them before persisting.
+ */
+const onColumnReorder = (newOrder: string[]) => {
+  const mode = props.searchMode ?? "traces";
+  console.log(newOrder);
+  // searchObj.data.stream.selectedFields = newOrder.filter(
+  //   (id) => !LLM_COLUMN_IDS.has(id),
+  // );
+  searchObj.data.stream.selectedFields = newOrder.filter(
+    (id) => id !== store.state.zoConfig.timestamp_column,
+  );
+  updatedLocalLogFilterField(mode);
+};
 
 const traceRowClass = (row: any) => {
   if (props.searchMode === "spans") {

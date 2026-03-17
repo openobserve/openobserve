@@ -761,18 +761,6 @@ watch(
   },
 );
 
-watch(
-  () => columnOrder.value,
-  () => {
-    emits("update:columnOrder", columnOrder.value, props.columns);
-  },
-  {
-    immediate: true,
-  },
-);
-
-console.log(sorting.value);
-
 let table: any = useVueTable({
   get data() {
     return tableRows.value || [];
@@ -994,6 +982,8 @@ const handleDragEnd = async () => {
     newColumnOrder.unshift(store.state.zoConfig.timestamp_column);
     columnOrder.value = [...newColumnOrder];
   }
+  await nextTick();
+  emits("update:columnOrder", columnOrder.value, props.columns);
 };
 
 const expandedRowIndices = ref<Set<number>>(new Set());
