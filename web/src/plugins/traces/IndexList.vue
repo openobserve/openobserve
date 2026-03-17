@@ -49,7 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="index-table">
       <q-table
         data-test="log-search-index-list-fields-table"
-        v-model="searchObj.data.stream.selectedFields"
         :visible-columns="['name']"
         :rows="normalizedFieldList"
         row-key="name"
@@ -77,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :field="props.row"
                 :selected-fields="searchObj.data.stream.selectedFields"
                 timestamp-column="_timestamp"
-                :theme="store.state.appTheme"
+                :theme="store.state.theme"
                 :show-quick-mode="false"
                 @add-to-filter="addToFilter(`${props.row.name}=''`)"
                 @toggle-field="toggleField"
@@ -152,7 +151,7 @@ export default defineComponent({
     BasicValuesFilter,
     FieldRow,
   },
-  emits: ["update:changeStream"],
+  emits: ["update:changeStream", "update:selectedFields"],
   props: {
     fieldList: {
       type: Array,
@@ -171,7 +170,7 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const { searchObj, updatedLocalLogFilterField } = useTraces();
+    const { searchObj } = useTraces();
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
 
     const duration = ref({
@@ -250,14 +249,8 @@ export default defineComponent({
       })),
     );
 
-    const toggleField = (field: any) => {
-      const idx = searchObj.data.stream.selectedFields.indexOf(field.name);
-      if (idx === -1) {
-        searchObj.data.stream.selectedFields.push(field.name);
-      } else {
-        searchObj.data.stream.selectedFields.splice(idx, 1);
-      }
-      updatedLocalLogFilterField();
+    const toggleField = async (field: any) => {
+      emit("update:selectedFields", field);
     };
 
     return {
