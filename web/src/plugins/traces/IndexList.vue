@@ -96,7 +96,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </div>
-              <basic-values-filter v-else :row="props.row" />
+              <basic-values-filter
+                v-else
+                :row="props.row"
+                :active-include-values="activeIncludeFieldValues?.[props.row.name] ?? []"
+                :active-exclude-values="activeExcludeFieldValues?.[props.row.name] ?? []"
+              />
             </q-td>
           </q-tr>
         </template>
@@ -158,6 +163,14 @@ export default defineComponent({
     fieldList: {
       type: Array,
       default: () => [],
+    },
+    activeIncludeFieldValues: {
+      type: Object as () => Record<string, string[]>,
+      default: () => ({}),
+    },
+    activeExcludeFieldValues: {
+      type: Object as () => Record<string, string[]>,
+      default: () => ({}),
     },
   },
   setup(props, { emit }) {
