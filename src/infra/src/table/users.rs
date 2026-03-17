@@ -19,7 +19,7 @@ use config::{
 };
 use sea_orm::{
     ColumnTrait, EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema,
-    Set, entity::prelude::*,
+    Set, entity::prelude::*, sea_query::Func,
 };
 use serde::{Deserialize, Serialize};
 
@@ -79,9 +79,8 @@ impl From<&DBUser> for UserRecord {
             .organizations
             .iter()
             .any(|org| org.role.eq(&UserRole::Root));
-        let email = user.email.to_lowercase();
         Self {
-            email,
+            email: user.email.clone(),
             first_name: user.first_name.clone(),
             last_name: user.last_name.clone(),
             password: user.password.clone(),
@@ -179,7 +178,7 @@ pub async fn update(
             Column::UpdatedAt,
             Expr::value(chrono::Utc::now().timestamp_micros()),
         )
-        .filter(Column::Email.eq(email))
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -193,7 +192,7 @@ pub async fn remove(email: &str) -> Result<(), errors::Error> {
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::delete_many()
-        .filter(Column::Email.eq(email))
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -204,7 +203,7 @@ pub async fn remove(email: &str) -> Result<(), errors::Error> {
 pub async fn get(email: &str) -> Result<UserRecord, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find()
-        .filter(Column::Email.eq(email))
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
         .one(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
@@ -277,8 +276,9 @@ pub async fn batch_remove(emails: Vec<String>) -> Result<(), errors::Error> {
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let lowered_emails: Vec<String> = emails.iter().map(|e| e.to_lowercase()).collect();
     Entity::delete_many()
-        .filter(Column::Email.is_in(emails))
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).is_in(lowered_emails))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
