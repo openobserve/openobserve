@@ -397,9 +397,9 @@ test.describe("Logs Regression Bug Fixes", () => {
     expect(stream2Available, `Stream ${stream2Name} should be available via API`).toBeTruthy();
     testLogger.info('Both streams confirmed available via API');
 
-    // Step 3: Navigate to logs and select stream1 (apiWaitMs=0: already confirmed above)
+    // Step 3: Navigate to logs and select stream1 (already confirmed via API above)
     await pm.logsPage.clickMenuLinkLogsItem();
-    await pm.logsPage.selectStream(stream1Name, 3, 0);
+    await pm.logsPage.selectStream(stream1Name);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Set time range and run query
@@ -442,9 +442,9 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Collapse the field
     await pm.logsPage.collapseField(testFieldName);
 
-    // Step 5: Switch to stream2 WITHOUT refreshing the page (apiWaitMs=0: already confirmed above)
+    // Step 5: Switch to stream2 WITHOUT refreshing the page (already confirmed via API above)
     testLogger.info(`Switching to ${stream2Name} without page refresh`);
-    await pm.logsPage.selectStream(stream2Name, 3, 0);
+    await pm.logsPage.selectStream(stream2Name);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Run query for stream2 and wait for search API response

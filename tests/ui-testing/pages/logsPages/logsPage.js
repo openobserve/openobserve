@@ -533,8 +533,8 @@ export class LogsPage {
      * @param {number} pollIntervalMs - Interval between checks
      * @returns {Promise<boolean>} True if stream exists, false if timeout
      */
-    async waitForStreamAvailable(streamName, maxWaitMs = 30000, pollIntervalMs = 3000) {
-        testLogger.debug(`waitForStreamAvailable: Waiting for stream ${streamName} to be available`);
+    async waitForStreamAvailable(streamName, maxWaitMs = 30000, pollIntervalMs = 3000, streamType = 'logs') {
+        testLogger.debug(`waitForStreamAvailable: Waiting for stream ${streamName} (type=${streamType}) to be available`);
         const startTime = Date.now();
 
         const apiUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL;
@@ -542,10 +542,10 @@ export class LogsPage {
 
         while (Date.now() - startTime < maxWaitMs) {
             try {
-                // Use page.request which automatically includes browser session cookies
-                // This works on both cloud (cookie auth) and self-hosted (Basic Auth via storageState)
+                // Use filtered list endpoint with keyword param — avoids pagination issues
+                // that occur with unfiltered GET /streams (which may return only first N results)
                 const response = await this.page.request.get(
-                    `${apiUrl}/api/${orgId}/streams`,
+                    `${apiUrl}/api/${orgId}/streams?type=${streamType}&keyword=${streamName}`,
                     { headers: getAuthHeaders() }
                 );
 
@@ -554,7 +554,7 @@ export class LogsPage {
                     if (data.list) {
                         const streamExists = data.list.some(s => s.name === streamName);
                         if (streamExists) {
-                            testLogger.debug(`waitForStreamAvailable: Stream ${streamName} found after ${Date.now() - startTime}ms`);
+                            testLogger.info(`waitForStreamAvailable: Stream ${streamName} found after ${Date.now() - startTime}ms`);
                             return true;
                         }
                     }
