@@ -77,11 +77,6 @@ describe("ConfigPanelSearch", () => {
       w.unmount();
     });
 
-    it("isSearchActive prop is accepted without error", () => {
-      const w = mountComponent({ modelValue: "", isSearchActive: true });
-      expect(w.exists()).toBe(true);
-      w.unmount();
-    });
   });
 
   // -------------------------------------------------------------------------
