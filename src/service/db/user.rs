@@ -182,7 +182,7 @@ pub async fn update(
 ) -> Result<(), anyhow::Error> {
     let key = format!("{USER_RECORD_KEY}{user_email}");
     users::update(
-        &user_email,
+        user_email,
         first_name,
         last_name,
         password,
@@ -216,7 +216,7 @@ pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
                     log::error!("error sending delete user to nats {name} : {e}");
                 })?;
             #[cfg(feature = "enterprise")]
-            super_cluster::delete_user_from_super_cluster(&name).await?;
+            super_cluster::delete_user_from_super_cluster(name).await?;
             Ok(())
         }
         Err(e) => {

@@ -24,8 +24,7 @@ use config::{
 };
 use sea_orm::{
     ColumnTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Schema, Set, entity::prelude::*,
-    sea_query::Func,
+    QuerySelect, Schema, Set, entity::prelude::*, sea_query::Func,
 };
 use serde::{Deserialize, Serialize};
 
