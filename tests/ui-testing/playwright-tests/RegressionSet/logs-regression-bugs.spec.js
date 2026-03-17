@@ -362,15 +362,22 @@ test.describe("Logs Regression Bug Fixes", () => {
   test("should fetch fresh field values when switching streams @fieldValuesCache @P1 @regression", async ({ page }) => {
     testLogger.info('Test: Field values should refresh when switching between streams');
 
-    const stream1Name = 'e2e_field_cache_stream1';
-    const stream2Name = 'e2e_field_cache_stream2';
+    // Unique stream names per attempt — avoids "stream is being deleted" errors on Playwright retries
+    const runId = Date.now();
+    const stream1Name = `e2e_field_cache_s1_${runId}`;
+    const stream2Name = `e2e_field_cache_s2_${runId}`;
     // Register streams for cleanup in afterEach
     fieldCacheStreamsToCleanup = [stream1Name, stream2Name];
     const testFieldName = 'service_name';
     const stream1Value = 'service-from-stream1-unique';
     const stream2Value = 'service-from-stream2-unique';
 
-    // Step 1: Ingest data into stream1 with unique service_name value
+    // Cloud alpha1 has a stream creation serialization bottleneck:
+    // ingesting two new streams simultaneously causes only the first to be indexed.
+    // Fix: ingest stream1 → wait for indexing → then ingest stream2 → wait for indexing.
+    const streamWaitMs = isCloudEnvironment() ? 150000 : 30000;
+
+    // Step 1: Ingest data into stream1 and wait for it to be indexed
     testLogger.info(`Ingesting data into ${stream1Name} with ${testFieldName}=${stream1Value}`);
     const timestamp1 = Date.now() * 1000;
     await pm.logsPage.ingestData(stream1Name, [
@@ -378,8 +385,12 @@ test.describe("Logs Regression Bug Fixes", () => {
       { [testFieldName]: stream1Value, level: 'info', message: 'Test log stream1 2', _timestamp: timestamp1 + 1000000 },
     ]);
 
-    // Step 2: Ingest data into stream2 with different unique service_name value
-    // Use offset from timestamp1 to guarantee uniqueness
+    testLogger.info(`Waiting for ${stream1Name} to be indexed...`);
+    const stream1Available = await pm.logsPage.waitForStreamAvailable(stream1Name, streamWaitMs, 3000);
+    expect(stream1Available, `Stream ${stream1Name} should be available via API`).toBeTruthy();
+    testLogger.info(`Stream ${stream1Name} confirmed available via API`);
+
+    // Step 2: Ingest data into stream2 AFTER stream1 is indexed (avoids cloud serialization bottleneck)
     testLogger.info(`Ingesting data into ${stream2Name} with ${testFieldName}=${stream2Value}`);
     const timestamp2 = timestamp1 + 2000000;
     await pm.logsPage.ingestData(stream2Name, [
@@ -387,13 +398,8 @@ test.describe("Logs Regression Bug Fixes", () => {
       { [testFieldName]: stream2Value, level: 'info', message: 'Test log stream2 2', _timestamp: timestamp2 + 1000000 },
     ]);
 
-    // Wait for BOTH streams to be indexed before any UI interaction
-    // Cloud environments can take >90s for stream indexing; wait upfront to avoid timeout mid-test
-    const streamWaitMs = isCloudEnvironment() ? 150000 : 30000;
-    testLogger.info(`Waiting for both streams to be indexed (timeout: ${streamWaitMs}ms)...`);
-    const stream1Available = await pm.logsPage.waitForStreamAvailable(stream1Name, streamWaitMs, 3000);
+    testLogger.info(`Waiting for ${stream2Name} to be indexed...`);
     const stream2Available = await pm.logsPage.waitForStreamAvailable(stream2Name, streamWaitMs, 3000);
-    expect(stream1Available, `Stream ${stream1Name} should be available via API`).toBeTruthy();
     expect(stream2Available, `Stream ${stream2Name} should be available via API`).toBeTruthy();
     testLogger.info('Both streams confirmed available via API');
 
