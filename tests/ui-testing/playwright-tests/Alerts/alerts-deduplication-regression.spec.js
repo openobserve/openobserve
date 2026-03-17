@@ -281,8 +281,8 @@ test.describe("Deduplication Regression Tests", {
             testLogger.info('Clicking update button via data-test');
             await updateBtn.click();
         } else {
-            // Try finding the pencil/edit icon in the row
-            const pencilIcon = alertRow.locator('button, .q-btn').filter({ has: page.locator('i, svg') }).nth(1); // Usually 2nd button is edit
+            // Try finding the pencil/edit icon in the row by title/aria-label (more robust than positional index)
+            const pencilIcon = alertRow.locator('[title="Edit"], [aria-label="Edit"], [title*="edit" i], button:has(.q-icon[name*="edit"])').first();
             if (await pencilIcon.isVisible({ timeout: 2000 }).catch(() => false)) {
                 testLogger.info('Clicking pencil icon in row');
                 await pencilIcon.click();
@@ -335,7 +335,7 @@ test.describe("Deduplication Regression Tests", {
         // Remove all fingerprint field chips
         // Scope to deduplication section to avoid clicking unrelated chips (filter chips, tag chips, etc.)
         const dedupContainer = page.locator('[data-test*="dedup"], [data-test*="fingerprint"], .q-card:has-text("Fingerprint"), .q-card:has-text("Deduplication")').first();
-        const chipSelector = '.q-chip__icon--remove, .q-chip button[class*="remove"], .q-chip .q-icon';
+        const chipSelector = '.q-chip__icon--remove';
 
         // Keep removing chips until none remain (re-query after each removal)
         let removedCount = 0;
