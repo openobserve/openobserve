@@ -1547,6 +1547,7 @@
     "configSectionComparison": "对比",
     "configSectionMarkLines": "Mark Lines",
     "configSectionBackground": "背景",
+    "configPanelNoResultsFound": "找不到 “{query}” 的设置",
     "pivotOptions": "数据透视选项",
     "pivotShowRowTotals": "显示行总数",
     "pivotShowColTotals": "显示列总数",

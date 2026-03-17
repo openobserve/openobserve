@@ -1547,6 +1547,7 @@
     "configSectionComparison": "비교",
     "configSectionMarkLines": "마크 라인",
     "configSectionBackground": "백그라운드",
+    "configPanelNoResultsFound": "“{query}”에 대한 설정을 찾을 수 없습니다.",
     "pivotOptions": "피벗 옵션",
     "pivotShowRowTotals": "행 합계 표시",
     "pivotShowColTotals": "컬럼 합계 보기",

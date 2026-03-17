@@ -1564,6 +1564,7 @@
     "configSectionComparison": "比較",
     "configSectionMarkLines": "マークライン",
     "configSectionBackground": "バックグラウンド",
+    "configPanelNoResultsFound": "「{query}」の設定が見つかりません",
     "pivotOptions": "ピボットオプション",
     "pivotShowRowTotals": "行合計を表示",
     "pivotShowColTotals": "列の合計を表示",

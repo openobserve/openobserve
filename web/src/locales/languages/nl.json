@@ -1547,6 +1547,7 @@
     "configSectionComparison": "Vergelijking",
     "configSectionMarkLines": "Lijnen markeren",
     "configSectionBackground": "Achtergrond",
+    "configPanelNoResultsFound": "Geen instellingen gevonden voor „{query}”",
     "pivotOptions": "Pivot-opties",
     "pivotShowRowTotals": "Rijtotalen weergeven",
     "pivotShowColTotals": "Kolomtotalen weergeven",

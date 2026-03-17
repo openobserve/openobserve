@@ -1547,6 +1547,7 @@
     "configSectionComparison": "Karşılaştırma",
     "configSectionMarkLines": "Çizgileri İşaretle",
     "configSectionBackground": "Arkaplan",
+    "configPanelNoResultsFound": "“{query}” için ayar bulunamadı",
     "pivotOptions": "Pivot Seçenekleri",
     "pivotShowRowTotals": "Satır Toplamlarını Göster",
     "pivotShowColTotals": "Sütun Toplamlarını Göster",
