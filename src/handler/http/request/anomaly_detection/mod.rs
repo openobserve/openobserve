@@ -399,6 +399,10 @@ pub struct CreateAnomalyConfigRequest {
     pub alert_enabled: Option<bool>,
     pub alert_destination_id: Option<String>,
     pub enabled: Option<bool>,
+    /// Folder to place this config in. Resolved to the org default folder if absent.
+    pub folder_id: Option<String>,
+    /// Owner username. Defaults to the requesting user if absent.
+    pub owner: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
