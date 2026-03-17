@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ml-sm o2-primary-button tw:h-[36px]"
             no-caps
             flat
-            :label="t('alerts.newAnomalyDetection')"
+            :label="t('alerts.add')"
             @click="router.push({ name: 'addAnomalyDetection', query: { org_identifier: store.state.selectedOrganization.identifier } })"
           />
         </div>
