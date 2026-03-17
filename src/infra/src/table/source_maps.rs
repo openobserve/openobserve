@@ -289,5 +289,5 @@ pub async fn get_values(
         .map(|v| v.value.unwrap_or_default())
         .collect();
 
-    return Ok((services, envs, versions));
+    Ok((services, envs, versions))
 }
