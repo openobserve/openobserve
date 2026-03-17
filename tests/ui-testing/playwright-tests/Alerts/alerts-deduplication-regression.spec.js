@@ -407,9 +407,9 @@ test.describe("Deduplication Regression Tests", {
             testLogger.info('REGRESSION TEST PASSED: enabled is false when fingerprint_fields is empty');
         } else {
             // If fingerprint_fields is not empty, the UI didn't remove them properly
-            // This is also a test failure
+            // Use explicit fail with descriptive message
             testLogger.error('Fingerprint fields were not removed by UI', { fingerprint_fields: dedup.fingerprint_fields });
-            expect(dedup.fingerprint_fields?.length || 0).toBe(0);
+            throw new Error(`UI failed to remove fingerprint fields. Expected empty array, got: ${JSON.stringify(dedup.fingerprint_fields)}`);
         }
 
         // ==================== Double-check via API ====================
