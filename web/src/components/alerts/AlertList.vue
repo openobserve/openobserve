@@ -1000,8 +1000,19 @@ export default defineComponent({
           sortable: true,
           style: "width: 150px",
         },
+        // Anomaly Detection tab — extra columns
+        ...(activeTab.value === 'anomalyDetection' ? [
+          {
+            name: "detection_window",
+            field: "detection_window_seconds",
+            label: "Detection Window",
+            align: "center" as const,
+            sortable: true,
+            style: "width: 150px",
+          },
+        ] : []),
         // "period" column — conditional
-        ...(activeTab.value !== 'realTime' ? [{
+        ...(activeTab.value == 'scheduled' ? [{
           name: "period",
           field: "period",
           label: t("alerts.period"),
@@ -1034,6 +1045,17 @@ export default defineComponent({
           sortable: true,
           style: "width: 150px",
         },
+        // Anomaly Detection tab — extra columns
+        ...(activeTab.value === 'anomalyDetection' ? [
+          {
+            name: "last_trained_at",
+            field: "training_completed_at",
+            label: "Last Trained At",
+            align: "left" as const,
+            sortable: true,
+            style: "width: 150px",
+          },
+        ] : []),
         {
           name: "actions",
           field: "actions",
@@ -1098,6 +1120,14 @@ export default defineComponent({
         : "",
       last_satisfied_at: anomaly.last_anomaly_detected_at
         ? convertUnixToQuasarFormat(anomaly.last_anomaly_detected_at)
+        : "",
+      detection_window: anomaly.detection_window_seconds
+        ? (anomaly.detection_window_seconds >= 3600 && anomaly.detection_window_seconds % 3600 === 0
+            ? `${anomaly.detection_window_seconds / 3600}h`
+            : `${Math.round(anomaly.detection_window_seconds / 60)} mins`)
+        : "--",
+      last_trained_at: anomaly.training_completed_at
+        ? convertUnixToQuasarFormat(anomaly.training_completed_at)
         : "",
       selected: false,
       type: "anomaly",
