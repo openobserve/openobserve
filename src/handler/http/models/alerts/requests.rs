@@ -142,6 +142,10 @@ pub struct ListAlertsQuery {
     ///
     /// This parameter is only used if `page_size` is also set.
     pub page_idx: Option<u64>,
+
+    /// Optional alert type filter: `all` (default), `scheduled`, `realtime`,
+    /// or `anomaly_detection`.
+    pub alert_type: Option<meta_alerts::AlertTypeFilter>,
 }
 
 /// HTTP URL query component that contains parameters for enabling alerts.
@@ -179,6 +183,7 @@ impl ListAlertsQuery {
             page_size_and_idx: self
                 .page_size
                 .map(|page_size| (page_size, self.page_idx.unwrap_or(0))),
+            alert_type: self.alert_type.unwrap_or_default(),
         }
     }
 }

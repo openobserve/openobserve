@@ -185,6 +185,10 @@ pub async fn create_config(
         )),
         alert_enabled: Set(req.alert_enabled.unwrap_or(true)),
         alert_destination_id: Set(req.alert_destination_id.clone()),
+        folder_id: Set(None),
+        owner: Set(None),
+        total_evaluations: Set(0),
+        firing_count: Set(0),
         status: Set(0i32), // 0 = waiting
         retries: Set(0),
         last_updated: Set(now_us),

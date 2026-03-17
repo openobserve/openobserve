@@ -36,6 +36,8 @@ use {
     },
 };
 
+use config::meta::alerts::alert::AlertTypeFilter;
+
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
@@ -49,6 +51,7 @@ use crate::{
             responses::{
                 AlertBulkEnableResponse, EnableAlertResponseBody, GenerateSqlMetadata,
                 GenerateSqlResponseBody, GetAlertResponseBody, ListAlertsResponseBody,
+                ListAlertsResponseBodyItem, anomaly_config_to_list_item,
             },
         },
         request::{
@@ -461,32 +464,57 @@ pub async fn list_alerts(
     #[cfg(feature = "enterprise")]
     let user_id = Some(user_email.user_id.as_str());
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let scheduled_jobs = scheduler::list_by_org(&org_id, Some(TriggerModule::Alert))
-        .await
-        .unwrap_or_default();
-    let mut scheduled_jobs: HashMap<String, Trigger> = scheduled_jobs
-        .into_iter()
-        .map(|t| (t.module_key.clone(), t))
-        .collect();
-    let folders_and_alerts_scheduled_job =
-        match alert::list_v2(client, user_id, query.into(&org_id)).await {
-            Ok(f_a) => {
-                let f_a: Vec<_> = f_a
+    let params = query.into(&org_id);
+    let alert_type = params.alert_type;
+
+    // Fetch regular (scheduled / realtime) alerts unless the filter is anomaly-only.
+    let mut list: Vec<ListAlertsResponseBodyItem> =
+        if alert_type != AlertTypeFilter::AnomalyDetection {
+            let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+            let mut scheduled_jobs: HashMap<String, Trigger> =
+                scheduler::list_by_org(&org_id, Some(TriggerModule::Alert))
+                    .await
+                    .unwrap_or_default()
                     .into_iter()
-                    .map(|(folder, alert)| {
-                        let key = alert.get_unique_key();
-                        (folder, alert, scheduled_jobs.remove(&key))
-                    })
+                    .map(|t| (t.module_key.clone(), t))
                     .collect();
-                f_a
-            }
-            Err(e) => return e.into(),
+
+            let folders_and_alerts = match alert::list_v2(client, user_id, params).await {
+                Ok(v) => v,
+                Err(e) => return e.into(),
+            };
+
+            folders_and_alerts
+                .into_iter()
+                // Apply is_real_time filter when a specific type is requested.
+                .filter(|(_, a)| match alert_type {
+                    AlertTypeFilter::Scheduled => !a.is_real_time,
+                    AlertTypeFilter::Realtime => a.is_real_time,
+                    _ => true,
+                })
+                .map(|(folder, alert)| {
+                    let key = alert.get_unique_key();
+                    (folder, alert, scheduled_jobs.remove(&key))
+                })
+                .filter_map(|item| ListAlertsResponseBodyItem::try_from(item).ok())
+                .collect()
+        } else {
+            vec![]
         };
-    let Ok(resp_body) = ListAlertsResponseBody::try_from(folders_and_alerts_scheduled_job) else {
-        return MetaHttpResponse::internal_error("");
-    };
-    MetaHttpResponse::json(resp_body)
+
+    // Fetch anomaly detection configs and merge when the filter includes them.
+    if matches!(
+        alert_type,
+        AlertTypeFilter::All | AlertTypeFilter::AnomalyDetection
+    ) {
+        if let Ok(configs) =
+            crate::service::anomaly_detection::list_configs(&org_id).await
+        {
+            list.extend(configs.iter().filter_map(anomaly_config_to_list_item));
+        }
+    }
+
+    MetaHttpResponse::json(ListAlertsResponseBody { list })
 }
 
 /// EnableAlert
