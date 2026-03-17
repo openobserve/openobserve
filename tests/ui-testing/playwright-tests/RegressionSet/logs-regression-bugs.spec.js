@@ -368,7 +368,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     // By reusing e2e_automate, we only create 1 new stream (which always works).
     const stream1Name = 'e2e_automate'; // existing stream from global setup
     const runId = Date.now();
-    const stream2Name = `e2e_field_cache_${runId}`;
+    const stream2Name = `e2e_svctest_${runId}`;
     // Only the new stream needs cleanup
     fieldCacheStreamsToCleanup = [stream2Name];
     const testFieldName = 'service_name';
