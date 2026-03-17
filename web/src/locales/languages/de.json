@@ -2109,7 +2109,9 @@
       "detectionConfig": "Konfiguration der Abfrage- und Erkennungsparameter",
       "alerting": "Richten Sie Benachrichtigungen ein, wenn Anomalien erkannt werden"
     },
-    "updateAnomalyDetection": "Anomalieerkennung aktualisieren:"
+    "updateAnomalyDetection": "Anomalieerkennung aktualisieren:",
+    "anomalyCreated": "Konfiguration zur Erkennung von Anomalien wurde erstellt. Die Schulung beginnt in Kürze.",
+    "editJson": "Alert-JSON bearbeiten"
   },
   "alert_templates": {
     "header": "Vorlagen",

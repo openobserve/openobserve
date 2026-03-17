@@ -2109,7 +2109,9 @@
       "detectionConfig": "Configuration des paramètres de requête et de détection",
       "alerting": "Configurer des notifications lorsque des anomalies sont détectées"
     },
-    "updateAnomalyDetection": "Mettre à jour la détection des anomalies :"
+    "updateAnomalyDetection": "Mettre à jour la détection des anomalies :",
+    "anomalyCreated": "Configuration de détection des anomalies créée. La formation débutera prochainement.",
+    "editJson": "Modifier le JSON d'alerte"
   },
   "alert_templates": {
     "header": "Modèles",

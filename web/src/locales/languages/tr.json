@@ -2109,7 +2109,9 @@
       "detectionConfig": "Sorgu ve algılama parametrelerini yapılandırma",
       "alerting": "Anormallikler tespit edildiğinde bildirimleri ayarlayın"
     },
-    "updateAnomalyDetection": "Anomali algılamayı güncelle:"
+    "updateAnomalyDetection": "Anomali algılamayı güncelle:",
+    "anomalyCreated": "Anomali algılama yapılandırması oluşturuldu. Eğitim kısa süre içinde başlayacak.",
+    "editJson": "Uyarı JSON'unu Düzenle"
   },
   "alert_templates": {
     "header": "Şablonlar",
