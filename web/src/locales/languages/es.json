@@ -1547,6 +1547,7 @@
     "configSectionComparison": "Comparación",
     "configSectionMarkLines": "Marcar líneas",
     "configSectionBackground": "Antecedentes",
+    "configPanelNoResultsFound": "No se encontró ninguna configuración para «{query}»",
     "pivotOptions": "Opciones de pivote",
     "pivotShowRowTotals": "Mostrar totales de fila",
     "pivotShowColTotals": "Mostrar totales de columna",

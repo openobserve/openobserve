@@ -1547,6 +1547,7 @@
     "configSectionComparison": "Vergleich",
     "configSectionMarkLines": "Linien markieren",
     "configSectionBackground": "Hintergrund",
+    "configPanelNoResultsFound": "Keine Einstellungen für „{query}“ gefunden",
     "pivotOptions": "Pivot-Optionen",
     "pivotShowRowTotals": "Zeilensummen anzeigen",
     "pivotShowColTotals": "Spaltensummen anzeigen",
