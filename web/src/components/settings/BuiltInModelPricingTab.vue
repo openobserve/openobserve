@@ -18,35 +18,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="built-in-model-pricing-container card-container">
     <!-- Search and Filter Bar -->
     <div class="filters-bar q-pa-md">
-      <div class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap">
+      <div class="tw:flex tw:items-center tw:justify-between tw:flex-wrap">
         <!-- Text search -->
-        <div class="tw:flex-1 tw:min-w-[200px]">
-          <q-input
+         <div class="tw:flex tw:gap-3">
+        <q-input
             v-model="searchQuery"
             placeholder="Search by model name..."
             borderless
             dense
             flat
             clearable
-            class="no-border tw:w-full"
+            class="no-border tw:w-[220px]"
             data-test="built-in-model-pricing-search"
           >
             <template v-slot:prepend>
               <q-icon class="o2-search-input-icon" name="search" />
             </template>
           </q-input>
-        </div>
 
         <!-- Provider dropdown filter -->
-        <div class="tw:w-[220px]">
           <q-select
             v-model="selectedProvider"
             :options="providerOptions"
-            placeholder="Filter by Provider"
+            placeholder="Provider"
             dense
             borderless
             clearable
             options-dense
+            use-input
+            hide-selected
+            menu-anchor="bottom left"
+            fill-input
             class="no-border"
             data-test="built-in-model-pricing-provider-filter"
           >
@@ -64,13 +66,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item>
             </template>
           </q-select>
-        </div>
+         </div>
 
         <!-- Refresh -->
         <div>
           <q-btn
             label="Refresh"
-            icon="refresh"
             flat
             class="o2-secondary-button tw:w-[120px] tw:h-[36px]"
             @click="refreshModels"
@@ -94,9 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-btn flat color="primary" label="Try Again" @click="fetchModels()" class="q-mt-md" />
     </div>
 
-    <!-- Models Table — no pagination, show all -->
-    <div v-else class="models-list">
-      <div class="q-pa-md">
+    <div v-else class="q-pb-md q-px-md">
         <q-table
           :rows="filteredModels"
           :columns="columns"
@@ -105,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           :pagination="{ rowsPerPage: 0 }"
           hide-pagination
-          class="o2-quasar-table"
+          class="o2-quasar-table tw:h-[calc(100vh-100px)] o2-row-md o2-quasar-table-header-sticky"
           data-test="built-in-model-pricing-table"
         >
           <!-- Checkbox -->
@@ -114,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-checkbox
                 v-model="props.row.selected"
                 dense
+                size="sm"
                 :data-test="`built-in-model-pricing-checkbox-${props.rowIndex}`"
               />
             </q-td>
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Provider — colored dot + name, no icon -->
           <template #body-cell-provider="props">
             <q-td :props="props">
-              <span class="provider-badge" :style="`background: ${providerBadgeBg(props.row.provider)}; color: ${providerBadgeText(props.row.provider)};`">
+              <span class="provider-badge" :style="`color: ${providerBadgeBg(props.row.provider)}; border-color: ${providerBadgeBg(props.row.provider)};`">
                 {{ props.row.provider || 'Unknown' }}
               </span>
             </q-td>
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-if="!props.row.tiers?.length">—</div>
               <div v-else>
                 <div
-                  v-for="(tier, idx) in props.row.tiers"
+                  v-for="(tier, idx) in [...props.row.tiers].sort((a: any, b: any) => (a.condition ? 1 : 0) - (b.condition ? 1 : 0))"
                   :key="idx"
                   class="tier-row"
                   :class="{ 'tier-conditional': !!tier.condition }"
@@ -202,7 +202,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </q-table>
-      </div>
     </div>
   </div>
 </template>
@@ -392,15 +391,16 @@ export default defineComponent({
   flex-shrink: 0;
 }
 
-/* Provider badge in table — color background, no icon */
+/* Provider badge — border only, matching IncidentList style */
 .provider-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
-  vertical-align: middle;
+  border: 1px solid currentColor;
 }
 
 /* Tier pricing rows */
@@ -427,15 +427,25 @@ export default defineComponent({
   flex-wrap: wrap;
 }
 .price-chip {
-  display: inline-block;
-  padding: 1px 5px;
-  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
+  border: 1px solid currentColor;
 }
-.price-input       { background: #e8f5e9; color: #2e7d32; }
-.price-output      { background: #e3f2fd; color: #1565c0; }
-.price-cache-read  { background: #fff8e1; color: #f57f17; }
-.price-cache-write { background: #fce4ec; color: #880e4f; }
+.price-input       { color: #2e7d32; }
+.price-output      { color: #1565c0; }
+.price-cache-read  { color: #f57f17; }
+.price-cache-write { color: #880e4f; }
+
+body.body--dark {
+  .price-input       { color: #81c784; }
+  .price-output      { color: #64b5f6; }
+  .price-cache-read  { color: #ffd54f; }
+  .price-cache-write { color: #f48fb1; }
+  .provider-badge    { opacity: 0.85; }
+}
 </style>

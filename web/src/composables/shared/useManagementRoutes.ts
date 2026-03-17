@@ -67,6 +67,18 @@ const useManagementRoutes = () => {
           },
         },
         {
+          path: "model_pricing/edit",
+          name: "modelPricingEditor",
+          meta: {
+            title: "Model Pricing Editor",
+          },
+          component: () =>
+            import("@/components/settings/ModelPricingEditor.vue"),
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
           path: "templates",
           name: "alertTemplates",
           meta:{
