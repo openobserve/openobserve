@@ -341,7 +341,7 @@ test.describe("Cross-Linking testcases", () => {
         // Delete first link
         await pm.crossLinkPage.clickDeleteCrossLink(0);
 
-        // Verify count decreased
+        // Verify count decreased.
         const itemsAfter = await page.locator('[data-test^="cross-link-item-"]').count();
         expect(itemsAfter).toBe(itemsBefore - 1);
 
