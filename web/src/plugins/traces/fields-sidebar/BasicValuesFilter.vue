@@ -124,6 +124,8 @@
           :show-multi-select="true"
           :default-values-count="defaultValuesCount"
           :theme="store.state.theme"
+          :active-include-values="activeIncludeValues"
+          :active-exclude-values="activeExcludeValues"
           @add-search-term="handleAddSearchTerm"
           @add-multiple-search-terms="handleAddMultipleSearchTerms"
           @load-more-values="handleLoadMoreValues"
@@ -164,6 +166,14 @@ const props = defineProps({
   row: {
     type: Object,
     default: () => null,
+  },
+  activeIncludeValues: {
+    type: Array as () => string[],
+    default: () => [],
+  },
+  activeExcludeValues: {
+    type: Array as () => string[],
+    default: () => [],
   },
 });
 

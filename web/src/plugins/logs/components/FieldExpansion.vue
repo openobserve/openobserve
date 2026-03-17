@@ -122,6 +122,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-multi-select="selectedStreamsCount == field.streams.length"
           :default-values-count="defaultValuesCount"
           :theme="theme"
+          :active-include-values="activeIncludeValues"
+          :active-exclude-values="activeExcludeValues"
           @add-search-term="(fn, v, a) => emit('add-search-term', fn, v, a)"
           @add-multiple-search-terms="
             (fn, vs, a) => emit('add-multiple-search-terms', fn, vs, a)
@@ -135,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import {
   outlinedAdd,
   outlinedVisibility,
@@ -156,6 +158,9 @@ interface Props {
   theme: string;
   showQuickMode: boolean;
   defaultValuesCount: number;
+  activeIncludeValues?: string[];
+  activeExcludeValues?: string[];
+  expanded?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -176,8 +181,15 @@ const emit = defineEmits<{
   "before-hide": [field: any];
 }>();
 
-const isExpanded = ref(false);
+const isExpanded = ref(props.expanded ?? false);
 const fieldValuesPanelRef = ref();
+
+watch(
+  () => props.expanded,
+  (val) => {
+    if (val !== undefined) isExpanded.value = val;
+  },
+);
 
 const isFieldSelected = computed(() =>
   props.selectedFields.includes(props.field.name),
