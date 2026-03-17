@@ -648,6 +648,7 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/{alert_id}/enable", patch(alerts::enable_alert))
         .route("/v2/{org_id}/alerts/bulk/enable", post(alerts::enable_alert_bulk))
         .route("/v2/{org_id}/alerts/{alert_id}/trigger", patch(alerts::trigger_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/retrain", patch(alerts::retrain_alert))
         .route("/v2/{org_id}/alerts/generate_sql", post(alerts::generate_sql))
         .route("/v2/{org_id}/alerts/move", patch(alerts::move_alerts))
         .route("/v2/{org_id}/alerts/history", get(alerts::history::get_alert_history))
