@@ -623,7 +623,7 @@ pub async fn add_user_to_org(
             "Invalid email",
         )));
     }
-    let email = email.trim().to_lowercase();
+    let email = email.trim();
     let existing_user = db::user::get_user_record(&email).await;
     let root_user = ROOT_USER.clone();
     if let Ok(existing_user) = existing_user {
@@ -913,9 +913,7 @@ pub async fn remove_user_from_org(
     email_id: &str,
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
-    let email_id = email_id.to_lowercase();
-    let initiator_id = initiator_id.to_lowercase();
-    let initiating_user = if is_root_user(&initiator_id) {
+    let initiating_user = if is_root_user(initiator_id) {
         ROOT_USER.get("root").unwrap().to_owned()
     } else {
         db::user::get(Some(org_id), &initiator_id)

@@ -187,7 +187,7 @@ pub async fn update(
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
-    let email_id = email_id.trim().to_lowercase();
+    let email_id = email_id.trim().to_string();
     let query = match web::Query::<HashMap<String, String>>::from_query(req.query_string()) {
         Ok(query) => query,
         Err(e) => {
