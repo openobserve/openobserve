@@ -23,6 +23,7 @@ const emit = defineEmits<{
     :placeholder="t('dashboard.configPanelSearchPlaceholder')"
     class="col config-panel-search"
     clearable
+    autofocus
   >
     <template #prepend>
       <q-icon name="search" size="xs" class="q-ml-xs text-grey-6" />
