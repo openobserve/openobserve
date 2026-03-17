@@ -19,7 +19,7 @@
  */
 
 // Fields that should never be stored (meta / high-cardinality)
-const EXCLUDED_FIELDS = new Set([
+export const EXCLUDED_FIELDS = new Set([
   "_timestamp",
   "_id",
   "__id",

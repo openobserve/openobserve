@@ -235,7 +235,14 @@ export const mergeMultipleValues = async (
  * This makes the read authoritative regardless of when cleanup last ran.
  */
 export const getValues = async (key: string): Promise<string[]> => {
-  const db = await openDB();
+  let db: IDBDatabase;
+  try {
+    db = await openDB();
+  } catch {
+    // IDB unavailable (private browsing, unsupported browser, quota) — return
+    // empty array so autocomplete silently degrades rather than throwing.
+    return [];
+  }
   return new Promise((resolve) => {
     const tx = db.transaction(STORE_NAME, "readonly");
     const req = tx.objectStore(STORE_NAME).get(key);
