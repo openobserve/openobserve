@@ -265,9 +265,11 @@ export default defineComponent({
         openobserveRum.stopSessionReplayRecording();
       }
 
-      if (config.isEnterprise == "true") {
-        invalidateLoginData();
-      }
+      // Always call backend logout to clear auth cookies (auth_tokens, auth_ext)
+      // before clearing local state — prevents stale credentials from causing
+      // 401 errors on the next login attempt (see #10900)
+      invalidateLoginData();
+
       this.store.dispatch("logout");
 
       useLocalCurrentUser("", true);
