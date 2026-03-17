@@ -1012,7 +1012,7 @@ export default defineComponent({
           },
         ] : []),
         // "period" column — conditional
-        ...(activeTab.value == 'scheduled' ? [{
+        ...(activeTab.value !== 'realTime' && activeTab.value !== 'anomalyDetection' ? [{
           name: "period",
           field: "period",
           label: t("alerts.period"),
@@ -1021,7 +1021,7 @@ export default defineComponent({
           style: "width: 150px",
         }] : []),
         // "frequency" column — conditional
-        ...(activeTab.value !== 'realTime' ? [{
+        ...(activeTab.value !== 'realTime' && activeTab.value !== 'anomalyDetection' ? [{
           name: "frequency",
           field: "frequency",
           label: t("alerts.frequency"),
@@ -1542,7 +1542,7 @@ export default defineComponent({
       const unixSeconds = unixMicroseconds / 1e6;
       const dateToFormat = new Date(unixSeconds * 1000);
       const formattedDate = dateToFormat.toISOString();
-      return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+      return date.formatDate(formattedDate, "YYYY-MM-DD HH:mm:ss");
     }
 
     const addAlert = () => {
