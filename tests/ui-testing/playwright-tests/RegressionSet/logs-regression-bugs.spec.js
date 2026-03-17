@@ -16,7 +16,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
 const { ingestTestData } = require('../utils/data-ingestion.js');
-const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { getOrgIdentifier, isCloudEnvironment } = require('../utils/cloud-auth.js');
 
 test.describe("Logs Regression Bug Fixes", () => {
   // Changed from serial to parallel - tests are independent (each gets own page/PM in beforeEach)
@@ -387,9 +387,19 @@ test.describe("Logs Regression Bug Fixes", () => {
       { [testFieldName]: stream2Value, level: 'info', message: 'Test log stream2 2', _timestamp: timestamp2 + 1000000 },
     ]);
 
-    // Step 3: Navigate to logs and select stream1
+    // Wait for BOTH streams to be indexed before any UI interaction
+    // Cloud environments can take >90s for stream indexing; wait upfront to avoid timeout mid-test
+    const streamWaitMs = isCloudEnvironment() ? 150000 : 30000;
+    testLogger.info(`Waiting for both streams to be indexed (timeout: ${streamWaitMs}ms)...`);
+    const stream1Available = await pm.logsPage.waitForStreamAvailable(stream1Name, streamWaitMs, 3000);
+    const stream2Available = await pm.logsPage.waitForStreamAvailable(stream2Name, streamWaitMs, 3000);
+    expect(stream1Available, `Stream ${stream1Name} should be available via API`).toBeTruthy();
+    expect(stream2Available, `Stream ${stream2Name} should be available via API`).toBeTruthy();
+    testLogger.info('Both streams confirmed available via API');
+
+    // Step 3: Navigate to logs and select stream1 (apiWaitMs=0: already confirmed above)
     await pm.logsPage.clickMenuLinkLogsItem();
-    await pm.logsPage.selectStream(stream1Name);
+    await pm.logsPage.selectStream(stream1Name, 3, 0);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Set time range and run query
@@ -432,9 +442,9 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Collapse the field
     await pm.logsPage.collapseField(testFieldName);
 
-    // Step 5: Switch to stream2 WITHOUT refreshing the page
+    // Step 5: Switch to stream2 WITHOUT refreshing the page (apiWaitMs=0: already confirmed above)
     testLogger.info(`Switching to ${stream2Name} without page refresh`);
-    await pm.logsPage.selectStream(stream2Name);
+    await pm.logsPage.selectStream(stream2Name, 3, 0);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Run query for stream2 and wait for search API response
