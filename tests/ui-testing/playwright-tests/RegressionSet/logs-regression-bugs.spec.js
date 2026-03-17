@@ -362,48 +362,44 @@ test.describe("Logs Regression Bug Fixes", () => {
   test("should fetch fresh field values when switching streams @fieldValuesCache @P1 @regression", async ({ page }) => {
     testLogger.info('Test: Field values should refresh when switching between streams');
 
-    // Unique stream names per attempt — avoids "stream is being deleted" errors on Playwright retries
+    // Strategy: use existing e2e_automate stream (always available) + ONE new stream.
+    // Alpha1 cloud has a backend bug where creating 2 new streams in quick succession
+    // causes the second stream's metadata to never appear in the streams API.
+    // By reusing e2e_automate, we only create 1 new stream (which always works).
+    const stream1Name = 'e2e_automate'; // existing stream from global setup
     const runId = Date.now();
-    const stream1Name = `e2e_field_cache_s1_${runId}`;
-    const stream2Name = `e2e_field_cache_s2_${runId}`;
-    // Register streams for cleanup in afterEach
-    fieldCacheStreamsToCleanup = [stream1Name, stream2Name];
+    const stream2Name = `e2e_field_cache_${runId}`;
+    // Only the new stream needs cleanup
+    fieldCacheStreamsToCleanup = [stream2Name];
     const testFieldName = 'service_name';
-    const stream1Value = 'service-from-stream1-unique';
-    const stream2Value = 'service-from-stream2-unique';
+    const stream1Value = `svc-automate-${runId}`;
+    const stream2Value = `svc-newstream-${runId}`;
 
-    // Cloud alpha1 has a stream creation serialization bottleneck:
-    // ingesting two new streams simultaneously causes only the first to be indexed.
-    // Fix: ingest stream1 → wait for indexing → then ingest stream2 → wait for indexing.
     const streamWaitMs = isCloudEnvironment() ? 150000 : 30000;
 
-    // Step 1: Ingest data into stream1 and wait for it to be indexed
+    // Step 1: Ingest data with unique service_name into e2e_automate (stream already exists)
     testLogger.info(`Ingesting data into ${stream1Name} with ${testFieldName}=${stream1Value}`);
     const timestamp1 = Date.now() * 1000;
     await pm.logsPage.ingestData(stream1Name, [
-      { [testFieldName]: stream1Value, level: 'info', message: 'Test log stream1', _timestamp: timestamp1 },
-      { [testFieldName]: stream1Value, level: 'info', message: 'Test log stream1 2', _timestamp: timestamp1 + 1000000 },
+      { [testFieldName]: stream1Value, level: 'info', message: 'Field cache test stream1', _timestamp: timestamp1 },
+      { [testFieldName]: stream1Value, level: 'info', message: 'Field cache test stream1 2', _timestamp: timestamp1 + 1000000 },
     ]);
 
-    testLogger.info(`Waiting for ${stream1Name} to be indexed...`);
-    const stream1Available = await pm.logsPage.waitForStreamAvailable(stream1Name, streamWaitMs, 3000);
-    expect(stream1Available, `Stream ${stream1Name} should be available via API`).toBeTruthy();
-    testLogger.info(`Stream ${stream1Name} confirmed available via API`);
-
-    // Step 2: Ingest data into stream2 AFTER stream1 is indexed (avoids cloud serialization bottleneck)
+    // Step 2: Ingest data into new stream with different service_name
     testLogger.info(`Ingesting data into ${stream2Name} with ${testFieldName}=${stream2Value}`);
     const timestamp2 = timestamp1 + 2000000;
     await pm.logsPage.ingestData(stream2Name, [
-      { [testFieldName]: stream2Value, level: 'info', message: 'Test log stream2', _timestamp: timestamp2 },
-      { [testFieldName]: stream2Value, level: 'info', message: 'Test log stream2 2', _timestamp: timestamp2 + 1000000 },
+      { [testFieldName]: stream2Value, level: 'info', message: 'Field cache test stream2', _timestamp: timestamp2 },
+      { [testFieldName]: stream2Value, level: 'info', message: 'Field cache test stream2 2', _timestamp: timestamp2 + 1000000 },
     ]);
 
+    // Wait for the new stream to be indexed (e2e_automate already exists)
     testLogger.info(`Waiting for ${stream2Name} to be indexed...`);
     const stream2Available = await pm.logsPage.waitForStreamAvailable(stream2Name, streamWaitMs, 3000);
     expect(stream2Available, `Stream ${stream2Name} should be available via API`).toBeTruthy();
-    testLogger.info('Both streams confirmed available via API');
+    testLogger.info(`Stream ${stream2Name} confirmed available via API`);
 
-    // Step 3: Navigate to logs and select stream1 (already confirmed via API above)
+    // Step 3: Navigate to logs and select stream1 (e2e_automate — always available)
     await pm.logsPage.clickMenuLinkLogsItem();
     await pm.logsPage.selectStream(stream1Name);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -448,7 +444,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Collapse the field
     await pm.logsPage.collapseField(testFieldName);
 
-    // Step 5: Switch to stream2 WITHOUT refreshing the page (already confirmed via API above)
+    // Step 5: Switch to stream2 WITHOUT refreshing the page
     testLogger.info(`Switching to ${stream2Name} without page refresh`);
     await pm.logsPage.selectStream(stream2Name);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -495,7 +491,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   });
 
   test.afterEach(async () => {
-    // Cleanup streams created by field cache test
+    // Cleanup new stream created by field cache test (e2e_automate is never deleted)
     if (fieldCacheStreamsToCleanup.length > 0 && pm) {
       testLogger.info('Cleaning up test streams');
       for (const streamName of fieldCacheStreamsToCleanup) {
