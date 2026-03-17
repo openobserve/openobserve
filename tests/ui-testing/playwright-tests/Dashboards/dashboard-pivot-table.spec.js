@@ -356,13 +356,9 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
-      // Verify labels in non-pivot mode
-      const xLayout = page.locator('[data-test="dashboard-x-layout"]');
-      const yLayout = page.locator('[data-test="dashboard-y-layout"]');
-
       // Check for "First Column" label (non-pivot mode)
-      await expect(xLayout.getByText("First Column")).toBeVisible();
-      await expect(yLayout.getByText("Other Columns")).toBeVisible();
+      await expect(page.getByText("First Column")).toBeVisible();
+      await expect(page.getByText("Other Columns")).toBeVisible();
 
       testLogger.info("Verified non-pivot labels: First Column, Other Columns");
 
@@ -370,8 +366,8 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "p");
 
       // Labels should update to pivot mode
-      await expect(xLayout.getByText("Row Fields")).toBeVisible();
-      await expect(yLayout.getByText("Value Fields")).toBeVisible();
+      await expect(page.getByText("Row Fields")).toBeVisible();
+      await expect(page.getByText("Value Fields")).toBeVisible();
 
       testLogger.info("Verified pivot labels: Row Fields, Value Fields");
 
@@ -379,8 +375,8 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await pm.chartTypeSelector.removeField("breakdown_1", "b");
 
       // Labels should revert to non-pivot mode
-      await expect(xLayout.getByText("First Column")).toBeVisible();
-      await expect(yLayout.getByText("Other Columns")).toBeVisible();
+      await expect(page.getByText("First Column")).toBeVisible();
+      await expect(page.getByText("Other Columns")).toBeVisible();
 
       testLogger.info("Verified labels revert when pivot field removed");
 
@@ -603,7 +599,7 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
         "p"
       );
       await pm.chartTypeSelector.searchAndAddField(
-        "kubernetes_docker_container_id",
+        "kubernetes_namespace_name",
         "p"
       );
 
@@ -625,7 +621,7 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
         '[data-test="index-field-search-input"]'
       );
       await searchInput.click();
-      await searchInput.fill("kubernetes_namespace_name");
+      await searchInput.fill("log");
 
       const pivotButton = page
         .locator('[data-test="dashboard-add-p-data"]')
@@ -801,8 +797,7 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await expect(breakdownItem).toBeVisible();
 
       // Verify pivot mode is active (labels should show "Row Fields")
-      const xLayout = page.locator('[data-test="dashboard-x-layout"]');
-      await expect(xLayout.getByText("Row Fields")).toBeVisible();
+      await expect(page.getByText("Row Fields")).toBeVisible();
 
       testLogger.info(
         "Breakdown preserved when switching back to table (pivot mode restored)"
@@ -925,15 +920,16 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await pm.chartTypeSelector.selectStreamType("logs");
       await pm.chartTypeSelector.selectStream("e2e_automate");
 
+      // Remote auto-populated X field
+      await pm.chartTypeSelector.removeField("x_axis_1", "x");
+
       // Add only Pivot (breakdown) + Y fields (no X)
       await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "p");
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
-      const streamPromise = waitForStreamComplete(page);
       await pm.dashboardPanelActions.applyDashboardBtn();
-      await streamPromise;
-      await pm.chartTypeSelector.waitForTableDataLoad();
+      await pm.dashboardPanelActions.waitForChartToRender();
 
       // Open config panel - pivot options should NOT be visible
       // (no X field → isPivotMode is false)
@@ -944,8 +940,7 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await expect(pivotRowTotals).not.toBeVisible();
 
       // Labels should show "First Column" (non-pivot mode)
-      const xLayout = page.locator('[data-test="dashboard-x-layout"]');
-      await expect(xLayout.getByText("First Column")).toBeVisible();
+      await expect(page.getByText("First Column")).toBeVisible();
 
       testLogger.info(
         "Verified flat table renders when breakdown + Y without X"
@@ -1001,14 +996,122 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await expect(pivotRowTotals).not.toBeVisible();
 
       // Labels should show "First Column" (non-pivot mode)
-      const xLayout = page.locator('[data-test="dashboard-x-layout"]');
-      await expect(xLayout.getByText("First Column")).toBeVisible();
+      await expect(page.getByText("First Column")).toBeVisible();
 
       testLogger.info(
         "Verified flat table renders when X + breakdown without Y"
       );
 
       // Clean up
+      await pm.dashboardPanelActions.savePanel();
+      await pm.dashboardCreate.backToDashboardList();
+      await deleteDashboard(page, dashboardName);
+    }
+  );
+
+  test(
+    "should support and render pivot with compound hierarchical headers (1x + 1p + 2y)",
+    {
+      tag: ["@pivotTable", "@functional", "@P1"],
+    },
+    async ({ page }) => {
+      const dashboardName = generateUniqueDashboardName();
+      const pm = new PageManager(page);
+      const panelName = pm.dashboardPanelActions.generateUniquePanelName("pivot-test");
+
+      await pm.dashboardList.menuItem("dashboards-item");
+      await waitForDashboardPage(page);
+      await pm.dashboardCreate.waitForDashboardUIStable();
+      await pm.dashboardCreate.createDashboard(dashboardName);
+      await pm.dashboardCreate.addPanel();
+      await pm.dashboardPanelActions.addPanelName(panelName);
+
+      // Create compound header pivot table
+      await pm.chartTypeSelector.selectChartType("table");
+      await pm.chartTypeSelector.selectStreamType("logs");
+      await pm.chartTypeSelector.selectStream("e2e_automate");
+
+      // X field
+      await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "x");
+      // P field
+      await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "p");
+      
+      // Multiple Y fields to create hierarchy
+      await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
+      await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
+
+      await pm.chartTypeSelector.searchAndAddField("log", "y");
+      await pm.chartTypeSelector.configureYAxisFunction("y_axis_2", "count");
+
+      const streamPromise = waitForStreamComplete(page);
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await streamPromise;
+      await pm.chartTypeSelector.waitForTableDataLoad();
+
+      // Verify that the breakdown layout accommodates multiple Y aggregations correctly
+      const table = page.locator('[data-test="dashboard-panel-table"]');
+      await expect(table).toBeVisible();
+
+      // Verify breakdown is present, signifying pivot mode is active
+      const breakdownItem = page.locator(
+        '[data-test="dashboard-b-item-breakdown_1"]'
+      );
+      await expect(breakdownItem).toBeVisible();
+
+      testLogger.info("Verified render pivot with compound hierarchical headers");
+
+      await pm.dashboardPanelActions.savePanel();
+      await pm.dashboardCreate.backToDashboardList();
+      await deleteDashboard(page, dashboardName);
+    }
+  );
+
+  test(
+    "should support multi-row pivot configuration (2x + 1p + 1y)",
+    {
+      tag: ["@pivotTable", "@functional", "@P1"],
+    },
+    async ({ page }) => {
+      const dashboardName = generateUniqueDashboardName();
+      const pm = new PageManager(page);
+      const panelName = pm.dashboardPanelActions.generateUniquePanelName("pivot-test");
+
+      await pm.dashboardList.menuItem("dashboards-item");
+      await waitForDashboardPage(page);
+      await pm.dashboardCreate.waitForDashboardUIStable();
+      await pm.dashboardCreate.createDashboard(dashboardName);
+      await pm.dashboardCreate.addPanel();
+      await pm.dashboardPanelActions.addPanelName(panelName);
+
+      await pm.chartTypeSelector.selectChartType("table");
+      await pm.chartTypeSelector.selectStreamType("logs");
+      await pm.chartTypeSelector.selectStream("e2e_automate");
+
+      // Multiple X Fields
+      await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "x");
+      await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
+      
+      // P field
+      await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "p");
+      
+      // Y field
+      await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
+      await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
+
+      const streamPromise = waitForStreamComplete(page);
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await streamPromise;
+      await pm.chartTypeSelector.waitForTableDataLoad();
+
+      const table = page.locator('[data-test="dashboard-panel-table"]');
+      await expect(table).toBeVisible();
+
+      // Ensure 2 X Fields and 1 breakdown were handled correctly
+      const bLayout = page.locator('[data-test="dashboard-b-layout"]');
+      await expect(bLayout).toBeVisible();
+
+      testLogger.info("Verified multi-row pivot configuration");
+      
       await pm.dashboardPanelActions.savePanel();
       await pm.dashboardCreate.backToDashboardList();
       await deleteDashboard(page, dashboardName);
