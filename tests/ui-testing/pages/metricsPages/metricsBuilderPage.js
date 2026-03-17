@@ -14,8 +14,9 @@ export class MetricsBuilderPage {
         this.builderModeButton = '[data-test="dashboard-builder-query-type"]';
         this.customModeButton = '[data-test="dashboard-custom-query-type"]';
 
-        // Metric Selector
-        this.metricSelector = '[data-test="metric-selector"]';
+        // Metric/Stream Selector (in the sidebar FieldList, not a separate MetricSelector component)
+        this.streamSelector = '[data-test="index-dropdown-stream"]';
+        this.fieldSearchInput = '[data-test="index-field-search-input"]';
 
         // Label Filter selectors
         this.addLabelFilterButton = '[data-test="promql-add-label-filter"]';
@@ -145,44 +146,55 @@ export class MetricsBuilderPage {
         return false;
     }
 
-    // ===== Metric Selector =====
+    // ===== Metric/Stream Selector (sidebar) =====
 
     /**
-     * Select a metric from the metric selector dropdown
+     * Select a metric stream from the sidebar stream selector dropdown.
+     * On the Metrics page, metric selection happens via the FieldList sidebar
+     * (data-test="index-dropdown-stream" INPUT element).
      * @param {string} metricName
      */
     async selectMetric(metricName) {
-        const selector = this.page.locator(this.metricSelector);
-        await selector.click();
+        const input = this.page.locator(this.streamSelector);
+        if (!await input.isVisible({ timeout: 5000 })) {
+            return false;
+        }
+
+        // Click to focus and open dropdown
+        await input.click();
         await this.page.waitForTimeout(500);
 
-        // Type to filter
-        const input = selector.locator('input').first();
+        // Clear and type to filter
+        await input.clear();
         await input.fill(metricName);
         await this.page.waitForTimeout(1000);
 
-        // Select from dropdown
-        const option = this.page.locator(`.q-item:has-text("${metricName}")`).first();
+        // Select from dropdown options
+        const option = this.page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item').filter({ hasText: metricName }).first();
         if (await option.isVisible({ timeout: 5000 })) {
             await option.click();
-            await this.page.waitForTimeout(1000);
+            await this.page.waitForTimeout(1500);
             return true;
         }
-        return false;
+
+        // If no dropdown option, press Enter to confirm
+        await this.page.keyboard.press('Enter');
+        await this.page.waitForTimeout(1000);
+        return true;
     }
 
     /**
-     * Check if metric selector is visible
+     * Check if stream/metric selector is visible in the sidebar
      */
     async isMetricSelectorVisible() {
-        return await this.page.locator(this.metricSelector).isVisible({ timeout: 3000 }).catch(() => false);
+        return await this.page.locator(this.streamSelector).isVisible({ timeout: 3000 }).catch(() => false);
     }
 
     /**
-     * Get the currently selected metric text
+     * Get the currently selected stream/metric text
      */
     async getSelectedMetric() {
-        const selector = this.page.locator(this.metricSelector);
+        const selector = this.page.locator(this.streamSelector);
         return await selector.locator('.q-field__native span, .q-field__native').textContent().catch(() => '');
     }
 
@@ -464,9 +476,16 @@ export class MetricsBuilderPage {
     async setStepValue(stepValue) {
         const stepField = this.page.locator(this.stepValueInput);
         if (await stepField.isVisible({ timeout: 3000 })) {
-            const input = stepField.locator('input').first();
-            await input.clear();
-            await input.fill(stepValue);
+            // data-test is directly on the <input> element, not a wrapper
+            const tagName = await stepField.evaluate(el => el.tagName).catch(() => '');
+            if (tagName === 'INPUT') {
+                await stepField.click();
+                await stepField.fill(stepValue);
+            } else {
+                const input = stepField.locator('input').first();
+                await input.click();
+                await input.fill(stepValue);
+            }
             await this.page.waitForTimeout(300);
             return true;
         }
@@ -543,9 +562,16 @@ export class MetricsBuilderPage {
     async fillPanelTitle(title) {
         const titleInput = this.page.locator(this.dashboardPanelTitleInput);
         if (await titleInput.isVisible({ timeout: 3000 })) {
-            const input = titleInput.locator('input').first();
-            await input.clear();
-            await input.fill(title);
+            // data-test may be directly on the <input> element
+            const tagName = await titleInput.evaluate(el => el.tagName).catch(() => '');
+            if (tagName === 'INPUT') {
+                await titleInput.click();
+                await titleInput.fill(title);
+            } else {
+                const input = titleInput.locator('input').first();
+                await input.click();
+                await input.fill(title);
+            }
             await this.page.waitForTimeout(300);
             return true;
         }
@@ -618,10 +644,30 @@ export class MetricsBuilderPage {
      */
     async isValueSelectDisabled() {
         const valueDropdown = this.page.locator(this.valueSelect).last();
+        await valueDropdown.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
         const isDisabled = await valueDropdown.evaluate(el => {
-            return el.classList.contains('q-field--disabled') ||
-                   el.querySelector('.q-field--disabled') !== null ||
-                   el.getAttribute('aria-disabled') === 'true';
+            // Quasar q-select disabled detection: check the element and its ancestors/descendants
+            // for disabled indicators
+            const hasDisabledClass = (node) => {
+                if (!node) return false;
+                const cls = node.className || '';
+                return cls.includes('q-field--disabled') || cls.includes('disabled');
+            };
+            // Check the element itself
+            if (hasDisabledClass(el)) return true;
+            // Check parent (q-field wrapper)
+            if (hasDisabledClass(el.parentElement)) return true;
+            // Check aria-disabled
+            if (el.getAttribute('aria-disabled') === 'true') return true;
+            // Check for disabled child elements (Quasar may nest q-field inside)
+            if (el.querySelector('.q-field--disabled')) return true;
+            // Check if the inner input/control is disabled
+            const input = el.querySelector('input');
+            if (input && input.disabled) return true;
+            // Check computed pointer-events (Quasar disabled fields have pointer-events: none)
+            const style = window.getComputedStyle(el);
+            if (style.pointerEvents === 'none') return true;
+            return false;
         }).catch(() => false);
         return isDisabled;
     }

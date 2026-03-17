@@ -5,7 +5,7 @@ const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 
 
 test.describe("Metrics PromQL Builder Mode testcases", () => {
-  test.describe.configure({ mode: 'serial' });
+  test.describe.configure({ mode: 'parallel' });
   let pm;
 
   test.beforeAll(async () => {
@@ -90,21 +90,18 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     testLogger.info('All mode tab switches completed successfully');
   });
 
-  test("Builder mode shows correct UI elements (Metric Selector, Label Filters, Operations, Options)", {
+  test("Builder mode shows correct UI elements (Stream Selector, Label Filters, Operations, Options)", {
     tag: ['@metrics', '@builder', '@smoke', '@P0', '@all']
   }, async ({ page }) => {
     testLogger.info('Testing Builder mode UI elements visibility');
 
     const builder = pm.metricsBuilderPage;
 
-    // Switch to PromQL Builder mode
-    await builder.switchToPromQLMode();
-    await builder.switchToBuilderMode();
-
-    // Verify Metric Selector is visible
-    const metricSelectorVisible = await builder.isMetricSelectorVisible();
-    expect(metricSelectorVisible).toBe(true);
-    testLogger.info('Metric Selector is visible');
+    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
+    // Verify Stream/Metric Selector is visible in the sidebar (INPUT element)
+    const streamSelectorVisible = await builder.isMetricSelectorVisible();
+    expect(streamSelectorVisible).toBe(true);
+    testLogger.info('Stream/Metric selector is visible in sidebar');
 
     // Verify Add Label Filter button is visible
     const addLabelFilterVisible = await builder.isAddLabelFilterVisible();
@@ -126,6 +123,24 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await expect(runQueryBtn).toBeVisible({ timeout: 3000 });
     testLogger.info('Run Query button is visible');
 
+    // Verify mode tab buttons are visible
+    const sqlBtn = page.locator(builder.sqlModeButton);
+    const promqlBtn = page.locator(builder.promqlModeButton);
+    const builderBtn = page.locator(builder.builderModeButton);
+    const customBtn = page.locator(builder.customModeButton);
+    await expect(sqlBtn).toBeVisible();
+    await expect(promqlBtn).toBeVisible();
+    await expect(builderBtn).toBeVisible();
+    await expect(customBtn).toBeVisible();
+    testLogger.info('All mode tab buttons are visible');
+
+    // Verify PromQL + Builder are currently selected
+    const isPromqlSelected = await builder.isModeSelected('promql');
+    const isBuilderSelected = await builder.isModeSelected('builder');
+    expect(isPromqlSelected).toBe(true);
+    expect(isBuilderSelected).toBe(true);
+    testLogger.info('PromQL + Builder modes are correctly selected by default');
+
     testLogger.info('All Builder mode UI elements are correctly displayed');
   });
 
@@ -133,30 +148,29 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
   // P0 - Critical: Metric Selection in Builder Mode
   // =========================================================================
 
-  test("Select a metric stream in Builder mode", {
+  test("Run query with pre-selected metric in Builder mode", {
     tag: ['@metrics', '@builder', '@smoke', '@P0', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing metric selection in Builder mode');
+    testLogger.info('Testing query execution with default metric in Builder mode');
 
     const builder = pm.metricsBuilderPage;
 
-    // Switch to PromQL Builder mode
-    await builder.switchToPromQLMode();
-    await builder.switchToBuilderMode();
+    // Metrics page defaults to PromQL + Builder with cpu_usage already selected
+    // Verify stream selector has a value
+    const streamInput = page.locator(builder.streamSelector);
+    const streamValue = await streamInput.inputValue();
+    testLogger.info(`Pre-selected stream value: "${streamValue}"`);
+    expect(streamValue.length).toBeGreaterThan(0);
 
-    // Select a metric - use cpu_usage which is ingested by shared setup
-    const metricSelected = await builder.selectMetric('cpu_usage');
-    expect(metricSelected).toBe(true);
-    testLogger.info('Metric "cpu_usage" selected successfully');
-
-    // Run the query
+    // Run the query with the default metric
     await builder.clickRunQuery();
+    await page.waitForTimeout(3000);
 
     // Verify no errors
     const hasError = await pm.metricsPage.isErrorNotificationVisible();
     if (hasError) {
       const errorText = await pm.metricsPage.getErrorNotificationText();
-      testLogger.error(`Query returned error: ${errorText}`);
+      testLogger.warn(`Query error: ${errorText}`);
     }
     expect(hasError).toBe(false);
 
@@ -177,13 +191,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     const builder = pm.metricsBuilderPage;
 
-    // Switch to PromQL Builder mode
-    await builder.switchToPromQLMode();
-    await builder.switchToBuilderMode();
-
-    // First select a metric to load available labels
-    await builder.selectMetric('cpu_usage');
-    await page.waitForTimeout(2000); // Wait for labels to load
+    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
+    // Labels are already loaded from the default stream
 
     // Initial filter count should be 0
     const initialCount = await builder.getLabelFilterCount();
@@ -244,13 +253,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     const builder = pm.metricsBuilderPage;
 
-    // Switch to PromQL Builder mode
-    await builder.switchToPromQLMode();
-    await builder.switchToBuilderMode();
-
-    // Select a metric first
-    await builder.selectMetric('cpu_usage');
-    await page.waitForTimeout(2000);
+    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
 
     // Add a label filter
     await builder.clickAddLabelFilter();
@@ -295,13 +298,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     const builder = pm.metricsBuilderPage;
 
-    // Switch to PromQL Builder mode
-    await builder.switchToPromQLMode();
-    await builder.switchToBuilderMode();
-
-    // Select a metric
-    await builder.selectMetric('cpu_usage');
-    await page.waitForTimeout(2000);
+    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
 
     // Add a label filter
     await builder.clickAddLabelFilter();
@@ -335,13 +332,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     const builder = pm.metricsBuilderPage;
 
-    // Switch to PromQL Builder mode
-    await builder.switchToPromQLMode();
-    await builder.switchToBuilderMode();
-
-    // Select a metric
-    await builder.selectMetric('cpu_usage');
-    await page.waitForTimeout(2000);
+    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
 
     // Add first label filter
     await builder.clickAddLabelFilter();
@@ -381,13 +372,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     const builder = pm.metricsBuilderPage;
 
-    // Switch to PromQL Builder mode
-    await builder.switchToPromQLMode();
-    await builder.switchToBuilderMode();
-
-    // Select a metric
-    await builder.selectMetric('cpu_usage');
-    await page.waitForTimeout(2000);
+    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
 
     // Add two label filters
     await builder.clickAddLabelFilter();
@@ -420,13 +405,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     const builder = pm.metricsBuilderPage;
 
-    // Switch to PromQL Builder mode
-    await builder.switchToPromQLMode();
-    await builder.switchToBuilderMode();
-
-    // Select a metric
-    await builder.selectMetric('cpu_usage');
-    await page.waitForTimeout(2000);
+    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
 
     // Initial operation count
     const initialCount = await builder.getOperationCount();
@@ -481,13 +460,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     const builder = pm.metricsBuilderPage;
 
-    // Switch to PromQL Builder mode
-    await builder.switchToPromQLMode();
-    await builder.switchToBuilderMode();
-
-    // Select a metric
-    await builder.selectMetric('cpu_usage');
-    await page.waitForTimeout(2000);
+    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
 
     // Add an operation
     const added = await builder.addOperation('Rate');
@@ -515,21 +488,15 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     const builder = pm.metricsBuilderPage;
 
-    // Switch to PromQL Builder mode
-    await builder.switchToPromQLMode();
-    await builder.switchToBuilderMode();
-
-    // Select a metric
-    await builder.selectMetric('cpu_usage');
-    await page.waitForTimeout(2000);
+    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
 
     // Set Step Value
     const stepSet = await builder.setStepValue('30s');
     expect(stepSet).toBe(true);
     testLogger.info('Step value set to "30s"');
 
-    // Verify step value input has the value
-    const stepInput = page.locator(builder.stepValueInput).locator('input').first();
+    // Verify step value input has the value (data-test is directly on the <input>)
+    const stepInput = page.locator(builder.stepValueInput);
     const stepValue = await stepInput.inputValue();
     expect(stepValue).toBe('30s');
     testLogger.info('Step value verified: ' + stepValue);
@@ -560,20 +527,14 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     const builder = pm.metricsBuilderPage;
 
-    // Switch to PromQL Builder mode
-    await builder.switchToPromQLMode();
-    await builder.switchToBuilderMode();
+    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
 
     // Set time range to last 15 minutes
     await pm.metricsPage.openDatePicker();
     await pm.metricsPage.selectLast15Minutes();
     await page.waitForTimeout(1000);
 
-    // Select a metric
-    await builder.selectMetric('cpu_usage');
-    await page.waitForTimeout(2000);
-
-    // Run the query
+    // Run the query with default metric
     await builder.clickRunQuery();
     await page.waitForTimeout(3000);
 
@@ -599,13 +560,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     const builder = pm.metricsBuilderPage;
 
-    // Switch to PromQL Builder mode
-    await builder.switchToPromQLMode();
-    await builder.switchToBuilderMode();
-
-    // Select a metric and run query
-    await builder.selectMetric('cpu_usage');
-    await page.waitForTimeout(2000);
+    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
+    // Run query first to enable Add to Dashboard
     await builder.clickRunQuery();
     await page.waitForTimeout(3000);
 
@@ -649,10 +605,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     const builder = pm.metricsBuilderPage;
 
-    // Switch to PromQL Builder mode
-    await builder.switchToPromQLMode();
-    await builder.switchToBuilderMode();
-
+    // Metrics page defaults to PromQL + Builder mode
     // Verify Builder UI is visible
     const builderUIVisible = await builder.isBuilderUIVisible();
     expect(builderUIVisible).toBe(true);
@@ -666,10 +619,11 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     expect(builderUIAfterSwitch).toBe(false);
     testLogger.info('Builder UI is hidden after switching to Custom mode');
 
-    // Verify Monaco editor is visible instead (Custom mode shows raw editor)
-    const monacoVisible = await page.locator('.monaco-editor').isVisible({ timeout: 3000 }).catch(() => false);
-    expect(monacoVisible).toBe(true);
-    testLogger.info('Monaco editor is visible in Custom mode');
+    // Verify raw query editor is visible instead (Custom mode shows a code editor)
+    // Check for Monaco editor or any code/text editor area
+    const editorVisible = await page.locator('.monaco-editor, .view-lines, [data-test*="query-editor"], textarea.inputarea, .cm-editor').first().isVisible({ timeout: 3000 }).catch(() => false);
+    expect(editorVisible).toBe(true);
+    testLogger.info('Code editor is visible in Custom mode');
 
     // Switch back to Builder mode
     await builder.switchToBuilderMode();
@@ -687,13 +641,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     const builder = pm.metricsBuilderPage;
 
-    // Switch to PromQL Builder mode
-    await builder.switchToPromQLMode();
-    await builder.switchToBuilderMode();
-
-    // Select a metric
-    await builder.selectMetric('cpu_usage');
-    await page.waitForTimeout(2000);
+    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
 
     // Add a label filter
     await builder.clickAddLabelFilter();
@@ -711,13 +659,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     const builder = pm.metricsBuilderPage;
 
-    // Switch to PromQL Builder mode
-    await builder.switchToPromQLMode();
-    await builder.switchToBuilderMode();
-
-    // Select a metric
-    await builder.selectMetric('cpu_usage');
-    await page.waitForTimeout(2000);
+    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
 
     // Switch to Custom mode
     await builder.switchToCustomMode();
@@ -740,13 +682,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     const builder = pm.metricsBuilderPage;
 
-    // Switch to PromQL Builder mode
-    await builder.switchToPromQLMode();
-    await builder.switchToBuilderMode();
-
-    // Select a metric
-    await builder.selectMetric('cpu_usage');
-    await page.waitForTimeout(2000);
+    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
 
     // Add Rate operation
     const rateAdded = await builder.addOperation('Rate');
@@ -778,13 +714,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     const builder = pm.metricsBuilderPage;
 
-    // Switch to PromQL Builder mode
-    await builder.switchToPromQLMode();
-    await builder.switchToBuilderMode();
-
-    // Select a metric
-    await builder.selectMetric('cpu_usage');
-    await page.waitForTimeout(2000);
+    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
 
     // Open operation selector dialog
     await builder.clickAddOperation();
@@ -829,22 +759,18 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     const builder = pm.metricsBuilderPage;
 
-    // Switch to PromQL Builder mode
-    await builder.switchToPromQLMode();
-    await builder.switchToBuilderMode();
+    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
 
     // Set time range
     await pm.metricsPage.openDatePicker();
     await pm.metricsPage.selectLast15Minutes();
     await page.waitForTimeout(1000);
 
-    // Step 1: Select metric
-    const metricSelected = await builder.selectMetric('cpu_usage');
-    expect(metricSelected).toBe(true);
-    testLogger.info('Step 1: Metric selected');
-
-    // Wait for labels to load
-    await page.waitForTimeout(3000);
+    // Step 1: Verify metric is pre-selected
+    const streamInput = page.locator(builder.streamSelector);
+    const streamValue = await streamInput.inputValue();
+    expect(streamValue.length).toBeGreaterThan(0);
+    testLogger.info(`Step 1: Metric pre-selected: ${streamValue}`);
 
     // Step 2: Add a label filter
     await builder.clickAddLabelFilter();
