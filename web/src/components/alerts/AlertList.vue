@@ -1102,8 +1102,8 @@ export default defineComponent({
     // (alert_type === "anomaly_detection") into the standard alert row shape.
     const normalizeAnomalyToAlertRow = (anomaly: any, counter: number): any => ({
       "#": counter <= 9 ? `0${counter}` : `${counter}`,
-      alert_id: anomaly.id,
-      anomaly_id: anomaly.id,
+      alert_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
+      anomaly_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
       name: anomaly.name,
       alert_type: "anomaly_detection",
       stream_name: anomaly.stream_name || "--",
@@ -1985,6 +1985,15 @@ export default defineComponent({
     };
 
     const editAlert = async (row: any) => {
+      // Anomaly detection rows route to the dedicated edit page
+      if (row.type === "anomaly") {
+        await router.push({
+          name: "editAnomalyDetection",
+          params: { anomaly_id: row.alert_id },
+          query: { org_identifier: store.state.selectedOrganization.identifier },
+        });
+        return;
+      }
       // Don't fetch alert data here - let the watcher handle it to avoid duplicate API calls
       // Just trigger the route change with alert_id, the watcher will fetch and call showAddUpdateFn
       await router.push({

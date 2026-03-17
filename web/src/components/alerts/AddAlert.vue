@@ -2936,29 +2936,33 @@ export default defineComponent({
         const orgId = store.state.selectedOrganization.identifier;
         const c = anomalyConfig.value;
         const payload: any = {
+          alert_type: "anomaly_detection",
           name: c.name,
           description: c.description || undefined,
           stream_name: c.stream_name,
           stream_type: c.stream_type,
-          query_mode: c.query_mode,
-          filters: c.query_mode === "filters" ? c.filters : undefined,
-          custom_sql: c.query_mode === "custom_sql" ? c.custom_sql : undefined,
-          detection_function: c.detection_function,
-          detection_function_field:
-            c.detection_function !== "count"
-              ? c.detection_function_field || undefined
-              : undefined,
-          histogram_interval: anomalyHistogramInterval.value,
-          schedule_interval: anomalyScheduleInterval.value,
-          detection_window_seconds: anomalyDetectionWindowSeconds.value,
-          training_window_days: c.training_window_days,
-          retrain_interval_days: c.retrain_interval_days,
-          percentile: c.threshold,
-          alert_enabled: c.alert_enabled,
-          alert_destination_id: c.alert_enabled
-            ? c.alert_destination_id
-            : undefined,
+          enabled: c.enabled ?? true,
           folder_id: (activeFolderId.value as string) || "default",
+          anomaly_config: {
+            query_mode: c.query_mode,
+            filters: c.query_mode === "filters" ? c.filters : undefined,
+            custom_sql: c.query_mode === "custom_sql" ? c.custom_sql : undefined,
+            detection_function: c.detection_function,
+            detection_function_field:
+              c.detection_function !== "count"
+                ? c.detection_function_field || undefined
+                : undefined,
+            histogram_interval: anomalyHistogramInterval.value,
+            schedule_interval: anomalyScheduleInterval.value,
+            detection_window_seconds: anomalyDetectionWindowSeconds.value,
+            training_window_days: c.training_window_days,
+            retrain_interval_days: c.retrain_interval_days,
+            percentile: c.threshold,
+            alert_enabled: c.alert_enabled,
+            alert_destination_id: c.alert_enabled
+              ? c.alert_destination_id
+              : undefined,
+          },
         };
 
         const routeAnomalyId = router.currentRoute.value.params
