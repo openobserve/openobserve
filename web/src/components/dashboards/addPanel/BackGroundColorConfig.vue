@@ -1,7 +1,8 @@
 <template>
   <div style="display: flex; align-items: center; width: 100%">
     <q-select
-    borderless hide-bottom-space
+      borderless
+      hide-bottom-space
       v-model="backgroundType"
       :options="colorModeOptions"
       dense
@@ -30,7 +31,7 @@
 </template>
 
 <script lang="ts">
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { computed, defineComponent, inject, onBeforeMount, watch } from "vue";
 import { useI18n } from "vue-i18n";
 

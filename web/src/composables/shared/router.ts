@@ -17,6 +17,7 @@ import {
   routeGuard,
   useLocalUserInfo,
   useLocalCurrentUser,
+  invalidateLoginData,
 } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import Home from "@/views/HomeView.vue";
@@ -90,6 +91,8 @@ const useRoutes = () => {
     {
       path: "/logout",
       beforeEnter(to: any, from: any, next: any) {
+        // Clear backend auth cookies before redirecting to login (#10900)
+        invalidateLoginData();
         useLocalCurrentUser("", true);
         useLocalUserInfo("", true);
 

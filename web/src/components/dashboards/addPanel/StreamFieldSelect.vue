@@ -49,7 +49,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, watch, PropType, inject } from "vue";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useStreams from "@/composables/useStreams";
 
 export interface OptionChild {
@@ -219,10 +219,13 @@ export default defineComponent({
     });
 
     // Watch for external modelValue changes
-    watch(() => props.modelValue, (newValue) => {
-      internalModel.value = newValue;
-      displayValue.value = newValue?.field || "";
-    });
+    watch(
+      () => props.modelValue,
+      (newValue) => {
+        internalModel.value = newValue;
+        displayValue.value = newValue?.field || "";
+      },
+    );
 
     // Watch for streams changes
     watch(() => props.streams, fetchFieldsForStreams, { immediate: true });

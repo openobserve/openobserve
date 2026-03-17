@@ -283,7 +283,7 @@ import {
   nextTick,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import { useQuasar } from "quasar";
@@ -515,7 +515,9 @@ export default defineComponent({
           : "",
       );
 
-      return label?.length > MAX_FIELD_LABEL_CHARS ? label.substring(0, MAX_FIELD_LABEL_CHARS) + "..." : label;
+      return label?.length > MAX_FIELD_LABEL_CHARS
+        ? label.substring(0, MAX_FIELD_LABEL_CHARS) + "..."
+        : label;
     };
 
     const nameLabel = computed(() => {
@@ -566,9 +568,11 @@ export default defineComponent({
 .axis-field {
   overflow: hidden;
 }
+
 :deep(.axis-field .q-btn--rectangle) {
   border-radius: 0%;
 }
+
 :deep(.axis-field .q-btn:before) {
   border: 0px solid transparent;
 }
