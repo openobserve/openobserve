@@ -426,6 +426,8 @@ pub struct UpdateAnomalyConfigRequest {
     pub alert_enabled: Option<bool>,
     pub alert_destination_id: Option<String>,
     pub enabled: Option<bool>,
+    pub folder_id: Option<String>,
+    pub owner: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

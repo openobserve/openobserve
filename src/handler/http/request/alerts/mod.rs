@@ -44,7 +44,7 @@ use crate::{
             requests::{
                 AlertBulkEnableRequest, AnomalyAlertFields, CreateAlertRequestBody,
                 EnableAlertQuery, GenerateSqlRequestBody, ListAlertsQuery,
-                MoveAlertsRequestBody, UpdateAlertRequestBody,
+                MoveAlertsRequestBody, UpdateAlertRequestBody, UpdateAnomalyAlertFields,
             },
             responses::{
                 AlertBulkEnableResponse, EnableAlertResponseBody, GenerateSqlMetadata,
@@ -365,20 +365,94 @@ pub async fn update_alert(
     Headers(user_email): Headers<UserEmail>,
     Json(req_body): Json<UpdateAlertRequestBody>,
 ) -> Response {
+    use crate::handler::http::request::anomaly_detection::UpdateAnomalyConfigRequest;
+
+    let alert_id_str = alert_id.clone();
     let alert_id = match Ksuid::from_str(&alert_id) {
         Ok(id) => id,
         Err(_) => {
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
+
+    // Explicit anomaly detection path.
+    if req_body.alert_type == Some(AlertTypeFilter::AnomalyDetection) {
+        return build_and_run_anomaly_update(
+            &org_id,
+            &alert_id_str,
+            user_email.user_id,
+            req_body.anomaly_config.unwrap_or_default(),
+            req_body.alert,
+        )
+        .await;
+    }
+
+    // Save anomaly fields before req_body is consumed, in case we need the fallback.
+    let anomaly_config = req_body.anomaly_config.clone().unwrap_or_default();
+    let alert_fields_for_fallback = req_body.alert.clone();
+
     let mut alert: MetaAlert = req_body.into();
-    alert.last_edited_by = Some(user_email.user_id);
+    alert.last_edited_by = Some(user_email.user_id.clone());
     alert.id = Some(alert_id);
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::update(client, &org_id, None, alert).await {
         Ok(_) => MetaHttpResponse::ok("Alert Updated"),
+        Err(AlertError::AlertNotFound) => {
+            // ID not in alerts table — try anomaly config.
+            build_and_run_anomaly_update(
+                &org_id,
+                &alert_id_str,
+                user_email.user_id,
+                anomaly_config,
+                alert_fields_for_fallback,
+            )
+            .await
+        }
         Err(e) => e.into(),
+    }
+}
+
+async fn build_and_run_anomaly_update(
+    org_id: &str,
+    anomaly_id: &str,
+    user_id: String,
+    fields: UpdateAnomalyAlertFields,
+    alert: crate::handler::http::models::alerts::Alert,
+) -> Response {
+    use crate::handler::http::request::anomaly_detection::UpdateAnomalyConfigRequest;
+
+    let owner = fields
+        .owner
+        .or_else(|| alert.owner.clone())
+        .or(Some(user_id));
+    let name = fields
+        .name
+        .or_else(|| Some(alert.name).filter(|n| !n.is_empty()));
+    let description = fields
+        .description
+        .or_else(|| Some(alert.description).filter(|d| !d.is_empty()));
+
+    let req = UpdateAnomalyConfigRequest {
+        name,
+        description,
+        detection_function: fields.detection_function,
+        histogram_interval: fields.histogram_interval,
+        schedule_interval: fields.schedule_interval,
+        detection_window_seconds: fields.detection_window_seconds,
+        training_window_days: fields.training_window_days,
+        percentile: fields.percentile,
+        retrain_interval_days: fields.retrain_interval_days,
+        alert_enabled: fields.alert_enabled,
+        alert_destination_id: fields.alert_destination_id,
+        enabled: fields.enabled,
+        folder_id: fields.folder_id,
+        owner,
+    };
+
+    match crate::service::anomaly_detection::update_config(org_id, anomaly_id, req).await {
+        Ok(v) => MetaHttpResponse::json(v),
+        Err(e) => MetaHttpResponse::internal_error(e.to_string()),
     }
 }
 
