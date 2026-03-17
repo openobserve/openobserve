@@ -185,8 +185,8 @@ pub async fn create_config(
         )),
         alert_enabled: Set(req.alert_enabled.unwrap_or(true)),
         alert_destination_id: Set(req.alert_destination_id.clone()),
-        folder_id: Set(None),
-        owner: Set(None),
+        folder_id: Set(req.folder_id.as_deref().and_then(|s| s.parse::<i64>().ok())),
+        owner: Set(req.owner.clone()),
         total_evaluations: Set(0),
         firing_count: Set(0),
         status: Set(0i32), // 0 = waiting

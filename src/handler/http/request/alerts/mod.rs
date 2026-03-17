@@ -22,7 +22,7 @@ use axum::{
     response::Response,
 };
 use config::meta::{
-    alerts::alert::Alert as MetaAlert,
+    alerts::alert::{Alert as MetaAlert, AlertTypeFilter},
     triggers::{Trigger, TriggerModule},
 };
 use hashbrown::HashMap;
@@ -36,17 +36,15 @@ use {
     },
 };
 
-use config::meta::alerts::alert::AlertTypeFilter;
-
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
         extractors::Headers,
         models::alerts::{
             requests::{
-                AlertBulkEnableRequest, CreateAlertRequestBody, EnableAlertQuery,
-                GenerateSqlRequestBody, ListAlertsQuery, MoveAlertsRequestBody,
-                UpdateAlertRequestBody,
+                AlertBulkEnableRequest, AnomalyAlertFields, CreateAlertRequestBody,
+                EnableAlertQuery, GenerateSqlRequestBody, ListAlertsQuery,
+                MoveAlertsRequestBody, UpdateAlertRequestBody,
             },
             responses::{
                 AlertBulkEnableResponse, EnableAlertResponseBody, GenerateSqlMetadata,
@@ -147,6 +145,11 @@ pub async fn create_alert(
     Headers(user_email): Headers<UserEmail>,
     Json(req_body): Json<CreateAlertRequestBody>,
 ) -> Response {
+    // Anomaly detection path: delegate to anomaly config creation.
+    if req_body.alert_type == Some(AlertTypeFilter::AnomalyDetection) {
+        return create_anomaly_alert(&org_id, user_email.user_id, req_body).await;
+    }
+
     let query_str = uri.query().unwrap_or("");
     let folder_id = get_folder(query_str);
     let overwrite = is_overwrite(query_str);
@@ -164,6 +167,57 @@ pub async fn create_alert(
                 .with_name(v.name),
         ),
         Err(e) => e.into(),
+    }
+}
+
+async fn create_anomaly_alert(
+    org_id: &str,
+    user_id: String,
+    req_body: CreateAlertRequestBody,
+) -> Response {
+    use crate::handler::http::request::anomaly_detection::CreateAnomalyConfigRequest;
+
+    let Some(anomaly_fields) = req_body.anomaly_config else {
+        return MetaHttpResponse::bad_request(
+            "anomaly_config is required when alert_type is anomaly_detection",
+        );
+    };
+
+    let owner = if req_body.alert.owner.as_deref().unwrap_or("").is_empty() {
+        Some(user_id)
+    } else {
+        req_body.alert.owner
+    };
+
+    let req = CreateAnomalyConfigRequest {
+        name: req_body.alert.name,
+        description: Some(req_body.alert.description).filter(|d| !d.is_empty()),
+        stream_name: req_body.alert.stream_name,
+        stream_type: config::meta::stream::StreamType::from(req_body.alert.stream_type)
+            .to_string(),
+        query_mode: anomaly_fields.query_mode,
+        filters: anomaly_fields.filters,
+        custom_sql: anomaly_fields.custom_sql,
+        detection_function: anomaly_fields.detection_function,
+        histogram_interval: anomaly_fields.histogram_interval,
+        schedule_interval: anomaly_fields.schedule_interval,
+        detection_window_seconds: anomaly_fields.detection_window_seconds,
+        training_window_days: anomaly_fields.training_window_days,
+        retrain_interval_days: anomaly_fields.retrain_interval_days,
+        percentile: anomaly_fields.percentile,
+        rcf_num_trees: anomaly_fields.rcf_num_trees,
+        rcf_tree_size: anomaly_fields.rcf_tree_size,
+        rcf_shingle_size: anomaly_fields.rcf_shingle_size,
+        alert_enabled: anomaly_fields.alert_enabled,
+        alert_destination_id: anomaly_fields.alert_destination_id,
+        enabled: req_body.alert.enabled.then_some(true),
+        folder_id: req_body.folder_id,
+        owner,
+    };
+
+    match crate::service::anomaly_detection::create_config(org_id, req).await {
+        Ok(v) => MetaHttpResponse::json(v),
+        Err(e) => MetaHttpResponse::internal_error(e.to_string()),
     }
 }
 
@@ -507,9 +561,7 @@ pub async fn list_alerts(
         alert_type,
         AlertTypeFilter::All | AlertTypeFilter::AnomalyDetection
     ) {
-        if let Ok(configs) =
-            crate::service::anomaly_detection::list_configs(&org_id).await
-        {
+        if let Ok(configs) = crate::service::anomaly_detection::list_configs(&org_id).await {
             list.extend(configs.iter().filter_map(anomaly_config_to_list_item));
         }
     }

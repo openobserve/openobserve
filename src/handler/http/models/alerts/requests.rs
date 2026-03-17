@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::alerts::alert as meta_alerts;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
@@ -57,10 +57,47 @@ pub struct CreateAlertRequestBody {
     #[schema(example = "default")]
     pub folder_id: Option<String>,
 
+    /// Discriminates the alert type. Defaults to scheduled alert when absent.
+    /// Set to `"anomaly_detection"` to create an anomaly detection config instead.
+    pub alert_type: Option<meta_alerts::AlertTypeFilter>,
+
+    /// Anomaly-detection-specific fields. Required when `alert_type` is
+    /// `"anomaly_detection"`. Common fields (`name`, `stream_type`,
+    /// `stream_name`, `enabled`, `description`) are still taken from the top
+    /// level (flattened `Alert`).
+    pub anomaly_config: Option<AnomalyAlertFields>,
+
     /// The alert configuration. All fields from Alert are flattened into this request body.
     #[serde(flatten)]
     #[schema(inline)]
     pub alert: Alert,
+}
+
+/// Anomaly-detection-specific fields for `CreateAlertRequestBody`.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct AnomalyAlertFields {
+    /// "filters" or "custom_sql"
+    pub query_mode: String,
+    pub filters: Option<serde_json::Value>,
+    pub custom_sql: Option<String>,
+    /// Aggregation function, e.g. "count(*)" or "avg(cpu_usage)"
+    pub detection_function: String,
+    /// SQL histogram bucket size, e.g. "5m", "1h"
+    pub histogram_interval: String,
+    /// How often the detection job fires, e.g. "1h", "30m"
+    pub schedule_interval: String,
+    /// Look-back window per detection run, in seconds
+    pub detection_window_seconds: i64,
+    pub training_window_days: Option<i32>,
+    /// 0 = never retrain automatically; otherwise days between retrains
+    pub retrain_interval_days: Option<i32>,
+    /// Percentile threshold (50.0–99.9). Default: 97.0
+    pub percentile: Option<f64>,
+    pub rcf_num_trees: Option<i32>,
+    pub rcf_tree_size: Option<i32>,
+    pub rcf_shingle_size: Option<i32>,
+    pub alert_enabled: Option<bool>,
+    pub alert_destination_id: Option<String>,
 }
 
 /// HTTP request body for `UpdateAlert` endpoint.
