@@ -503,7 +503,7 @@ const saveTemplate = async () => {
     if (editingTemplate.value) {
       await evalTemplateService.updateTemplate(
         orgId,
-        editingTemplate.value.agent_type,
+        editingTemplate.value.id,
         payload,
       );
       $q.notify({
@@ -546,7 +546,7 @@ const deleteTemplate = async (template: Template) => {
         (route.query.org_identifier as string) ||
         localStorage.getItem("org_id") ||
         "default";
-      await evalTemplateService.deleteTemplate(orgId, template.agent_type);
+      await evalTemplateService.deleteTemplate(orgId, template.id);
       $q.notify({
         type: "positive",
         message: "Template deleted successfully",
@@ -574,7 +574,7 @@ const showStats = async (template: Template) => {
       "default";
     selectedStats.value = await evalTemplateService.getTemplateStats(
       orgId,
-      template.agent_type,
+      template.id,
     );
     showStatsDialog.value = true;
   } catch (error) {

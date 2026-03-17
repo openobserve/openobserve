@@ -108,14 +108,17 @@ pub async fn list(Path(org_id): Path<String>) -> impl IntoResponse {
     }
 }
 
-/// Get a specific template by ID (by agent_type for now, as templates are keyed by org+agent_type)
-pub async fn get(Path((org_id, agent_type)): Path<(String, String)>) -> impl IntoResponse {
+/// Get a specific template by UUID
+pub async fn get(Path((org_id, template_id)): Path<(String, String)>) -> impl IntoResponse {
     #[cfg(feature = "enterprise")]
     {
         use o2_enterprise::enterprise::ai::evaluation::prompt_manager_singleton;
 
         if let Some(manager) = prompt_manager_singleton::get() {
-            match manager.get_template(&org_id, &agent_type).await {
+            match manager
+                .get_template_by_id_async(&org_id, &template_id)
+                .await
+            {
                 Ok(t) => {
                     let response = TemplateResponse {
                         id: t.id,
@@ -276,9 +279,9 @@ pub async fn create(
     }
 }
 
-/// Update an existing template
+/// Update an existing template by UUID
 pub async fn update(
-    Path((org_id, _agent_type)): Path<(String, String)>,
+    Path((org_id, template_id)): Path<(String, String)>,
     Json(req): Json<CreateTemplateRequest>,
 ) -> impl IntoResponse {
     #[cfg(feature = "enterprise")]
@@ -286,8 +289,11 @@ pub async fn update(
         use o2_enterprise::enterprise::ai::evaluation::prompt_manager_singleton;
 
         if let Some(manager) = prompt_manager_singleton::get() {
-            // Get existing template to increment version and preserve created_at
-            match manager.get_template(&org_id, &req.agent_type).await {
+            // Get existing template by UUID to increment version and preserve created_at
+            match manager
+                .get_template_by_id_async(&org_id, &template_id)
+                .await
+            {
                 Ok(existing) => {
                     let now = chrono::Utc::now().timestamp_millis();
                     let new_version = existing.version + 1;
@@ -402,8 +408,8 @@ pub async fn update(
     }
 }
 
-/// Delete a template
-pub async fn delete(Path((org_id, agent_type)): Path<(String, String)>) -> impl IntoResponse {
+/// Delete a template by UUID
+pub async fn delete(Path((org_id, template_id)): Path<(String, String)>) -> impl IntoResponse {
     #[cfg(feature = "enterprise")]
     {
         use o2_enterprise::enterprise::ai::evaluation::prompt_manager_singleton;
@@ -411,8 +417,11 @@ pub async fn delete(Path((org_id, agent_type)): Path<(String, String)>) -> impl 
         use crate::service::pipeline;
 
         if let Some(manager) = prompt_manager_singleton::get() {
-            // Get template to find its ID for database deletion
-            match manager.get_template(&org_id, &agent_type).await {
+            // Get template by UUID
+            match manager
+                .get_template_by_id_async(&org_id, &template_id)
+                .await
+            {
                 Ok(template) => {
                     // Check if template is being used in any pipeline
                     match pipeline::list_pipelines(&org_id, None).await {
@@ -422,7 +431,7 @@ pub async fn delete(Path((org_id, agent_type)): Path<(String, String)>) -> impl 
                                 .filter_map(|p| {
                                     let uses_template = p.nodes.iter().any(|node| {
                                         if let config::meta::pipeline::components::NodeData::LlmEvaluation(eval_params) = &node.data {
-                                            eval_params.eval_template.as_ref() == Some(&agent_type)
+                                            eval_params.eval_template.as_deref() == Some(&template_id)
                                         } else {
                                             false
                                         }
@@ -443,7 +452,7 @@ pub async fn delete(Path((org_id, agent_type)): Path<(String, String)>) -> impl 
                                         409u16,
                                         format!(
                                             "Cannot delete template '{}' as it is being used in the following pipeline(s): {}. Please update or remove those pipelines first.",
-                                            agent_type, pipeline_list
+                                            template.name, pipeline_list
                                         ),
                                     )),
                                 )
@@ -469,8 +478,8 @@ pub async fn delete(Path((org_id, agent_type)): Path<(String, String)>) -> impl 
                             .into_response();
                     }
 
-                    // Delete from manager
-                    match manager.remove_template(&org_id, &agent_type).await {
+                    // Remove from in-memory manager by UUID
+                    match manager.remove_template_by_id(&org_id, &template_id).await {
                         Ok(_) => (
                             StatusCode::OK,
                             Json(serde_json::json!({"message": "Template deleted successfully"})),
@@ -519,16 +528,19 @@ pub async fn delete(Path((org_id, agent_type)): Path<(String, String)>) -> impl 
     }
 }
 
-/// Get usage statistics for a template
-pub async fn get_stats(Path((org_id, agent_type)): Path<(String, String)>) -> impl IntoResponse {
+/// Get usage statistics for a template by UUID
+pub async fn get_stats(Path((org_id, template_id)): Path<(String, String)>) -> impl IntoResponse {
     #[cfg(feature = "enterprise")]
     {
         use o2_enterprise::enterprise::ai::evaluation::prompt_manager_singleton;
 
         if let Some(manager) = prompt_manager_singleton::get() {
-            match manager.get_template(&org_id, &agent_type).await {
+            match manager
+                .get_template_by_id_async(&org_id, &template_id)
+                .await
+            {
                 Ok(template) => {
-                    match manager.get_usage_stats(&org_id, &agent_type).await {
+                    match manager.get_usage_stats_by_id(&org_id, &template_id).await {
                         Some(stats) => {
                             let response = TemplateStats {
                                 template_id: template.id,
