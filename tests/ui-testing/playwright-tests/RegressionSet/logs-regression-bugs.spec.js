@@ -15,7 +15,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
-const { ingestTestData } = require('../utils/data-ingestion.js');
+const { ingestTestData, sendRequest, getHeaders, getIngestionUrl } = require('../utils/data-ingestion.js');
 const { getOrgIdentifier, isCloudEnvironment } = require('../utils/cloud-auth.js');
 
 test.describe("Logs Regression Bug Fixes", () => {
@@ -378,20 +378,29 @@ test.describe("Logs Regression Bug Fixes", () => {
     const streamWaitMs = isCloudEnvironment() ? 150000 : 30000;
 
     // Step 1: Ingest data with unique service_name into e2e_automate (stream already exists)
+    // IMPORTANT: Use sendRequest (page.request.post) instead of pm.logsPage.ingestData (node-fetch).
+    // On cloud, streams ingested via node-fetch never appear in the streams API keyword search,
+    // while streams ingested via page.request are indexed immediately.
+    const orgId = getOrgIdentifier() || 'default';
+    const headers = getHeaders();
     testLogger.info(`Ingesting data into ${stream1Name} with ${testFieldName}=${stream1Value}`);
     const timestamp1 = Date.now() * 1000;
-    await pm.logsPage.ingestData(stream1Name, [
+    const stream1Url = getIngestionUrl(orgId, stream1Name);
+    const stream1Response = await sendRequest(page, stream1Url, [
       { [testFieldName]: stream1Value, level: 'info', message: 'Field cache test stream1', _timestamp: timestamp1 },
       { [testFieldName]: stream1Value, level: 'info', message: 'Field cache test stream1 2', _timestamp: timestamp1 + 1000000 },
-    ]);
+    ], headers);
+    testLogger.info(`Stream1 ingestion response: ${JSON.stringify(stream1Response)}`);
 
     // Step 2: Ingest data into new stream with different service_name
     testLogger.info(`Ingesting data into ${stream2Name} with ${testFieldName}=${stream2Value}`);
     const timestamp2 = timestamp1 + 2000000;
-    await pm.logsPage.ingestData(stream2Name, [
+    const stream2Url = getIngestionUrl(orgId, stream2Name);
+    const stream2Response = await sendRequest(page, stream2Url, [
       { [testFieldName]: stream2Value, level: 'info', message: 'Field cache test stream2', _timestamp: timestamp2 },
       { [testFieldName]: stream2Value, level: 'info', message: 'Field cache test stream2 2', _timestamp: timestamp2 + 1000000 },
-    ]);
+    ], headers);
+    testLogger.info(`Stream2 ingestion response: ${JSON.stringify(stream2Response)}`);
 
     // Wait for the new stream to be indexed (e2e_automate already exists)
     testLogger.info(`Waiting for ${stream2Name} to be indexed...`);
