@@ -868,7 +868,72 @@ pub async fn trigger_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::trigger_by_id(client, &org_id, alert_id).await {
         Ok(_) => MetaHttpResponse::ok("Alert triggered"),
+        Err(AlertError::AlertNotFound) => {
+            // Fall back to anomaly detection — trigger a detection run
+            match crate::service::anomaly_detection::detect_anomalies(
+                &org_id,
+                &alert_id.to_string(),
+            )
+            .await
+            {
+                Ok(_) => MetaHttpResponse::ok("Detection triggered"),
+                Err(e) => MetaHttpResponse::not_found(e.to_string()),
+            }
+        }
         Err(e) => e.into(),
+    }
+}
+
+/// RetrainAlert
+#[utoipa::path(
+    patch,
+    path = "/v2/{org_id}/alerts/{alert_id}/retrain",
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "RetrainAlert",
+    summary = "Trigger retraining for an anomaly detection alert",
+    description = "Triggers a model retrain for an anomaly detection alert. Returns 400 if called on a non-anomaly alert type.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("alert_id" = String, Path, description = "Anomaly detection alert ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Not an anomaly detection alert", content_type = "application/json", body = ()),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+    )
+)]
+pub async fn retrain_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+    let alert_id_str = alert_id.clone();
+    let alert_id = match Ksuid::from_str(&alert_id) {
+        Ok(id) => id,
+        Err(_) => {
+            return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
+        }
+    };
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    // Check if this is a regular alert — if so, return 400
+    match alert::get_by_id(client, &org_id, alert_id).await {
+        Ok(_) => {
+            return MetaHttpResponse::bad_request(
+                "retrain is only supported for anomaly detection alerts",
+            );
+        }
+        Err(AlertError::AlertNotFound) => {
+            // Expected — fall through to anomaly detection
+        }
+        Err(e) => return e.into(),
+    }
+    match crate::service::anomaly_detection::train_model(&org_id, &alert_id_str).await {
+        Ok(_) => MetaHttpResponse::ok("Retraining triggered"),
+        Err(e) => MetaHttpResponse::not_found(e.to_string()),
     }
 }
 
