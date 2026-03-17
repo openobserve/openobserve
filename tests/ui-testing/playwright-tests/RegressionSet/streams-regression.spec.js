@@ -80,7 +80,7 @@ test.describe("Streams Regression Bugs", () => {
       'fifth_exceptionally_long_stream_name_for_comprehensive_ellipsis_testing_scenario_number_five_epsilon'
     ];
 
-    const orgId = getOrgIdentifier();
+    const orgId = getOrgIdentifier() || 'default';
     const headers = getHeaders();
 
     // Ingest 1 line to each long-named stream in parallel
