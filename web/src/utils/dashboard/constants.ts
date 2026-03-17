@@ -11,7 +11,7 @@ export const TABLE_ROWS_PER_PAGE_DEFAULT_VALUE = 10;
 // Pivot table constants
 export const PIVOT_TABLE_MAX_COLUMNS = 50;
 export const PIVOT_TABLE_SEPARATOR = "\x00";
-export const PIVOT_TABLE_ROW_KEY_SEPARATOR = "|||";
+export const PIVOT_TABLE_ROW_KEY_SEPARATOR = "\x00";
 export const PIVOT_TABLE_TOTAL_LABEL = "Total";
 export const PIVOT_TABLE_OTHERS_LABEL = "Others";
 export const PIVOT_TABLE_HEADER_ROW_HEIGHT = 28;

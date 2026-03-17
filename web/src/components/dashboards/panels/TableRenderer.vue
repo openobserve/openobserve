@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="id"
       ref="tableRef"
       data-test="dashboard-panel-table"
+      :data-sticky-id="tableId"
       @row-click="(...args: any) => $emit('row-click', ...args)"
       hide-no-data
       :row-class="getRowClass"
@@ -249,6 +250,7 @@ import {
   PIVOT_TABLE_HEADER_ROW_HEIGHT,
   PIVOT_TABLE_DEFAULT_HEADER_HEIGHT,
   PIVOT_TABLE_TOTAL_COLUMN_WIDTH,
+  PIVOT_TABLE_ROW_KEY_SEPARATOR,
 } from "@/utils/dashboard/constants";
 import TablePaginationControls from "../addPanel/TablePaginationControls.vue";
 
@@ -296,7 +298,7 @@ export default defineComponent({
       useNotifications();
 
     // Use sticky columns composable
-    const { getStickyColumnStyle } = useStickyColumns(props, store);
+    const { getStickyColumnStyle, tableId } = useStickyColumns(props, store);
 
     // Pivot table header levels (from convertPivotTableData)
     const pivotHeaderLevels = computed(() => {
@@ -329,7 +331,7 @@ export default defineComponent({
       if (rows.length === 0) return map;
 
       const getRowKey = (row: any) =>
-        rowCols.map((c: any) => String(row[c.name] ?? "")).join("|||");
+        rowCols.map((c: any) => String(row[c.name] ?? "")).join(PIVOT_TABLE_ROW_KEY_SEPARATOR);
 
       // Re-sort to match q-table's display order
       const sortBy = pagination.value.sortBy;
@@ -402,7 +404,7 @@ export default defineComponent({
     const pivotRowKey = (row: any) =>
       pivotRowColumns.value
         .map((c: any) => String(row[c.name] ?? ""))
-        .join("|||");
+        .join(PIVOT_TABLE_ROW_KEY_SEPARATOR);
 
     const isPivotMergeHidden = (row: any, col: any): boolean => {
       if (!col._isRowField) return false;
@@ -716,6 +718,7 @@ export default defineComponent({
       stickyRowTotals,
       stickyColTotals,
       stickyTotalRow,
+      tableId,
     };
   },
 });

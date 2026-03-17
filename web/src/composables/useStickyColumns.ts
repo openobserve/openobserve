@@ -18,6 +18,8 @@ import { ref, watch, onMounted, onBeforeUnmount } from "vue";
 export function useStickyColumns(props: any, store: any) {
   const stickyColumnOffsets = ref<{ [key: string]: number }>({});
   let styleElement: HTMLStyleElement | null = null;
+  // Unique ID to scope injected CSS so multiple panels don't override each other
+  const tableId = `sticky-${Math.random().toString(36).slice(2)}`;
 
   // Watch for columns changes to update sticky offsets
   watch(
@@ -76,6 +78,8 @@ export function useStickyColumns(props: any, store: any) {
     const stickyRowTotals = !!props.data?.stickyRowTotals;
     const TOTAL_COL_WIDTH = 150;
 
+    const scope = `.my-sticky-virtscroll-table[data-sticky-id="${tableId}"]`;
+
     // Generate CSS rules for each column position
     columns.forEach((col: any, colIndex: number) => {
       if (col.sticky) {
@@ -84,14 +88,14 @@ export function useStickyColumns(props: any, store: any) {
         // Headers get position sticky, left offset, and higher z-index
         // Body cells with sticky-column class get the same positioning
         css += `
-          .my-sticky-virtscroll-table thead tr th:nth-child(${colIndex + 1}) {
+          ${scope} thead tr th:nth-child(${colIndex + 1}) {
             position: sticky !important;
             left: ${offset}px !important;
             z-index: 4 !important;
             background-color: ${bgColor} !important;
             box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1) !important;
           }
-          .my-sticky-virtscroll-table tbody td:nth-child(${colIndex + 1}).sticky-column {
+          ${scope} tbody td:nth-child(${colIndex + 1}).sticky-column {
             left: ${offset}px !important;
           }
         `;
@@ -101,7 +105,7 @@ export function useStickyColumns(props: any, store: any) {
       if (stickyColTotals && col._isTotalColumn) {
         const rightOffset = (col._totalColRightIndex ?? 0) * TOTAL_COL_WIDTH;
         css += `
-          .my-sticky-virtscroll-table thead tr:first-child th:nth-child(${colIndex + 1}) {
+          ${scope} thead tr:first-child th:nth-child(${colIndex + 1}) {
             position: sticky !important;
             right: ${rightOffset}px !important;
             z-index: 4 !important;
@@ -117,14 +121,14 @@ export function useStickyColumns(props: any, store: any) {
     css =
       `
       /* Sticky body cells */
-      .my-sticky-virtscroll-table tbody td.sticky-column {
+      ${scope} tbody td.sticky-column {
         position: sticky !important;
         z-index: 2 !important;
         box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1) !important;
       }
 
       /* Right-sticky total column body cells */
-      .my-sticky-virtscroll-table tbody td.pivot-total-col {
+      ${scope} tbody td.pivot-total-col {
         position: sticky !important;
         z-index: 2 !important;
         background-color: ${bgColor} !important;
@@ -132,7 +136,7 @@ export function useStickyColumns(props: any, store: any) {
       }
 
       /* Sticky total row (bottom sticky) */
-      .my-sticky-virtscroll-table.pivot-sticky-totals .pivot-sticky-total-row td {
+      ${scope}.pivot-sticky-totals .pivot-sticky-total-row td {
         position: sticky !important;
         bottom: 0 !important;
         z-index: 2 !important;
@@ -142,7 +146,7 @@ export function useStickyColumns(props: any, store: any) {
       }
 
       /* Corner: sticky total row + sticky total column intersection */
-      .my-sticky-virtscroll-table.pivot-sticky-totals .pivot-sticky-total-row td.pivot-total-col {
+      ${scope}.pivot-sticky-totals .pivot-sticky-total-row td.pivot-total-col {
         z-index: 5 !important;
       }
 
@@ -174,5 +178,6 @@ export function useStickyColumns(props: any, store: any) {
   return {
     stickyColumnOffsets,
     getStickyColumnStyle,
+    tableId,
   };
 }
