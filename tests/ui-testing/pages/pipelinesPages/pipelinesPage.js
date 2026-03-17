@@ -916,19 +916,17 @@ export class PipelinesPage {
         const orgId = process.env["ORGNAME"];
         const headers = getAuthHeaders();
 
-        const url = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
-        await this.page.evaluate(async ({ url, headers, logsdata }) => {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(logsdata)
-            });
-            return await response.json();
-        }, {
-            url: url,
+        const baseUrl = (process.env.INGESTION_URL || '').replace(/\/$/, '');
+        const url = `${baseUrl}/api/${orgId}/${streamName}/_json`;
+        const fetchResponse = await fetch(url, {
+            method: 'POST',
             headers: headers,
-            logsdata: require('../../../test-data/logs_data.json')
+            body: JSON.stringify(require('../../../test-data/logs_data.json'))
         });
+        if (!fetchResponse.ok) {
+            throw new Error(`Ingestion failed for stream ${streamName}: ${fetchResponse.status} ${fetchResponse.statusText}`);
+        }
+        testLogger.info('Stream ingestion response', { streamName, status: fetchResponse.status });
         await this.page.waitForTimeout(2000);
 
         // Navigate and explore
@@ -1488,22 +1486,19 @@ export class PipelinesPage {
     async bulkIngestToStreams(streamNames, data) {
         const orgId = process.env["ORGNAME"];
         const headers = getAuthHeaders();
+        const baseUrl = (process.env.INGESTION_URL || '').replace(/\/$/, '');
 
         for (const streamName of streamNames) {
-            const response = await this.page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-                const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify(logsdata)
-                });
-                return await fetchResponse.json();
-            }, {
-                url: process.env.INGESTION_URL,
+            const url = `${baseUrl}/api/${orgId}/${streamName}/_json`;
+            const fetchResponse = await fetch(url, {
+                method: 'POST',
                 headers: headers,
-                orgId: orgId,
-                streamName: streamName,
-                logsdata: data
+                body: JSON.stringify(data)
             });
+            if (!fetchResponse.ok) {
+                throw new Error(`Bulk ingestion failed for stream ${streamName}: ${fetchResponse.status} ${fetchResponse.statusText}`);
+            }
+            const response = await fetchResponse.json();
             testLogger.debug('Bulk ingestion response', { streamName, response });
         }
     }
@@ -1536,22 +1531,20 @@ export class PipelinesPage {
             });
         }
 
-        const response = await this.page.evaluate(async ({ url, headers, orgId, metricsData }) => {
-            const fetchResponse = await fetch(`${url}/api/${orgId}/ingest/metrics/_json`, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(metricsData)
-            });
-            return {
-                status: fetchResponse.status,
-                data: await fetchResponse.json()
-            };
-        }, {
-            url: process.env.INGESTION_URL,
+        const baseUrl = (process.env.INGESTION_URL || '').replace(/\/$/, '');
+        const url = `${baseUrl}/api/${orgId}/ingest/metrics/_json`;
+        const fetchResponse = await fetch(url, {
+            method: 'POST',
             headers: headers,
-            orgId: orgId,
-            metricsData: metricsData
+            body: JSON.stringify(metricsData)
         });
+        if (!fetchResponse.ok) {
+            throw new Error(`Metrics ingestion failed for ${streamName}: ${fetchResponse.status} ${fetchResponse.statusText}`);
+        }
+        const response = {
+            status: fetchResponse.status,
+            data: await fetchResponse.json()
+        };
 
         testLogger.info('Metrics ingestion response', { streamName, status: response.status, data: response.data });
         return response;
@@ -1647,28 +1640,23 @@ export class PipelinesPage {
             }]
         };
 
-        const response = await this.page.evaluate(async ({ url, headers, orgId, tracesData, streamName }) => {
-            const requestHeaders = { ...headers };
-            // Add custom stream header if streamName is provided
-            if (streamName) {
-                requestHeaders["stream-name"] = streamName;
-            }
-            const fetchResponse = await fetch(`${url}/api/${orgId}/v1/traces`, {
-                method: 'POST',
-                headers: requestHeaders,
-                body: JSON.stringify(tracesData)
-            });
-            return {
-                status: fetchResponse.status,
-                data: await fetchResponse.json().catch(() => ({}))
-            };
-        }, {
-            url: process.env.INGESTION_URL,
-            headers: authHeaders,
-            orgId: orgId,
-            tracesData: tracesData,
-            streamName: streamName
+        const baseUrl = (process.env.INGESTION_URL || '').replace(/\/$/, '');
+        const requestHeaders = { ...authHeaders };
+        if (streamName) {
+            requestHeaders["stream-name"] = streamName;
+        }
+        const fetchResponse = await fetch(`${baseUrl}/api/${orgId}/v1/traces`, {
+            method: 'POST',
+            headers: requestHeaders,
+            body: JSON.stringify(tracesData)
         });
+        if (!fetchResponse.ok) {
+            throw new Error(`Traces ingestion failed for ${serviceName}: ${fetchResponse.status} ${fetchResponse.statusText}`);
+        }
+        const response = {
+            status: fetchResponse.status,
+            data: await fetchResponse.json().catch(() => ({}))
+        };
 
         testLogger.info('Traces ingestion response', { serviceName, streamName: streamName || 'default', status: response.status, data: response.data });
         return response;
