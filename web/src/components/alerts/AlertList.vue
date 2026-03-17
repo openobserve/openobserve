@@ -1004,7 +1004,7 @@ export default defineComponent({
         ...(activeTab.value === 'anomalyDetection' ? [
           {
             name: "detection_window",
-            field: "detection_window_seconds",
+            field: "detection_window",
             label: "Detection Window",
             align: "center" as const,
             sortable: true,
@@ -1049,7 +1049,7 @@ export default defineComponent({
         ...(activeTab.value === 'anomalyDetection' ? [
           {
             name: "last_trained_at",
-            field: "training_completed_at",
+            field: "last_trained_at",
             label: "Last Trained At",
             align: "left" as const,
             sortable: true,
