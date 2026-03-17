@@ -45,6 +45,7 @@ env:
   ZO_FORMAT_STREAM_NAME_TO_LOWERCASE: false
   ZO_CREATE_ORG_THROUGH_INGESTION: true
   ZO_UTF8_VIEW_ENABLED: false
+  ZO_ENABLE_CROSS_LINKING: true
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 
 jobs:
@@ -173,6 +174,7 @@ jobs:
                 "maxquery.spec.js",
                 "dashboard-chartJson.spec.js",
                 "dashboard-promql-suggestions.spec.js",
+                "crossLinking.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
