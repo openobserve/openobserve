@@ -1627,7 +1627,8 @@
       "variablesTooltip": "As variáveis são usadas para passar dados do alerta para o destino.",
       "rowTemplateTooltip": "O modelo de linha é usado para formatar a mensagem de alerta.",
       "templateType": "Tipo de modelo:"
-    }
+    },
+    "editJson": "Editar alerta JSON"
   },
   "alert_templates": {
     "header": "Modelos",
