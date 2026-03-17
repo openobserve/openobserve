@@ -1951,10 +1951,16 @@
     "anomalyDetection": "Anomaly Detection",
     "newAnomalyDetection": "New anomaly detection",
     "editAnomalyDetection": "Edit anomaly detection",
+    "updateAnomalyDetection": "Update anomaly detection:",
     "anomalyDetectionSubtitle": "Detect anomalies in your observability data using machine learning",
     "anomalyDetectionConfig": "Detection Config",
     "alerting": "Alerting",
     "saveAndTrain": "Save & Train",
+    "anomalyStepCaptions": {
+      "alertSetup": "Name your detector and select a stream to monitor",
+      "detectionConfig": "Configure the query and detection parameters",
+      "alerting": "Set up notifications when anomalies are detected"
+    },
     "detectionInterval": "Detection Interval",
     "trainingWindow": "Training Window",
     "sensitivity": "Sensitivity",
