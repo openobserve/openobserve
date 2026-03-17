@@ -37,8 +37,7 @@ use crate::{
 
 pub const USER_RECORD_KEY: &str = "/user_record/";
 pub async fn get_user_record(email: &str) -> Result<users::UserRecord, anyhow::Error> {
-    let email = email.to_lowercase();
-    users::get(&email)
+    users::get(email)
         .await
         .map_err(|e| anyhow::anyhow!("Error getting user record: {e}"))
 }
@@ -119,8 +118,7 @@ pub async fn get_by_token(
 }
 
 pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
-    let name = name.to_lowercase();
-    let user = match users::get(&name).await {
+    let user = match users::get(name).await {
         Ok(user) => user,
         Err(e) => {
             log::error!("Error retrieving user from db: {e}");
@@ -128,7 +126,7 @@ pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
         }
     };
 
-    let orgs = org_users::list_orgs_by_user(&name).await?;
+    let orgs = org_users::list_orgs_by_user(name).await?;
     Ok(DBUser {
         email: user.email,
         password: user.password,
@@ -182,10 +180,9 @@ pub async fn update(
     password: &str,
     password_ext: Option<String>,
 ) -> Result<(), anyhow::Error> {
-    let user_email = user_email.to_lowercase();
     let key = format!("{USER_RECORD_KEY}{user_email}");
     users::update(
-        &user_email,
+        user_email,
         first_name,
         last_name,
         password,
@@ -197,7 +194,7 @@ pub async fn update(
 
     #[cfg(feature = "enterprise")]
     super_cluster::update_user_in_super_cluster(&UserUpdate {
-        email: user_email,
+        email: user_email.to_string(),
         first_name: first_name.to_string(),
         last_name: last_name.to_string(),
         password: password.to_string(),
@@ -208,11 +205,10 @@ pub async fn update(
 }
 
 pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
-    let name = name.to_lowercase();
     let key = format!("{USER_RECORD_KEY}{name}");
     // First delete all org_user entries for this user
-    org_users::remove_by_user(&name).await?;
-    match users::remove(&name).await {
+    org_users::remove_by_user(name).await?;
+    match users::remove(name).await {
         Ok(_) => {
             delete_from_db_coordinator(&key, false, true, None)
                 .await
@@ -220,7 +216,7 @@ pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
                     log::error!("error sending delete user to nats {name} : {e}");
                 })?;
             #[cfg(feature = "enterprise")]
-            super_cluster::delete_user_from_super_cluster(&name).await?;
+            super_cluster::delete_user_from_super_cluster(name).await?;
             Ok(())
         }
         Err(e) => {
@@ -232,8 +228,7 @@ pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
 
 #[cfg(feature = "cloud")]
 pub async fn list_user_invites(user_id: &str) -> Result<Vec<InvitationRecord>, anyhow::Error> {
-    let user_id = user_id.to_lowercase();
-    org_invites::list_by_invitee(&user_id).await
+    org_invites::list_by_invitee(user_id).await
 }
 
 #[cfg(feature = "cloud")]
@@ -275,7 +270,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         }
                     };
 
-                USERS.insert(item_key.to_string(), item_value.clone());
+                USERS.insert(item_key.to_lowercase(), item_value.clone());
                 if item_value.is_root {
                     // Root user must be there, it is created when
                     // openobserve is run for the first time
@@ -289,7 +284,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                USERS.remove(item_key);
+                USERS.remove(&item_key.to_lowercase());
             }
             db::Event::Empty => {}
         }
@@ -300,7 +295,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 pub async fn cache() -> Result<(), anyhow::Error> {
     let users = list_users(None).await?;
     for user in users {
-        USERS.insert(user.email.clone(), user);
+        USERS.insert(user.email.to_lowercase(), user);
     }
     log::info!("Users Cached");
     Ok(())

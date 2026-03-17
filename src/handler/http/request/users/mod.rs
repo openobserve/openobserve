@@ -215,7 +215,7 @@ pub async fn update(
     Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
-    let email_id = email_id.trim().to_lowercase();
+    let email_id = email_id.trim().to_string();
     #[cfg(not(feature = "enterprise"))]
     let mut user = user.into_inner();
     #[cfg(feature = "enterprise")]
@@ -402,11 +402,7 @@ pub async fn authentication(
 
     let mut resp = SignInResponse::default();
     let auth = match auth {
-        Some(auth) => {
-            let mut auth = auth.into_inner();
-            auth.name = auth.name.to_lowercase();
-            auth
-        }
+        Some(auth) => auth.into_inner(),
         None => {
             // get Authorization header from request
             #[cfg(feature = "enterprise")]
