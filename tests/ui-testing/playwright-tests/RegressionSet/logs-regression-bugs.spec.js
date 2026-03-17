@@ -392,15 +392,18 @@ test.describe("Logs Regression Bug Fixes", () => {
     ], headers);
     testLogger.info(`Stream1 ingestion response: ${JSON.stringify(stream1Response)}`);
 
-    // Step 2: Ingest data into new stream with different service_name
-    testLogger.info(`Ingesting data into ${stream2Name} with ${testFieldName}=${stream2Value}`);
+    // Step 2: Create new stream by ingesting standard test data first (ensures proper stream registration),
+    // then ingest custom records with distinct service_name for the field values cache test.
+    testLogger.info(`Creating stream ${stream2Name} with standard test data`);
+    await ingestTestData(page, stream2Name);
+    testLogger.info(`Ingesting custom data into ${stream2Name} with ${testFieldName}=${stream2Value}`);
     const timestamp2 = timestamp1 + 2000000;
     const stream2Url = getIngestionUrl(orgId, stream2Name);
     const stream2Response = await sendRequest(page, stream2Url, [
-      { [testFieldName]: stream2Value, level: 'info', message: 'Field cache test stream2', _timestamp: timestamp2 },
-      { [testFieldName]: stream2Value, level: 'info', message: 'Field cache test stream2 2', _timestamp: timestamp2 + 1000000 },
+      { [testFieldName]: stream2Value, level: 'info', log: 'Field cache test stream2', _timestamp: timestamp2 },
+      { [testFieldName]: stream2Value, level: 'info', log: 'Field cache test stream2 2', _timestamp: timestamp2 + 1000000 },
     ], headers);
-    testLogger.info(`Stream2 ingestion response: ${JSON.stringify(stream2Response)}`);
+    testLogger.info(`Stream2 custom ingestion response: ${JSON.stringify(stream2Response)}`);
 
     // Wait for the new stream to be indexed (e2e_automate already exists)
     testLogger.info(`Waiting for ${stream2Name} to be indexed...`);

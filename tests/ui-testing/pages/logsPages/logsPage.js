@@ -534,12 +534,12 @@ export class LogsPage {
      * @returns {Promise<boolean>} True if stream exists, false if timeout
      */
     async waitForStreamAvailable(streamName, maxWaitMs = 30000, pollIntervalMs = 3000, streamType = 'logs') {
-        testLogger.info(`waitForStreamAvailable: Waiting for stream ${streamName} (type=${streamType}, timeout=${maxWaitMs}ms)`);
         const startTime = Date.now();
 
         const apiUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL;
         const orgId = getOrgIdentifier();
         const url = `${apiUrl}/api/${orgId}/streams?type=${streamType}&keyword=${streamName}`;
+        testLogger.info(`waitForStreamAvailable: Waiting for stream ${streamName} (type=${streamType}, timeout=${maxWaitMs}ms)`);
         let pollCount = 0;
 
         while (Date.now() - startTime < maxWaitMs) {
@@ -556,13 +556,11 @@ export class LogsPage {
                         testLogger.info(`waitForStreamAvailable: Stream ${streamName} found after ${Date.now() - startTime}ms (poll #${pollCount})`);
                         return true;
                     }
-                    // Log first few polls and then every 10th to diagnose CI failures
                     if (pollCount <= 3 || pollCount % 10 === 0) {
                         const names = data.list ? data.list.map(s => s.name).join(', ') : 'none';
                         testLogger.info(`waitForStreamAvailable: poll #${pollCount} — HTTP ${status}, list=${listCount}, names=[${names}]`);
                     }
                 } else {
-                    // Always log non-200 responses at info level for CI visibility
                     const bodyText = await response.text().catch(() => 'unreadable');
                     testLogger.info(`waitForStreamAvailable: poll #${pollCount} — HTTP ${status}, body=${bodyText.substring(0, 200)}`);
                 }
