@@ -174,7 +174,7 @@ import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoCompl
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useI18n } from "vue-i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
 import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 import { buildCondition } from "@/utils/dashboard/dashboardAutoQueryBuilder";
@@ -200,9 +200,11 @@ export default defineComponent({
       "dashboardPanelDataPageKey",
       "dashboard",
     );
-    const { getAllSelectedStreams, getStreamNameFromStreamAlias, dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const {
+      getAllSelectedStreams,
+      getStreamNameFromStreamAlias,
+      dashboardPanelData,
+    } = useDashboardPanelData(dashboardPanelDataPageKey);
     const { t } = useI18n();
     const searchTerm = ref("");
     const { filterFn: filterStreamFn, filteredOptions: filteredSchemaOptions } =
@@ -213,7 +215,10 @@ export default defineComponent({
         .find(
           (it: any) =>
             it.column == props?.condition?.column?.field &&
-            it.stream == getStreamNameFromStreamAlias(props?.condition?.column?.streamAlias),
+            it.stream ==
+              getStreamNameFromStreamAlias(
+                props?.condition?.column?.streamAlias,
+              ),
         )
         ?.value?.filter((option: any) =>
           option?.toLowerCase().includes(searchTerm.value.toLowerCase()),
@@ -321,6 +326,7 @@ export default defineComponent({
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
   border-radius: 0px;
+
   .q-virtual-scroll__content {
     padding: 0.5rem;
   }
@@ -335,7 +341,8 @@ export default defineComponent({
   height: 26px !important;
   padding: 0px 0px 0px 5px !important;
   vertical-align: middle !important;
-  margin-top: 4px; /* Nudge up slightly to align with buttons */
+  margin-top: 4px;
+  /* Nudge up slightly to align with buttons */
 }
 
 :deep(.condition-logical-operator .q-field__native) {

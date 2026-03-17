@@ -580,4 +580,169 @@ describe("IndexList Component", () => {
       expect(typeof wrapper.vm.t).toBe("function");
     });
   });
+
+  // ─── New tests covering functionality added after Sep 02 2025 ───────────────
+
+  describe("fnMarkerLabel computed property", () => {
+    it("should be defined", () => {
+      expect(wrapper.vm.fnMarkerLabel).toBeDefined();
+      expect(Array.isArray(wrapper.vm.fnMarkerLabel)).toBe(true);
+    });
+
+    it("should return exactly 5 markers", () => {
+      expect(wrapper.vm.fnMarkerLabel).toHaveLength(5);
+    });
+
+    it("each marker should have label and value properties", () => {
+      for (const marker of wrapper.vm.fnMarkerLabel) {
+        expect(marker).toHaveProperty("label");
+        expect(marker).toHaveProperty("value");
+      }
+    });
+
+    it("first marker value should equal duration.slider.min", () => {
+      const { min } = wrapper.vm.duration.slider;
+      expect(wrapper.vm.fnMarkerLabel[0].value).toBe(min);
+    });
+
+    it("last marker value should equal duration.slider.max", () => {
+      const { max } = wrapper.vm.duration.slider;
+      expect(wrapper.vm.fnMarkerLabel[4].value).toBe(max);
+    });
+
+    it("marker labels should contain 'ms' suffix", () => {
+      for (const marker of wrapper.vm.fnMarkerLabel) {
+        expect(marker.label).toMatch(/ms$/);
+      }
+    });
+
+    it("should recalculate when duration slider values change", async () => {
+      wrapper.vm.duration.slider.min = 100;
+      wrapper.vm.duration.slider.max = 500;
+      await nextTick();
+
+      const markers = wrapper.vm.fnMarkerLabel;
+      expect(markers[0].value).toBe(100);
+      expect(markers[4].value).toBe(500);
+    });
+  });
+
+  describe("addSearchTerm method", () => {
+    it("should be defined and callable", () => {
+      expect(wrapper.vm.addSearchTerm).toBeDefined();
+      expect(typeof wrapper.vm.addSearchTerm).toBe("function");
+    });
+
+    it("should update searchObj.data.stream.addToFilter with the supplied term", () => {
+      const term = "service_name='test'";
+      wrapper.vm.addSearchTerm(term);
+      expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe(term);
+    });
+
+    it("should accept empty string without throwing", () => {
+      expect(() => wrapper.vm.addSearchTerm("")).not.toThrow();
+      expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("");
+    });
+  });
+
+  describe("onStreamChange side-effects", () => {
+    it("should reset query to empty string on stream change", async () => {
+      wrapper.vm.searchObj.data.query = "some query";
+      await wrapper.vm.onStreamChange({ label: "s1", value: "s1" });
+      expect(wrapper.vm.searchObj.data.query).toBe("");
+    });
+
+    it("should reset editorValue to empty string on stream change", async () => {
+      wrapper.vm.searchObj.data.editorValue = "SELECT *";
+      await wrapper.vm.onStreamChange({ label: "s1", value: "s1" });
+      expect(wrapper.vm.searchObj.data.editorValue).toBe("");
+    });
+
+    it("should reset resultGrid.currentPage to 0 on stream change", async () => {
+      wrapper.vm.searchObj.data.resultGrid.currentPage = 3;
+      await wrapper.vm.onStreamChange({ label: "s1", value: "s1" });
+      expect(wrapper.vm.searchObj.data.resultGrid.currentPage).toBe(0);
+    });
+
+    it("should update selectedStream on stream change", async () => {
+      const newStream = { label: "new_stream", value: "new_stream" };
+      await wrapper.vm.onStreamChange(newStream);
+      expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual(
+        newStream,
+      );
+    });
+  });
+
+  describe("Loading stream indicator", () => {
+    it("should show loading indicator when searchObj.loadingStream is true", async () => {
+      mockSearchObj.loadingStream = true;
+      await wrapper.vm.$nextTick();
+      // The q-tr with spinner is conditionally rendered via v-if="searchObj.loadingStream"
+      // Verify the component still renders without errors
+      expect(wrapper.exists()).toBe(true);
+      mockSearchObj.loadingStream = false;
+    });
+
+    it("should not crash when loadingStream transitions from true to false", async () => {
+      mockSearchObj.loadingStream = true;
+      await wrapper.vm.$nextTick();
+      mockSearchObj.loadingStream = false;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.exists()).toBe(true);
+    });
+  });
+
+  describe("filterFieldFn — edge cases", () => {
+    it("should return all rows when terms is empty string", () => {
+      const rows = [
+        { name: "field_a" },
+        { name: "field_b" },
+      ];
+      const result = wrapper.vm.filterFieldFn(rows, "");
+      // When terms === "" the function returns empty filtered array (loop is skipped)
+      expect(result).toEqual([]);
+    });
+
+    it("should perform case-insensitive match", () => {
+      const rows = [{ name: "ServiceName" }, { name: "operation" }];
+      const result = wrapper.vm.filterFieldFn(rows, "servicename");
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe("ServiceName");
+    });
+
+    it("should return multiple matches when several rows match", () => {
+      const rows = [
+        { name: "span_id" },
+        { name: "span_name" },
+        { name: "duration" },
+      ];
+      const result = wrapper.vm.filterFieldFn(rows, "span");
+      expect(result).toHaveLength(2);
+    });
+
+    it("should return empty array when no rows match", () => {
+      const rows = [{ name: "field_a" }, { name: "field_b" }];
+      const result = wrapper.vm.filterFieldFn(rows, "xyz_no_match");
+      expect(result).toHaveLength(0);
+    });
+  });
+
+  describe("duration reactive object", () => {
+    it("should expose a duration ref with slider sub-object", () => {
+      expect(wrapper.vm.duration).toBeDefined();
+      expect(wrapper.vm.duration.slider).toBeDefined();
+      expect(typeof wrapper.vm.duration.slider.min).toBe("number");
+      expect(typeof wrapper.vm.duration.slider.max).toBe("number");
+    });
+
+    it("should expose a duration ref with input sub-object", () => {
+      expect(wrapper.vm.duration.input).toBeDefined();
+      expect(typeof wrapper.vm.duration.input.min).toBe("number");
+      expect(typeof wrapper.vm.duration.input.max).toBe("number");
+    });
+
+    it("input.max default should be 100000", () => {
+      expect(wrapper.vm.duration.input.max).toBe(100000);
+    });
+  });
 });

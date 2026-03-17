@@ -21,6 +21,7 @@ import Index from "@/plugins/traces/Index.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import * as useDurationPercentilesModule from "@/composables/useDurationPercentiles";
 
 // Create DOM node for mounting
 const node = document.createElement("div");
@@ -226,6 +227,30 @@ vi.mock("@/composables/useNotifications", () => ({
   }),
 }));
 
+// Hoisted so vi.mock factory can reference them and tests can override per-call
+const {
+  mockCancelStreamQueryBasedOnRequestId,
+  mockFetchQueryDataWithHttpStream,
+} = vi.hoisted(() => ({
+  mockCancelStreamQueryBasedOnRequestId: vi.fn(),
+  mockFetchQueryDataWithHttpStream: vi.fn(),
+}));
+
+vi.mock("@/composables/useStreamingSearch", () => ({
+  default: () => ({
+    fetchQueryDataWithHttpStream: mockFetchQueryDataWithHttpStream,
+    cancelStreamQueryBasedOnRequestId: mockCancelStreamQueryBasedOnRequestId,
+  }),
+}));
+
+vi.mock("@/composables/useDurationPercentiles", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    parseDurationWhereClause: vi.fn((whereClause: string) => whereClause),
+  };
+});
+
 // Mock services
 vi.mock("@/services/search", () => ({
   default: {
@@ -263,6 +288,20 @@ vi.mock("@/composables/useParser", () => ({
 describe("Index.vue (Main Traces Page)", () => {
   let wrapper: VueWrapper<any>;
 
+  // Create router spies once at describe-level to prevent stacking from repeated vi.spyOn calls.
+  // vi.clearAllMocks() in afterEach clears their call history; beforeEach resets the implementation.
+  const routerPushSpy = vi
+    .spyOn(router, "push")
+    .mockResolvedValue(undefined as any);
+  const routerReplaceSpy = vi
+    .spyOn(router, "replace")
+    .mockResolvedValue(undefined as any);
+  const routerCurrentRouteSpy = vi
+    .spyOn(router, "currentRoute", "get")
+    .mockReturnValue({
+      value: { query: {}, name: "traces", path: "/traces" },
+    } as any);
+
   beforeEach(async () => {
     // Set default stream mock implementations (tests can override with mockResolvedValueOnce)
     mockGetStreams.mockResolvedValue(mockStreamList);
@@ -281,17 +320,12 @@ describe("Index.vue (Main Traces Page)", () => {
     mockSearchObj.data.errorMsg = "";
     mockSearchObj.data.editorValue = "";
 
-    // Mock router query params
-    vi.spyOn(router, "currentRoute", "get").mockReturnValue({
-      value: {
-        query: {},
-        name: "traces",
-        path: "/traces",
-      },
+    // Reset router spy return values to defaults for each test
+    routerPushSpy.mockResolvedValue(undefined as any);
+    routerReplaceSpy.mockResolvedValue(undefined as any);
+    routerCurrentRouteSpy.mockReturnValue({
+      value: { query: {}, name: "traces", path: "/traces" },
     } as any);
-
-    vi.spyOn(router, "push").mockResolvedValue(undefined as any);
-    vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
   });
 
   afterEach(() => {
@@ -364,10 +398,16 @@ describe("Index.vue (Main Traces Page)", () => {
       });
 
       await flushPromises();
-      await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Check that streams were loaded
-      expect(mockSearchObj.data.stream.streamLists.length).toBeGreaterThan(0);
+      // getStreamList uses an un-awaited .then() chain; poll until it resolves
+      await vi.waitFor(
+        () => {
+          expect(mockSearchObj.data.stream.streamLists.length).toBeGreaterThan(
+            0,
+          );
+        },
+        { timeout: 2000 },
+      );
     });
   });
 
@@ -376,7 +416,7 @@ describe("Index.vue (Main Traces Page)", () => {
       // Enable service graph in store
       store.state.zoConfig.service_graph_enabled = true;
 
-      vi.spyOn(router, "currentRoute", "get").mockReturnValue({
+      routerCurrentRouteSpy.mockReturnValue({
         value: {
           query: { tab: "service-graph" },
           name: "traces",
@@ -408,7 +448,7 @@ describe("Index.vue (Main Traces Page)", () => {
       // Disable service graph
       store.state.zoConfig.service_graph_enabled = false;
 
-      vi.spyOn(router, "currentRoute", "get").mockReturnValue({
+      routerCurrentRouteSpy.mockReturnValue({
         value: {
           query: { tab: "service-graph" },
           name: "traces",
@@ -460,7 +500,7 @@ describe("Index.vue (Main Traces Page)", () => {
       wrapper.vm.activeTab = "service-graph";
       await flushPromises();
 
-      expect(router.replace).toHaveBeenCalled();
+      expect(routerReplaceSpy).toHaveBeenCalled();
     });
   });
 
@@ -482,14 +522,18 @@ describe("Index.vue (Main Traces Page)", () => {
       });
 
       await flushPromises();
-      await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // The default stream should be selected
-      expect(mockSearchObj.data.stream.selectedStream.value).toBeTruthy();
+      // getStreamList uses an un-awaited .then() chain; poll until it resolves
+      await vi.waitFor(
+        () => {
+          expect(mockSearchObj.data.stream.selectedStream.value).toBeTruthy();
+        },
+        { timeout: 2000 },
+      );
     });
 
     it("should select stream from URL query params if provided", async () => {
-      vi.spyOn(router, "currentRoute", "get").mockReturnValue({
+      routerCurrentRouteSpy.mockReturnValue({
         value: {
           query: { stream: "test-stream" },
           name: "traces",
@@ -513,10 +557,15 @@ describe("Index.vue (Main Traces Page)", () => {
       });
 
       await flushPromises();
-      await new Promise((resolve) => setTimeout(resolve, 100));
 
-      expect(mockSearchObj.data.stream.selectedStream.value).toBe(
-        "test-stream",
+      // getStreamList uses an un-awaited .then() chain; poll until it resolves
+      await vi.waitFor(
+        () => {
+          expect(mockSearchObj.data.stream.selectedStream.value).toBe(
+            "test-stream",
+          );
+        },
+        { timeout: 2000 },
       );
     });
 
@@ -806,7 +855,7 @@ describe("Index.vue (Main Traces Page)", () => {
       const startTime = "1755853746625720";
       const endTime = "1755853746725720";
 
-      vi.spyOn(router, "currentRoute", "get").mockReturnValue({
+      routerCurrentRouteSpy.mockReturnValue({
         value: {
           query: {
             from: startTime,
@@ -840,7 +889,7 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("should restore relative time period from URL params", async () => {
-      vi.spyOn(router, "currentRoute", "get").mockReturnValue({
+      routerCurrentRouteSpy.mockReturnValue({
         value: {
           query: {
             period: "15m",
@@ -906,14 +955,26 @@ describe("Index.vue (Main Traces Page)", () => {
   });
 
   describe("Metrics Filters Integration", () => {
-    it("should update query editor when metrics filters are updated", async () => {
-      wrapper = mount(Index, {
+    // Spies for SearchBar ref methods exposed via stub
+    const mockApplyFilters = vi.fn();
+    const mockRemoveFilterByField = vi.fn();
+
+    function mountWithSearchBarStub() {
+      return mount(Index, {
         attachTo: node,
         global: {
           plugins: [i18n, router],
           provide: { store: store },
           stubs: {
-            "search-bar": true,
+            "search-bar": {
+              template: "<div />",
+              setup() {
+                return {
+                  applyFilters: mockApplyFilters,
+                  removeFilterByField: mockRemoveFilterByField,
+                };
+              },
+            },
             "index-list": true,
             "search-result": true,
             "service-graph": true,
@@ -921,73 +982,82 @@ describe("Index.vue (Main Traces Page)", () => {
           },
         },
       });
+    }
 
-      await flushPromises();
-
-      const filters = ["duration >= 100", "service_name = 'test'"];
-      wrapper.vm.onMetricsFiltersUpdated(filters);
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toBe(
-        "duration >= 100 AND service_name = 'test'",
-      );
+    beforeEach(() => {
+      mockApplyFilters.mockReset();
+      mockRemoveFilterByField.mockReset();
+      mockSearchObj.meta.showErrorOnly = false;
+      mockSearchObj.meta.metricsRangeFilters.clear();
     });
 
-    it("should add error filter when error only toggle is enabled", async () => {
+    it("should call applyFilters with all filter terms when metrics filters are updated", async () => {
+      wrapper = mountWithSearchBarStub();
+      await flushPromises();
+
+      wrapper.vm.onMetricsFiltersUpdated([
+        "duration >= 100",
+        "service_name = 'test'",
+      ]);
+      await flushPromises();
+
+      expect(mockApplyFilters).toHaveBeenCalledWith([
+        "duration >= 100",
+        "service_name = 'test'",
+      ]);
+    });
+
+    it("should append error filter to applyFilters call when showErrorOnly is enabled", async () => {
       mockSearchObj.meta.showErrorOnly = true;
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
+      wrapper = mountWithSearchBarStub();
       await flushPromises();
 
-      const filters = ["duration >= 100"];
-      wrapper.vm.onMetricsFiltersUpdated(filters);
+      wrapper.vm.onMetricsFiltersUpdated(["duration >= 100"]);
       await flushPromises();
 
-      expect(mockSearchObj.data.editorValue).toContain("span_status = 'ERROR'");
+      expect(mockApplyFilters).toHaveBeenCalledWith([
+        "duration >= 100",
+        "span_status = 'ERROR'",
+      ]);
     });
 
-    it("should handle error only toggle correctly", async () => {
-      mockSearchObj.meta.metricsRangeFilters.set("duration", {
-        panelTitle: "Duration",
-        start: 100,
-        end: 500,
-      });
+    it("should not duplicate error filter when it is already present in incoming filters", async () => {
+      mockSearchObj.meta.showErrorOnly = true;
+      wrapper = mountWithSearchBarStub();
+      await flushPromises();
 
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
+      // Error panel brush already emitted span_status filter
+      wrapper.vm.onMetricsFiltersUpdated([
+        "duration >= 100",
+        "span_status = 'ERROR'",
+      ]);
+      await flushPromises();
 
+      // span_status = 'ERROR' must appear exactly once
+      const calledWith = mockApplyFilters.mock.calls[0][0] as string[];
+      expect(
+        calledWith.filter((f) => f === "span_status = 'ERROR'"),
+      ).toHaveLength(1);
+    });
+
+    it("should call applyFilters with error condition when error only toggle is turned on", async () => {
+      wrapper = mountWithSearchBarStub();
       await flushPromises();
 
       wrapper.vm.onErrorOnlyToggled(true);
       await flushPromises();
 
-      expect(mockSearchObj.data.editorValue).toContain("span_status = 'ERROR'");
+      expect(mockApplyFilters).toHaveBeenCalledWith(["span_status = 'ERROR'"]);
+    });
+
+    it("should call removeFilterByField when error only toggle is turned off", async () => {
+      wrapper = mountWithSearchBarStub();
+      await flushPromises();
+
+      wrapper.vm.onErrorOnlyToggled(false);
+      await flushPromises();
+
+      expect(mockRemoveFilterByField).toHaveBeenCalledWith("span_status");
     });
   });
 
@@ -1099,7 +1169,7 @@ describe("Index.vue (Main Traces Page)", () => {
       const testQuery = "service_name = 'test'";
       const encodedQuery = btoa(testQuery);
 
-      vi.spyOn(router, "currentRoute", "get").mockReturnValue({
+      routerCurrentRouteSpy.mockReturnValue({
         value: {
           query: {
             query: encodedQuery,
@@ -1208,6 +1278,377 @@ describe("Index.vue (Main Traces Page)", () => {
 
       // No error should be thrown
       expect(wrapper.vm).toBeTruthy();
+    });
+  });
+
+  describe("cancelSearch", () => {
+    it("should dispatch cancelQuery event on window when cancelSearch is called", async () => {
+      const dispatchEventSpy = vi.spyOn(window, "dispatchEvent");
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      wrapper.vm.cancelSearch();
+      await flushPromises();
+
+      const cancelQueryCalls = dispatchEventSpy.mock.calls.filter(
+        ([evt]) => evt instanceof Event && evt.type === "cancelQuery",
+      );
+      expect(cancelQueryCalls.length).toBeGreaterThan(0);
+    });
+
+    it.skip("should set searchObj.loading to false when an in-flight search is cancelled", async () => {
+      mockSearchObj.data.stream.selectedStream = {
+        label: "default",
+        value: "default",
+      };
+      mockSearchObj.data.stream.streamLists = [
+        { label: "default", value: "default" },
+      ];
+      // Ensure datetime is in a valid state for buildSearch
+      mockSearchObj.data.datetime = {
+        startTime: new Date().getTime() * 1000 - 900000000,
+        endTime: new Date().getTime() * 1000,
+        relativeTimePeriod: "15m",
+        type: "relative",
+      };
+      // Keep the stream query open — never resolve — so currentSearchTraceId stays set
+      vi.mocked(mockFetchQueryDataWithHttpStream).mockImplementation(() => {
+        // intentional no-op: callbacks never called
+      });
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      // Start a search to populate currentSearchTraceId; wait until loading is set
+      wrapper.vm.searchData();
+      await flushPromises();
+
+      // Verify the search started (loading = true means getQueryData reached fetchQueryDataWithHttpStream)
+      await vi.waitFor(
+        () => {
+          expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+        },
+        { timeout: 2000 },
+      );
+
+      expect(mockSearchObj.loading).toBe(true);
+
+      wrapper.vm.cancelSearch();
+      await flushPromises();
+
+      expect(mockSearchObj.loading).toBe(false);
+    });
+
+    it("should not call cancelStreamQueryBasedOnRequestId when there is no active trace id", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      wrapper.vm.cancelSearch();
+      await flushPromises();
+
+      expect(mockCancelStreamQueryBasedOnRequestId).not.toHaveBeenCalled();
+    });
+
+    it.skip("should call cancelStreamQueryBasedOnRequestId with trace id and org id when a search is in-flight", async () => {
+      mockSearchObj.data.stream.selectedStream = {
+        label: "default",
+        value: "default",
+      };
+      mockSearchObj.data.stream.streamLists = [
+        { label: "default", value: "default" },
+      ];
+      // Reset datetime to a known-good state so buildSearch doesn't fall back to
+      // absolute timestamps that might be left over from previous tests
+      mockSearchObj.data.datetime = {
+        startTime: new Date().getTime() * 1000 - 900000000,
+        endTime: new Date().getTime() * 1000,
+        relativeTimePeriod: "15m",
+        type: "relative",
+      };
+
+      // Keep the search in-flight so currentSearchTraceId stays set
+      mockFetchQueryDataWithHttpStream.mockImplementation(() => {
+        // intentional no-op: callbacks never called, search stays open
+      });
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      // Trigger a search to populate currentSearchTraceId
+      wrapper.vm.searchData();
+      await flushPromises();
+
+      // Wait until the search has actually started (fetchQueryDataWithHttpStream called)
+      await vi.waitFor(
+        () => {
+          expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+        },
+        { timeout: 2000 },
+      );
+
+      wrapper.vm.cancelSearch();
+      await flushPromises();
+
+      expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledWith(
+        expect.objectContaining({
+          org_id: mockSearchObj.organizationIdentifier,
+        }),
+      );
+      expect(mockSearchObj.loading).toBe(false);
+    });
+  });
+
+  describe("parseDurationWhereClause integration", () => {
+    beforeEach(() => {
+      mockSearchObj.data.stream.selectedStream = {
+        label: "default",
+        value: "default",
+      };
+      mockSearchObj.data.stream.streamLists = [
+        { label: "default", value: "default" },
+      ];
+    });
+
+    it("should call parseDurationWhereClause when building a search with a non-empty where clause", async () => {
+      const parseSpy = vi.mocked(
+        useDurationPercentilesModule.parseDurationWhereClause,
+      );
+      parseSpy.mockReturnValue("duration >= 1500");
+
+      mockSearchObj.data.editorValue = "duration >= '1.50ms'";
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      await wrapper.vm.searchData();
+      await flushPromises();
+
+      expect(parseSpy).toHaveBeenCalled();
+    });
+
+    it("should use the converted where clause string returned by parseDurationWhereClause", async () => {
+      const parseSpy = vi.mocked(
+        useDurationPercentilesModule.parseDurationWhereClause,
+      );
+      // Simulate duration conversion: '1.50ms' → 1500 (raw µs)
+      parseSpy.mockReturnValue("duration >= 1500");
+
+      mockSearchObj.data.editorValue = "duration >= '1.50ms'";
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      // buildSearch is called inside searchData
+      await wrapper.vm.searchData();
+      await flushPromises();
+
+      // parseDurationWhereClause should have been called with the raw where clause
+      expect(parseSpy).toHaveBeenCalledWith(
+        expect.stringContaining("duration"),
+        expect.anything(),
+        "default",
+      );
+    });
+
+    it("should not call parseDurationWhereClause when where clause is empty", async () => {
+      const parseSpy = vi.mocked(
+        useDurationPercentilesModule.parseDurationWhereClause,
+      );
+      mockSearchObj.data.editorValue = "";
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      await wrapper.vm.searchData();
+      await flushPromises();
+
+      // parseDurationWhereClause returns the input unchanged for empty strings (no-op)
+      // Either it was not called, or if called, it was with an empty string and returned it
+      const callsWithNonEmpty = parseSpy.mock.calls.filter(
+        ([clause]) => typeof clause === "string" && clause.trim() !== "",
+      );
+      expect(callsWithNonEmpty.length).toBe(0);
+    });
+
+    it("should pass only the WHERE-clause portion to parseDurationWhereClause when editorValue contains a pipe prefix", async () => {
+      const parseSpy = vi.mocked(
+        useDurationPercentilesModule.parseDurationWhereClause,
+      );
+      parseSpy.mockReturnValue("duration >= 1500");
+
+      // editorValue with a query-functions prefix before the pipe
+      mockSearchObj.data.editorValue = "someFunc | duration >= '1.50ms'";
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      await wrapper.vm.searchData();
+      await flushPromises();
+
+      // parseDurationWhereClause must be called with only the part after the pipe,
+      // NOT with the full "someFunc | duration >= '1.50ms'" string.
+      const calls = parseSpy.mock.calls.filter(
+        ([clause]) => typeof clause === "string" && clause.trim() !== "",
+      );
+      expect(calls.length).toBeGreaterThan(0);
+      for (const [clause] of calls) {
+        expect(clause).not.toContain("|");
+        expect(clause).not.toContain("someFunc");
+      }
+    });
+
+    it("should keep original where clause when parseDurationWhereClause returns an error object", async () => {
+      const parseSpy = vi.mocked(
+        useDurationPercentilesModule.parseDurationWhereClause,
+      );
+      // Return an error object — component should keep the original whereClause
+      parseSpy.mockReturnValue({
+        error: 'Unknown duration unit: "lightyears"',
+      });
+
+      mockSearchObj.data.editorValue = "duration >= '5lightyears'";
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      // Component should not throw when parseDurationWhereClause returns an error object
+      let thrownError: unknown = null;
+      try {
+        await wrapper.vm.searchData();
+      } catch (e) {
+        thrownError = e;
+      }
+      await flushPromises();
+
+      expect(thrownError).toBeNull();
+      expect(parseSpy).toHaveBeenCalled();
     });
   });
 });

@@ -94,6 +94,32 @@ export default class DashboardPanelConfigs {
     this.connectNullValuesToggle = page.locator(
       '[data-test="dashboard-config-connect-null-values"]'
     );
+
+    // Time Shift (Compare Against / Multi-Window) locators
+    this.timeShiftAddBtn = page.locator(
+      '[data-test="dashboard-addpanel-config-time-shift-add-btn"]'
+    );
+
+    // Column Order Popup locators (PromQL Aggregate mode)
+    this.columnOrderBtn = page.locator('[data-test="dashboard-config-column-order-button"]');
+    this.columnOrderDialog = page.locator('[data-test="column-order-dialog"]');
+
+    // Color By Series locators
+    this.colorBySeriesBtn = page.locator(
+      '[data-test="dashboard-addpanel-config-colorBySeries-add-btn"]'
+    );
+    this.colorBySeriesPopup = page.locator(
+      '[data-test="dashboard-color-by-series-popup"]'
+    );
+    this.colorBySeriesAddColorBtn = page.locator(
+      '[data-test="dashboard-addpanel-config-color-by-series-add-btn"]'
+    );
+    this.colorBySeriesSaveBtn = page.locator(
+      '[data-test="dashboard-addpanel-config-color-by-series-apply-btn"]'
+    );
+    this.colorBySeriesCancelBtn = page.locator(
+      '[data-test="dashboard-color-by-series-cancel"]'
+    );
   }
   /// Open the config panel
   async openConfigPanel() {
@@ -111,7 +137,7 @@ export default class DashboardPanelConfigs {
   async selectUnit(unit) {
     await this.unit.waitFor({ state: "visible" });
     await this.unit.click();
-    await this.page.getByRole("option", { name: unit }).click();
+    await this.page.getByRole("option", { name: unit, exact: true }).click();
   }
 
   //Decimals
@@ -158,7 +184,7 @@ export default class DashboardPanelConfigs {
   async selectValuePosition(position) {
     await this.valuePosition.waitFor({ state: "visible" });
     await this.valuePosition.click();
-    await this.page.getByRole("option", { name: position }).click();
+    await this.page.getByRole("option", { name: position, exact: true }).click();
   }
 
   // Value rotate
@@ -291,6 +317,94 @@ export default class DashboardPanelConfigs {
     await this.overrideConfig.click();
   }
 
+  /**
+   * Open override config popup, select a column (by name or first available) and a unit,
+   * then save. Popup auto-adds one row on open (onMounted).
+   * @param {Object} options
+   * @param {string|null} [options.columnName] - Column label to select; null = pick first option
+   * @param {string} [options.unitName] - Unit label to select (e.g. "Bytes", "Milliseconds")
+   */
+  async configureOverrideWithUnit({ columnName = null, unitName = "Bytes" } = {}) {
+    await this.scrollSidebarToElement(this.overrideConfig);
+    await this.overrideConfig.click();
+
+    const fieldSelect = this.page.locator('[data-test="dashboard-addpanel-config-unit-config-select-column-0"]');
+    await fieldSelect.waitFor({ state: "visible", timeout: 10000 });
+    await fieldSelect.click();
+
+    if (columnName) {
+      await this.page.getByRole("option", { name: columnName }).first().waitFor({ state: "visible", timeout: 5000 });
+      await this.page.getByRole("option", { name: columnName }).first().click();
+    } else {
+      // Pick first available column when column name is unknown
+      await this.page.locator('.q-menu [role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
+      await this.page.locator('.q-menu [role="option"]').first().click();
+    }
+
+    const unitSelect = this.page.locator('[data-test="dashboard-addpanel-config-unit-config-select-unit-0"]');
+    await unitSelect.waitFor({ state: "visible", timeout: 5000 });
+    await unitSelect.click();
+    await this.page.getByRole("option", { name: unitName, exact: true }).click();
+
+    // Scope to q-card__actions (OverrideConfigPopup footer) to avoid matching the panel Save btn
+    await this.page.locator('.q-card__actions').getByRole("button", { name: "Save" }).click();
+    await fieldSelect.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+  }
+
+  /**
+   * Open value mapping popup, fill one mapping row, then click Apply.
+   * Popup auto-adds one row on open (onMounted).
+   * @param {Object} options
+   * @param {string} [options.value] - Value to match (type=value row)
+   * @param {string} [options.text] - Display text to show
+   * @param {boolean} [options.setColor] - Whether to initialize the color (clicks "Set color")
+   */
+  async configureValueMapping({ value = "test_value", text = "Mapped!", setColor = true } = {}) {
+    // ValueMapping.vue shares data-test with Drilldown.vue — use last()
+    const valueMappingBtn = this.page.locator('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').last();
+    await this.scrollSidebarToElement(valueMappingBtn);
+    await valueMappingBtn.click();
+
+    const popup = this.page.locator('[data-test="dashboard-value-mapping-popup"]');
+    await popup.waitFor({ state: "visible", timeout: 10000 });
+
+    const valueInput = popup.locator('[data-test="dashboard-addpanel-config-value-mapping-value-input-0"]');
+    await valueInput.waitFor({ state: "visible", timeout: 5000 });
+    await valueInput.fill(value);
+
+    const textInput = popup.locator('[data-test="dashboard-addpanel-config-value-mapping-text-input-0"]');
+    await textInput.fill(text);
+
+    if (setColor) {
+      await popup.getByText("Set color").click();
+      await popup.locator('.color-section input').first().waitFor({ state: "visible", timeout: 5000 });
+    }
+
+    await popup.locator('[data-test="dashboard-addpanel-config-value-mapping-apply-btn"]').click();
+    await popup.waitFor({ state: "hidden", timeout: 5000 });
+  }
+
+  /**
+   * Open value mapping popup and return the popup locator (for external assertions).
+   */
+  async openValueMappingPopup() {
+    const valueMappingBtn = this.page.locator('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').last();
+    await this.scrollSidebarToElement(valueMappingBtn);
+    await valueMappingBtn.click();
+    const popup = this.page.locator('[data-test="dashboard-value-mapping-popup"]');
+    await popup.waitFor({ state: "visible", timeout: 10000 });
+    return popup;
+  }
+
+  /**
+   * Close value mapping popup via the X button without saving.
+   */
+  async closeValueMappingPopup() {
+    const popup = this.page.locator('[data-test="dashboard-value-mapping-popup"]');
+    await popup.locator('[data-test="dashboard-tab-settings-tab-name-edit-cancel"]').click();
+    await popup.waitFor({ state: "hidden", timeout: 5000 });
+  }
+
   // Add and configure override with dynamic column and type
   async configureOverride({ columnName, typeName, enableTypeCheckbox = true }) {
     // Ensure the override button is visible by scrolling the sidebar
@@ -415,6 +529,288 @@ export default class DashboardPanelConfigs {
     }
 
     return isChecked;
+  }
+
+  // ========== Time Shift (Compare Against / Multi-Window) ==========
+
+  /**
+   * Scroll sidebar until target element is visible
+   * @param {import('@playwright/test').Locator} targetLocator - Element to scroll to
+   */
+  async scrollSidebarToElement(targetLocator) {
+    const sidebar = this.page.locator('.sidebar-content');
+    await sidebar.waitFor({ state: "visible" });
+    await sidebar.hover();
+
+    for (let i = 0; i < 15; i++) {
+      if (await targetLocator.isVisible().catch(() => false)) break;
+      await this.page.mouse.wheel(0, 300);
+      await this.page.waitForTimeout(200);
+    }
+
+    if (!(await targetLocator.isVisible().catch(() => false))) {
+      await this.page.evaluate((selector) => {
+        const el = document.querySelector(selector);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, await targetLocator.evaluate(el => {
+        return el.getAttribute('data-test')
+          ? `[data-test="${el.getAttribute('data-test')}"]`
+          : null;
+      }).catch(() => null) || '.sidebar-content');
+
+      // Fallback: scroll sidebar to bottom
+      await this.page.evaluate(() => {
+        const el = document.querySelector('.sidebar-content');
+        if (el) el.scrollTop = el.scrollHeight;
+      });
+      await this.page.waitForTimeout(500);
+    }
+
+    await targetLocator.waitFor({ state: "visible", timeout: 15000 });
+  }
+
+  /**
+   * Add a time shift entry (Compare Against) with default 15m offset
+   * Opens config sidebar first if needed
+   */
+  async addTimeShift() {
+    await this.scrollSidebarToElement(this.timeShiftAddBtn);
+    await this.timeShiftAddBtn.click();
+  }
+
+  /**
+   * Remove a time shift entry at the given index
+   * @param {number} index - Index of the time shift to remove (0-based)
+   */
+  async removeTimeShift(index = 0) {
+    const removeBtn = this.page.locator(
+      `[data-test="dashboard-addpanel-config-time-shift-remove-${index}"]`
+    );
+    await removeBtn.waitFor({ state: "visible" });
+    await removeBtn.click();
+  }
+
+  // ========== Color By Series ==========
+
+  /**
+   * Open the Color By Series popup dialog
+   */
+  async openColorBySeries() {
+    await this.scrollSidebarToElement(this.colorBySeriesBtn);
+    await this.colorBySeriesBtn.click();
+    await this.colorBySeriesPopup.waitFor({ state: "visible", timeout: 10000 });
+  }
+
+  /**
+   * Select a series from the autocomplete dropdown at the given row index.
+   * Can select by index or by matching text (e.g., "ago" to find comparison series).
+   * @param {number} rowIndex - Row index in the color-by-series popup (0-based)
+   * @param {Object} options - Selection options
+   * @param {number} [options.optionIndex] - Which option to select by index (0-based)
+   * @param {string} [options.matchText] - Text to match in the option (e.g., "ago", "Minutes")
+   * @returns {string} The selected series name
+   */
+  async selectColorBySeriesOption(rowIndex = 0, { optionIndex, matchText } = {}) {
+    const autoComplete = this.colorBySeriesPopup
+      .locator('[data-test="common-auto-complete"]')
+      .nth(rowIndex);
+    await autoComplete.waitFor({ state: "visible" });
+    await autoComplete.click();
+
+    const optionLocators = this.colorBySeriesPopup.locator(
+      '[data-test="common-auto-complete-option"]'
+    );
+    await optionLocators.first().waitFor({ state: "visible", timeout: 10000 });
+
+    let targetOption;
+
+    if (matchText) {
+      // Find option containing the match text (e.g., "ago" for comparison series)
+      const count = await optionLocators.count();
+      for (let i = 0; i < count; i++) {
+        const text = await optionLocators.nth(i).textContent();
+        if (text && text.includes(matchText)) {
+          targetOption = optionLocators.nth(i);
+          break;
+        }
+      }
+      // Fallback to last option if no match (comparison series is usually last)
+      if (!targetOption && count > 1) {
+        targetOption = optionLocators.nth(count - 1);
+      } else if (!targetOption) {
+        targetOption = optionLocators.first();
+      }
+    } else {
+      targetOption = optionLocators.nth(optionIndex ?? 0);
+    }
+
+    const seriesName = await targetOption.textContent();
+    await targetOption.click();
+
+    return seriesName?.trim() || "";
+  }
+
+  /**
+   * Set a color for a series row in the Color By Series popup
+   * @param {number} rowIndex - Row index (0-based)
+   * @param {string} color - Hex color value (e.g., "#FF0000")
+   */
+  async setColorForSeriesRow(rowIndex = 0, color = "#5960b2") {
+    // Click "Set color" button if the color picker is not yet initialized
+    const setColorBtn = this.colorBySeriesPopup.getByText("Set color");
+    if (await setColorBtn.first().isVisible().catch(() => false)) {
+      await setColorBtn.first().click();
+      await this.page.waitForTimeout(500);
+    }
+
+    // Strategy 1: Set color via Vue's reactive data (setupState).
+    // __vueParentComponent is only available in Vue dev builds; in production builds
+    // this property is stripped. We try this first and fall back to native input events.
+    const result = await this.page.evaluate(
+      ({ color, rowIndex }) => {
+        const popup = document.querySelector(
+          '[data-test="dashboard-color-by-series-popup"]'
+        );
+        if (!popup) return { success: false, reason: "popup not found" };
+
+        // Strategy 1: Vue setupState (dev builds only)
+        if (popup.__vueParentComponent) {
+          console.warn("[test] setColorForSeriesRow: using __vueParentComponent (dev build detected)");
+          const vpc = popup.__vueParentComponent;
+          const series = vpc.setupState?.editColorBySeries;
+          if (Array.isArray(series) && series.length > rowIndex) {
+            series[rowIndex].color = color;
+            return { success: true, method: "vue-setupState", color: series[rowIndex].color };
+          }
+        } else {
+          console.warn("[test] setColorForSeriesRow: __vueParentComponent not found (prod build), using native input fallback");
+        }
+
+        // Strategy 2: Native input events fallback (works in prod builds)
+        // Find the color input for the given row and set value via native setter + events
+        const colorInputs = popup.querySelectorAll(".color-section input");
+        const input = colorInputs[rowIndex];
+        if (input) {
+          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+            window.HTMLInputElement.prototype, "value"
+          ).set;
+          nativeInputValueSetter.call(input, color);
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+          return { success: true, method: "native-input", color };
+        }
+
+        return { success: false, reason: "no vue component or input found" };
+      },
+      { color, rowIndex }
+    );
+
+    if (!result.success) {
+      throw new Error(`Failed to set color: ${result.reason}`);
+    }
+
+    await this.page.waitForTimeout(500);
+  }
+
+  /**
+   * Add a new color row in the Color By Series popup
+   */
+  async addColorBySeriesRow() {
+    await this.colorBySeriesAddColorBtn.click();
+  }
+
+  /**
+   * Save the Color By Series configuration
+   */
+  async saveColorBySeries() {
+    await this.colorBySeriesSaveBtn.click();
+    await this.colorBySeriesPopup.waitFor({ state: "hidden", timeout: 10000 });
+  }
+
+  /**
+   * Close the Color By Series popup without saving
+   */
+  async cancelColorBySeries() {
+    await this.colorBySeriesCancelBtn.click();
+    await this.colorBySeriesPopup.waitFor({ state: "hidden", timeout: 10000 });
+  }
+
+  // ========== Column Order Popup (PromQL Aggregate / Expanded Time series mode) ==========
+
+  /** Returns the locator for the column row at the given index in the column order popup. */
+  columnOrderRow(index) {
+    return this.page.locator(`[data-test="column-order-row-${index}"]`);
+  }
+
+  /** Opens the column order dialog via the "Configure Column Order" button in the config sidebar. */
+  async openColumnOrderDialog() {
+    await this.scrollSidebarToElement(this.columnOrderBtn);
+    await this.columnOrderBtn.click();
+    await this.columnOrderDialog.waitFor({ state: 'visible', timeout: 5000 });
+  }
+
+  /**
+   * Returns the column NAME text (not row number or icons) of the row at the given index.
+   * Targets the `.column-name` div inside the row.
+   */
+  async getColumnName(index) {
+    const nameEl = this.columnOrderRow(index).locator('.column-name');
+    await nameEl.waitFor({ state: 'visible', timeout: 5000 });
+    return (await nameEl.textContent() || '').trim();
+  }
+
+  /** Clicks the move-down button for the column at the given index. */
+  async moveColumnDown(index) {
+    const btn = this.page.locator(`[data-test="column-order-move-down-${index}"]`);
+    await btn.waitFor({ state: 'visible', timeout: 5000 });
+    await btn.click();
+  }
+
+  /** Clicks the move-up button for the column at the given index. */
+  async moveColumnUp(index) {
+    const btn = this.page.locator(`[data-test="column-order-move-up-${index}"]`);
+    await btn.waitFor({ state: 'visible', timeout: 5000 });
+    await btn.click();
+  }
+
+  /** Saves the column order and waits for the dialog to close. */
+  async saveColumnOrder() {
+    await this.page.locator('[data-test="dashboard-column-order-save-btn"]').click();
+    await this.columnOrderDialog.waitFor({ state: 'hidden', timeout: 5000 });
+  }
+
+  /** Cancels the column order dialog without saving. */
+  async cancelColumnOrder() {
+    await this.page.locator('[data-test="dashboard-column-order-cancel-btn"]').click();
+    await this.columnOrderDialog.waitFor({ state: 'hidden', timeout: 5000 });
+  }
+
+  /**
+   * Delete a color-by-series row at the given index
+   * @param {number} index - Row index (0-based)
+   */
+  async deleteColorBySeriesRow(index = 0) {
+    const deleteBtn = this.page.locator(
+      `[data-test="dashboard-addpanel-config-color-by-series-delete-btn-${index}"]`
+    );
+    await deleteBtn.waitFor({ state: "visible" });
+    await deleteBtn.click();
+  }
+
+  /**
+   * Configure a complete color-by-series entry: select series and set color.
+   * Can select by index or by matching text.
+   * @param {Object} options - Configuration options
+   * @param {number} [options.rowIndex=0] - Row index (0-based)
+   * @param {number} [options.optionIndex] - Which series option to select by index (0-based)
+   * @param {string} [options.matchText] - Text to match in the series option (e.g., "ago")
+   * @param {string} [options.color="#FF0000"] - Hex color value
+   * @returns {string} The selected series name
+   */
+  async configureColorBySeries({ rowIndex = 0, optionIndex, matchText, color = "#FF0000" } = {}) {
+    const seriesName = await this.selectColorBySeriesOption(rowIndex, { optionIndex, matchText });
+    await this.setColorForSeriesRow(rowIndex, color);
+    return seriesName;
   }
 
 }

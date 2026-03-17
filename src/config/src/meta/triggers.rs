@@ -37,6 +37,7 @@ pub enum TriggerModule {
     DerivedStream,
     QueryRecommendations,
     Backfill,
+    AnomalyDetection,
 }
 
 impl std::fmt::Display for TriggerModule {
@@ -47,6 +48,7 @@ impl std::fmt::Display for TriggerModule {
             Self::DerivedStream => write!(f, "derived_stream"),
             Self::QueryRecommendations => write!(f, "query_recommendations"),
             Self::Backfill => write!(f, "backfill"),
+            Self::AnomalyDetection => write!(f, "anomaly_detection"),
         }
     }
 }

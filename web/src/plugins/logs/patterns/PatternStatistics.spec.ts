@@ -57,7 +57,7 @@ describe("PatternStatistics", () => {
       const summaryText = summaryElement.text();
 
       // Check that summary contains the key statistics
-      expect(summaryText).toContain("1,000"); // logs analyzed
+      expect(summaryText).toContain((1000).toLocaleString()); // logs analyzed
       expect(summaryText).toContain("42"); // patterns found
       expect(summaryText).toContain("events");
       expect(summaryText).toContain("patterns found");
@@ -82,7 +82,7 @@ describe("PatternStatistics", () => {
       const summaryElement = wrapper.find('[data-test="pattern-statistics"]');
       const summaryText = summaryElement.text();
 
-      expect(summaryText).toContain("5,000"); // totalEvents
+      expect(summaryText).toContain((5000).toLocaleString()); // totalEvents
     });
 
     it("should combine histogram time with extraction time", async () => {
@@ -110,6 +110,107 @@ describe("PatternStatistics", () => {
 
       expect(summaryText).toContain("0 patterns found");
       expect(summaryText).toContain("0 events");
+    });
+  });
+
+  // --- New tests covering functionality added in Dec 29 changes ---
+
+  describe("histogramTime prop", () => {
+    it("should use only extraction_time_ms when histogramTime is not provided", () => {
+      const summaryElement = wrapper.find('[data-test="pattern-statistics"]');
+      const summaryText = summaryElement.text();
+      // histogramTime defaults to 0, extraction_time_ms is 150 → total = 150ms
+      expect(summaryText).toContain("150 ms");
+    });
+
+    it("should use only extraction_time_ms when histogramTime is 0", async () => {
+      await wrapper.setProps({ histogramTime: 0 });
+      const summaryElement = wrapper.find('[data-test="pattern-statistics"]');
+      expect(summaryElement.text()).toContain("150 ms");
+    });
+
+    it("should sum histogramTime and extraction_time_ms for total time", async () => {
+      await wrapper.setProps({ histogramTime: 100 });
+      const summaryElement = wrapper.find('[data-test="pattern-statistics"]');
+      // 100 + 150 = 250ms
+      expect(summaryElement.text()).toContain("250 ms");
+    });
+
+    it("should show 0 ms when both histogramTime and extraction_time_ms are absent", async () => {
+      await wrapper.setProps({
+        statistics: { total_patterns_found: 5, total_logs_analyzed: 200 },
+        histogramTime: 0,
+      });
+      const summaryElement = wrapper.find('[data-test="pattern-statistics"]');
+      expect(summaryElement.text()).toContain("0 ms");
+    });
+  });
+
+  describe("totalEvents prop", () => {
+    it("should fall back to total_logs_analyzed for event count when totalEvents is absent", () => {
+      const summaryElement = wrapper.find('[data-test="pattern-statistics"]');
+      const summaryText = summaryElement.text();
+      // totalEvents not set → uses logsAnalyzed = 1,000
+      expect(summaryText).toContain((1000).toLocaleString());
+    });
+
+    it("should use totalEvents for event count when provided", async () => {
+      await wrapper.setProps({ totalEvents: 9999 });
+      const summaryElement = wrapper.find('[data-test="pattern-statistics"]');
+      expect(summaryElement.text()).toContain((9999).toLocaleString());
+    });
+
+    it("should format totalEvents with locale separators", async () => {
+      await wrapper.setProps({ totalEvents: 1000000 });
+      const summaryElement = wrapper.find('[data-test="pattern-statistics"]');
+      expect(summaryElement.text()).toContain((1000000).toLocaleString());
+    });
+
+    it("should format total_logs_analyzed with locale separators in fallback path", async () => {
+      await wrapper.setProps({
+        statistics: { ...mockStatistics, total_logs_analyzed: 50000 },
+        totalEvents: undefined,
+      });
+      const summaryElement = wrapper.find('[data-test="pattern-statistics"]');
+      expect(summaryElement.text()).toContain((50000).toLocaleString());
+    });
+  });
+
+  describe("summaryText computed property", () => {
+    it("should always start with 'Showing 1 to 50 out of'", () => {
+      const summaryElement = wrapper.find('[data-test="pattern-statistics"]');
+      expect(summaryElement.text()).toMatch(/^Showing 1 to 50 out of/);
+    });
+
+    it("should include patterns found count in the output", () => {
+      const summaryElement = wrapper.find('[data-test="pattern-statistics"]');
+      expect(summaryElement.text()).toContain("42 patterns found");
+    });
+
+    it("should include logs analyzed count in the 'in X events' clause", () => {
+      const summaryElement = wrapper.find('[data-test="pattern-statistics"]');
+      // logs analyzed = 1000 → "in 1,000 events"
+      expect(summaryElement.text()).toContain(`in ${(1000).toLocaleString()} events`);
+    });
+
+    it("should produce correct full summary string", async () => {
+      await wrapper.setProps({ histogramTime: 0 });
+      const summaryElement = wrapper.find('[data-test="pattern-statistics"]');
+      const formatted = (1000).toLocaleString();
+      expect(summaryElement.text()).toBe(
+        `Showing 1 to 50 out of ${formatted} events & 42 patterns found in ${formatted} events in 150 ms.`,
+      );
+    });
+  });
+
+  describe("data-test attribute", () => {
+    it("should always render the pattern-statistics container", () => {
+      expect(wrapper.find('[data-test="pattern-statistics"]').exists()).toBe(true);
+    });
+
+    it("should still render the container when statistics is null", async () => {
+      await wrapper.setProps({ statistics: null });
+      expect(wrapper.find('[data-test="pattern-statistics"]').exists()).toBe(true);
     });
   });
 });

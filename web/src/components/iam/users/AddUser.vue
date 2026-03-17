@@ -466,9 +466,8 @@ export default defineComponent({
   },
   methods: {
     signout() {
-      if (config.isEnterprise == "true") {
-        this.invalidateLoginData();
-      }
+      // Always call backend logout to clear auth cookies (#10900)
+      this.invalidateLoginData();
 
       this.store.dispatch("logout");
 

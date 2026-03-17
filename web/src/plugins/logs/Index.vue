@@ -55,7 +55,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             id="thirdLevel"
             class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection full-width"
-            v-show="searchObj.meta.logsVisualizeToggle == 'logs' || searchObj.meta.logsVisualizeToggle == 'patterns'"
+            v-show="
+              searchObj.meta.logsVisualizeToggle == 'logs' ||
+              searchObj.meta.logsVisualizeToggle == 'patterns'
+            "
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <q-splitter
@@ -238,6 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div
                       v-else-if="
+                        searchObj.meta.logsVisualizeToggle === 'logs' &&
                         searchObj.data.queryResults.hasOwnProperty('hits') &&
                         searchObj.data.queryResults.hits.length == 0 &&
                         searchObj.loading == false &&
@@ -319,7 +323,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :is_ui_histogram="shouldUseHistogramQuery"
               :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
               :histogramQuery="storedHistogramQuery"
-            ></VisualizeLogsQuery>
+            >
+            </VisualizeLogsQuery>
           </div>
           <div
             v-if="searchObj.meta.logsVisualizeToggle == 'build'"
@@ -337,7 +342,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @queryGenerated="onBuildQueryGenerated"
               @customQueryModeChanged="onCustomQueryModeChanged"
               @initialized="onBuildInitialized"
-              @fieldsUpdated="updateUrlQueryParams(null, buildQueryPageRef?.dashboardPanelData)"
+              @fieldsUpdated="
+                updateUrlQueryParams(
+                  null,
+                  buildQueryPageRef?.dashboardPanelData,
+                )
+              "
             />
           </div>
         </template>
@@ -437,7 +447,7 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep, debounce } from "lodash-es";
@@ -888,7 +898,11 @@ export default defineComponent({
           resetSearchObj();
 
           // Set time range based on source type
-          if (type == "ai_chat_query" && router.currentRoute.value.query.from && router.currentRoute.value.query.to) {
+          if (
+            type == "ai_chat_query" &&
+            router.currentRoute.value.query.from &&
+            router.currentRoute.value.query.to
+          ) {
             searchBarRef.value.dateTimeRef.setAbsoluteTime(
               router.currentRoute.value.query.from,
               router.currentRoute.value.query.to,
@@ -963,21 +977,30 @@ export default defineComponent({
       searchObj.loading = true;
 
       try {
-        const queryReq = buildSearch(false, false);
+        const queryReq = buildSearch(false, true);
         if (!queryReq) {
           searchObj.loading = false;
           return;
         }
 
         // Debug: Log the full queryReq structure
-        console.log("[Patterns Debug] Full queryReq structure:", JSON.stringify(queryReq, null, 2));
-        console.log("[Patterns Debug] selectedStream array:", searchObj.data.stream.selectedStream);
+        console.log(
+          "[Patterns Debug] Full queryReq structure:",
+          JSON.stringify(queryReq, null, 2),
+        );
+        console.log(
+          "[Patterns Debug] selectedStream array:",
+          searchObj.data.stream.selectedStream,
+        );
         console.log("[Patterns Debug] SQL mode:", searchObj.meta.sqlMode);
         console.log("[Patterns Debug] NLP mode:", searchObj.meta.nlpMode);
         console.log("[Patterns Debug] Quick mode:", searchObj.meta.quickMode);
 
         // Set size to -1 to let backend determine sampling size based on config
         queryReq.query.size = -1;
+
+        // set quick_mode false for patterns
+        queryReq.query.quick_mode = false;
 
         // Extract stream name - priority order:
         // 1. From SQL query (SQL mode)
@@ -988,31 +1011,52 @@ export default defineComponent({
         // Try SQL query first (SQL mode)
         if (queryReq.query.sql) {
           console.log("[Patterns Debug] SQL query exists:", queryReq.query.sql);
-          const fromMatch = queryReq.query.sql.match(/FROM\s+["']?([^"'\s,]+)["']?/i);
+          const fromMatch = queryReq.query.sql.match(
+            /FROM\s+["']?([^"'\s,]+)["']?/i,
+          );
           if (fromMatch && fromMatch[1]) {
             streamName = fromMatch[1];
-            console.log(`[Patterns] ✅ Method 1: Extracted stream from SQL query: ${streamName}`);
+            console.log(
+              `[Patterns] ✅ Method 1: Extracted stream from SQL query: ${streamName}`,
+            );
           } else {
-            console.log("[Patterns Debug] ❌ Method 1: Could not extract stream from SQL query");
+            console.log(
+              "[Patterns Debug] ❌ Method 1: Could not extract stream from SQL query",
+            );
           }
         } else {
-          console.log("[Patterns Debug] ⏭️  Method 1: No SQL query found (not in SQL mode)");
+          console.log(
+            "[Patterns Debug] ⏭️  Method 1: No SQL query found (not in SQL mode)",
+          );
         }
 
         // Try query_context.from (Quick mode - this is the actual stream being queried)
         if (!streamName && queryReq.query_context?.from) {
           streamName = queryReq.query_context.from;
-          console.log(`[Patterns] ✅ Method 2: Extracted stream from query_context.from: ${streamName}`);
-          console.log(`[Patterns Debug] query_context structure:`, queryReq.query_context);
+          console.log(
+            `[Patterns] ✅ Method 2: Extracted stream from query_context.from: ${streamName}`,
+          );
+          console.log(
+            `[Patterns Debug] query_context structure:`,
+            queryReq.query_context,
+          );
         } else if (!streamName) {
-          console.log("[Patterns Debug] ❌ Method 2: query_context.from not available");
-          console.log("[Patterns Debug] query_context value:", queryReq.query_context);
+          console.log(
+            "[Patterns Debug] ❌ Method 2: query_context.from not available",
+          );
+          console.log(
+            "[Patterns Debug] query_context value:",
+            queryReq.query_context,
+          );
         }
 
         // Fallback to selectedStream
         if (!streamName) {
           const selectedStreams = searchObj.data.stream.selectedStream;
-          console.log("[Patterns Debug] Attempting fallback - selectedStreams:", selectedStreams);
+          console.log(
+            "[Patterns Debug] Attempting fallback - selectedStreams:",
+            selectedStreams,
+          );
           if (!selectedStreams || selectedStreams.length === 0) {
             console.log("[Index] ❌ No stream selected");
             searchObj.loading = false;
@@ -1020,9 +1064,13 @@ export default defineComponent({
             return;
           }
           streamName = selectedStreams[0];
-          console.warn(`[Patterns] ⚠️  Method 3: Using fallback from selectedStream[0]: ${streamName}`);
+          console.warn(
+            `[Patterns] ⚠️  Method 3: Using fallback from selectedStream[0]: ${streamName}`,
+          );
           console.warn(`[Patterns] ⚠️  All selected streams:`, selectedStreams);
-          console.warn(`[Patterns] ⚠️  This might not be the stream you're viewing if in Quick Mode!`);
+          console.warn(
+            `[Patterns] ⚠️  This might not be the stream you're viewing if in Quick Mode!`,
+          );
         }
 
         console.log(`[Patterns] 🎯 FINAL STREAM SELECTED: ${streamName}`);
@@ -1672,7 +1720,7 @@ export default defineComponent({
           storedHistogramQuery.value = newHistogramQuery;
         }
       },
-      { immediate: true }
+      { immediate: true },
     );
 
     // Flag to prevent unnecessary chart type changes during URL restoration
@@ -1697,7 +1745,10 @@ export default defineComponent({
           // Set loading flag for build mode with SQL mode ON to prevent flicker between initialization and chart API call
           // This will be cleared when trace IDs arrive (via watcher) or when unmounting
           // When SQL mode is OFF, build page handles its own loading state
-          if (searchObj.meta.logsVisualizeToggle === "build" && searchObj.meta.sqlMode) {
+          if (
+            searchObj.meta.logsVisualizeToggle === "build" &&
+            searchObj.meta.sqlMode
+          ) {
             // If query is empty, don't set loading flag - BuildQueryPage handles
             // empty query by using builder mode with the selected stream
             if (searchObj.data.query?.trim()) {
@@ -1821,10 +1872,9 @@ export default defineComponent({
 
             let logsPageQuery = "";
 
-
             // Everytime, build the query inrespective of sqlMode
-              const queryBuild = buildSearch();
-              logsPageQuery = queryBuild?.query?.sql ?? "";
+            const queryBuild = buildSearch();
+            logsPageQuery = queryBuild?.query?.sql ?? "";
 
             // Check if query is SELECT * which is not supported for visualization
             if (
@@ -1991,7 +2041,8 @@ export default defineComponent({
             // Only clear fieldsExtractionLoading if we have data to reuse (no API call needed)
             // If searchResponseForVisualization has hits, data will be reused and no API call
             // If empty, API call will happen and trace IDs watcher will clear the flag
-            const hasDataToReuse = searchResponseForVisualization.value?.hits?.length > 0;
+            const hasDataToReuse =
+              searchResponseForVisualization.value?.hits?.length > 0;
             if (hasDataToReuse) {
               variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
             }
@@ -2318,8 +2369,13 @@ export default defineComponent({
       if (searchObj.meta.logsVisualizeToggle == "build") {
         // Validate query before running - only block if in custom query mode with empty query.
         // In builder mode (non-custom), BuildQueryPage generates the query automatically.
-        const isCustomQueryMode = buildDashboardPanelData.data.queries[0]?.customQuery === true;
-        if (isCustomQueryMode && searchObj.meta.sqlMode && !searchObj.data.query?.trim()) {
+        const isCustomQueryMode =
+          buildDashboardPanelData.data.queries[0]?.customQuery === true;
+        if (
+          isCustomQueryMode &&
+          searchObj.meta.sqlMode &&
+          !searchObj.data.query?.trim()
+        ) {
           showErrorNotification(
             "Query is empty, please select fields to build query",
           );
@@ -2642,7 +2698,6 @@ export default defineComponent({
         shouldUseHistogramQuery.value =
           !willBeTableChart &&
           !(extractedFields?.group_by && extractedFields.group_by.length);
-
 
         const finalQuery = logsPageQuery;
 
@@ -3225,7 +3280,8 @@ export default defineComponent({
     margin: 0 !important;
     box-sizing: border-box !important;
     height: 100% !important;
-    overflow: visible !important; /* Changed from hidden to visible for button */
+    overflow: visible !important;
+    /* Changed from hidden to visible for button */
   }
 
   .logs-horizontal-splitter .q-splitter__before {

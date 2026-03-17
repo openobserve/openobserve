@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <VariablesValueSelector
         v-if="
           globalVariables.length > 0 ||
-          dashboardData.variables?.showDynamicFilters
+          dashboardData?.variables?.showDynamicFilters
         "
         :scope="'global'"
         :variablesConfig="{ list: globalVariables }"

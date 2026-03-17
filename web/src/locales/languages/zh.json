@@ -1632,7 +1632,13 @@
     "discountTag": "打折时",
     "enterpriseNote": "高容量需求？让我们来谈谈规模！联系我们获取量身定制的解决方案。",
     "contactSupport": "联系支持部门",
-    "totalUsage": "总使用量"
+    "totalUsage": "总使用量",
+    "aiCredits": "AI 积分",
+    "aiModeFree": "免费",
+    "aiModePayAsYouGo": "即用即付",
+    "aiModeExhausted": "精疲力",
+    "aiExhaustedMessage": "订阅即可继续使用 AI 功能",
+    "aiPaygMessage": "免费积分已用尽 — 使用量计入订阅账单"
   },
   "message": {
     "ServerInternalError": "错误：出了点问题。内部服务器错误。",
@@ -2069,7 +2075,41 @@
     "noStreamSelected": "未选择任何直播",
     "resultsIncludeAllWindows": "结果包括所有多窗口新增内容",
     "runQueryForOutput": "请单击 “运行查询” 以查看输出",
-    "applyVRLForOutput": "请单击 Apply VRL 查看组合输出"
+    "applyVRLForOutput": "请单击 Apply VRL 查看组合输出",
+    "anomalyDetection": "异常检测",
+    "newAnomalyDetection": "新的异常检测",
+    "editAnomalyDetection": "编辑异常检测",
+    "anomalyDetectionSubtitle": "使用机器学习检测可观测性数据中的异常",
+    "anomalyDetectionConfig": "检测配置",
+    "alerting": "警报",
+    "saveAndTrain": "保存并训练",
+    "detectionInterval": "检测间隔",
+    "trainingWindow": "训练窗口",
+    "sensitivity": "灵敏度",
+    "sensitivityHint": "更高的百分位数 = 更少的警报。仅标记最极端的异常。",
+    "queryMode": "查询模式",
+    "detectionFunction": "检测功能",
+    "trained": "训练有素",
+    "notTrained": "未受过训练",
+    "lastDetection": "上次检测",
+    "nextRun": "下次运行",
+    "triggerTraining": "触发训练",
+    "retraining": "再训练...",
+    "sqlPreview": "SQL 预览",
+    "configSummary": "摘要",
+    "anomalyStatus": {
+      "waiting": "等待",
+      "training": "训练",
+      "active": "活跃",
+      "failed": "失败",
+      "disabled": "已禁用"
+    },
+    "anomalyStepCaptions": {
+      "alertSetup": "为您的探测器命名并选择要监视的直播",
+      "detectionConfig": "配置查询和检测参数",
+      "alerting": "在检测到异常时设置通知"
+    },
+    "updateAnomalyDetection": "更新异常检测："
   },
   "alert_templates": {
     "header": "模板",
@@ -2606,7 +2646,9 @@
     "today": "今天",
     "yesterday": "昨天",
     "spanColorPalettePreview": "Span 调色板预览",
-    "errorsFound": "错误跟踪"
+    "errorsFound": "错误跟踪",
+    "spansTitle": "跨度",
+    "spansFound": "已找到跨度"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
@@ -2884,7 +2926,8 @@
     "rateLabel": "频率：",
     "timeRangeLabel": "时间范围：",
     "analyzeTooltipTraces": "分析跟踪维度的速率、延迟和错误模式",
-    "insightsButtonLabel": "见解"
+    "insightsButtonLabel": "见解",
+    "searchInspectionsLabel": "检查搜索任务执行详情"
   },
   "errorInsights": {
     "title": "标题",

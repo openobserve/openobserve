@@ -221,7 +221,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useLoading } from "@/composables/useLoading";
 import useStreams from "@/composables/useStreams";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
 import LeftJoinSvg from "@/components/icons/LeftJoinSvg.vue";
 import LeftJoinTypeSvg from "@/components/icons/LeftJoinTypeSvg.vue";

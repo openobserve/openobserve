@@ -2,11 +2,22 @@ const { test, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { expect } = require('@playwright/test');
+const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 // NOTE: JavaScript transform type is ONLY allowed in _meta organization
 // This file consolidates tests from:
 // - javascript-functions.spec.js (JS function operations)
 // - meta-org-js-restriction.spec.js (org-based JS restrictions)
+
+// Helper: get the org identifier for "non-meta" tests
+// On self-hosted: 'default' org. On cloud: user's own org (also non-meta, JS blocked there too)
+function getNonMetaOrg() {
+  if (isCloudEnvironment()) {
+    return getOrgIdentifier();
+  }
+  return 'default';
+}
 
 test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functions'] }, () => {
   let pm;
@@ -200,52 +211,57 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
     // - test_create_js_function_in_meta_org_success
   });
 
-  test.describe('Default Organization - JavaScript Blocked', () => {
+  test.describe('Non-Meta Organization - JavaScript Blocked', () => {
     test.beforeEach(async ({ page }) => {
-      // Switch to default organization
-      testLogger.info('Switching to default organization');
-      await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=default`);
+      // Switch to a non-meta organization (self-hosted: 'default', cloud: user's own org)
+      const nonMetaOrg = getNonMetaOrg();
+      testLogger.info(`Switching to non-meta organization: ${nonMetaOrg}`);
+      await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${nonMetaOrg}`);
       await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
       await page.waitForTimeout(2000);
 
-      // Verify we're in default org
+      // Verify we're in the correct org
       const currentUrl = page.url();
-      expect(currentUrl).toContain('org_identifier=default');
-      testLogger.info('Confirmed in default organization');
+      expect(currentUrl).toContain(`org_identifier=${nonMetaOrg}`);
+      testLogger.info(`Confirmed in non-meta organization: ${nonMetaOrg}`);
     });
 
     // NOTE: Consolidated from meta-org "JS radio NOT visible" + "VRL functions work" tests
     // Both validations preserved: JS hidden check + VRL creation
-    test('P0: Default org - JS hidden, VRL works', { tag: ['@smoke', '@P0'] }, async ({ page }) => {
-      testLogger.info('Test: Default org - JS hidden, VRL works');
+    test('P0: Non-meta org - JS hidden, VRL works', { tag: ['@smoke', '@P0'] }, async ({ page }) => {
+      const nonMetaOrg = getNonMetaOrg();
+      testLogger.info(`Test: Non-meta org (${nonMetaOrg}) - JS hidden, VRL works`);
 
       // Step 1: Verify JS radio is hidden, VRL is visible
-      await pm.functionsPage.clickAddFunctionButton('default');
+      await pm.functionsPage.clickAddFunctionButton(nonMetaOrg);
       await pm.functionsPage.expectVrlRadioVisible();
       testLogger.info('VRL radio button visible');
 
       const isJsRadioVisible = await pm.functionsPage.isJsRadioVisible();
       expect(isJsRadioVisible).toBe(false);
-      testLogger.info('JavaScript radio button correctly hidden in default org');
+      testLogger.info(`JavaScript radio button correctly hidden in ${nonMetaOrg} org`);
       await pm.functionsPage.clickCancelButton();
 
       // Step 2: Create VRL function to verify it works
-      const functionName = `default_vrl_fn_${Date.now()}`;
-      const vrlCode = '.processed = true\n.org = "default"';
+      const functionName = `nonmeta_vrl_fn_${Date.now()}`;
+      const vrlCode = '.processed = true\n.org = "non_meta"';
 
-      await pm.functionsPage.clickAddFunctionButton('default');
+      await pm.functionsPage.clickAddFunctionButton(nonMetaOrg);
       await pm.functionsPage.fillFunctionName(functionName);
       // VRL is default, no need to select
       await pm.functionsPage.enterFunctionCode(vrlCode);
       await pm.functionsPage.clickSaveButton();
 
-      // Verify function appears
+      // Navigate back to functions list and search for the function
+      await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${nonMetaOrg}`);
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(1000);
+      await pm.functionsPage.searchFunction(functionName);
       await pm.functionsPage.expectFunctionInList(functionName);
-      testLogger.info('VRL function created successfully in default org');
+      testLogger.info(`VRL function created successfully in ${nonMetaOrg} org`);
 
       // Cleanup
-      await pm.functionsPage.deleteFunctionByName(functionName);
+      await pm.functionsPage.deleteFunctionByName(functionName, nonMetaOrg);
     });
 
     // NOTE: API tests for JavaScript function blocking in default org have been migrated to:
@@ -258,18 +274,19 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
     // NOTE: Consolidated from meta-org "Org switching" + "VRL always visible" tests
     // Both validations preserved: JS visibility changes with org + VRL always visible
     test('P1: Radio visibility across orgs', { tag: ['@P1', '@orgSwitching', '@control'] }, async ({ page }) => {
-      testLogger.info('Test: Radio visibility across orgs');
+      const nonMetaOrg = getNonMetaOrg();
+      testLogger.info(`Test: Radio visibility across orgs (non-meta: ${nonMetaOrg})`);
 
-      // Step 1: Default org - JS hidden, VRL visible
-      await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=default`);
+      // Step 1: Non-meta org - JS hidden, VRL visible
+      await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${nonMetaOrg}`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(2000);
 
-      await pm.functionsPage.clickAddFunctionButton('default');
+      await pm.functionsPage.clickAddFunctionButton(nonMetaOrg);
       await pm.functionsPage.expectVrlRadioVisible();
-      testLogger.info('VRL visible in default org');
+      testLogger.info(`VRL visible in ${nonMetaOrg} org`);
       await pm.functionsPage.expectJsRadioHidden();
-      testLogger.info('JS hidden in default org');
+      testLogger.info(`JS hidden in ${nonMetaOrg} org`);
       await pm.functionsPage.clickCancelButton();
 
       // Step 2: Switch to _meta org - JS visible, VRL visible
@@ -284,16 +301,16 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       testLogger.info('JS visible in _meta org');
       await pm.functionsPage.clickCancelButton();
 
-      // Step 3: Switch back to default - JS hidden again, VRL still visible
-      await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=default`);
+      // Step 3: Switch back to non-meta - JS hidden again, VRL still visible
+      await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${nonMetaOrg}`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(2000);
 
-      await pm.functionsPage.clickAddFunctionButton('default');
+      await pm.functionsPage.clickAddFunctionButton(nonMetaOrg);
       await pm.functionsPage.expectVrlRadioVisible();
       testLogger.info('VRL still visible after switching back');
       await pm.functionsPage.expectJsRadioHidden();
-      testLogger.info('JS hidden after switching back to default');
+      testLogger.info(`JS hidden after switching back to ${nonMetaOrg}`);
       await pm.functionsPage.clickCancelButton();
     });
   });

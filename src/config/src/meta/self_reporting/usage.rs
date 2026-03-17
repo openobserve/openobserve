@@ -54,6 +54,10 @@ pub enum TriggerDataType {
     DerivedStream,
     #[serde(rename = "backfill")]
     Backfill,
+    #[serde(rename = "anomaly_detection")]
+    AnomalyDetection,
+    #[serde(rename = "anomaly_detection_training")]
+    AnomalyDetectionTraining,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -337,6 +341,9 @@ pub enum UsageEvent {
     RemotePipeline,
     NewIncident,
     IncidentReAnalysis,
+    AiChat,
+    AiCredits,
+    AiFreeCredits,
     Other,
 }
 
@@ -350,6 +357,9 @@ impl std::fmt::Display for UsageEvent {
             UsageEvent::RemotePipeline => write!(f, "RemotePipeline"),
             UsageEvent::NewIncident => write!(f, "NewIncident"),
             UsageEvent::IncidentReAnalysis => write!(f, "IncidentReAnalysis"),
+            UsageEvent::AiChat => write!(f, "AiChat"),
+            UsageEvent::AiCredits => write!(f, "AiCredits"),
+            UsageEvent::AiFreeCredits => write!(f, "AiFreeCredits"),
             UsageEvent::Other => write!(f, "Other"),
         }
     }

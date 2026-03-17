@@ -1632,7 +1632,13 @@
     "discountTag": "Com desconto",
     "enterpriseNote": "Necessidades de alto volume? Vamos falar de escala! Entre em contato conosco para obter soluções personalizadas.",
     "contactSupport": "Contate o suporte",
-    "totalUsage": "Uso total"
+    "totalUsage": "Uso total",
+    "aiCredits": "Créditos de IA",
+    "aiModeFree": "Gratuito",
+    "aiModePayAsYouGo": "Pague conforme o uso",
+    "aiModeExhausted": "Exausta",
+    "aiExhaustedMessage": "Inscreva-se para continuar usando os recursos de IA",
+    "aiPaygMessage": "Créditos gratuitos esgotados — uso cobrado na assinatura"
   },
   "message": {
     "ServerInternalError": "Erro: Algo deu errado. Erro interno do servidor.",
@@ -2069,7 +2075,41 @@
     "noStreamSelected": "Nenhum stream selecionado",
     "resultsIncludeAllWindows": "Os resultados incluem todas as adições de várias janelas",
     "runQueryForOutput": "Clique em Executar consulta para ver a saída",
-    "applyVRLForOutput": "Clique em Aplicar VRL para ver a saída combinada"
+    "applyVRLForOutput": "Clique em Aplicar VRL para ver a saída combinada",
+    "anomalyDetection": "Detecção de anomalias",
+    "newAnomalyDetection": "Nova detecção de anomalias",
+    "editAnomalyDetection": "Editar detecção de anomalias",
+    "anomalyDetectionSubtitle": "Detecte anomalias em seus dados de observabilidade usando aprendizado de máquina",
+    "anomalyDetectionConfig": "Configuração de detecção",
+    "alerting": "Alertando",
+    "saveAndTrain": "Economize e treine",
+    "detectionInterval": "Intervalo de detecção",
+    "trainingWindow": "Janela de treinamento",
+    "sensitivity": "Sensibilidade",
+    "sensitivityHint": "Percentil mais alto = menos alertas. Somente as anomalias mais extremas são sinalizadas.",
+    "queryMode": "Modo de consulta",
+    "detectionFunction": "Função de detecção",
+    "trained": "Treinado",
+    "notTrained": "Não treinado",
+    "lastDetection": "Última detecção",
+    "nextRun": "Próxima corrida",
+    "triggerTraining": "Trigger o treinamento",
+    "retraining": "Reciclagem...",
+    "sqlPreview": "Pré-visualização do SQL",
+    "configSummary": "Resumo",
+    "anomalyStatus": {
+      "waiting": "Esperando",
+      "training": "Treinamento",
+      "active": "Ativo",
+      "failed": "Falhou",
+      "disabled": "Desativado"
+    },
+    "anomalyStepCaptions": {
+      "alertSetup": "Nomeie seu detector e selecione um fluxo para monitorar",
+      "detectionConfig": "Configurar os parâmetros de consulta e detecção",
+      "alerting": "Configure notificações quando anomalias forem detectadas"
+    },
+    "updateAnomalyDetection": "Atualize a detecção de anomalias:"
   },
   "alert_templates": {
     "header": "Modelos",
@@ -2601,7 +2641,9 @@
     "today": "Hoje",
     "yesterday": "Ontem",
     "spanColorPalettePreview": "Pré-visualização da paleta de cores Span",
-    "errorsFound": "Traços de erro"
+    "errorsFound": "Traços de erro",
+    "spansTitle": "VÃOS",
+    "spansFound": "Vãos encontrados"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
@@ -2879,7 +2921,8 @@
     "rateLabel": "Tarifa:",
     "timeRangeLabel": "Intervalo de tempo:",
     "analyzeTooltipTraces": "Analise as dimensões do rastreamento para padrões de taxa, latência e erro",
-    "insightsButtonLabel": "Percepções"
+    "insightsButtonLabel": "Percepções",
+    "searchInspectionsLabel": "Inspecione os detalhes da execução do trabalho de pesquisa"
   },
   "errorInsights": {
     "title": "Percepções",

@@ -46,6 +46,7 @@ env:
   ZO_FORMAT_STREAM_NAME_TO_LOWERCASE: false
   ZO_CREATE_ORG_THROUGH_INGESTION: true
   ZO_UTF8_VIEW_ENABLED: false
+  ZO_ENABLE_CROSS_LINKING: true
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 
 jobs:
@@ -181,6 +182,7 @@ jobs:
                 "dashboard-chartJson.spec.js",
                 "dashboard-promql-suggestions.spec.js",
                 "dashboard-share-link.spec.js",
+                "crossLinking.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
@@ -306,7 +308,7 @@ jobs:
             browser: "chrome"
             run_files: 
               [
-                "dashboard-table-pagination.spec.js"
+                "dashboard-table-pagination.spec.js",
               ]
           - testfolder: "Dashboards-Panel-Level-DateTime-Config"
             browser: "chrome"
@@ -317,6 +319,24 @@ jobs:
                 "dashboard-panel-time-advanced-edge-cases.spec.js",
                 "dashboard-panel-time-apply-behavior.spec.js",
                 "dashboard-panel-time-variables-behavior.spec.js",
+              ]
+          - testfolder: "Dashboard-Config-Settings"
+            browser: "chrome"
+            run_files:
+              [
+                "dashboard-series-color-multiwindow.spec.js",
+                "dashboard-config-advanced.spec.js",
+                "dashboard-config-axis.spec.js",
+                "dashboard-config-gauge-maps.spec.js",
+                "dashboard-config-general.spec.js",
+                "dashboard-config-legends.spec.js",
+                "dashboard-config-line-style.spec.js",
+                "dashboard-config-panel-time.spec.js",
+                "dashboard-config-table.spec.js",
+                "dashboard-config-trellis.spec.js",
+                "dashboard-config-drilldown.spec.js",
+                "dashboard-config-promql.spec.js",
+                "dashboard-config-markline.spec.js",
               ]
     steps:
       - name: Clone the current repo
@@ -477,7 +497,7 @@ jobs:
               "Logs-Core"|"Logs-Queries")
                 ACTUAL_FOLDER="Logs"
                 ;;
-              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables"|"Dashboard-Table-Pagination"|"Dashboards-Panel-Level-DateTime-Config")
+              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables"|"Dashboard-Table-Pagination"|"Dashboards-Panel-Level-DateTime-Config"|"Dashboard-Config-Settings")
                 ACTUAL_FOLDER="Dashboards"
                 ;;
               *)

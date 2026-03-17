@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]"
             :style="{
               backgroundColor:
-              store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
+                store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
             }"
             class="button button-left"
             @click="onUpdateQueryMode('sql', $event)"
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="onUpdateBuilderMode('builder', $event)"
             :style="{
               backgroundColor:
-              store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
+                store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
             }"
           >
             {{ t("panel.builder") }}
@@ -121,7 +121,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import { useStore } from "vuex";
 
@@ -137,7 +137,7 @@ export default defineComponent({
     const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
     const {
       dashboardPanelData,
@@ -145,7 +145,9 @@ export default defineComponent({
       updateXYFieldsForCustomQueryMode,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
     const confirmQueryModeChangeDialog = ref(false);
-    const confirmDialogMessage = ref("Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off.");
+    const confirmDialogMessage = ref(
+      "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off.",
+    );
 
     const selectedButtonQueryType = ref("sql");
     // this is the value of the current button
@@ -206,7 +208,7 @@ export default defineComponent({
       ],
       () => {
         initializeSelectedButtonType();
-      }
+      },
     );
 
     const isSQLMode = computed(() => selectedButtonQueryType.value === "sql");
@@ -309,7 +311,10 @@ export default defineComponent({
       updateXYFieldsForCustomQueryMode();
 
       // Clear query when switching query types (SQL <-> PromQL)
-      if (isQueryTypeChange && dashboardPanelData.data.type !== "custom_chart") {
+      if (
+        isQueryTypeChange &&
+        dashboardPanelData.data.type !== "custom_chart"
+      ) {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].query = "";

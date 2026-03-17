@@ -1632,7 +1632,13 @@
     "discountTag": "İndirimli",
     "enterpriseNote": "Yüksek hacimli ihtiyaçlar? Ölçekten bahsedelim! Özel çözümler için bizimle iletişime geçin.",
     "contactSupport": "Destek ile iletişime geçin",
-    "totalUsage": "Toplam Kullanım"
+    "totalUsage": "Toplam Kullanım",
+    "aiCredits": "AI Kredileri",
+    "aiModeFree": "Bedava",
+    "aiModePayAsYouGo": "Kullandıkça öde",
+    "aiModeExhausted": "Yorgun",
+    "aiExhaustedMessage": "Yapay zeka özelliklerini kullanmaya devam etmek için abone olun",
+    "aiPaygMessage": "Ücretsiz krediler tükendi — kullanım aboneliğe faturalandırılır"
   },
   "message": {
     "ServerInternalError": "Hata: Bir şeyler ters gitti. Dahili sunucu hatası.",
@@ -2069,7 +2075,41 @@
     "noStreamSelected": "Akış Seçilmedi",
     "resultsIncludeAllWindows": "Sonuçlar tüm çoklu pencere eklemelerini içerir",
     "runQueryForOutput": "Çıktıyı görmek için lütfen Sorguyu Çalıştır'a tıklayın",
-    "applyVRLForOutput": "Kombine çıktıyı görmek için lütfen VRL Uygula'ya tıklayın"
+    "applyVRLForOutput": "Kombine çıktıyı görmek için lütfen VRL Uygula'ya tıklayın",
+    "anomalyDetection": "Anomali Algılama",
+    "newAnomalyDetection": "Yeni anormallik tespiti",
+    "editAnomalyDetection": "Anomali algılamayı düzenle",
+    "anomalyDetectionSubtitle": "Makine öğrenimini kullanarak gözlemlenebilirlik verilerinizdeki anormallikleri tespit edin",
+    "anomalyDetectionConfig": "Algılama Yapılandırması",
+    "alerting": "Uyarı",
+    "saveAndTrain": "Kaydet ve Eğitin",
+    "detectionInterval": "Algılama Aralığı",
+    "trainingWindow": "Eğitim Penceresi",
+    "sensitivity": "Hassasiyet",
+    "sensitivityHint": "Daha yüksek yüzdelik = daha az uyarı. Sadece en aşırı anomaliler işaretlenir.",
+    "queryMode": "Sorgu Modu",
+    "detectionFunction": "Algılama Fonksiyonu",
+    "trained": "Eğitimli",
+    "notTrained": "Eğitimli değil",
+    "lastDetection": "Son Algılama",
+    "nextRun": "Sonraki Koşu",
+    "triggerTraining": "Tetik Eğitimi",
+    "retraining": "Yeniden eğitim...",
+    "sqlPreview": "SQL Önizleme",
+    "configSummary": "Özet",
+    "anomalyStatus": {
+      "waiting": "Bekliyor",
+      "training": "Eğitim",
+      "active": "Aktif",
+      "failed": "Başarısız",
+      "disabled": "Engelli"
+    },
+    "anomalyStepCaptions": {
+      "alertSetup": "Dedektörünüzü adlandırın ve izlenecek bir akış seçin",
+      "detectionConfig": "Sorgu ve algılama parametrelerini yapılandırma",
+      "alerting": "Anormallikler tespit edildiğinde bildirimleri ayarlayın"
+    },
+    "updateAnomalyDetection": "Anomali algılamayı güncelle:"
   },
   "alert_templates": {
     "header": "Şablonlar",
@@ -2601,7 +2641,9 @@
     "today": "Bugün",
     "yesterday": "Dün",
     "spanColorPalettePreview": "Span Renk Paleti Önizlemesi",
-    "errorsFound": "Hata İzleri"
+    "errorsFound": "Hata İzleri",
+    "spansTitle": "YAYILIMLAR",
+    "spansFound": "Bulunan Açıklıklar"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
@@ -2879,7 +2921,8 @@
     "rateLabel": "Oranı:",
     "timeRangeLabel": "Zaman Aralığı:",
     "analyzeTooltipTraces": "Hız, gecikme süresi ve hata kalıpları için izleme boyutlarını analiz edin",
-    "insightsButtonLabel": "İçgörüler"
+    "insightsButtonLabel": "İçgörüler",
+    "searchInspectionsLabel": "Arama işi yürütme ayrıntılarını inceleyin"
   },
   "errorInsights": {
     "title": "İçgörüler",

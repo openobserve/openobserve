@@ -22,7 +22,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::{
-    META_ORG_ID, RouteDispatchStrategy, get_config,
+    RouteDispatchStrategy, get_config,
     meta::{
         cluster::{Node, Role, RoleGroup},
         search::{
@@ -91,11 +91,6 @@ pub async fn dispatch(req: Request) -> Response {
         .unwrap_or("")
         .to_string();
 
-    // Handle node list API locally (special case)
-    if path.contains("/api/_meta/node/list") {
-        return handle_node_list_request(req).await;
-    }
-
     // Resolve target node
     let target = match resolve_target(&path, &cfg.common.base_uri).await {
         Ok(target) => target,
@@ -116,18 +111,6 @@ pub async fn dispatch(req: Request) -> Response {
     } else {
         proxy_request(req, target, start).await
     }
-}
-
-/// Handles the special node list API request locally.
-async fn handle_node_list_request(req: Request) -> Response {
-    let query_string = req.uri().query().unwrap_or("");
-    let query: StdHashMap<String, String> = url::form_urlencoded::parse(query_string.as_bytes())
-        .into_owned()
-        .collect();
-
-    crate::handler::http::request::organization::org::node_list_impl(META_ORG_ID, query)
-        .await
-        .into_response()
 }
 
 /// Resolves the target node for a given request path.

@@ -52,12 +52,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="span.operationName"
           >
             <div
-              class="flex no-wrap full-width relative-position operation-name-container"
+              class="flex no-wrap full-width relative-position operation-name-container tw:cursor-pointer"
               :class="[
                 store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
                 isLLMTrace(span) ? '' : 'q-pt-sm',
               ]"
               :data-test="`trace-tree-span-operation-name-container-${span.spanId}`"
+              @click="selectSpan(span.spanId)"
             >
               <div
                 class="absolute view-logs-container"
@@ -103,7 +104,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 class="ellipsis q-pl-xs cursor-pointer span-name-section"
-                @click="selectSpan(span.spanId)"
                 :data-test="`trace-tree-span-select-btn-${span.spanId}`"
               >
                 <div

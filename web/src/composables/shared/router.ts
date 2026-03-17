@@ -17,7 +17,9 @@ import {
   routeGuard,
   useLocalUserInfo,
   useLocalCurrentUser,
+  invalidateLoginData,
 } from "@/utils/zincutils";
+import config from "@/aws-exports";
 import Home from "@/views/HomeView.vue";
 import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
 import About from "@/views/About.vue";
@@ -26,6 +28,7 @@ import Error404 from "@/views/Error404.vue";
 import ShortUrl from "@/views/ShortUrl.vue";
 
 const Search = () => import("@/plugins/logs/Index.vue");
+const SearchJobInspector = () => import("@/plugins/logs/SearchJobInspector.vue");
 const AppMetrics = () => import("@/plugins/metrics/Index.vue");
 const AppTraces = () => import("@/plugins/traces/Index.vue");
 const PromQLQueryBuilder = () => import("@/views/PromQL/QueryBuilder.vue");
@@ -90,6 +93,8 @@ const useRoutes = () => {
     {
       path: "/logout",
       beforeEnter(to: any, from: any, next: any) {
+        // Clear backend auth cookies before redirecting to login (#10900)
+        invalidateLoginData();
         useLocalCurrentUser("", true);
         useLocalUserInfo("", true);
 
@@ -123,6 +128,18 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         title: "Logs",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "logs/inspector",
+      name: "searchJobInspector",
+      component: SearchJobInspector,
+      meta: {
+        keepAlive: false,
+        title: "Search Job Inspector",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -379,6 +396,40 @@ const useRoutes = () => {
         title: "Add Alert",
       },
       beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "alerts/anomaly/add",
+      name: "addAnomalyDetection",
+      component: () => import("@/views/AddAlertView.vue"),
+      meta: {
+        title: "Add Anomaly Detection",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        const store = (window as any).store;
+        const isOss = store?.state?.zoConfig?.build_type === "opensource";
+        if (isOss || (config.isEnterprise !== "true" && config.isCloud !== "true")) {
+          next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+          return;
+        }
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "alerts/anomaly/edit/:anomaly_id",
+      name: "editAnomalyDetection",
+      component: () => import("@/views/AddAlertView.vue"),
+      meta: {
+        title: "Edit Anomaly Detection",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        const store = (window as any).store;
+        const isOss = store?.state?.zoConfig?.build_type === "opensource";
+        if (isOss || (config.isEnterprise !== "true" && config.isCloud !== "true")) {
+          next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+          return;
+        }
         routeGuard(to, from, next);
       },
     },

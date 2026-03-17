@@ -41,9 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-if="field.dataType"
               class="field-type-container"
-              :title="field.dataType"
             >
-              <FieldTypeBadge :dataType="field.dataType" />
               <q-icon
                 class="field-expand-icon"
                 :name="isExpanded ? 'expand_more' : 'chevron_right'"
@@ -124,6 +122,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-multi-select="selectedStreamsCount == field.streams.length"
           :default-values-count="defaultValuesCount"
           :theme="theme"
+          :active-include-values="activeIncludeValues"
+          :active-exclude-values="activeExcludeValues"
           @add-search-term="(fn, v, a) => emit('add-search-term', fn, v, a)"
           @add-multiple-search-terms="
             (fn, vs, a) => emit('add-multiple-search-terms', fn, vs, a)
@@ -137,13 +137,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import {
   outlinedAdd,
   outlinedVisibility,
   outlinedVisibilityOff,
 } from "@quasar/extras/material-icons-outlined";
-import FieldTypeBadge from "@/components/common/FieldTypeBadge.vue";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 
 interface Props {
@@ -159,6 +158,9 @@ interface Props {
   theme: string;
   showQuickMode: boolean;
   defaultValuesCount: number;
+  activeIncludeValues?: string[];
+  activeExcludeValues?: string[];
+  expanded?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -179,8 +181,15 @@ const emit = defineEmits<{
   "before-hide": [field: any];
 }>();
 
-const isExpanded = ref(false);
+const isExpanded = ref(props.expanded ?? false);
 const fieldValuesPanelRef = ref();
+
+watch(
+  () => props.expanded,
+  (val) => {
+    if (val !== undefined) isExpanded.value = val;
+  },
+);
 
 const isFieldSelected = computed(() =>
   props.selectedFields.includes(props.field.name),
@@ -210,16 +219,6 @@ const handleBeforeHide = () => {
   align-items: center;
   padding: 0 0.25rem;
   background: var(--q-dark);
-}
-
-// field-type-container base styles come from the global _field-type-badge.scss partial;
-// override only what differs in the logs expansion context.
-.field-type-container {
-  margin-left: 0.1rem;
-}
-
-.field-expansion-header:hover .field-expand-icon {
-  left: -2px;
 }
 
 :deep(.q-expansion-item):hover .field_overlay {

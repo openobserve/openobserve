@@ -2,6 +2,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const logsdata = require("../../../test-data/logs_data.json");
+const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -12,16 +13,13 @@ test.describe("Schema testcases", () => {
     // Ingestion helper function 
     async function ingestion(page, testStreamName) {
         testLogger.debug('Starting ingestion for test stream', { testStreamName });
-        const orgId = process.env["ORGNAME"];
-        const basicAuthCredentials = Buffer.from(
-            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-        ).toString('base64');
+        const orgId = getOrgIdentifier();
 
         const headers = {
-            "Authorization": `Basic ${basicAuthCredentials}`,
+            ...getAuthHeaders(),
             "Content-Type": "application/json",
         };
-        
+
         const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
             const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
                 method: 'POST',
@@ -63,13 +61,13 @@ test.describe("Schema testcases", () => {
         await page.waitForLoadState('domcontentloaded');
 
         // Navigate to logs page with VRL editor enabled
-        await pm.logsPage.navigateToLogs(process.env["ORGNAME"]);
+        await pm.logsPage.navigateToLogs(getOrgIdentifier());
         await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.selectStream(testStreamName);
         await page.waitForTimeout(1000);
 
-        const allsearch = page.waitForResponse(`**/api/${process.env["ORGNAME"]}/_search**`, { timeout: 60000 });
+        const allsearch = page.waitForResponse(`**/api/${getOrgIdentifier()}/_search**`, { timeout: 60000 });
         await pm.schemaPage.applyQuery();
         await allsearch;
         
@@ -99,11 +97,13 @@ test.describe("Schema testcases", () => {
         await page.waitForLoadState('domcontentloaded');
 
         // Navigate to logs page with VRL editor enabled
-        await pm.logsPage.navigateToLogs(process.env["ORGNAME"]);
-        
-        await pm.logsPage.selectStream(testStreamName); 
+        await pm.logsPage.navigateToLogs(getOrgIdentifier());
+
+        await pm.logsPage.selectStream(testStreamName);
+        const allsearch2 = page.waitForResponse(`**/api/${getOrgIdentifier()}/_search**`, { timeout: 60000 });
         await pm.schemaPage.applyQuery();
-        
+        await allsearch2;
+
         // Start of actual test - complete blank to detailed stream workflow
         await pm.schemaPage.completeBlankToDetailedStreamWorkflow(streamName, testStreamName);
         
@@ -128,11 +128,13 @@ test.describe("Schema testcases", () => {
         await page.waitForLoadState('domcontentloaded');
 
         // Navigate to logs page with VRL editor enabled
-        await pm.logsPage.navigateToLogs(process.env["ORGNAME"]);
-        
-        await pm.logsPage.selectStream(testStreamName); 
+        await pm.logsPage.navigateToLogs(getOrgIdentifier());
+
+        await pm.logsPage.selectStream(testStreamName);
+        const allsearch3 = page.waitForResponse(`**/api/${getOrgIdentifier()}/_search**`, { timeout: 60000 });
         await pm.schemaPage.applyQuery();
-        
+        await allsearch3;
+
         // Start of actual test - use original working enhanced framework method
         await pm.schemaPage.completeAddAndDeleteFieldWorkflow(testStreamName);
         

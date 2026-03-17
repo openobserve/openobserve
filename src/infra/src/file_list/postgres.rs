@@ -20,7 +20,8 @@ use chrono::{DateTime, Duration, NaiveDate, TimeZone, Timelike, Utc};
 use config::{
     RwHashSet, get_config,
     meta::stream::{
-        FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType,
+        FileKey, FileListBookKeepMode, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats,
+        StreamType,
     },
     metrics::{DB_QUERY_NUMS, DB_QUERY_TIME},
     utils::{
@@ -2099,7 +2100,14 @@ async fn precreate_partitions(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     let start_date = today - Duration::days(past_days);
     let end_date = today + Duration::days(FILE_LIST_POST_PARTITION_DAYS);
 
-    let tables = ["file_list", "file_list_history", "file_list_dump_stats"];
+    let mut tables = vec!["file_list", "file_list_dump_stats"];
+    if cfg
+        .compact
+        .file_list_deleted_mode
+        .eq(&FileListBookKeepMode::History.to_string())
+    {
+        tables.push("file_list_history");
+    }
     let mut date = start_date;
     while date <= end_date {
         let date_key = format!(

@@ -18,7 +18,7 @@ use std::{collections::HashMap, fmt::Debug};
 use axum::{
     Json,
     extract::FromRequestParts,
-    http::{StatusCode, request::Parts},
+    http::{HeaderMap, StatusCode, request::Parts},
     response::{IntoResponse, Response},
 };
 use base64::Engine;
@@ -30,13 +30,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 #[cfg(feature = "enterprise")]
 use {
-    crate::{
-        common::{
-            infra::config::{USER_SESSIONS, USER_SESSIONS_EXPIRY},
-            meta::ingestion::INGESTION_EP,
-        },
-        service::users::get_user,
-    },
+    crate::{common::meta::ingestion::INGESTION_EP, service::users::get_user},
     jsonwebtoken::TokenData,
     o2_dex::service::auth::get_dex_jwks,
     o2_openfga::config::get_config as get_openfga_config,
@@ -320,11 +314,11 @@ where
 
                 "org:##user_id##".to_string()
             } else if path_columns[0].eq("invites") && method.eq("GET") {
-                let auth_str = extract_auth_str_from_parts(parts).await;
+                let auth_str = extract_auth_str_from_headers(&parts.headers).await;
                 // because the /invites route is checked by user_id,
                 // and does not return any other info, we can bypass the auth
                 return Ok(AuthExtractor {
-                    auth: auth_str.to_owned(),
+                    auth: auth_str,
                     method: "GET".to_string(),
                     o2_type: "".to_string(),
                     org_id: "".to_string(),
@@ -360,11 +354,11 @@ where
             }
 
             if path_columns[0].eq("invites") && method.eq("DELETE") {
-                let auth_str = extract_auth_str_from_parts(parts).await;
+                let auth_str = extract_auth_str_from_headers(&parts.headers).await;
                 // because the delete /invites/token route is checked by user_id,
                 // and does not return any other info, we can bypass the auth
                 return Ok(AuthExtractor {
-                    auth: auth_str.to_owned(),
+                    auth: auth_str,
                     method: "DELETE".to_string(),
                     o2_type: "".to_string(),
                     org_id: "".to_string(),
@@ -902,6 +896,19 @@ where
                         path_columns[4]
                     )
                 }
+            } else if path_columns[0].eq(V2_API_PREFIX)
+                && path_columns[2].eq("alerts")
+                && path_columns[url_len - 1].eq("trigger")
+            {
+                // For v2/default/alerts/3ATPoRfPdc0n1mEcORhMHV4h56n/trigger api to trigger
+                // destination
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[2])
+                        .map_or(path_columns[2], |model| model.key),
+                    path_columns[3]
+                )
             }
             //  this is specifically for enabling alerts
             else if !(path_columns[1].eq("pipelines") && path_columns[3].eq("backfill"))
@@ -958,7 +965,7 @@ where
             });
         }
 
-        let auth_str = extract_auth_str_from_parts(parts).await;
+        let auth_str = extract_auth_str_from_headers(&parts.headers).await;
 
         // Log auth metadata without exposing sensitive tokens
         let auth_type = if auth_str.starts_with("Basic ") {
@@ -1008,6 +1015,9 @@ where
             || path.contains("/resources")
             || path.contains("/format_query")
             || path.contains("/prometheus/api/v1/series")
+            || path.contains("/prometheus/api/v1/metadata")
+            || path.contains("/prometheus/api/v1/labels")
+            || path.contains("/prometheus/api/v1/label/")
             || path.contains("/traces/latest")
             || path.contains("/traces/session")
             || path.contains("/traces/user")
@@ -1159,7 +1169,7 @@ where
 
     #[cfg(not(feature = "enterprise"))]
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        let cookies = extract_cookie_from_parts(parts);
+        let cookies = extract_cookies_from_headers(&parts.headers);
         let auth_str = if let Some(cookie) = cookies.get("auth_tokens") {
             let val = config::utils::base64::decode_raw(cookie).unwrap_or_default();
             let auth_tokens: AuthTokens =
@@ -1198,10 +1208,9 @@ where
     }
 }
 
-fn extract_cookie_from_parts(parts: &Parts) -> HashMap<&str, &str> {
+fn extract_cookies_from_headers(headers: &HeaderMap) -> HashMap<&str, &str> {
     // Check cookies
-    let cookies = parts
-        .headers
+    let cookies = headers
         .get(http::header::COOKIE)
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
@@ -1219,8 +1228,8 @@ fn extract_cookie_from_parts(parts: &Parts) -> HashMap<&str, &str> {
 }
 
 #[cfg(feature = "enterprise")]
-pub async fn extract_auth_str_from_parts(parts: &Parts) -> String {
-    let cookies = extract_cookie_from_parts(parts);
+pub async fn extract_auth_str_from_headers(headers: &HeaderMap) -> String {
+    let cookies = extract_cookies_from_headers(headers);
     if let Some(cookie) = cookies.get("auth_tokens") {
         let val = config::utils::base64::decode_raw(cookie).unwrap_or_default();
         let auth_tokens: AuthTokens =
@@ -1264,7 +1273,7 @@ pub async fn extract_auth_str_from_parts(parts: &Parts) -> String {
     } else if let Some(cookie) = cookies.get("auth_ext") {
         let val = config::utils::base64::decode_raw(cookie).unwrap_or_default();
         std::str::from_utf8(&val).unwrap_or_default().to_string()
-    } else if let Some(auth_header) = parts.headers.get("Authorization") {
+    } else if let Some(auth_header) = headers.get("Authorization") {
         if let Ok(auth_str) = auth_header.to_str() {
             // Log auth type without exposing sensitive tokens
             let auth_type = if auth_str.starts_with("Basic ") {
@@ -1307,144 +1316,6 @@ pub async fn extract_auth_str_from_parts(parts: &Parts) -> String {
                     }
                 }
             } else {
-                auth_str.to_owned()
-            }
-        } else {
-            "".to_string()
-        }
-    } else {
-        "".to_string()
-    }
-}
-
-#[cfg(feature = "enterprise")]
-pub fn extract_basic_auth_str_from_parts(parts: &Parts) -> String {
-    let cookies = extract_cookie_from_parts(parts);
-
-    if let Some(cookie) = cookies.get("auth_tokens") {
-        let val = config::utils::base64::decode_raw(cookie).unwrap_or_default();
-        let auth_tokens: AuthTokens =
-            json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
-        let access_token = auth_tokens.access_token;
-        if access_token.is_empty() {
-            // If cookie was set but access token is still empty
-            // we check auth_ext cookie to get the token.
-            cookies
-                .get("auth_ext")
-                .map(|cookie| {
-                    let val = config::utils::base64::decode_raw(cookie).unwrap_or_default();
-                    std::str::from_utf8(&val).unwrap_or_default().to_string()
-                })
-                .unwrap_or_default()
-        } else if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
-            access_token
-        } else if access_token.starts_with("session") {
-            let session_key = access_token.strip_prefix("session ").unwrap().to_string();
-            // For sync context (rate limiting), only check cache with expiry validation
-            match USER_SESSIONS.get(&session_key) {
-                Some(token) => {
-                    let token_value = token.to_string();
-                    drop(token); // Drop reference before checking expiry
-
-                    // Check expiry from cache
-                    if let Some(expires_at_ref) = USER_SESSIONS_EXPIRY.get(&session_key) {
-                        let expires_at = *expires_at_ref;
-                        drop(expires_at_ref);
-
-                        let now = chrono::Utc::now().timestamp();
-                        if now > expires_at {
-                            log::warn!("Session '{}' expired in sync context", session_key);
-                            // Return the session key as-is, will fail auth
-                            access_token
-                        } else {
-                            // Check if token already has auth prefix (Basic/Bearer)
-                            if token_value.starts_with("Basic ")
-                                || token_value.starts_with("Bearer ")
-                            {
-                                // Already has prefix (e.g., assume_service_account sessions)
-                                token_value
-                            } else {
-                                // Plain JWT token, needs Bearer prefix
-                                format!("Bearer {}", token_value)
-                            }
-                        }
-                    } else {
-                        // No expiry info, check format and add Bearer if needed
-                        if token_value.starts_with("Basic ") || token_value.starts_with("Bearer ") {
-                            token_value
-                        } else {
-                            format!("Bearer {}", token_value)
-                        }
-                    }
-                }
-                None => {
-                    log::warn!("Session '{}' not found in USER_SESSIONS cache", session_key);
-                    access_token
-                }
-            }
-        } else {
-            format!("Bearer {access_token}")
-        }
-    } else if let Some(cookie) = cookies.get("auth_ext") {
-        let val = config::utils::base64::decode_raw(cookie).unwrap_or_default();
-        std::str::from_utf8(&val).unwrap_or_default().to_string()
-    } else if let Some(auth_header) = parts.headers.get("Authorization") {
-        if let Ok(auth_str) = auth_header.to_str() {
-            // Handle session tokens from Authorization header (same as cookie path)
-            if auth_str.starts_with("session ") {
-                let session_key = auth_str.strip_prefix("session ").unwrap().to_string();
-                // For sync context (rate limiting), only check cache with expiry validation
-                match USER_SESSIONS.get(&session_key) {
-                    Some(token) => {
-                        let token_value = token.to_string();
-                        drop(token); // Drop reference before checking expiry
-
-                        // Check expiry from cache
-                        if let Some(expires_at_ref) = USER_SESSIONS_EXPIRY.get(&session_key) {
-                            let expires_at = *expires_at_ref;
-                            drop(expires_at_ref);
-
-                            let now = chrono::Utc::now().timestamp();
-                            if now > expires_at {
-                                log::warn!(
-                                    "Session '{}' expired in sync context (header)",
-                                    session_key
-                                );
-                                // Return empty string, will fail auth
-                                "".to_string()
-                            } else {
-                                // Check if token already has auth prefix (Basic/Bearer)
-                                if token_value.starts_with("Basic ")
-                                    || token_value.starts_with("Bearer ")
-                                {
-                                    // Already has prefix (e.g., assume_service_account sessions)
-                                    token_value
-                                } else {
-                                    // Plain JWT token, needs Bearer prefix
-                                    format!("Bearer {}", token_value)
-                                }
-                            }
-                        } else {
-                            // No expiry info, check format and add Bearer if needed
-                            if token_value.starts_with("Basic ")
-                                || token_value.starts_with("Bearer ")
-                            {
-                                token_value
-                            } else {
-                                format!("Bearer {}", token_value)
-                            }
-                        }
-                    }
-                    None => {
-                        log::warn!(
-                            "Session '{}' not found in USER_SESSIONS cache (header)",
-                            session_key
-                        );
-                        "".to_string()
-                    }
-                }
-            } else {
-                // Not a session token, return as-is
                 auth_str.to_owned()
             }
         } else {
@@ -1557,7 +1428,7 @@ pub async fn extract_auth_expiry_and_user_id(
         }
     };
 
-    let auth_str = extract_auth_str_from_parts(parts).await;
+    let auth_str = extract_auth_str_from_headers(&parts.headers).await;
     if auth_str.is_empty() {
         return (None, None);
     } else if auth_str.starts_with("Basic") {

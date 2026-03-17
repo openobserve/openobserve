@@ -1632,7 +1632,13 @@
     "discountTag": "Met korting",
     "enterpriseNote": "Heeft u grote hoeveelheden nodig? Laten we het over schaal hebben! Neem contact met ons op voor oplossingen op maat.",
     "contactSupport": "Contact opnemen met de klantenservice",
-    "totalUsage": "Totaal gebruik"
+    "totalUsage": "Totaal gebruik",
+    "aiCredits": "AI-kredieten",
+    "aiModeFree": "Gratis",
+    "aiModePayAsYouGo": "Betaal terwijl je onderweg bent",
+    "aiModeExhausted": "Uitgeput",
+    "aiExhaustedMessage": "Schrijf je in om AI-functies te blijven gebruiken",
+    "aiPaygMessage": "Gratis credits uitgeput — gebruik wordt gefactureerd op het abonnement"
   },
   "message": {
     "ServerInternalError": "Fout: er is iets misgegaan. Interne serverfout.",
@@ -2069,7 +2075,41 @@
     "noStreamSelected": "Geen stream geselecteerd",
     "resultsIncludeAllWindows": "De resultaten omvatten alle toevoegingen met meerdere vensters",
     "runQueryForOutput": "Klik op Query uitvoeren om de uitvoer te zien",
-    "applyVRLForOutput": "Klik op VRL toepassen om de gecombineerde uitvoer te zien"
+    "applyVRLForOutput": "Klik op VRL toepassen om de gecombineerde uitvoer te zien",
+    "anomalyDetection": "Detectie van afwijkingen",
+    "newAnomalyDetection": "Nieuwe detectie van afwijkingen",
+    "editAnomalyDetection": "Anomaliedetectie bewerken",
+    "anomalyDetectionSubtitle": "Detecteer afwijkingen in uw waarneembaarheidsgegevens met behulp van machine learning",
+    "anomalyDetectionConfig": "Opsporingsconfiguratie",
+    "alerting": "Alarmering",
+    "saveAndTrain": "Opslaan en trainen",
+    "detectionInterval": "Detectie-interval",
+    "trainingWindow": "Trainingsvenster",
+    "sensitivity": "Gevoeligheid",
+    "sensitivityHint": "Hoger percentiel = minder meldingen. Alleen de meest extreme afwijkingen worden gemarkeerd.",
+    "queryMode": "Query-modus",
+    "detectionFunction": "Detectiefunctie",
+    "trained": "Getraind",
+    "notTrained": "Niet opgeleid",
+    "lastDetection": "Laatste detectie",
+    "nextRun": "Volgende run",
+    "triggerTraining": "Triggertraining",
+    "retraining": "Omscholing...",
+    "sqlPreview": "SQL-voorbeeld",
+    "configSummary": "Samenvatting",
+    "anomalyStatus": {
+      "waiting": "Wachtend",
+      "training": "Opleiding",
+      "active": "Actief",
+      "failed": "Mislukt",
+      "disabled": "Uitgeschakeld"
+    },
+    "anomalyStepCaptions": {
+      "alertSetup": "Geef je detector een naam en selecteer een stream om te monitoren",
+      "detectionConfig": "Configureer de query- en detectieparameters",
+      "alerting": "Meldingen instellen wanneer er afwijkingen worden gedetecteerd"
+    },
+    "updateAnomalyDetection": "Anomaliedetectie bijwerken:"
   },
   "alert_templates": {
     "header": "Sjablonen",
@@ -2601,7 +2641,9 @@
     "today": "Vandaag",
     "yesterday": "Gisteren",
     "spanColorPalettePreview": "Voorbeeld van het kleurenpalet van Span",
-    "errorsFound": "Foutsporen"
+    "errorsFound": "Foutsporen",
+    "spansTitle": "OVERSPANT",
+    "spansFound": "Overspanningen gevonden"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
@@ -2879,7 +2921,8 @@
     "rateLabel": "Tarief:",
     "timeRangeLabel": "Tijdbereik:",
     "analyzeTooltipTraces": "Analyseer de traceerdimensies voor snelheid, latentie en foutpatronen",
-    "insightsButtonLabel": "Inzichten"
+    "insightsButtonLabel": "Inzichten",
+    "searchInspectionsLabel": "Bekijk de details van de uitvoering van de zoekopdracht"
   },
   "errorInsights": {
     "title": "Inzichten",

@@ -489,6 +489,14 @@ if .severity == "error" {
       it("should format smaller numbers as is", () => {
         expect(formatLargeNumber(500)).toBe("500");
       });
+
+      it("should return empty string for undefined", () => {
+        expect(formatLargeNumber(undefined as any)).toBe("");
+      });
+
+      it("should return empty string for null", () => {
+        expect(formatLargeNumber(null as any)).toBe("");
+      });
     });
 
     describe("formatSizeFromMB", () => {

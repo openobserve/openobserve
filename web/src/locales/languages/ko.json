@@ -1632,7 +1632,13 @@
     "discountTag": "할인 시",
     "enterpriseNote": "대량 구매가 필요하신가요?스케일에 대해 얘기해 볼까요!맞춤형 솔루션을 원하시면 저희에게 문의하세요.",
     "contactSupport": "지원팀에 문의",
-    "totalUsage": "총 사용량"
+    "totalUsage": "총 사용량",
+    "aiCredits": "AI 크레딧",
+    "aiModeFree": "무료",
+    "aiModePayAsYouGo": "사용량에 따라 지불",
+    "aiModeExhausted": "지쳤다",
+    "aiExhaustedMessage": "구독하여 AI 기능을 계속 사용하세요",
+    "aiPaygMessage": "무료 크레딧 소진 — 사용량이 구독에 청구됨"
   },
   "message": {
     "ServerInternalError": "오류: 문제가 발생했습니다. 내부 서버 오류입니다.",
@@ -2069,7 +2075,41 @@
     "noStreamSelected": "선택한 스트림 없음",
     "resultsIncludeAllWindows": "결과에는 모든 다중 창 추가 사항이 포함됩니다.",
     "runQueryForOutput": "결과를 보려면 [쿼리 실행] 을 클릭하십시오.",
-    "applyVRLForOutput": "VRL 적용을 클릭하여 결합된 출력을 확인하십시오."
+    "applyVRLForOutput": "VRL 적용을 클릭하여 결합된 출력을 확인하십시오.",
+    "anomalyDetection": "이상 징후 탐지",
+    "newAnomalyDetection": "새로운 이상 탐지",
+    "editAnomalyDetection": "이상 탐지 편집",
+    "anomalyDetectionSubtitle": "머신러닝을 사용하여 옵저버빌리티 데이터에서 이상 징후를 감지합니다.",
+    "anomalyDetectionConfig": "탐지 구성",
+    "alerting": "알림",
+    "saveAndTrain": "저장 및 교육",
+    "detectionInterval": "감지 간격",
+    "trainingWindow": "교육 창",
+    "sensitivity": "민감도",
+    "sensitivityHint": "백분위수가 높을수록 경고가 적어집니다.가장 극단적인 예외 항목만 플래그됩니다.",
+    "queryMode": "쿼리 모드",
+    "detectionFunction": "감지 기능",
+    "trained": "트레이닝",
+    "notTrained": "교육을 받지 않음",
+    "lastDetection": "마지막 탐지",
+    "nextRun": "다음 실행",
+    "triggerTraining": "트리거 트레이닝",
+    "retraining": "재교육...",
+    "sqlPreview": "SQL 미리 보기",
+    "configSummary": "요약",
+    "anomalyStatus": {
+      "waiting": "대기 중",
+      "training": "트레이닝",
+      "active": "액티브",
+      "failed": "실패",
+      "disabled": "장애인"
+    },
+    "anomalyStepCaptions": {
+      "alertSetup": "감지기 이름을 지정하고 모니터링할 스트림을 선택합니다.",
+      "detectionConfig": "쿼리 및 탐지 매개변수 구성",
+      "alerting": "이상 징후 감지 시 알림 설정"
+    },
+    "updateAnomalyDetection": "이상 탐지 업데이트:"
   },
   "alert_templates": {
     "header": "템플릿",
@@ -2601,7 +2641,9 @@
     "today": "오늘",
     "yesterday": "어제",
     "spanColorPalettePreview": "스팬 컬러 팔레트 미리보기",
-    "errorsFound": "오류 추적"
+    "errorsFound": "오류 추적",
+    "spansTitle": "기간",
+    "spansFound": "스팬 발견"
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",
@@ -2879,7 +2921,8 @@
     "rateLabel": "요금:",
     "timeRangeLabel": "시간 범위:",
     "analyzeTooltipTraces": "속도, 지연 및 오류 패턴에 대한 트레이스 차원 분석",
-    "insightsButtonLabel": "인사이트"
+    "insightsButtonLabel": "인사이트",
+    "searchInspectionsLabel": "검색 작업 실행 세부 정보 검사"
   },
   "errorInsights": {
     "title": "인사이트",

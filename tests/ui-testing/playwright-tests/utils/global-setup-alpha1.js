@@ -2,6 +2,7 @@ const { chromium } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
 const testLogger = require('./test-logger.js');
+const logsdata = require('../../../test-data/logs_data.json');
 
 /**
  * Global setup for Alpha1 cloud tests
@@ -138,18 +139,39 @@ async function globalSetup() {
       );
     }
 
-    // If stuck on callback URL (/web/cb#id_token=...), the auth cookies are set
-    // but the client-side router may not complete the redirect.
-    // Navigate directly to /web/ — the auth state is already persisted.
+    // If on callback URL (/web/cb#id_token=...), the SPA needs time to process
+    // the token from the hash before the session is valid. Wait for the SPA to
+    // complete token processing and auto-redirect, rather than navigating away
+    // prematurely (which would lose the session).
     if (page.url().includes('/cb#') || page.url().includes('/cb?')) {
-      testLogger.info('[alpha1] On callback URL — auth cookies set, navigating to /web/...');
-      await page.goto(`${baseUrl}/web/`, { waitUntil: 'domcontentloaded' });
+      testLogger.info('[alpha1] On callback URL — waiting for SPA token processing...');
+      try {
+        // Wait for the SPA to process the token and redirect away from /cb
+        await page.waitForURL(
+          url => !url.toString().includes('/cb'),
+          { timeout: 30000 }
+        );
+        testLogger.info(`[alpha1] Callback processed, now at: ${page.url()}`);
+      } catch (e) {
+        // If the SPA didn't auto-redirect, wait for network to settle then navigate
+        testLogger.warn('[alpha1] Callback did not auto-redirect, waiting for network idle...');
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        if (page.url().includes('/cb')) {
+          testLogger.info('[alpha1] Still on callback, navigating to /web/...');
+          await page.goto(`${baseUrl}/web/`, { waitUntil: 'domcontentloaded' });
+        }
+      }
     }
 
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch((e) => testLogger.warn('[alpha1] networkidle timeout:', { error: e.message }));
 
     // Step 7: Verify login success
     testLogger.info(`[alpha1] Verifying login at: ${page.url()}`);
+
+    // If we ended up back on Dex, the token exchange failed
+    if (page.url().includes('dex')) {
+      throw new Error(`Login failed — redirected back to Dex after token exchange: ${page.url()}`);
+    }
 
     const menuItem = page.locator('[data-test="menu-link-\\/-item"]');
     await menuItem.waitFor({ state: 'visible', timeout: 15000 });
@@ -200,6 +222,16 @@ async function globalSetup() {
       testLogger.warn('[alpha1] Failed to fetch cloud config', { error: e.message });
     }
 
+    // Step 9: Perform global data ingestion (same as self-hosted global-setup.js)
+    // This creates streams that tests expect to find in dropdowns
+    const specFiles = process.argv.filter(arg => /\.spec\.(js|ts)$/.test(arg));
+    const isCleanupOnly = specFiles.length === 1 && /cleanup\.spec\.(js|ts)$/.test(specFiles[0]);
+    if (isCleanupOnly || process.env.SKIP_INGESTION === 'true') {
+      testLogger.info('[alpha1] Skipping data ingestion (cleanup-only run or SKIP_INGESTION=true)');
+    } else {
+      await performGlobalIngestion(page, baseUrl);
+    }
+
   } catch (error) {
     const debugDir = path.join(__dirname, '..', '..', 'test-results');
     if (!fs.existsSync(debugDir)) {
@@ -221,6 +253,97 @@ async function globalSetup() {
   }
 
   testLogger.info('[alpha1] Global setup completed successfully');
+}
+
+/**
+ * Ingest test data into streams so they appear in UI dropdowns.
+ * Uses cloud auth (email:passcode) from cloud-config.json.
+ */
+async function performGlobalIngestion(page, baseUrl) {
+  const cloudConfigFile = path.join(__dirname, 'auth', 'cloud-config.json');
+  let headers;
+  let orgId;
+
+  try {
+    const cloudConfig = JSON.parse(fs.readFileSync(cloudConfigFile, 'utf-8'));
+    orgId = cloudConfig.orgIdentifier;
+    const basicAuth = Buffer.from(`${cloudConfig.userEmail}:${cloudConfig.passcode}`).toString('base64');
+    headers = {
+      'Authorization': `Basic ${basicAuth}`,
+      'Content-Type': 'application/json',
+    };
+  } catch (e) {
+    testLogger.warn('[alpha1] Cannot read cloud-config.json for ingestion — skipping', { error: e.message });
+    return;
+  }
+
+  // Streams that tests expect to exist in dropdowns
+  const streams = [
+    { name: 'e2e_automate', data: logsdata },
+    { name: 'auto_playwright_stream', data: [{ level: 'info', job: 'test', log: 'test message for openobserve' }] },
+  ];
+
+  for (const stream of streams) {
+    try {
+      const response = await page.evaluate(async ({ url, headers, orgId, streamName, data }) => {
+        const base = url.endsWith('/') ? url.slice(0, -1) : url;
+        const r = await fetch(`${base}/api/${orgId}/${streamName}/_json`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(data),
+        });
+        return { status: r.status, text: await r.text() };
+      }, { url: baseUrl, headers, orgId, streamName: stream.name, data: stream.data });
+
+      if (response.status === 200) {
+        testLogger.info(`[alpha1] Ingested test data into '${stream.name}'`, { status: response.status });
+      } else {
+        testLogger.warn(`[alpha1] Ingestion into '${stream.name}' returned ${response.status}`, { body: response.text.substring(0, 200) });
+      }
+    } catch (e) {
+      testLogger.warn(`[alpha1] Failed to ingest into '${stream.name}'`, { error: e.message });
+    }
+  }
+
+  // Wait for streams to be indexed and visible in the API
+  // Cloud environments need time after ingestion before streams appear in UI dropdowns
+  testLogger.info('[alpha1] Waiting for streams to be indexed...');
+  const maxWaitMs = 90000; // 90 seconds max
+  const pollIntervalMs = 3000;
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < maxWaitMs) {
+    try {
+      const streamsResult = await page.evaluate(async ({ url, orgId, headers }) => {
+        const base = url.endsWith('/') ? url.slice(0, -1) : url;
+        const r = await fetch(`${base}/api/${orgId}/streams?type=logs&page_num=0&page_size=1000`, { headers });
+        if (!r.ok) return { ok: false, status: r.status };
+        const data = await r.json();
+        const names = (data.list || []).map(s => s.name);
+        return { ok: true, names };
+      }, { url: baseUrl, orgId, headers });
+
+      if (streamsResult.ok) {
+        const hasE2e = streamsResult.names.includes('e2e_automate');
+        const hasAuto = streamsResult.names.includes('auto_playwright_stream');
+        if (hasE2e && hasAuto) {
+          testLogger.info(`[alpha1] Both streams indexed after ${Date.now() - startTime}ms`);
+          break;
+        }
+        testLogger.debug(`[alpha1] Streams not yet indexed (e2e_automate=${hasE2e}, auto_playwright_stream=${hasAuto}), waiting...`);
+      } else {
+        testLogger.debug(`[alpha1] Streams API returned ${streamsResult.status}, retrying...`);
+      }
+    } catch (e) {
+      testLogger.debug(`[alpha1] Error checking streams: ${e.message}`);
+    }
+
+    await page.waitForTimeout(pollIntervalMs);
+  }
+
+  if (Date.now() - startTime >= maxWaitMs) {
+    testLogger.warn(`[alpha1] Streams not fully indexed after ${maxWaitMs}ms — tests may fail on stream selection`);
+  }
 }
 
 module.exports = globalSetup;

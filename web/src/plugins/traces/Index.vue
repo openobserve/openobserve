@@ -37,6 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:activeTab="activeTab = $event"
           @error-only-toggled="onErrorOnlyToggled"
           @filters-reset="onFiltersReset"
+          @cancel-query="cancelSearch"
+          @update:searchMode="onSearchModeChange"
         />
       </div>
 
@@ -74,6 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-show="searchObj.meta.showFields"
                 ref="indexListRef"
                 :field-list="searchObj.data.stream.selectedStreamFields"
+                :active-include-field-values="activeIncludeFilterValues"
+                :active-exclude-field-values="activeExcludeFilterValues"
                 data-test="traces-search-index-list"
                 class="card-container"
                 :key="searchObj.data.stream.streamLists"
@@ -122,13 +126,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ t("traces.errorRetrievingTraces") }}
                     <q-btn
-                      v-if="searchObj.data.errorDetail"
+                      v-if="
+                        searchObj.data.errorDetail || searchObj?.data?.errorMsg
+                      "
                       @click="toggleErrorDetails"
                       size="sm"
                       class="o2-secondary-button q-ml-sm"
                       data-test="traces-search-error-details-btn"
                       >{{ t("search.histogramErrorBtnLabel") }}</q-btn
                     >
+                  </div>
+                  <!-- Collapsible error detail — shown below results when toggled -->
+                  <div class="text-center">
+                    <div class="tw:my-none tw:text-[1rem]! tw:px-[2rem]!">
+                      <span v-if="disableMoreErrorDetails">
+                        <SanitizedHtmlRenderer
+                          data-test="traces-search-detail-error-message"
+                          :htmlContent="searchObj?.data?.errorMsg"
+                          class="tw:pt-[1rem]"
+                        />
+                        <div
+                          v-if="searchObj?.data?.errorDetail"
+                          class="error-display__message tw:pt-[1rem]! tw:text-[var(--o2-text-2)]!"
+                        >
+                          {{ searchObj.data.errorDetail }}
+                        </div>
+                      </span>
+                    </div>
                   </div>
                   <!-- FTS not configured -->
                   <div
@@ -204,23 +228,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @metrics:filters-updated="onMetricsFiltersUpdated"
                 />
               </div>
-              <!-- Collapsible error detail — shown below results when toggled -->
-              <div class="text-center">
-                <h5 class="tw:my-none">
-                  <span v-if="disableMoreErrorDetails">
-                    <SanitizedHtmlRenderer
-                      data-test="traces-search-detail-error-message"
-                      :htmlContent="searchObj?.data?.errorMsg"
-                    />
-                    <div
-                      v-if="searchObj?.data?.errorDetail"
-                      class="error-display__message"
-                    >
-                      {{ searchObj.data.errorDetail }}
-                    </div>
-                  </span>
-                </h5>
-              </div>
             </div>
           </template>
         </q-splitter>
@@ -257,6 +264,7 @@ import {
   timestampToTimezoneDate,
   escapeSingleQuotes,
   getUUID,
+  generateTraceContext,
 } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import segment from "@/services/segment_analytics";
@@ -267,6 +275,8 @@ import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
+import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
@@ -288,6 +298,7 @@ const {
   copyTracesUrl,
   formatTracesMetaData,
 } = useTraces();
+const { fnParsedSQL } = logsUtils();
 let refreshIntervalID = 0;
 const searchResultRef = ref(null);
 const searchBarRef = ref(null);
@@ -305,6 +316,8 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
   useHttpStreaming();
 // Track the current search stream so we can cancel it when a new search starts
 let currentSearchTraceId: string | null = null;
+// Track the count query stream so it can be cancelled independently
+let currentCountTraceId: string | null = null;
 // The processed WHERE clause from the last buildSearch() call — used for the count query
 let builtWhereClause = "";
 /**
@@ -594,6 +607,16 @@ function buildSearch() {
     }
 
     if (whereClause.trim() != "") {
+      // Convert human-readable duration suffixes (e.g. '1.50ms') to raw µs.
+      const durationParseResult = parseDurationWhereClause(
+        whereClause,
+        parser,
+        searchObj.data.stream.selectedStream.value,
+      );
+      if (typeof durationParseResult === "string") {
+        whereClause = durationParseResult;
+      }
+
       whereClause = whereClause
         .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
         .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
@@ -642,8 +665,20 @@ function fetchTracesCount() {
   if (!queryReq || !selectedStreamName.value) return;
 
   const streamName = selectedStreamName.value;
-  const countSql = `select approx_distinct(trace_id) as trace_count, (approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR')) as error_count FROM "${streamName}"${builtWhereClause ? " WHERE " + builtWhereClause : ""}`;
-  const countTraceId = getUUID().replace(/-/g, "");
+  const whereClause = builtWhereClause ? ` WHERE ${builtWhereClause}` : "";
+  const isSpansMode = searchObj.meta.searchMode === "spans";
+
+  const countSql = isSpansMode
+    ? `select count(*) as span_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count FROM "${streamName}"${whereClause}`
+    : `select approx_distinct(trace_id) as trace_count, (approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR')) as error_count FROM "${streamName}"${whereClause}`;
+
+  if (currentCountTraceId) {
+    cancelStreamQueryBasedOnRequestId({
+      trace_id: currentCountTraceId,
+      org_id: searchObj.organizationIdentifier,
+    });
+  }
+  currentCountTraceId = generateTraceContext().traceId;
 
   fetchQueryDataWithHttpStream(
     {
@@ -660,14 +695,16 @@ function fetchTracesCount() {
       type: "search",
       pageType: "traces",
       searchType: "ui",
-      traceId: countTraceId,
+      traceId: currentCountTraceId,
       org_id: searchObj.organizationIdentifier,
     },
     {
       data: (_payload: any, response: any) => {
         const hits: any[] = response.content?.results?.hits || [];
         if (hits.length > 0) {
-          const count = hits[0]?.trace_count ?? 0;
+          const count = isSpansMode
+            ? (hits[0]?.span_count ?? 0)
+            : (hits[0]?.trace_count ?? 0);
           searchObj.data.queryResults.total = count;
           searchObj.data.queryResults.errorCount = hits[0]?.error_count ?? 0;
           searchObj.meta.resultGrid.showPagination = count > 0;
@@ -675,8 +712,11 @@ function fetchTracesCount() {
       },
       error: (_payload: any, _err: any) => {
         console.error("Failed to fetch traces count");
+        currentCountTraceId = null;
       },
-      complete: (_payload: any) => {},
+      complete: (_payload: any) => {
+        currentCountTraceId = null;
+      },
       reset: (_payload: any) => {},
     },
   );
@@ -717,7 +757,10 @@ const updateFieldValues = (data) => {
   });
 };
 
-async function getQueryData(isPagination: boolean = false, isSort: boolean = false) {
+async function getQueryData(
+  isPagination: boolean = false,
+  isSort: boolean = false,
+) {
   try {
     if (searchObj.data.stream.selectedStream.value == "") {
       return false;
@@ -765,8 +808,22 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
 
     queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
 
-    // Filters are already in editorValue (set by metrics dashboard brush selections)
-    const filter = searchObj.data.editorValue.trim();
+    // Filters are already in editorValue (set by metrics dashboard brush selections).
+    // Mirror buildSearch: split on | so only the WHERE-clause portion (after the pipe)
+    // is passed to parseDurationWhereClause, not the query-functions prefix.
+    const editorParts = searchObj.data.editorValue.trim().split("|");
+    let filter = (
+      editorParts.length > 1 ? editorParts[1] : editorParts[0]
+    ).trim();
+    const filterParseResult = parseDurationWhereClause(
+      filter,
+      parser,
+      searchObj.data.stream.selectedStream.value,
+    );
+    if (typeof filterParseResult === "string") {
+      filter = filterParseResult;
+    }
+
     const combinedFilter = filter;
 
     if (!isPagination && !isSort) searchResultRef?.value?.getDashboardData();
@@ -788,19 +845,46 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
     currentSearchTraceId = searchTraceId;
     tracesPartitionMap[searchTraceId] = { partition: 0, chunks: {} };
 
-    fetchQueryDataWithHttpStream(
-      {
-        queryReq: {
-          stream_name: selectedStreamName.value,
-          filter: combinedFilter || "",
-          start_time: queryReq.query.start_time,
-          end_time: queryReq.query.end_time,
+    const isSpansMode = searchObj.meta.searchMode === "spans";
+    const spansQueryReq = (() => {
+      if (!isSpansMode) return null;
+      const sortCol =
+        searchObj.meta.resultGrid.sortBy === "duration"
+          ? "duration"
+          : "start_time";
+      const sortOrd = (
+        searchObj.meta.resultGrid.sortOrder || "desc"
+      ).toUpperCase();
+      const whereClause = combinedFilter ? ` WHERE ${combinedFilter}` : "";
+      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${sortCol} ${sortOrd}`;
+      return {
+        query: {
+          sql: b64EncodeUnicode(spansSql),
           from: queryReq.query.from,
           size: queryReq.query.size,
-          sort_by: searchObj.meta.resultGrid.sortBy || "start_time",
-          sort_order: searchObj.meta.resultGrid.sortOrder || "desc",
+          start_time: queryReq.query.start_time,
+          end_time: queryReq.query.end_time,
         },
-        type: "traces",
+        encoding: "base64",
+      };
+    })();
+
+    fetchQueryDataWithHttpStream(
+      {
+        queryReq: isSpansMode
+          ? spansQueryReq
+          : {
+              stream_name: selectedStreamName.value,
+              filter: combinedFilter || "",
+              start_time: queryReq.query.start_time,
+              end_time: queryReq.query.end_time,
+              from: queryReq.query.from,
+              size: queryReq.query.size,
+              sort_by: searchObj.meta.resultGrid.sortBy || "start_time",
+              sort_order: searchObj.meta.resultGrid.sortOrder || "desc",
+            },
+        type: isSpansMode ? "search" : "traces",
+        ...(isSpansMode ? { pageType: "traces", searchType: "ui" } : {}),
         traceId: searchTraceId,
         org_id: searchObj.organizationIdentifier,
       },
@@ -853,7 +937,10 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
             // the current partition (mirrors useSearchResponseHandler logic)
             const appendResult = partition > 1 || isChunkedHits;
 
-            const formattedHits = formatTracesMetaData(rawHits);
+            const formattedHits =
+              searchObj.meta.searchMode === "traces"
+                ? formatTracesMetaData(rawHits)
+                : rawHits;
             // Replace hits on the first partition of a pagination fetch (clears the
             // previous page) or on the very first data chunk of a fresh search
             if ((isPagination && partition === 1) || !appendResult) {
@@ -908,6 +995,18 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
     searchObj.data.errorDetail = "";
   }
 }
+
+const cancelSearch = () => {
+  // Cancel dashboard panel queries (RenderDashboardCharts via usePanelDataLoader)
+  window.dispatchEvent(new Event("cancelQuery"));
+  if (!currentSearchTraceId) return;
+  cancelStreamQueryBasedOnRequestId({
+    trace_id: currentSearchTraceId,
+    org_id: searchObj.organizationIdentifier,
+  });
+  currentSearchTraceId = null;
+  searchObj.loading = false;
+};
 
 /**
  *
@@ -980,6 +1079,7 @@ async function extractFields() {
         service_name: 1,
         span_status: 1,
         operation_name: 1,
+        span_kind: 1,
         trace_id: 1,
         span_id: 1,
         reference_parent_span_id: 1,
@@ -1246,6 +1346,13 @@ function restoreUrlQueryParams() {
   }
 
   if (
+    queryParams.search_mode === "spans" ||
+    queryParams.search_mode === "traces"
+  ) {
+    searchObj.meta.searchMode = queryParams.search_mode as "traces" | "spans";
+  }
+
+  if (
     queryParams.stream &&
     searchObj.data.stream.selectedStream.value !== queryParams.stream
   ) {
@@ -1277,8 +1384,11 @@ const restoreFiltersFromQuery = (node: any) => {
           (_value: { value: string }) => _value.value,
         );
       }
-      searchObj.data.stream.fieldValues[node.left.column].selectedValues =
-        values;
+      if (
+        searchObj.data.stream.fieldValues?.[node?.left?.column]?.selectedValues
+      )
+        searchObj.data.stream.fieldValues[node.left.column].selectedValues =
+          values;
     }
   }
 
@@ -1310,61 +1420,41 @@ const setHistogramDate = async (date: any) => {
 // Simply replace the query editor content with metrics filters
 // User can manually add their own filters before clicking "Run Query"
 const onMetricsFiltersUpdated = (filters: string[]) => {
-  // Add Error Only filter if toggle is enabled
   const allFilters = [...filters];
-  if (searchObj.meta.showErrorOnly) {
+  // Add error filter only if toggle is on and not already present from Error panel brush
+  if (
+    searchObj.meta.showErrorOnly &&
+    !allFilters.includes("span_status = 'ERROR'")
+  ) {
     allFilters.push("span_status = 'ERROR'");
   }
+  // Apply each filter term independently so replace-or-append works per field
+  searchBarRef.value?.applyFilters(allFilters);
+};
 
-  // Join filters with AND
-  const newFilters = allFilters.join(" AND ");
-
-  searchObj.data.editorValue = newFilters;
-
-  // Update the query editor UI via ref
-  if (searchBarRef.value?.setEditorValue) {
-    searchBarRef.value.setEditorValue(newFilters);
+// Handler for Error Only toggle — only adds/removes span_status condition,
+// leaving all other filters (field sidebar, duration, etc.) intact.
+const onErrorOnlyToggled = (value: boolean) => {
+  if (value) {
+    searchBarRef.value?.applyFilters(["span_status = 'ERROR'"]);
+  } else {
+    searchBarRef.value?.removeFilterByField("span_status");
   }
 };
 
-// Handler for Error Only toggle
-// Triggers re-emission of filters from metrics dashboard
-const onErrorOnlyToggled = (value: boolean) => {
-  // The toggle value is already updated in searchObj.meta.showErrorOnly
-  // Now we need to re-trigger filter emission from metrics dashboard
-  // We'll do this by manually calling the filter update logic
-
-  // Build filters from current brush selections
-  const filters: string[] = [];
-
-  searchObj.meta.metricsRangeFilters.forEach((rangeFilter) => {
-    if (rangeFilter.panelTitle === "Duration") {
-      if (rangeFilter.start !== null && rangeFilter.end !== null) {
-        filters.push(
-          `duration >= ${rangeFilter.start} and duration <= ${rangeFilter.end}`,
-        );
-      } else if (rangeFilter.start !== null) {
-        filters.push(`duration >= ${rangeFilter.start}`);
-      } else if (rangeFilter.end !== null) {
-        filters.push(`duration <= ${rangeFilter.end}`);
-      }
-    } else if (rangeFilter.panelTitle === "Errors") {
-      filters.push("span_status = 'ERROR'");
-    }
-  });
-
-  // Add Error Only filter if toggle is enabled
-  if (value && !filters.includes("span_status = 'ERROR'")) {
-    filters.push("span_status = 'ERROR'");
-  }
-
-  // Update Query Editor
-  const newFilters = filters.join(" AND ");
-  searchObj.data.editorValue = newFilters;
-
-  if (searchBarRef.value?.setEditorValue) {
-    searchBarRef.value.setEditorValue(newFilters);
-  }
+// Handler for Search Mode toggle (Traces / Spans)
+const onSearchModeChange = (mode: "traces" | "spans") => {
+  searchObj.meta.searchMode = mode;
+  searchObj.data.resultGrid.currentPage = 0;
+  searchObj.data.queryResults = {
+    hits: [],
+    total: 0,
+    from: 0,
+    size: searchObj.meta.resultGrid.rowsPerPage,
+    took: 0,
+    errorCount: 0,
+  };
+  getQueryData();
 };
 
 // Handler for Reset Filters button
@@ -1373,11 +1463,139 @@ const onFiltersReset = () => {
   // Brush selections already cleared in SearchBar.vue
   // metricsRangeFilters.clear() was called
   // No additional action needed here
-  console.log("Filters reset - brush selections cleared");
 };
 
 const isStreamSelected = computed(() => {
   return searchObj.data.stream.selectedStream.value.trim().length > 0;
+});
+
+/**
+ * Extracts a plain column name from a DataFusion SQL AST column node.
+ * The parser can represent column names as either a plain string or a nested
+ * object ({ expr: { value: "name" } }), so we handle both shapes.
+ */
+const extractTracesColName = (col: any): string | null => {
+  if (typeof col === "string") return col.replace(/^"|"$/g, "");
+  if (col?.expr?.value != null) return String(col.expr.value);
+  return null;
+};
+
+/**
+ * Wraps the traces WHERE clause (stored in editorValue) into a full SQL
+ * statement so that fnParsedSQL can parse it.
+ *
+ * The traces query editor only stores the WHERE portion of the query,
+ * optionally pipe-separated (e.g. "| status='200' and duration>100").
+ * fnParsedSQL requires a complete SELECT statement, so we synthesise one.
+ *
+ * Returns an empty string when there is no active WHERE clause.
+ */
+const buildTracesWhereSQL = (): string => {
+  const query = searchObj.data.editorValue?.trim();
+  if (!query) return "";
+  const parts = query.split("|");
+  const whereClause = (parts.length > 1 ? parts[1] : parts[0]).trim();
+  if (!whereClause) return "";
+  const streamName = searchObj.data.stream.selectedStream?.value || "stream";
+  return `SELECT * FROM "${streamName}" WHERE ${whereClause}`;
+};
+
+/**
+ * Derives which field values are currently *included* in the active query.
+ * Returns a map of { fieldName: [value, ...] } by walking the SQL WHERE AST
+ * and collecting:
+ *   - equality conditions  (field = 'value')
+ *   - IS NULL conditions   (field IS NULL  → sentinel key "null")
+ *
+ * Used to pre-check the corresponding checkboxes (blue) in the field sidebar.
+ */
+const activeIncludeFilterValues = computed((): Record<string, string[]> => {
+  const result: Record<string, string[]> = {};
+  try {
+    const fullSql = buildTracesWhereSQL();
+    if (!fullSql) return result;
+    const parsed = fnParsedSQL(fullSql);
+    if (!parsed?.where) return result;
+    const walkNode = (node: any) => {
+      if (!node) return;
+      const op = node.operator?.toUpperCase();
+      if (op === "OR" || op === "AND") {
+        walkNode(node.left);
+        walkNode(node.right);
+      } else if (op === "=") {
+        if (node.left?.type === "column_ref") {
+          const colName = extractTracesColName(node.left.column);
+          if (colName && node.right?.value != null) {
+            const val = String(node.right.value);
+            if (!result[colName]) result[colName] = [];
+            if (!result[colName].includes(val)) result[colName].push(val);
+          }
+        }
+      } else if (op === "IS") {
+        // IS NULL — the field values API returns null rows with key "null"
+        if (node.left?.type === "column_ref") {
+          const colName = extractTracesColName(node.left.column);
+          if (colName) {
+            if (!result[colName]) result[colName] = [];
+            if (!result[colName].includes("null")) result[colName].push("null");
+          }
+        }
+      }
+    };
+    walkNode(parsed.where);
+  } catch {
+    // ignore parse errors
+  }
+  return result;
+});
+
+/**
+ * Derives which field values are currently *excluded* from the active query.
+ * Returns a map of { fieldName: [value, ...] } by walking the SQL WHERE AST
+ * and collecting:
+ *   - inequality conditions  (field != 'value' / field <> 'value')
+ *   - IS NOT NULL conditions (field IS NOT NULL → sentinel key "null")
+ *
+ * Used to pre-check the corresponding checkboxes (red) in the field sidebar.
+ */
+const activeExcludeFilterValues = computed((): Record<string, string[]> => {
+  const result: Record<string, string[]> = {};
+  try {
+    const fullSql = buildTracesWhereSQL();
+    if (!fullSql) return result;
+    const parsed = fnParsedSQL(fullSql);
+    if (!parsed?.where) return result;
+    const walkNode = (node: any) => {
+      if (!node) return;
+      const op = node.operator?.toUpperCase();
+      if (op === "OR" || op === "AND") {
+        walkNode(node.left);
+        walkNode(node.right);
+      } else if (op === "!=" || op === "<>") {
+        if (node.left?.type === "column_ref") {
+          const colName = extractTracesColName(node.left.column);
+          if (colName && node.right?.value != null) {
+            const val = String(node.right.value);
+            if (!result[colName]) result[colName] = [];
+            if (!result[colName].includes(val)) result[colName].push(val);
+          }
+        }
+      } else if (op === "IS NOT") {
+        // IS NOT NULL — the field values API returns null rows with key "null"
+        if (node.left?.type === "column_ref") {
+          const colName = extractTracesColName(node.left.column);
+          if (colName) {
+            if (!result[colName]) result[colName] = [];
+            if (!result[colName].includes("null")) result[colName].push("null");
+          }
+        }
+      }
+    };
+    walkNode(parsed.where);
+  } catch {
+    // ignore parse errors
+  }
+  return result;
 });
 
 const searchData = () => {

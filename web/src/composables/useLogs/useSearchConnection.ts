@@ -49,6 +49,10 @@ export const useSearchConnection = () => {
     const { traceId } = generateTraceContext();
     addTraceId(traceId);
 
+    if (type === "search") {
+      searchObj.data.lastSearchTraceId = traceId;
+    }
+
     const payload: {
       queryReq: SearchRequestPayload;
       type: "search" | "histogram" | "pageCount" | "values";

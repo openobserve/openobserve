@@ -54,6 +54,7 @@ import { EnrichmentPage } from "./generalPages/enrichmentPage.js";
 import { ThemePage } from "./generalPages/themePage.js";
 import { LanguagePage } from "./generalPages/languagePage.js";
 import { CorrelationSettingsPage } from "./generalPages/correlationSettingsPage.js";
+import { CrossLinkPage } from "./generalPages/crossLinkPage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
 const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 const APICleanup = require("./apiCleanup.js");
@@ -103,7 +104,7 @@ class PageManager {
     this.alertsPage = new AlertsPage(page);
 
     // ===== API CLEANUP =====
-    this.apiCleanup = new APICleanup();
+    this.apiCleanup = new APICleanup(page);
 
     // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
     this.logsPage = new LogsPage(page);
@@ -136,6 +137,7 @@ class PageManager {
     this.themePage = new ThemePage(page);
     this.languagePage = new LanguagePage(page);
     this.correlationSettingsPage = new CorrelationSettingsPage(page);
+    this.crossLinkPage = new CrossLinkPage(page);
     this.schemaPage = new SchemaPage(page);
     this.schemaLoadPage = new SchemaLoadPage(page);
 

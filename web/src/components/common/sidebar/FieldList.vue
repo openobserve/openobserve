@@ -37,11 +37,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Non-expandable field (ftsKey or no values to show) -->
               <div
                 v-if="props.row.ftsKey || !props.row.showValues"
-                class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
+                class="field-container flex content-center ellipsis q-pr-sm"
                 :title="props.row.name"
               >
-                <div class="field_label ellipsis tw:flex tw:items-center">
-                  <FieldTypeBadge :dataType="props.row.type" />
+                <div
+                  class="field_label ellipsis tw:flex tw:items-center tw:pl-[1.2rem]"
+                >
                   {{ props.row.name }}
                 </div>
                 <div
@@ -78,11 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="props.row.name"
                   >
                     <div class="field_label ellipsis tw:flex tw:items-center">
-                      <span
-                        class="field-type-container"
-                        :title="props.row.type"
-                      >
-                        <FieldTypeBadge :dataType="props.row.type" />
+                      <span class="field-type-container">
                         <q-icon
                           class="field-expand-icon"
                           :name="
@@ -214,16 +211,23 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
-import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
-import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
-import FieldTypeBadge from "@/components/common/FieldTypeBadge.vue";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
+import {
+  formatLargeNumber,
+  getImageURL,
+  b64EncodeUnicode,
+} from "@/utils/zincutils";
+import streamService from "@/services/stream";
+import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
+import EqualIcon from "@/components/icons/EqualIcon.vue";
+import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import useHttpStreaming from "@/composables/useStreamingSearch";
+import { generateTraceContext } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "IndexList",
   components: {
-    FieldTypeBadge,
     FieldValuesPanel,
   },
   props: {
@@ -252,6 +256,14 @@ export default defineComponent({
       default: true,
     },
     hideAddSearchTerm: {
+      type: Boolean,
+      default: false,
+    },
+    query: {
+      type: String,
+      default: "",
+    },
+    showCount: {
       type: Boolean,
       default: false,
     },
@@ -323,6 +335,9 @@ export default defineComponent({
 
     // ─── Filter ──────────────────────────────────────────────────────────
 
+    const { fetchQueryDataWithHttpStream } = useHttpStreaming();
+    const traceIdMapper = ref<{ [key: string]: string[] }>({});
+
     const filterFieldFn = (rows: any, terms: any) => {
       const filtered = [];
       if (terms !== "") {
@@ -338,8 +353,10 @@ export default defineComponent({
 
     // ─── SQL helper ──────────────────────────────────────────────────────
 
-    const buildSql = (streamName: string) =>
-      b64EncodeUnicode(`SELECT * FROM "${streamName}"`) || "";
+    const buildSql = (streamName: string, whereClause?: string) =>
+      b64EncodeUnicode(
+        `SELECT * FROM "${streamName}"${whereClause ? ` WHERE ${whereClause}` : ""}`,
+      ) || "";
 
     // ─── Field expand / collapse ─────────────────────────────────────────
 
@@ -368,7 +385,7 @@ export default defineComponent({
         end_time: props.timeStamp.endTime,
         stream_name: resolvedStream,
         stream_type: props.streamType,
-        sql: buildSql(resolvedStream),
+        sql: buildSql(resolvedStream, props.query || undefined),
         timeout: 30000,
         use_cache: (globalThis as any).use_cache ?? true,
       });
@@ -402,7 +419,7 @@ export default defineComponent({
         end_time: props.timeStamp.endTime,
         stream_name: resolvedStream,
         stream_type: props.streamType,
-        sql: buildSql(resolvedStream),
+        sql: buildSql(resolvedStream, props.query || undefined),
         keyword: term || undefined,
         timeout: 30000,
         use_cache: (globalThis as any).use_cache ?? true,
@@ -425,7 +442,7 @@ export default defineComponent({
         end_time: props.timeStamp.endTime,
         stream_name: resolvedStream,
         stream_type: props.streamType,
-        sql: buildSql(resolvedStream),
+        sql: buildSql(resolvedStream, props.query || undefined),
         keyword: currentKeyword.value[fieldName] || undefined,
         timeout: 30000,
         use_cache: (globalThis as any).use_cache ?? true,
@@ -510,7 +527,6 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .traces-field-table {
-  height: calc(100vh - 212px) !important;
 }
 
 .field-list-pagination {

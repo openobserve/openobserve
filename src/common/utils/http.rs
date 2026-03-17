@@ -152,7 +152,7 @@ pub(crate) fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) 
         && !trace_id_str.chars().all(|c| c == '0')
     {
         // Set as parent context if tracing is enabled
-        if (cfg.common.tracing_enabled || cfg.common.tracing_search_enabled) && !span.is_none() {
+        if cfg.common.should_create_span() && !span.is_none() {
             // Check for x-openobserve-span-id header (parent span ID from RUM SDK)
             let parent_span_id = if let Some(oo_span_id) = headers.get("x-openobserve-span-id")
                 && let Ok(span_id_str) = oo_span_id.to_str()
@@ -180,7 +180,7 @@ pub(crate) fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) 
 
     // Check for traceparent header (W3C standard)
     if let Some(traceparent) = headers.get("traceparent") {
-        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
+        if cfg.common.should_create_span() {
             // OpenTelemetry is initialized -> can use propagator to get traceparent
             let ctx = global::get_text_map_propagator(|propagator| {
                 propagator.extract(&RequestHeaderExtractor::new(headers))
