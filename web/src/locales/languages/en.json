@@ -1774,6 +1774,7 @@
     "overrideConfigAddNew": "+ Add field override",
     "overrideConfigSave": "Save",
     "configPanelSearchPlaceholder": "Search config...",
+    "configPanelNoResultsFound": "No settings found for \"{query}\"",
     "intervalInputPlaceholder": "e.g., 30s, 1m, 5m, 1h",
     "placeholderAll": "ALL",
     "mapsMapTypeTooltip": "Map type to display. Default: \"world\"",

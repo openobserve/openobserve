@@ -5,14 +5,12 @@ const { t } = useI18n();
 
 interface Props {
   modelValue: string;
-  isSearchActive?: boolean;
 }
 
 const props = defineProps<Props>();
 
 const emit = defineEmits<{
   (e: "update:modelValue", value: string): void;
-  (e: "search-toggled", active: boolean): void;
   (e: "search-cleared"): void;
 }>();
 

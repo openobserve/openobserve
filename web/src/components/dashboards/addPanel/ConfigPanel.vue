@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <q-icon name="search_off" size="24px" class="q-mb-xs text-grey-5" />
       <div class="text-grey-6 text-caption">
-        No settings found for "{{ searchQuery }}"
+        {{ t('dashboard.configPanelNoResultsFound', { query: searchQuery }) }}
       </div>
     </div>
 
