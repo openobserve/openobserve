@@ -163,7 +163,7 @@
 import { ref, watch, computed, inject } from "vue";
 import { useI18n } from "vue-i18n";
 import { QueryBuilderLabelFilter } from "@/components/promql/types";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 
 const props = defineProps<{
   labels: QueryBuilderLabelFilter[];
@@ -200,7 +200,6 @@ const operatorOptions = ["=", "!=", "=~", "!~"];
 
 const availableLabelOptions = ref([]);
 const filteredLabelOptions = ref([...availableLabelOptions.value]);
-
 
 const filterLabelOptions = () => {
   const selectedLabels = props.labels.map((l) => l.label);

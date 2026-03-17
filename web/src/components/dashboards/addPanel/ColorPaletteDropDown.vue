@@ -26,7 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onColorModeChange"
         style="width: 100%"
         :popup-content-style="{ height: '300px', width: '200px' }"
-       borderless hide-bottom-space>
+        borderless
+        hide-bottom-space
+      >
         <template v-slot:option="props">
           <!-- label -->
           <!-- sublabel -->
@@ -107,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts">
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { getColorPalette } from "@/utils/dashboard/colorPalette";
 import { computed, inject, onBeforeMount, defineComponent } from "vue";
 import { useStore } from "vuex";
@@ -258,10 +260,12 @@ export default defineComponent({
 :deep(.selectedLabel span) {
   text-transform: none !important;
 }
+
 .space {
   margin-top: 10px;
   margin-bottom: 10px;
 }
+
 .color-input-wrapper {
   height: 25px;
   width: 25px;
@@ -271,6 +275,7 @@ export default defineComponent({
   align-items: center;
   position: relative;
 }
+
 .color-input-wrapper input[type="color"] {
   position: absolute;
   height: 4em;
@@ -283,6 +288,7 @@ export default defineComponent({
   margin: 0;
   padding: 0;
 }
+
 .color-container {
   display: flex;
   height: 8px;

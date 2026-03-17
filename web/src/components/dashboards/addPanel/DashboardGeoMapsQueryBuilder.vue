@@ -385,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, reactive, watch, computed, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
@@ -627,8 +627,9 @@ export default defineComponent({
           : "",
       );
 
-      return label?.length > MAX_FIELD_LABEL_CHARS ? label.substring(0, MAX_FIELD_LABEL_CHARS) + "..." : label
-
+      return label?.length > MAX_FIELD_LABEL_CHARS
+        ? label.substring(0, MAX_FIELD_LABEL_CHARS) + "..."
+        : label;
     };
 
     const latitudeLabel = computed(() => {
@@ -690,9 +691,11 @@ export default defineComponent({
 .axis-field {
   overflow: hidden;
 }
+
 :deep(.axis-field .q-btn--rectangle) {
   border-radius: 0%;
 }
+
 :deep(.axis-field .q-btn:before) {
   border: 0px solid transparent;
 }
