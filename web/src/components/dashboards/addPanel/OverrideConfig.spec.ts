@@ -129,17 +129,20 @@ describe("OverrideConfig", () => {
     it("should render override config section", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.text()).toContain("Override Config");
+      // Title block was removed in config redesign (PR #10917);
+      // the section header is now rendered by the parent ConfigPanel expansion item.
+      expect(wrapper.exists()).toBe(true);
     });
 
     it("should render info tooltip button", () => {
       wrapper = createWrapper();
 
+      // Info tooltip button was removed from this component in config redesign (PR #10917).
       expect(
         wrapper
           .find('[data-test="dashboard-addpanel-config-drilldown-info"]')
           .exists(),
-      ).toBe(true);
+      ).toBe(false);
     });
 
     it("should render add field override button", () => {
