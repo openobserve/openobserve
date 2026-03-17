@@ -357,7 +357,9 @@ pub async fn get_expanded_user_org(
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
-        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
+        .filter(
+            Expr::expr(Func::lower(Expr::col((Entity, Column::Email)))).eq(email.to_lowercase()),
+        )
         .inner_join(users::Entity)
         .select_only()
         .column(users::Column::Email)
@@ -436,7 +438,9 @@ pub async fn list_users_by_org(org_id: &str) -> Result<Vec<OrgUserRecord>, error
 pub async fn list_orgs_by_user(email: &str) -> Result<Vec<UserOrgExpandedRecord>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let records = Entity::find()
-        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
+        .filter(
+            Expr::expr(Func::lower(Expr::col((Entity, Column::Email)))).eq(email.to_lowercase()),
+        )
         .order_by(Column::CreatedAt, Order::Desc)
         .inner_join(super::entity::organizations::Entity)
         .select_only()
