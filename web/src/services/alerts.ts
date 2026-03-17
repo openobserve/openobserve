@@ -37,6 +37,7 @@ const alerts = {
     org_identifier: string,
     folder_id?: string,
     query?: string,
+    alert_type?: string,
   ) => {
     let url = `/api/v2/${org_identifier}/alerts?sort_by=${sort_by}&desc=${desc}&name=${name}`;
     if (folder_id) {
@@ -44,6 +45,9 @@ const alerts = {
     }
     if (query) {
       url += `&alert_name_substring=${query}`;
+    }
+    if (alert_type) {
+      url += `&alert_type=${alert_type}`;
     }
     return http().get(url);
   },

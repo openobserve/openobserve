@@ -1098,12 +1098,14 @@ export default defineComponent({
     // Anomaly detection scaffolding — TEMPORARY until backend returns anomaly
     // data as part of the alert list API. Remove this block when that happens.
     // ---------------------------------------------------------------------------
+    // Normalizes an anomaly-detection item returned by the merged alerts list API
+    // (alert_type === "anomaly_detection") into the standard alert row shape.
     const normalizeAnomalyToAlertRow = (anomaly: any, counter: number): any => ({
       "#": counter <= 9 ? `0${counter}` : `${counter}`,
-      alert_id: anomaly.anomaly_id,
-      anomaly_id: anomaly.anomaly_id,
+      alert_id: anomaly.id,
+      anomaly_id: anomaly.id,
       name: anomaly.name,
-      alert_type: "Anomaly Detection",
+      alert_type: "anomaly_detection",
       stream_name: anomaly.stream_name || "--",
       stream_type: anomaly.stream_type || "--",
       enabled: anomaly.enabled,
@@ -1115,23 +1117,29 @@ export default defineComponent({
       period: "",
       frequency: anomaly.schedule_interval != null ? String(anomaly.schedule_interval) : "--",
       frequency_type: "cron",
-      last_triggered_at: anomaly.last_detection_run
-        ? convertUnixToQuasarFormat(anomaly.last_detection_run)
+      last_triggered_at: anomaly.last_triggered_at
+        ? convertUnixToQuasarFormat(anomaly.last_triggered_at)
         : "",
-      last_satisfied_at: anomaly.last_anomaly_detected_at
-        ? convertUnixToQuasarFormat(anomaly.last_anomaly_detected_at)
+      last_satisfied_at: anomaly.last_satisfied_at
+        ? convertUnixToQuasarFormat(anomaly.last_satisfied_at)
         : "",
       detection_window: anomaly.detection_window_seconds
         ? (anomaly.detection_window_seconds >= 3600 && anomaly.detection_window_seconds % 3600 === 0
             ? `${anomaly.detection_window_seconds / 3600}h`
             : `${Math.round(anomaly.detection_window_seconds / 60)} mins`)
         : "--",
-      last_trained_at: anomaly.training_completed_at
-        ? convertUnixToQuasarFormat(anomaly.training_completed_at)
+      last_trained_at: anomaly.last_trained_at
+        ? convertUnixToQuasarFormat(anomaly.last_trained_at)
         : "",
+      total_evaluations: anomaly.total_evaluations ?? "--",
+      firing_count: anomaly.firing_count ?? "--",
+      status: anomaly.status || "--",
       selected: false,
       type: "anomaly",
-      folder_name: { name: "—", id: "" },
+      folder_name: {
+        name: anomaly.folder_name || "default",
+        id: anomaly.folder_id || "",
+      },
       // Marker: "anomaly" distinguishes these rows from boolean is_real_time alerts
       is_real_time: "anomaly",
     });
@@ -1193,7 +1201,14 @@ export default defineComponent({
           //localAllAlerts is the alerts that we use to store
           // PERFORMANCE OPTIMIZATION: Store raw condition data without conversion
           // Conversion happens lazily only when user expands an alert (in triggerExpand)
+          // Anomaly detection items (alert_type === "anomaly_detection") from the merged
+          // list API have no trigger_condition/condition — handled by normalizeAnomalyToAlertRow.
           localAllAlerts = localAllAlerts.map((data: any) => {
+            if (data.alert_type === "anomaly_detection") {
+              const num = counter++;
+              return normalizeAnomalyToAlertRow(data, num);
+            }
+
             let frequency = "";
             if (data.trigger_condition?.frequency_type == "cron") {
               frequency = data.trigger_condition.cron;
@@ -1232,26 +1247,6 @@ export default defineComponent({
               is_real_time: data.is_real_time,
             };
           });
-          // ---------------------------------------------------------------------------
-          // TEMPORARY: Fetch anomaly detections and merge as synthetic alert rows.
-          // Remove this block once the backend returns anomaly data in the alert list API.
-          // ---------------------------------------------------------------------------
-          if (isAnomalyDetectionEnabled.value) {
-            try {
-              const anomalyRes = await anomalyDetectionService.list(
-                store?.state?.selectedOrganization?.identifier,
-              );
-              const anomalyList: any[] = anomalyRes.data?.list ?? anomalyRes.data ?? [];
-              let anomalyCounter = localAllAlerts.length + 1;
-              const anomalyRows = anomalyList.map((a: any) =>
-                normalizeAnomalyToAlertRow(a, anomalyCounter++),
-              );
-              localAllAlerts = [...localAllAlerts, ...anomalyRows];
-            } catch (anomalyError) {
-              console.warn("Failed to fetch anomaly detections:", anomalyError);
-            }
-          }
-          // ---------------------------------------------------------------------------
 
           //this is the condition where we are setting the alertStateLoadingMap
           localAllAlerts.forEach((alert: any) => {
