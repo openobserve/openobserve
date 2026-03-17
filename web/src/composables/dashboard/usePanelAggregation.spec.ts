@@ -213,13 +213,14 @@ describe("usePanelAggregation", () => {
         expect(panelData.data.queries[0].fields.y[0].functionName).toBe("count");
       });
 
-      it("clears z and breakdown fields", () => {
+      it("clears z field but preserves breakdown fields for pivot table mode", () => {
         panelData.data.queries[0].fields.z = [{ alias: "z1" }];
         panelData.data.queries[0].fields.breakdown = [{ alias: "bd1" }];
         const { resetAggregationFunction } = makeAggregation(panelData);
         resetAggregationFunction();
         expect(panelData.data.queries[0].fields.z).toHaveLength(0);
-        expect(panelData.data.queries[0].fields.breakdown).toHaveLength(0);
+        // breakdown is intentionally preserved for table type (used in pivot table mode)
+        expect(panelData.data.queries[0].fields.breakdown).toHaveLength(1);
       });
     });
 
