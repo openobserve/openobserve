@@ -37,13 +37,9 @@ pub struct Model {
     pub rcf_shingle_size: i32,
     pub alert_enabled: bool,
     pub alert_destination_id: Option<String>,
-    /// Foreign key to the folders table. NULL means the default folder.
-    pub folder_id: Option<i64>,
+    /// Folder slug (e.g. "default"). NULL means the default folder.
+    pub folder_id: Option<String>,
     pub owner: Option<String>,
-    /// Number of times the detection job has run for this config.
-    pub total_evaluations: i64,
-    /// Number of anomalies detected and written to the _anomalies stream.
-    pub firing_count: i64,
     /// 0=waiting, 1=active, 2=training, 3=failed, 4=disabled
     pub status: i32,
     pub retries: i32,

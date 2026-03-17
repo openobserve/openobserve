@@ -56,10 +56,6 @@ pub struct ListAlertsResponseBodyItem {
     pub last_triggered_at: Option<i64>,
     pub last_satisfied_at: Option<i64>,
     pub is_real_time: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub total_evaluations: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub firing_count: Option<i64>,
     /// Timestamp (µs) when the anomaly model was last successfully trained.
     /// Only present for `anomaly_detection` items.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -132,8 +128,6 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             last_triggered_at,
             last_satisfied_at,
             is_real_time: alert.is_real_time,
-            total_evaluations: None,
-            firing_count: None,
             last_trained_at: None,
             status: None,
         })
@@ -149,9 +143,10 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
 
     let folder_id = v
         .get("folder_id")
-        .and_then(|f| f.as_i64())
-        .map(|id| id.to_string())
-        .unwrap_or_else(|| "default".to_string());
+        .and_then(|f| f.as_str())
+        .filter(|s| !s.is_empty())
+        .unwrap_or("default")
+        .to_string();
 
     let status = v.get("status").and_then(|s| s.as_i64()).map(|s| {
         match s {
@@ -170,10 +165,7 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         folder_id,
         folder_name: String::new(),
         name: v.get("name")?.as_str()?.to_string(),
-        owner: v
-            .get("owner")
-            .and_then(|o| o.as_str())
-            .map(String::from),
+        owner: v.get("owner").and_then(|o| o.as_str()).map(String::from),
         description: v
             .get("description")
             .and_then(|d| d.as_str())
@@ -184,15 +176,9 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         trigger_condition: None,
         enabled: v.get("enabled").and_then(|e| e.as_bool()).unwrap_or(false),
         last_triggered_at: v.get("last_detection_run").and_then(|t| t.as_i64()),
-        last_satisfied_at: v
-            .get("last_anomaly_detected_at")
-            .and_then(|t| t.as_i64()),
+        last_satisfied_at: v.get("last_anomaly_detected_at").and_then(|t| t.as_i64()),
         is_real_time: false,
-        total_evaluations: v.get("total_evaluations").and_then(|t| t.as_i64()),
-        firing_count: v.get("firing_count").and_then(|t| t.as_i64()),
-        last_trained_at: v
-            .get("training_completed_at")
-            .and_then(|t| t.as_i64()),
+        last_trained_at: v.get("training_completed_at").and_then(|t| t.as_i64()),
         status,
     })
 }
