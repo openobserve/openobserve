@@ -642,15 +642,15 @@ async fn query_range(
 pub async fn metadata(
     Path(org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestMetadata>,
-    Headers(user_email): Headers<UserEmail>,
+    Headers(_user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
         use crate::common::utils::auth::{AuthExtractor, is_root_user};
 
-        if !is_root_user(&user_email.user_id) {
+        if !is_root_user(&_user_email.user_id) {
             use crate::service::db::org_users::get_cached_user_org;
-            let user = match get_cached_user_org(&org_id, &user_email.user_id) {
+            let user = match get_cached_user_org(&org_id, &_user_email.user_id) {
                 Some(u) => u,
                 None => return MetaHttpResponse::forbidden("Unauthorized Access"),
             };
@@ -673,7 +673,7 @@ pub async fn metadata(
                 ),
             };
             if !crate::handler::http::auth::validator::check_permissions(
-                &user_email.user_id,
+                &_user_email.user_id,
                 AuthExtractor {
                     auth: "".to_string(),
                     method: "GET".to_string(),
@@ -956,21 +956,21 @@ pub async fn labels_post(
 async fn labels(
     org_id: &str,
     req: config::meta::promql::RequestLabels,
-    user_email: &str,
+    _user_email: &str,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
         use crate::common::utils::auth::{AuthExtractor, is_root_user};
 
-        if !is_root_user(user_email) {
+        if !is_root_user(_user_email) {
             use crate::service::db::org_users::get_cached_user_org;
-            let user = match get_cached_user_org(org_id, user_email) {
+            let user = match get_cached_user_org(org_id, _user_email) {
                 Some(u) => u,
                 None => return MetaHttpResponse::forbidden("Unauthorized Access"),
             };
             let stream_type_str = StreamType::Metrics.as_str();
             if !crate::handler::http::auth::validator::check_permissions(
-                user_email,
+                _user_email,
                 AuthExtractor {
                     auth: "".to_string(),
                     method: "GET".to_string(),
@@ -1071,21 +1071,21 @@ async fn labels(
 pub async fn label_values(
     Path((org_id, label_name)): Path<(String, String)>,
     Query(req): Query<config::meta::promql::RequestLabelValues>,
-    Headers(user_email): Headers<UserEmail>,
+    Headers(_user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
         use crate::common::utils::auth::{AuthExtractor, is_root_user};
 
-        if !is_root_user(&user_email.user_id) {
+        if !is_root_user(&_user_email.user_id) {
             use crate::service::db::org_users::get_cached_user_org;
-            let user = match get_cached_user_org(&org_id, &user_email.user_id) {
+            let user = match get_cached_user_org(&org_id, &_user_email.user_id) {
                 Some(u) => u,
                 None => return MetaHttpResponse::forbidden("Unauthorized Access"),
             };
             let stream_type_str = StreamType::Metrics.as_str();
             if !crate::handler::http::auth::validator::check_permissions(
-                &user_email.user_id,
+                &_user_email.user_id,
                 AuthExtractor {
                     auth: "".to_string(),
                     method: "GET".to_string(),
