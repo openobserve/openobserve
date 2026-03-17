@@ -11,12 +11,7 @@ const props = defineProps<Props>();
 
 const emit = defineEmits<{
   (e: "update:modelValue", value: string): void;
-  (e: "search-cleared"): void;
 }>();
-
-const clearSearch = () => {
-  emit("search-cleared");
-};
 </script>
 
 <template>
@@ -28,8 +23,6 @@ const clearSearch = () => {
     :placeholder="t('dashboard.configPanelSearchPlaceholder')"
     class="col config-panel-search"
     clearable
-    autofocus
-    @clear="clearSearch"
   >
     <template #prepend>
       <q-icon name="search" size="xs" class="q-ml-xs text-grey-6" />
