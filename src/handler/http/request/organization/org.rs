@@ -944,6 +944,11 @@ async fn get_super_cluster_nodes(regions: &[String]) -> Result<NodeListResponse,
         }
     };
 
+    log::info!(
+        "Super cluster clusters: {:?}",
+        clusters.iter().map(|c| c.get_name()).collect::<Vec<_>>()
+    );
+
     // For each node in the super cluster
     let trace_id = config::ider::generate_trace_id();
     for cluster in clusters {
@@ -1009,6 +1014,11 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
             return Ok(response); // Return empty response instead of failing
         }
     };
+
+    log::info!(
+        "Super cluster clusters: {:?}",
+        clusters.iter().map(|c| c.get_name()).collect::<Vec<_>>()
+    );
 
     // For each node in the super cluster
     let trace_id = config::ider::generate_trace_id();

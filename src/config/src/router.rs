@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 29] = [
+const QUERIER_ROUTES: [(&str, usize); 30] = [
     ("config", 0),               // /config
     ("summary", 2),              // /api/{org_id}/summary
     ("organizations", 1),        // /api/organizations
@@ -47,6 +47,7 @@ const QUERIER_ROUTES: [(&str, usize); 29] = [
                                                * {label_name}/
                                                * values */
     ("service_streams", 2), // /api/{org_id}/service_streams/...
+    ("node/list", 2),       // /api/_meta/node/list
 ];
 const QUERIER_ROUTES_BY_BODY: [&str; 9] = [
     "/_search",
