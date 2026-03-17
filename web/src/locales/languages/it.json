@@ -2103,7 +2103,13 @@
       "active": "Attivo",
       "failed": "Fallito",
       "disabled": "Disabili"
-    }
+    },
+    "anomalyStepCaptions": {
+      "alertSetup": "Assegna un nome al rilevatore e seleziona uno stream da monitorare",
+      "detectionConfig": "Configurazione dei parametri di interrogazione e rilevamento",
+      "alerting": "Imposta notifiche quando vengono rilevate anomalie"
+    },
+    "updateAnomalyDetection": "Aggiorna il rilevamento delle anomalie:"
   },
   "alert_templates": {
     "header": "Modelli",
