@@ -403,6 +403,8 @@ test.describe("Logs Regression Bug Fixes", () => {
     );
     await pm.logsPage.clickRefreshButton();
     await searchResponsePromise1;
+    // Wait for results table to fully render before field interaction
+    await page.waitForTimeout(3000);
 
     // Step 4: Expand the service_name field and capture values from stream1
     testLogger.info(`Expanding ${testFieldName} field in ${stream1Name}`);
@@ -416,7 +418,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     );
     await pm.logsPage.clickFieldExpandButton(testFieldName);
     await valuesResponsePromise1;
-    await pm.logsPage.waitForFieldValues(testFieldName);
+    await pm.logsPage.waitForFieldValues(testFieldName, 15000);
 
     // Get field values from stream1
     const stream1FieldValues = await pm.logsPage.getFieldValuesText(testFieldName);
@@ -442,6 +444,8 @@ test.describe("Logs Regression Bug Fixes", () => {
     );
     await pm.logsPage.clickRefreshButton();
     await searchResponsePromise2;
+    // Wait for results table to fully render before field interaction
+    await page.waitForTimeout(3000);
 
     // Step 6: Expand the same service_name field in stream2
     testLogger.info(`Expanding ${testFieldName} field in ${stream2Name}`);
@@ -455,7 +459,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     );
     await pm.logsPage.clickFieldExpandButton(testFieldName);
     await valuesResponsePromise2;
-    await pm.logsPage.waitForFieldValues(testFieldName);
+    await pm.logsPage.waitForFieldValues(testFieldName, 15000);
 
     // Get field values from stream2
     const stream2FieldValues = await pm.logsPage.getFieldValuesText(testFieldName);

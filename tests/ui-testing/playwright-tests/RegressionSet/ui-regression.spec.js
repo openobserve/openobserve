@@ -9,7 +9,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { getOrgIdentifier, isCloudEnvironment } = require('../utils/cloud-auth.js');
 
 test.describe("UI Regression Bugs", () => {
   test.describe.configure({ mode: 'parallel' });
@@ -62,6 +62,9 @@ test.describe("UI Regression Bugs", () => {
    * When clicking OpenAPI button in Help menu, should redirect to correct OpenAPI documentation page
    */
   test("should redirect to OpenAPI documentation from Help menu @bug-9308 @P1 @regressionBugs @navigation", async ({ page }) => {
+    // OpenAPI menu item is intentionally hidden on cloud deployments
+    // (Header.vue: v-if="config.isCloud !== 'true'")
+    test.skip(isCloudEnvironment(), 'OpenAPI menu item is hidden on cloud — feature not available');
     testLogger.info('Test: OpenAPI button redirect (Bug #9308)');
 
     // Click Help menu - using POM method

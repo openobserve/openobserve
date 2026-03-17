@@ -574,14 +574,16 @@ export class LogsPage {
         return false;
     }
 
-    async selectStream(stream, maxRetries = 3, apiWaitMs = 30000) {
-        testLogger.info(`selectStream: Selecting stream: ${stream}`);
+    async selectStream(stream, maxRetries = 3, apiWaitMs = null) {
+        // Cloud environments need longer for streams to be indexed after ingestion
+        const effectiveApiWaitMs = apiWaitMs ?? (isCloudEnvironment() ? 90000 : 30000);
+        testLogger.info(`selectStream: Selecting stream: ${stream} (apiWait: ${effectiveApiWaitMs}ms)`);
 
         // First, wait for the stream to be available via API (skip if apiWaitMs is 0)
-        if (apiWaitMs > 0) {
-            const streamAvailable = await this.waitForStreamAvailable(stream, apiWaitMs, 3000);
+        if (effectiveApiWaitMs > 0) {
+            const streamAvailable = await this.waitForStreamAvailable(stream, effectiveApiWaitMs, 3000);
             if (!streamAvailable) {
-                testLogger.warn(`selectStream: Stream ${stream} not found via API after ${apiWaitMs}ms, will still try UI selection`);
+                testLogger.warn(`selectStream: Stream ${stream} not found via API after ${effectiveApiWaitMs}ms, will still try UI selection`);
             } else {
                 testLogger.info(`selectStream: Stream ${stream} confirmed available via API`);
             }
@@ -613,6 +615,7 @@ export class LogsPage {
                 if (searchVisible) {
                     testLogger.info(`selectStream: Using search box to filter for: ${stream}`);
                     await searchInput.click();
+                    await searchInput.fill(''); // Clear any previous filter first
                     await searchInput.fill(stream);
                     await this.page.waitForTimeout(1500);
                 }
