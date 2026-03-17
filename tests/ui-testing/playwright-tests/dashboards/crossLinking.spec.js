@@ -429,7 +429,7 @@ test.describe("Cross-Linking testcases", () => {
         await page.waitForTimeout(1000);
 
         // Run query to get results
-        await pm.logsPage.clickRunQueryButton();
+        await pm.logsPage.runQueryAndWaitForResults();
         await page.waitForTimeout(2000);
 
         // Step 3: Expand a log row to reveal the inline JSON detail (JsonPreview)
@@ -879,7 +879,7 @@ test.describe("Cross-Linking testcases", () => {
         await pm.logsPage.navigateToLogs();
         await pm.logsPage.selectStream(STREAM_NAME);
         await page.waitForTimeout(2000);
-        await pm.logsPage.clickRunQueryButton();
+        await pm.logsPage.runQueryAndWaitForResults();
         await page.waitForTimeout(2000);
 
         // Open log detail
@@ -1242,7 +1242,7 @@ test.describe("Cross-Linking testcases", () => {
         await page.waitForTimeout(1000);
 
         // Run query to get results and ensure result_schema picks up the org cross-links
-        await pm.logsPage.clickRunQueryButton();
+        await pm.logsPage.runQueryAndWaitForResults();
         await page.waitForTimeout(2000);
 
         // Step 3: Expand a log row to reveal the inline JSON detail (JsonPreview)

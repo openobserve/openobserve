@@ -1117,6 +1117,42 @@ export class LogsPage {
         await this.page.locator("[data-test='logs-search-bar-refresh-btn']").click({ force: true });
     }
 
+    async runQueryAndWaitForResults(timeout = 60000) {
+        const btn = this.page.locator(this.queryButton);
+
+        // Click Run query
+        await btn.click({ force: true });
+
+        // Wait for the button to enter loading/disabled state (query started)
+        await this.page.waitForFunction(
+            (selector) => {
+                const btn = document.querySelector(selector);
+                if (!btn) return false;
+                return btn.hasAttribute('disabled') || btn.classList.contains('q-btn--loading') || btn.textContent?.trim()?.includes('Cancel');
+            },
+            this.queryButton,
+            { timeout: 5000 }
+        ).catch(() => {
+            // Query may have completed instantly — that's OK
+        });
+
+        // Wait for the button to exit loading/disabled state (query completed)
+        await this.page.waitForFunction(
+            (selector) => {
+                const btn = document.querySelector(selector);
+                if (!btn) return false;
+                const isDisabled = btn.hasAttribute('disabled') || btn.getAttribute('aria-disabled') === 'true';
+                const isLoading = btn.classList.contains('q-btn--loading');
+                const text = btn.textContent?.trim() || '';
+                return !isDisabled && !isLoading && !text.includes('Cancel');
+            },
+            this.queryButton,
+            { timeout }
+        );
+
+        testLogger.info('Query execution complete - Run query button ready');
+    }
+
     async verifySearchPartitionResponse() {
         const orgName = process.env.ORGNAME || 'default';
         const searchPartitionPromise = this.page.waitForResponse(response =>
@@ -3621,11 +3657,13 @@ export class LogsPage {
     }
 
     async ensureQuickModeState(desiredState) {
-        const quickModeToggle = this.page.locator(this.quickModeToggle);
-        const isEnabled = await quickModeToggle.getAttribute('aria-pressed');
-        
-        if ((desiredState && isEnabled !== 'true') || (!desiredState && isEnabled === 'true')) {
-            await quickModeToggle.click();
+        const toggleInner = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
+        const isOn = toggleInner
+            ? await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy'))
+            : false;
+
+        if (desiredState !== isOn) {
+            await this.page.locator(this.quickModeToggle).click();
             await this.page.waitForTimeout(500);
         }
     }
