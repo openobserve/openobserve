@@ -37,7 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dense
         class="q-mb-xs o2-custom-select-dashboard"
         :readonly="dashboardPanelDataPageKey === 'logs'"
-       hide-bottom-space></q-select>
+        hide-bottom-space
+      ></q-select>
       <q-select
         v-model="
           dashboardPanelData.data.queries[
@@ -69,7 +70,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : ''
         "
         :readonly="dashboardPanelDataPageKey === 'logs'"
-       hide-bottom-space>
+        hide-bottom-space
+      >
         <template
           v-if="
             dashboardPanelData.data.queries[
@@ -342,7 +344,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery &&
                         props.pageIndex >= customQueryFieldsLength)
-                    ) && dashboardPanelData.data.type == 'geomap'
+                    ) &&
+                    dashboardPanelData.data.type == 'geomap'
                   "
                 >
                   <q-btn
@@ -411,7 +414,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery &&
                         props.pageIndex >= customQueryFieldsLength)
-                    ) && dashboardPanelData.data.type == 'maps'
+                    ) &&
+                    dashboardPanelData.data.type == 'maps'
                   "
                 >
                   <q-btn
@@ -459,7 +463,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery &&
                         props.pageIndex >= customQueryFieldsLength)
-                    ) && dashboardPanelData.data.type == 'sankey'
+                    ) &&
+                    dashboardPanelData.data.type == 'sankey'
                   "
                 >
                   <q-btn
@@ -533,7 +538,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="getStreamFields.isLoading.value"
             :placeholder="t('search.searchField')"
             class="tw:mx-[0.625rem]"
-           hide-bottom-space>
+            hide-bottom-space
+          >
             <template #prepend>
               <q-icon name="search" />
             </template>
@@ -557,7 +563,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { useLoading } from "@/composables/useLoading";
 import useStreams from "@/composables/useStreams";
 import { inject } from "vue";
@@ -626,7 +632,7 @@ export default defineComponent({
       addValue,
       cleanupDraggingFields,
       updateGroupedFields,
-      fetchPromQLLabels
+      fetchPromQLLabels,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
     const { getStreams, getStream } = useStreams();
     const { showErrorNotification } = useNotifications();
@@ -653,7 +659,9 @@ export default defineComponent({
     });
 
     // computed property to set default value as false
-    const hideAllFieldsSelection = computed(() => props.hideAllFieldsSelection ?? false);
+    const hideAllFieldsSelection = computed(
+      () => props.hideAllFieldsSelection ?? false,
+    );
 
     // get stream list
     const streamDataLoading = useLoading(async (stream_type: any) => {
@@ -671,12 +679,11 @@ export default defineComponent({
 
     // watch the stream type and load the stream list
     watch(
-      () =>
-        [
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream_type,
-        ],
+      () => [
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type,
+      ],
       async () => {
         loadStreamsListBasedOnType();
       },
@@ -745,8 +752,10 @@ export default defineComponent({
         const previousForThisQuery = queryStreamTracking.value[currentIndex];
 
         // Check if stream or streamType changed FOR THIS SPECIFIC QUERY
-        const streamChangedForThisQuery = previousForThisQuery.stream !== currentStream;
-        const streamTypeChangedForThisQuery = previousForThisQuery.streamType !== currentStreamType;
+        const streamChangedForThisQuery =
+          previousForThisQuery.stream !== currentStream;
+        const streamTypeChangedForThisQuery =
+          previousForThisQuery.streamType !== currentStreamType;
 
         // Update tracking for this query
         queryStreamTracking.value[currentIndex] = {
@@ -781,7 +790,6 @@ export default defineComponent({
             dashboardPanelData.meta.stream.streamResultsType
         ) {
           try {
-
             // if promql mode
             // NOTE: For the metrics page, we added one watch that resets the query on stream change.
             // Because of that, the default query overrides the original/saved query on the edit panel.
@@ -1159,6 +1167,7 @@ export default defineComponent({
   min-width: 28px !important;
   padding-right: 8px !important;
 }
+
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
@@ -1196,6 +1205,7 @@ export default defineComponent({
   .index-table {
     width: 100%;
     height: 100%;
+
     // border: 1px solid rgba(0, 0, 0, 0.02);
     .q-table {
       display: block;
@@ -1355,7 +1365,7 @@ export default defineComponent({
   }
 
   .field-group-header {
-    background-color: rgb(229,231,235);
+    background-color: rgb(229, 231, 235);
   }
 }
 

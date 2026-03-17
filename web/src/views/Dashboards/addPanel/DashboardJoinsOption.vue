@@ -3,10 +3,7 @@
     <div class="joins-header">
       <div class="layout-name">{{ t("panel.joins") }}</div>
       <span class="layout-separator">:</span>
-      <div
-        class="joins-list"
-        data-test="dashboard-filter-layout"
-      >
+      <div class="joins-list" data-test="dashboard-filter-layout">
         <div
           v-for="(joinObj, index) in currentJoins"
           :key="index"
@@ -64,7 +61,7 @@
                 @click="handleRemoveJoin(index)"
                 :aria-label="t('panel.removeJoin')"
               >
-                <q-tooltip>{{ t('panel.removeJoin') }}</q-tooltip>
+                <q-tooltip>{{ t("panel.removeJoin") }}</q-tooltip>
               </q-btn>
             </div>
           </q-btn-group>
@@ -79,7 +76,7 @@
           @click="handleAddJoin"
           :aria-label="t('panel.addJoin')"
         >
-          <q-tooltip>{{ t('panel.addJoin') }}</q-tooltip>
+          <q-tooltip>{{ t("panel.addJoin") }}</q-tooltip>
         </q-btn>
       </div>
     </div>
@@ -91,7 +88,7 @@ import { defineComponent, inject, onMounted, computed, watchEffect } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { watchDebounced } from "@vueuse/core";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import AddJoinPopUp from "./AddJoinPopUp.vue";
 import LeftJoinTypeSvg from "@/components/icons/LeftJoinTypeSvg.vue";
 import InnerJoinTypeSvg from "@/components/icons/InnerJoinTypeSvg.vue";
@@ -179,8 +176,7 @@ export default defineComponent({
       if (!currentQuery) return false;
 
       return !(
-        currentQuery.customQuery &&
-        dashboardPanelData.data.queryType === "sql"
+        currentQuery.customQuery && dashboardPanelData.data.queryType === "sql"
       );
     });
 
@@ -213,7 +209,11 @@ export default defineComponent({
         const queries = dashboardPanelData?.data?.queries;
         const currentIndex = dashboardPanelData?.layout?.currentQueryIndex ?? 0;
 
-        if (!Array.isArray(queries) || currentIndex < 0 || currentIndex >= queries.length) {
+        if (
+          !Array.isArray(queries) ||
+          currentIndex < 0 ||
+          currentIndex >= queries.length
+        ) {
           return undefined;
         }
 
@@ -348,7 +348,7 @@ export default defineComponent({
       () => {
         updateStreamAliases();
       },
-      { debounce: 300, deep: true }
+      { debounce: 300, deep: true },
     );
 
     return {

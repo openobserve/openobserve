@@ -473,8 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'
         "
       >
-        <div class="q-mb-sm q-mt-md" style="font-weight: 600">
-        </div>
+        <div class="q-mb-sm q-mt-md" style="font-weight: 600"></div>
         <q-btn
           @click="openColumnOrderPopup"
           style="cursor: pointer; padding: 0px 5px"
@@ -505,7 +504,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, computed, ref, inject, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ColumnOrderPopUp from "./ColumnOrderPopUp.vue";
 
 export default defineComponent({

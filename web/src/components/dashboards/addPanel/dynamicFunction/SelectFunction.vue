@@ -180,7 +180,7 @@
 <script lang="ts">
 import { ref, watch, toRef, computed, inject } from "vue";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import HistogramIntervalDropDown from "../HistogramIntervalDropDown.vue";
 import { addMissingArgs } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";

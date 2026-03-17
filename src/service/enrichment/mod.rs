@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -55,7 +55,7 @@ impl Table for StreamTable {
         select: Option<&[String]>,
         _wildcard: Option<&Value>,
         _index: Option<vector_enrichment::IndexHandle>,
-    ) -> Result<ObjectMap, String> {
+    ) -> Result<ObjectMap, vector_enrichment::Error> {
         let resp = get_data(self, conditions, select, case);
         let record = if resp.is_empty() {
             ObjectMap::new()
@@ -73,7 +73,7 @@ impl Table for StreamTable {
         select: Option<&[String]>,
         _wildcard: Option<&Value>,
         _index: Option<vector_enrichment::IndexHandle>,
-    ) -> Result<Vec<ObjectMap>, String> {
+    ) -> Result<Vec<ObjectMap>, vector_enrichment::Error> {
         let resp = get_data(self, conditions, select, case);
         Ok(resp)
     }
@@ -82,7 +82,7 @@ impl Table for StreamTable {
         &mut self,
         _case: vector_enrichment::Case,
         _fields: &[&str],
-    ) -> Result<vector_enrichment::IndexHandle, String> {
+    ) -> Result<vector_enrichment::IndexHandle, vector_enrichment::Error> {
         Ok(IndexHandle(1))
     }
 

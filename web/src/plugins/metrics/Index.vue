@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AutoRefreshInterval
             v-if="
               !['html', 'markdown', 'custom_chart'].includes(
-                dashboardPanelData.data.type
+                dashboardPanelData.data.type,
               )
             "
             v-model="refreshInterval"
@@ -65,7 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="dashboard-icons tw:mx-2"
           >
             <q-btn
-              v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
+              v-if="
+                config.isEnterprise == 'true' && searchRequestTraceIds.length
+              "
               class="tw:text-xs tw:font-bold no-border"
               data-test="metrics-cancel"
               padding="xs lg"
@@ -131,7 +133,7 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import useDashboardPanelData from "../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../composables/dashboard/useDashboardPanel";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import MetricLegends from "./MetricLegends.vue";
@@ -244,7 +246,7 @@ export default defineComponent({
       async () => {
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-      }
+      },
     );
 
     watch(selectedDate, () => {
@@ -256,7 +258,7 @@ export default defineComponent({
       () => dashboardPanelData.layout.isConfigPanelOpen,
       () => {
         window.dispatchEvent(new Event("resize"));
-      }
+      },
     );
 
     // NOTE: Field change watcher for auto SQL generation has been moved to PanelEditor.vue
@@ -267,7 +269,7 @@ export default defineComponent({
       () => dashboardPanelData.layout.showQueryBar,
       () => {
         window.dispatchEvent(new Event("resize"));
-      }
+      },
     );
 
     const runQuery = () => {
@@ -306,7 +308,7 @@ export default defineComponent({
           isPanelConfigChanged.value = true;
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     // Auto-apply config changes that don't require API calls (similar to dashboard)
@@ -314,7 +316,7 @@ export default defineComponent({
       if (!isEqual(chartData.value, newVal)) {
         const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
           chartData.value,
-          newVal
+          newVal,
         );
 
         if (!configNeedsApiCall) {
@@ -349,7 +351,7 @@ export default defineComponent({
 
       if (errors.length) {
         showErrorNotification(
-          "There are some errors, please fix them and try again"
+          "There are some errors, please fix them and try again",
         );
       }
 
@@ -402,12 +404,12 @@ export default defineComponent({
     // provide variablesAndPanelsDataLoadingState to share data between components
     provide(
       "variablesAndPanelsDataLoadingState",
-      variablesAndPanelsDataLoadingState
+      variablesAndPanelsDataLoadingState,
     );
 
     const searchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
-        variablesAndPanelsDataLoadingState.searchRequestTraceIds
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds,
       ).filter((item: any) => item.length > 0);
 
       return searchIds.flat() as string[];
@@ -423,7 +425,7 @@ export default defineComponent({
 
     watch(variablesAndPanelsDataLoadingState, () => {
       const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState.panels
+        variablesAndPanelsDataLoadingState.panels,
       );
       disable.value = panelsValues.some((item: any) => item === true);
     });
@@ -437,7 +439,7 @@ export default defineComponent({
         // set errors into errorData
         errorData.errors = errors;
         showErrorNotification(
-          "There are some errors, please fix them and try again"
+          "There are some errors, please fix them and try again",
         );
         return;
       } else {

@@ -79,7 +79,7 @@ const mockRemoveXYFilters = vi.fn();
 const mockUpdateXYFieldsForCustomQueryMode = vi.fn();
 
 // Mock useDashboardPanel composable
-vi.mock("../../../composables/useDashboardPanel", () => ({
+vi.mock("../../../composables/dashboard/useDashboardPanel", () => ({
   default: () => ({
     dashboardPanelData: mockDashboardPanelData,
     removeXYFilters: mockRemoveXYFilters,
@@ -179,10 +179,18 @@ describe("QueryTypeSelector", () => {
 
     it("should render all buttons", () => {
       wrapper = createWrapper();
-      const builderButton = wrapper.find('[data-test="dashboard-builder-query-type"]');
-      const promqlButton = wrapper.find('[data-test="dashboard-promql-query-type"]');
-      const sqlButton = wrapper.find('[data-test="dashboard-custom-query-type"]');
-      const customButton = wrapper.find('[data-test="dashboard-custom-query-type"]');
+      const builderButton = wrapper.find(
+        '[data-test="dashboard-builder-query-type"]',
+      );
+      const promqlButton = wrapper.find(
+        '[data-test="dashboard-promql-query-type"]',
+      );
+      const sqlButton = wrapper.find(
+        '[data-test="dashboard-custom-query-type"]',
+      );
+      const customButton = wrapper.find(
+        '[data-test="dashboard-custom-query-type"]',
+      );
 
       expect(builderButton.exists()).toBeTruthy();
       expect(promqlButton.exists()).toBeTruthy();
@@ -196,7 +204,9 @@ describe("QueryTypeSelector", () => {
         '[data-test="dashboard-builder-query-type"]',
       );
       const sqlButton = wrapper.find('[data-test="dashboard-sql-query-type"]');
-      const customButton = wrapper.find('[data-test="dashboard-custom-query-type"]');
+      const customButton = wrapper.find(
+        '[data-test="dashboard-custom-query-type"]',
+      );
 
       expect(builderButton.text()).toBe("panel.builder");
       expect(sqlButton.text()).toBe("panel.SQL");
@@ -207,7 +217,9 @@ describe("QueryTypeSelector", () => {
   describe("Button State Management", () => {
     it("should select builder button initially", () => {
       wrapper = createWrapper();
-      const builderButton = wrapper.find('[data-test="dashboard-builder-query-type"]');
+      const builderButton = wrapper.find(
+        '[data-test="dashboard-builder-query-type"]',
+      );
       expect(builderButton.classes()).toContain("selected");
     });
 
@@ -261,28 +273,36 @@ describe("QueryTypeSelector", () => {
     it("should show builder button for non-custom chart types", () => {
       mockDashboardPanelData.data.type = "line";
       wrapper = createWrapper();
-      const builderButton = wrapper.find('[data-test="dashboard-builder-query-type"]');
+      const builderButton = wrapper.find(
+        '[data-test="dashboard-builder-query-type"]',
+      );
       expect(builderButton.exists()).toBeTruthy();
     });
 
     it("should hide builder button for custom_chart type", () => {
       mockDashboardPanelData.data.type = "custom_chart";
       wrapper = createWrapper();
-      const builderButton = wrapper.find('[data-test="dashboard-builder-query-type"]');
+      const builderButton = wrapper.find(
+        '[data-test="dashboard-builder-query-type"]',
+      );
       expect(builderButton.exists()).toBeFalsy();
     });
 
     it("should show promql button for metrics stream type", () => {
       mockDashboardPanelData.data.queries[0].fields.stream_type = "metrics";
       wrapper = createWrapper();
-      const promqlButton = wrapper.find('[data-test="dashboard-promql-query-type"]');
+      const promqlButton = wrapper.find(
+        '[data-test="dashboard-promql-query-type"]',
+      );
       expect(promqlButton.isVisible()).toBeTruthy();
     });
 
     it("should hide promql button for non-metrics stream type", () => {
       mockDashboardPanelData.data.queries[0].fields.stream_type = "logs";
       wrapper = createWrapper();
-      const promqlButton = wrapper.find('[data-test="dashboard-promql-query-type"]');
+      const promqlButton = wrapper.find(
+        '[data-test="dashboard-promql-query-type"]',
+      );
       expect(promqlButton.isVisible()).toBeFalsy();
     });
 
@@ -294,7 +314,9 @@ describe("QueryTypeSelector", () => {
 
     it("should always show Custom button", () => {
       wrapper = createWrapper();
-      const customButton = wrapper.find('[data-test="dashboard-custom-query-type"]');
+      const customButton = wrapper.find(
+        '[data-test="dashboard-custom-query-type"]',
+      );
       expect(customButton.exists()).toBeTruthy();
     });
   });
@@ -302,7 +324,9 @@ describe("QueryTypeSelector", () => {
   describe("Button Interactions", () => {
     it("should handle builder button click", async () => {
       wrapper = createWrapper();
-      const builderButton = wrapper.find('[data-test="dashboard-builder-query-type"]');
+      const builderButton = wrapper.find(
+        '[data-test="dashboard-builder-query-type"]',
+      );
       await builderButton.trigger("click");
 
       expect(wrapper.vm.selectedButtonType).toBe("builder");
@@ -310,7 +334,9 @@ describe("QueryTypeSelector", () => {
 
     it("should handle custom button click from builder", async () => {
       wrapper = createWrapper();
-      const customButton = wrapper.find('[data-test="dashboard-custom-query-type"]');
+      const customButton = wrapper.find(
+        '[data-test="dashboard-custom-query-type"]',
+      );
       await customButton.trigger("click");
 
       expect(wrapper.vm.selectedButtonType).toBe("custom");
@@ -321,7 +347,9 @@ describe("QueryTypeSelector", () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
-      const promqlButton = wrapper.find('[data-test="dashboard-promql-query-type"]');
+      const promqlButton = wrapper.find(
+        '[data-test="dashboard-promql-query-type"]',
+      );
       await promqlButton.trigger("click");
 
       expect(wrapper.vm.selectedButtonQueryType).toBe("promql");
@@ -350,7 +378,9 @@ describe("QueryTypeSelector", () => {
 
     it("should not change selection when clicking same button", async () => {
       wrapper = createWrapper();
-      const builderButton = wrapper.find('[data-test="dashboard-builder-query-type"]');
+      const builderButton = wrapper.find(
+        '[data-test="dashboard-builder-query-type"]',
+      );
       const initialType = wrapper.vm.selectedButtonType;
 
       await builderButton.trigger("click");
@@ -377,7 +407,9 @@ describe("QueryTypeSelector", () => {
       mockDashboardPanelData.data.queries[0].query = "";
       wrapper = createWrapper();
 
-      const customButton = wrapper.find('[data-test="dashboard-custom-query-type"]');
+      const customButton = wrapper.find(
+        '[data-test="dashboard-custom-query-type"]',
+      );
       await customButton.trigger("click");
 
       expect(wrapper.vm.confirmQueryModeChangeDialog).toBeFalsy();
@@ -620,19 +652,25 @@ describe("QueryTypeSelector", () => {
   describe("CSS Classes", () => {
     it("should apply selected class to active button", () => {
       wrapper = createWrapper();
-      const builderButton = wrapper.find('[data-test="dashboard-builder-query-type"]');
+      const builderButton = wrapper.find(
+        '[data-test="dashboard-builder-query-type"]',
+      );
       expect(builderButton.classes()).toContain("selected");
     });
 
     it("should not apply selected class to inactive buttons", () => {
       wrapper = createWrapper();
-      const customButton = wrapper.find('[data-test="dashboard-custom-query-type"]');
+      const customButton = wrapper.find(
+        '[data-test="dashboard-custom-query-type"]',
+      );
       expect(customButton.classes()).not.toContain("selected");
     });
 
     it("should have proper button classes", () => {
       wrapper = createWrapper();
-      const builderButton = wrapper.find('[data-test="dashboard-builder-query-type"]');
+      const builderButton = wrapper.find(
+        '[data-test="dashboard-builder-query-type"]',
+      );
       expect(builderButton.classes()).toContain("button");
       expect(builderButton.classes()).toContain("button-left");
     });

@@ -16,31 +16,31 @@ vi.mock("../../../composables/useSelectAutocomplete", () => ({
 }));
 
 // Mock useDashboardPanel composable
-vi.mock("../../../composables/useDashboardPanel", () => ({
+vi.mock("../../../composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(() => ({
     dashboardPanelData: {
       data: {
-        queries: [{ joins: [] }]
+        queries: [{ joins: [] }],
       },
       layout: {
-        currentQueryIndex: 0
+        currentQueryIndex: 0,
       },
       meta: {
         stream: {
           selectedStreamFields: [],
           customQueryFields: [],
           userDefinedSchema: [],
-          useUserDefinedSchemas: false
-        }
-      }
+          useUserDefinedSchemas: false,
+        },
+      },
     },
     getAllSelectedStreams: vi.fn(() => []),
-    getStreamNameFromStreamAlias: vi.fn((alias) => alias || "default")
-  }))
+    getStreamNameFromStreamAlias: vi.fn((alias) => alias || "default"),
+  })),
 }));
 
 // Mock DOM methods to prevent Quasar errors
-Object.defineProperty(Element.prototype, 'removeAttribute', {
+Object.defineProperty(Element.prototype, "removeAttribute", {
   writable: true,
   value: vi.fn(),
 });
@@ -108,7 +108,22 @@ describe("AddCondition.vue", () => {
       props: { ...defaultProps, ...props },
       global: {
         plugins: [i18n],
-        stubs: ["q-select", "q-btn", "q-btn-group", "q-menu", "q-tabs", "q-tab", "q-tab-panels", "q-tab-panel", "q-separator", "q-item", "q-item-section", "q-checkbox", "CommonAutoComplete", "SanitizedHtmlRenderer"],
+        stubs: [
+          "q-select",
+          "q-btn",
+          "q-btn-group",
+          "q-menu",
+          "q-tabs",
+          "q-tab",
+          "q-tab-panels",
+          "q-tab-panel",
+          "q-separator",
+          "q-item",
+          "q-item-section",
+          "q-checkbox",
+          "CommonAutoComplete",
+          "SanitizedHtmlRenderer",
+        ],
       },
       ...mountOptions,
     });
@@ -133,13 +148,17 @@ describe("AddCondition.vue", () => {
 
   it("should not display logical operator when conditionIndex is 0", () => {
     wrapper = createWrapper({ conditionIndex: 0 });
-    const logicalOperatorSelect = wrapper.find('[data-test="dashboard-add-condition-logical-operator-0}"]');
+    const logicalOperatorSelect = wrapper.find(
+      '[data-test="dashboard-add-condition-logical-operator-0}"]',
+    );
     expect(logicalOperatorSelect.exists()).toBe(false);
   });
 
   it("should display logical operator when conditionIndex is not 0", () => {
     wrapper = createWrapper({ conditionIndex: 1 });
-    const logicalOperatorSelect = wrapper.find('[data-test="dashboard-add-condition-logical-operator-1}"]');
+    const logicalOperatorSelect = wrapper.find(
+      '[data-test="dashboard-add-condition-logical-operator-1}"]',
+    );
     expect(logicalOperatorSelect.exists()).toBe(true);
   });
 
@@ -412,19 +431,19 @@ describe("AddCondition.vue", () => {
   describe("Emit functions", () => {
     it("should emit remove-condition when remove button is clicked", async () => {
       wrapper = createWrapper();
-      
+
       // Since we're using shallow mount with stubs, we need to trigger the emit directly
       await wrapper.vm.$emit("remove-condition");
-      
+
       expect(wrapper.emitted("remove-condition")).toBeTruthy();
       expect(wrapper.emitted("remove-condition")).toHaveLength(1);
     });
 
     it("should emit logical-operator-change when emitLogicalOperatorChange is called", () => {
       wrapper = createWrapper();
-      
+
       wrapper.vm.emitLogicalOperatorChange("OR");
-      
+
       expect(wrapper.emitted("logical-operator-change")).toBeTruthy();
       expect(wrapper.emitted("logical-operator-change")[0]).toEqual(["OR"]);
     });
@@ -434,9 +453,9 @@ describe("AddCondition.vue", () => {
     it("should call loadFilterItem when handleFieldChange is called", () => {
       const mockLoadFilterItem = vi.fn();
       wrapper = createWrapper({ loadFilterItem: mockLoadFilterItem });
-      
+
       wrapper.vm.handleFieldChange("new_field");
-      
+
       expect(mockLoadFilterItem).toHaveBeenCalledWith("new_field");
     });
   });
@@ -444,10 +463,16 @@ describe("AddCondition.vue", () => {
   describe("List functionality", () => {
     it("should compute sortedFilteredListOptions correctly", () => {
       wrapper = createWrapper();
-      
+
       const options = wrapper.vm.sortedFilteredListOptions;
       expect(Array.isArray(options)).toBe(true);
-      expect(options).toEqual(["alpha", "option1", "option2", "option3", "zebra"]); // Sorted alphabetically
+      expect(options).toEqual([
+        "alpha",
+        "option1",
+        "option2",
+        "option3",
+        "zebra",
+      ]); // Sorted alphabetically
     });
 
     it("should filter list options based on search term", async () => {
@@ -471,9 +496,9 @@ describe("AddCondition.vue", () => {
         condition: {
           ...defaultProps.condition,
           column: "nonexistent_field",
-        }
+        },
       });
-      
+
       const options = wrapper.vm.sortedFilteredListOptions;
       expect(options).toEqual([]);
     });
@@ -495,15 +520,29 @@ describe("AddCondition.vue", () => {
   describe("Operator array", () => {
     it("should contain all expected operators", () => {
       wrapper = createWrapper();
-      
+
       const expectedOperators = [
-        "=", "<>", ">=", "<=", ">", "<",
-        "IN", "NOT IN", "str_match", "str_match_ignore_case",
-        "match_all", "re_match", "re_not_match",
-        "Contains", "Starts With", "Ends With", "Not Contains",
-        "Is Null", "Is Not Null"
+        "=",
+        "<>",
+        ">=",
+        "<=",
+        ">",
+        "<",
+        "IN",
+        "NOT IN",
+        "str_match",
+        "str_match_ignore_case",
+        "match_all",
+        "re_match",
+        "re_not_match",
+        "Contains",
+        "Starts With",
+        "Ends With",
+        "Not Contains",
+        "Is Null",
+        "Is Not Null",
       ];
-      
+
       expect(wrapper.vm.operators).toEqual(expectedOperators);
     });
   });
@@ -511,7 +550,7 @@ describe("AddCondition.vue", () => {
   describe("Filter options", () => {
     it("should contain AND and OR options", () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.vm.filterOptions).toEqual(["AND", "OR"]);
     });
   });
@@ -523,15 +562,15 @@ describe("AddCondition.vue", () => {
         column: "test_field",
         values: ["value1", "value2"],
       };
-      
+
       wrapper = createWrapper({ condition });
-      
+
       // Change the column
       wrapper.vm.$props.condition.column = "new_field";
-      
+
       // Wait for watchers to run
       await nextTick();
-      
+
       expect(wrapper.vm.$props.condition.values).toEqual([]);
     });
 
@@ -541,12 +580,12 @@ describe("AddCondition.vue", () => {
         column: "test_field",
         values: ["value1", "value2"],
       };
-      
+
       wrapper = createWrapper({ condition });
-      
+
       // Don't change the column, just trigger a re-render
       await nextTick();
-      
+
       expect(wrapper.vm.$props.condition.values).toEqual(["value1", "value2"]);
     });
   });
@@ -562,7 +601,7 @@ describe("AddCondition.vue", () => {
           values: null,
         },
       });
-      
+
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.vm).toBeDefined();
     });
@@ -575,7 +614,7 @@ describe("AddCondition.vue", () => {
           },
         },
       });
-      
+
       expect(wrapper.vm.sortedFilteredListOptions).toEqual([]);
     });
 
@@ -585,7 +624,7 @@ describe("AddCondition.vue", () => {
           meta: {},
         },
       });
-      
+
       expect(wrapper.exists()).toBe(true);
     });
 
@@ -593,7 +632,7 @@ describe("AddCondition.vue", () => {
       wrapper = createWrapper({
         schemaOptions: [],
       });
-      
+
       expect(wrapper.vm.filteredSchemaOptions).toBeDefined();
     });
   });
