@@ -26,6 +26,31 @@ use crate::handler::http::request::anomaly_detection::{
     CreateAnomalyConfigRequest, UpdateAnomalyConfigRequest,
 };
 
+/// Resolve a folder slug (e.g. "default") to the PK stored in `folders.id`.
+///
+/// Anomaly detection configs store the same FK as the alerts table — the KSUID primary
+/// key of the folder row, NOT the human-readable slug.  This helper performs that
+/// lookup and is called whenever we write a folder_id value to the DB.
+async fn resolve_folder_pk(org_id: &str, slug: &str) -> Option<String> {
+    infra::table::folders::get_pk_by_slug(org_id, slug, config::meta::folder::FolderType::Alerts)
+        .await
+        .ok()
+        .flatten()
+}
+
+/// Translate a stored folder PK back to the user-visible slug for API responses.
+/// Falls back to "default" if the PK cannot be resolved (e.g. folder was deleted).
+async fn pk_to_slug(pk: Option<&str>) -> String {
+    match pk {
+        None => "default".to_string(),
+        Some(pk) => infra::table::folders::get_slug_by_pk(pk)
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or_else(|| "default".to_string()),
+    }
+}
+
 /// Convert an integer status code to its human-readable string label.
 /// This is applied when serializing configs to API responses so the UI
 /// continues to receive "waiting"/"active"/"training"/"failed"/"disabled".
@@ -78,11 +103,38 @@ pub async fn list_configs(org_id: &str) -> Result<Vec<serde_json::Value>> {
             .map(|t| (t.module_key.clone(), t))
             .collect();
 
+    // Collect unique folder PKs so we can batch-resolve them to slugs.
+    let unique_pks: std::collections::HashSet<String> = configs
+        .iter()
+        .filter_map(|m| m.folder_id.as_ref())
+        .cloned()
+        .collect();
+    let mut pk_to_slug_map: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+    for pk in unique_pks {
+        if let Ok(Some(slug)) = infra::table::folders::get_slug_by_pk(&pk).await {
+            pk_to_slug_map.insert(pk, slug);
+        }
+    }
+
     let result: Vec<serde_json::Value> = configs
         .into_iter()
         .map(|model| {
             let anomaly_id = model.anomaly_id.clone();
+            let folder_slug = model
+                .folder_id
+                .as_deref()
+                .and_then(|pk| pk_to_slug_map.get(pk))
+                .cloned()
+                .unwrap_or_else(|| "default".to_string());
             let mut val = model_to_api_json(serde_json::to_value(model).unwrap_or_default());
+            // Replace stored PK with the user-visible slug.
+            if let Some(obj) = val.as_object_mut() {
+                obj.insert(
+                    "folder_id".to_string(),
+                    serde_json::Value::String(folder_slug),
+                );
+            }
             if let Some(obj) = val.as_object_mut()
                 && let Some(trigger) = trigger_map.get(&anomaly_id)
             {
@@ -122,7 +174,17 @@ pub async fn get_config(org_id: &str, anomaly_id: &str) -> Result<Option<serde_j
         .one(db)
         .await?;
 
-    Ok(config.map(|model| model_to_api_json(serde_json::to_value(model).unwrap_or_default())))
+    match config {
+        None => Ok(None),
+        Some(model) => {
+            let slug = pk_to_slug(model.folder_id.as_deref()).await;
+            let mut val = model_to_api_json(serde_json::to_value(model).unwrap_or_default());
+            if let Some(obj) = val.as_object_mut() {
+                obj.insert("folder_id".to_string(), serde_json::Value::String(slug));
+            }
+            Ok(Some(val))
+        }
+    }
 }
 
 /// Create a new anomaly detection configuration
@@ -139,6 +201,14 @@ pub async fn create_config(
 
     let anomaly_id = svix_ksuid::Ksuid::new(None, None).to_string();
     let now_us = Utc::now().timestamp_micros();
+
+    // Resolve the folder slug to the FK (folders.id PK), consistent with the alerts table.
+    let folder_slug = req
+        .folder_id
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .unwrap_or("default");
+    let folder_pk = resolve_folder_pk(org_id, folder_slug).await;
 
     let new_config = anomaly_detection_config::ActiveModel {
         anomaly_id: Set(anomaly_id.clone()),
@@ -185,7 +255,7 @@ pub async fn create_config(
         )),
         alert_enabled: Set(req.alert_enabled.unwrap_or(true)),
         alert_destination_id: Set(req.alert_destination_id.clone()),
-        folder_id: Set(req.folder_id.clone()),
+        folder_id: Set(folder_pk),
         owner: Set(req.owner.clone()),
         status: Set(0i32), // 0 = waiting
         retries: Set(0),
@@ -198,6 +268,7 @@ pub async fn create_config(
     };
 
     let result = new_config.insert(db).await?;
+    let folder_slug_owned = folder_slug.to_string();
 
     // Register a detection trigger in the shared scheduler so it is driven by the
     // same infrastructure as alerts.  The handler will check `is_trained` and skip
@@ -239,7 +310,14 @@ pub async fn create_config(
         });
     }
 
-    Ok(serde_json::to_value(result)?)
+    let mut val = serde_json::to_value(result)?;
+    if let Some(obj) = val.as_object_mut() {
+        obj.insert(
+            "folder_id".to_string(),
+            serde_json::Value::String(folder_slug_owned),
+        );
+    }
+    Ok(val)
 }
 
 /// Update an existing anomaly detection configuration
@@ -328,7 +406,8 @@ pub async fn update_config(
         active_model.alert_destination_id = Set(Some(alert_destination_id));
     }
     if let Some(folder_id_str) = req.folder_id {
-        active_model.folder_id = Set(Some(folder_id_str));
+        let pk = resolve_folder_pk(org_id, &folder_id_str).await;
+        active_model.folder_id = Set(pk);
     }
     if let Some(owner) = req.owner {
         active_model.owner = Set(Some(owner));
@@ -401,7 +480,12 @@ pub async fn update_config(
         }
     }
 
-    Ok(serde_json::to_value(updated)?)
+    let slug = pk_to_slug(updated.folder_id.as_deref()).await;
+    let mut val = serde_json::to_value(updated)?;
+    if let Some(obj) = val.as_object_mut() {
+        obj.insert("folder_id".to_string(), serde_json::Value::String(slug));
+    }
+    Ok(val)
 }
 
 /// Delete an anomaly detection configuration
@@ -465,7 +549,15 @@ pub async fn clone_config(
     let new_id = svix_ksuid::Ksuid::new(None, None).to_string();
     let now_us = Utc::now().timestamp_micros();
 
-    let resolved_folder_id = folder_id.or_else(|| src.folder_id.clone());
+    // If a new folder slug is given, resolve it to the PK; otherwise inherit the
+    // source's already-stored PK.
+    let resolved_folder_id = if let Some(slug) = folder_id {
+        resolve_folder_pk(org_id, &slug)
+            .await
+            .or_else(|| src.folder_id.clone())
+    } else {
+        src.folder_id.clone()
+    };
 
     let cloned = anomaly_detection_config::ActiveModel {
         anomaly_id: Set(new_id.clone()),
@@ -525,9 +617,12 @@ pub async fn clone_config(
         }
     }
 
-    Ok(model_to_api_json(
-        serde_json::to_value(result).unwrap_or_default(),
-    ))
+    let slug = pk_to_slug(result.folder_id.as_deref()).await;
+    let mut val = model_to_api_json(serde_json::to_value(result).unwrap_or_default());
+    if let Some(obj) = val.as_object_mut() {
+        obj.insert("folder_id".to_string(), serde_json::Value::String(slug));
+    }
+    Ok(val)
 }
 
 /// Cancel an in-progress training run.
