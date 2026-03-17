@@ -6,7 +6,7 @@
 
 import { setupTestDashboard } from "./dashCreation.js";
 import { ingestionForMaps } from "./dashIngestion.js";
-const testLogger = require('../../utils/test-logger.js');
+import testLogger from '../../utils/test-logger.js';
 
 // ---------------------------------------------------------------------------
 // Name generator
