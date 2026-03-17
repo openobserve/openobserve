@@ -1956,6 +1956,7 @@
     "anomalyDetectionConfig": "Detection Config",
     "alerting": "Alerting",
     "saveAndTrain": "Save & Train",
+    "anomalyCreated": "Anomaly detection config created. Training will start shortly.",
     "anomalyStepCaptions": {
       "alertSetup": "Name your detector and select a stream to monitor",
       "detectionConfig": "Configure the query and detection parameters",
