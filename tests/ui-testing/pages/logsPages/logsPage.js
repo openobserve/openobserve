@@ -537,7 +537,7 @@ export class LogsPage {
         const startTime = Date.now();
 
         const apiUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL;
-        const orgId = getOrgIdentifier();
+        const orgId = getOrgIdentifier() || 'default';
         const url = `${apiUrl}/api/${orgId}/streams?type=${streamType}&keyword=${streamName}`;
         testLogger.info(`waitForStreamAvailable: Waiting for stream ${streamName} (type=${streamType}, timeout=${maxWaitMs}ms)`);
         let pollCount = 0;
