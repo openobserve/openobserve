@@ -98,27 +98,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="importAlert"
             data-test="alert-import"
           />
-          <!-- Add Alert button (hidden on Anomaly Detection tab) -->
+          <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
           <q-btn
-            v-if="activeTab !== 'anomalyDetection'"
             data-test="alert-list-add-alert-btn"
             class="q-ml-sm o2-primary-button tw:h-[36px]"
             no-caps
             flat
-            :disable="!destinations.length"
-            :title="!destinations.length ? t('alerts.noDestinations') : ''"
+            :disable="activeTab !== 'anomalyDetection' && !destinations.length"
+            :title="activeTab !== 'anomalyDetection' && !destinations.length ? t('alerts.noDestinations') : ''"
             :label="t(`alerts.add`)"
-            @click="showAddUpdateFn({})"
-          />
-          <!-- New Anomaly Detection button (shown only on Anomaly Detection tab) -->
-          <q-btn
-            v-if="activeTab === 'anomalyDetection'"
-            data-test="alert-list-add-anomaly-btn"
-            class="q-ml-sm o2-primary-button tw:h-[36px]"
-            no-caps
-            flat
-            :label="t('alerts.add')"
-            @click="router.push({ name: 'addAnomalyDetection', query: { org_identifier: store.state.selectedOrganization.identifier } })"
+            @click="activeTab === 'anomalyDetection'
+              ? router.push({ name: 'addAnomalyDetection', query: { org_identifier: store.state.selectedOrganization.identifier } })
+              : showAddUpdateFn({})"
           />
         </div>
       </div>
@@ -149,14 +140,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #after>
           <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
             <div class="tw:h-full card-container">
-              <!-- Anomaly Detection List (shown when Anomaly Detection tab is active) -->
-              <AnomalyDetectionList
-                v-if="activeTab === 'anomalyDetection'"
-                :org_identifier="store.state.selectedOrganization.identifier"
-              />
-              <!-- Alert List Table -->
+                  <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
               <q-table
-                v-if="activeTab !== 'anomalyDetection'"
                 v-model:selected="selectedAlerts"
                 :selected-rows-label="getSelectedString"
                 selection="multiple"
@@ -794,8 +779,8 @@ import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
 import { toRaw } from "vue";
 import { nextTick } from "vue";
 import AppTabs from "@/components/common/AppTabs.vue";
-import AnomalyDetectionList from "@/components/anomaly_detection/AnomalyDetectionList.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
+import anomalyDetectionService from "@/services/anomaly_detection";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import { symOutlinedSoundSampler } from "@quasar/extras/material-symbols-outlined";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
@@ -816,7 +801,6 @@ export default defineComponent({
     FolderList,
     MoveAcrossFolders,
     AppTabs,
-    AnomalyDetectionList,
     SelectFolderDropDown,
     AlertHistoryDrawer,
     O2AIContextAddBtn,
@@ -1133,6 +1117,45 @@ export default defineComponent({
     const filteredResults: Ref<any[]> = ref([]);
     const selectedAlertToMove: Ref<any> = ref({});
     const folderIdToBeCloned = ref<any>(router.currentRoute.value.query.folder ?? "default");
+    // ---------------------------------------------------------------------------
+    // Anomaly detection scaffolding — TEMPORARY until backend returns anomaly
+    // data as part of the alert list API. Remove this block when that happens.
+    // ---------------------------------------------------------------------------
+    const normalizeAnomalyToAlertRow = (anomaly: any, counter: number): any => ({
+      "#": counter <= 9 ? `0${counter}` : `${counter}`,
+      alert_id: anomaly.anomaly_id,
+      anomaly_id: anomaly.anomaly_id,
+      name: anomaly.name,
+      alert_type: "Anomaly Detection",
+      stream_name: anomaly.stream_name || "--",
+      stream_type: anomaly.stream_type || "--",
+      enabled: anomaly.enabled,
+      conditions: "--",
+      rawCondition: {},
+      description: anomaly.description || "",
+      uuid: getUUID(),
+      owner: anomaly.owner || "",
+      period: "",
+      frequency: anomaly.schedule_interval != null ? String(anomaly.schedule_interval) : "--",
+      frequency_type: "cron",
+      last_triggered_at: anomaly.last_detection_run
+        ? convertUnixToQuasarFormat(anomaly.last_detection_run)
+        : "",
+      last_satisfied_at: anomaly.last_anomaly_detected_at
+        ? convertUnixToQuasarFormat(anomaly.last_anomaly_detected_at)
+        : "",
+      selected: false,
+      type: "anomaly",
+      folder_name: { name: "—", id: "" },
+      // Marker: "anomaly" distinguishes these rows from boolean is_real_time alerts
+      is_real_time: "anomaly",
+      total_evaluations: 0,
+      firing_count: 0,
+      deduplication: null,
+    });
+
+    // ---------------------------------------------------------------------------
+
     const getAlertsByFolderId = async (store: any, folderId: any) => {
       try {
         //this is the condition where we are fetching the alerts from the server 
@@ -1281,10 +1304,31 @@ export default defineComponent({
               firing_count: data.firing_count || 0,
             };
           });
+          // ---------------------------------------------------------------------------
+          // TEMPORARY: Fetch anomaly detections and merge as synthetic alert rows.
+          // Remove this block once the backend returns anomaly data in the alert list API.
+          // ---------------------------------------------------------------------------
+          if (isAnomalyDetectionEnabled.value) {
+            try {
+              const anomalyRes = await anomalyDetectionService.list(
+                store?.state?.selectedOrganization?.identifier,
+              );
+              const anomalyList: any[] = anomalyRes.data?.list ?? anomalyRes.data ?? [];
+              let anomalyCounter = localAllAlerts.length + 1;
+              const anomalyRows = anomalyList.map((a: any) =>
+                normalizeAnomalyToAlertRow(a, anomalyCounter++),
+              );
+              localAllAlerts = [...localAllAlerts, ...anomalyRows];
+            } catch (anomalyError) {
+              console.warn("Failed to fetch anomaly detections:", anomalyError);
+            }
+          }
+          // ---------------------------------------------------------------------------
+
           //this is the condition where we are setting the alertStateLoadingMap
           localAllAlerts.forEach((alert: any) => {
             alertStateLoadingMap.value[alert.uuid as string] = false;
-          });    
+          });
           //this is the condition where we are setting the allAlertsListByFolderId in the store
           store?.dispatch("setAllAlertsListByFolderId", {
             ...store.state.organizationData.allAlertsListByFolderId,
@@ -1368,26 +1412,23 @@ export default defineComponent({
       if (activeTab.value === "incidents") {
         return;
       }
-      // Anomaly Detection tab shows its own component — no alert table filtering needed
-      if (activeTab.value === "anomalyDetection") {
-        return;
-      }
-      //here we are filtering the alerts by the activeTab
-      //why allAlerts.value is used because we are not fetching the alerts again,
-      // we are just assigning the alerts to the filteredResults
       if (activeTab.value === "scheduled") {
+        // Scheduled: is_real_time is falsy (false / undefined / null) — anomaly rows ("anomaly") excluded
         filteredResults.value = allAlerts.value.filter(
           (alert: any) => !alert.is_real_time,
         );
-      }
-      //we filter the alerts by the realTime tab
-      else if (activeTab.value === "realTime") {
+      } else if (activeTab.value === "realTime") {
+        // Real-time: strictly boolean true — anomaly rows excluded
         filteredResults.value = allAlerts.value.filter(
-          (alert: any) => alert.is_real_time,
+          (alert: any) => alert.is_real_time === true,
         );
-      }
-      //else we will return all the alerts
-      else {
+      } else if (activeTab.value === "anomalyDetection") {
+        // Anomaly Detection: rows injected by normalizeAnomalyToAlertRow with is_real_time === "anomaly"
+        filteredResults.value = allAlerts.value.filter(
+          (alert: any) => alert.is_real_time === "anomaly",
+        );
+      } else {
+        // "all" — show everything
         filteredResults.value = allAlerts.value;
       }
     };
@@ -2307,16 +2348,13 @@ export default defineComponent({
           alert.name.toLowerCase().includes(query.toLowerCase())
         )
         filteredResults.value = tempResults.filter((alert: any) => {
-          //here we are filtering the alerts by the activeTab
-          if(activeTab.value === "scheduled"){
+          if (activeTab.value === "scheduled") {
             return !alert.is_real_time;
-          } 
-          //we filter the alerts by the realTime tab
-          else if(activeTab.value === "realTime"){
-            return alert.is_real_time;
-          } 
-          //else we will return all the alerts
-          else {
+          } else if (activeTab.value === "realTime") {
+            return alert.is_real_time === true;
+          } else if (activeTab.value === "anomalyDetection") {
+            return alert.is_real_time === "anomaly";
+          } else {
             return true;
           }
         })
