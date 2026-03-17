@@ -170,7 +170,9 @@ pub async fn get_pk_by_slug(
     folder_type: FolderType,
 ) -> Result<Option<String>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Ok(get_model(client, org_id, slug, folder_type).await?.map(|m| m.id))
+    Ok(get_model(client, org_id, slug, folder_type)
+        .await?
+        .map(|m| m.id))
 }
 
 /// Returns the folder slug (`folder_id` column) for the given primary-key `id`.
@@ -179,7 +181,10 @@ pub async fn get_pk_by_slug(
 /// API responses for anomaly detection configs.
 pub async fn get_slug_by_pk(pk: &str) -> Result<Option<String>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Ok(Entity::find_by_id(pk).one(client).await?.map(|m| m.folder_id))
+    Ok(Entity::find_by_id(pk)
+        .one(client)
+        .await?
+        .map(|m| m.folder_id))
 }
 
 /// Gets a folder ORM entity by its `folder_id`.
