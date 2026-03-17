@@ -16,7 +16,7 @@
 use std::sync::OnceLock;
 
 use ::config::{
-    META_ORG_ID, RouteDispatchStrategy, get_config,
+    RouteDispatchStrategy, get_config,
     meta::{
         cluster::{Node, Role, RoleGroup},
         promql::RequestRangeQuery,
@@ -174,11 +174,6 @@ async fn dispatch(
         .unwrap_or("")
         .to_string();
 
-    // Handle node list API locally (special case)
-    if path.contains("/api/_meta/node/list") {
-        return handle_node_list_request(&req).await;
-    }
-
     // Resolve target node
     let target = match resolve_target(&path, &cfg.common.base_uri).await {
         Ok(target) => target,
@@ -199,23 +194,6 @@ async fn dispatch(
     } else {
         proxy_request(req, payload, target, start).await
     }
-}
-
-/// Handles the special node list API request locally.
-async fn handle_node_list_request(req: &HttpRequest) -> actix_web::Result<HttpResponse, Error> {
-    let query =
-        web::Query::<std::collections::HashMap<String, String>>::from_query(req.query_string())
-            .ok()
-            .map(|x| x.into_inner())
-            .unwrap_or_default();
-
-    crate::handler::http::request::organization::org::node_list_impl(META_ORG_ID, query)
-        .await
-        .map_err(|e| {
-            Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
-                format!("Failed to get node list: {e}"),
-            )))
-        })
 }
 
 /// Resolves the target node for a given request path.
