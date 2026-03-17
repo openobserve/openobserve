@@ -3043,7 +3043,8 @@
     "metricsError": "Metrikler Yüklenemiyor",
     "metricsErrorDetails": "Metrik verileri alınırken bir hata oluştu. Lütfen tekrar deneyin.",
     "noMetricsDescription": "Seçilen zaman aralığında bu korelasyon için hiçbir metrik bulunamadı.",
-    "errorRetrievingTraces": "İzler alınırken hata oluştu."
+    "errorRetrievingTraces": "İzler alınırken hata oluştu.",
+    "serviceGroupProtected": "Hizmet grubu kaldırılamaz. Yalnızca eşlenen alanları değiştirebilirsiniz."
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",

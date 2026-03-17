@@ -3041,7 +3041,8 @@
     "metricsError": "Impossibile caricare le metriche",
     "metricsErrorDetails": "Si è verificato un errore durante il recupero dei dati delle metriche. Riprova.",
     "noMetricsDescription": "Nessuna metrica trovata per questa correlazione nell'intervallo di tempo selezionato.",
-    "errorRetrievingTraces": "Si è verificato un errore durante il recupero delle tracce."
+    "errorRetrievingTraces": "Si è verificato un errore durante il recupero delle tracce.",
+    "serviceGroupProtected": "Il gruppo di servizi non può essere rimosso. È possibile modificare solo i campi mappati."
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",
