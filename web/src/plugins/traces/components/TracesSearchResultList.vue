@@ -129,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :hide-search-term-actions="false"
               @copy="copyToClipboard"
+              @add-search-term="addSearchTerm"
               @send-to-ai-chat="sendToAiChat"
             />
           </template>
@@ -259,8 +260,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from "vue";
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
+import { copyToClipboard as qCopyToClipboard } from "quasar";
 import TenstackTable from "@/components/TenstackTable.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import {
@@ -335,15 +337,27 @@ const emit = defineEmits<{
   "send-to-ai-chat": [value: string];
 }>();
 
-const copyToClipboard = (value: any) => emit("copy", value);
+const copyToClipboard = (value: any) => qCopyToClipboard(String(value));
+
+const addSearchTerm = (
+  field: string,
+  fieldValue: string | number | boolean,
+  action: string,
+) => {
+  const operator = action === "include" ? "=" : "!=";
+  if (fieldValue === null || fieldValue === "" || fieldValue === "null") {
+    const isOp = action === "include" ? "is" : "is not";
+    searchObj.data.stream.addToFilter = `${field} ${isOp} null`;
+  } else {
+    searchObj.data.stream.addToFilter = `${field} ${operator} '${fieldValue}'`;
+  }
+};
+
 const sendToAiChat = (value: string) => emit("send-to-ai-chat", value);
 
 const rowsPerPageOptions = [10, 25, 50, 100];
 
 const { searchObj, updatedLocalLogFilterField } = useTraces();
-const selectedStreamFields = computed(
-  () => searchObj.data.stream.selectedStreamFields,
-);
 
 // const rebuildColumns = () => {
 //   buildColumns(
