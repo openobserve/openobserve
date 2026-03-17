@@ -52,7 +52,7 @@ function buildPivotHeaderLevels(
   const levels: any[] = [];
 
   // Parse pivot keys into per-level values
-  // e.g., "GET > 200" → ["GET", "200"]
+  // e.g., "GET\x00200" → ["GET", "200"]
   const parsedKeys = allPivotKeys.map((pk) => pk.split(PIVOT_TABLE_SEPARATOR));
 
   // Track top-level (level 0) group boundary positions (leaf column indices)
