@@ -42,7 +42,7 @@ use crate::{
         extractors::Headers,
         models::alerts::{
             requests::{
-                AlertBulkEnableRequest, AnomalyAlertFields, CloneAlertRequestBody,
+                AlertBulkEnableRequest, CloneAlertRequestBody,
                 CreateAlertRequestBody, EnableAlertQuery, GenerateSqlRequestBody, ListAlertsQuery,
                 MoveAlertsRequestBody, UpdateAlertRequestBody, UpdateAnomalyAlertFields,
             },
@@ -472,8 +472,6 @@ pub async fn update_alert(
     Headers(user_email): Headers<UserEmail>,
     Json(req_body): Json<UpdateAlertRequestBody>,
 ) -> Response {
-    use crate::handler::http::request::anomaly_detection::UpdateAnomalyConfigRequest;
-
     let alert_id_str = alert_id.clone();
     let alert_id = match Ksuid::from_str(&alert_id) {
         Ok(id) => id,
@@ -916,7 +914,13 @@ pub async fn enable_alert_bulk(
                     enabled: Some(should_enable),
                     ..Default::default()
                 };
-                match crate::service::anomaly_detection::update_config(&org_id, &id.to_string(), req).await {
+                match crate::service::anomaly_detection::update_config(
+                    &org_id,
+                    &id.to_string(),
+                    req,
+                )
+                .await
+                {
                     Ok(_) => successful.push(id),
                     Err(e) => {
                         log::error!("error in enabling anomaly config {id} : {e}");
@@ -1093,8 +1097,14 @@ pub async fn move_alerts(
 
     // Move regular alerts in one batch
     if !alert_ids.is_empty() {
-        if let Err(e) =
-            alert::move_to_folder(client, &org_id, &alert_ids, &req_body.dst_folder_id, &user_email.user_id).await
+        if let Err(e) = alert::move_to_folder(
+            client,
+            &org_id,
+            &alert_ids,
+            &req_body.dst_folder_id,
+            &user_email.user_id,
+        )
+        .await
         {
             return e.into();
         }
