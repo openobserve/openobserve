@@ -695,6 +695,7 @@ import { useStore } from "vuex";
 import streamService from "@/services/stream";
 import {
   ANOMALY_FILTER_OPERATORS,
+  buildAnomalyFilterExpression,
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
 import QueryEditor from "@/components/QueryEditor.vue";
@@ -923,11 +924,46 @@ export default defineComponent({
         sql = props.config.custom_sql || "";
       } else {
         const streamName = props.config.stream_name;
-        const intervalValue = props.config.histogram_interval_value ?? 5;
-        const intervalUnit = props.config.histogram_interval_unit ?? "m";
-        sql = streamName
-          ? buildDefaultSql(streamName, intervalValue, intervalUnit)
-          : "";
+        if (!streamName) {
+          sql = "";
+        } else {
+          const intervalValue = props.config.histogram_interval_value ?? 5;
+          const intervalUnit = props.config.histogram_interval_unit ?? "m";
+          const interval = `${intervalValue}${intervalUnit}`;
+          const fn =
+            props.config.detection_function === "count" ||
+            !props.config.detection_function
+              ? "count(*)"
+              : `${props.config.detection_function}(${props.config.detection_function_field || "*"})`;
+          const filterLines = (props.config.filters || [])
+            .filter(
+              (f: any) =>
+                f.field &&
+                (operatorNeedsValue(f.operator) ? f.value : true),
+            )
+            .map(
+              (f: any) =>
+                `  AND ${buildAnomalyFilterExpression(f.field, f.operator, f.value)}`,
+            );
+          const where = filterLines.length
+            ? [
+                "WHERE",
+                ...filterLines.map((l: string, i: number) =>
+                  i === 0 ? l.replace(/^\s+AND /, "  ") : l,
+                ),
+              ].join("\n")
+            : "";
+          sql = [
+            `SELECT histogram(_timestamp, '${interval}') AS time_bucket,`,
+            `       ${fn} AS value`,
+            `FROM "${streamName}"`,
+            where,
+            `GROUP BY time_bucket`,
+            `ORDER BY time_bucket`,
+          ]
+            .filter(Boolean)
+            .join("\n");
+        }
       }
       // Normalize multiline SQL to a single line — the dashboard panel
       // query executor can truncate at newlines in some code paths
@@ -1032,7 +1068,8 @@ export default defineComponent({
       previewActive.value = true;
     };
 
-    // Auto-refresh when Look Back Window or Detection Resolution changes
+    // Auto-refresh when Look Back Window, Detection Resolution, filters, or
+    // detection function changes
     let previewRefreshTimer: ReturnType<typeof setTimeout> | null = null;
     watch(
       () => [
@@ -1040,6 +1077,11 @@ export default defineComponent({
         props.config.detection_window_unit,
         props.config.histogram_interval_value,
         props.config.histogram_interval_unit,
+        props.config.query_mode,
+        props.config.custom_sql,
+        props.config.detection_function,
+        props.config.detection_function_field,
+        props.config.filters,
       ],
       () => {
         if (!previewActive.value) return;
@@ -1048,6 +1090,7 @@ export default defineComponent({
           loadPreview();
         }, 600);
       },
+      { deep: true },
     );
 
     // ── Sensitivity slider ──────────────────────────────────────────────────
