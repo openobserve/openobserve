@@ -148,17 +148,13 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         .unwrap_or("default")
         .to_string();
 
-    let status = v.get("status").and_then(|s| s.as_i64()).map(|s| {
-        match s {
-            0 => "waiting",
-            1 => "active",
-            2 => "training",
-            3 => "failed",
-            4 => "disabled",
-            _ => "unknown",
-        }
-        .to_string()
-    });
+    // list_configs runs model_to_api_json which already converts the integer
+    // status column to a string label ("waiting", "active", etc.).  Read it
+    // directly as a string; the old as_i64() path always returned None here.
+    let status = v
+        .get("status")
+        .and_then(|s| s.as_str())
+        .map(String::from);
 
     // Build trigger_condition so the UI can display "Look back window" and "Check every".
     // period  = detection_window_seconds / 60  (look-back window in minutes)
