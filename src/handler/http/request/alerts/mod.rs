@@ -384,7 +384,14 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
                         MetaHttpResponse::json(v)
                     }
                     Ok(None) => MetaHttpResponse::not_found("alert not found"),
-                    Err(e) => MetaHttpResponse::not_found(e.to_string()),
+                    Err(e) => {
+                        let msg = e.to_string().to_lowercase();
+                        if msg.contains("not found") {
+                            MetaHttpResponse::not_found(e.to_string())
+                        } else {
+                            MetaHttpResponse::internal_error(e.to_string())
+                        }
+                    }
                 }
             }
         }
@@ -665,7 +672,14 @@ pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
                 match crate::service::anomaly_detection::delete_config(&org_id, &alert_id_str).await
                 {
                     Ok(_) => MetaHttpResponse::ok("Alert deleted"),
-                    Err(e) => MetaHttpResponse::not_found(e.to_string()),
+                    Err(e) => {
+                        let msg = e.to_string().to_lowercase();
+                        if msg.contains("not found") {
+                            MetaHttpResponse::not_found(e.to_string())
+                        } else {
+                            MetaHttpResponse::internal_error(e.to_string())
+                        }
+                    }
                 }
             }
         }
@@ -925,7 +939,14 @@ pub async fn enable_alert(
                     Ok(_) => MetaHttpResponse::json(EnableAlertResponseBody {
                         enabled: should_enable,
                     }),
-                    Err(e) => MetaHttpResponse::not_found(e.to_string()),
+                    Err(e) => {
+                        let msg = e.to_string().to_lowercase();
+                        if msg.contains("not found") {
+                            MetaHttpResponse::not_found(e.to_string())
+                        } else {
+                            MetaHttpResponse::internal_error(e.to_string())
+                        }
+                    }
                 }
             }
         }
@@ -1085,7 +1106,14 @@ pub async fn trigger_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
                 .await
                 {
                     Ok(_) => MetaHttpResponse::ok("Detection triggered"),
-                    Err(e) => MetaHttpResponse::not_found(e.to_string()),
+                    Err(e) => {
+                        let msg = e.to_string().to_lowercase();
+                        if msg.contains("not found") {
+                            MetaHttpResponse::not_found(e.to_string())
+                        } else {
+                            MetaHttpResponse::internal_error(e.to_string())
+                        }
+                    }
                 }
             }
         }
