@@ -97,12 +97,12 @@ const KNOWN_COLUMN_META: Record<
   status_code: {
     header: "Status Code",
     size: 140,
-    meta: { align: "center", slot: true },
+    meta: { align: "center", slot: true, closable: true },
   },
   method: {
     header: "Method",
     size: 140,
-    meta: { align: "center", slot: true },
+    meta: { align: "center", slot: true, closable: true },
   },
   service_latency: {
     header: "Service Latency",
@@ -146,7 +146,7 @@ function toColumnDef(fieldName: string): ColumnDef<Record<string, any>> {
     id: fieldName,
     header,
     size: 160,
-    meta: { slot: false },
+    meta: { slot: false, closable: true },
     accessorFn: (row: any) => row[fieldName],
   };
 }

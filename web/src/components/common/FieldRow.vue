@@ -63,7 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <q-icon
         :data-test="`log-search-index-list-add-${field.name}-field-btn`"
-        v-if="!isFieldSelected && field.name !== timestampColumn"
+        v-if="
+          showVisibilityToggle &&
+          !isFieldSelected &&
+          field.name !== timestampColumn
+        "
         :name="outlinedVisibility"
         style="margin-right: 0.375rem"
         size="1.1rem"
@@ -73,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <q-icon
         :data-test="`log-search-index-list-remove-${field.name}-field-btn`"
-        v-if="isFieldSelected"
+        v-if="showVisibilityToggle && isFieldSelected"
         :name="outlinedVisibilityOff"
         style="margin-right: 0.375rem"
         size="1.1rem"
@@ -116,9 +120,12 @@ interface Props {
   timestampColumn: string;
   theme: string;
   showQuickMode: boolean;
+  showVisibilityToggle?: boolean;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  showVisibilityToggle: true,
+});
 
 defineEmits<{
   "add-to-filter": [value: string];

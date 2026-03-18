@@ -39,7 +39,7 @@
           />
           <q-icon
             :data-test="`log-search-index-list-add-${row.name}-field-btn`"
-            v-if="!isFieldSelected"
+            v-if="showVisibilityToggle && !isFieldSelected"
             :name="outlinedVisibility"
             size="1.1rem"
             title="Add field to table"
@@ -48,7 +48,7 @@
           />
           <q-icon
             :data-test="`log-search-index-list-remove-${row.name}-field-btn`"
-            v-if="isFieldSelected"
+            v-if="showVisibilityToggle && isFieldSelected"
             :name="outlinedVisibilityOff"
             size="1.1rem"
             title="Remove field from table"
@@ -194,10 +194,17 @@ const props = defineProps({
     type: Array as () => string[],
     default: () => [],
   },
-
+  activeExcludeValues: {
+    type: Array as () => string[],
+    default: () => [],
+  },
   selectedFields: {
     type: Array as () => string[],
     default: () => [],
+  },
+  showVisibilityToggle: {
+    type: Boolean,
+    default: true,
   },
 });
 

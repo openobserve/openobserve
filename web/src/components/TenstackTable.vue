@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="header in headerGroup.headers"
             :key="header.id"
             :id="header.id"
-            class="tw:px-2 tw:relative table-head tw:text-ellipsis"
+            class="tw:px-2 tw:relative table-head tw:text-ellipsis!"
             :class="[
               (header.column.columnDef.meta as any)?.align === 'center'
                 ? 'tw:text-center!'
@@ -82,79 +82,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : '',
               (header.column.columnDef.meta as any)?.headerClass ?? '',
             ]"
-            :style="{ width: `calc(var(--header-${header?.id}-size) * 1px)` }"
-            :data-test="`log-search-result-table-th-${header.id}`"
+            :style="{
+              width: `calc(var(--header-${header?.id}-size) * 1px)`,
+              height: rowHeight + 'px',
+            }"
+            :data-test="`o2-table-th-${header.id}`"
           >
-            <div
-              v-if="header.column.getCanResize()"
-              @dblclick="header.column.resetSize()"
-              @mousedown.self.prevent.stop="header.getResizeHandler()?.($event)"
-              @touchstart.self.prevent.stop="
-                header.getResizeHandler()?.($event)
-              "
-              :class="[
-                'resizer',
-                'tw:hover:bg-[var(--o2-border-color)]',
-                header.column.getIsResizing() ? 'isResizing' : '',
-              ]"
-              class="tw:right-0 tw:bg-transparent"
-            />
-            <div
-              v-if="!header.isPlaceholder"
-              :data-test="`log-search-result-table-th-sort-${header.id}`"
-              :class="[
-                'text-left',
-                header.column.getCanSort() ||
-                (sortBy !== undefined &&
-                  (header.column.columnDef.meta as any)?.sortable)
-                  ? 'cursor-pointer tw:inline-flex tw:items-center tw:gap-1'
-                  : 'cursor-pointer tw:inline-flex tw:items-center tw:gap-1',
-              ]"
-              @click="
-                handleHeaderSortClick(
-                  $event,
-                  header.column,
-                  header.column.getToggleSortingHandler(),
-                )
-              "
-              class="tw:overflow-hidden tw:text-ellipsis tw:tracking-[0.06rem] tw:text-[var(--o2-text-2)] tw:text-[0.85rem]"
-              :style="{ height: wrap ? '100%' : rowHeight + 'px' }"
-            >
-              <FlexRender
-                :render="header.column.columnDef.header"
-                :props="header.getContext()"
-              />
-              <!-- Server-side sort icons (shown when sortBy prop is provided) -->
-              <template
-                v-if="
-                  sortBy !== undefined &&
-                  (header.column.columnDef.meta as any)?.sortable
-                "
-              >
-                <q-icon
-                  v-if="
-                    (sortFieldMap?.[header.column.id] ?? header.column.id) ===
-                    sortBy
-                  "
-                  :name="
-                    sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward'
-                  "
-                  data-test="tenstack-table-sort-icon-active"
-                  size="0.85rem"
-                  class="tw:text-[var(--o2-primary-color)]"
-                />
-                <q-icon
-                  v-else
-                  name="unfold_more"
-                  data-test="tenstack-table-sort-icon-inactive"
-                  size="0.85rem"
-                  class="tw:opacity-40"
-                />
-              </template>
-
+            <div class="tw:h-full tw:w-full tw:flex tw:items-center">
               <div
-                :data-test="`log-add-data-from-column-${header.column.columnDef.header}`"
-                class="tw:invisible tw:items-center tw:absolute tw:right-2 tw:top-0 tw:px-2 column-actions"
+                v-if="header.column.getCanResize()"
+                @dblclick="header.column.resetSize()"
+                @mousedown.self.prevent.stop="
+                  header.getResizeHandler()?.($event)
+                "
+                @touchstart.self.prevent.stop="
+                  header.getResizeHandler()?.($event)
+                "
+                :class="[
+                  'resizer',
+                  'tw:hover:bg-[var(--o2-border-color)]',
+                  header.column.getIsResizing() ? 'isResizing' : '',
+                ]"
+                class="tw:right-0 tw:bg-transparent"
+              />
+              <div
+                v-if="!header.isPlaceholder"
+                :data-test="`o2-table-th-sort-${header.id}`"
+                :class="[
+                  'text-left',
+                  header.column.getCanSort() ||
+                  (sortBy !== undefined &&
+                    (header.column.columnDef.meta as any)?.sortable)
+                    ? 'cursor-pointer tw:gap-1'
+                    : 'cursor-pointer tw:gap-1',
+                ]"
+                @click="
+                  handleHeaderSortClick(
+                    $event,
+                    header.column,
+                    header.column.getToggleSortingHandler(),
+                  )
+                "
+                class="tw:overflow-hidden tw:whitespace-nowrap tw:text-ellipsis! tw:tracking-[0.06rem] tw:text-[var(--o2-text-2)] tw:text-[0.85rem]"
+              >
+                <FlexRender
+                  :render="header.column.columnDef.header"
+                  :props="header.getContext()"
+                />
+                <!-- Server-side sort icons (shown when sortBy prop is provided) -->
+                <template
+                  v-if="
+                    sortBy !== undefined &&
+                    (header.column.columnDef.meta as any)?.sortable
+                  "
+                >
+                  <q-icon
+                    v-if="
+                      (sortFieldMap?.[header.column.id] ?? header.column.id) ===
+                      sortBy
+                    "
+                    :name="
+                      sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward'
+                    "
+                    data-test="tenstack-table-sort-icon-active"
+                    size="0.85rem"
+                    class="tw:text-[var(--o2-primary-color)]"
+                  />
+                  <q-icon
+                    v-else
+                    name="unfold_more"
+                    data-test="tenstack-table-sort-icon-inactive"
+                    size="0.85rem"
+                    class="tw:opacity-40"
+                  />
+                </template>
+              </div>
+              <div
+                :data-test="`o2-table-add-data-from-column-${header.column.columnDef.header}`"
+                class="tw:invisible tw:items-center tw:absolute tw:right-2 tw:top-0 tw:px-2 column-actions tw:h-full tw:flex"
                 :class="
                   store.state.theme === 'dark' ? 'field_overlay_dark' : ''
                 "
@@ -219,10 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </td>
         </tr>
-        <tr
-          data-test="log-search-result-function-error"
-          v-if="functionErrorMsg != ''"
-        >
+        <tr data-test="o2-table-function-error" v-if="functionErrorMsg != ''">
           <td
             :colspan="columnOrder.length"
             class="text-bold"
@@ -333,7 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ?.isExpandedRow
               "
               :colspan="columnOrder.length"
-              :data-test="`log-search-result-expanded-row-${virtualRow.index}`"
+              :data-test="`o2-table-expanded-row-${virtualRow.index}`"
               class="tw:w-full tw:relative"
             >
               <json-preview
@@ -364,7 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ].getVisibleCells()"
                 :key="cell.id"
                 :data-test="
-                  'log-table-column-' +
+                  'o2-table-column-' +
                   virtualRow.index +
                   '-' +
                   cell.column.columnDef.id
