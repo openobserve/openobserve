@@ -81,7 +81,10 @@ fn model_to_api_json(mut val: serde_json::Value) -> serde_json::Value {
 ///     Waiting→Processing, i.e. the actual trigger-fired wall-clock time)
 ///   - `last_anomaly_detected_at` ← `ScheduledTriggerData.last_satisfied_at` stored in
 ///     `trigger.data` JSON by the handler when `anomaly_count > 0`
-pub async fn list_configs(org_id: &str) -> Result<Vec<serde_json::Value>> {
+pub async fn list_configs(
+    org_id: &str,
+    folder_slug: Option<&str>,
+) -> Result<Vec<serde_json::Value>> {
     use config::meta::triggers::{ScheduledTriggerData, TriggerModule};
 
     let db = ORM_CLIENT
@@ -103,17 +106,47 @@ pub async fn list_configs(org_id: &str) -> Result<Vec<serde_json::Value>> {
             .map(|t| (t.module_key.clone(), t))
             .collect();
 
-    // Collect unique folder PKs so we can batch-resolve them to slugs.
+    // Resolve the folder slug filter to a PK so we can filter the in-memory list.
+    // (Storing PKs in the DB means we must compare against the PK, not the slug.)
+    let folder_pk_filter: Option<String> = if let Some(slug) = folder_slug {
+        infra::table::folders::get_pk_by_slug(
+            org_id,
+            slug,
+            config::meta::folder::FolderType::Alerts,
+        )
+        .await
+        .ok()
+        .flatten()
+    } else {
+        None
+    };
+
+    // Filter by folder if a slug was provided. When the PK lookup returns None
+    // (slug not found), no configs should match — return empty.
+    let configs: Vec<_> = if folder_slug.is_some() {
+        match &folder_pk_filter {
+            Some(pk) => configs
+                .into_iter()
+                .filter(|m| m.folder_id.as_deref() == Some(pk.as_str()))
+                .collect(),
+            None => vec![],
+        }
+    } else {
+        configs
+    };
+
+    // Collect unique folder PKs so we can batch-resolve them to slug + display name.
     let unique_pks: std::collections::HashSet<String> = configs
         .iter()
         .filter_map(|m| m.folder_id.as_ref())
         .cloned()
         .collect();
-    let mut pk_to_slug_map: std::collections::HashMap<String, String> =
+    // pk → (slug, display_name)
+    let mut pk_to_folder_map: std::collections::HashMap<String, (String, String)> =
         std::collections::HashMap::new();
     for pk in unique_pks {
-        if let Ok(Some(slug)) = infra::table::folders::get_slug_by_pk(&pk).await {
-            pk_to_slug_map.insert(pk, slug);
+        if let Ok(Some(info)) = infra::table::folders::get_slug_and_name_by_pk(&pk).await {
+            pk_to_folder_map.insert(pk, info);
         }
     }
 
@@ -121,18 +154,22 @@ pub async fn list_configs(org_id: &str) -> Result<Vec<serde_json::Value>> {
         .into_iter()
         .map(|model| {
             let anomaly_id = model.anomaly_id.clone();
-            let folder_slug = model
+            let (folder_slug, folder_name) = model
                 .folder_id
                 .as_deref()
-                .and_then(|pk| pk_to_slug_map.get(pk))
+                .and_then(|pk| pk_to_folder_map.get(pk))
                 .cloned()
-                .unwrap_or_else(|| "default".to_string());
+                .unwrap_or_else(|| ("default".to_string(), String::new()));
             let mut val = model_to_api_json(serde_json::to_value(model).unwrap_or_default());
-            // Replace stored PK with the user-visible slug.
+            // Replace stored PK with the user-visible slug and add display name.
             if let Some(obj) = val.as_object_mut() {
                 obj.insert(
                     "folder_id".to_string(),
                     serde_json::Value::String(folder_slug),
+                );
+                obj.insert(
+                    "folder_name".to_string(),
+                    serde_json::Value::String(folder_name),
                 );
             }
             if let Some(obj) = val.as_object_mut()
