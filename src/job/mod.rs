@@ -405,7 +405,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
             |org_id, sql, start, end, cfg_id, stream_type| {
                 Box::pin(async move {
                     crate::service::anomaly_detection::execute_anomaly_query(
-                        &org_id, &sql, start, end, &cfg_id, &stream_type,
+                        &org_id,
+                        &sql,
+                        start,
+                        end,
+                        &cfg_id,
+                        &stream_type,
                     )
                     .await
                 })

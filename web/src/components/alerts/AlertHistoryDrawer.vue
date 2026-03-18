@@ -68,13 +68,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <!-- Alert Type Chip -->
           <q-chip
-            v-if="alertDetails"
+            v-if="alertDetails && !isAnomaly"
             dense
             size="sm"
             :icon="alertDetails.is_real_time ? 'bolt' : 'schedule'"
             :label="alertDetails.is_real_time ? 'Real-time' : 'Scheduled'"
             :color="alertDetails.is_real_time ? 'orange-2' : 'grey-2'"
             :text-color="alertDetails.is_real_time ? 'orange-9' : 'grey-8'"
+            class="tw:shrink-0"
+          />
+          <q-chip
+            v-if="alertDetails && isAnomaly"
+            dense
+            size="sm"
+            icon="query_stats"
+            label="Anomaly Detection"
+            color="blue-1"
+            text-color="blue-8"
             class="tw:shrink-0"
           />
           <!-- Tab toggle -->
@@ -280,6 +290,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                             {{ formatStatus(props.row.status) }}
                           </span>
+                          <q-icon
+                            v-if="props.row.error"
+                            name="visibility"
+                            size="14px"
+                            class="tw:cursor-pointer tw:text-red-400"
+                          >
+                            <q-tooltip max-width="300px" class="tw:text-xs tw:break-words">
+                              {{ props.row.error }}
+                            </q-tooltip>
+                          </q-icon>
                         </div>
                       </template>
                       <template v-else-if="col.name === 'timestamp'">
@@ -309,37 +329,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           }}
                         </span>
                       </template>
-                      <template v-else-if="col.name === 'error'">
-                        <div
-                          v-if="props.row.error"
-                          class="tw:flex tw:items-center tw:gap-1"
-                        >
-                          <q-icon
-                            name="error_outline"
-                            size="16px"
-                            class="tw:text-red-500"
-                          />
-                          <span
-                            class="tw:text-[12px] tw:text-red-500 tw:truncate tw:max-w-[120px]"
-                          >
-                            {{ props.row.error }}
-                          </span>
-                          <q-tooltip
-                            class="tw:text-xs tw:max-w-xs tw:break-words"
-                          >
-                            {{ props.row.error }}
-                          </q-tooltip>
-                        </div>
-                        <span v-else class="tw:text-gray-400">—</span>
-                      </template>
-                      <template v-else-if="col.name === 'actual_value' || col.name === 'score' || col.name === 'threshold_value'">
-                        <span class="tw:text-[13px] tw:tabular-nums">
-                          {{ props.row[col.field] != null ? Number(props.row[col.field]).toFixed(4) : "—" }}
-                        </span>
-                      </template>
-                      <template v-else-if="col.name === 'deviation_percent'">
-                        <span class="tw:text-[13px] tw:tabular-nums">
-                          {{ props.row.deviation_percent != null ? Number(props.row.deviation_percent).toFixed(2) + "%" : "—" }}
+                      <template v-else-if="col.name === 'anomaly_count'">
+                        <span class="tw:text-[13px] tw:tabular-nums" :class="props.row.anomaly_count > 0 ? 'tw:text-red-500 tw:font-medium' : ''">
+                          {{ props.row.anomaly_count != null ? props.row.anomaly_count : "—" }}
                         </span>
                       </template>
                     </q-td>
@@ -376,6 +368,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:pt-2 tw:pb-2"
           >
+            <!-- Anomaly detection condition view -->
+            <template v-if="isAnomaly">
+              <div class="tw:flex tw:flex-col tw:gap-2 tw:flex-1 tw:overflow-y-auto">
+                <!-- Key-value metadata rows -->
+                <div
+                  v-for="item in anomalyConditionMeta"
+                  :key="item.label"
+                  class="tw:flex tw:items-start tw:gap-3 tw:px-1 tw:py-1 tw:rounded"
+                >
+                  <span
+                    class="tw:text-[11px] tw:font-semibold tw:uppercase tw:tracking-wide tw:w-36 tw:shrink-0 tw:pt-0.5"
+                    :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                  >{{ item.label }}</span>
+                  <span class="tw:text-[13px] tw:font-mono tw:break-all"
+                    :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-800'"
+                  >{{ item.value }}</span>
+                </div>
+                <!-- SQL block (custom_sql mode) -->
+                <template v-if="alertDetails.query_mode === 'custom_sql' && alertDetails.custom_sql">
+                  <div
+                    class="code-block tw:flex tw:flex-col tw:overflow-hidden tw:mt-1"
+                    :class="store.state.theme === 'dark' ? 'code-block-dark' : 'code-block-light'"
+                  >
+                    <div
+                      class="code-block-header tw:shrink-0"
+                      :class="store.state.theme === 'dark' ? 'code-block-header-dark' : 'code-block-header-light'"
+                    >
+                      <span class="tw:text-[11px] tw:font-medium"
+                        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                      >SQL</span>
+                      <q-btn flat dense size="xs" icon="content_copy"
+                        :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
+                        @click="copyToClipboard(alertDetails.custom_sql, 'SQL')"
+                      ><q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip></q-btn>
+                    </div>
+                    <pre class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:overflow-y-auto">{{ alertDetails.custom_sql }}</pre>
+                  </div>
+                </template>
+                <!-- Filters list (filters mode) -->
+                <template v-else-if="alertDetails.query_mode === 'filters' && alertDetails.filters?.length">
+                  <div
+                    class="tw:text-[11px] tw:font-semibold tw:uppercase tw:tracking-wide tw:px-1 tw:mt-1"
+                    :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                  >Filters</div>
+                  <div
+                    v-for="(f, i) in alertDetails.filters"
+                    :key="i"
+                    class="tw:flex tw:items-center tw:gap-2 tw:text-[13px] tw:font-mono tw:px-1"
+                    :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-800'"
+                  >
+                    <span>{{ f.field }} {{ f.operator }} {{ f.value }}</span>
+                  </div>
+                </template>
+              </div>
+            </template>
+
+            <!-- Regular alert condition view -->
+            <template v-else>
             <div
               class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden"
               :class="
@@ -453,6 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}</pre
               >
             </div>
+            </template>
 
             <!-- Description (only show if exists) -->
             <div v-if="alertDetails.description" class="tw:mt-3 tw:shrink-0">
@@ -510,6 +561,26 @@ interface Props {
 const props = defineProps<Props>();
 
 const isAnomaly = computed(() => props.alertType === "anomaly_detection");
+
+const anomalyConditionMeta = computed(() => {
+  const d = props.alertDetails;
+  if (!d) return [];
+  const items = [];
+  if (d.stream_type && d.stream_name) {
+    items.push({ label: "Stream", value: `${d.stream_type} / ${d.stream_name}` });
+  }
+  if (d.detection_function) {
+    items.push({ label: "Detection", value: d.detection_function });
+  }
+  if (d.histogram_interval) {
+    items.push({ label: "Bucket Size", value: d.histogram_interval });
+  }
+  if (d.detection_window) {
+    items.push({ label: "Window", value: d.detection_window });
+  }
+  items.push({ label: "Query Mode", value: d.query_mode === "custom_sql" ? "Custom SQL" : "Filters" });
+  return items;
+});
 
 const emit = defineEmits(["edit"]);
 
@@ -657,39 +728,23 @@ const anomalyHistoryColumns = [
     field: "status",
     align: "left" as const,
     sortable: true,
-    style: "width: 110px;",
-  },
-  {
-    name: "actual_value",
-    label: "Actual Value",
-    field: "actual_value",
-    align: "right" as const,
-    sortable: true,
     style: "width: 120px;",
   },
   {
-    name: "score",
-    label: "Score",
-    field: "score",
+    name: "evaluation_time",
+    label: t("alerts.historyTable.evaluationTime"),
+    field: "evaluation_took_in_secs",
     align: "right" as const,
     sortable: true,
-    style: "width: 100px;",
+    style: "width: 130px;",
   },
   {
-    name: "threshold_value",
-    label: "Threshold",
-    field: "threshold_value",
+    name: "anomaly_count",
+    label: "Anomalies",
+    field: "anomaly_count",
     align: "right" as const,
     sortable: true,
-    style: "width: 110px;",
-  },
-  {
-    name: "deviation_percent",
-    label: "Deviation %",
-    field: "deviation_percent",
-    align: "right" as const,
-    sortable: true,
-    style: "width: 110px;",
+    style: "width: 120px;",
   },
 ];
 
