@@ -16,14 +16,13 @@
 //! Adds folder_id, owner, and (when missing) alert_destinations columns to the
 //! anomaly_detection_config table.
 //!
-//! - folder_id (varchar 256): stores the folders.id PK, backfilled from the
-//!   "default" Alerts folder for each org.
+//! - folder_id (varchar 256): stores the folders.id PK, backfilled from the "default" Alerts folder
+//!   for each org.
 //! - owner (varchar 256): nullable attributed owner.
-//! - alert_destinations (jsonb): only added when the old alert_destination_id
-//!   column is present (i.e. environments that ran m20260310 before it was
-//!   updated). In that case the old value is wrapped in a JSON array and the
-//!   old column is dropped. Fresh installs already have alert_destinations from
-//!   the CREATE TABLE statement and skip this block entirely.
+//! - alert_destinations (jsonb): only added when the old alert_destination_id column is present
+//!   (i.e. environments that ran m20260310 before it was updated). In that case the old value is
+//!   wrapped in a JSON array and the old column is dropped. Fresh installs already have
+//!   alert_destinations from the CREATE TABLE statement and skip this block entirely.
 
 use sea_orm::{ConnectionTrait, Statement};
 use sea_orm_migration::prelude::*;
@@ -34,10 +33,7 @@ const ANOMALY_CONFIG_FOLDER_ID_IDX: &str = "idx_anomaly_config_folder_id";
 pub struct Migration;
 
 /// Returns `true` when the named column exists in `anomaly_detection_config`.
-async fn column_exists(
-    manager: &SchemaManager<'_>,
-    column: &str,
-) -> Result<bool, DbErr> {
+async fn column_exists(manager: &SchemaManager<'_>, column: &str) -> Result<bool, DbErr> {
     let db_backend = manager.get_database_backend();
     let sql = match db_backend {
         sea_orm::DbBackend::Sqlite => format!(
