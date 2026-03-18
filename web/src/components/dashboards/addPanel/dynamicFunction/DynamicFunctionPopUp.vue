@@ -39,7 +39,6 @@
     </div>
 
     <div
-      v-if="(!customQuery && !fields.isDerived) || chartType === 'table'"
       :style="(!customQuery && !fields.isDerived) ? 'width: calc(100% - 134px)' : 'width: max-content;'"
     >
       <q-tabs
