@@ -444,6 +444,15 @@ pub async fn update_config(
     if let Some(description) = req.description {
         active_model.description = Set(Some(description));
     }
+    if let Some(query_mode) = req.query_mode {
+        active_model.query_mode = Set(query_mode);
+    }
+    if let Some(filters) = req.filters {
+        active_model.filters = Set(Some(filters));
+    }
+    if let Some(custom_sql) = req.custom_sql {
+        active_model.custom_sql = Set(Some(custom_sql));
+    }
     if let Some(detection_function) = req.detection_function {
         active_model.detection_function = Set(detection_function);
     }
