@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
-use super::{Alert, QueryCondition, TriggerCondition};
+use super::{Alert, FrequencyType, QueryCondition, TriggerCondition};
 
 /// HTTP response body for `GetAlert` endpoint.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -160,10 +160,36 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         .to_string()
     });
 
+    // Build trigger_condition so the UI can display "Look back window" and "Check every".
+    // period  = detection_window_seconds / 60  (look-back window in minutes)
+    // frequency = schedule_interval parsed to minutes (e.g. "5m" → 5, "1h" → 60)
+    let period_minutes = v
+        .get("detection_window_seconds")
+        .and_then(|s| s.as_i64())
+        .map(|s| s / 60)
+        .unwrap_or(0);
+    let frequency_minutes = v
+        .get("schedule_interval")
+        .and_then(|s| s.as_str())
+        .map(parse_interval_to_minutes)
+        .unwrap_or(0);
+    let trigger_condition = Some(TriggerCondition {
+        period_minutes,
+        frequency_minutes,
+        frequency_type: FrequencyType::Minutes,
+        ..Default::default()
+    });
+
+    let folder_name = v
+        .get("folder_name")
+        .and_then(|n| n.as_str())
+        .unwrap_or("")
+        .to_string();
+
     Some(ListAlertsResponseBodyItem {
         alert_id,
         folder_id,
-        folder_name: String::new(),
+        folder_name,
         name: v.get("name")?.as_str()?.to_string(),
         owner: v.get("owner").and_then(|o| o.as_str()).map(String::from),
         description: v
@@ -173,7 +199,7 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
             .map(String::from),
         alert_type: "anomaly_detection".to_string(),
         condition: None,
-        trigger_condition: None,
+        trigger_condition,
         enabled: v.get("enabled").and_then(|e| e.as_bool()).unwrap_or(false),
         last_triggered_at: v.get("last_detection_run").and_then(|t| t.as_i64()),
         last_satisfied_at: v.get("last_anomaly_detected_at").and_then(|t| t.as_i64()),
@@ -182,6 +208,22 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         status,
     })
 }
+/// Parse an interval string like "5m", "1h", "30s" into minutes.
+/// Returns 0 for unrecognised formats.
+fn parse_interval_to_minutes(s: &str) -> i64 {
+    if let Some(n) = s.strip_suffix('m') {
+        n.parse().unwrap_or(0)
+    } else if let Some(n) = s.strip_suffix('h') {
+        n.parse::<i64>().unwrap_or(0) * 60
+    } else if let Some(n) = s.strip_suffix('s') {
+        n.parse::<i64>().unwrap_or(0) / 60
+    } else if let Some(n) = s.strip_suffix('d') {
+        n.parse::<i64>().unwrap_or(0) * 1440
+    } else {
+        s.parse().unwrap_or(0)
+    }
+}
+
 #[derive(Default, Serialize, ToSchema)]
 pub struct AlertBulkEnableResponse {
     #[schema(value_type = Vec<String>)]

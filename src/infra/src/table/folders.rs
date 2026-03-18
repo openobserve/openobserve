@@ -187,6 +187,18 @@ pub async fn get_slug_by_pk(pk: &str) -> Result<Option<String>, errors::Error> {
         .map(|m| m.folder_id))
 }
 
+/// Returns `(folder_id slug, display name)` for the given primary-key `id`.
+///
+/// Both values are needed when building API list responses for anomaly configs
+/// (mirrors the `folder_id` + `folder_name` fields returned for regular alerts).
+pub async fn get_slug_and_name_by_pk(pk: &str) -> Result<Option<(String, String)>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(Entity::find_by_id(pk)
+        .one(client)
+        .await?
+        .map(|m| (m.folder_id, m.name)))
+}
+
 /// Gets a folder ORM entity by its `folder_id`.
 pub(crate) async fn get_model<C: ConnectionTrait>(
     db: &C,
