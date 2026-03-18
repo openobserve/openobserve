@@ -402,10 +402,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // Must happen before start_scheduler() so the training/detection jobs can
         // call execute_anomaly_query() via the registered callback.
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_query_executor(
-            |org_id, sql, start, end, cfg_id| {
+            |org_id, sql, start, end, cfg_id, stream_type| {
                 Box::pin(async move {
                     crate::service::anomaly_detection::execute_anomaly_query(
-                        &org_id, &sql, start, end, &cfg_id,
+                        &org_id, &sql, start, end, &cfg_id, &stream_type,
                     )
                     .await
                 })
