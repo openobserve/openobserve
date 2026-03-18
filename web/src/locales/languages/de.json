@@ -2561,7 +2561,9 @@
     "spanColorPalettePreview": "Vorschau der Span-Farbpalette",
     "errorsFound": "Fehlerspuren",
     "spansTitle": "SPANNT",
-    "spansFound": "Gefundene Spannweiten"
+    "spansFound": "Gefundene Spannweiten",
+    "errorTraces": "Fehlerspuren",
+    "errorSpans": "Fehlerspannen"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",

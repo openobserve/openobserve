@@ -2559,7 +2559,9 @@
     "spanColorPalettePreview": "Anteprima della palette di colori Span",
     "errorsFound": "Tracce di errore",
     "spansTitle": "SI ESTENDE",
-    "spansFound": "Spacchi trovati"
+    "spansFound": "Spacchi trovati",
+    "errorTraces": "Tracce di errore",
+    "errorSpans": "Spazi di errore"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",

@@ -2582,7 +2582,9 @@
     "spanColorPalettePreview": "Span カラーパレットのプレビュー",
     "errorsFound": "エラートレース",
     "spansTitle": "スパン",
-    "spansFound": "スパンが見つかりました"
+    "spansFound": "スパンが見つかりました",
+    "errorTraces": "エラートレース",
+    "errorSpans": "エラースパン"
   },
   "actions": {
     "testAction": "アクションをテスト",
