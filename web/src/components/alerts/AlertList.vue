@@ -1211,6 +1211,11 @@ export default defineComponent({
       enabled: anomaly.enabled,
       conditions: "--",
       rawCondition: {},
+      detection_function: anomaly.detection_function || "",
+      query_mode: anomaly.query_mode || "filters",
+      custom_sql: anomaly.custom_sql || "",
+      filters: anomaly.filters || [],
+      histogram_interval: anomaly.histogram_interval || "",
       description: anomaly.description || "",
       uuid: getUUID(),
       owner: anomaly.owner || "",
@@ -2118,12 +2123,12 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           row.alert_id,
         );
+        row.status = "training";
         $q.notify({
           type: "positive",
           message: "Retraining triggered",
           timeout: 2000,
         });
-        await getAlertsFn(store, activeFolderId.value);
       } catch (error: any) {
         $q.notify({
           type: "negative",

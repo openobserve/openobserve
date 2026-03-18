@@ -97,15 +97,9 @@ pub struct AlertHistoryEntry {
     pub grouped: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub group_size: Option<i32>,
-    // Anomaly detection fields (only set when entry comes from _anomalies stream)
+    /// Number of anomalies found in this evaluation run (anomaly detection only).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub actual_value: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub score: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub threshold_value: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub deviation_percent: Option<f64>,
+    pub anomaly_count: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -248,16 +242,20 @@ pub async fn get_alert_history(
         "DESC" // Default sort order
     };
 
-    // Anomaly detection history: query the _anomalies stream instead of TRIGGERS_STREAM.
+    // Anomaly detection history: query the triggers stream with module = 'anomaly_detection'.
+    // The anomaly_count is stored in success_response as {"anomalies_found": N}.
+    // Result is derived: "anomaly" when count > 0, "normal" when 0, "failed"/"skipped" on error.
     if let Some(ref anomaly_id) = query.anomaly_id {
-        let anomaly_id = escape_like(anomaly_id);
+        let escaped_id = escape_like(anomaly_id);
         let where_clause = format!(
-            "anomaly_id = '{anomaly_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
+            "module = 'anomaly_detection' AND key LIKE '%/{escaped_id}' \
+             AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
         );
 
         let trace_id = get_or_create_trace_id(req.headers(), &Span::current());
 
-        let count_sql = format!("SELECT _timestamp FROM \"_anomalies\" WHERE {where_clause}");
+        let count_sql =
+            format!("SELECT _timestamp FROM \"{TRIGGERS_STREAM}\" WHERE {where_clause}");
         let count_req = SearchRequest {
             query: SearchQuery {
                 sql: count_sql,
@@ -286,7 +284,7 @@ pub async fn get_alert_history(
         {
             Ok(r) => r.total,
             Err(e) => {
-                // _anomalies stream doesn't exist yet (no detection has run) — treat as empty.
+                // Triggers stream doesn't exist yet — treat as empty.
                 let msg = e.to_string().to_lowercase();
                 if msg.contains("not found") || msg.contains("stream not found") {
                     return MetaHttpResponse::json(AlertHistoryResponse {
@@ -312,24 +310,10 @@ pub async fn get_alert_history(
             });
         }
 
-        let sort_col = match query
-            .sort_by
-            .as_deref()
-            .unwrap_or("timestamp")
-            .to_lowercase()
-            .as_str()
-        {
-            "timestamp" => "_timestamp",
-            "status" => "is_anomaly",
-            "actual_value" => "actual_value",
-            "score" => "score",
-            "deviation_percent" => "deviation_percent",
-            _ => "_timestamp",
-        };
         let data_sql = format!(
-            "SELECT _timestamp, anomaly_name, is_anomaly, actual_value, score, threshold_value, deviation_percent \
-             FROM \"_anomalies\" WHERE {where_clause} \
-             ORDER BY {sort_col} {sort_order} LIMIT {size} OFFSET {from}"
+            "SELECT _timestamp, status, evaluation_took_in_secs, error, success_response \
+             FROM \"{TRIGGERS_STREAM}\" WHERE {where_clause} \
+             ORDER BY {sort_column} {sort_order} LIMIT {size} OFFSET {from}"
         );
         let data_req = SearchRequest {
             query: SearchQuery {
@@ -370,33 +354,45 @@ pub async fn get_alert_history(
             .hits
             .into_iter()
             .map(|hit| {
-                let is_anomaly = hit
-                    .get("is_anomaly")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false);
+                let raw_status = hit
+                    .get("status")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown");
+                // Derive result: parse anomalies_found from success_response JSON.
+                let anomaly_count = hit
+                    .get("success_response")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
+                    .and_then(|v| v["anomalies_found"].as_i64())
+                    .unwrap_or(0);
+                let result = match raw_status {
+                    "failed" => "failed".to_string(),
+                    "skipped" => "skipped".to_string(),
+                    _ => {
+                        if anomaly_count > 0 {
+                            "anomaly".to_string()
+                        } else {
+                            "normal".to_string()
+                        }
+                    }
+                };
                 AlertHistoryEntry {
                     timestamp: hit.get("_timestamp").and_then(|v| v.as_i64()).unwrap_or(0),
-                    alert_name: hit
-                        .get("anomaly_name")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string(),
+                    alert_name: String::new(),
                     org: org_id.clone(),
-                    status: if is_anomaly {
-                        "anomaly".to_string()
-                    } else {
-                        "normal".to_string()
-                    },
+                    status: result,
                     is_realtime: false,
                     is_silenced: false,
                     start_time: hit.get("_timestamp").and_then(|v| v.as_i64()).unwrap_or(0),
                     end_time: hit.get("_timestamp").and_then(|v| v.as_i64()).unwrap_or(0),
                     retries: 0,
-                    error: None,
+                    error: hit.get("error").and_then(|v| v.as_str()).map(String::from),
                     success_response: None,
                     is_partial: None,
                     delay_in_secs: None,
-                    evaluation_took_in_secs: None,
+                    evaluation_took_in_secs: hit
+                        .get("evaluation_took_in_secs")
+                        .and_then(|v| v.as_f64()),
                     source_node: None,
                     query_took: None,
                     dedup_enabled: None,
@@ -404,10 +400,7 @@ pub async fn get_alert_history(
                     dedup_count: None,
                     grouped: None,
                     group_size: None,
-                    actual_value: hit.get("actual_value").and_then(|v| v.as_f64()),
-                    score: hit.get("score").and_then(|v| v.as_f64()),
-                    threshold_value: hit.get("threshold_value").and_then(|v| v.as_f64()),
-                    deviation_percent: hit.get("deviation_percent").and_then(|v| v.as_f64()),
+                    anomaly_count: Some(anomaly_count as i32),
                 }
             })
             .collect();
@@ -756,10 +749,7 @@ pub async fn get_alert_history(
                 .get("group_size")
                 .and_then(|v| v.as_i64())
                 .map(|v| v as i32),
-            actual_value: None,
-            score: None,
-            threshold_value: None,
-            deviation_percent: None,
+            anomaly_count: None,
         });
     }
 
@@ -824,10 +814,7 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
-            actual_value: None,
-            score: None,
-            threshold_value: None,
-            deviation_percent: None,
+            anomaly_count: None,
         };
 
         assert_eq!(entry.alert_name, "test_alert");
@@ -878,10 +865,7 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
-            actual_value: None,
-            score: None,
-            threshold_value: None,
-            deviation_percent: None,
+            anomaly_count: None,
         };
 
         let response = AlertHistoryResponse {
@@ -921,10 +905,7 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
-            actual_value: None,
-            score: None,
-            threshold_value: None,
-            deviation_percent: None,
+            anomaly_count: None,
         };
 
         assert_eq!(entry.status, "error");
@@ -1138,10 +1119,7 @@ mod tests {
             dedup_count: Some(1),
             grouped: Some(false),
             group_size: None,
-            actual_value: None,
-            score: None,
-            threshold_value: None,
-            deviation_percent: None,
+            anomaly_count: None,
         };
 
         let json = serde_json::to_string(&entry).unwrap();
@@ -1178,10 +1156,7 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
-            actual_value: None,
-            score: None,
-            threshold_value: None,
-            deviation_percent: None,
+            anomaly_count: None,
         };
 
         let response = AlertHistoryResponse {
