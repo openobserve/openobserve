@@ -43,8 +43,12 @@ describe("AlertHistoryDrawer.vue", () => {
   const mockAlertDetails = {
     name: "CPU Alert",
     is_real_time: false,
-    type: "sql",
-    conditions: "SELECT count(*) FROM logs WHERE level='error'",
+    condition: {
+      type: "sql",
+      sql: "SELECT count(*) FROM logs WHERE level='error'",
+      vrl_function: null,
+      conditions: null,
+    },
     description: "Fires when CPU usage exceeds 80%",
   };
 
@@ -201,7 +205,16 @@ describe("AlertHistoryDrawer.vue", () => {
 
     it("should display PromQL label for promql type alerts", async () => {
       await mountComponent({
-        alertDetails: { ...mockAlertDetails, type: "promql", conditions: "rate(http_errors[5m])" },
+        alertDetails: {
+          ...mockAlertDetails,
+          condition: {
+            type: "promql",
+            promql: "rate(http_errors[5m])",
+            sql: null,
+            vrl_function: null,
+            conditions: null,
+          },
+        },
         alertId: "alert-123",
       });
       await switchToConditionTab();
@@ -226,22 +239,10 @@ describe("AlertHistoryDrawer.vue", () => {
       ).toBe(true);
     });
 
-    it("should display the description when provided", async () => {
+    it("should not display description in condition tab", async () => {
       await mountComponent();
       await switchToConditionTab();
-      expect(wrapper.text()).toContain(
-        "Fires when CPU usage exceeds 80%",
-      );
-    });
-
-    it("should hide the description section when not provided", async () => {
-      await mountComponent({
-        alertDetails: { ...mockAlertDetails, description: "" },
-        alertId: "alert-123",
-      });
-      // Description label should not be present when description is empty
-      const text = wrapper.text();
-      expect(text).not.toContain("Fires when CPU usage exceeds 80%");
+      expect(wrapper.text()).not.toContain("Fires when CPU usage exceeds 80%");
     });
   });
 
