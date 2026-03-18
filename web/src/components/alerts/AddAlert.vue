@@ -1390,9 +1390,18 @@ export default defineComponent({
             : rawDestIds
               ? [rawDestIds]
               : [];
+          // Parse "avg(field)" → fn="avg", field="field"
+          const rawFn: string = data.detection_function || "count";
+          const fnMatch = rawFn.match(/^(\w+)\(([^)]*)\)$/);
+          const parsedFn = fnMatch ? fnMatch[1] : rawFn;
+          const parsedField =
+            data.detection_function_field ||
+            (fnMatch && fnMatch[2] !== "*" ? fnMatch[2] : "");
           anomalyConfig.value = {
             ...defaultAnomalyConfig(),
             ...data,
+            detection_function: parsedFn,
+            detection_function_field: parsedField,
             threshold: data.threshold ?? data.percentile ?? 97,
             filters: data.filters ?? [],
             histogram_interval_value: histInterval.value,
