@@ -36,7 +36,7 @@ pub struct Model {
     pub rcf_tree_size: i32,
     pub rcf_shingle_size: i32,
     pub alert_enabled: bool,
-    pub alert_destination_id: Option<String>,
+    pub alert_destinations: Option<Json>,
     /// Folder slug (e.g. "default"). NULL means the default folder.
     pub folder_id: Option<String>,
     pub owner: Option<String>,

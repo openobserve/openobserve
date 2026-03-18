@@ -254,7 +254,9 @@ pub async fn create_config(
                 .rcf_shingle_size as i32,
         )),
         alert_enabled: Set(req.alert_enabled.unwrap_or(true)),
-        alert_destination_id: Set(req.alert_destination_id.clone()),
+        alert_destinations: Set(Some(
+            serde_json::to_value(&req.alert_destinations).unwrap_or(serde_json::json!([])),
+        )),
         folder_id: Set(folder_pk),
         owner: Set(req.owner.clone()),
         status: Set(0i32), // 0 = waiting
@@ -402,8 +404,10 @@ pub async fn update_config(
     if let Some(alert_enabled) = req.alert_enabled {
         active_model.alert_enabled = Set(alert_enabled);
     }
-    if let Some(alert_destination_id) = req.alert_destination_id {
-        active_model.alert_destination_id = Set(Some(alert_destination_id));
+    if let Some(destinations) = req.alert_destinations {
+        active_model.alert_destinations = Set(Some(
+            serde_json::to_value(&destinations).unwrap_or(serde_json::json!([])),
+        ));
     }
     if let Some(folder_id_str) = req.folder_id {
         let pk = resolve_folder_pk(org_id, &folder_id_str).await;
@@ -588,7 +592,7 @@ pub async fn clone_config(
         rcf_tree_size: Set(src.rcf_tree_size),
         rcf_shingle_size: Set(src.rcf_shingle_size),
         alert_enabled: Set(src.alert_enabled),
-        alert_destination_id: Set(src.alert_destination_id.clone()),
+        alert_destinations: Set(src.alert_destinations.clone()),
         folder_id: Set(resolved_folder_id),
         owner: Set(src.owner.clone()),
         status: Set(0i32),
@@ -778,61 +782,67 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
         }
 
         // Send alert if anomalies found and alert is configured
-        if result.anomaly_count > 0
-            && config.alert_enabled
-            && let Some(ref dest_id) = config.alert_destination_id
-        {
-            let anomaly_pts: Vec<_> = result
-                .scored_points
-                .iter()
-                .filter(|p| p.is_anomaly)
-                .collect();
-            let max_dev = anomaly_pts
-                .iter()
-                .map(|p| p.deviation_percent)
-                .fold(0.0f64, f64::max);
-            let worst_val = anomaly_pts
-                .iter()
-                .max_by(|a, b| {
-                    a.deviation_percent
-                        .partial_cmp(&b.deviation_percent)
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                })
-                .map(|p| p.actual_value)
-                .unwrap_or(0.0);
-            let window_start = result
-                .scored_points
-                .iter()
-                .map(|p| p.timestamp)
-                .min()
-                .unwrap_or(start_time_us);
-            let window_end = result
-                .scored_points
-                .iter()
-                .map(|p| p.timestamp)
-                .max()
-                .unwrap_or(end_time_us);
+        if result.anomaly_count > 0 && config.alert_enabled {
+            let destinations: Vec<String> = config
+                .alert_destinations
+                .as_ref()
+                .and_then(|v| serde_json::from_value::<Vec<String>>(v.clone()).ok())
+                .unwrap_or_default();
+            if !destinations.is_empty() {
+                let anomaly_pts: Vec<_> = result
+                    .scored_points
+                    .iter()
+                    .filter(|p| p.is_anomaly)
+                    .collect();
+                let max_dev = anomaly_pts
+                    .iter()
+                    .map(|p| p.deviation_percent)
+                    .fold(0.0f64, f64::max);
+                let worst_val = anomaly_pts
+                    .iter()
+                    .max_by(|a, b| {
+                        a.deviation_percent
+                            .partial_cmp(&b.deviation_percent)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .map(|p| p.actual_value)
+                    .unwrap_or(0.0);
+                let window_start = result
+                    .scored_points
+                    .iter()
+                    .map(|p| p.timestamp)
+                    .min()
+                    .unwrap_or(start_time_us);
+                let window_end = result
+                    .scored_points
+                    .iter()
+                    .map(|p| p.timestamp)
+                    .max()
+                    .unwrap_or(end_time_us);
 
-            if let Err(e) = send_anomaly_alert(
-                org_id.to_string(),
-                dest_id.clone(),
-                config.name.clone(),
-                anomaly_id.to_string(),
-                result.anomaly_count,
-                config.stream_name.clone(),
-                max_dev,
-                worst_val,
-                window_start,
-                window_end,
-            )
-            .await
-            {
-                log::warn!(
-                    "[anomaly_detection {}] failed to send alert to '{}': {}",
-                    anomaly_id,
-                    dest_id,
-                    e
-                );
+                for dest_id in destinations {
+                    if let Err(e) = send_anomaly_alert(
+                        org_id.to_string(),
+                        dest_id.clone(),
+                        config.name.clone(),
+                        anomaly_id.to_string(),
+                        result.anomaly_count,
+                        config.stream_name.clone(),
+                        max_dev,
+                        worst_val,
+                        window_start,
+                        window_end,
+                    )
+                    .await
+                    {
+                        log::warn!(
+                            "[anomaly_detection {}] failed to send alert to '{}': {}",
+                            anomaly_id,
+                            dest_id,
+                            e
+                        );
+                    }
+                }
             }
         }
 
@@ -1022,7 +1032,11 @@ pub fn config_to_training_config(
         rcf_tree_size: config.rcf_tree_size as usize,
         rcf_shingle_size: config.rcf_shingle_size as usize,
         alert_enabled: config.alert_enabled,
-        alert_destination_id: config.alert_destination_id.clone(),
+        alert_destinations: config
+            .alert_destinations
+            .as_ref()
+            .and_then(|v| serde_json::from_value::<Vec<String>>(v.clone()).ok())
+            .unwrap_or_default(),
         status: o2_enterprise::enterprise::anomaly_detection::types::Status::from_i32(
             config.status,
         ),

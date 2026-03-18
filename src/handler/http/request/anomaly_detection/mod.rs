@@ -397,7 +397,8 @@ pub struct CreateAnomalyConfigRequest {
     pub rcf_tree_size: Option<i32>,
     pub rcf_shingle_size: Option<i32>,
     pub alert_enabled: Option<bool>,
-    pub alert_destination_id: Option<String>,
+    #[serde(default)]
+    pub alert_destinations: Vec<String>,
     pub enabled: Option<bool>,
     /// Folder to place this config in. Resolved to the org default folder if absent.
     pub folder_id: Option<String>,
@@ -424,7 +425,7 @@ pub struct UpdateAnomalyConfigRequest {
     /// How often to retrain the model (in days). `0` means never retrain automatically.
     pub retrain_interval_days: Option<i32>,
     pub alert_enabled: Option<bool>,
-    pub alert_destination_id: Option<String>,
+    pub alert_destinations: Option<Vec<String>>,
     pub enabled: Option<bool>,
     pub folder_id: Option<String>,
     pub owner: Option<String>,
