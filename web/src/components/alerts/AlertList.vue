@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="tw-flex tw-items-center tw-gap-4">
             <!-- Icon-only View Mode Tabs -->
-            <div class="view-mode-tabs">
+            <div v-if="isIncidentsEnabled" class="view-mode-tabs">
               <q-btn
                 flat
                 dense
@@ -990,9 +990,15 @@ export default defineComponent({
 
     const activeFolderToMove = ref("default");
 
+    const isIncidentsEnabled = computed(
+      () => store.state.zoConfig.incidents_enabled,
+    );
+
     // Initialize viewMode from URL query parameter
     const viewMode = ref(
-      (router.currentRoute.value.query.view as string) === "incidents" ? "incidents" : "alerts"
+      (router.currentRoute.value.query.view as string) === "incidents" && isIncidentsEnabled.value
+        ? "incidents"
+        : "alerts"
     );
 
     // Initialize activeTab from URL query parameter, default to "all"
@@ -2460,6 +2466,7 @@ export default defineComponent({
       computedOwner,
       tabs,
       alertTabs,
+      isIncidentsEnabled,
       viewMode,
       onViewModeChange,
       incidentSearchQuery,

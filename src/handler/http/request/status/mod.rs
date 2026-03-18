@@ -154,6 +154,7 @@ struct ConfigResponse<'a> {
     mysql_deprecated_warning: bool,
     alert_preview_timerange_minutes: i64,
     service_graph_enabled: bool,
+    incidents_enabled: bool,
     service_streams_enabled: bool,
     /// Available FQN priority dimensions from O2_FQN_PRIORITY_DIMENSIONS env var
     /// Used by UI to populate the FQN priority dimension selector
@@ -327,6 +328,11 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let service_graph_enabled = false;
 
     #[cfg(feature = "enterprise")]
+    let incidents_enabled = o2cfg.incidents.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let incidents_enabled = false;
+
+    #[cfg(feature = "enterprise")]
     let service_streams_enabled = o2cfg.service_streams.enabled;
     #[cfg(not(feature = "enterprise"))]
     let service_streams_enabled = false;
@@ -436,6 +442,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         mysql_deprecated_warning: cfg.common.meta_store.starts_with("mysql"),
         alert_preview_timerange_minutes: cfg.limit.alert_preview_timerange_minutes,
         service_graph_enabled,
+        incidents_enabled,
         service_streams_enabled,
         #[cfg(feature = "enterprise")]
         fqn_priority_dimensions: o2_enterprise::enterprise::common::config::get_config()
