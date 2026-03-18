@@ -106,8 +106,8 @@ pub struct AnomalyAlertFields {
 /// structure as Alert.
 ///
 /// For anomaly detection configs, set `alert_type = "anomaly_detection"` and supply
-/// anomaly-specific changes in the `anomaly_config` object. Only fields present in
-/// `anomaly_config` will be updated (partial update semantics for anomaly fields).
+/// anomaly-specific fields directly at the top level (flat). Only fields present in
+/// the request body will be updated (partial update semantics for anomaly fields).
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct UpdateAlertRequestBody {
     /// Discriminates the alert type. When `"anomaly_detection"`, delegates to the
@@ -115,13 +115,57 @@ pub struct UpdateAlertRequestBody {
     pub alert_type: Option<meta_alerts::AlertTypeFilter>,
 
     /// Anomaly-detection-specific fields to update (partial — only supplied fields
-    /// are changed). Required when `alert_type` is `"anomaly_detection"`.
+    /// are changed). Accepted as a nested object OR as flat top-level fields.
     pub anomaly_config: Option<UpdateAnomalyAlertFields>,
+
+    // Anomaly-detection fields accepted at the top level (flat payload from frontend).
+    // These take precedence over the nested `anomaly_config` when both are present.
+    pub query_mode: Option<String>,
+    pub filters: Option<serde_json::Value>,
+    pub custom_sql: Option<String>,
+    pub detection_function: Option<String>,
+    pub histogram_interval: Option<String>,
+    pub schedule_interval: Option<String>,
+    pub detection_window_seconds: Option<i64>,
+    pub training_window_days: Option<i32>,
+    pub retrain_interval_days: Option<i32>,
+    /// Anomaly threshold as an integer percentile (e.g. 97 means 97th percentile).
+    /// Maps to the internal `percentile` field.
+    pub threshold: Option<i32>,
+    pub alert_enabled: Option<bool>,
 
     /// Alert configuration fields (used for scheduled/realtime alerts).
     #[serde(flatten)]
     #[schema(inline)]
     pub alert: Alert,
+}
+
+impl UpdateAlertRequestBody {
+    /// Merge flat top-level anomaly fields with any nested `anomaly_config`,
+    /// returning a single `UpdateAnomalyAlertFields`. Top-level fields win.
+    pub fn anomaly_fields(&self) -> UpdateAnomalyAlertFields {
+        let base = self.anomaly_config.clone().unwrap_or_default();
+        UpdateAnomalyAlertFields {
+            name: base.name,
+            description: base.description,
+            query_mode: self.query_mode.clone().or(base.query_mode),
+            filters: self.filters.clone().or(base.filters),
+            custom_sql: self.custom_sql.clone().or(base.custom_sql),
+            detection_function: self.detection_function.clone().or(base.detection_function),
+            histogram_interval: self.histogram_interval.clone().or(base.histogram_interval),
+            schedule_interval: self.schedule_interval.clone().or(base.schedule_interval),
+            detection_window_seconds: self
+                .detection_window_seconds
+                .or(base.detection_window_seconds),
+            training_window_days: self.training_window_days.or(base.training_window_days),
+            retrain_interval_days: self.retrain_interval_days.or(base.retrain_interval_days),
+            percentile: self.threshold.map(|t| t as f64).or(base.percentile),
+            alert_enabled: self.alert_enabled.or(base.alert_enabled),
+            enabled: base.enabled,
+            folder_id: base.folder_id,
+            owner: base.owner,
+        }
+    }
 }
 
 /// Anomaly-detection-specific fields for `UpdateAlertRequestBody` (all optional).
