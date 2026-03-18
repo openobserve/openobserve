@@ -2969,7 +2969,10 @@ export default defineComponent({
         const c = anomalyConfig.value;
         const payload: any = {
           alert_type: "anomaly_detection",
-          destinations: [],
+          destinations:
+            c.alert_enabled && c.alert_destination_id
+              ? [c.alert_destination_id]
+              : [],
           name: c.name,
           description: c.description || undefined,
           stream_name: c.stream_name,
@@ -2992,9 +2995,6 @@ export default defineComponent({
             retrain_interval_days: c.retrain_interval_days,
             percentile: c.threshold,
             alert_enabled: c.alert_enabled,
-            alert_destination_ids: c.alert_enabled
-              ? c.alert_destination_ids
-              : undefined,
           },
         };
 
