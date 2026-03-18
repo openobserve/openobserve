@@ -22,20 +22,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Pattern Column -->
     <div class="tw-flex-1 tw-min-w-0 tw-px-2">
+      <!-- Template rendered as tokenized chips so wildcards are visually distinct -->
       <div
-        class="tw-truncate pattern-template-text"
+        class="pattern-template-text tw-flex tw-flex-wrap tw-items-baseline tw-gap-x-[2px] tw-gap-y-[1px]"
         :class="store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'"
         :data-test="`pattern-card-${index}-template`"
         :title="pattern.template"
       >
-        {{ pattern.template }}
+        <template v-for="(tok, i) in templateTokens" :key="i">
+          <span v-if="tok.kind === 'text'" class="tw-whitespace-pre">{{ tok.value }}</span>
+          <q-chip
+            v-else
+            dense
+            size="xs"
+            class="wildcard-chip q-my-none q-mx-none"
+            :class="wildcardChipColor(tok.value)"
+          >
+            {{ tok.value }}
+            <q-tooltip
+              v-if="tok.sampleValues.length > 0"
+              anchor="bottom middle"
+              self="top middle"
+              :delay="300"
+              class="wildcard-tooltip"
+            >
+              <div class="tw-font-mono tw-text-xs">
+                <div class="tw-font-semibold tw-mb-1">{{ t("search.wildcardSampleValues") }}</div>
+                <div
+                  v-for="(val, vi) in tok.sampleValues.slice(0, 10)"
+                  :key="vi"
+                  class="tw-truncate tw-max-w-[20rem]"
+                >
+                  {{ val }}
+                </div>
+              </div>
+            </q-tooltip>
+          </q-chip>
+        </template>
       </div>
+
+      <!-- Anomaly badge with explanation tooltip -->
       <span
         v-if="pattern.is_anomaly"
-        class="text-negative text-weight-bold tw-text-[0.625rem]"
+        class="text-negative text-weight-bold tw-text-[0.625rem] tw-cursor-help"
         :data-test="`pattern-card-${index}-anomaly-badge`"
-        >⚠️ {{ t("search.anomalyLabel") }}</span
       >
+        ⚠️ {{ t("search.anomalyLabel") }}
+        <q-tooltip anchor="bottom middle" self="top middle" class="anomaly-tooltip">
+          <div class="tw-text-xs tw-max-w-[22rem]">{{ anomalyExplanationText }}</div>
+        </q-tooltip>
+      </span>
     </div>
 
     <!-- Occurrence Column -->
@@ -104,12 +140,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import {
+  tokenizeTemplate,
+  wildcardChipColor,
+  anomalyExplanation,
+} from "@/composables/useLogs/useTemplateTokenizer";
 
-defineProps<{
+const props = defineProps<{
   pattern: any;
   index: number;
 }>();
@@ -122,6 +164,12 @@ defineEmits<{
 
 const store = useStore();
 const { t } = useI18n();
+
+const templateTokens = computed(() =>
+  tokenizeTemplate(props.pattern.template ?? "", props.pattern.wildcard_values ?? []),
+);
+
+const anomalyExplanationText = computed(() => anomalyExplanation(props.pattern, t));
 </script>
 
 <style scoped lang="scss">
@@ -130,5 +178,16 @@ const { t } = useI18n();
 .pattern-template-text {
   font-family: monospace;
   font-size: 12px;
+}
+
+.wildcard-chip {
+  font-family: monospace;
+  font-size: 10px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 3px;
+  line-height: 16px;
+  // Prevent chips from inheriting the truncate overflow of the parent row
+  flex-shrink: 0;
 }
 </style>
