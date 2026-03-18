@@ -122,6 +122,7 @@ export default class ChartTypeSelector {
       x: "dashboard-add-x-data",
       y: "dashboard-add-y-data",
       b: "dashboard-add-b-data",
+      p: "dashboard-add-p-data",
       filter: "dashboard-add-filter-data",
       latitude: "dashboard-add-latitude-data",
       longitude: "dashboard-add-longitude-data",

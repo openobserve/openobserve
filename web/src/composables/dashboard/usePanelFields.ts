@@ -50,6 +50,19 @@ export const usePanelFields = ({
       .join(" ");
   };
 
+  const isPivotMode = computed(() => {
+    if (dashboardPanelData.data.type !== "table") return false;
+    const currentQuery =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ];
+    return (
+      (currentQuery?.fields?.breakdown?.length ?? 0) > 0 &&
+      (currentQuery?.fields?.y?.length ?? 0) > 0 &&
+      (currentQuery?.fields?.x?.length ?? 0) > 0
+    );
+  });
+
   const isAddXAxisNotAllowed = computed((e: any) => {
     switch (dashboardPanelData.data.type) {
       case "pie":
@@ -100,6 +113,13 @@ export const usePanelFields = ({
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields.breakdown?.length >= 1
+        );
+      case "table":
+        // Allow up to 3 breakdown fields for table charts
+        return (
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.breakdown?.length >= 3
         );
     }
   });
@@ -934,12 +954,8 @@ export const usePanelFields = ({
     // First reset all existing fields in dashboardPanelData
     resetFields();
 
-    // For table chart type, merge breakdown fields into x fields
+    // Keep breakdown fields for table — they are used for pivot table mode
     const fieldsToProcess = { ...fields };
-    if (chartType === "table") {
-      fieldsToProcess.x = [...(fields.x || []), ...(fields.breakdown || [])];
-      fieldsToProcess.breakdown = [];
-    }
 
     // The add functions will automatically apply validation based on current chart type
     // Add X-axis fields
@@ -1017,5 +1033,6 @@ export const usePanelFields = ({
     resetFields,
     removeXYFilters,
     setFieldsBasedOnChartTypeValidation,
+    isPivotMode,
   };
 };
