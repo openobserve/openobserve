@@ -18,7 +18,10 @@ import {
   convertMultiSQLData,
   convertSQLData,
 } from "@/utils/dashboard/convertSQLData";
-import { convertTableData } from "@/utils/dashboard/convertTableData";
+import {
+  convertTableData,
+  convertMultiQueryTableData,
+} from "@/utils/dashboard/convertTableData";
 import { convertPivotTableData } from "@/utils/dashboard/convertPivotTableData";
 import { convertGeoMapData } from "@/utils/dashboard/convertGeoMapData";
 import { convertMapsData } from "@/utils/dashboard/convertMapsData";
@@ -139,11 +142,21 @@ export const convertPanelData = async (
           (pivotQuery?.fields?.y?.length ?? 0) > 0;
 
         if (isPivot) {
+          // Pivot: single query only
           return {
             chartType: panelSchema.type,
-            ...convertPivotTableData(panelSchema, data, store),
+            ...convertPivotTableData(panelSchema, [data[0]], store),
           };
         }
+
+        // Multi-query UNION mode for non-pivot tables
+        if (Array.isArray(data) && data.length > 1) {
+          return {
+            chartType: panelSchema.type,
+            ...convertMultiQueryTableData(panelSchema, data, store),
+          };
+        }
+
         return {
           chartType: panelSchema.type,
           ...convertTableData(panelSchema, data, store),

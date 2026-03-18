@@ -454,6 +454,10 @@ pub struct PanelConfig {
     panel_time_enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     panel_time_range: Option<PanelTimeRange>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    series_label_position: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_multi_query_mode: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -624,6 +628,8 @@ pub struct QueryConfig {
     max: Option<OrdF64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     time_shift: Option<Vec<TimeShift>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    query_label: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]

@@ -639,7 +639,7 @@ export const validateSQLPanelFields = (
   const isPromQLMode = panelData?.queryType === "promql";
   if (
     !isPromQLMode &&
-    !panelData?.queries?.[0]?.customQuery &&
+    !panelData?.queries?.[queryIndex]?.customQuery &&
     isFieldsValidationRequired
   ) {
     // Validate fields configuration based on chart type
