@@ -39,6 +39,25 @@ vi.mock("@/utils/html", () => ({
 
 import PatternDetailsDialog from "./PatternDetailsDialog.vue";
 
+// escapeHtml is mocked to perform only the < and > escaping needed to make
+// <*> tokens become &lt;*&gt; — matching what the real utility produces for
+// angle-bracket characters, without pulling in full HTML escaping behaviour.
+//
+// A stable spy is declared with vi.hoisted so tests can assert call args
+// against the same function instance used inside the component.
+const escapeHtmlSpy = vi.hoisted(() =>
+  vi.fn(
+    (text: string) =>
+      String(text).replace(/</g, "&lt;").replace(/>/g, "&gt;"),
+  ),
+);
+
+vi.mock("@/utils/html", () => ({
+  escapeHtml: escapeHtmlSpy,
+}));
+
+import PatternDetailsDialog from "./PatternDetailsDialog.vue";
+
 installQuasar({
   plugins: [quasar.Dialog, quasar.Notify],
 });
