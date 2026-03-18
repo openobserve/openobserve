@@ -13,17 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Adds folder_id and owner columns to the anomaly_detection_config table.
+//! Adds folder_id, owner, and (when missing) alert_destinations columns to the
+//! anomaly_detection_config table.
 //!
-//! - folder_id (varchar 256, NOT NULL): stores the folders.id PK (same FK as alerts table).
-//!   Existing rows are backfilled from the "default" Alerts folder for each org. Then the column is
-//!   made NOT NULL, consistent with the alerts table.
-//! - owner (varchar 256): nullable, attributed owner of the config.
-//!
-//! Note: alert_destinations is already present in the CREATE TABLE statement
-//! (m20260310_000001_create_anomaly_detection_config_table), so it is not added here.
+//! - folder_id (varchar 256): stores the folders.id PK, backfilled from the
+//!   "default" Alerts folder for each org.
+//! - owner (varchar 256): nullable attributed owner.
+//! - alert_destinations (jsonb): only added when the old alert_destination_id
+//!   column is present (i.e. environments that ran m20260310 before it was
+//!   updated). In that case the old value is wrapped in a JSON array and the
+//!   old column is dropped. Fresh installs already have alert_destinations from
+//!   the CREATE TABLE statement and skip this block entirely.
 
-use sea_orm::ConnectionTrait;
+use sea_orm::{ConnectionTrait, Statement};
 use sea_orm_migration::prelude::*;
 
 const ANOMALY_CONFIG_FOLDER_ID_IDX: &str = "idx_anomaly_config_folder_id";
@@ -31,21 +33,48 @@ const ANOMALY_CONFIG_FOLDER_ID_IDX: &str = "idx_anomaly_config_folder_id";
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
+/// Returns `true` when the named column exists in `anomaly_detection_config`.
+async fn column_exists(
+    manager: &SchemaManager<'_>,
+    column: &str,
+) -> Result<bool, DbErr> {
+    let db_backend = manager.get_database_backend();
+    let sql = match db_backend {
+        sea_orm::DbBackend::Sqlite => format!(
+            "SELECT COUNT(*) AS cnt FROM pragma_table_info('anomaly_detection_config') \
+             WHERE name = '{column}'"
+        ),
+        sea_orm::DbBackend::Postgres => format!(
+            "SELECT COUNT(*) AS cnt FROM information_schema.columns \
+             WHERE table_name = 'anomaly_detection_config' AND column_name = '{column}'"
+        ),
+        sea_orm::DbBackend::MySql => format!(
+            "SELECT COUNT(*) AS cnt FROM information_schema.columns \
+             WHERE table_name = 'anomaly_detection_config' \
+             AND column_name = '{column}' AND table_schema = DATABASE()"
+        ),
+    };
+    let row = manager
+        .get_connection()
+        .query_one(Statement::from_string(db_backend, sql))
+        .await?;
+    Ok(row
+        .map(|r| r.try_get::<i64>("", "cnt").unwrap_or(0) > 0)
+        .unwrap_or(false))
+}
+
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let db_backend = manager.get_database_backend();
 
-        // --- Add folder_id and owner columns ---
-        // alert_destinations is already created by
-        // m20260310_000001_create_anomaly_detection_config_table.
-        if matches!(db_backend, sea_orm::DbBackend::Sqlite) {
-            // SQLite requires separate ALTER TABLE statements per column.
+        // --- Add folder_id (always) ---
+        if !column_exists(manager, "folder_id").await? {
             manager
                 .alter_table(
                     Table::alter()
                         .table(AnomalyDetectionConfig::Table)
-                        .add_column_if_not_exists(
+                        .add_column(
                             ColumnDef::new(AnomalyDetectionConfig::FolderId)
                                 .string_len(256)
                                 .null(),
@@ -53,31 +82,15 @@ impl MigrationTrait for Migration {
                         .to_owned(),
                 )
                 .await?;
+        }
 
+        // --- Add owner (always) ---
+        if !column_exists(manager, "owner").await? {
             manager
                 .alter_table(
                     Table::alter()
                         .table(AnomalyDetectionConfig::Table)
-                        .add_column_if_not_exists(
-                            ColumnDef::new(AnomalyDetectionConfig::Owner)
-                                .string_len(256)
-                                .null(),
-                        )
-                        .to_owned(),
-                )
-                .await?;
-        } else {
-            // PostgreSQL and MySQL support multiple ADD COLUMN IF NOT EXISTS in one statement.
-            manager
-                .alter_table(
-                    Table::alter()
-                        .table(AnomalyDetectionConfig::Table)
-                        .add_column_if_not_exists(
-                            ColumnDef::new(AnomalyDetectionConfig::FolderId)
-                                .string_len(256)
-                                .null(),
-                        )
-                        .add_column_if_not_exists(
+                        .add_column(
                             ColumnDef::new(AnomalyDetectionConfig::Owner)
                                 .string_len(256)
                                 .null(),
@@ -87,7 +100,67 @@ impl MigrationTrait for Migration {
                 .await?;
         }
 
-        // Backfill folder_id: resolve "default" slug to the folder PK.
+        // --- Migrate alert_destination_id → alert_destinations (old envs only) ---
+        // Fresh installs (updated m20260310) already have alert_destinations and
+        // never had alert_destination_id, so both checks will short-circuit.
+        let has_old_col = column_exists(manager, "alert_destination_id").await?;
+        let has_new_col = column_exists(manager, "alert_destinations").await?;
+
+        if !has_new_col {
+            manager
+                .alter_table(
+                    Table::alter()
+                        .table(AnomalyDetectionConfig::Table)
+                        .add_column(
+                            ColumnDef::new(AnomalyDetectionConfig::AlertDestinations)
+                                .json_binary()
+                                .null(),
+                        )
+                        .to_owned(),
+                )
+                .await?;
+        }
+
+        if has_old_col {
+            // Copy old single-value column into a JSON array, then drop it.
+            let migrate_sql = match db_backend {
+                sea_orm::DbBackend::Sqlite => {
+                    "UPDATE anomaly_detection_config \
+                     SET alert_destinations = json_array(alert_destination_id) \
+                     WHERE alert_destination_id IS NOT NULL AND alert_destinations IS NULL"
+                }
+                sea_orm::DbBackend::Postgres => {
+                    "UPDATE anomaly_detection_config \
+                     SET alert_destinations = json_build_array(alert_destination_id) \
+                     WHERE alert_destination_id IS NOT NULL AND alert_destinations IS NULL"
+                }
+                sea_orm::DbBackend::MySql => {
+                    "UPDATE anomaly_detection_config \
+                     SET alert_destinations = JSON_ARRAY(alert_destination_id) \
+                     WHERE alert_destination_id IS NOT NULL AND alert_destinations IS NULL"
+                }
+            };
+            manager
+                .get_connection()
+                .execute_unprepared(migrate_sql)
+                .await?;
+
+            let drop_sql = match db_backend {
+                sea_orm::DbBackend::Sqlite => {
+                    "ALTER TABLE anomaly_detection_config DROP COLUMN alert_destination_id"
+                }
+                sea_orm::DbBackend::Postgres | sea_orm::DbBackend::MySql => {
+                    "ALTER TABLE anomaly_detection_config \
+                     DROP COLUMN IF EXISTS alert_destination_id"
+                }
+            };
+            manager
+                .get_connection()
+                .execute_unprepared(drop_sql)
+                .await?;
+        }
+
+        // Backfill folder_id from the "default" Alerts folder for each org.
         manager
             .get_connection()
             .execute_unprepared(
@@ -114,10 +187,8 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Make folder_id NOT NULL, consistent with the alerts table.
-        // The backfill above ensures no NULLs remain.
-        // SQLite does not support changing nullability in-place; the backfill is
-        // sufficient for SQLite dev environments.
+        // Make folder_id NOT NULL on databases that support it in-place.
+        // SQLite: the backfill is sufficient for dev environments.
         match db_backend {
             sea_orm::DbBackend::Postgres => {
                 manager
@@ -167,4 +238,5 @@ enum AnomalyDetectionConfig {
     Table,
     FolderId,
     Owner,
+    AlertDestinations,
 }
