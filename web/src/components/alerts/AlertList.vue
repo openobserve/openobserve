@@ -364,23 +364,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   <q-item-section>Export</q-item-section>
                                 </q-item>
                                 <q-separator />
-                                <!-- Anomaly Detection: Retrain (status=failed) or Trigger Detection (other statuses) -->
+                                <!-- Anomaly Detection: Trigger Detection + Re-train (always available) -->
                                 <template v-if="props.row.type === 'anomaly'">
                                   <q-item
-                                    v-if="props.row.status === 'failed'"
-                                    class="flex items-center justify-center"
-                                    clickable
-                                    v-close-popup
-                                    :data-test="`alert-list-${props.row.name}-retrain-anomaly`"
-                                    @click="retrainAnomaly(props.row)"
-                                  >
-                                    <q-item-section dense avatar>
-                                      <q-icon size="16px" name="replay" />
-                                    </q-item-section>
-                                    <q-item-section>Retrain</q-item-section>
-                                  </q-item>
-                                  <q-item
-                                    v-else
                                     class="flex items-center justify-center"
                                     clickable
                                     v-close-popup
@@ -391,6 +377,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                       <q-icon size="16px" :name="symOutlinedSoundSampler" />
                                     </q-item-section>
                                     <q-item-section>Trigger Detection</q-item-section>
+                                  </q-item>
+                                  <q-item
+                                    class="flex items-center justify-center"
+                                    clickable
+                                    v-close-popup
+                                    :data-test="`alert-list-${props.row.name}-retrain-anomaly`"
+                                    @click="retrainAnomaly(props.row)"
+                                  >
+                                    <q-item-section dense avatar>
+                                      <q-icon size="16px" name="replay" />
+                                    </q-item-section>
+                                    <q-item-section>Re-train</q-item-section>
                                   </q-item>
                                 </template>
                                 <!-- Regular alerts: existing Trigger Alert item -->
@@ -1034,19 +1032,8 @@ export default defineComponent({
           sortable: true,
           style: "width: 150px",
         },
-        // Anomaly Detection tab — extra columns
-        ...(activeTab.value === 'anomalyDetection' ? [
-          {
-            name: "detection_window",
-            field: "detection_window",
-            label: "Detection Window",
-            align: "center" as const,
-            sortable: true,
-            style: "width: 150px",
-          },
-        ] : []),
-        // "period" column — conditional
-        ...(activeTab.value !== 'realTime' && activeTab.value !== 'anomalyDetection' ? [{
+        // "period" (Look back window) — all tabs except realTime
+        ...(activeTab.value !== 'realTime' ? [{
           name: "period",
           field: "period",
           label: t("alerts.period"),
@@ -1054,8 +1041,8 @@ export default defineComponent({
           sortable: true,
           style: "width: 150px",
         }] : []),
-        // "frequency" column — conditional
-        ...(activeTab.value !== 'realTime' && activeTab.value !== 'anomalyDetection' ? [{
+        // "frequency" (Check every) — all tabs except realTime
+        ...(activeTab.value !== 'realTime' ? [{
           name: "frequency",
           field: "frequency",
           label: t("alerts.frequency"),
@@ -1088,6 +1075,14 @@ export default defineComponent({
             align: "left" as const,
             sortable: true,
             style: "width: 150px",
+          },
+          {
+            name: "status",
+            field: "status",
+            label: "Status",
+            align: "left" as const,
+            sortable: true,
+            style: "width: 120px",
           },
         ] : []),
         {
@@ -1148,9 +1143,9 @@ export default defineComponent({
       description: anomaly.description || "",
       uuid: getUUID(),
       owner: anomaly.owner || "",
-      period: "",
-      frequency: anomaly.schedule_interval != null ? String(anomaly.schedule_interval) : "--",
-      frequency_type: "cron",
+      period: anomaly.trigger_condition?.period ?? "",
+      frequency: anomaly.trigger_condition?.frequency ?? "",
+      frequency_type: anomaly.trigger_condition?.frequency_type ?? "minutes",
       last_triggered_at: anomaly.last_triggered_at
         ? convertUnixToQuasarFormat(anomaly.last_triggered_at)
         : "",
@@ -1235,8 +1230,8 @@ export default defineComponent({
           //localAllAlerts is the alerts that we use to store
           // PERFORMANCE OPTIMIZATION: Store raw condition data without conversion
           // Conversion happens lazily only when user expands an alert (in triggerExpand)
-          // Anomaly detection items (alert_type === "anomaly_detection") from the merged
-          // list API have no trigger_condition/condition — handled by normalizeAnomalyToAlertRow.
+          // Anomaly detection items (alert_type === "anomaly_detection") are handled by
+          // normalizeAnomalyToAlertRow which reads period/frequency from trigger_condition.
           localAllAlerts = localAllAlerts.map((data: any) => {
             if (data.alert_type === "anomaly_detection") {
               const num = counter++;
