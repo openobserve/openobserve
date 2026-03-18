@@ -15,6 +15,15 @@
 
 use anyhow::Result;
 use chrono::Utc;
+use config::{
+    meta::{
+        destinations::{DestinationType, Module},
+        folder::{DEFAULT_FOLDER, Folder, FolderType},
+        stream::StreamType,
+        triggers::{ScheduledTriggerData, TriggerModule},
+    },
+    utils::time::now_micros,
+};
 use infra::{db::ORM_CLIENT, table::entity::anomaly_detection_config};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter,
@@ -22,8 +31,11 @@ use sea_orm::{
 };
 use svix_ksuid::KsuidLike;
 
-use crate::handler::http::request::anomaly_detection::{
-    CreateAnomalyConfigRequest, UpdateAnomalyConfigRequest,
+use crate::{
+    handler::http::request::anomaly_detection::{
+        CreateAnomalyConfigRequest, UpdateAnomalyConfigRequest,
+    },
+    service::{alerts::destinations, search},
 };
 
 /// Resolve a folder slug (e.g. "default") to the PK stored in `folders.id`.
@@ -35,40 +47,30 @@ use crate::handler::http::request::anomaly_detection::{
 /// If the slug is "default" and the folder does not yet exist it is auto-created,
 /// matching the behaviour of `alert::create` which calls `create_default_alerts_folder`.
 async fn resolve_folder_pk(org_id: &str, slug: &str) -> Option<String> {
-    let pk =
-        infra::table::folders::get_pk_by_slug(org_id, slug, config::meta::folder::FolderType::Alerts)
-            .await
-            .ok()
-            .flatten();
+    let pk = infra::table::folders::get_pk_by_slug(org_id, slug, FolderType::Alerts)
+        .await
+        .ok()
+        .flatten();
 
     if pk.is_some() {
         return pk;
     }
 
     // Auto-create the default Alerts folder on first use, same as alert::create does.
-    if slug == config::meta::folder::DEFAULT_FOLDER {
-        let folder = config::meta::folder::Folder {
-            folder_id: config::meta::folder::DEFAULT_FOLDER.to_owned(),
+    if slug == DEFAULT_FOLDER {
+        let folder = Folder {
+            folder_id: DEFAULT_FOLDER.to_owned(),
             name: "default".to_owned(),
             description: "default".to_owned(),
         };
-        if crate::service::folders::save_folder(
-            org_id,
-            folder,
-            config::meta::folder::FolderType::Alerts,
-            true,
-        )
-        .await
-        .is_ok()
-        {
-            return infra::table::folders::get_pk_by_slug(
-                org_id,
-                slug,
-                config::meta::folder::FolderType::Alerts,
-            )
+        if crate::service::folders::save_folder(org_id, folder, FolderType::Alerts, true)
             .await
-            .ok()
-            .flatten();
+            .is_ok()
+        {
+            return infra::table::folders::get_pk_by_slug(org_id, slug, FolderType::Alerts)
+                .await
+                .ok()
+                .flatten();
         }
     }
 
@@ -122,8 +124,6 @@ pub async fn list_configs(
     org_id: &str,
     folder_slug: Option<&str>,
 ) -> Result<Vec<serde_json::Value>> {
-    use config::meta::triggers::{ScheduledTriggerData, TriggerModule};
-
     let db = ORM_CLIENT
         .get()
         .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
@@ -344,7 +344,6 @@ pub async fn create_config(
     // same infrastructure as alerts.  The handler will check `is_trained` and skip
     // until training is complete.
     {
-        use config::{meta::triggers::TriggerModule, utils::time::now_micros};
         let trigger = crate::service::db::scheduler::Trigger {
             org: org_id.to_string(),
             module: TriggerModule::AnomalyDetection,
@@ -417,7 +416,7 @@ pub async fn update_config(
     let mut reset_trigger_after_save = false;
     if let Some(enabled) = req.enabled {
         active_model.enabled = Set(enabled);
-        use config::meta::triggers::TriggerModule;
+
         if enabled {
             // Defer the push until after active_model.update() so the scheduler
             // always reads enabled=true from the DB when it picks up the trigger.
@@ -494,7 +493,6 @@ pub async fn update_config(
     // Push the trigger AFTER the DB save so the scheduler always sees enabled=true
     // when it picks up the newly inserted trigger row.
     if push_trigger_after_save {
-        use config::{meta::triggers::TriggerModule, utils::time::now_micros};
         let trigger = crate::service::db::scheduler::Trigger {
             org: org_id.to_string(),
             module: TriggerModule::AnomalyDetection,
@@ -515,7 +513,6 @@ pub async fn update_config(
     // so the new cadence takes effect immediately (push() alone would be a no-op on an
     // existing row due to ON CONFLICT DO NOTHING).  Only applicable for enabled configs.
     if reset_trigger_after_save && updated.enabled {
-        use config::{meta::triggers::TriggerModule, utils::time::now_micros};
         let now = now_micros();
         match crate::service::db::scheduler::get(
             org_id,
@@ -578,7 +575,6 @@ pub async fn delete_config(org_id: &str, anomaly_id: &str) -> Result<()> {
 
     // Remove the detection trigger from the shared scheduler.
     {
-        use config::meta::triggers::TriggerModule;
         if let Err(e) = crate::service::db::scheduler::delete(
             org_id,
             TriggerModule::AnomalyDetection,
@@ -680,7 +676,6 @@ pub async fn clone_config(
 
     // Register detection trigger for the new config
     {
-        use config::{meta::triggers::TriggerModule, utils::time::now_micros};
         let trigger = crate::service::db::scheduler::Trigger {
             org: org_id.to_string(),
             module: TriggerModule::AnomalyDetection,
@@ -969,8 +964,6 @@ pub struct DetectionHistoryItem {
 /// scheduler's `watch_timeout()` job already resets any `Processing` rows whose
 /// `end_time` has passed, exactly as it does for alert triggers.
 pub async fn recover_detection_triggers_on_startup() {
-    use config::{meta::triggers::TriggerModule, utils::time::now_micros};
-
     let db = match ORM_CLIENT.get() {
         Some(db) => db,
         None => {
@@ -1133,10 +1126,6 @@ pub async fn execute_anomaly_query(
     end_time: i64,
     anomaly_id: &str,
 ) -> Result<Vec<o2_enterprise::enterprise::anomaly_detection::types::QueryDataPoint>> {
-    use config::meta::stream::StreamType;
-
-    use crate::service::search;
-
     log::info!(
         "[anomaly_detection {}] executing query: sql={}, start_time_us={}, end_time_us={}",
         anomaly_id,
@@ -1425,10 +1414,6 @@ pub async fn send_anomaly_alert(
     // Detection window end (Unix microseconds).
     window_end_us: i64,
 ) -> anyhow::Result<()> {
-    use config::meta::destinations::{DestinationType, Module};
-
-    use crate::service::alerts::destinations;
-
     let dest = match destinations::get(&org_id, &destination_id).await {
         Ok(d) => d,
         Err(e) => {
