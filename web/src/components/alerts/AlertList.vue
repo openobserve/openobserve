@@ -737,6 +737,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <MoveAcrossFolders
           :activeFolderId="activeFolderToMove"
           :moduleId="selectedAlertToMove"
+          :anomalyConfigIds="selectedAnomalyConfigsToMove"
           type="alerts"
           @updated="updateAcrossFolders"
         />
@@ -1144,7 +1145,8 @@ export default defineComponent({
     const filterQuery = ref<any>("");
     const searchAcrossFolders = ref<any>(false);
     const filteredResults: Ref<any[]> = ref([]);
-    const selectedAlertToMove: Ref<any> = ref({});
+    const selectedAlertToMove: Ref<any[]> = ref([]);
+    const selectedAnomalyConfigsToMove: Ref<any[]> = ref([]);
     const folderIdToBeCloned = ref<any>(router.currentRoute.value.query.folder ?? "default");
     // ---------------------------------------------------------------------------
     // Anomaly detection scaffolding — TEMPORARY until backend returns anomaly
@@ -2142,7 +2144,13 @@ export default defineComponent({
 
     const moveAlertToAnotherFolder = (row: any) => {
       showMoveAlertDialog.value = true;
-      selectedAlertToMove.value = [row.alert_id];
+      if (row.type === "anomaly") {
+        selectedAlertToMove.value = [];
+        selectedAnomalyConfigsToMove.value = [row.alert_id];
+      } else {
+        selectedAlertToMove.value = [row.alert_id];
+        selectedAnomalyConfigsToMove.value = [];
+      }
       activeFolderToMove.value = activeFolderId.value;
     };
 
@@ -2155,6 +2163,7 @@ export default defineComponent({
       await getAlertsFn(store, activeFolderId);
       showMoveAlertDialog.value = false;
       selectedAlertToMove.value = [];
+      selectedAnomalyConfigsToMove.value = [];
       activeFolderToMove.value = "";
       selectedAlerts.value = [];
       allSelectedAlerts.value = false;
@@ -2170,10 +2179,12 @@ export default defineComponent({
 
     const moveMultipleAlerts = () => {
       showMoveAlertDialog.value = true;
-      const selectedAlertsToMove = selectedAlerts.value.map((alert: any) => {
-        return alert.alert_id;
-      });
-      selectedAlertToMove.value = selectedAlertsToMove;
+      selectedAlertToMove.value = selectedAlerts.value
+        .filter((alert: any) => alert.type !== "anomaly")
+        .map((alert: any) => alert.alert_id);
+      selectedAnomalyConfigsToMove.value = selectedAlerts.value
+        .filter((alert: any) => alert.type === "anomaly")
+        .map((alert: any) => alert.alert_id);
       activeFolderToMove.value = activeFolderId.value;
     };
 
@@ -2654,6 +2665,7 @@ export default defineComponent({
       showMoveAlertDialog,
       outlinedDriveFileMove,
       selectedAlertToMove,
+      selectedAnomalyConfigsToMove,
       moveAlertToAnotherFolder,
       activeFolderToMove,
       updateAcrossFolders,

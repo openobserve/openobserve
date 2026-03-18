@@ -1187,22 +1187,49 @@ pub async fn move_alerts(
     Json(req_body): Json<MoveAlertsRequestBody>,
 ) -> Response {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let total_ids = req_body.alert_ids.len()
+        + req_body
+            .anomaly_config_ids
+            .as_deref()
+            .map_or(0, |v| v.len());
 
-    // Separate IDs into regular alerts and anomaly configs (anomaly is enterprise-only)
-    let mut alert_ids: Vec<Ksuid> = Vec::new();
+    // Separate IDs into regular alerts and anomaly configs (anomaly is enterprise-only).
+    // If the caller supplies anomaly_config_ids, use that to skip per-ID DB lookups.
+    let alert_ids: Vec<Ksuid>;
     #[cfg(feature = "enterprise")]
-    let mut anomaly_ids: Vec<Ksuid> = Vec::new();
-    for id in &req_body.alert_ids {
-        match alert::get_by_id(client, &org_id, *id).await {
-            Ok(_) => alert_ids.push(*id),
-            #[cfg(feature = "enterprise")]
-            Err(AlertError::AlertNotFound) => anomaly_ids.push(*id),
-            #[cfg(not(feature = "enterprise"))]
-            Err(AlertError::AlertNotFound) => {
-                return MetaHttpResponse::not_found(format!("alert {id} not found"));
+    let anomaly_ids: Vec<Ksuid>;
+
+    #[cfg(feature = "enterprise")]
+    if let Some(explicit_anomaly_ids) = req_body.anomaly_config_ids {
+        alert_ids = req_body.alert_ids;
+        anomaly_ids = explicit_anomaly_ids;
+    } else {
+        let mut classified_alert_ids: Vec<Ksuid> = Vec::new();
+        let mut classified_anomaly_ids: Vec<Ksuid> = Vec::new();
+        for id in &req_body.alert_ids {
+            match alert::get_by_id(client, &org_id, *id).await {
+                Ok(_) => classified_alert_ids.push(*id),
+                Err(AlertError::AlertNotFound) => classified_anomaly_ids.push(*id),
+                Err(e) => return e.into(),
             }
-            Err(e) => return e.into(),
         }
+        alert_ids = classified_alert_ids;
+        anomaly_ids = classified_anomaly_ids;
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let mut classified_alert_ids: Vec<Ksuid> = Vec::new();
+        for id in &req_body.alert_ids {
+            match alert::get_by_id(client, &org_id, *id).await {
+                Ok(_) => classified_alert_ids.push(*id),
+                Err(AlertError::AlertNotFound) => {
+                    return MetaHttpResponse::not_found(format!("alert {id} not found"));
+                }
+                Err(e) => return e.into(),
+            }
+        }
+        alert_ids = classified_alert_ids;
     }
 
     // Move anomaly configs first (enterprise only) so that if this fails,
@@ -1240,7 +1267,7 @@ pub async fn move_alerts(
         return e.into();
     }
 
-    let message = if req_body.alert_ids.len() == 1 {
+    let message = if total_ids == 1 {
         "Alert moved"
     } else {
         "Alerts moved"
