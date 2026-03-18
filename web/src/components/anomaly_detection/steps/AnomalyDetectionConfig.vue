@@ -600,14 +600,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   no-caps
                   size="sm"
                   icon="refresh"
-                  :loading="historyLoading"
-                  :disable="!config.id || historyLoading"
+                  :disable="
+                    !config.stream_name ||
+                    (config.query_mode === 'custom_sql' && !config.custom_sql)
+                  "
                   class="text-caption"
                   data-test="anomaly-sensitivity-load-btn"
-                  @click="loadSensitivityHistory"
+                  @click="loadPreview"
                 >
-                  <q-tooltip v-if="!config.id"
-                    >Available after saving</q-tooltip
+                  <q-tooltip v-if="!config.stream_name"
+                    >Select a stream first</q-tooltip
+                  >
+                  <q-tooltip
+                    v-else-if="
+                      config.query_mode === 'custom_sql' && !config.custom_sql
+                    "
+                    >Enter a SQL query first</q-tooltip
                   >
                   <span v-else class="q-ml-xs">Load Data</span>
                 </q-btn>
@@ -615,54 +623,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Chart + Vertical Slider row -->
               <div class="tw:flex tw:gap-3">
-                <!-- ECharts time series chart -->
+                <!-- Time series chart -->
                 <div class="sensitivity-chart-wrapper tw:flex-1">
                   <div
-                    v-if="!config.id"
+                    v-if="!previewActive"
                     class="sensitivity-empty-state"
                     :class="
                       store.state.theme === 'dark'
                         ? 'text-grey-5'
                         : 'text-grey-6'
                     "
+                    data-test="anomaly-sensitivity-empty"
                   >
                     <q-icon
                       name="bar_chart"
                       size="2rem"
                       class="tw:mb-2 tw:opacity-40"
                     />
-                    <span class="text-caption"
-                      >Save first to load historical data</span
-                    >
+                    <span class="text-caption">{{
+                      !config.stream_name
+                        ? "Select a stream first"
+                        : "Click Load Data to preview the time series"
+                    }}</span>
                   </div>
-                  <div
-                    v-else-if="historyLoading"
-                    class="sensitivity-empty-state"
-                  >
-                    <q-spinner size="1.5rem" color="primary" />
-                  </div>
-                  <div
-                    v-else-if="historyPoints.length === 0"
-                    class="sensitivity-empty-state"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'text-grey-5'
-                        : 'text-grey-6'
-                    "
-                  >
-                    <q-icon
-                      name="timeline"
-                      size="2rem"
-                      class="tw:mb-2 tw:opacity-40"
-                    />
-                    <span class="text-caption"
-                      >No history data yet. Click Load Data.</span
-                    >
-                  </div>
-                  <div
+                  <PanelSchemaRenderer
                     v-else
-                    ref="chartRef"
-                    class="sensitivity-chart"
+                    :key="previewKey"
+                    :panelSchema="previewPanelSchema"
+                    :selectedTimeObj="previewTimeObj"
+                    :variablesData="{}"
+                    :forceLoad="true"
+                    searchType="UI"
+                    style="height: 180px; width: 100%"
                     data-test="anomaly-sensitivity-chart"
                   />
                 </div>
@@ -697,22 +689,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, onUnmounted, type PropType } from "vue";
+import { defineComponent, ref, watch, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import * as echarts from "echarts";
 import streamService from "@/services/stream";
-import anomalyDetectionService from "@/services/anomaly_detection";
 import {
   ANOMALY_FILTER_OPERATORS,
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
 import QueryEditor from "@/components/QueryEditor.vue";
+import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 
 export default defineComponent({
   name: "AnomalyDetectionConfig",
 
-  components: { QueryEditor },
+  components: { QueryEditor, PanelSchemaRenderer },
 
   props: {
     config: {
@@ -905,159 +896,157 @@ export default defineComponent({
       return formValid;
     };
 
-    // ── Sensitivity chart ───────────────────────────────────────────────────
-    const chartRef = ref<HTMLElement | null>(null);
-    const historyLoading = ref(false);
-    const historyPoints = ref<
-      Array<{ ts: number; value: number; score: number }>
-    >([]);
+    // ── Data Preview chart ──────────────────────────────────────────────────
+    const previewActive = ref(false);
+    const previewKey = ref(0);
+    const previewPanelSchema = ref<any>(null);
+    const previewTimeObj = ref<any>(null);
+
+    const buildPreviewSql = () => {
+      let sql: string;
+      if (props.config.query_mode === "custom_sql") {
+        sql = props.config.custom_sql || "";
+      } else {
+        const streamName = props.config.stream_name;
+        const intervalValue = props.config.histogram_interval_value ?? 5;
+        const intervalUnit = props.config.histogram_interval_unit ?? "m";
+        sql = streamName
+          ? buildDefaultSql(streamName, intervalValue, intervalUnit)
+          : "";
+      }
+      // Normalize multiline SQL to a single line — the dashboard panel
+      // query executor can truncate at newlines in some code paths
+      return sql.replace(/\s+/g, " ").trim();
+    };
+
+    const loadPreview = () => {
+      const sql = buildPreviewSql();
+      if (!sql || !props.config.stream_name) return;
+
+      const windowValue = props.config.detection_window_value ?? 30;
+      const windowUnit = props.config.detection_window_unit ?? "m";
+      const windowMs =
+        windowValue * (windowUnit === "h" ? 3600000 : 60000);
+      // The dashboard DateTime picker returns microseconds (ms * 1000).
+      // viewDashboard wraps those with new Date(microseconds), so the Date
+      // object's internal value IS the microsecond number.
+      // usePanelDataLoader then calls .getTime() which returns the microsecond
+      // value unchanged. We must replicate that convention here.
+      const endMicros = new Date().getTime() * 1000;
+      const startMicros = endMicros - windowMs * 1000;
+
+      previewTimeObj.value = {
+        start_time: new Date(startMicros),
+        end_time: new Date(endMicros),
+      };
+      // PanelSchemaRenderer expects the inner data object directly (not wrapped)
+      previewPanelSchema.value = {
+        version: 2,
+        id: "anomaly-preview",
+        type: "line",
+        title: "",
+        description: "",
+        config: {
+          show_legends: false,
+          legends_position: "bottom",
+          unit: "short",
+          unit_custom: "",
+          promql_legend: "",
+          axis_border_show: false,
+          connect_nulls: true,
+          no_value_replacement: "",
+          wrap_table_cells: false,
+          table_transpose: false,
+          table_dynamic_columns: false,
+          base_map: { type: "osm" },
+          map_view: { zoom: 1, lat: 0, lng: 0 },
+          custom_chart_options: {
+            tooltip: { appendToBody: true, confine: false },
+          },
+        },
+        queryType: "sql",
+        queries: [
+          {
+            query: sql,
+            customQuery: true,
+            vrlFunctionQuery: null,
+            query_fn: null,
+            fields: {
+              stream: props.config.stream_name,
+              stream_type: props.config.stream_type || "logs",
+              x: [
+                {
+                  alias: "time_bucket",
+                  column: "time_bucket",
+                  label: "time_bucket",
+                  color: null,
+                },
+              ],
+              y: [
+                {
+                  alias: "value",
+                  column: "value",
+                  label: "value",
+                  color: "#5960b2",
+                },
+              ],
+              z: [],
+              breakdown: [],
+              filter: {
+                filterType: "group",
+                logicalOperator: "AND",
+                conditions: [],
+              },
+              latitude: null,
+              longitude: null,
+              weight: null,
+            },
+            config: {
+              promql_legend: "",
+              layer_type: "scatter",
+              weight_fixed: 1,
+              limit: 0,
+              min: 0,
+              max: 100,
+              time_shift: [],
+            },
+          },
+        ],
+      };
+      previewKey.value++;
+      previewActive.value = true;
+    };
+
+    // Auto-refresh when Look Back Window or Detection Resolution changes
+    let previewRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+    watch(
+      () => [
+        props.config.detection_window_value,
+        props.config.detection_window_unit,
+        props.config.histogram_interval_value,
+        props.config.histogram_interval_unit,
+      ],
+      () => {
+        if (!previewActive.value) return;
+        if (previewRefreshTimer) clearTimeout(previewRefreshTimer);
+        previewRefreshTimer = setTimeout(() => {
+          loadPreview();
+        }, 600);
+      },
+    );
+
+    // ── Sensitivity slider ──────────────────────────────────────────────────
     const thresholdRange = ref<{ min: number; max: number }>({
       min: props.config.threshold_min ?? 0,
       max: props.config.threshold ?? 97,
     });
-
-    let chartInstance: echarts.ECharts | null = null;
-
-    const isDark = () => store.state.theme === "dark";
-
-    const buildChartOption = () => {
-      const pts = historyPoints.value;
-      const scatterData = pts.map((p) => [p.ts, p.value, p.score]);
-      const lineData = pts.map((p) => [p.ts, p.value]);
-      const scores = pts.map((p) => p.score);
-      const minScore = scores.length ? Math.min(...scores) : 0;
-      const maxScore = scores.length ? Math.max(...scores) : 100;
-
-      return {
-        backgroundColor: "transparent",
-        animation: false,
-        grid: { left: 50, right: 90, top: 10, bottom: 30 },
-        xAxis: {
-          type: "time",
-          axisLabel: {
-            color: isDark() ? "#9e9e9e" : "#666",
-            fontSize: 10,
-            formatter: (val: number) => {
-              const d = new Date(val);
-              return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
-            },
-          },
-          axisLine: { lineStyle: { color: isDark() ? "#444" : "#ddd" } },
-          splitLine: { show: false },
-        },
-        yAxis: {
-          type: "value",
-          name: "Value",
-          nameTextStyle: { color: isDark() ? "#9e9e9e" : "#666", fontSize: 10 },
-          axisLabel: { color: isDark() ? "#9e9e9e" : "#666", fontSize: 10 },
-          axisLine: { lineStyle: { color: isDark() ? "#444" : "#ddd" } },
-          splitLine: { lineStyle: { color: isDark() ? "#333" : "#eee" } },
-        },
-        visualMap: {
-          min: minScore,
-          max: maxScore,
-          dimension: 2,
-          orient: "vertical",
-          right: 0,
-          top: "center",
-          text: ["High", "Low"],
-          textStyle: { color: isDark() ? "#9e9e9e" : "#666", fontSize: 10 },
-          calculable: false,
-          inRange: {
-            color: ["#5470c6", "#91cc75", "#fac858", "#ee6666"],
-          },
-          width: 12,
-          itemHeight: 100,
-        },
-        tooltip: {
-          trigger: "item",
-          formatter: (params: any) => {
-            if (params.seriesIndex === 0) {
-              const [ts, val, score] = params.data;
-              const d = new Date(ts);
-              return `${d.toLocaleString()}<br/>Value: ${Number(val).toFixed(4)}<br/>Score: ${Number(score).toFixed(2)}`;
-            }
-            return "";
-          },
-        },
-        series: [
-          {
-            name: "Data",
-            type: "scatter",
-            data: scatterData,
-            symbolSize: 6,
-            encode: { x: 0, y: 1, tooltip: [0, 1, 2] },
-          },
-          {
-            name: "Baseline",
-            type: "line",
-            data: lineData,
-            lineStyle: { color: isDark() ? "#555" : "#ccc", width: 1 },
-            symbol: "none",
-            z: 0,
-          },
-        ],
-      };
-    };
-
-    const renderChart = () => {
-      if (!chartRef.value || historyPoints.value.length === 0) return;
-      if (!chartInstance) {
-        chartInstance = echarts.init(
-          chartRef.value,
-          isDark() ? "dark" : undefined,
-        );
-      }
-      chartInstance.setOption(buildChartOption(), true);
-    };
-
-    watch(historyPoints, () => {
-      setTimeout(renderChart, 50);
-    });
-
-    watch(
-      () => store.state.theme,
-      () => {
-        if (chartInstance) {
-          chartInstance.dispose();
-          chartInstance = null;
-        }
-        setTimeout(renderChart, 50);
-      },
-    );
-
-    const loadSensitivityHistory = async () => {
-      const orgId = store.state.selectedOrganization?.identifier;
-      if (!orgId || !props.config.id) return;
-      historyLoading.value = true;
-      try {
-        const res = await anomalyDetectionService.getHistory(
-          orgId,
-          props.config.id,
-          200,
-        );
-        const raw: any[] = res.data?.history ?? res.data?.list ?? [];
-        historyPoints.value = raw
-          .map((r: any) => ({
-            ts: r.timestamp ?? r._timestamp ?? r.ts ?? 0,
-            value: r.actual_value ?? r.value ?? 0,
-            score: r.anomaly_score ?? r.score ?? 0,
-          }))
-          .filter((p) => p.ts > 0)
-          .sort((a, b) => a.ts - b.ts);
-      } catch {
-        historyPoints.value = [];
-      } finally {
-        historyLoading.value = false;
-      }
-    };
 
     const onThresholdRangeChange = (val: { min: number; max: number }) => {
       props.config.threshold_min = val.min;
       props.config.threshold = val.max;
     };
 
-    // init range from config
+    // sync range when config changes externally
     watch(
       () => [props.config.threshold, props.config.threshold_min],
       ([max, min]) => {
@@ -1068,10 +1057,6 @@ export default defineComponent({
       },
     );
 
-    onUnmounted(() => {
-      chartInstance?.dispose();
-      chartInstance = null;
-    });
 
     return {
       t,
@@ -1092,12 +1077,13 @@ export default defineComponent({
       addFilter,
       removeFilter,
       validate,
-      chartRef,
-      historyLoading,
-      historyPoints,
       thresholdRange,
-      loadSensitivityHistory,
       onThresholdRangeChange,
+      previewActive,
+      previewKey,
+      previewPanelSchema,
+      previewTimeObj,
+      loadPreview,
     };
   },
 });
@@ -1158,10 +1144,6 @@ export default defineComponent({
   position: relative;
 }
 
-.sensitivity-chart {
-  width: 100%;
-  height: 180px;
-}
 
 .sensitivity-empty-state {
   width: 100%;
@@ -1276,4 +1258,5 @@ export default defineComponent({
     }
   }
 }
+
 </style>
