@@ -238,7 +238,7 @@ fn create_anomaly_detection_config_table_stmt() -> TableCreateStatement {
         )
         .col(
             ColumnDef::new(AnomalyDetectionConfig::AlertDestinations)
-                .text()
+                .json_binary()
                 .null(),
         )
         // Scheduler Integration (for locking)
