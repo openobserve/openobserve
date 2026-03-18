@@ -64,6 +64,9 @@ pub struct ListAlertsResponseBodyItem {
     /// Values: "waiting" | "active" | "training" | "failed" | "disabled"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
+    /// Last error message from training or detection. Only present for `anomaly_detection` items.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_error: Option<String>,
 }
 
 /// HTTP response body for `EnableAlert` endpoint.
@@ -130,6 +133,7 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             is_real_time: alert.is_real_time,
             last_trained_at: None,
             status: None,
+            last_error: None,
         })
     }
 }
@@ -202,6 +206,11 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         is_real_time: false,
         last_trained_at: v.get("training_completed_at").and_then(|t| t.as_i64()),
         status,
+        last_error: v
+            .get("last_error")
+            .and_then(|e| e.as_str())
+            .filter(|s| !s.is_empty())
+            .map(String::from),
     })
 }
 /// Parse an interval string like "5m", "1h", "30s" into minutes.
