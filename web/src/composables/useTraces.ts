@@ -161,6 +161,26 @@ const defaultObject = {
 
 const searchObj = reactive(Object.assign({}, defaultObject));
 
+/** Default ordered column ID lists used when no localStorage entry exists. */
+export const DEFAULT_TRACE_COLUMNS: Record<"traces" | "spans", string[]> = {
+  spans: [
+    "service_name",
+    "operation_name",
+    "duration",
+    "status",
+    "status_code",
+    "method",
+  ],
+  traces: [
+    "service_name",
+    "operation_name",
+    "duration",
+    "spans",
+    "status",
+    "service_latency",
+  ],
+};
+
 const useTraces = () => {
   const store = useStore();
   const router = useRouter();
@@ -190,26 +210,6 @@ const useTraces = () => {
     searchObj.runQuery = false;
     searchObj.data.traceDetails.isLoadingTraceDetails = false;
     searchObj.data.traceDetails.isLoadingTraceMeta = false;
-  };
-
-  /** Default ordered column lists used when no localStorage entry exists. */
-  const DEFAULT_TRACE_COLUMNS: Record<"traces" | "spans", string[]> = {
-    spans: [
-      "service_name",
-      "operation_name",
-      "duration",
-      "status",
-      "status_code",
-      "method",
-    ],
-    traces: [
-      "service_name",
-      "operation_name",
-      "duration",
-      "spans",
-      "status",
-      "service_latency",
-    ],
   };
 
   /**
