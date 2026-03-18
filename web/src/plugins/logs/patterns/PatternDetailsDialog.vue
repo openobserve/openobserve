@@ -359,6 +359,14 @@ const highlightedTemplate = computed(() => {
   );
 });
 
+const highlightedTemplate = computed(() => {
+  if (!props.selectedPattern?.pattern?.template) return "";
+  return escapeHtml(props.selectedPattern.pattern.template).replace(
+    /&lt;\*&gt;/g,
+    '<span class="log-pattern-wildcard">&lt;*&gt;</span>',
+  );
+});
+
 const variableColumns = [
   {
     name: "name",
