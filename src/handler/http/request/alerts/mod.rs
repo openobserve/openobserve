@@ -36,6 +36,8 @@ use {
     },
 };
 
+#[cfg(feature = "enterprise")]
+use crate::handler::http::models::alerts::responses::anomaly_config_to_list_item;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
@@ -49,7 +51,7 @@ use crate::{
             responses::{
                 AlertBulkEnableResponse, EnableAlertResponseBody, GenerateSqlMetadata,
                 GenerateSqlResponseBody, GetAlertResponseBody, ListAlertsResponseBody,
-                ListAlertsResponseBodyItem, anomaly_config_to_list_item,
+                ListAlertsResponseBodyItem,
             },
         },
         request::{
@@ -148,7 +150,8 @@ pub async fn create_alert(
     let query_str = uri.query().unwrap_or("");
     let folder_id = get_folder(query_str);
 
-    // Anomaly detection path: delegate to anomaly config creation.
+    // Anomaly detection path: delegate to anomaly config creation (enterprise only).
+    #[cfg(feature = "enterprise")]
     if req_body.alert_type == Some(AlertTypeFilter::AnomalyDetection) {
         return create_anomaly_alert(&org_id, user_email.user_id, req_body, &folder_id).await;
     }
@@ -170,6 +173,7 @@ pub async fn create_alert(
     }
 }
 
+#[cfg(feature = "enterprise")]
 async fn create_anomaly_alert(
     org_id: &str,
     user_id: String,
@@ -271,20 +275,29 @@ pub async fn get_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Resp
             MetaHttpResponse::json(resp_body)
         }
         Err(AlertError::AlertNotFound) => {
-            // Fall back to anomaly detection config lookup.
-            match crate::service::anomaly_detection::get_config(&org_id, &alert_id_str).await {
-                Ok(Some(mut v)) => {
-                    // Tag with alert_type so the caller can discriminate.
-                    if let Some(obj) = v.as_object_mut() {
-                        obj.insert(
-                            "alert_type".to_string(),
-                            serde_json::Value::String("anomaly_detection".to_string()),
-                        );
+            #[cfg(not(feature = "enterprise"))]
+            {
+                return MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"));
+            }
+            #[cfg(feature = "enterprise")]
+            {
+                // Fall back to anomaly detection config lookup.
+                match crate::service::anomaly_detection::get_config(&org_id, &alert_id_str).await {
+                    Ok(Some(mut v)) => {
+                        // Tag with alert_type so the caller can discriminate.
+                        if let Some(obj) = v.as_object_mut() {
+                            obj.insert(
+                                "alert_type".to_string(),
+                                serde_json::Value::String("anomaly_detection".to_string()),
+                            );
+                        }
+                        MetaHttpResponse::json(v)
                     }
-                    MetaHttpResponse::json(v)
+                    Ok(None) => {
+                        MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"))
+                    }
+                    Err(e) => MetaHttpResponse::internal_error(e.to_string()),
                 }
-                Ok(None) => MetaHttpResponse::not_found(format!("alert {alert_id_str} not found")),
-                Err(e) => MetaHttpResponse::internal_error(e.to_string()),
             }
         }
         Err(e) => e.into(),
@@ -336,33 +349,40 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
             MetaHttpResponse::json(resp_body)
         }
         Err(AlertError::AlertNotFound) => {
-            // Fall back to anomaly detection config export
-            match crate::service::anomaly_detection::get_config(&org_id, &alert_id_str).await {
-                Ok(Some(mut v)) => {
-                    // Inject alert_type so consumers know what kind this is
-                    if let Some(obj) = v.as_object_mut() {
-                        obj.insert(
-                            "alert_type".to_string(),
-                            serde_json::Value::String("anomaly_detection".to_string()),
-                        );
-                        // Strip runtime/training state from the export payload
-                        for key in &[
-                            "is_trained",
-                            "training_started_at",
-                            "training_completed_at",
-                            "last_processed_timestamp",
-                            "current_model_version",
-                            "status",
-                            "last_error",
-                            "retries",
-                        ] {
-                            obj.remove(*key);
+            #[cfg(not(feature = "enterprise"))]
+            {
+                return MetaHttpResponse::not_found("alert not found");
+            }
+            #[cfg(feature = "enterprise")]
+            {
+                // Fall back to anomaly detection config export
+                match crate::service::anomaly_detection::get_config(&org_id, &alert_id_str).await {
+                    Ok(Some(mut v)) => {
+                        // Inject alert_type so consumers know what kind this is
+                        if let Some(obj) = v.as_object_mut() {
+                            obj.insert(
+                                "alert_type".to_string(),
+                                serde_json::Value::String("anomaly_detection".to_string()),
+                            );
+                            // Strip runtime/training state from the export payload
+                            for key in &[
+                                "is_trained",
+                                "training_started_at",
+                                "training_completed_at",
+                                "last_processed_timestamp",
+                                "current_model_version",
+                                "status",
+                                "last_error",
+                                "retries",
+                            ] {
+                                obj.remove(*key);
+                            }
                         }
+                        MetaHttpResponse::json(v)
                     }
-                    MetaHttpResponse::json(v)
+                    Ok(None) => MetaHttpResponse::not_found("alert not found"),
+                    Err(e) => MetaHttpResponse::not_found(e.to_string()),
                 }
-                Ok(None) => MetaHttpResponse::not_found("alert not found"),
-                Err(e) => MetaHttpResponse::not_found(e.to_string()),
             }
         }
         Err(e) => e.into(),
@@ -427,17 +447,24 @@ pub async fn clone_alert(
             }
         }
         Err(AlertError::AlertNotFound) => {
-            // Fall back to anomaly detection config clone
-            match crate::service::anomaly_detection::clone_config(
-                &org_id,
-                &alert_id_str,
-                req_body.name,
-                req_body.folder_id,
-            )
-            .await
+            #[cfg(not(feature = "enterprise"))]
             {
-                Ok(v) => MetaHttpResponse::json(v),
-                Err(e) => MetaHttpResponse::not_found(e.to_string()),
+                return MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"));
+            }
+            #[cfg(feature = "enterprise")]
+            {
+                // Fall back to anomaly detection config clone
+                match crate::service::anomaly_detection::clone_config(
+                    &org_id,
+                    &alert_id_str,
+                    req_body.name,
+                    req_body.folder_id,
+                )
+                .await
+                {
+                    Ok(v) => MetaHttpResponse::json(v),
+                    Err(e) => MetaHttpResponse::not_found(e.to_string()),
+                }
             }
         }
         Err(e) => e.into(),
@@ -484,7 +511,8 @@ pub async fn update_alert(
         }
     };
 
-    // Explicit anomaly detection path.
+    // Explicit anomaly detection path (enterprise only).
+    #[cfg(feature = "enterprise")]
     if req_body.alert_type == Some(AlertTypeFilter::AnomalyDetection) {
         return build_and_run_anomaly_update(
             &org_id,
@@ -497,7 +525,9 @@ pub async fn update_alert(
     }
 
     // Save anomaly fields before req_body is consumed, in case we need the fallback.
+    #[cfg(feature = "enterprise")]
     let anomaly_config = req_body.anomaly_config.clone().unwrap_or_default();
+    #[cfg(feature = "enterprise")]
     let alert_fields_for_fallback = req_body.alert.clone();
 
     let mut alert: MetaAlert = req_body.into();
@@ -508,20 +538,28 @@ pub async fn update_alert(
     match alert::update(client, &org_id, None, alert).await {
         Ok(_) => MetaHttpResponse::ok("Alert Updated"),
         Err(AlertError::AlertNotFound) => {
-            // ID not in alerts table — try anomaly config.
-            build_and_run_anomaly_update(
-                &org_id,
-                &alert_id_str,
-                user_email.user_id,
-                anomaly_config,
-                alert_fields_for_fallback,
-            )
-            .await
+            #[cfg(not(feature = "enterprise"))]
+            {
+                return MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"));
+            }
+            #[cfg(feature = "enterprise")]
+            {
+                // ID not in alerts table — try anomaly config.
+                build_and_run_anomaly_update(
+                    &org_id,
+                    &alert_id_str,
+                    user_email.user_id,
+                    anomaly_config,
+                    alert_fields_for_fallback,
+                )
+                .await
+            }
         }
         Err(e) => e.into(),
     }
 }
 
+#[cfg(feature = "enterprise")]
 async fn build_and_run_anomaly_update(
     org_id: &str,
     anomaly_id: &str,
@@ -603,9 +641,17 @@ pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     match alert::delete_by_id(client, &org_id, alert_id).await {
         Ok(_) => MetaHttpResponse::ok("Alert deleted"),
         Err(AlertError::AlertNotFound) => {
-            match crate::service::anomaly_detection::delete_config(&org_id, &alert_id_str).await {
-                Ok(_) => MetaHttpResponse::ok("Alert deleted"),
-                Err(e) => MetaHttpResponse::not_found(e.to_string()),
+            #[cfg(not(feature = "enterprise"))]
+            {
+                return MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"));
+            }
+            #[cfg(feature = "enterprise")]
+            {
+                match crate::service::anomaly_detection::delete_config(&org_id, &alert_id_str).await
+                {
+                    Ok(_) => MetaHttpResponse::ok("Alert deleted"),
+                    Err(e) => MetaHttpResponse::not_found(e.to_string()),
+                }
             }
         }
         Err(e) => e.into(),
@@ -676,10 +722,15 @@ pub async fn delete_alert_bulk(
         let result = match alert::delete_by_id(client, &org_id, alert_id).await {
             Ok(_) => Ok(()),
             Err(AlertError::AlertNotFound) => {
-                // Fall back to anomaly config delete.
+                // Fall back to anomaly config delete (enterprise only).
+                #[cfg(not(feature = "enterprise"))]
+                {
+                    Err(format!("alert {id} not found"))
+                }
+                #[cfg(feature = "enterprise")]
                 crate::service::anomaly_detection::delete_config(&org_id, &id)
                     .await
-                    .map_err(|e| e.to_string())
+                    .map_err(|e: anyhow::Error| e.to_string())
             }
             Err(e) => Err(e.to_string()),
         };
@@ -773,7 +824,8 @@ pub async fn list_alerts(
             vec![]
         };
 
-    // Fetch anomaly detection configs and merge when the filter includes them.
+    // Fetch anomaly detection configs and merge when the filter includes them (enterprise only).
+    #[cfg(feature = "enterprise")]
     if matches!(
         alert_type,
         AlertTypeFilter::All | AlertTypeFilter::AnomalyDetection
@@ -835,23 +887,30 @@ pub async fn enable_alert(
             MetaHttpResponse::json(resp_body)
         }
         Err(AlertError::AlertNotFound) => {
-            // Fall back to anomaly detection config
-            use crate::handler::http::request::anomaly_detection::UpdateAnomalyConfigRequest;
-            let req = UpdateAnomalyConfigRequest {
-                enabled: Some(should_enable),
-                ..Default::default()
-            };
-            match crate::service::anomaly_detection::update_config(
-                &org_id,
-                &alert_id.to_string(),
-                req,
-            )
-            .await
+            #[cfg(not(feature = "enterprise"))]
             {
-                Ok(_) => MetaHttpResponse::json(EnableAlertResponseBody {
-                    enabled: should_enable,
-                }),
-                Err(e) => MetaHttpResponse::not_found(e.to_string()),
+                return MetaHttpResponse::not_found(format!("alert {alert_id} not found"));
+            }
+            #[cfg(feature = "enterprise")]
+            {
+                // Fall back to anomaly detection config
+                use crate::handler::http::request::anomaly_detection::UpdateAnomalyConfigRequest;
+                let req = UpdateAnomalyConfigRequest {
+                    enabled: Some(should_enable),
+                    ..Default::default()
+                };
+                match crate::service::anomaly_detection::update_config(
+                    &org_id,
+                    &alert_id.to_string(),
+                    req,
+                )
+                .await
+                {
+                    Ok(_) => MetaHttpResponse::json(EnableAlertResponseBody {
+                        enabled: should_enable,
+                    }),
+                    Err(e) => MetaHttpResponse::not_found(e.to_string()),
+                }
             }
         }
         Err(e) => e.into(),
@@ -915,24 +974,32 @@ pub async fn enable_alert_bulk(
                 successful.push(id);
             }
             Err(AlertError::AlertNotFound) => {
-                // Fall back to anomaly detection config
-                use crate::handler::http::request::anomaly_detection::UpdateAnomalyConfigRequest;
-                let req = UpdateAnomalyConfigRequest {
-                    enabled: Some(should_enable),
-                    ..Default::default()
-                };
-                match crate::service::anomaly_detection::update_config(
-                    &org_id,
-                    &id.to_string(),
-                    req,
-                )
-                .await
+                #[cfg(not(feature = "enterprise"))]
                 {
-                    Ok(_) => successful.push(id),
-                    Err(e) => {
-                        log::error!("error in enabling anomaly config {id} : {e}");
-                        unsuccessful.push(id);
-                        err = Some(e.to_string());
+                    unsuccessful.push(id);
+                    err = Some(format!("alert {id} not found"));
+                }
+                #[cfg(feature = "enterprise")]
+                {
+                    // Fall back to anomaly detection config
+                    use crate::handler::http::request::anomaly_detection::UpdateAnomalyConfigRequest;
+                    let req = UpdateAnomalyConfigRequest {
+                        enabled: Some(should_enable),
+                        ..Default::default()
+                    };
+                    match crate::service::anomaly_detection::update_config(
+                        &org_id,
+                        &id.to_string(),
+                        req,
+                    )
+                    .await
+                    {
+                        Ok(_) => successful.push(id),
+                        Err(e) => {
+                            log::error!("error in enabling anomaly config {id} : {e}");
+                            unsuccessful.push(id);
+                            err = Some(e.to_string());
+                        }
                     }
                 }
             }
@@ -988,15 +1055,22 @@ pub async fn trigger_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
     match alert::trigger_by_id(client, &org_id, alert_id).await {
         Ok(_) => MetaHttpResponse::ok("Alert triggered"),
         Err(AlertError::AlertNotFound) => {
-            // Fall back to anomaly detection — trigger a detection run
-            match crate::service::anomaly_detection::detect_anomalies(
-                &org_id,
-                &alert_id.to_string(),
-            )
-            .await
+            #[cfg(not(feature = "enterprise"))]
             {
-                Ok(_) => MetaHttpResponse::ok("Detection triggered"),
-                Err(e) => MetaHttpResponse::not_found(e.to_string()),
+                return MetaHttpResponse::not_found(format!("alert {alert_id} not found"));
+            }
+            #[cfg(feature = "enterprise")]
+            {
+                // Fall back to anomaly detection — trigger a detection run
+                match crate::service::anomaly_detection::detect_anomalies(
+                    &org_id,
+                    &alert_id.to_string(),
+                )
+                .await
+                {
+                    Ok(_) => MetaHttpResponse::ok("Detection triggered"),
+                    Err(e) => MetaHttpResponse::not_found(e.to_string()),
+                }
             }
         }
         Err(e) => e.into(),
@@ -1050,6 +1124,13 @@ pub async fn retrain_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
         }
         Err(e) => return e.into(),
     }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        return MetaHttpResponse::bad_request(
+            "retrain is only supported for anomaly detection alerts",
+        );
+    }
+    #[cfg(feature = "enterprise")]
     match crate::service::anomaly_detection::train_model(&org_id, &alert_id_str).await {
         Ok(_) => MetaHttpResponse::ok("Retraining triggered"),
         Err(e) => MetaHttpResponse::not_found(e.to_string()),
@@ -1088,16 +1169,21 @@ pub async fn move_alerts(
     Headers(user_email): Headers<UserEmail>,
     Json(req_body): Json<MoveAlertsRequestBody>,
 ) -> Response {
-    use crate::handler::http::request::anomaly_detection::UpdateAnomalyConfigRequest;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    // Separate IDs into regular alerts and anomaly configs
+    // Separate IDs into regular alerts and anomaly configs (anomaly is enterprise-only)
     let mut alert_ids: Vec<Ksuid> = Vec::new();
+    #[cfg(feature = "enterprise")]
     let mut anomaly_ids: Vec<Ksuid> = Vec::new();
     for id in &req_body.alert_ids {
         match alert::get_by_id(client, &org_id, *id).await {
             Ok(_) => alert_ids.push(*id),
+            #[cfg(feature = "enterprise")]
             Err(AlertError::AlertNotFound) => anomaly_ids.push(*id),
+            #[cfg(not(feature = "enterprise"))]
+            Err(AlertError::AlertNotFound) => {
+                return MetaHttpResponse::not_found(format!("alert {id} not found"));
+            }
             Err(e) => return e.into(),
         }
     }
@@ -1117,8 +1203,10 @@ pub async fn move_alerts(
         }
     }
 
-    // Move anomaly configs individually
+    // Move anomaly configs individually (enterprise only)
+    #[cfg(feature = "enterprise")]
     for id in anomaly_ids {
+        use crate::handler::http::request::anomaly_detection::UpdateAnomalyConfigRequest;
         let req = UpdateAnomalyConfigRequest {
             folder_id: Some(req_body.dst_folder_id.clone()),
             ..Default::default()
