@@ -445,6 +445,18 @@ pub async fn update_config(
         active_model.description = Set(Some(description));
     }
     if let Some(query_mode) = req.query_mode {
+        // Clear the opposing field so the DB doesn't hold stale data from the
+        // previous mode. query_builder selects the path based on query_mode alone,
+        // but stale fields in the DB are confusing when inspecting records.
+        match query_mode.as_str() {
+            "custom_sql" => {
+                active_model.filters = Set(None);
+            }
+            "filters" => {
+                active_model.custom_sql = Set(None);
+            }
+            _ => {}
+        }
         active_model.query_mode = Set(query_mode);
     }
     if let Some(filters) = req.filters {
