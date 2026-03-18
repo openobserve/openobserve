@@ -35,6 +35,8 @@ vi.mock("@/services/alerts", () => ({
     delete_by_alert_id: vi.fn(),
     create_by_alert_id: vi.fn(),
     getHistory: vi.fn(),
+    export_by_id: vi.fn(),
+    retrain_by_id: vi.fn(),
   },
 }));
 vi.mock("@/services/alert_templates", () => ({
@@ -207,6 +209,15 @@ beforeEach(() => {
 
   (alertsSvc.getHistory as any) = vi.fn().mockImplementation(async () => {
     return Promise.resolve({ data: { total: 0, hits: [] } } as any);
+  });
+
+  (alertsSvc.export_by_id as any) = vi.fn().mockImplementation(async (_org: any, id: string) => {
+    const alert = alertsDB.find((a) => a.alert_id === id) ?? { name: "exported" };
+    return Promise.resolve({ data: { ...alert } } as any);
+  });
+
+  (alertsSvc.retrain_by_id as any) = vi.fn().mockImplementation(async () => {
+    return Promise.resolve({ data: { code: 200 } } as any);
   });
 
   (alertsSvc.create_by_alert_id as any) = vi.fn().mockImplementation(async (_org: any, body: any, folder?: string) => {
