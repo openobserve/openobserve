@@ -170,6 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="
               store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
             "
+            v-html="highlightedTemplate"
           >
             <template v-for="(tok, i) in selectedTemplateTokens" :key="i">
               <span v-if="tok.kind === 'text'" class="tw-whitespace-pre">{{ tok.value }}</span>
@@ -322,6 +323,7 @@ import {
   wildcardChipColor,
   anomalyExplanation,
 } from "@/composables/useLogs/useTemplateTokenizer";
+import { escapeHtml } from "@/utils/html";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -349,6 +351,15 @@ const anomalyExplanationForSelected = computed(() =>
 );
 
 const variableColumns = computed(() => [
+const highlightedTemplate = computed(() => {
+  if (!props.selectedPattern?.pattern?.template) return "";
+  return escapeHtml(props.selectedPattern.pattern.template).replace(
+    /&lt;\*&gt;/g,
+    '<span class="log-pattern-wildcard">&lt;*&gt;</span>',
+  );
+});
+
+const variableColumns = [
   {
     name: "name",
     label: t("search.patternVariableNameColumn"),
