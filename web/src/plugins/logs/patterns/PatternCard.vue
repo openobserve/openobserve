@@ -215,6 +215,7 @@ const anomalyExplanationText = computed(() => anomalyExplanation(props.pattern, 
 @import "@/assets/styles/log-highlighting.css";
 .pattern-details-btn > span.q-btn__content {
   display: block !important;
+}
 .wildcard-chip {
   font-family: monospace;
   font-size: 10px;
