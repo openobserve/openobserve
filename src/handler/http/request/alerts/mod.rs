@@ -593,6 +593,9 @@ async fn build_and_run_anomaly_update(
     let req = UpdateAnomalyConfigRequest {
         name,
         description,
+        query_mode: fields.query_mode,
+        filters: fields.filters,
+        custom_sql: fields.custom_sql,
         detection_function: fields.detection_function,
         histogram_interval: fields.histogram_interval,
         schedule_interval: fields.schedule_interval,

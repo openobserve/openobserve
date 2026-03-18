@@ -410,6 +410,9 @@ pub struct CreateAnomalyConfigRequest {
 pub struct UpdateAnomalyConfigRequest {
     pub name: Option<String>,
     pub description: Option<String>,
+    pub query_mode: Option<String>,
+    pub filters: Option<serde_json::Value>,
+    pub custom_sql: Option<String>,
     pub detection_function: Option<String>,
     /// SQL histogram bucket size. Changing this requires retraining.
     pub histogram_interval: Option<String>,
