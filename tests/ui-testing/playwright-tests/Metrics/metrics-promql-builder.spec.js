@@ -2,6 +2,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
+const { waitForDashboardPage, deleteDashboard } = require('../dashboards/utils/dashCreation.js');
 
 
 test.describe("Metrics PromQL Builder Mode testcases", () => {
@@ -585,6 +586,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const builder = pm.metricsBuilderPage;
     const uniqueId = Date.now().toString().slice(-6);
     const panelTitle = `E2E Builder Panel ${uniqueId}`;
+    let dashboardName = '';
 
     // 1. Set time range
     await pm.metricsPage.openDatePicker();
@@ -608,11 +610,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     // 5. Click Add to Dashboard
     const addClicked = await builder.clickAddToDashboard();
-    if (!addClicked) {
-      testLogger.warn('Add to Dashboard button not visible, skipping save flow');
-      return;
-    }
-
+    expect(addClicked).toBe(true);
     expect(await builder.isDashboardDialogVisible()).toBe(true);
     testLogger.info('Add to Dashboard dialog opened');
 
@@ -620,91 +618,37 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await builder.selectDashboardFolder('default');
     testLogger.info('Folder selected: default');
 
-    // 7. Select or create dashboard
-    const dashDropdown = page.locator('[data-test="dashboard-dropdown-dashboard-selection"]');
-    if (await dashDropdown.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await dashDropdown.click();
-      await page.waitForTimeout(1000);
+    // 7. Select or create dashboard using ensureDashboardSelected
+    dashboardName = await builder.ensureDashboardSelected();
+    testLogger.info(`Dashboard: ${dashboardName}`);
 
-      // Select first available dashboard
-      const dashOptions = page.locator('.q-menu .q-item');
-      const dashCount = await dashOptions.count();
-      testLogger.info(`Available dashboards: ${dashCount}`);
+    // 8. Select tab
+    await builder.selectDashboardTab('Default');
+    testLogger.info('Tab selected: Default');
 
-      if (dashCount > 0) {
-        const dashName = await dashOptions.first().textContent();
-        await dashOptions.first().click();
-        await page.waitForTimeout(500);
-        testLogger.info(`Selected dashboard: ${dashName}`);
+    // 9. Fill panel title
+    await builder.fillPanelTitle(panelTitle);
+    testLogger.info(`Panel title: ${panelTitle}`);
 
-        // 8. Select tab
-        await builder.selectDashboardTab('Default');
-        testLogger.info('Tab selected: Default');
+    // 10. Click Add to save
+    await builder.clickDashboardAdd();
+    await page.waitForTimeout(3000);
 
-        // 9. Fill panel title
-        await builder.fillPanelTitle(panelTitle);
-        testLogger.info(`Panel title: ${panelTitle}`);
+    // 11. Wait for dashboard view to load after redirect
+    await waitForDashboardPage(page);
+    await page.waitForTimeout(2000);
+    testLogger.info('Navigated to dashboard after save');
 
-        // 10. Click Add to save
-        await builder.clickDashboardAdd();
-        await page.waitForTimeout(3000);
+    // 12. Verify panel exists on the dashboard
+    const panelBar = page.locator('[data-test="dashboard-panel-bar"]').filter({ hasText: panelTitle });
+    const panelVisible = await panelBar.isVisible({ timeout: 10000 }).catch(() => false);
+    expect(panelVisible).toBe(true);
+    testLogger.info(`Panel "${panelTitle}" visible on dashboard`);
 
-        // 11. Check if navigated to dashboard (success case)
-        const url = page.url();
-        if (url.includes('dashboard')) {
-          testLogger.info('Navigated to dashboard after save');
-
-          // 12. Verify panel exists
-          await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-          await page.waitForTimeout(2000);
-          const panelVisible = await builder.isPanelVisibleOnDashboard(panelTitle);
-          if (panelVisible) {
-            testLogger.info(`Panel "${panelTitle}" visible on dashboard`);
-          } else {
-            testLogger.info('Panel may be rendered differently or page still loading');
-          }
-
-          // 13. Cleanup: delete the saved panel
-          const panelContainer = page.locator('[data-test="dashboard-panel-container"]').filter({ hasText: panelTitle });
-          if (await panelContainer.isVisible({ timeout: 5000 }).catch(() => false)) {
-            await panelContainer.hover();
-            await page.waitForTimeout(500);
-            const dropdownBtn = page.locator(`[data-test="dashboard-edit-panel-${panelTitle}-dropdown"]`);
-            if (await dropdownBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-              await dropdownBtn.click();
-              await page.waitForTimeout(500);
-              const deleteItem = page.locator('[data-test="dashboard-delete-panel"]');
-              await deleteItem.waitFor({ state: 'visible', timeout: 5000 });
-              await deleteItem.click();
-              await page.waitForTimeout(500);
-              const confirmBtn = page.locator('[data-test="confirm-button"]');
-              if (await confirmBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-                await confirmBtn.click();
-                await page.waitForTimeout(2000);
-              }
-              testLogger.info(`Cleanup: panel "${panelTitle}" deleted`);
-            } else {
-              testLogger.warn('Cleanup: could not find panel dropdown for deletion');
-            }
-          } else {
-            testLogger.warn('Cleanup: panel container not found for deletion');
-          }
-        } else {
-          // Check for success/error notification
-          const hasSuccess = await builder.hasSuccessNotification();
-          const hasError = await builder.hasErrorNotification();
-          testLogger.info(`Save result - success: ${hasSuccess}, error: ${hasError}`);
-        }
-      } else {
-        testLogger.warn('No dashboards available to select');
-        await builder.clickDashboardCancel();
-      }
-    } else {
-      testLogger.warn('Dashboard dropdown not visible');
-      await builder.clickDashboardCancel();
-    }
-
-    testLogger.info('Save to dashboard workflow completed');
+    // 13. Cleanup: navigate back to dashboard list and delete the dashboard
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
+    testLogger.info(`Cleanup: dashboard "${dashboardName}" deleted`);
   });
 
   // =========================================================================
@@ -1319,61 +1263,16 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     expect(dialogVisible).toBe(true);
 
     // Select folder (default)
-    const folderDropdown = page.locator('[data-test="index-dropdown-stream_type"]');
-    if (await folderDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await folderDropdown.click();
-      await page.waitForTimeout(500);
-      const defaultFolder = page.locator('.q-menu .q-item').filter({ hasText: 'default' }).first();
-      if (await defaultFolder.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await defaultFolder.click();
-        await page.waitForTimeout(500);
-      }
-      testLogger.info('Folder: default');
-    }
+    await builder.selectDashboardFolder('default');
+    testLogger.info('Folder: default');
 
-    // Select dashboard — pick the first available or create new
-    const dashDropdown = page.locator('[data-test="dashboard-dropdown-dashboard-selection"]');
-    await dashDropdown.waitFor({ state: 'visible', timeout: 5000 });
-    await dashDropdown.click();
-    await page.waitForTimeout(500);
+    // Select or create dashboard using ensureDashboardSelected
+    let dashboardName = await builder.ensureDashboardSelected();
+    testLogger.info(`Dashboard: ${dashboardName}`);
 
-    let dashboardName = '';
-    const dashOptions = page.locator('.q-menu .q-item');
-    const dashCount = await dashOptions.count();
-    if (dashCount > 0) {
-      dashboardName = (await dashOptions.first().textContent()).trim();
-      await dashOptions.first().click();
-      await page.waitForTimeout(500);
-      testLogger.info(`Dashboard: ${dashboardName}`);
-    } else {
-      // Create a new dashboard
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(300);
-      const newDashBtn = page.locator('[data-test="dashboard-dashboard-new-add"]');
-      if (await newDashBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await newDashBtn.click();
-        await page.waitForTimeout(500);
-        const dashNameInput = page.locator('[data-test="dashboard-dashboard-add-dialog"] input, .q-dialog input').first();
-        dashboardName = `test_dash_${Date.now()}`;
-        await dashNameInput.fill(dashboardName);
-        await page.locator('.q-dialog .q-btn:has-text("Save"), .q-dialog .q-btn:has-text("OK")').first().click();
-        await page.waitForTimeout(1000);
-        testLogger.info(`Created new dashboard: ${dashboardName}`);
-      }
-    }
-
-    // Select tab (first available)
-    const tabDropdown = page.locator('[data-test="dashboard-dropdown-tab-selection"]');
-    if (await tabDropdown.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await tabDropdown.click();
-      await page.waitForTimeout(500);
-      const tabOptions = page.locator('.q-menu .q-item');
-      if (await tabOptions.count() > 0) {
-        await tabOptions.first().click();
-        await page.waitForTimeout(500);
-        testLogger.info('Tab selected');
-      }
-    }
+    // Select tab
+    await builder.selectDashboardTab('Default');
+    testLogger.info('Tab selected');
 
     // Fill panel title
     await builder.fillPanelTitle(panelTitle);
@@ -1384,9 +1283,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await page.waitForTimeout(3000);
     testLogger.info('Panel saved to dashboard');
 
-    // 9. After save, we should be redirected to the dashboard view
-    // Wait for dashboard view to load
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    // 9. Wait for dashboard view to load after redirect
+    await waitForDashboardPage(page);
     await page.waitForTimeout(2000);
 
     // Verify the panel is visible on the dashboard
@@ -1505,30 +1403,10 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('Discarded panel editor');
 
-    // 18. Cleanup: delete the panel from the dashboard
-    await page.waitForTimeout(2000);
-    const panelContainerAfter = page.locator('[data-test="dashboard-panel-container"]').filter({ hasText: panelTitle });
-    if (await panelContainerAfter.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await panelContainerAfter.hover();
-      await page.waitForTimeout(500);
-      const deleteDropdown = page.locator(`[data-test="dashboard-edit-panel-${panelTitle}-dropdown"]`);
-      if (await deleteDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await deleteDropdown.click();
-        await page.waitForTimeout(500);
-        const deleteItem = page.locator('[data-test="dashboard-delete-panel"]');
-        await deleteItem.waitFor({ state: 'visible', timeout: 5000 });
-        await deleteItem.click();
-        await page.waitForTimeout(500);
-
-        // Confirm deletion
-        const confirmDelete = page.locator('[data-test="confirm-button"]');
-        if (await confirmDelete.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await confirmDelete.click();
-          await page.waitForTimeout(2000);
-        }
-        testLogger.info('Panel deleted from dashboard');
-      }
-    }
+    // 18. Cleanup: navigate back to dashboard list and delete the entire dashboard
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
+    testLogger.info(`Cleanup: dashboard "${dashboardName}" deleted`);
 
     testLogger.info('Save → edit → verify → cleanup complete');
   });

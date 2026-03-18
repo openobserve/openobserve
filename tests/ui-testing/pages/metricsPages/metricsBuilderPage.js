@@ -2,8 +2,6 @@
 // Page Object Model for PromQL Builder Mode UI interactions
 // Covers: Label Filters, Operations, Options, Query Mode tabs, Add to Dashboard
 
-import { expect } from '@playwright/test';
-
 export class MetricsBuilderPage {
     constructor(page) {
         this.page = page;
@@ -542,7 +540,10 @@ export class MetricsBuilderPage {
         const addBtn = this.page.locator(this.addToDashboardButton).first();
         if (await addBtn.isVisible({ timeout: 5000 })) {
             await addBtn.click();
-            await this.page.waitForTimeout(500);
+            // Wait for the "Add to Dashboard" side panel to fully load (matches visualise.js pattern)
+            const sidePanelTitle = this.page.locator(this.dashboardDialogTitle);
+            await sidePanelTitle.waitFor({ state: 'visible', timeout: 10000 });
+            await sidePanelTitle.waitFor({ state: 'attached', timeout: 5000 });
             return true;
         }
         return false;
@@ -1040,6 +1041,77 @@ export class MetricsBuilderPage {
         await this.page.waitForTimeout(2000);
 
         return true;
+    }
+
+    /**
+     * Create a new dashboard from within the Add to Dashboard dialog.
+     * Follows the proven pattern from visualise.js addPanelToNewDashboard:
+     * waitFor visible+attached, click, then fill.
+     * @param {string} dashboardName
+     */
+    async createNewDashboardInDialog(dashboardName) {
+        const newDashBtn = this.page.locator('[data-test="dashboard-dashboard-new-add"]');
+        await newDashBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await newDashBtn.waitFor({ state: 'attached', timeout: 5000 });
+        await newDashBtn.click();
+
+        // Wait for the "New dashboard" dialog name input to be fully ready
+        const dashNameInput = this.page.locator('[data-test="add-dashboard-name"]');
+        await dashNameInput.waitFor({ state: 'visible', timeout: 10000 });
+        await dashNameInput.waitFor({ state: 'attached', timeout: 5000 });
+
+        // Click then fill (Quasar q-input needs click to focus first)
+        await dashNameInput.click();
+        await dashNameInput.fill(dashboardName);
+
+        // Submit dashboard creation
+        const submitBtn = this.page.locator('[data-test="dashboard-add-submit"]');
+        await submitBtn.waitFor({ state: 'visible', timeout: 5000 });
+        await submitBtn.click();
+
+        // Wait for the dialog to close and dashboard to be auto-selected
+        await this.page.waitForTimeout(3000);
+    }
+
+    /**
+     * Ensure a dashboard is selected in the Add to Dashboard dialog.
+     * Checks if one is auto-selected, tries dropdown options, or creates a new one.
+     * Follows the pattern from visualise.js addPanelToNewDashboard.
+     * @returns {Promise<string>} The name of the selected/created dashboard
+     */
+    async ensureDashboardSelected() {
+        const dashDropdown = this.page.locator('[data-test="dashboard-dropdown-dashboard-selection"]');
+        await dashDropdown.waitFor({ state: 'visible', timeout: 5000 });
+
+        // Wait for the dashboard list API to finish loading
+        await this.page.waitForTimeout(2000);
+
+        // Check if a dashboard is already auto-selected by reading the q-select's
+        // displayed value. Quasar q-select (without use-input) renders the selected
+        // option text inside .q-field__native > span.
+        const hasSelectedValue = await dashDropdown.evaluate((el) => {
+            const nativeSpans = el.querySelectorAll('.q-field__native > span');
+            for (const span of nativeSpans) {
+                const text = span.textContent?.trim();
+                if (text && text.length > 0 && !text.includes('Select')) {
+                    return text;
+                }
+            }
+            return '';
+        });
+
+        if (hasSelectedValue) {
+            return hasSelectedValue;
+        }
+
+        // No dashboard auto-selected — create a new one.
+        // We skip opening the dropdown because when the list is empty,
+        // the q-select shows a "No result" q-item that matches .q-menu .q-item
+        // and pressing Escape to close the menu could close the parent dialog.
+        // This matches the visualise.js pattern of always creating a fresh dashboard.
+        const newDashName = `test_dash_${Date.now()}`;
+        await this.createNewDashboardInDialog(newDashName);
+        return newDashName;
     }
 
     // ===== Dashboard Verification & Cleanup =====
