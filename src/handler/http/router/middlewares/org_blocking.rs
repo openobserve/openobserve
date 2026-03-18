@@ -28,11 +28,10 @@ pub async fn blocked_orgs_middleware(request: Request, next: Next) -> Response {
 
     #[cfg(feature = "cloud")]
     {
-        let prefix = format!("{}/api/", get_config().common.base_uri);
         let path = request
             .uri()
             .path()
-            .strip_prefix(&prefix)
+            .strip_prefix("/")
             .unwrap_or("")
             .split('?')
             .next()
