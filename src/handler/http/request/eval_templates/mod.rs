@@ -21,6 +21,7 @@ use axum::{
 #[cfg(feature = "enterprise")]
 use infra::table::eval_templates as db_eval_templates;
 use serde::{Deserialize, Serialize};
+use svix_ksuid::KsuidLike;
 
 use crate::common::meta::http::HttpResponse;
 
@@ -175,7 +176,7 @@ pub async fn create(
 
         if let Some(manager) = prompt_manager_singleton::get() {
             let now = chrono::Utc::now().timestamp_millis();
-            let template_id = format!("tmpl_{}", now);
+            let template_id = svix_ksuid::Ksuid::new(None, None).to_string();
 
             let template = o2_enterprise::enterprise::ai::evaluation::prompt_manager::EvalPrompt {
                 id: template_id,
