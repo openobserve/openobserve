@@ -17,6 +17,8 @@
 //!
 //! m20260310 creates the table with `alert_destination_id` (varchar). This migration:
 //! - Adds `folder_id` (varchar 256): backfilled from the "default" Alerts folder for each org.
+//!   If an org has anomaly configs but no default Alerts folder, one is auto-created so the
+//!   backfill always succeeds and folder_id can be set NOT NULL.
 //! - Adds `owner` (varchar 256): nullable attributed owner.
 //! - Adds `alert_destinations` (jsonb): wraps the old `alert_destination_id` value in a JSON
 //!   array, then drops the old column.
@@ -25,6 +27,7 @@
 
 use sea_orm::{ConnectionTrait, Statement};
 use sea_orm_migration::prelude::*;
+use svix_ksuid::{Ksuid, KsuidLike};
 
 const ANOMALY_CONFIG_FOLDER_ID_IDX: &str = "idx_anomaly_config_folder_id";
 
@@ -151,6 +154,37 @@ impl MigrationTrait for Migration {
                 .get_connection()
                 .execute_unprepared(drop_sql)
                 .await?;
+        }
+
+        // Ensure every org with anomaly configs has a default Alerts folder (type=1).
+        // If not, auto-create one so the backfill below never leaves a NULL.
+        let db = manager.get_connection();
+        let orgs_rows = db
+            .query_all(Statement::from_string(
+                db_backend,
+                "SELECT DISTINCT org_id FROM anomaly_detection_config WHERE folder_id IS NULL",
+            ))
+            .await?;
+        for row in orgs_rows {
+            let org_id: String = row.try_get("", "org_id")?;
+            // Escape single quotes in org_id to prevent SQL issues.
+            let org_id_escaped = org_id.replace('\'', "''");
+            let check_sql = format!(
+                "SELECT id FROM folders \
+                 WHERE org = '{org_id_escaped}' \
+                 AND folder_id = 'default' AND type = 1 LIMIT 1"
+            );
+            let existing = db
+                .query_one(Statement::from_string(db_backend, check_sql))
+                .await?;
+            if existing.is_none() {
+                let ksuid = Ksuid::new(None, None).to_string();
+                let insert_sql = format!(
+                    "INSERT INTO folders (id, org, folder_id, name, type) \
+                     VALUES ('{ksuid}', '{org_id_escaped}', 'default', 'Default', 1)"
+                );
+                db.execute_unprepared(&insert_sql).await?;
+            }
         }
 
         // Backfill folder_id from the "default" Alerts folder for each org.
