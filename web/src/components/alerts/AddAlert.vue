@@ -2969,6 +2969,7 @@ export default defineComponent({
         const c = anomalyConfig.value;
         const payload: any = {
           alert_type: "anomaly_detection",
+          destinations: [],
           name: c.name,
           description: c.description || undefined,
           stream_name: c.stream_name,
