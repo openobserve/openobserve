@@ -2970,8 +2970,8 @@ export default defineComponent({
         const payload: any = {
           alert_type: "anomaly_detection",
           destinations:
-            c.alert_enabled && c.alert_destination_id
-              ? [c.alert_destination_id]
+            c.alert_enabled && c.alert_destination_ids?.length
+              ? c.alert_destination_ids
               : [],
           name: c.name,
           description: c.description || undefined,
