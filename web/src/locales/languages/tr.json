@@ -1471,7 +1471,18 @@
     "hideQueryResults": "Sorgu sonuçlarını gizle",
     "vrlExtractionTooltip": "Grafikte çıkarılan VRL alanlarını kullanmak için bir VRL işlevi yazın ve Uygula düğmesine tıklayın. Alanlar çıkarılacak ve bunları grafiği oluşturmak için kullanmanıza izin verecektir.",
     "errorFetchingFunctions": "İşlevleri getirirken hata oluştu",
-    "functionAppliedSuccess": "{name} işlevi başarıyla uygulandı."
+    "functionAppliedSuccess": "{name} işlevi başarıyla uygulandı.",
+    "pivotOptions": "Pivot Seçenekleri",
+    "pivotShowRowTotals": "Satır Toplamlarını Göster",
+    "pivotShowColTotals": "Sütun Toplamlarını Göster",
+    "pivotMissingValue": "Eksik Değer",
+    "pivotMissingValueHint": "Veri içermeyen hücreler için gösterilen değer",
+    "pivotShowRowTotalsTooltip": "Pivot tablonun altında her sütunun değerlerini özetleyen bir toplamlar satırı görüntüleyin",
+    "pivotShowColTotalsTooltip": "Pivot tablonun sağ tarafında her satırın değerlerini özetleyen bir toplamlar sütunu görüntüleyin",
+    "pivotStickyRowTotals": "Yapışkan Satır Toplamları",
+    "pivotStickyRowTotalsTooltip": "Toplamlar satırını dikey olarak kaydırırken görünür kalması için alttaki sabitleyin",
+    "pivotStickyColTotals": "Yapışkan Sütun Toplamları",
+    "pivotStickyColTotalsTooltip": "Yatay kaydırırken görünür kalması için sağdaki toplamlar sütununu sabitleyin"
   },
   "panel": {
     "header": "Panel",
@@ -1553,7 +1564,12 @@
     "sqlBuilder": "SQL Oluşturucu",
     "generatedSql": "Oluşturulan SQL",
     "enterCustomSql": "Özel SQL sorgunuzu girin...",
-    "customSql": "Özel SQL"
+    "customSql": "Özel SQL",
+    "pivotField": "Pivot Alanı",
+    "addToPivot": "Pivot Alanına Ekle",
+    "pivotFieldTooltip": "Bir boyut alanını buraya sürükleyin. Farklı değerleri pivot tabloda sütun başlıkları haline gelir. Çok seviyeli döndürme için en fazla 3 alana izin verilir.",
+    "breakdownTooltipHBar": "Daha net bir görünüm için verileri Y ekseninde farklı bölümlere bölmek için bu alanları kullanın.",
+    "breakdownTooltipDefault": "Daha net bir görünüm için verileri X ekseninde farklı bölümlere bölmek için bu alanları kullanın."
   },
   "home": {
     "streams": "Akışlar",
