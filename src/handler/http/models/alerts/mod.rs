@@ -72,6 +72,7 @@ pub struct Alert {
 
     /// List of destination names to notify when alert fires.
     /// Destinations must be pre-configured in the system.
+    #[serde(default)]
     #[schema(example = json!(["slack-alerts", "pagerduty"]))]
     pub destinations: Vec<String>,
 
