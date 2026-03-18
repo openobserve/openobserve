@@ -557,10 +557,10 @@ pub fn check_schema_for_defined_schema_fields(
             // Automatically include all OTEL Gen-AI and LLM evaluation fields from the schema
             for field in schema.fields() {
                 let name = field.name();
-                if name.starts_with("gen_ai.")
-                    || name.starts_with("llm.")
-                    || name == "user.id"
-                    || name == "session.id"
+                if name.starts_with("gen_ai_")
+                    || name.starts_with("llm_")
+                    || name == "user_id"
+                    || name == "session_id"
                 {
                     fields.insert(name.to_string());
                 }
