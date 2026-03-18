@@ -593,19 +593,20 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await setupPromQLMapsPanelWithConfig(page, pm, dashboardName);
 
     const nameLabelInput = page.locator('[data-test="dashboard-config-maps-name-label"]');
-    const mapTypeSelect = page.locator('[data-test="dashboard-config-maps-type"]');
+    const mapTypeSelect = page.locator('[data-test="dashboard-config-map-type"]');
 
     await pm.dashboardPanelConfigs.scrollSidebarToElement(nameLabelInput);
     await expect(nameLabelInput).toBeVisible();
-    await expect(mapTypeSelect).toBeVisible();
 
     await nameLabelInput.fill("country_name");
     testLogger.info("Maps name label set to 'country_name'");
 
-    // Map type select — click and choose "world"
+    // Map type select — click and choose "World" (label is capitalized via t("dashboard.world"))
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(mapTypeSelect);
+    await expect(mapTypeSelect).toBeVisible();
     await mapTypeSelect.click();
-    await page.getByRole("option", { name: "world", exact: true }).click();
-    testLogger.info("Maps map type set to 'world'");
+    await page.getByRole("option", { name: "World", exact: true }).click();
+    testLogger.info("Maps map type set to 'World'");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
@@ -615,14 +616,15 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await reopenPanelConfig(page, pm);
 
     const nameLabelAfter = page.locator('[data-test="dashboard-config-maps-name-label"]');
-    const mapTypeAfter = page.locator('[data-test="dashboard-config-maps-type"]');
+    const mapTypeAfter = page.locator('[data-test="dashboard-config-map-type"]');
 
     await pm.dashboardPanelConfigs.scrollSidebarToElement(nameLabelAfter);
     await expect(nameLabelAfter).toHaveValue("country_name");
 
-    // Map type wrapper should contain "world"
+    // Map type wrapper should contain "World" (label shown in q-select display)
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(mapTypeAfter);
     const mapTypeWrapper = mapTypeAfter.locator('xpath=ancestor::div[contains(@class,"q-field")][1]');
-    await expect(mapTypeWrapper).toContainText("world");
+    await expect(mapTypeWrapper).toContainText("World");
     testLogger.info("Maps name label and map type persisted after save");
 
     await pm.dashboardPanelActions.savePanel();

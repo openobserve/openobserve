@@ -25,7 +25,7 @@
           : t('dashboard.addValueMapping')
       "
       no-caps
-      data-test="dashboard-addpanel-config-drilldown-add-btn"
+      data-test="dashboard-addpanel-config-value-mapping-add-btn"
       class="el-border"
     />
     <q-dialog v-model="showValueMappingPopUp">
