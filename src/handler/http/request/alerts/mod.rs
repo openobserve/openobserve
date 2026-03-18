@@ -842,12 +842,10 @@ pub async fn list_alerts(
     if matches!(
         alert_type,
         AlertTypeFilter::All | AlertTypeFilter::AnomalyDetection
-    ) {
-        if let Ok(configs) =
-            crate::service::anomaly_detection::list_configs(&org_id, folder_slug.as_deref()).await
-        {
-            list.extend(configs.iter().filter_map(anomaly_config_to_list_item));
-        }
+    ) && let Ok(configs) =
+        crate::service::anomaly_detection::list_configs(&org_id, folder_slug.as_deref()).await
+    {
+        list.extend(configs.iter().filter_map(anomaly_config_to_list_item));
     }
 
     MetaHttpResponse::json(ListAlertsResponseBody { list })
