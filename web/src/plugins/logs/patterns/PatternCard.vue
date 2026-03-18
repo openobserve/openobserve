@@ -164,7 +164,6 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
-import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import {
   tokenizeTemplate,
   wildcardChipColor,
