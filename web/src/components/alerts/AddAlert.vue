@@ -1382,8 +1382,8 @@ export default defineComponent({
             : parseSeconds(
                 sched.value * (sched.unit === "h" ? 3600 : 60),
               );
-          // Normalize destinations: API may return a single id (string) or array
-          const rawDestIds = data.alert_destination_ids ?? data.alert_destination_id;
+          // Normalize destinations: API may return alert_destinations (array), alert_destination_ids, or alert_destination_id
+          const rawDestIds = data.alert_destinations ?? data.alert_destination_ids ?? data.alert_destination_id;
           const destIds: string[] = Array.isArray(rawDestIds)
             ? rawDestIds
             : rawDestIds
