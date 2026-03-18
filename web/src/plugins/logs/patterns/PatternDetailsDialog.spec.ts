@@ -19,6 +19,7 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
 import PatternDetailsDialog from "./PatternDetailsDialog.vue";
 import store from "@/test/unit/helpers/store";
+import i18n from "@/locales";
 
 installQuasar({
   plugins: [quasar.Dialog, quasar.Notify],
@@ -62,6 +63,7 @@ describe("PatternDetailsDialog", () => {
         totalPatterns: totalPatterns,
       },
       global: {
+        plugins: [i18n],
         provide: { store },
         stubs: {
           "q-dialog": {
@@ -119,12 +121,12 @@ describe("PatternDetailsDialog", () => {
       });
 
       const text = wrapper.text();
-      expect(text).toContain("This pattern is detected as an anomaly");
+      expect(text).toContain("This pattern is detected as a rare pattern");
     });
 
     it("should not display anomaly banner when pattern is not anomaly", () => {
       const text = wrapper.text();
-      expect(text).not.toContain("This pattern is detected as an anomaly");
+      expect(text).not.toContain("This pattern is detected as a rare pattern");
     });
   });
 
@@ -314,6 +316,7 @@ describe("PatternDetailsDialog", () => {
           totalPatterns: 10,
         },
         global: {
+          plugins: [i18n],
           provide: { store },
           stubs: {
             "q-dialog": {
