@@ -725,6 +725,7 @@ export default defineComponent({
       "sum",
       "min",
       "max",
+      "p50",
       "p95",
       "p99",
     ];
