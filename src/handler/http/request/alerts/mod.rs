@@ -524,19 +524,21 @@ pub async fn update_alert(
     // Explicit anomaly detection path (enterprise only).
     #[cfg(feature = "enterprise")]
     if req_body.alert_type == Some(AlertTypeFilter::AnomalyDetection) {
+        let alert = req_body.alert.clone();
+        let anomaly_fields = req_body.anomaly_fields();
         return build_and_run_anomaly_update(
             &org_id,
             &alert_id_str,
             user_email.user_id,
-            req_body.anomaly_config.unwrap_or_default(),
-            req_body.alert,
+            anomaly_fields,
+            alert,
         )
         .await;
     }
 
     // Save anomaly fields before req_body is consumed, in case we need the fallback.
     #[cfg(feature = "enterprise")]
-    let anomaly_config = req_body.anomaly_config.clone().unwrap_or_default();
+    let anomaly_config = req_body.anomaly_fields();
     #[cfg(feature = "enterprise")]
     let alert_fields_for_fallback = req_body.alert.clone();
 
