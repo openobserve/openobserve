@@ -37,6 +37,8 @@ use {
 };
 
 #[cfg(feature = "enterprise")]
+use crate::handler::http::models::alerts::requests::UpdateAnomalyAlertFields;
+#[cfg(feature = "enterprise")]
 use crate::handler::http::models::alerts::responses::anomaly_config_to_list_item;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
@@ -46,7 +48,7 @@ use crate::{
             requests::{
                 AlertBulkEnableRequest, CloneAlertRequestBody, CreateAlertRequestBody,
                 EnableAlertQuery, GenerateSqlRequestBody, ListAlertsQuery, MoveAlertsRequestBody,
-                UpdateAlertRequestBody, UpdateAnomalyAlertFields,
+                UpdateAlertRequestBody,
             },
             responses::{
                 AlertBulkEnableResponse, EnableAlertResponseBody, GenerateSqlMetadata,
@@ -331,6 +333,7 @@ pub async fn get_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Resp
     )
 )]
 pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+    #[cfg(feature = "enterprise")]
     let alert_id_str = alert_id.clone();
     let alert_id = match Ksuid::from_str(&alert_id) {
         Ok(id) => id,
@@ -792,28 +795,28 @@ pub async fn list_alerts(
     #[cfg(feature = "enterprise")]
     let user_id = Some(user_email.user_id.as_str());
 
+    #[cfg(feature = "enterprise")]
     let folder_slug = query.folder.clone();
     let params = query.into(&org_id);
     let alert_type = params.alert_type;
 
     // Fetch regular (scheduled / realtime) alerts unless the filter is anomaly-only.
-    let mut list: Vec<ListAlertsResponseBodyItem> =
-        if alert_type != AlertTypeFilter::AnomalyDetection {
-            let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-            let mut scheduled_jobs: HashMap<String, Trigger> =
-                scheduler::list_by_org(&org_id, Some(TriggerModule::Alert))
-                    .await
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|t| (t.module_key.clone(), t))
-                    .collect();
+    let list: Vec<ListAlertsResponseBodyItem> = if alert_type != AlertTypeFilter::AnomalyDetection {
+        let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        let mut scheduled_jobs: HashMap<String, Trigger> =
+            scheduler::list_by_org(&org_id, Some(TriggerModule::Alert))
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .map(|t| (t.module_key.clone(), t))
+                .collect();
 
-            let folders_and_alerts = match alert::list_v2(client, user_id, params).await {
-                Ok(v) => v,
-                Err(e) => return e.into(),
-            };
+        let folders_and_alerts = match alert::list_v2(client, user_id, params).await {
+            Ok(v) => v,
+            Err(e) => return e.into(),
+        };
 
-            folders_and_alerts
+        folders_and_alerts
                 .into_iter()
                 // Apply is_real_time filter when a specific type is requested.
                 .filter(|(_, a)| match alert_type {
@@ -827,9 +830,12 @@ pub async fn list_alerts(
                 })
                 .filter_map(|item| ListAlertsResponseBodyItem::try_from(item).ok())
                 .collect()
-        } else {
-            vec![]
-        };
+    } else {
+        vec![]
+    };
+    // In enterprise builds, anomaly configs will be appended — we need mutability.
+    #[cfg(feature = "enterprise")]
+    let mut list = list;
 
     // Fetch anomaly detection configs and merge when the filter includes them (enterprise only).
     #[cfg(feature = "enterprise")]
@@ -1111,6 +1117,7 @@ pub async fn trigger_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
     )
 )]
 pub async fn retrain_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+    #[cfg(feature = "enterprise")]
     let alert_id_str = alert_id.clone();
     let alert_id = match Ksuid::from_str(&alert_id) {
         Ok(id) => id,
