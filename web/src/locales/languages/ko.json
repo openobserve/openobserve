@@ -375,7 +375,8 @@
     "patternNavPrevious": "이전",
     "patternNavNext": "다음",
     "patternWildcardSampleValues": "샘플 값",
-    "wildcardSampleValues": "샘플 값"
+    "wildcardSampleValues": "샘플 값",
+    "patternZScore": "Z-점수: {z점수} (평균 주파수: {평균 주파수})"
   },
   "menu": {
     "home": "홈",

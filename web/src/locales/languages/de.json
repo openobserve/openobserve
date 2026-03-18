@@ -375,7 +375,8 @@
     "patternNavPrevious": "Bisherige",
     "patternNavNext": "Weiter",
     "patternWildcardSampleValues": "Beispielwerte",
-    "wildcardSampleValues": "Beispielwerte"
+    "wildcardSampleValues": "Beispielwerte",
+    "patternZScore": "Z-Score: {zScore} (durchschnittliche Häufigkeit: {avgFrequency})"
   },
   "menu": {
     "home": "Startseite",

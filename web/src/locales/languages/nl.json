@@ -375,7 +375,8 @@
     "patternNavPrevious": "Vorige",
     "patternNavNext": "Volgende",
     "patternWildcardSampleValues": "Voorbeeldwaarden",
-    "wildcardSampleValues": "Voorbeeldwaarden"
+    "wildcardSampleValues": "Voorbeeldwaarden",
+    "patternZScore": "Z-score: {zScore} (gemiddelde frequentie: {avgFrequency})"
   },
   "menu": {
     "home": "Home",

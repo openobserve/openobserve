@@ -375,7 +375,8 @@
     "patternNavPrevious": "Önceki",
     "patternNavNext": "Sonraki",
     "patternWildcardSampleValues": "Örnek değerler",
-    "wildcardSampleValues": "Örnek değerler"
+    "wildcardSampleValues": "Örnek değerler",
+    "patternZScore": "Z puanı: {zScore} (ortalama frekans: {avgFrequency})"
   },
   "menu": {
     "home": "Ana Sayfa",

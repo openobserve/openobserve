@@ -375,7 +375,8 @@
     "patternNavPrevious": "Anterior",
     "patternNavNext": "Próximo",
     "patternWildcardSampleValues": "Valores da amostra",
-    "wildcardSampleValues": "Valores da amostra"
+    "wildcardSampleValues": "Valores da amostra",
+    "patternZScore": "Pontuação Z: {zScore} (frequência média: {avgFrequency})"
   },
   "menu": {
     "home": "Início",

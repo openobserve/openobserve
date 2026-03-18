@@ -375,7 +375,8 @@
     "patternNavPrevious": "以前",
     "patternNavNext": "下一步",
     "patternWildcardSampleValues": "样本值",
-    "wildcardSampleValues": "样本值"
+    "wildcardSampleValues": "样本值",
+    "patternZScore": "Z 分数：{zScore}（平均频率：{avgFrequency}）"
   },
   "menu": {
     "home": "主页",
