@@ -13,7 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
+import { qLayoutInjections } from "@/test/unit/helpers/layout-injections";
+import store from "@/test/unit/helpers/store";
+import router from "@/test/unit/helpers/router";
+import { searchState } from "@/composables/useLogs/searchState";
+import SearchBar from "./SearchBar.vue";
 
 // Mock all external services at the top level
 vi.mock("@/services/search", () => ({
@@ -59,6 +66,248 @@ vi.mock("@/services/organizations", () => ({
     list: vi.fn(),
     update_org_setting: vi.fn(),
   },
+}));
+
+// Composable mocks required for the mounted describe block below.
+// These must live at the top level so Vitest's hoisting applies them before
+// the component module is imported.
+
+vi.mock("@/composables/useLogs/searchState", () => {
+  const { reactive } = require("vue");
+  const mockSearchObj = reactive({
+    organizationIdentifier: "default",
+    communicationMethod: "http",
+    loading: false,
+    loadingHistogram: false,
+    runQuery: false,
+    shouldIgnoreWatcher: false,
+    meta: {
+      showHistogram: true,
+      sqlMode: false,
+      quickMode: true,
+      logsVisualizeToggle: "logs",
+      refreshInterval: 0,
+      refreshHistogram: false,
+      toggleFunction: false,
+      showSearchScheduler: false,
+      jobId: "",
+      jobRecords: 100,
+      regions: [],
+      functionEditorPlaceholderFlag: true,
+      queryEditorPlaceholderFlag: true,
+      logsVisualizeDirtyFlag: false,
+      resultGrid: {
+        wrapCells: false,
+        showPagination: false,
+        currentPage: 0,
+      },
+    },
+    data: {
+      query: "",
+      editorValue: "",
+      transforms: [],
+      actions: [],
+      selectedTransform: null,
+      transformType: "function",
+      savedViews: [],
+      savedViewFilterFields: "",
+      queryResults: { hits: [], total: 0 },
+      sortedQueryResults: [],
+      errorMsg: "",
+      errorDetail: "",
+      countErrorMsg: "",
+      streamResults: {},
+      stream: {
+        selectedStream: [],
+        selectedStreamFields: [],
+        selectedFields: [],
+        filterField: "",
+        addToFilter: "",
+        functions: [],
+        streamType: "logs",
+        streamLists: [],
+        interestingFieldList: [],
+      },
+      histogram: {
+        xData: [],
+        yData: [],
+        chartParams: { title: "", unparsed_x_data: [], timezone: "UTC" },
+        errorMsg: "",
+        errorCode: 0,
+        errorDetail: "",
+      },
+      datetime: {
+        startTime: 0,
+        endTime: 0,
+        relativeTimePeriod: "1h",
+        type: "relative",
+        queryRangeRestrictionInHour: 0,
+      },
+      customDownloadQueryObj: { query: { from: 0, size: 100 } },
+    },
+    config: {
+      refreshTimes: [],
+      fnSplitterModel: 99.5,
+    },
+    loadingSavedView: false,
+  });
+  return {
+    searchState: () => ({
+      searchObj: mockSearchObj,
+      resetStreamData: vi.fn(),
+      fieldValues: { value: null },
+      notificationMsg: { value: "" },
+      ftsFields: { value: [] },
+      initialLogsState: vi.fn().mockResolvedValue(true),
+    }),
+  };
+});
+
+vi.mock("@/composables/useLogs/logsUtils", () => ({
+  logsUtils: () => ({
+    fnParsedSQL: vi.fn().mockReturnValue(""),
+    fnUnparsedSQL: vi.fn().mockReturnValue(""),
+    updatedLocalLogFilterField: vi.fn(),
+    updateUrlQueryParams: vi.fn(),
+    generateURLQuery: vi.fn().mockReturnValue(""),
+    isActionsEnabled: { value: false },
+    checkTimestampAlias: vi.fn(),
+  }),
+}));
+
+vi.mock("@/composables/useLogs/useSearchBar", () => ({
+  default: () => ({
+    getSavedViews: vi.fn().mockResolvedValue([]),
+    setSelectedStreams: vi.fn(),
+    onStreamChange: vi.fn(),
+    getQueryData: vi.fn(),
+    cancelQuery: vi.fn(),
+  }),
+}));
+
+vi.mock("@/composables/useLogs/useStreamFields", () => ({
+  default: () => ({
+    loadStreamLists: vi.fn().mockResolvedValue([]),
+    extractFields: vi.fn(),
+  }),
+}));
+
+vi.mock("@/composables/useLogs/useSearchStream", () => ({
+  useSearchStream: () => ({
+    buildSearch: vi.fn(),
+  }),
+}));
+
+vi.mock("@/composables/useLogs/logsVisualization", () => ({
+  allSelectionFieldsHaveAlias: vi.fn().mockReturnValue(true),
+  getVisualizationData: vi.fn(),
+  useLogsVisualization: vi.fn(),
+}));
+
+vi.mock("@/composables/useLogs", () => ({
+  default: () => ({
+    refreshData: vi.fn(),
+    handleRunQuery: vi.fn(),
+    getJobData: vi.fn(),
+    routeToSearchSchedule: vi.fn(),
+    getHistogramTitle: vi.fn().mockReturnValue("Histogram"),
+  }),
+}));
+
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({
+    isStreamExists: vi.fn().mockReturnValue(false),
+    isStreamFetched: vi.fn().mockReturnValue(false),
+    getStreams: vi.fn().mockResolvedValue([]),
+    getStream: vi.fn().mockResolvedValue(null),
+  }),
+}));
+
+vi.mock("@/composables/useSuggestions", () => ({
+  default: () => ({
+    autoCompleteData: { value: {} },
+    autoCompleteKeywords: { value: [] },
+    autoCompleteSuggestions: { value: [] },
+    getSuggestions: vi.fn(),
+    updateFieldKeywords: vi.fn(),
+    updateFunctionKeywords: vi.fn(),
+  }),
+}));
+
+vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
+  default: () => ({}),
+}));
+
+vi.mock("@/composables/dashboard/useCancelQuery", () => ({
+  default: () => ({
+    closeSocketWithError: vi.fn(),
+  }),
+}));
+
+vi.mock("@/composables/useLoading", () => ({
+  useLoading: () => ({
+    isLoading: { value: false },
+  }),
+}));
+
+vi.mock("@/composables/useSearchWebSocket", () => ({
+  default: () => ({
+    closeSocketWithError: vi.fn(),
+  }),
+}));
+
+vi.mock("@/composables/useNotifications", () => ({
+  default: () => ({
+    showErrorNotification: vi.fn(),
+  }),
+}));
+
+vi.mock("@/utils/query/visualizationUtils", () => ({
+  allSelectionFieldsHaveAlias: vi.fn().mockReturnValue(true),
+}));
+
+vi.mock("@/services/jstransform", () => ({
+  default: {
+    list: vi.fn().mockResolvedValue({ data: [] }),
+  },
+}));
+
+vi.mock("@/services/short_url", () => ({
+  default: {
+    create: vi.fn().mockResolvedValue({ data: { short_id: "abc123" } }),
+  },
+}));
+
+vi.mock("@/aws-exports", () => ({
+  default: {
+    isEnterprise: "false",
+    isCloud: "false",
+    WEB_URL: "http://localhost:8081",
+  },
+}));
+
+vi.mock("lucide-vue-next", () => ({
+  Bookmark: { template: "<span />" },
+  ChartLine: { template: "<span />" },
+  ChartNoAxesColumn: { template: "<span />" },
+  RefreshCcw: { template: "<span />" },
+  ScanSearch: { template: "<span />" },
+  Share: { template: "<span />" },
+  Menu: { template: "<span />" },
+  Maximize: { template: "<span />" },
+  Minimize: { template: "<span />" },
+}));
+
+vi.mock("@quasar/extras/material-icons-outlined", () => ({
+  outlinedShowChart: "show_chart",
+}));
+
+vi.mock("vue-i18n", () => ({
+  useI18n: () => ({ t: (key: string) => key }),
+  createI18n: () => ({
+    install: vi.fn(),
+    global: { t: (key: string) => key },
+  }),
 }));
 
 // Test the component methods directly without mounting
@@ -4062,5 +4311,144 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
       // and not silently skip it because logsVisualizeToggle is already "visualize"
       expect(typeof testInstance.onLogsVisualizeToggleUpdate).toBe("function");
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Mounted DOM tests — histogram toggle toolbar placement
+//
+// SearchBar.vue depends on ~15 composables, Options API + setup(), dynamic
+// async component imports, Vuex store getters, vue-router, and many Quasar
+// layout injections. All composables are mocked at the top of this file with
+// vi.mock() (hoisted).  Heavy sub-components are stubbed to prevent further
+// cascading dependency resolution at mount time.
+//
+// If the component cannot be mounted due to unresolvable runtime errors
+// (e.g., store shape mismatches or dynamic import failures), the describe
+// block below is wrapped in describe.skip with the reason documented inline.
+// The mock-instance tests in "SearchBar.vue Methods" (Tests 11–12, 24)
+// continue to cover histogram state logic independently of the DOM.
+// ---------------------------------------------------------------------------
+describe("SearchBar.vue - Histogram toolbar placement", () => {
+  // searchState, store, router, SearchBar, and mounting utilities are all
+  // imported at the top of the file. The vi.mock() calls above ensure every
+  // composable is mocked before any module is resolved by Vitest.
+
+  installQuasar();
+
+  let wrapper: VueWrapper;
+
+  function mountSearchBar() {
+    return mount(SearchBar, {
+      global: {
+        plugins: [store, router],
+        provide: { ...qLayoutInjections() },
+        stubs: {
+          // Heavy editor components that pull in Monaco / CodeMirror
+          "query-editor": true,
+          "code-query-editor": true,
+          "unified-query-editor": true,
+          // Date picker sub-tree
+          "date-time": true,
+          // Chart sub-components
+          "custom-chart": true,
+          "log-search-grid": true,
+          // Named sub-components registered inside SearchBar
+          DateTime: true,
+          ShareButton: true,
+          SyntaxGuide: true,
+          AutoRefreshInterval: true,
+          ConfirmDialog: true,
+          TransformSelector: true,
+          FunctionSelector: true,
+          QueryPlanDialog: true,
+          // lucide icons (already mocked as trivial spans but stub them too
+          // so Vue does not look up the real component registration)
+          ScanSearch: true,
+          ChartLine: true,
+          ChartNoAxesColumn: true,
+          RefreshCcw: true,
+          Bookmark: true,
+          Share: true,
+          Menu: true,
+          Maximize: true,
+          Minimize: true,
+        },
+      },
+    });
+  }
+
+  beforeEach(async () => {
+    // Reset the reactive searchObj to a known baseline before each test so
+    // that mutations in one test do not bleed into the next.
+    const { searchObj } = searchState();
+    searchObj.meta.showHistogram = true;
+    searchObj.meta.sqlMode = false;
+
+    wrapper = mountSearchBar();
+    await flushPromises();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.clearAllMocks();
+  });
+
+  it("should render histogram toggle directly in toolbar without opening a menu", () => {
+    const toggle = wrapper.find(
+      '[data-test="logs-search-bar-show-histogram-toggle-btn"]',
+    );
+    expect(toggle.exists()).toBe(true);
+  });
+
+  it("should render histogram toggle before SQL toggle in toolbar", () => {
+    const histogramToggle = wrapper.find(
+      '[data-test="logs-search-bar-show-histogram-toggle-btn"]',
+    );
+    const sqlToggle = wrapper.find(
+      '[data-test="logs-search-bar-sql-mode-toggle-btn"]',
+    );
+
+    expect(histogramToggle.exists()).toBe(true);
+    expect(sqlToggle.exists()).toBe(true);
+
+    // DOCUMENT_POSITION_FOLLOWING = 4: the SQL toggle comes after the histogram toggle
+    // in document order, confirming the histogram toggle renders first.
+    const DOCUMENT_POSITION_FOLLOWING = 4;
+    const position = histogramToggle.element.compareDocumentPosition(
+      sqlToggle.element,
+    );
+    expect(position & DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("should toggle showHistogram state when histogram toggle is clicked", async () => {
+    const { searchObj } = searchState();
+
+    // Baseline: showHistogram starts true
+    expect(searchObj.meta.showHistogram).toBe(true);
+
+    const toggle = wrapper.find(
+      '[data-test="logs-search-bar-show-histogram-toggle-btn"]',
+    );
+    expect(toggle.exists()).toBe(true);
+    await toggle.trigger("click");
+    await flushPromises();
+
+    // q-toggle uses v-model bound directly to searchObj.meta.showHistogram so
+    // clicking it flips the reactive value
+    expect(searchObj.meta.showHistogram).toBe(false);
+  });
+
+  it("should not render histogram toggle inside utilities menu", () => {
+    const utilitiesMenu = wrapper.find(
+      '[data-test="logs-search-bar-utilities-menu-btn"]',
+    );
+    expect(utilitiesMenu.exists()).toBe(true);
+
+    // The histogram toggle must NOT be a descendant of the utilities menu button
+    const histogramInsideMenu = utilitiesMenu.find(
+      '[data-test="logs-search-bar-show-histogram-toggle-btn"]',
+    );
+    expect(histogramInsideMenu.exists()).toBe(false);
   });
 });
