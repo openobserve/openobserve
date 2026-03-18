@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Template rendered as tokenized chips so wildcards are visually distinct -->
       <div
         class="pattern-template-text tw-flex tw-flex-wrap tw-items-baseline tw-gap-x-[2px] tw-gap-y-[1px]"
-        :class="store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'"
+        :class="[store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8', wrap ? 'tw:break-all' : 'tw:truncate']"
         :data-test="`pattern-card-${index}-template`"
         :title="pattern.template"
       >

@@ -406,6 +406,7 @@ describe("PatternDetailsDialog", () => {
           totalPatterns: 10,
         },
         global: {
+          plugins: [i18n],
           provide: { store },
           stubs: {
             "q-dialog": {
