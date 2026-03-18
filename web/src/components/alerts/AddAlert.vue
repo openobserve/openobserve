@@ -867,6 +867,7 @@ import AnomalyDetectionConfig from "@/components/anomaly_detection/steps/Anomaly
 import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlerting.vue";
 import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
 import anomalyDetectionService from "@/services/anomaly_detection";
+import searchService from "@/services/search";
 import QueryEditor from "@/components/QueryEditor.vue";
 import { buildAnomalyFilterExpression, operatorNeedsValue } from "@/utils/alerts/anomalyFilterOperators";
 import {
@@ -2964,38 +2965,77 @@ export default defineComponent({
       }
 
       anomalySaving.value = true;
+      const orgId = store.state.selectedOrganization.identifier;
+      const c = anomalyConfig.value;
+
+      // Validate custom SQL against the search API before saving
+      if (c.query_mode === "custom_sql") {
+        if (!c.custom_sql?.trim()) {
+          q.notify({
+            type: "negative",
+            message: "Custom SQL is required in custom SQL mode.",
+          });
+          wizardStep.value = 2;
+          anomalySaving.value = false;
+          return;
+        }
+        try {
+          await searchService.search({
+            org_identifier: orgId,
+            query: {
+              query: {
+                sql: c.custom_sql,
+                start_time: (Date.now() - 3600000) * 1000,
+                end_time: Date.now() * 1000,
+                from: 0,
+                size: 1,
+              },
+            },
+            page_type: c.stream_type,
+          });
+        } catch (sqlErr: any) {
+          const msg =
+            sqlErr?.response?.data?.message || "Invalid SQL query";
+          q.notify({
+            type: "negative",
+            message: `SQL validation error: ${msg}`,
+          });
+          wizardStep.value = 2;
+          anomalySaving.value = false;
+          return;
+        }
+      }
+
       try {
-        const orgId = store.state.selectedOrganization.identifier;
-        const c = anomalyConfig.value;
+        // Build payload with flat structure matching the API response format
         const payload: any = {
           alert_type: "anomaly_detection",
-          destinations:
-            c.alert_enabled && c.alert_destination_ids?.length
-              ? c.alert_destination_ids
-              : [],
           name: c.name,
           description: c.description || undefined,
           stream_name: c.stream_name,
           stream_type: c.stream_type,
           enabled: c.enabled ?? true,
           folder_id: (activeFolderId.value as string) || "default",
-          anomaly_config: {
-            query_mode: c.query_mode,
-            filters: c.query_mode === "filters" ? c.filters : undefined,
-            custom_sql: c.query_mode === "custom_sql" ? c.custom_sql : undefined,
-            detection_function: c.detection_function,
-            detection_function_field:
-              c.detection_function !== "count"
-                ? c.detection_function_field || undefined
-                : undefined,
-            histogram_interval: anomalyHistogramInterval.value,
-            schedule_interval: anomalyScheduleInterval.value,
-            detection_window_seconds: anomalyDetectionWindowSeconds.value,
-            training_window_days: c.training_window_days,
-            retrain_interval_days: c.retrain_interval_days,
-            percentile: c.threshold,
-            alert_enabled: c.alert_enabled,
-          },
+          query_mode: c.query_mode,
+          filters: c.query_mode === "filters" ? (c.filters ?? []) : null,
+          custom_sql: c.query_mode === "custom_sql" ? c.custom_sql : null,
+          detection_function:
+            c.query_mode === "filters" ? c.detection_function : undefined,
+          detection_function_field:
+            c.query_mode === "filters" && c.detection_function !== "count"
+              ? c.detection_function_field || undefined
+              : undefined,
+          histogram_interval: anomalyHistogramInterval.value,
+          schedule_interval: anomalyScheduleInterval.value,
+          detection_window_seconds: anomalyDetectionWindowSeconds.value,
+          training_window_days: c.training_window_days,
+          retrain_interval_days: c.retrain_interval_days,
+          threshold: c.threshold,
+          alert_enabled: c.alert_enabled,
+          alert_destinations:
+            c.alert_enabled && c.alert_destination_ids?.length
+              ? c.alert_destination_ids
+              : [],
         };
 
         const routeAnomalyId = router.currentRoute.value.params
