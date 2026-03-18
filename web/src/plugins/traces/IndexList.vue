@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- TODO OK : Repeated code make separate component to display field  -->
               <div
-                v-if="props.row.ftsKey || !props.row.showValues"
+                v-if="(props.row.ftsKey && !fieldValuesForFst) || !props.row.showValues"
                 class="field-container flex content-center ellipsis q-pl-lg q-pr-sm hover:!tw-bg-[var(--o2-hover-accent)]"
                 :title="props.row.label || props.row.name"
               >
@@ -138,7 +138,7 @@ style="opacity: 0.7">
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { computed,defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -146,7 +146,6 @@ import useTraces from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
 import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import BasicValuesFilter from "./fields-sidebar/BasicValuesFilter.vue";
-import { computed } from "vue";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -177,6 +176,10 @@ export default defineComponent({
         max: 100000,
       },
     });
+
+    const fieldValuesForFst = computed(
+      () => store.state.zoConfig?.field_values_for_fst ?? false,
+    );
 
     const fnMarkerLabel = computed(() => {
       const markers = [];
@@ -247,6 +250,7 @@ export default defineComponent({
       fnMarkerLabel,
       duration,
       onStreamChange,
+      fieldValuesForFst,
     };
   },
 });
