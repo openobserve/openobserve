@@ -1471,7 +1471,18 @@
     "hideQueryResults": "Ocultar resultados da consulta",
     "vrlExtractionTooltip": "Para usar campos VRL extraídos no gráfico, escreva uma função VRL e clique no botão Aplicar. Os campos serão extraídos, permitindo que você os use para criar o gráfico.",
     "errorFetchingFunctions": "Erro ao buscar funções",
-    "functionAppliedSuccess": "função {name} aplicada com sucesso."
+    "functionAppliedSuccess": "função {name} aplicada com sucesso.",
+    "pivotOptions": "Opções de pivô",
+    "pivotShowRowTotals": "Mostrar totais de linhas",
+    "pivotShowColTotals": "Mostrar totais de colunas",
+    "pivotMissingValue": "Valor ausente",
+    "pivotMissingValueHint": "Valor mostrado para células sem dados",
+    "pivotShowRowTotalsTooltip": "Exibir uma linha de totais na parte inferior da tabela dinâmica resumindo os valores de cada coluna",
+    "pivotShowColTotalsTooltip": "Exibir uma coluna de totais no lado direito da tabela dinâmica resumindo os valores de cada linha",
+    "pivotStickyRowTotals": "Totais de linhas fixas",
+    "pivotStickyRowTotalsTooltip": "Fixe a linha de totais na parte inferior para que ela permaneça visível ao rolar verticalmente",
+    "pivotStickyColTotals": "Totais de colunas fixas",
+    "pivotStickyColTotalsTooltip": "Fixe a coluna de totais à direita para que ela permaneça visível ao rolar horizontalmente"
   },
   "panel": {
     "header": "Painel",
@@ -1553,7 +1564,12 @@
     "sqlBuilder": "Construtor de SQL",
     "generatedSql": "SQL gerado",
     "enterCustomSql": "Insira sua consulta SQL personalizada...",
-    "customSql": "SQL personalizado"
+    "customSql": "SQL personalizado",
+    "pivotField": "Campo pivô",
+    "addToPivot": "Adicionar ao campo dinâmico",
+    "pivotFieldTooltip": "Arraste um campo de dimensão aqui. Seus valores distintos se tornam cabeçalhos de coluna na tabela dinâmica. Até 3 campos são permitidos para dinamização em vários níveis.",
+    "breakdownTooltipHBar": "Use esses campos para dividir os dados em diferentes seções no eixo Y para uma visão mais clara.",
+    "breakdownTooltipDefault": "Use esses campos para dividir os dados em diferentes seções no eixo X para uma visão mais clara."
   },
   "home": {
     "streams": "Transmissões",

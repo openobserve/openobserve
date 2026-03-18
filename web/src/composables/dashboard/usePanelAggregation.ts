@@ -140,9 +140,7 @@ export const usePanelAggregation = ({
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.z = [];
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.breakdown = [];
+        // Keep breakdown fields — they are used for pivot table mode
         // we have multiple queries for geomap, so if we are moving away, we need to reset
         // the values of lat, lng and weight in all the queries
         dashboardPanelData.data.queries?.forEach((query: any) => {
