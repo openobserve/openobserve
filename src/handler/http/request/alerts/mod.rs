@@ -145,13 +145,13 @@ pub async fn create_alert(
     Headers(user_email): Headers<UserEmail>,
     Json(req_body): Json<CreateAlertRequestBody>,
 ) -> Response {
-    // Anomaly detection path: delegate to anomaly config creation.
-    if req_body.alert_type == Some(AlertTypeFilter::AnomalyDetection) {
-        return create_anomaly_alert(&org_id, user_email.user_id, req_body).await;
-    }
-
     let query_str = uri.query().unwrap_or("");
     let folder_id = get_folder(query_str);
+
+    // Anomaly detection path: delegate to anomaly config creation.
+    if req_body.alert_type == Some(AlertTypeFilter::AnomalyDetection) {
+        return create_anomaly_alert(&org_id, user_email.user_id, req_body, &folder_id).await;
+    }
     let overwrite = is_overwrite(query_str);
     let mut alert: MetaAlert = req_body.into();
     if alert.owner.clone().filter(|o| !o.is_empty()).is_none() {
@@ -174,6 +174,7 @@ async fn create_anomaly_alert(
     org_id: &str,
     user_id: String,
     req_body: CreateAlertRequestBody,
+    query_folder_id: &str,
 ) -> Response {
     use crate::handler::http::request::anomaly_detection::CreateAnomalyConfigRequest;
 
@@ -210,7 +211,12 @@ async fn create_anomaly_alert(
         alert_enabled: anomaly_fields.alert_enabled,
         alert_destinations: req_body.alert.destinations,
         enabled: req_body.alert.enabled.then_some(true),
-        folder_id: req_body.folder_id,
+        // Prefer explicit folder_id in JSON body; fall back to the ?folder= query param
+        // (same mechanism regular alerts use — the UI sends folder as a query param).
+        folder_id: req_body
+            .folder_id
+            .filter(|f| !f.is_empty())
+            .or_else(|| Some(query_folder_id.to_string()).filter(|f| !f.is_empty())),
         owner,
     };
 

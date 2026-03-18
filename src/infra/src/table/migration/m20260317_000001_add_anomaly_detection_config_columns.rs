@@ -16,10 +16,12 @@
 //! Adds folder_id, owner, and alert_destinations columns to the
 //! anomaly_detection_config table and removes the old alert_destination_id column.
 //!
-//! - folder_id (varchar 256): stores the folders.id PK (same FK as alerts table). Existing rows are
-//!   backfilled from the "default" folder for each org.
+//! - folder_id (varchar 256, NOT NULL): stores the folders.id PK (same FK as alerts table).
+//!   Existing rows (including those created before this migration on the main branch) are
+//!   backfilled from the "default" Alerts folder for each org. Then the column is made NOT NULL,
+//!   consistent with the alerts table.
 //! - owner (varchar 256): nullable, attributed owner of the config.
-//! - alert_destinations (text): JSON array of destination names, replacing the old single-value
+//! - alert_destinations (jsonb): JSON array of destination names, replacing the old single-value
 //!   alert_destination_id column. Existing rows are migrated by wrapping the old value in a JSON
 //!   array.
 
@@ -203,6 +205,32 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
+
+        // Make folder_id NOT NULL, consistent with the alerts table.
+        // The backfill above ensures no NULLs remain.
+        // SQLite does not support changing nullability in-place; the backfill is
+        // sufficient for SQLite dev environments.
+        match db_backend {
+            sea_orm::DbBackend::Postgres => {
+                manager
+                    .get_connection()
+                    .execute_unprepared(
+                        "ALTER TABLE anomaly_detection_config \
+                         ALTER COLUMN folder_id SET NOT NULL",
+                    )
+                    .await?;
+            }
+            sea_orm::DbBackend::MySql => {
+                manager
+                    .get_connection()
+                    .execute_unprepared(
+                        "ALTER TABLE anomaly_detection_config \
+                         MODIFY COLUMN folder_id VARCHAR(256) NOT NULL",
+                    )
+                    .await?;
+            }
+            sea_orm::DbBackend::Sqlite => {}
+        }
 
         Ok(())
     }
