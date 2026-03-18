@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="[store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8', wrap ? 'tw:break-all' : 'tw:truncate']"
         :data-test="`pattern-card-${index}-template`"
         :title="pattern.template"
+        v-html="highlightedTemplate"
       >
         <template v-for="(tok, i) in templateTokens" :key="i">
           <span v-if="tok.kind === 'text'" class="tw-whitespace-pre">{{ tok.value }}</span>
