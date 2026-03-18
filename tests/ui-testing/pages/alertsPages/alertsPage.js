@@ -1780,38 +1780,12 @@ export class AlertsPage {
         await headerCheckbox.click();
         testLogger.info('Clicked select all checkbox for export');
 
-        // The Vue component uses Blob URL + <a>.click() for export, which may not
-        // trigger Playwright's download event in headless Chromium. Intercept the
-        // blob data by patching URL.createObjectURL before clicking.
-        await this.page.evaluate(() => {
-            window.__capturedBlobData = null;
-            const origCreateObjectURL = URL.createObjectURL;
-            URL.createObjectURL = function (blob) {
-                if (blob instanceof Blob && blob.type === 'application/json') {
-                    blob.text().then(text => { window.__capturedBlobData = text; });
-                }
-                return origCreateObjectURL.call(URL, blob);
-            };
-        });
-
+        const downloadPromise = this.page.waitForEvent('download');
         await this.page.locator('[data-test="alert-list-export-alerts-btn"]').click();
-        await expect(this.page.getByText('Successfully exported')).toBeVisible({ timeout: 60000 });
-        testLogger.info('Export success notification visible');
-
-        // Wait for the blob data to be captured (blob.text() is async)
-        await this.page.waitForFunction(() => window.__capturedBlobData !== null, null, { timeout: 10000 });
-        const blobData = await this.page.evaluate(() => window.__capturedBlobData);
-        if (!blobData) {
-            throw new Error('Failed to capture exported alert data from blob');
-        }
-
-        // Return an object mimicking Playwright's Download interface with saveAs()
-        return {
-            saveAs: async (filePath) => {
-                fs.writeFileSync(filePath, blobData, 'utf-8');
-                testLogger.info('Saved exported alerts to file', { filePath });
-            }
-        };
+        const download = await downloadPromise;
+        await this.page.waitForTimeout(2000);
+        await expect(this.page.getByText('Successfully exported')).toBeVisible({ timeout: 10000 });
+        return download;
     }
 
     async importInvalidFile(filePath) {
