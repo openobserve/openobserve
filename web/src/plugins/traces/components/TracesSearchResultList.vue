@@ -65,7 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="tw:text-[0.75rem] tw:tracking-[0.03em] tw:font-bold">
             {{ formatLargeNumber(props.errorCount!) }}
-            {{ t("traces.errorsFound") }}
+            {{
+              props.searchMode === "spans"
+                ? t("traces.errorSpans")
+                : t("traces.errorTraces")
+            }}
           </span>
         </div>
 
