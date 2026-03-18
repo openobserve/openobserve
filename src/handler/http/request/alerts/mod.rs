@@ -463,7 +463,14 @@ pub async fn clone_alert(
                 .await
                 {
                     Ok(v) => MetaHttpResponse::json(v),
-                    Err(e) => MetaHttpResponse::not_found(e.to_string()),
+                    Err(e) => {
+                        let msg = e.to_string().to_lowercase();
+                        if msg.contains("not found") {
+                            MetaHttpResponse::not_found(e.to_string())
+                        } else {
+                            MetaHttpResponse::internal_error(e.to_string())
+                        }
+                    }
                 }
             }
         }
@@ -1133,7 +1140,14 @@ pub async fn retrain_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
     #[cfg(feature = "enterprise")]
     match crate::service::anomaly_detection::train_model(&org_id, &alert_id_str).await {
         Ok(_) => MetaHttpResponse::ok("Retraining triggered"),
-        Err(e) => MetaHttpResponse::not_found(e.to_string()),
+        Err(e) => {
+            let msg = e.to_string().to_lowercase();
+            if msg.contains("not found") {
+                MetaHttpResponse::not_found(e.to_string())
+            } else {
+                MetaHttpResponse::internal_error(e.to_string())
+            }
+        }
     }
 }
 
@@ -1188,6 +1202,27 @@ pub async fn move_alerts(
         }
     }
 
+    // Move anomaly configs first (enterprise only) so that if this fails,
+    // regular alerts have not yet been relocated (reduces partial-move risk).
+    #[cfg(feature = "enterprise")]
+    for id in anomaly_ids {
+        use crate::handler::http::request::anomaly_detection::UpdateAnomalyConfigRequest;
+        let req = UpdateAnomalyConfigRequest {
+            folder_id: Some(req_body.dst_folder_id.clone()),
+            ..Default::default()
+        };
+        if let Err(e) =
+            crate::service::anomaly_detection::update_config(&org_id, &id.to_string(), req).await
+        {
+            let msg = e.to_string().to_lowercase();
+            if msg.contains("not found") {
+                return MetaHttpResponse::not_found(e.to_string());
+            } else {
+                return MetaHttpResponse::internal_error(e.to_string());
+            }
+        }
+    }
+
     // Move regular alerts in one batch
     if !alert_ids.is_empty() {
         if let Err(e) = alert::move_to_folder(
@@ -1200,21 +1235,6 @@ pub async fn move_alerts(
         .await
         {
             return e.into();
-        }
-    }
-
-    // Move anomaly configs individually (enterprise only)
-    #[cfg(feature = "enterprise")]
-    for id in anomaly_ids {
-        use crate::handler::http::request::anomaly_detection::UpdateAnomalyConfigRequest;
-        let req = UpdateAnomalyConfigRequest {
-            folder_id: Some(req_body.dst_folder_id.clone()),
-            ..Default::default()
-        };
-        if let Err(e) =
-            crate::service::anomaly_detection::update_config(&org_id, &id.to_string(), req).await
-        {
-            return MetaHttpResponse::not_found(e.to_string());
         }
     }
 

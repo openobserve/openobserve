@@ -651,7 +651,7 @@ pub async fn clone_config(
         training_window_days: Set(src.training_window_days),
         retrain_interval_days: Set(src.retrain_interval_days),
         threshold: Set(src.threshold),
-        seasonality: Set("none".to_string()),
+        seasonality: Set(src.seasonality.clone()),
         is_trained: Set(false),
         training_started_at: Set(None),
         training_completed_at: Set(None),
