@@ -100,6 +100,7 @@ mod m20260305_000001_create_trial_quota_usage_table;
 mod m20260310_000001_create_anomaly_detection_config_table;
 mod m20260310_000002_create_anomaly_detection_models_table;
 mod m20260317_000001_add_anomaly_detection_config_columns;
+mod m20260318_000001_ensure_anomaly_alert_destinations;
 
 pub struct Migrator;
 
@@ -189,6 +190,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260310_000002_create_anomaly_detection_models_table::Migration),
             Box::new(m20260305_000001_create_trial_quota_usage_table::Migration),
             Box::new(m20260317_000001_add_anomaly_detection_config_columns::Migration),
+            Box::new(m20260318_000001_ensure_anomaly_alert_destinations::Migration),
         ]
     }
 }
