@@ -754,6 +754,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <AlertHistoryDrawer
           :alert-details="selectedAlertDetails"
           :alert-id="selectedAlertDetails?.alert_id || ''"
+          :alert-type="selectedAlertDetails?.alert_type"
           @close="showAlertDetailsDrawer = false"
           @edit="editAlertFromDrawer"
         />
