@@ -851,6 +851,21 @@ export default defineComponent({
       },
     );
 
+    // Sync histogram interval changes into the custom SQL histogram() call
+    watch(
+      () => [
+        props.config.histogram_interval_value,
+        props.config.histogram_interval_unit,
+      ],
+      ([newValue, newUnit]) => {
+        if (props.config.query_mode !== "custom_sql" || !props.config.custom_sql) return;
+        props.config.custom_sql = props.config.custom_sql.replace(
+          /histogram\(\s*_timestamp\s*,\s*'[^']+'\s*\)/gi,
+          `histogram(_timestamp, '${newValue}${newUnit}')`,
+        );
+      },
+    );
+
     const addFilter = () => {
       props.config.filters.push({ field: "", operator: "=", value: "" });
     };
