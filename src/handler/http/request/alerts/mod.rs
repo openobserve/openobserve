@@ -184,9 +184,9 @@ async fn create_anomaly_alert(
 ) -> Response {
     use crate::handler::http::request::anomaly_detection::CreateAnomalyConfigRequest;
 
-    let Some(anomaly_fields) = req_body.anomaly_config else {
+    let Some(anomaly_fields) = req_body.anomaly_fields() else {
         return MetaHttpResponse::bad_request(
-            "anomaly_config is required when alert_type is anomaly_detection",
+            "detection_function is required when alert_type is anomaly_detection",
         );
     };
 

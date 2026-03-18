@@ -61,16 +61,102 @@ pub struct CreateAlertRequestBody {
     /// Set to `"anomaly_detection"` to create an anomaly detection config instead.
     pub alert_type: Option<meta_alerts::AlertTypeFilter>,
 
-    /// Anomaly-detection-specific fields. Required when `alert_type` is
-    /// `"anomaly_detection"`. Common fields (`name`, `stream_type`,
-    /// `stream_name`, `enabled`, `description`) are still taken from the top
-    /// level (flattened `Alert`).
+    /// Anomaly-detection-specific fields. Accepted as a nested object OR as
+    /// flat top-level fields (the frontend sends a flat payload).
     pub anomaly_config: Option<AnomalyAlertFields>,
+
+    // Anomaly-detection fields accepted at the top level (flat payload from frontend).
+    // These take precedence over the nested `anomaly_config` when both are present.
+    pub query_mode: Option<String>,
+    pub filters: Option<serde_json::Value>,
+    pub custom_sql: Option<String>,
+    pub detection_function: Option<String>,
+    pub histogram_interval: Option<String>,
+    pub schedule_interval: Option<String>,
+    pub detection_window_seconds: Option<i64>,
+    pub training_window_days: Option<i32>,
+    pub retrain_interval_days: Option<i32>,
+    /// Anomaly threshold as an integer percentile (e.g. 97 means 97th percentile).
+    /// Maps to the internal `percentile` field.
+    pub threshold: Option<i32>,
+    pub rcf_num_trees: Option<i32>,
+    pub rcf_tree_size: Option<i32>,
+    pub rcf_shingle_size: Option<i32>,
+    pub alert_enabled: Option<bool>,
 
     /// The alert configuration. All fields from Alert are flattened into this request body.
     #[serde(flatten)]
     #[schema(inline)]
     pub alert: Alert,
+}
+
+impl CreateAlertRequestBody {
+    /// Merge flat top-level anomaly fields with any nested `anomaly_config`,
+    /// returning a single `AnomalyAlertFields`. Top-level fields win.
+    /// Returns `None` only if the result has no `detection_function` (required).
+    pub fn anomaly_fields(&self) -> Option<AnomalyAlertFields> {
+        let base = self.anomaly_config.clone();
+        let detection_function = self
+            .detection_function
+            .clone()
+            .or_else(|| base.as_ref().map(|b| b.detection_function.clone()))?;
+        let query_mode = self
+            .query_mode
+            .clone()
+            .or_else(|| base.as_ref().map(|b| b.query_mode.clone()))
+            .unwrap_or_else(|| "filters".to_string());
+        let histogram_interval = self
+            .histogram_interval
+            .clone()
+            .or_else(|| base.as_ref().map(|b| b.histogram_interval.clone()))
+            .unwrap_or_else(|| "5m".to_string());
+        let schedule_interval = self
+            .schedule_interval
+            .clone()
+            .or_else(|| base.as_ref().map(|b| b.schedule_interval.clone()))
+            .unwrap_or_else(|| "1h".to_string());
+        let detection_window_seconds = self
+            .detection_window_seconds
+            .or_else(|| base.as_ref().map(|b| b.detection_window_seconds))
+            .unwrap_or(3600);
+        Some(AnomalyAlertFields {
+            query_mode,
+            filters: self
+                .filters
+                .clone()
+                .or_else(|| base.as_ref().and_then(|b| b.filters.clone())),
+            custom_sql: self
+                .custom_sql
+                .clone()
+                .or_else(|| base.as_ref().and_then(|b| b.custom_sql.clone())),
+            detection_function,
+            histogram_interval,
+            schedule_interval,
+            detection_window_seconds,
+            training_window_days: self
+                .training_window_days
+                .or_else(|| base.as_ref().and_then(|b| b.training_window_days)),
+            retrain_interval_days: self
+                .retrain_interval_days
+                .or_else(|| base.as_ref().and_then(|b| b.retrain_interval_days)),
+            percentile: self
+                .threshold
+                .map(|t| t as f64)
+                .or_else(|| base.as_ref().and_then(|b| b.percentile)),
+            rcf_num_trees: self
+                .rcf_num_trees
+                .or_else(|| base.as_ref().and_then(|b| b.rcf_num_trees)),
+            rcf_tree_size: self
+                .rcf_tree_size
+                .or_else(|| base.as_ref().and_then(|b| b.rcf_tree_size)),
+            rcf_shingle_size: self
+                .rcf_shingle_size
+                .or_else(|| base.as_ref().and_then(|b| b.rcf_shingle_size)),
+            alert_enabled: self
+                .alert_enabled
+                .or_else(|| base.as_ref().and_then(|b| b.alert_enabled)),
+        })
+    }
 }
 
 /// Anomaly-detection-specific fields for `CreateAlertRequestBody`.
