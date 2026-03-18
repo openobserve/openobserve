@@ -193,6 +193,7 @@ struct ConfigResponse<'a> {
     /// Used by UI to populate the FQN priority dimension selector
     fqn_priority_dimensions: Vec<String>,
     enable_cross_linking: bool,
+    field_values_for_fst: bool,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -436,6 +437,7 @@ pub async fn zo_config() -> impl IntoResponse {
                 .get_fqn_priority_dimensions()
         ),
         enable_cross_linking: cfg.common.enable_cross_linking,
+        field_values_for_fst: cfg.common.field_values_for_fst,
     })
 }
 
