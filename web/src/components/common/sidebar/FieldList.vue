@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-td :props="props" class="field_list">
               <!-- TODO OK : Repeated code make separate component to display field  -->
               <div
-                v-if="props.row.ftsKey || !props.row.showValues"
+                v-if="(props.row.ftsKey && !fieldValuesForFst) || !props.row.showValues"
                 class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
                 :title="props.row.name"
               >
@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
+import { computed, defineComponent, ref, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -320,6 +320,10 @@ export default defineComponent({
         values: { key: string; count: string }[];
       };
     }> = ref({});
+
+    const fieldValuesForFst = computed(
+      () => store.state.zoConfig?.field_values_for_fst ?? false,
+    );
 
     const filterFieldFn = (rows: any, terms: any) => {
       var filtered = [];
@@ -405,6 +409,7 @@ export default defineComponent({
       outlinedAdd,
       filterFieldValue,
       copyContentValue,
+      fieldValuesForFst,
     };
   },
 });
