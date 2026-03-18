@@ -31,11 +31,48 @@ use crate::handler::http::request::anomaly_detection::{
 /// Anomaly detection configs store the same FK as the alerts table — the KSUID primary
 /// key of the folder row, NOT the human-readable slug.  This helper performs that
 /// lookup and is called whenever we write a folder_id value to the DB.
+///
+/// If the slug is "default" and the folder does not yet exist it is auto-created,
+/// matching the behaviour of `alert::create` which calls `create_default_alerts_folder`.
 async fn resolve_folder_pk(org_id: &str, slug: &str) -> Option<String> {
-    infra::table::folders::get_pk_by_slug(org_id, slug, config::meta::folder::FolderType::Alerts)
+    let pk =
+        infra::table::folders::get_pk_by_slug(org_id, slug, config::meta::folder::FolderType::Alerts)
+            .await
+            .ok()
+            .flatten();
+
+    if pk.is_some() {
+        return pk;
+    }
+
+    // Auto-create the default Alerts folder on first use, same as alert::create does.
+    if slug == config::meta::folder::DEFAULT_FOLDER {
+        let folder = config::meta::folder::Folder {
+            folder_id: config::meta::folder::DEFAULT_FOLDER.to_owned(),
+            name: "default".to_owned(),
+            description: "default".to_owned(),
+        };
+        if crate::service::folders::save_folder(
+            org_id,
+            folder,
+            config::meta::folder::FolderType::Alerts,
+            true,
+        )
         .await
-        .ok()
-        .flatten()
+        .is_ok()
+        {
+            return infra::table::folders::get_pk_by_slug(
+                org_id,
+                slug,
+                config::meta::folder::FolderType::Alerts,
+            )
+            .await
+            .ok()
+            .flatten();
+        }
+    }
+
+    None
 }
 
 /// Translate a stored folder PK back to the user-visible slug for API responses.
