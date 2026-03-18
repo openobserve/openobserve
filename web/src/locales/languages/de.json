@@ -1482,7 +1482,11 @@
     "pivotStickyRowTotals": "Gesamtwerte für wichtige Zeilen",
     "pivotStickyRowTotalsTooltip": "Stecken Sie die Ergebniszeile unten fest, damit sie beim vertikalen Scrollen sichtbar bleibt",
     "pivotStickyColTotals": "Gesamtwerte für wichtige Spalten",
-    "pivotStickyColTotalsTooltip": "Fixieren Sie die Summenspalte auf der rechten Seite, damit sie beim horizontalen Scrollen sichtbar bleibt"
+    "pivotStickyColTotalsTooltip": "Fixieren Sie die Summenspalte auf der rechten Seite, damit sie beim horizontalen Scrollen sichtbar bleibt",
+    "multiSqlQueryLabel": "Bezeichnung abfragen",
+    "multiSqlQueryLabelHint": "Benutzerdefinierter Name für diese Abfrage in Legenden (z. B. 'Production')",
+    "multiQueryWarning": "Nur Abfrage 1 wird für {chartType} gerendert",
+    "trellisNotSupportedWithMultiQuery": "Das Trellis-Layout ist bei mehreren Abfragen deaktiviert. Entfernen Sie zusätzliche Abfragen, um Trellis zu verwenden."
   },
   "panel": {
     "header": "Panel",

@@ -1499,7 +1499,11 @@
     "pivotStickyRowTotals": "スティッキー行の合計",
     "pivotStickyRowTotalsTooltip": "合計行を下部に固定して、垂直方向にスクロールしても表示されたままにします",
     "pivotStickyColTotals": "スティッキーカラムの合計",
-    "pivotStickyColTotalsTooltip": "合計列を右側に固定して、横にスクロールしても表示されたままにします"
+    "pivotStickyColTotalsTooltip": "合計列を右側に固定して、横にスクロールしても表示されたままにします",
+    "multiSqlQueryLabel": "クエリーラベル",
+    "multiSqlQueryLabelHint": "このクエリの凡例でのカスタム名 (例:'Production')",
+    "multiQueryWarning": "{chartType} ではクエリ 1 のみがレンダリングされます",
+    "trellisNotSupportedWithMultiQuery": "Trellis レイアウトは複数のクエリで無効になります。トレリスを使用するには余分なクエリを削除してください。"
   },
   "panel": {
     "header": "パネル",

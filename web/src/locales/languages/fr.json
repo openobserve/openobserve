@@ -1482,7 +1482,11 @@
     "pivotStickyRowTotals": "Totaux des lignes collantes",
     "pivotStickyRowTotalsTooltip": "Épinglez la ligne des totaux en bas pour qu'elle reste visible lorsque vous faites défiler la page verticalement",
     "pivotStickyColTotals": "Totaux des colonnes adhésives",
-    "pivotStickyColTotalsTooltip": "Épinglez la colonne des totaux sur la droite pour qu'elle reste visible lors du défilement horizontal"
+    "pivotStickyColTotalsTooltip": "Épinglez la colonne des totaux sur la droite pour qu'elle reste visible lors du défilement horizontal",
+    "multiSqlQueryLabel": "Libellé de requête",
+    "multiSqlQueryLabelHint": "Nom personnalisé pour cette requête dans les légendes (par exemple, « Production »)",
+    "multiQueryWarning": "Seule la requête 1 est affichée pour {ChartType}",
+    "trellisNotSupportedWithMultiQuery": "La disposition en treillis est désactivée en cas de requêtes multiples. Supprimez les requêtes supplémentaires pour utiliser Trellis."
   },
   "panel": {
     "header": "Panneau",

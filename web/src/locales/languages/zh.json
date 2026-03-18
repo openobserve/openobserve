@@ -1482,7 +1482,11 @@
     "pivotStickyRowTotals": "置顶行总数",
     "pivotStickyRowTotalsTooltip": "将总数行固定在底部，以便在垂直滚动时保持可见状态",
     "pivotStickyColTotals": "置顶栏总数",
-    "pivotStickyColTotalsTooltip": "将总数列固定在右侧，以便在水平滚动时保持可见"
+    "pivotStickyColTotalsTooltip": "将总数列固定在右侧，以便在水平滚动时保持可见",
+    "multiSqlQueryLabel": "查询标签",
+    "multiSqlQueryLabelHint": "图例中此查询的自定义名称（例如，“生产”）",
+    "multiQueryWarning": "仅为 {ChartType} 呈现查询 1",
+    "trellisNotSupportedWithMultiQuery": "多次查询禁用网格布局。移除额外的查询以使用网格。"
   },
   "panel": {
     "header": "面板",
