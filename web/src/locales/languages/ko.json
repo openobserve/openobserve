@@ -1471,7 +1471,18 @@
     "hideQueryResults": "쿼리 결과 숨기기",
     "vrlExtractionTooltip": "차트에서 추출된 VRL 필드를 사용하려면 VRL 함수를 작성하고 적용 버튼을 클릭합니다.필드가 추출되어 차트를 작성하는 데 사용할 수 있습니다.",
     "errorFetchingFunctions": "함수를 가져오는 중 오류가 발생했습니다.",
-    "functionAppliedSuccess": "{name} 함수가 성공적으로 적용되었습니다."
+    "functionAppliedSuccess": "{name} 함수가 성공적으로 적용되었습니다.",
+    "pivotOptions": "피벗 옵션",
+    "pivotShowRowTotals": "행 합계 표시",
+    "pivotShowColTotals": "컬럼 합계 보기",
+    "pivotMissingValue": "누락된 값",
+    "pivotMissingValueHint": "데이터가 없는 셀에 표시된 값",
+    "pivotShowRowTotalsTooltip": "피벗 테이블 하단에 각 열의 값을 요약하는 합계 행을 표시합니다.",
+    "pivotShowColTotalsTooltip": "피벗 테이블 오른쪽에 각 행의 값을 요약하는 합계 열을 표시합니다.",
+    "pivotStickyRowTotals": "고정 행 합계",
+    "pivotStickyRowTotalsTooltip": "총계 행을 아래쪽에 고정하여 세로로 스크롤할 때 계속 표시되도록 합니다.",
+    "pivotStickyColTotals": "고정 컬럼 합계",
+    "pivotStickyColTotalsTooltip": "합계 열을 오른쪽에 고정하여 가로로 스크롤할 때 계속 표시되도록 합니다."
   },
   "panel": {
     "header": "패널",
@@ -1553,7 +1564,12 @@
     "sqlBuilder": "SQL 빌더",
     "generatedSql": "생성된 SQL",
     "enterCustomSql": "사용자 지정 SQL 쿼리를 입력하세요...",
-    "customSql": "사용자 지정 SQL"
+    "customSql": "사용자 지정 SQL",
+    "pivotField": "피벗 필드",
+    "addToPivot": "피벗 필드에 추가",
+    "pivotFieldTooltip": "차원 필드를 여기로 드래그합니다.고유 값은 피벗 테이블의 열 머리글이 됩니다.다단계 피벗에는 최대 3개의 필드가 허용됩니다.",
+    "breakdownTooltipHBar": "이 필드를 사용하여 데이터를 Y축의 여러 섹션으로 분할하여 더 명확하게 볼 수 있습니다.",
+    "breakdownTooltipDefault": "이 필드를 사용하여 데이터를 X축의 여러 섹션으로 분할하여 더 명확하게 볼 수 있습니다."
   },
   "home": {
     "streams": "스트림",

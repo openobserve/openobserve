@@ -66,7 +66,7 @@ async fn base_href_middleware(request: axum::http::Request<Body>, next: Next) ->
     let path = request
         .uri()
         .path()
-        .strip_prefix(&prefix)
+        .strip_prefix("/")
         .unwrap_or("")
         .to_string();
 

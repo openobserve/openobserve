@@ -22,6 +22,7 @@ import {
 import { formatDate } from "../dateTimeUtils";
 import { findFirstValidMappedValue } from "../panelValidation";
 import { toZonedTime } from "date-fns-tz";
+import { parseOverrideConfigs } from "../tableConfigUtils";
 
 /**
  * Converter for table charts
@@ -98,25 +99,9 @@ export class TableConverter implements PromQLChartConverter {
     const tableMode = config.promql_table_mode || "single";
 
     // Build override maps (color/unit) to mimic SQL table behavior
-    const overrideConfigs = panelSchema.config?.override_config || [];
-    const colorConfigMap: Record<string, any> = {};
-    const unitConfigMap: Record<string, any> = {};
-
-    overrideConfigs.forEach((o: any) => {
-      const alias = o?.field?.value;
-      const cfg = o?.config?.[0];
-      if (alias && cfg) {
-        const aliasLower = alias.toLowerCase();
-        if (cfg.type === "unique_value_color") {
-          colorConfigMap[aliasLower] = { autoColor: cfg.autoColor };
-        } else if (cfg.type === "unit") {
-          unitConfigMap[aliasLower] = {
-            unit: cfg.value?.unit,
-            customUnit: cfg.value?.customUnit,
-          };
-        }
-      }
-    });
+    const { colorConfigMap, unitConfigMap } = parseOverrideConfigs(
+      panelSchema.config?.override_config,
+    );
 
     // Mappings for value text replacements
     const mappings = panelSchema.config?.mappings || [];

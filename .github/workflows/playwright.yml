@@ -306,9 +306,15 @@ jobs:
               ]
           - testfolder: "Dashboard-Table-Pagination"
             browser: "chrome"
-            run_files: 
+            run_files:
               [
                 "dashboard-table-pagination.spec.js",
+              ]
+          - testfolder: "Dashboard-Pivot-Table"
+            browser: "chrome"
+            run_files:
+              [
+                "dashboard-pivot-table.spec.js",
               ]
           - testfolder: "Dashboards-Panel-Level-DateTime-Config"
             browser: "chrome"
@@ -497,7 +503,7 @@ jobs:
               "Logs-Core"|"Logs-Queries")
                 ACTUAL_FOLDER="Logs"
                 ;;
-              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables"|"Dashboard-Table-Pagination"|"Dashboards-Panel-Level-DateTime-Config"|"Dashboard-Config-Settings")
+              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables"|"Dashboard-Table-Pagination"|"Dashboard-Pivot-Table"|"Dashboards-Panel-Level-DateTime-Config"|"Dashboard-Config-Settings")
                 ACTUAL_FOLDER="Dashboards"
                 ;;
               *)
