@@ -13,16 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Adds folder_id, owner, and (when missing) alert_destinations columns to the
-//! anomaly_detection_config table.
+//! Upgrades anomaly_detection_config from the P1 schema to the P2 schema.
 //!
-//! - folder_id (varchar 256): stores the folders.id PK, backfilled from the "default" Alerts folder
-//!   for each org.
-//! - owner (varchar 256): nullable attributed owner.
-//! - alert_destinations (jsonb): only added when the old alert_destination_id column is present
-//!   (i.e. environments that ran m20260310 before it was updated). In that case the old value is
-//!   wrapped in a JSON array and the old column is dropped. Fresh installs already have
-//!   alert_destinations from the CREATE TABLE statement and skip this block entirely.
+//! m20260310 creates the table with `alert_destination_id` (varchar). This migration:
+//! - Adds `folder_id` (varchar 256): backfilled from the "default" Alerts folder for each org.
+//! - Adds `owner` (varchar 256): nullable attributed owner.
+//! - Adds `alert_destinations` (jsonb): wraps the old `alert_destination_id` value in a JSON
+//!   array, then drops the old column.
+//!
+//! All three steps are guarded by column-existence checks so the migration is idempotent.
 
 use sea_orm::{ConnectionTrait, Statement};
 use sea_orm_migration::prelude::*;
@@ -96,9 +95,7 @@ impl MigrationTrait for Migration {
                 .await?;
         }
 
-        // --- Migrate alert_destination_id → alert_destinations (old envs only) ---
-        // Fresh installs (updated m20260310) already have alert_destinations and
-        // never had alert_destination_id, so both checks will short-circuit.
+        // --- Migrate alert_destination_id → alert_destinations ---
         let has_old_col = column_exists(manager, "alert_destination_id").await?;
         let has_new_col = column_exists(manager, "alert_destinations").await?;
 
