@@ -759,7 +759,7 @@ style="height: 36px" />
           <q-btn
             data-test="add-alert-submit-btn"
             class="o2-primary-button no-border tw:h-[36px]"
-            :label="isAnomalyMode ? t('alerts.saveAndTrain') : t('alerts.save')"
+            :label="isAnomalyMode && !anomalyEditMode ? t('alerts.saveAndTrain') : t('alerts.save')"
             no-caps
             flat
             :loading="anomalySaving"
@@ -944,7 +944,7 @@ const defaultAnomalyConfig = () => ({
   description: "",
   stream_type: "logs",
   stream_name: "",
-  query_mode: "filters" as const,
+  query_mode: "filters" as "filters" | "custom_sql",
   filters: [] as any[],
   custom_sql: "",
   detection_function: "count",
@@ -3056,7 +3056,7 @@ export default defineComponent({
           });
         }
 
-        emit("update:list");
+        emit("update:list", (activeFolderId.value as string) || "default");
         router.push({
           name: "alertList",
           query: {
