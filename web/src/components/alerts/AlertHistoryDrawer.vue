@@ -34,20 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:items-center tw:gap-2 tw:min-w-0"
           data-test="alert-details-title"
         >
-          <q-icon
-            name="history"
-            size="18px"
-            :color="store.state.theme === 'dark' ? 'blue-4' : 'primary'"
-          />
-          <span class="tw:font-semibold tw:text-[15px] tw:whitespace-nowrap">{{
-            t("alert_list.alert_history")
-          }}</span>
-          <q-icon
-            name="chevron_right"
-            size="16px"
-            color="grey-5"
-            class="tw:shrink-0"
-          />
           <!-- Alert Name Badge -->
           <span
             v-if="alertDetails"
@@ -366,15 +352,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:pt-2 tw:pb-2"
           >
+            <!-- Condition sections container -->
             <div
-              class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden"
+              v-if="hasBothSqlAndVrl"
+              class="tw:flex tw:flex-col tw:gap-2 tw:flex-1 tw:overflow-hidden tw:min-h-0"
+            >
+              <!-- SQL Section (collapsible) -->
+              <div
+                class="tw:flex tw:flex-col tw:overflow-hidden tw:min-h-0"
+                :style="{ flex: collapsedSectionSQL ? '0 0 auto' : '1 1 50%' }"
+              >
+                <div
+                  class="code-block tw:flex tw:flex-col tw:h-full tw:overflow-hidden"
+                  :class="store.state.theme === 'dark' ? 'code-block-dark' : 'code-block-light'"
+                >
+                  <div
+                    class="code-block-header tw:shrink-0 tw:cursor-pointer tw:select-none"
+                    :class="store.state.theme === 'dark' ? 'code-block-header-dark' : 'code-block-header-light'"
+                    @click="collapsedSectionSQL = !collapsedSectionSQL"
+                  >
+                    <div class="tw:flex tw:items-center tw:gap-1.5">
+                      <q-icon :name="collapsedSectionSQL ? 'chevron_right' : 'expand_more'" size="16px" />
+                      <span
+                        class="tw:text-[11px] tw:font-medium"
+                        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                      >SQL</span>
+                    </div>
+                    <q-btn
+                      v-if="rawSql && rawSql !== '--'"
+                      @click.stop="copyToClipboard(rawSql, t('alerts.alertDetails.sqlQuery'))"
+                      flat dense size="xs" icon="content_copy"
+                      :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
+                    >
+                      <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
+                    </q-btn>
+                  </div>
+                  <pre
+                    v-if="!collapsedSectionSQL"
+                    class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto tw:whitespace-pre-wrap tw:break-all"
+                    >{{ rawSql || t("alerts.alertDetails.noCondition") }}</pre>
+                </div>
+              </div>
+
+              <!-- VRL Section (collapsible) -->
+              <div
+                class="tw:flex tw:flex-col tw:overflow-hidden tw:min-h-0"
+                :style="{ flex: collapsedSectionVRL ? '0 0 auto' : '1 1 50%' }"
+              >
+                <div
+                  class="code-block tw:flex tw:flex-col tw:h-full tw:overflow-hidden"
+                  :class="store.state.theme === 'dark' ? 'code-block-dark' : 'code-block-light'"
+                >
+                  <div
+                    class="code-block-header tw:shrink-0 tw:cursor-pointer tw:select-none"
+                    :class="store.state.theme === 'dark' ? 'code-block-header-dark' : 'code-block-header-light'"
+                    @click="collapsedSectionVRL = !collapsedSectionVRL"
+                  >
+                    <div class="tw:flex tw:items-center tw:gap-1.5">
+                      <q-icon :name="collapsedSectionVRL ? 'chevron_right' : 'expand_more'" size="16px" />
+                      <span
+                        class="tw:text-[11px] tw:font-medium"
+                        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                      >VRL</span>
+                    </div>
+                    <q-btn
+                      v-if="rawVRL && rawVRL !== '--'"
+                      @click.stop="copyToClipboard(rawVRL, 'VRL Function')"
+                      flat dense size="xs" icon="content_copy"
+                      :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
+                    >
+                      <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
+                    </q-btn>
+                  </div>
+                  <pre
+                    v-if="!collapsedSectionVRL"
+                    class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto tw:whitespace-pre-wrap tw:break-all"
+                    >{{ rawVRL || t("alerts.alertDetails.noCondition") }}</pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- Single section view (SQL, PromQL, or Conditions) -->
+            <div v-else class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden"
               :class="
                 store.state.theme === 'dark'
                   ? 'code-block-dark'
                   : 'code-block-light'
               "
             >
-              <!-- Code block header bar — stays fixed -->
               <div
                 class="code-block-header tw:shrink-0"
                 :class="
@@ -393,28 +458,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     {{
-                      alertDetails.type === "sql"
-                        ? "SQL"
-                        : alertDetails.type === "promql"
-                          ? "PromQL"
-                          : "Conditions"
+                      queryType === "promql" ? "PromQL"
+                      : rawSql ? "SQL"
+                      : rawVRL ? "VRL"
+                      : "Conditions"
                     }}
                   </span>
                 </div>
                 <q-btn
-                  v-if="
-                    alertDetails.conditions &&
-                    alertDetails.conditions !== '' &&
-                    alertDetails.conditions !== '--'
-                  "
+                  v-if="getSingleConditionText() !== t('alerts.alertDetails.noCondition')"
                   @click="
                     copyToClipboard(
-                      alertDetails.conditions,
-                      alertDetails.type === 'sql'
-                        ? t('alerts.alertDetails.sqlQuery')
-                        : alertDetails.type === 'promql'
-                          ? t('alerts.alertDetails.promqlQuery')
-                          : t('alerts.alertDetails.conditions'),
+                      getSingleConditionText(),
+                      queryType === 'promql' ? t('alerts.alertDetails.promqlQuery')
+                      : rawSql ? t('alerts.alertDetails.sqlQuery')
+                      : rawVRL ? 'VRL Function'
+                      : t('alerts.alertDetails.conditions'),
                     )
                   "
                   flat
@@ -427,46 +486,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
                 </q-btn>
               </div>
-              <!-- Code content — scrolls internally -->
               <pre
                 class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
-                >{{
-                  alertDetails.conditions !== "" &&
-                  alertDetails.conditions !== "--"
-                    ? alertDetails.type === "sql" ||
-                      alertDetails.type === "promql"
-                      ? alertDetails.conditions
-                      : alertDetails.conditions.length !== 2
-                        ? `if ${alertDetails.conditions}`
-                        : t("alerts.alertDetails.noCondition")
-                    : t("alerts.alertDetails.noCondition")
-                }}</pre
+                >{{ getSingleConditionText() }}</pre
               >
-            </div>
-
-            <!-- Description (only show if exists) -->
-            <div v-if="alertDetails.description" class="tw:mt-3 tw:shrink-0">
-              <div
-                class="tw:flex tw:items-center tw:gap-1.5 tw:text-[12px] tw:font-semibold tw:uppercase tw:tracking-wider tw:mb-1"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'tw:text-gray-400'
-                    : 'tw:text-gray-500'
-                "
-              >
-                <q-icon name="info_outline" size="13px" />
-                {{ t("common.description") }}
-              </div>
-              <div
-                class="tw:text-[13px] tw:px-3 tw:py-2 tw:rounded tw:leading-relaxed"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'tw:bg-gray-800 tw:text-gray-300'
-                    : 'tw:bg-gray-50 tw:text-gray-700'
-                "
-              >
-                {{ alertDetails.description }}
-              </div>
             </div>
           </div>
         </q-tab-panel>
@@ -504,6 +527,15 @@ const resultTotal = ref(0);
 
 // Tabs
 const activeTab = ref("history");
+
+// Condition panel state
+const collapsedSectionSQL = ref(false);
+const collapsedSectionVRL = ref(false);
+const rawSql = ref("");
+const rawVRL = ref("");
+const rawConditions = ref("");
+const hasBothSqlAndVrl = ref(false);
+const queryType = ref(""); // "sql", "promql", "custom"
 
 // Refs
 const alertHistory: Ref<any[]> = ref([]);
@@ -798,7 +830,59 @@ const copyToClipboard = (text: string, type: string) => {
     });
 };
 
+// Condition panel helpers
+const extractConditionData = () => {
+  if (!props.alertDetails) return;
+
+  const raw = props.alertDetails.rawCondition || props.alertDetails.condition || {};
+  queryType.value = raw.type || props.alertDetails.type || "custom";
+
+  rawSql.value = raw.sql || raw.promql || "";
+  rawVRL.value = raw.vrl_function || "";
+
+  // For custom conditions, use the pre-computed display string from alertDetails.conditions
+  // (already formatted by triggerExpand in AlertList.vue)
+  const precomputed = props.alertDetails.conditions;
+  if (precomputed && precomputed !== "--" && precomputed !== "") {
+    rawConditions.value = precomputed;
+  } else {
+    rawConditions.value = "";
+  }
+
+  hasBothSqlAndVrl.value = !!(rawSql.value && rawVRL.value);
+};
+
+const getSingleConditionText = () => {
+  if (rawSql.value) return rawSql.value;
+  if (rawVRL.value) return rawVRL.value;
+  if (rawConditions.value) {
+    return typeof rawConditions.value === "string" && rawConditions.value.length > 2
+      ? `if ${rawConditions.value}`
+      : rawConditions.value;
+  }
+  return t("alerts.alertDetails.noCondition");
+};
+
+// Extract condition data immediately on mount
+extractConditionData();
+
 // Watchers
+watch(
+  () => props.alertDetails,
+  () => {
+    extractConditionData();
+    collapsedSectionSQL.value = false;
+    collapsedSectionVRL.value = false;
+  },
+  { deep: true },
+);
+
+watch(activeTab, (tab) => {
+  if (tab === "condition") {
+    extractConditionData();
+  }
+});
+
 watch(
   () => props.alertId,
   async (newVal) => {
