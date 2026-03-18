@@ -104,6 +104,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     resetFields,
     removeXYFilters,
     setFieldsBasedOnChartTypeValidation,
+    isPivotMode,
   } = usePanelFields({ dashboardPanelData, store });
 
   const { resetAggregationFunction } = usePanelAggregation({
@@ -1257,19 +1258,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   );
 
   const currentXLabel = computed(() => {
-    return dashboardPanelData.data.type == "table"
-      ? "First Column"
-      : dashboardPanelData.data.type == "h-bar"
-        ? "Y-Axis"
-        : "X-Axis";
+    if (dashboardPanelData.data.type == "table") {
+      return isPivotMode.value ? "Row Fields" : "First Column";
+    }
+    return dashboardPanelData.data.type == "h-bar" ? "Y-Axis" : "X-Axis";
   });
 
   const currentYLabel = computed(() => {
-    return dashboardPanelData.data.type == "table"
-      ? "Other Columns"
-      : dashboardPanelData.data.type == "h-bar"
-        ? "X-Axis"
-        : "Y-Axis";
+    if (dashboardPanelData.data.type == "table") {
+      return isPivotMode.value ? "Value Fields" : "Other Columns";
+    }
+    return dashboardPanelData.data.type == "h-bar" ? "X-Axis" : "Y-Axis";
   });
 
   // Function to get result schema
@@ -1579,6 +1578,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     isAddYAxisNotAllowed,
     isAddZAxisNotAllowed,
     promqlMode,
+    isPivotMode,
     addQuery,
     removeQuery,
     resetAggregationFunction,

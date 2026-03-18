@@ -111,6 +111,11 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
       column_order: [],
       table_pagination: false,
       table_pagination_rows_per_page: null,
+      // Pivot table config
+      table_pivot_show_row_totals: false,
+      table_pivot_show_col_totals: false,
+      table_pivot_sticky_row_totals: false,
+      table_pivot_sticky_col_totals: false,
       panel_time_enabled: false,
       panel_time_range: null,
     },

@@ -1471,7 +1471,18 @@
     "hideQueryResults": "隐藏查询结果",
     "vrlExtractionTooltip": "要在图表中使用提取的 VRL 字段，请编写 VRL 函数，然后单击 “应用” 按钮。这些字段将被提取，允许您使用它们来构建图表。",
     "errorFetchingFunctions": "获取函数时出错",
-    "functionAppliedSuccess": "{name} 函数成功应用。"
+    "functionAppliedSuccess": "{name} 函数成功应用。",
+    "pivotOptions": "数据透视选项",
+    "pivotShowRowTotals": "显示行总数",
+    "pivotShowColTotals": "显示列总数",
+    "pivotMissingValue": "缺失的价值",
+    "pivotMissingValueHint": "为没有数据的单元格显示的值",
+    "pivotShowRowTotalsTooltip": "在数据透视表底部显示总计行，汇总每列的值",
+    "pivotShowColTotalsTooltip": "在数据透视表的右侧显示总计列，汇总每行的值",
+    "pivotStickyRowTotals": "置顶行总数",
+    "pivotStickyRowTotalsTooltip": "将总数行固定在底部，以便在垂直滚动时保持可见状态",
+    "pivotStickyColTotals": "置顶栏总数",
+    "pivotStickyColTotalsTooltip": "将总数列固定在右侧，以便在水平滚动时保持可见"
   },
   "panel": {
     "header": "面板",
@@ -1553,7 +1564,12 @@
     "sqlBuilder": "SQL 生成器",
     "generatedSql": "生成的 SQL",
     "enterCustomSql": "输入您的自定义 SQL 查询...",
-    "customSql": "自定义 SQL"
+    "customSql": "自定义 SQL",
+    "pivotField": "枢轴字段",
+    "addToPivot": "添加到数据透视字段",
+    "pivotFieldTooltip": "将维度字段拖到此处。它的不同值成为数据透视表中的列标题。最多允许 3 个字段进行多级旋转。",
+    "breakdownTooltipHBar": "使用这些字段在 Y 轴上将数据拆分为不同的部分，以获得更清晰的视图。",
+    "breakdownTooltipDefault": "使用这些字段在 X 轴上将数据拆分为不同的部分，以获得更清晰的视图。"
   },
   "home": {
     "streams": "数据流",
@@ -2103,7 +2119,13 @@
       "active": "活跃",
       "failed": "失败",
       "disabled": "已禁用"
-    }
+    },
+    "anomalyStepCaptions": {
+      "alertSetup": "为您的探测器命名并选择要监视的直播",
+      "detectionConfig": "配置查询和检测参数",
+      "alerting": "在检测到异常时设置通知"
+    },
+    "updateAnomalyDetection": "更新异常检测："
   },
   "alert_templates": {
     "header": "模板",

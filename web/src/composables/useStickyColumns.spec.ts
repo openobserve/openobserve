@@ -409,9 +409,10 @@ describe("useStickyColumns", () => {
       composable = useStickyColumns(mockProps, mockStore);
 
       const keys = Object.keys(composable);
-      expect(keys).toHaveLength(2);
+      expect(keys).toHaveLength(3);
       expect(keys).toContain("stickyColumnOffsets");
       expect(keys).toContain("getStickyColumnStyle");
+      expect(keys).toContain("tableId");
     });
   });
 

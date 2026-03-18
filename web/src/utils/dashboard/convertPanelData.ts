@@ -19,6 +19,7 @@ import {
   convertSQLData,
 } from "@/utils/dashboard/convertSQLData";
 import { convertTableData } from "@/utils/dashboard/convertTableData";
+import { convertPivotTableData } from "@/utils/dashboard/convertPivotTableData";
 import { convertGeoMapData } from "@/utils/dashboard/convertGeoMapData";
 import { convertMapsData } from "@/utils/dashboard/convertMapsData";
 import { convertSankeyData } from "./convertSankeyData";
@@ -130,7 +131,19 @@ export const convertPanelData = async (
           )),
         };
       } else {
-        // SQL query type
+        // SQL query type — check for pivot mode
+        const pivotQuery = panelSchema?.queries?.[0];
+        const isPivot =
+          (pivotQuery?.fields?.x?.length ?? 0) > 0 &&
+          (pivotQuery?.fields?.breakdown?.length ?? 0) > 0 &&
+          (pivotQuery?.fields?.y?.length ?? 0) > 0;
+
+        if (isPivot) {
+          return {
+            chartType: panelSchema.type,
+            ...convertPivotTableData(panelSchema, data, store),
+          };
+        }
         return {
           chartType: panelSchema.type,
           ...convertTableData(panelSchema, data, store),

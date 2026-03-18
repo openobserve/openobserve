@@ -1471,7 +1471,18 @@
     "hideQueryResults": "Masquer les résultats de la requête",
     "vrlExtractionTooltip": "Pour utiliser les champs VRL extraits dans le graphique, écrivez une fonction VRL et cliquez sur le bouton Appliquer. Les champs seront extraits, ce qui vous permettra de les utiliser pour créer le graphique.",
     "errorFetchingFunctions": "Erreur lors de la récupération des fonctions",
-    "functionAppliedSuccess": "La fonction {name} a été appliquée avec succès."
+    "functionAppliedSuccess": "La fonction {name} a été appliquée avec succès.",
+    "pivotOptions": "Options de pivot",
+    "pivotShowRowTotals": "Afficher les totaux des lignes",
+    "pivotShowColTotals": "Afficher les totaux des colonnes",
+    "pivotMissingValue": "Valeur manquante",
+    "pivotMissingValueHint": "Valeur affichée pour les cellules sans données",
+    "pivotShowRowTotalsTooltip": "Afficher une ligne de totaux en bas du tableau croisé dynamique résumant les valeurs de chaque colonne",
+    "pivotShowColTotalsTooltip": "Afficher une colonne de totaux sur le côté droit du tableau croisé dynamique résumant les valeurs de chaque ligne",
+    "pivotStickyRowTotals": "Totaux des lignes collantes",
+    "pivotStickyRowTotalsTooltip": "Épinglez la ligne des totaux en bas pour qu'elle reste visible lorsque vous faites défiler la page verticalement",
+    "pivotStickyColTotals": "Totaux des colonnes adhésives",
+    "pivotStickyColTotalsTooltip": "Épinglez la colonne des totaux sur la droite pour qu'elle reste visible lors du défilement horizontal"
   },
   "panel": {
     "header": "Panneau",
@@ -1553,7 +1564,12 @@
     "sqlBuilder": "Générateur SQL",
     "generatedSql": "SQL généré",
     "enterCustomSql": "Entrez votre requête SQL personnalisée...",
-    "customSql": "SQL personnalisé"
+    "customSql": "SQL personnalisé",
+    "pivotField": "Champ pivot",
+    "addToPivot": "Ajouter au champ Pivot",
+    "pivotFieldTooltip": "Faites glisser un champ de dimension ici. Ses valeurs distinctes deviennent des en-têtes de colonne dans le tableau croisé dynamique. Jusqu'à 3 champs sont autorisés pour le pivotement à plusieurs niveaux.",
+    "breakdownTooltipHBar": "Utilisez ces champs pour diviser les données en différentes sections sur l'axe Y pour une vue plus claire.",
+    "breakdownTooltipDefault": "Utilisez ces champs pour diviser les données en différentes sections sur l'axe X pour une vue plus claire."
   },
   "home": {
     "streams": "Ruisseaux",
@@ -2103,7 +2119,13 @@
       "active": "Actif",
       "failed": "Échoué",
       "disabled": "Désactivé"
-    }
+    },
+    "anomalyStepCaptions": {
+      "alertSetup": "Donnez un nom à votre détecteur et sélectionnez un flux à surveiller",
+      "detectionConfig": "Configuration des paramètres de requête et de détection",
+      "alerting": "Configurer des notifications lorsque des anomalies sont détectées"
+    },
+    "updateAnomalyDetection": "Mettre à jour la détection des anomalies :"
   },
   "alert_templates": {
     "header": "Modèles",

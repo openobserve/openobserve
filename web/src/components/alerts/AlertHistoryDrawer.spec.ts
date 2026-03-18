@@ -186,8 +186,16 @@ describe("AlertHistoryDrawer.vue", () => {
   });
 
   describe("Query/Conditions Block", () => {
+    const switchToConditionTab = async () => {
+      const buttons = wrapper.findAll(".tab-toggle-btn");
+      const conditionBtn = buttons.find((b) => b.text().includes("Condition"));
+      await conditionBtn!.trigger("click");
+      await flushPromises();
+    };
+
     it("should display SQL label for sql type alerts", async () => {
       await mountComponent();
+      await switchToConditionTab();
       expect(wrapper.text()).toContain("SQL");
     });
 
@@ -196,11 +204,13 @@ describe("AlertHistoryDrawer.vue", () => {
         alertDetails: { ...mockAlertDetails, type: "promql", conditions: "rate(http_errors[5m])" },
         alertId: "alert-123",
       });
+      await switchToConditionTab();
       expect(wrapper.text()).toContain("PromQL");
     });
 
     it("should display the query text", async () => {
       await mountComponent();
+      await switchToConditionTab();
       expect(wrapper.text()).toContain(
         "SELECT count(*) FROM logs WHERE level='error'",
       );
@@ -208,6 +218,7 @@ describe("AlertHistoryDrawer.vue", () => {
 
     it("should have a copy button for conditions", async () => {
       await mountComponent();
+      await switchToConditionTab();
       expect(
         wrapper
           .find('[data-test="alert-details-copy-conditions-btn"]')
@@ -217,6 +228,7 @@ describe("AlertHistoryDrawer.vue", () => {
 
     it("should display the description when provided", async () => {
       await mountComponent();
+      await switchToConditionTab();
       expect(wrapper.text()).toContain(
         "Fires when CPU usage exceeds 80%",
       );

@@ -1488,7 +1488,18 @@
     "hideQueryResults": "クエリ結果を非表示にする",
     "vrlExtractionTooltip": "抽出された VRL フィールドをチャートで使用するには、VRL 関数を記述して [適用] ボタンをクリックします。フィールドが抽出され、そのフィールドを使用してチャートを作成できます。",
     "errorFetchingFunctions": "関数を取得中にエラーが発生しました",
-    "functionAppliedSuccess": "{name} 関数が正常に適用されました。"
+    "functionAppliedSuccess": "{name} 関数が正常に適用されました。",
+    "pivotOptions": "ピボットオプション",
+    "pivotShowRowTotals": "行合計を表示",
+    "pivotShowColTotals": "列の合計を表示",
+    "pivotMissingValue": "値が見つかりません",
+    "pivotMissingValueHint": "データがないセルに表示される値",
+    "pivotShowRowTotalsTooltip": "ピボットテーブルの下部に、各列の値をまとめた集計行を表示します",
+    "pivotShowColTotalsTooltip": "ピボットテーブルの右側に、各行の値をまとめた合計列を表示します",
+    "pivotStickyRowTotals": "スティッキー行の合計",
+    "pivotStickyRowTotalsTooltip": "合計行を下部に固定して、垂直方向にスクロールしても表示されたままにします",
+    "pivotStickyColTotals": "スティッキーカラムの合計",
+    "pivotStickyColTotalsTooltip": "合計列を右側に固定して、横にスクロールしても表示されたままにします"
   },
   "panel": {
     "header": "パネル",
@@ -1570,7 +1581,12 @@
     "sqlBuilder": "SQL ビルダー",
     "generatedSql": "生成された SQL",
     "enterCustomSql": "カスタム SQL クエリを入力してください...",
-    "customSql": "カスタム SQL"
+    "customSql": "カスタム SQL",
+    "pivotField": "ピボットフィールド",
+    "addToPivot": "ピボットフィールドに追加",
+    "pivotFieldTooltip": "ここにディメンションフィールドをドラッグします。その個別の値はピボットテーブルの列ヘッダーになります。最大 3 つのフィールドでマルチレベルピボットが可能です。",
+    "breakdownTooltipHBar": "これらのフィールドを使用してデータを Y 軸上のさまざまなセクションに分割すると、見やすくなります。",
+    "breakdownTooltipDefault": "これらのフィールドを使用してデータを X 軸上のさまざまなセクションに分割すると、見やすくなります。"
   },
   "home": {
     "streams": "ストリーム",
@@ -2120,7 +2136,13 @@
       "active": "アクティブ",
       "failed": "失敗",
       "disabled": "無効"
-    }
+    },
+    "anomalyStepCaptions": {
+      "alertSetup": "検出器に名前を付け、監視するストリームを選択します",
+      "detectionConfig": "クエリと検出パラメータの設定",
+      "alerting": "異常が検出されたときの通知を設定する"
+    },
+    "updateAnomalyDetection": "異常検出の更新:"
   },
   "alert_templates": {
     "header": "テンプレート",
