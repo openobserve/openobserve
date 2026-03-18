@@ -234,6 +234,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ props.row[col.field] }}
                       </template>
+                      <template v-else-if="col.name === 'status'">
+                        <q-badge
+                          :color="
+                            props.row.status === 'failed' ? 'negative' :
+                            props.row.status === 'active' ? 'positive' :
+                            props.row.status === 'training' ? 'warning' :
+                            props.row.status === 'disabled' ? 'grey' :
+                            'info'
+                          "
+                          :label="props.row.status !== '--' ? props.row.status : ''"
+                          style="text-transform: capitalize; cursor: default"
+                        >
+                          <q-tooltip
+                            v-if="props.row.status === 'failed' && props.row.last_error"
+                            max-width="400px"
+                            anchor="top middle"
+                            self="bottom middle"
+                          >
+                            {{ props.row.last_error }}
+                          </q-tooltip>
+                        </q-badge>
+                        <span v-if="props.row.status === '--'">--</span>
+                      </template>
                       <template v-else-if="col.name === 'period'">
                         {{ props.row[col.field] ?  props.row[col.field] + " Mins" : "--" }}
                       </template>
@@ -1163,6 +1186,7 @@ export default defineComponent({
       total_evaluations: anomaly.total_evaluations ?? "--",
       firing_count: anomaly.firing_count ?? "--",
       status: anomaly.status || "--",
+      last_error: anomaly.last_error || null,
       selected: false,
       type: "anomaly",
       folder_name: {
