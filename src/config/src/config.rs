@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 34;
+pub const DB_SCHEMA_VERSION: u64 = 35;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1233,6 +1233,12 @@ pub struct Common {
         help = "URL for built-in regex patterns JSON source. Can be customized to use different pattern libraries."
     )]
     pub regex_patterns_source_url: String,
+    #[env_config(
+        name = "ZO_MODEL_PRICING_SOURCE_URL",
+        default = "https://raw.githubusercontent.com/openobserve/model_pricing/main/pricing.json",
+        help = "URL for built-in LLM model pricing JSON source."
+    )]
+    pub model_pricing_source_url: String,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
     pub fake_es_version: String,
     #[env_config(name = "ZO_ES_VERSION", default = "")]

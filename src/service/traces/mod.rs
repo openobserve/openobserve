@@ -243,6 +243,10 @@ pub async fn handle_otlp_request(
 
     // Initialize OTEL processor for enriching spans with AI/ML observability attributes
     let otel_processor = OtelIngestionProcessor::new();
+
+    // Pre-load user-defined model pricing entries for this org (in-memory cache, no I/O)
+    let org_pricing_entries = crate::service::db::model_pricing::get_org_pricing_entries(org_id);
+
     for res_span in res_spans {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
         let mut service_name_explicitly_set = false;
@@ -347,11 +351,13 @@ pub async fn handle_otlp_request(
                 // Enrich span attributes with OTEL processor if enabled
                 // This adds AI/ML observability fields like model_name, usage_details, etc.
                 if is_llm_span {
-                    otel_processor.process_span(
+                    otel_processor.process_span_with_pricing(
                         &mut span_att_map,
                         &service_att_map,
                         scope_name,
                         &events,
+                        &org_pricing_entries,
+                        start_time,
                     );
 
                     // check if we have any LLM related attributes

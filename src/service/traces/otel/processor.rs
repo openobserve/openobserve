@@ -20,7 +20,7 @@
 
 use std::collections::HashMap;
 
-use config::utils::{json, str::EMPTY_STRING, time::parse_timestamp_micro_from_value};
+use config::utils::{json, time::parse_timestamp_micro_from_value};
 
 use super::{
     attributes::{LangfuseAttributes, O2Attributes},
@@ -31,7 +31,10 @@ use super::{
     },
     pricing,
 };
-use crate::{common::meta::traces::Event, service::traces::otel::extractors::ObservationType};
+use crate::{
+    common::meta::traces::Event,
+    service::{db::model_pricing::CachedModelPricing, traces::otel::extractors::ObservationType},
+};
 
 pub struct OtelIngestionProcessor {
     model_extractor: ModelExtractor,
@@ -78,15 +81,19 @@ impl OtelIngestionProcessor {
             .extract_from_span_attributes(span_attributes)
     }
 
-    /// Process span attributes and enrich them with OpenObserve-specific fields
-    /// This modifies span_attributes in-place, removing processed attributes(only input/output
-    /// related attributes) and adding enriched fields
-    pub fn process_span(
+    /// Process span with optional user-defined model pricing entries.
+    /// If matching pricing is found in `org_pricing_entries`, it takes priority over built-in
+    /// pricing. `span_start_nanos` is the span's `start_time_unix_nano` from the OTLP payload;
+    /// it is used to select the most-recently-applicable pricing definition via `valid_from`.
+    /// In production always call `get_org_pricing_entries` to populate this slice.
+    pub fn process_span_with_pricing(
         &self,
         span_attributes: &mut HashMap<String, json::Value>,
         resource_attributes: &HashMap<String, json::Value>,
         scope_name: Option<&str>,
         events: &[Event],
+        org_pricing_entries: &[CachedModelPricing],
+        span_start_nanos: u64,
     ) {
         // Extract and add observation type
         let scope_info = scope_name.map(|name| ScopeInfo {
@@ -154,7 +161,18 @@ impl OtelIngestionProcessor {
 
         // need to guarantee have the field USAGE_DETAILS and COST_DETAILS
         if input.is_some() || output.is_some() {
-            // recalculate input and output tokens if not present
+            // Convert span start time from nanoseconds to microseconds for valid_from comparison.
+            let span_ts_micros = i64::try_from(span_start_nanos / 1_000).unwrap_or(i64::MAX);
+            let matched_pricing = model_name.as_ref().and_then(|mn| {
+                crate::service::db::model_pricing::find_pricing_sync_at(
+                    org_pricing_entries,
+                    mn,
+                    Some(span_ts_micros),
+                )
+            });
+            // Use model_name as the tiktoken key for fallback token counting.
+            let tokenizer_key: &str = model_name.as_deref().unwrap_or("");
+
             if let Some(v) = &input
                 && !usage.contains_key("input")
                 && matches!(
@@ -163,8 +181,7 @@ impl OtelIngestionProcessor {
                 )
             {
                 let prompt = v.to_string();
-                let model_name = model_name.as_ref().unwrap_or(&EMPTY_STRING);
-                let prompt_tokens = pricing::calculate_token_count(model_name, &prompt);
+                let prompt_tokens = pricing::calculate_token_count(tokenizer_key, &prompt);
                 usage.insert("input".to_string(), prompt_tokens);
             }
             if let Some(v) = &output
@@ -174,9 +191,8 @@ impl OtelIngestionProcessor {
                     ObservationType::Generation | ObservationType::Embedding
                 )
             {
-                let output = v.to_string();
-                let model_name = model_name.as_ref().unwrap_or(&EMPTY_STRING);
-                let output_tokens = pricing::calculate_token_count(model_name, &output);
+                let output_text = v.to_string();
+                let output_tokens = pricing::calculate_token_count(tokenizer_key, &output_text);
                 usage.insert("output".to_string(), output_tokens);
             }
 
@@ -188,38 +204,62 @@ impl OtelIngestionProcessor {
                 usage.insert("output".to_string(), 0);
             }
             if !usage.contains_key("total") {
-                let input = usage.get("input").cloned().unwrap_or_default();
-                let output = usage.get("output").cloned().unwrap_or_default();
-                let total = input + output;
-                usage.insert("total".to_string(), total);
+                // Total = input + output only. Cache tokens (cache_read_input_tokens,
+                // cache_creation_input_tokens) are subsets of input, not additive.
+                let input = usage.get("input").copied().unwrap_or(0);
+                let output = usage.get("output").copied().unwrap_or(0);
+                usage.insert("total".to_string(), input + output);
             }
 
-            // Calculate cost from tokens if cost is missing but we have model and usage
-            if let Some(ref model_name) = model_name
-                && cost.is_empty()
+            // Calculate cost from tokens if cost is missing but we have model and usage.
+            // User-defined pricing takes priority over built-in pricing.
+            if cost.is_empty()
                 && matches!(
                     obs_type,
                     ObservationType::Generation | ObservationType::Embedding
                 )
             {
-                let input_tokens = usage.get("input").cloned().unwrap_or_default();
-                let output_tokens = usage.get("output").cloned().unwrap_or_default();
-
-                if let Some((input_cost, output_cost, total_cost)) =
-                    pricing::calculate_cost(model_name, input_tokens, output_tokens)
-                {
-                    cost.insert("input".to_string(), input_cost);
-                    cost.insert("output".to_string(), output_cost);
-                    cost.insert("total".to_string(), total_cost);
+                if let Some(pricing_def) = matched_pricing {
+                    // Use user-defined per-token pricing (already matched above)
+                    let result = crate::service::db::model_pricing::calculate_cost_from_definition(
+                        &pricing_def,
+                        &usage,
+                    );
+                    if !result.cost.is_empty() {
+                        log::debug!(
+                            "[model_pricing] model='{}' pattern='{}' tier='{}' total_cost={:.8}",
+                            model_name.as_deref().unwrap_or(""),
+                            pricing_def.match_pattern,
+                            result.tier_name,
+                            result.cost.get("total").copied().unwrap_or(0.0),
+                        );
+                        cost = result.cost;
+                    }
+                } else if let Some(ref model_name) = model_name {
+                    // Fall back to built-in pricing (per-1M token rates)
+                    let input_tokens = usage.get("input").cloned().unwrap_or_default();
+                    let output_tokens = usage.get("output").cloned().unwrap_or_default();
+                    if let Some((input_cost, output_cost, total_cost)) =
+                        pricing::calculate_cost(model_name, input_tokens, output_tokens)
+                    {
+                        cost.insert("input".to_string(), input_cost);
+                        cost.insert("output".to_string(), output_cost);
+                        cost.insert("total".to_string(), total_cost);
+                    }
                 }
             }
 
-            // Ensure cost has a total if it has any data
+            // Ensure cost has a total if it has any data — sum all component costs
+            // (not just input+output) so cache token costs are included.
             if !cost.contains_key("total") {
-                let input = cost.get("input").cloned().unwrap_or_default();
-                let output = cost.get("output").cloned().unwrap_or_default();
-                let total = input + output;
-                cost.insert("total".to_string(), total);
+                let total: f64 = cost
+                    .iter()
+                    .filter(|(k, _)| k.as_str() != "total")
+                    .map(|(_, &v)| v)
+                    .sum();
+                if total > 0.0 {
+                    cost.insert("total".to_string(), total);
+                }
             }
         }
 
@@ -357,6 +397,26 @@ impl OtelIngestionProcessor {
                 json::json!(evaluation.evaluator.evaluator_type.as_str()),
             );
         }
+    }
+
+    /// Test-only convenience wrapper: calls `process_span_with_pricing` with no user pricing.
+    /// Never call this from production code — user-defined pricing will be silently skipped.
+    #[cfg(test)]
+    pub fn process_span(
+        &self,
+        span_attributes: &mut HashMap<String, json::Value>,
+        resource_attributes: &HashMap<String, json::Value>,
+        scope_name: Option<&str>,
+        events: &[Event],
+    ) {
+        self.process_span_with_pricing(
+            span_attributes,
+            resource_attributes,
+            scope_name,
+            events,
+            &[],
+            0,
+        );
     }
 }
 
@@ -885,5 +945,143 @@ mod tests {
         assert!(input_cost > 0.0);
         assert!(output_cost > 0.0);
         assert!(total_cost > 0.0);
+    }
+
+    #[test]
+    fn test_process_span_with_user_defined_pricing() {
+        use config::meta::model_pricing::{ModelPricingDefinition, PricingTierDefinition};
+
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("my-custom-model-v1"),
+        );
+        span_attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(1000));
+        span_attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(500));
+        span_attrs.insert(
+            "gen_ai.input.messages".to_string(),
+            json::json!("[{\"role\":\"user\",\"content\":\"hello\"}]"),
+        );
+        span_attrs.insert(
+            "gen_ai.output.messages".to_string(),
+            json::json!("[{\"role\":\"assistant\",\"content\":\"hi\"}]"),
+        );
+
+        let resource_attrs = HashMap::new();
+        let events = vec![];
+
+        // Create user-defined pricing entries with per-token prices
+        // $5/1M input = 0.000005 per token, $20/1M output = 0.00002 per token
+        let pricing_entries = vec![CachedModelPricing {
+            definition: ModelPricingDefinition {
+                name: "My Custom Model".to_string(),
+                match_pattern: "(?i)^my-custom-model".to_string(),
+                enabled: true,
+                tiers: vec![PricingTierDefinition {
+                    name: "Default".to_string(),
+                    condition: None,
+                    prices: std::collections::HashMap::from([
+                        ("input".to_string(), 0.000005),
+                        ("output".to_string(), 0.00002),
+                    ]),
+                }],
+                ..Default::default()
+            },
+            compiled_regex: regex::Regex::new("(?i)^my-custom-model").unwrap(),
+        }];
+
+        processor.process_span_with_pricing(
+            &mut span_attrs,
+            &resource_attrs,
+            None,
+            &events,
+            &pricing_entries,
+            0,
+        );
+
+        // Cost should be calculated using user-defined pricing
+        assert!(span_attrs.contains_key(O2Attributes::COST_DETAILS));
+        let cost = span_attrs.get(O2Attributes::COST_DETAILS).unwrap();
+        let input_cost = cost.get("input").and_then(|v| v.as_f64()).unwrap();
+        let output_cost = cost.get("output").and_then(|v| v.as_f64()).unwrap();
+        let total_cost = cost.get("total").and_then(|v| v.as_f64()).unwrap();
+
+        // 1000 tokens * $0.000005 = $0.005
+        assert!((input_cost - 0.005).abs() < 1e-10);
+        // 500 tokens * $0.00002 = $0.01
+        assert!((output_cost - 0.01).abs() < 1e-10);
+        assert!((total_cost - 0.015).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_process_span_user_pricing_takes_priority_over_builtin() {
+        use config::meta::model_pricing::{ModelPricingDefinition, PricingTierDefinition};
+
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        // gpt-4o has built-in pricing ($2.50/$10.00 per 1M)
+        span_attrs.insert("gen_ai.request.model".to_string(), json::json!("gpt-4o"));
+        span_attrs.insert(
+            "gen_ai.usage.input_tokens".to_string(),
+            json::json!(1_000_000),
+        );
+        span_attrs.insert(
+            "gen_ai.usage.output_tokens".to_string(),
+            json::json!(1_000_000),
+        );
+        span_attrs.insert(
+            "gen_ai.input.messages".to_string(),
+            json::json!("[{\"role\":\"user\",\"content\":\"hello\"}]"),
+        );
+        span_attrs.insert(
+            "gen_ai.output.messages".to_string(),
+            json::json!("[{\"role\":\"assistant\",\"content\":\"hi\"}]"),
+        );
+
+        let resource_attrs = HashMap::new();
+        let events = vec![];
+
+        // Override gpt-4o pricing with custom per-token prices: $1/1M input, $2/1M output
+        let pricing_entries = vec![CachedModelPricing {
+            definition: ModelPricingDefinition {
+                name: "Custom GPT-4o".to_string(),
+                match_pattern: "(?i)^gpt-4o".to_string(),
+                enabled: true,
+                tiers: vec![PricingTierDefinition {
+                    name: "Default".to_string(),
+                    condition: None,
+                    prices: std::collections::HashMap::from([
+                        ("input".to_string(), 0.000001),  // $1/1M
+                        ("output".to_string(), 0.000002), // $2/1M
+                    ]),
+                }],
+                ..Default::default()
+            },
+            compiled_regex: regex::Regex::new("(?i)^gpt-4o").unwrap(),
+        }];
+
+        processor.process_span_with_pricing(
+            &mut span_attrs,
+            &resource_attrs,
+            None,
+            &events,
+            &pricing_entries,
+            0,
+        );
+
+        let cost = span_attrs.get(O2Attributes::COST_DETAILS).unwrap();
+        let input_cost = cost.get("input").and_then(|v| v.as_f64()).unwrap();
+        let output_cost = cost.get("output").and_then(|v| v.as_f64()).unwrap();
+
+        // Should use custom pricing, not built-in
+        // 1M * $0.000001 = $1.00 (not $2.50 from built-in)
+        assert!((input_cost - 1.0).abs() < 1e-10);
+        // 1M * $0.000002 = $2.00 (not $10.00 from built-in)
+        assert!((output_cost - 2.0).abs() < 1e-10);
     }
 }
