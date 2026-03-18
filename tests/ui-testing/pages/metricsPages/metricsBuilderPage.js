@@ -54,7 +54,7 @@ export class MetricsBuilderPage {
         const promqlBtn = this.page.locator(this.promqlModeButton);
         if (await promqlBtn.isVisible({ timeout: 3000 })) {
             await promqlBtn.click();
-            await this.page.waitForTimeout(500);
+            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -69,7 +69,7 @@ export class MetricsBuilderPage {
             const classes = await builderBtn.getAttribute('class') || '';
             if (!classes.includes('selected')) {
                 await builderBtn.click();
-                await this.page.waitForTimeout(500);
+                await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
                 // Handle confirmation dialog if it appears
                 await this.handleConfirmDialog();
@@ -88,7 +88,7 @@ export class MetricsBuilderPage {
             const classes = await customBtn.getAttribute('class') || '';
             if (!classes.includes('selected')) {
                 await customBtn.click();
-                await this.page.waitForTimeout(500);
+                await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
             }
             return true;
         }
@@ -102,7 +102,7 @@ export class MetricsBuilderPage {
         const sqlBtn = this.page.locator(this.sqlModeButton);
         if (await sqlBtn.isVisible({ timeout: 3000 })) {
             await sqlBtn.click();
-            await this.page.waitForTimeout(500);
+            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -116,7 +116,7 @@ export class MetricsBuilderPage {
             const okBtn = this.page.locator(this.confirmDialogOk).first();
             if (await okBtn.isVisible({ timeout: 2000 })) {
                 await okBtn.click();
-                await this.page.waitForTimeout(500);
+                await this.page.locator(this.confirmDialogOk).first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
                 return true;
             }
         } catch {
@@ -160,24 +160,24 @@ export class MetricsBuilderPage {
 
         // Click to focus and open dropdown
         await input.click();
-        await this.page.waitForTimeout(500);
+        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
 
         // Clear and type to filter
         await input.clear();
         await input.fill(metricName);
-        await this.page.waitForTimeout(1000);
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         // Select from dropdown options
         const option = this.page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item').filter({ hasText: metricName }).first();
         if (await option.isVisible({ timeout: 5000 })) {
             await option.click();
-            await this.page.waitForTimeout(1500);
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             return true;
         }
 
         // If no dropdown option, press Enter to confirm
         await this.page.keyboard.press('Enter');
-        await this.page.waitForTimeout(1000);
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
         return true;
     }
 
@@ -204,7 +204,7 @@ export class MetricsBuilderPage {
     async clickAddLabelFilter() {
         const addBtn = this.page.locator(this.addLabelFilterButton);
         await addBtn.click();
-        await this.page.waitForTimeout(500);
+        await this.page.locator(this.addLabelFilterButton).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
 
     /**
@@ -222,7 +222,7 @@ export class MetricsBuilderPage {
     async openLabelFilterMenu(index) {
         const filterBtn = this.getLabelFilterButton(index);
         await filterBtn.click();
-        await this.page.waitForTimeout(500);
+        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
     }
 
     /**
@@ -232,20 +232,20 @@ export class MetricsBuilderPage {
     async selectLabel(labelName) {
         const labelDropdown = this.page.locator(this.labelSelect).last();
         await labelDropdown.click();
-        await this.page.waitForTimeout(300);
+        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
 
         // Type to filter
         const input = labelDropdown.locator('input').first();
         if (await input.isVisible({ timeout: 2000 })) {
             await input.fill(labelName);
-            await this.page.waitForTimeout(1000);
+            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
         }
 
         // Select from dropdown options
         const option = this.page.locator('.q-menu .q-item').filter({ hasText: labelName }).first();
         if (await option.isVisible({ timeout: 5000 })) {
             await option.click();
-            await this.page.waitForTimeout(500);
+            await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -258,13 +258,13 @@ export class MetricsBuilderPage {
     async selectOperator(operator) {
         const operatorDropdown = this.page.locator(this.operatorSelect).last();
         await operatorDropdown.click();
-        await this.page.waitForTimeout(300);
+        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
 
         // Select from dropdown options
         const option = this.page.locator('.q-menu .q-item').filter({ hasText: operator }).first();
         if (await option.isVisible({ timeout: 3000 })) {
             await option.click();
-            await this.page.waitForTimeout(500);
+            await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -277,20 +277,20 @@ export class MetricsBuilderPage {
     async selectValue(value) {
         const valueDropdown = this.page.locator(this.valueSelect).last();
         await valueDropdown.click();
-        await this.page.waitForTimeout(300);
+        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
 
         // Type to filter
         const input = valueDropdown.locator('input').first();
         if (await input.isVisible({ timeout: 2000 })) {
             await input.fill(value);
-            await this.page.waitForTimeout(1000);
+            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
         }
 
         // Select from dropdown options
         const option = this.page.locator('.q-menu .q-item').filter({ hasText: value }).first();
         if (await option.isVisible({ timeout: 5000 })) {
             await option.click();
-            await this.page.waitForTimeout(500);
+            await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -303,7 +303,7 @@ export class MetricsBuilderPage {
     async removeLabelFilter(index) {
         const removeBtn = this.page.locator(`[data-test="promql-label-filter-remove-${index}"]`);
         await removeBtn.click();
-        await this.page.waitForTimeout(500);
+        await removeBtn.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
 
     /**
@@ -349,7 +349,7 @@ export class MetricsBuilderPage {
 
         // Close menu by pressing Escape
         await this.page.keyboard.press('Escape');
-        await this.page.waitForTimeout(300);
+        await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
     }
 
     // ===== Operations =====
@@ -360,7 +360,7 @@ export class MetricsBuilderPage {
     async clickAddOperation() {
         const addBtn = this.page.locator(this.addOperationButton);
         await addBtn.click();
-        await this.page.waitForTimeout(500);
+        await this.page.locator('.q-dialog').waitFor({ state: 'visible', timeout: 5000 });
     }
 
     /**
@@ -376,14 +376,14 @@ export class MetricsBuilderPage {
         const searchInput = dialog.locator('input').first();
         if (await searchInput.isVisible({ timeout: 2000 })) {
             await searchInput.fill(operationName);
-            await this.page.waitForTimeout(500);
+            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
         }
 
         // Click on the operation item
         const opItem = dialog.locator(`.q-item:has-text("${operationName}")`).first();
         if (await opItem.isVisible({ timeout: 3000 })) {
             await opItem.click();
-            await this.page.waitForTimeout(500);
+            await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -422,7 +422,7 @@ export class MetricsBuilderPage {
     async removeOperation(index) {
         const removeBtn = this.page.locator(`[data-test="promql-operation-remove-${index}"]`);
         await removeBtn.click();
-        await this.page.waitForTimeout(500);
+        await removeBtn.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
 
     /**
@@ -435,7 +435,7 @@ export class MetricsBuilderPage {
         // Open operation menu
         const opBtn = this.page.locator(`[data-test="promql-operation-${operationIndex}"]`);
         await opBtn.click();
-        await this.page.waitForTimeout(500);
+        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
 
         // Find and fill the parameter input
         const paramInput = this.page.locator(`[data-test="promql-operation-param-${paramIndex}"]`).last();
@@ -443,7 +443,6 @@ export class MetricsBuilderPage {
             const input = paramInput.locator('input').first();
             await input.clear();
             await input.fill(value);
-            await this.page.waitForTimeout(300);
             return true;
         }
         return false;
@@ -461,7 +460,6 @@ export class MetricsBuilderPage {
             const input = legendField.locator('input').first();
             await input.clear();
             await input.fill(legend);
-            await this.page.waitForTimeout(300);
             return true;
         }
         return false;
@@ -484,7 +482,6 @@ export class MetricsBuilderPage {
                 await input.click();
                 await input.fill(stepValue);
             }
-            await this.page.waitForTimeout(300);
             return true;
         }
         return false;
@@ -498,13 +495,13 @@ export class MetricsBuilderPage {
         const qtSelect = this.page.locator(this.queryTypeSelect);
         if (await qtSelect.isVisible({ timeout: 3000 })) {
             await qtSelect.click();
-            await this.page.waitForTimeout(300);
+            await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
 
             const label = queryType === 'range' ? 'Range' : 'Instant';
             const option = this.page.locator(`.q-menu .q-item:has-text("${label}")`).first();
             if (await option.isVisible({ timeout: 3000 })) {
                 await option.click();
-                await this.page.waitForTimeout(300);
+                await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
                 return true;
             }
         }
@@ -528,7 +525,7 @@ export class MetricsBuilderPage {
     async clickRunQuery() {
         const runBtn = this.page.locator(this.runQueryButton).first();
         await runBtn.click();
-        await this.page.waitForTimeout(2000);
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     // ===== Add to Dashboard =====
@@ -573,7 +570,6 @@ export class MetricsBuilderPage {
                 await input.click();
                 await input.fill(title);
             }
-            await this.page.waitForTimeout(300);
             return true;
         }
         return false;
@@ -586,7 +582,7 @@ export class MetricsBuilderPage {
         const cancelBtn = this.page.locator(this.dashboardCancelButton);
         if (await cancelBtn.isVisible({ timeout: 3000 })) {
             await cancelBtn.click();
-            await this.page.waitForTimeout(500);
+            await cancelBtn.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -599,7 +595,7 @@ export class MetricsBuilderPage {
         const addBtn = this.page.locator(this.dashboardAddButton);
         if (await addBtn.isVisible({ timeout: 3000 })) {
             await addBtn.click();
-            await this.page.waitForTimeout(1000);
+            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -635,8 +631,8 @@ export class MetricsBuilderPage {
      * Check if label select dropdown has options loaded
      */
     async hasLabelOptions() {
-        const options = this.page.locator('.q-menu').last().locator('.q-item');
-        const count = await options.count();
+        const menu = this.page.locator('.q-menu').filter({ has: this.page.locator('.q-item') });
+        const count = await menu.last().locator('.q-item').count();
         return count > 0;
     }
 
@@ -663,20 +659,20 @@ export class MetricsBuilderPage {
         if (!await selector.isVisible({ timeout: 5000 })) return false;
 
         await selector.click();
-        await this.page.waitForTimeout(500);
+        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
 
         // Type to filter
         const input = selector.locator('input').first();
         if (await input.isVisible({ timeout: 2000 })) {
             await input.fill(metricName);
-            await this.page.waitForTimeout(1000);
+            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
         }
 
         // Select from dropdown options
         const option = this.page.locator('.q-menu .q-item').filter({ hasText: metricName }).first();
         if (await option.isVisible({ timeout: 5000 })) {
             await option.click();
-            await this.page.waitForTimeout(1500);
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             return true;
         }
         return false;
@@ -720,7 +716,7 @@ export class MetricsBuilderPage {
         const closeBtn = dialog.locator('button:has-text("Close")');
         if (await closeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
             await closeBtn.click();
-            await this.page.waitForTimeout(300);
+            await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -803,7 +799,7 @@ export class MetricsBuilderPage {
         }
 
         // Wait for response to complete
-        await this.page.waitForTimeout(2000);
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         return decodeURIComponent(query);
     }
 
@@ -912,7 +908,7 @@ export class MetricsBuilderPage {
         const chartItem = this.page.locator(`[data-test="selected-chart-${chartType}-item"]`);
         if (await chartItem.isVisible({ timeout: 3000 }).catch(() => false)) {
             await chartItem.click();
-            await this.page.waitForTimeout(500);
+            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -948,11 +944,11 @@ export class MetricsBuilderPage {
         const folderDropdown = this.page.locator('[data-test="index-dropdown-stream_type"]');
         if (await folderDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
             await folderDropdown.click();
-            await this.page.waitForTimeout(500);
+            await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
             const option = this.page.locator('.q-menu .q-item').filter({ hasText: folderName }).first();
             if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
                 await option.click();
-                await this.page.waitForTimeout(500);
+                await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
                 return true;
             }
         }
@@ -967,19 +963,19 @@ export class MetricsBuilderPage {
         const dashDropdown = this.page.locator('[data-test="dashboard-dropdown-dashboard-selection"]');
         if (await dashDropdown.isVisible({ timeout: 5000 }).catch(() => false)) {
             await dashDropdown.click();
-            await this.page.waitForTimeout(500);
+            await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
 
             // Type to filter
             const input = dashDropdown.locator('input').first();
             if (await input.isVisible({ timeout: 2000 }).catch(() => false)) {
                 await input.fill(dashboardName);
-                await this.page.waitForTimeout(1000);
+                await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
             }
 
             const option = this.page.locator('.q-menu .q-item').filter({ hasText: dashboardName }).first();
             if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
                 await option.click();
-                await this.page.waitForTimeout(500);
+                await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
                 return true;
             }
         }
@@ -994,11 +990,11 @@ export class MetricsBuilderPage {
         const tabDropdown = this.page.locator('[data-test="dashboard-dropdown-tab-selection"]');
         if (await tabDropdown.isVisible({ timeout: 5000 }).catch(() => false)) {
             await tabDropdown.click();
-            await this.page.waitForTimeout(500);
+            await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
             const option = this.page.locator('.q-menu .q-item').filter({ hasText: tabName }).first();
             if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
                 await option.click();
-                await this.page.waitForTimeout(500);
+                await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
                 return true;
             }
         }
@@ -1038,7 +1034,7 @@ export class MetricsBuilderPage {
 
         // Click Add button to save
         await this.clickDashboardAdd();
-        await this.page.waitForTimeout(2000);
+        await this.page.locator(this.dashboardDialogTitle).waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
 
         return true;
     }
@@ -1070,7 +1066,8 @@ export class MetricsBuilderPage {
         await submitBtn.click();
 
         // Wait for the dialog to close and dashboard to be auto-selected
-        await this.page.waitForTimeout(3000);
+        await this.page.locator('[data-test="add-dashboard-name"]').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
     /**
@@ -1084,7 +1081,7 @@ export class MetricsBuilderPage {
         await dashDropdown.waitFor({ state: 'visible', timeout: 5000 });
 
         // Wait for the dashboard list API to finish loading
-        await this.page.waitForTimeout(2000);
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Check if a dashboard is already auto-selected by reading the q-select's
         // displayed value. Quasar q-select (without use-input) renders the selected
@@ -1140,13 +1137,13 @@ export class MetricsBuilderPage {
      */
     async deleteDashboard(dashboardName) {
         await this.navigateToDashboards();
-        await this.page.waitForTimeout(1000);
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Search for the dashboard
         const searchInput = this.page.locator('[data-test="dashboard-search"]');
         if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
             await searchInput.fill(dashboardName);
-            await this.page.waitForTimeout(1000);
+            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
         }
 
         // Find the row and click delete
@@ -1155,13 +1152,13 @@ export class MetricsBuilderPage {
             const deleteBtn = dashboardRow.locator('[data-test="dashboard-delete"]');
             if (await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
                 await deleteBtn.click();
-                await this.page.waitForTimeout(500);
+                await this.page.locator('[data-test="confirm-button"]').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
                 // Confirm deletion
                 const confirmBtn = this.page.locator('[data-test="confirm-button"]');
                 if (await confirmBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
                     await confirmBtn.click();
-                    await this.page.waitForTimeout(2000);
+                    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
                     return true;
                 }
             }
@@ -1185,3 +1182,4 @@ export class MetricsBuilderPage {
         return await notification.isVisible({ timeout: 3000 }).catch(() => false);
     }
 }
+
