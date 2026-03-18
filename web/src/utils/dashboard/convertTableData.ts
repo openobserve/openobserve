@@ -76,8 +76,8 @@ const lookupValueMapping = (value: any, cache: Map<any, string> | null) => {
       const [key, text] = entries[i];
       if (typeof key === 'string' && key.startsWith('__range_')) {
         const parts = key.split('_');
-        const from = parseFloat(parts[2]);
-        const to = parseFloat(parts[3]);
+        const from = parseFloat(parts[3]);
+        const to = parseFloat(parts[4]);
         if (!isNaN(from) && !isNaN(to) && value >= from && value <= to) {
           return text;
         }
