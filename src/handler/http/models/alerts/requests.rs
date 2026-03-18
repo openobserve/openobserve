@@ -97,7 +97,6 @@ pub struct AnomalyAlertFields {
     pub rcf_tree_size: Option<i32>,
     pub rcf_shingle_size: Option<i32>,
     pub alert_enabled: Option<bool>,
-    pub alert_destination_id: Option<String>,
 }
 
 /// HTTP request body for `UpdateAlert` endpoint.
@@ -138,7 +137,6 @@ pub struct UpdateAnomalyAlertFields {
     pub retrain_interval_days: Option<i32>,
     pub percentile: Option<f64>,
     pub alert_enabled: Option<bool>,
-    pub alert_destination_id: Option<String>,
     pub enabled: Option<bool>,
     pub folder_id: Option<String>,
     pub owner: Option<String>,
