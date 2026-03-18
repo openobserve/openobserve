@@ -977,20 +977,13 @@ export default defineComponent({
       document.addEventListener('click', handleClickOutside, true);
     });
 
-    onBeforeUnmount(() => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('click', handleClickOutside, true);
-    });
-
-    const activeFolderToMove = ref("default");
-
     // Show anomaly detection only when the backend is an enterprise or cloud build.
     // The frontend build flag alone is not sufficient — an enterprise UI can be
     // pointed at an OSS backend which does not have the feature.
     const isAnomalyDetectionEnabled = computed(
       () =>
         store.state.zoConfig.build_type !== "opensource" &&
-        config.isEnterprise === "true" && 
+        config.isEnterprise === "true" &&
         config.isCloud === "false",
     );
 
@@ -1002,6 +995,59 @@ export default defineComponent({
         ? "all"
         : rawTab,
     );
+
+    const filteredResults: Ref<any[]> = ref([]);
+
+    // ── Anomaly polling ──────────────────────────────────────────────────────
+    // Statuses that mean the anomaly job is done — no need to keep polling
+    const ANOMALY_TERMINAL_STATUSES = ["failed", "active", "completed"];
+
+    const hasNonTerminalAnomalyRows = computed(
+      () =>
+        activeTab.value === "anomalyDetection" &&
+        filteredResults.value.some(
+          (row: any) =>
+            row.type === "anomaly" &&
+            !ANOMALY_TERMINAL_STATUSES.includes(row.status),
+        ),
+    );
+
+    let anomalyPollingTimer: ReturnType<typeof setInterval> | null = null;
+
+    const stopAnomalyPolling = () => {
+      if (anomalyPollingTimer !== null) {
+        clearInterval(anomalyPollingTimer);
+        anomalyPollingTimer = null;
+      }
+    };
+
+    const startAnomalyPolling = () => {
+      if (anomalyPollingTimer !== null) return; // already running
+      anomalyPollingTimer = setInterval(async () => {
+        if (!hasNonTerminalAnomalyRows.value) {
+          stopAnomalyPolling();
+          return;
+        }
+        await getAlertsFn(store, activeFolderId.value);
+      }, 10000);
+    };
+
+    watch(hasNonTerminalAnomalyRows, (hasNonTerminal) => {
+      if (hasNonTerminal) {
+        startAnomalyPolling();
+      } else {
+        stopAnomalyPolling();
+      }
+    });
+    // ── End anomaly polling ──────────────────────────────────────────────────
+
+    onBeforeUnmount(() => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('click', handleClickOutside, true);
+      stopAnomalyPolling();
+    });
+
+    const activeFolderToMove = ref("default");
 
     // Tabs for alerts view
     const alertTabs = computed(() => {
@@ -1144,7 +1190,6 @@ export default defineComponent({
     const searchQuery = ref<any>("");
     const filterQuery = ref<any>("");
     const searchAcrossFolders = ref<any>(false);
-    const filteredResults: Ref<any[]> = ref([]);
     const selectedAlertToMove: Ref<any[]> = ref([]);
     const selectedAnomalyConfigsToMove: Ref<any[]> = ref([]);
     const folderIdToBeCloned = ref<any>(router.currentRoute.value.query.folder ?? "default");
@@ -1801,14 +1846,15 @@ export default defineComponent({
       }
 
     };
-    const refreshList = async (folderId: string) => {
+    const refreshList = async (folderId?: string) => {
       //here we are fetching the alerts from the server because after creating the alert we should get the latest alerts
       //and then we are setting the activeFolderId to the folderId
       //this is done to avoid multiple api calls , when we assign the folderId before fetching it will trigger the watch and it will fetch the alerts again
       //and we dont need to fetch the alerts again because we are already fetching the alerts in the getAlertsFn
-      await getAlertsFn(store, folderId);
+      const resolvedFolderId = folderId || activeFolderId.value || "default";
+      await getAlertsFn(store, resolvedFolderId);
       await hideForm();
-      activeFolderId.value = folderId;
+      activeFolderId.value = resolvedFolderId;
     };
     const hideForm = async () => {
       showAddAlertDialog.value = false;
@@ -2053,6 +2099,9 @@ export default defineComponent({
           message: t("alerts.alertTriggeredSuccess"),
           timeout: 2000,
         });
+        if (row.type === "anomaly") {
+          await getAlertsFn(store, activeFolderId.value);
+        }
       } catch (error: any) {
         $q.notify({
           type: "negative",
@@ -2073,6 +2122,7 @@ export default defineComponent({
           message: "Retraining triggered",
           timeout: 2000,
         });
+        await getAlertsFn(store, activeFolderId.value);
       } catch (error: any) {
         $q.notify({
           type: "negative",
