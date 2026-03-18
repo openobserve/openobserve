@@ -520,6 +520,10 @@ pub async fn delete_config(org_id: &str, anomaly_id: &str) -> Result<()> {
         }
     }
 
+    // Delete stored model files and clear cache (enterprise only).
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::anomaly_detection::delete_config_models(org_id, anomaly_id).await;
+
     Ok(())
 }
 

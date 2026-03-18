@@ -16,13 +16,14 @@
 //! Adds folder_id, owner, and alert_destinations columns to the
 //! anomaly_detection_config table and removes the old alert_destination_id column.
 //!
-//! - folder_id (varchar 256): stores the folders.id PK (same FK as alerts table).
-//!   Existing rows are backfilled from the "default" folder for each org.
+//! - folder_id (varchar 256): stores the folders.id PK (same FK as alerts table). Existing rows are
+//!   backfilled from the "default" folder for each org.
 //! - owner (varchar 256): nullable, attributed owner of the config.
-//! - alert_destinations (text): JSON array of destination names, replacing the
-//!   old single-value alert_destination_id column. Existing rows are migrated
-//!   by wrapping the old value in a JSON array.
+//! - alert_destinations (text): JSON array of destination names, replacing the old single-value
+//!   alert_destination_id column. Existing rows are migrated by wrapping the old value in a JSON
+//!   array.
 
+use sea_orm::{ConnectionTrait, Statement};
 use sea_orm_migration::prelude::*;
 
 const ANOMALY_CONFIG_FOLDER_ID_IDX: &str = "idx_anomaly_config_folder_id";
@@ -70,7 +71,7 @@ impl MigrationTrait for Migration {
                         .table(AnomalyDetectionConfig::Table)
                         .add_column_if_not_exists(
                             ColumnDef::new(AnomalyDetectionConfig::AlertDestinations)
-                                .text()
+                                .json_binary()
                                 .null(),
                         )
                         .to_owned(),
@@ -94,7 +95,7 @@ impl MigrationTrait for Migration {
                         )
                         .add_column_if_not_exists(
                             ColumnDef::new(AnomalyDetectionConfig::AlertDestinations)
-                                .text()
+                                .json_binary()
                                 .null(),
                         )
                         .to_owned(),
@@ -117,38 +118,79 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Migrate alert_destination_id → alert_destinations JSON array.
-        let migrate_sql = match db_backend {
+        // Check if alert_destination_id still exists. A prior failed run may have already
+        // dropped it, and running any SQL that references it would abort the transaction.
+        let check_sql = match db_backend {
             sea_orm::DbBackend::Sqlite => {
-                "UPDATE anomaly_detection_config \
-                 SET alert_destinations = json_array(alert_destination_id) \
-                 WHERE alert_destination_id IS NOT NULL AND alert_destinations IS NULL"
+                "SELECT COUNT(*) AS cnt FROM pragma_table_info('anomaly_detection_config') \
+                 WHERE name = 'alert_destination_id'"
             }
             sea_orm::DbBackend::Postgres => {
-                "UPDATE anomaly_detection_config \
-                 SET alert_destinations = json_build_array(alert_destination_id)::text \
-                 WHERE alert_destination_id IS NOT NULL AND alert_destinations IS NULL"
+                "SELECT COUNT(*) AS cnt FROM information_schema.columns \
+                 WHERE table_name = 'anomaly_detection_config' \
+                 AND column_name = 'alert_destination_id'"
             }
             sea_orm::DbBackend::MySql => {
-                "UPDATE anomaly_detection_config \
-                 SET alert_destinations = JSON_ARRAY(alert_destination_id) \
-                 WHERE alert_destination_id IS NOT NULL AND alert_destinations IS NULL"
+                "SELECT COUNT(*) AS cnt FROM information_schema.columns \
+                 WHERE table_name = 'anomaly_detection_config' \
+                 AND column_name = 'alert_destination_id' \
+                 AND table_schema = DATABASE()"
             }
         };
-        manager
+        let row = manager
             .get_connection()
-            .execute_unprepared(migrate_sql)
+            .query_one(Statement::from_string(db_backend, check_sql))
             .await?;
+        let old_col_exists = row
+            .map(|r| r.try_get::<i64>("", "cnt").unwrap_or(0) > 0)
+            .unwrap_or(false);
 
-        // Drop the old single-destination column.
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(AnomalyDetectionConfig::Table)
-                    .drop_column(AnomalyDetectionConfig::AlertDestinationId)
-                    .to_owned(),
-            )
-            .await?;
+        if old_col_exists {
+            // Migrate alert_destination_id → alert_destinations JSON array.
+            let migrate_sql = match db_backend {
+                sea_orm::DbBackend::Sqlite => {
+                    "UPDATE anomaly_detection_config \
+                     SET alert_destinations = json_array(alert_destination_id) \
+                     WHERE alert_destination_id IS NOT NULL AND alert_destinations IS NULL"
+                }
+                sea_orm::DbBackend::Postgres => {
+                    "UPDATE anomaly_detection_config \
+                     SET alert_destinations = json_build_array(alert_destination_id) \
+                     WHERE alert_destination_id IS NOT NULL AND alert_destinations IS NULL"
+                }
+                sea_orm::DbBackend::MySql => {
+                    "UPDATE anomaly_detection_config \
+                     SET alert_destinations = JSON_ARRAY(alert_destination_id) \
+                     WHERE alert_destination_id IS NOT NULL AND alert_destinations IS NULL"
+                }
+            };
+            manager
+                .get_connection()
+                .execute_unprepared(migrate_sql)
+                .await?;
+
+            // Drop the old column.
+            match db_backend {
+                sea_orm::DbBackend::Sqlite => {
+                    manager
+                        .get_connection()
+                        .execute_unprepared(
+                            "ALTER TABLE anomaly_detection_config \
+                             DROP COLUMN alert_destination_id",
+                        )
+                        .await?;
+                }
+                sea_orm::DbBackend::Postgres | sea_orm::DbBackend::MySql => {
+                    manager
+                        .get_connection()
+                        .execute_unprepared(
+                            "ALTER TABLE anomaly_detection_config \
+                             DROP COLUMN IF EXISTS alert_destination_id",
+                        )
+                        .await?;
+                }
+            }
+        }
 
         // Index on folder_id for fast folder-based filtering.
         manager
@@ -194,7 +236,7 @@ impl MigrationTrait for Migration {
             }
             sea_orm::DbBackend::Postgres => {
                 "UPDATE anomaly_detection_config \
-                 SET alert_destination_id = alert_destinations::json->>0 \
+                 SET alert_destination_id = alert_destinations->>0 \
                  WHERE alert_destinations IS NOT NULL"
             }
             sea_orm::DbBackend::MySql => {
