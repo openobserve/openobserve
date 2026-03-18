@@ -30,28 +30,24 @@ export interface ServiceStreams {
 export interface ServiceMetadata {
   service_name: string;
   dimensions: Record<string, string>;
+  disambiguation?: Record<string, string>;
   streams: ServiceStreams;
   first_seen: number;
   last_seen: number;
   metadata?: Record<string, string>;
 }
 
-export interface SemanticFieldGroup {
+export interface FieldAlias {
   id: string;
   display: string;
   fields: string[];
-  normalize?: boolean;
   group?: string;
-  /** Whether this dimension is stable (persists across pod restarts, deployments, etc.)
-   * Stable dimensions: cluster, namespace, deployment, statefulset
-   * Unstable dimensions: pod-id, pod-start-time, container-id, node-id
-   * Used for correlation - unstable dimension mismatches are ignored */
-  is_stable?: boolean;
 }
 
 export interface StreamInfo {
   stream_name: string;
-  filters: Record<string, string>;
+  stream_type: string;
+  filters: Record<string, string>; // actual field names resolved per-stream by backend
 }
 
 export interface RelatedStreams {
@@ -71,6 +67,8 @@ export interface CorrelationResponse {
   matched_dimensions: Record<string, string>;
   additional_dimensions: Record<string, string>;
   related_streams: RelatedStreams;
+  /** The identity set selected by best-coverage resolution, if available. */
+  matched_set_id?: string;
 }
 
 export type CardinalityClass = "VeryLow" | "Low" | "Medium" | "High" | "VeryHigh";
@@ -82,7 +80,22 @@ export interface DimensionAnalytics {
   service_count: number;
   first_seen: number;
   last_updated: number;
-  sample_values: string[];
+  /** sample_values[stream_type][stream_name] = unique values */
+  sample_values: Record<string, Record<string, string[]>>;
+  /** value_children[this_dim_value][other_dim_name] = co-occurring values */
+  value_children: Record<string, Record<string, string[]>>;
+  /** value_counts[this_dim_value] = number of services with this specific value */
+  value_counts?: Record<string, number>;
+}
+
+export interface FoundGroup {
+  group_id: string;
+  display: string;
+  stream_types: string[];
+  aliases: Record<string, string>;
+  recommended: boolean;
+  unique_values?: number;
+  cardinality_class?: CardinalityClass;
 }
 
 export interface DimensionAnalyticsSummary {
@@ -91,48 +104,20 @@ export interface DimensionAnalyticsSummary {
   by_cardinality: Record<string, string[]>;
   recommended_priority_dimensions: string[];
   dimensions: DimensionAnalytics[];
+  available_groups: FoundGroup[];
   generated_at: number;
-}
-
-// Types for grouped services API
-export interface ServiceStreamsInfo {
-  logs: string[];
-  traces: string[];
-  metrics: string[];
-}
-
-export interface ServiceInGroup {
-  service_name: string;
-  derived_from: string;
-  streams: ServiceStreamsInfo;
-  dimensions: Record<string, string>;
-}
-
-export interface StreamSummary {
-  logs_count: number;
-  traces_count: number;
-  metrics_count: number;
-  has_full_correlation: boolean;
-}
-
-export interface ServiceFqnGroup {
-  fqn: string;
-  services: ServiceInGroup[];
-  stream_summary: StreamSummary;
-}
-
-export interface GroupedServicesResponse {
-  groups: ServiceFqnGroup[];
-  total_fqns: number;
-  total_services: number;
 }
 
 /**
  * Get semantic field groups for field name translation
  * Uses the existing alerts/deduplication/semantic-groups API
  */
-export const getSemanticGroups = (org_identifier: string): Promise<{ data: SemanticFieldGroup[] }> => {
+export const getSemanticGroups = (org_identifier: string): Promise<{ data: FieldAlias[] }> => {
   return http().get(`/api/${org_identifier}/alerts/deduplication/semantic-groups`);
+};
+
+export const updateSemanticGroups = (org_identifier: string, groups: FieldAlias[]): Promise<any> => {
+  return http().put(`/api/${org_identifier}/alerts/deduplication/semantic-groups`, groups);
 };
 
 /**
@@ -171,26 +156,64 @@ export const getDimensionAnalytics = (
   return http().get(`/api/${org_identifier}/service_streams/_analytics`);
 };
 
+
 /**
- * Get services grouped by their FQN (Fully Qualified Name)
+ * Get flat list of services
  *
- * Returns services organized by their correlation FQN, showing:
- * - Which services share the same FQN (correlated together)
- * - Stream counts per group (logs/traces/metrics)
- * - Whether each group has full telemetry coverage
- *
- * @param org_identifier Organization ID
- * @returns Grouped services response
+ * @param orgIdentifier Organization ID
+ * @returns Flat list of services
  */
-export const getGroupedServices = (
-  org_identifier: string
-): Promise<{ data: GroupedServicesResponse }> => {
-  return http().get(`/api/${org_identifier}/service_streams/_grouped`);
+export const getServicesList = (
+  orgIdentifier: string
+): Promise<{ data: any }> => {
+  return http().get(`/api/${orgIdentifier}/service_streams`);
+};
+
+export interface IdentitySet {
+  /** Semantic category slug: "k8s", "aws", "gcp", "azure", or a custom slug. */
+  id: string;
+  /** Human-readable display name, e.g. "Kubernetes". */
+  label: string;
+  /** Semantic group IDs used for disambiguation (1–5). */
+  distinguish_by: string[];
+}
+
+export interface ServiceIdentityConfig {
+  sets: IdentitySet[];
+}
+
+/**
+ * Save service identity configuration
+ *
+ * @param orgIdentifier Organization ID
+ * @param config Identity config payload
+ * @returns Save response
+ */
+export const saveIdentityConfig = (
+  orgIdentifier: string,
+  config: ServiceIdentityConfig
+): Promise<{ data: any }> => {
+  return http().put(`/api/${orgIdentifier}/service_streams/config/identity`, config);
+};
+
+/**
+ * Get service identity configuration
+ *
+ * @param orgIdentifier Organization ID
+ * @returns Identity config
+ */
+export const getIdentityConfig = (
+  orgIdentifier: string
+): Promise<{ data: ServiceIdentityConfig }> => {
+  return http().get(`/api/${orgIdentifier}/service_streams/config/identity`);
 };
 
 export default {
   getSemanticGroups,
+  updateSemanticGroups,
   correlate,
   getDimensionAnalytics,
-  getGroupedServices,
+  getServicesList,
+  saveIdentityConfig,
+  getIdentityConfig,
 };

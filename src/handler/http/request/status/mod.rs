@@ -430,12 +430,7 @@ pub async fn zo_config() -> impl IntoResponse {
         incidents_enabled,
         service_streams_enabled,
         anomaly_detection_enabled,
-        fqn_priority_dimensions: enterprise_value!(
-            vec![],
-            o2_enterprise::enterprise::common::config::get_config()
-                .service_streams
-                .get_fqn_priority_dimensions()
-        ),
+        fqn_priority_dimensions: enterprise_value!(vec![], vec![]),
         enable_cross_linking: cfg.common.enable_cross_linking,
         field_values_for_fst: cfg.common.field_values_for_fst,
     })

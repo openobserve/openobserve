@@ -15,27 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full">
-    <div class="q-px-md q-py-md">
-      <div class="general-page-title">
-        {{ t("settings.correlation.title") }}
+  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-hidden">
+    <!-- Sticky header: title + tabs -->
+    <div class="tw:shrink-0 tw:bg-[var(--o2-card-bg)]">
+      <div class="q-px-md q-py-md">
+        <div class="general-page-title">
+          {{ t("settings.correlation.title") }}
+        </div>
+        <div class="general-page-subtitle">
+          {{ t("settings.correlation.subtitle") }}
+        </div>
       </div>
-      <div class="general-page-subtitle">
-        {{ t("settings.correlation.subtitle") }}
-      </div>
-    </div>
-
-    <div class="tw:px-4">
-      <div class="flex justify-start">
+      <div class="tw:px-4 tw:flex tw:justify-start">
         <q-tabs v-model="activeTab" inline-label dense @update:model-value="onTabChange">
           <q-tab
-            name="identity"
-            :label="t('settings.correlation.serviceIdentityTab')"
-            no-caps
-          />
-          <q-tab
-            name="services"
-            :label="t('settings.correlation.discoveredServicesTab')"
+            name="discovery"
+            :label="t('settings.correlation.serviceDiscoveryTab')"
             no-caps
           />
           <q-tab
@@ -43,71 +38,173 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('settings.correlation.alertCorrelationTab')"
             no-caps
           />
+          <q-tab
+            name="field-aliases"
+            :label="t('settings.correlation.fieldAliasesTab')"
+            no-caps
+          />
         </q-tabs>
       </div>
+    </div>
 
-      <div class="tw:overflow-hidden">
-        <ServiceIdentityConfig
-          v-if="activeTab === 'identity'"
-          :org-id="store.state.selectedOrganization.identifier"
-          :config="store.state.organizationSettings?.deduplication_config"
-          @saved="onCorrelationSettingsSaved"
+    <!-- Scrollable content -->
+    <div class="tw:flex-1 tw:overflow-y-auto tw:px-4 tw:py-4">
+      <div v-if="activeTab === 'discovery'">
+        <ServiceIdentitySetup
+          :org-identifier="store.state.selectedOrganization.identifier"
+          @navigate-to-aliases="onNavigateToAliases"
         />
-
-        <DiscoveredServices v-if="activeTab === 'services'" />
-
-        <OrganizationDeduplicationSettings
-          v-if="activeTab === 'alert-correlation'"
-          :org-id="store.state.selectedOrganization.identifier"
-          :config="store.state.organizationSettings?.deduplication_config"
-          @saved="onCorrelationSettingsSaved"
-        />
+        <q-separator class="tw:my-6" />
+        <DiscoveredServices />
       </div>
+
+      <OrganizationDeduplicationSettings
+        v-if="activeTab === 'alert-correlation'"
+        :org-id="store.state.selectedOrganization.identifier"
+        :config="store.state.organizationSettings?.deduplication_config"
+        @saved="onCorrelationSettingsSaved"
+      />
+
+      <SemanticFieldGroupsConfig
+        v-if="activeTab === 'field-aliases'"
+        :semantic-field-groups="semanticGroups"
+        :scroll-to-group-id="aliasScrollToGroup"
+        @update:semantic-field-groups="onSaveSemanticGroups"
+      />
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from "vue";
+import { defineComponent, ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
+import { useRouter, useRoute } from "vue-router";
 import OrganizationDeduplicationSettings from "@/components/alerts/OrganizationDeduplicationSettings.vue";
 import DiscoveredServices from "@/components/settings/DiscoveredServices.vue";
-import ServiceIdentityConfig from "@/components/settings/ServiceIdentityConfig.vue";
+import ServiceIdentitySetup from "@/components/settings/ServiceIdentitySetup.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
+import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
+import serviceStreamsService from "@/services/service_streams";
 
 export default defineComponent({
   name: "CorrelationSettings",
   components: {
     OrganizationDeduplicationSettings,
     DiscoveredServices,
-    ServiceIdentityConfig,
+    ServiceIdentitySetup,
     AppTabs,
+    SemanticFieldGroupsConfig,
   },
   setup() {
     const store = useStore();
     const q = useQuasar();
     const { t } = useI18n();
-    const activeTab = ref("identity");
+    const router = useRouter();
+    const route = useRoute();
+
+    // URL slug ↔ internal tab name
+    const slugToTab: Record<string, string> = {
+      "service-discovery": "discovery",
+      "alert-correlation": "alert-correlation",
+      "field-aliases": "field-aliases",
+    };
+    const tabToSlug: Record<string, string> = {
+      "discovery": "service-discovery",
+      "alert-correlation": "alert-correlation",
+      "field-aliases": "field-aliases",
+    };
+
+    const initialSlug = route.params.tab as string;
+    const activeTab = ref(slugToTab[initialSlug] ?? "discovery");
+    const aliasScrollToGroup = ref<string | undefined>(
+      route.query.group as string | undefined
+    );
+
+    const semanticGroups = ref<any[]>([]);
+
+    const loadSemanticGroups = async () => {
+      try {
+        const orgId = store.state.selectedOrganization.identifier;
+        const res = await serviceStreamsService.getSemanticGroups(orgId);
+        semanticGroups.value = res.data ?? [];
+      } catch (_) {
+        semanticGroups.value = [];
+      }
+    };
+
+    onMounted(loadSemanticGroups);
+
+    // Keep URL in sync when route changes externally (e.g. browser back/forward)
+    watch(
+      () => route.params.tab,
+      (slug) => {
+        const tab = slugToTab[slug as string] ?? "discovery";
+        if (tab !== activeTab.value) activeTab.value = tab;
+        aliasScrollToGroup.value = route.query.group as string | undefined;
+      }
+    );
+
+    // Clear the group deep-link after the scroll + blink animation completes,
+    // so revisiting the tab doesn't re-trigger the highlight.
+    watch(activeTab, (tab) => {
+      if (tab === "field-aliases" && route.query.group) {
+        setTimeout(() => {
+          aliasScrollToGroup.value = undefined;
+          const { group: _g, ...rest } = route.query;
+          router.replace({
+            name: "correlationSettings",
+            params: { tab: "field-aliases" },
+            query: rest,
+          });
+        }, 1800);
+      }
+    });
 
     const tabs = computed(() => [
       {
-        label: t("settings.correlation.serviceIdentityTab"),
-        value: "identity",
-      },
-      {
-        label: t("settings.correlation.discoveredServicesTab"),
-        value: "services",
+        label: t("settings.correlation.serviceDiscoveryTab"),
+        value: "discovery",
       },
       {
         label: t("settings.correlation.alertCorrelationTab"),
         value: "alert-correlation",
       },
+      {
+        label: t("settings.correlation.fieldAliasesTab"),
+        value: "field-aliases",
+      },
     ]);
 
     const onTabChange = (tab: string) => {
       activeTab.value = tab;
+      router.push({
+        name: "correlationSettings",
+        params: { tab: tabToSlug[tab] ?? tab },
+        query: route.query,
+      });
+    };
+
+    const onNavigateToAliases = (groupId: string) => {
+      aliasScrollToGroup.value = groupId;
+      activeTab.value = "field-aliases";
+      router.push({
+        name: "correlationSettings",
+        params: { tab: "field-aliases" },
+        query: { ...route.query, group: groupId },
+      });
+    };
+
+    const onSaveSemanticGroups = async (groups: any[]) => {
+      try {
+        const orgId = store.state.selectedOrganization.identifier;
+        await serviceStreamsService.updateSemanticGroups(orgId, groups);
+        semanticGroups.value = groups;
+        q.notify({ type: "positive", message: t("settings.correlation.fieldAliasesSaved") });
+      } catch (_) {
+        q.notify({ type: "negative", message: t("settings.correlation.fieldAliasesSaveError") });
+      }
     };
 
     const onCorrelationSettingsSaved = () => {
@@ -118,9 +215,13 @@ export default defineComponent({
     return {
       store,
       activeTab,
+      aliasScrollToGroup,
       tabs,
       onTabChange,
       onCorrelationSettingsSaved,
+      onNavigateToAliases,
+      onSaveSemanticGroups,
+      semanticGroups,
       t,
     };
   },

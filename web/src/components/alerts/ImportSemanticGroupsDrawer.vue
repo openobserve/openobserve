@@ -309,14 +309,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ field }}
         </q-chip>
-        <div class="q-mt-md">
-          <q-badge
-            v-if="selectedGroup?.normalize"
-            color="blue"
-            label="Normalized"
-          />
-          <q-badge v-else color="grey" label="Not Normalized" />
-        </div>
       </q-card-section>
 
       <q-card-actions align="right">
@@ -398,9 +390,6 @@ interface SemanticGroup {
   display: string;
   group?: string;
   fields: string[];
-  normalize: boolean;
-  is_stable?: boolean;
-  is_scope?: boolean;
 }
 
 interface SemanticGroupModification {

@@ -1,11 +1,11 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// This program is distributed in the hope that it will be useful,
+// This program is distributed in the hope that it will be useful
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
@@ -13,9 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+//! Service Streams Table — v2 schema
+//!
+//! Stores service registry entries. Keyed by (org_id, service_name, disambiguation).
+//! `disambiguation` is a JSONB object of distinguish_by field values.
+//! Streams are split into three typed columns.
+
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, QueryFilter, Schema, Set,
-    entity::prelude::*,
+    entity::prelude::*, sea_query::Expr,
 };
 use serde::{Deserialize, Serialize};
 use svix_ksuid::KsuidLike;
@@ -26,18 +32,10 @@ use crate::{
     errors::{self, DbError, Error},
 };
 
-/// Service Streams Table
-///
-/// Stores services with their metadata, dimensions, and associated streams.
-/// Primary key: id (KSUID)
-/// Unique index: (org_id, service_key)
-///
-/// service_key format: "service_name?dimension1=value1&dimension2=value2"
-/// Example: "api-server?environment=production&host=server01"
+/// Service Streams Table — v2 ORM entity
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "service_streams")]
 pub struct Model {
-    /// 27-character human readable KSUID
     #[sea_orm(
         primary_key,
         column_type = "String(StringLen::N(27))",
@@ -48,35 +46,39 @@ pub struct Model {
     #[sea_orm(column_type = "String(StringLen::N(128))")]
     pub org_id: String,
 
-    #[sea_orm(column_type = "String(StringLen::N(512))")]
-    pub service_key: String,
-
-    /// Correlation key (hash of stable dimensions only)
-    /// Used as the primary identity for grouping services and preventing DB explosion
-    #[sea_orm(column_type = "String(StringLen::N(64))", default_value = "")]
-    pub correlation_key: String,
-
-    /// Service name (e.g., "api-server", "web-server")
     #[sea_orm(column_type = "String(StringLen::N(256))")]
     pub service_name: String,
 
-    /// Dimensions as JSON: {"environment": "production", "version": "1.0"}
-    #[sea_orm(column_type = "Text")]
-    pub dimensions: String,
+    /// Identity set that produced this service record.
+    /// E.g. "k8s", "aws", "gcp", "azure", "default".
+    #[sea_orm(column_type = "String(StringLen::N(64))")]
+    pub set_id: String,
 
-    /// Streams as JSON: {"logs": [...], "metrics": [...], "traces": [...]}
-    #[sea_orm(column_type = "Text")]
-    pub streams: String,
+    /// JSONB: distinguish_by field values. Keys are field alias group IDs.
+    /// E.g., {"k8s-cluster": "prod", "k8s-namespace": "default"}
+    #[sea_orm(column_type = "Json")]
+    pub disambiguation: Json,
 
-    /// When this service was first discovered (microseconds since epoch)
-    pub first_seen: i64,
+    /// JSONB: all semantic dimensions extracted from the telemetry record.
+    /// Superset of `disambiguation` — every field the processor mapped to a semantic group.
+    /// Used by analytics to compute cardinality and co-occurrence without requiring
+    /// disambiguation to be configured first.
+    #[sea_orm(column_type = "Json")]
+    pub all_dimensions: Json,
 
-    /// When this service was last seen (microseconds since epoch)
+    /// JSONB array of log stream names
+    #[sea_orm(column_type = "Json")]
+    pub logs_streams: Json,
+
+    /// JSONB array of trace stream names
+    #[sea_orm(column_type = "Json")]
+    pub traces_streams: Json,
+
+    /// JSONB array of metric stream names
+    #[sea_orm(column_type = "Json")]
+    pub metrics_streams: Json,
+
     pub last_seen: i64,
-
-    /// Additional metadata as JSON (optional)
-    #[sea_orm(column_type = "Text", nullable)]
-    pub metadata: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter)]
@@ -90,43 +92,45 @@ impl RelationTrait for Relation {
 
 impl ActiveModelBehavior for ActiveModel {}
 
-/// Service record for cross-region synchronization.
-/// Clone is required for super-cluster queue message serialization.
+/// Service record returned from DB queries (v2 schema).
 #[derive(FromQueryResult, Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceRecord {
+    pub id: String,
     pub org_id: String,
-    pub service_key: String,
-    pub correlation_key: String,
     pub service_name: String,
-    pub dimensions: String,
-    pub streams: String,
-    pub first_seen: i64,
+    /// Identity set that produced this service record (e.g. "k8s", "aws").
+    pub set_id: String,
+    /// JSONB: distinguish_by values. Keys = field alias group IDs.
+    pub disambiguation: serde_json::Value,
+    /// JSONB: all semantic dimensions extracted from the telemetry record.
+    pub all_dimensions: serde_json::Value,
+    /// JSONB array of log stream names
+    pub logs_streams: serde_json::Value,
+    /// JSONB array of trace stream names
+    pub traces_streams: serde_json::Value,
+    /// JSONB array of metric stream names
+    pub metrics_streams: serde_json::Value,
     pub last_seen: i64,
-    pub metadata: Option<String>,
 }
 
 impl ServiceRecord {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         org_id: &str,
-        service_key: &str,
-        correlation_key: &str,
         service_name: &str,
-        dimensions: &str,
-        streams: &str,
-        first_seen: i64,
-        last_seen: i64,
+        set_id: &str,
+        disambiguation: serde_json::Value,
     ) -> Self {
         Self {
+            id: svix_ksuid::Ksuid::new(None, None).to_string(),
             org_id: org_id.to_owned(),
-            service_key: service_key.to_owned(),
-            correlation_key: correlation_key.to_owned(),
             service_name: service_name.to_owned(),
-            dimensions: dimensions.to_owned(),
-            streams: streams.to_owned(),
-            first_seen,
-            last_seen,
-            metadata: None,
+            set_id: set_id.to_owned(),
+            disambiguation,
+            all_dimensions: serde_json::json!({}),
+            logs_streams: serde_json::json!([]),
+            traces_streams: serde_json::json!([]),
+            metrics_streams: serde_json::json!([]),
+            last_seen: 0,
         }
     }
 }
@@ -154,205 +158,245 @@ pub async fn create_table() -> Result<(), errors::Error> {
     Ok(())
 }
 
-/// Add or update a service (upsert)
-///
-/// IMPORTANT: When updating an existing record, streams are MERGED (not overwritten)
-/// to prevent race conditions between multiple ingesters. This ensures that logs
-/// discovered by one ingester are not lost when another ingester updates the same
-/// service with traces/metrics.
-pub async fn put(record: ServiceRecord) -> Result<(), errors::Error> {
+/// Upsert a service record.
+/// Looks up by (org_id, service_name, disambiguation). If found: union stream name. If not: insert.
+pub async fn put(org_id: &str, record: ServiceRecord) -> Result<(), errors::Error> {
     let _lock = get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    let service_name_for_log = record.service_name.clone();
-    log::debug!(
-        "[SERVICE_STREAMS] put () called for org={} service={} correlation_key={} incoming_streams={}",
-        record.org_id,
-        service_name_for_log,
-        record.correlation_key,
-        record.streams
-    );
-
-    // Try to find existing record by unique constraint (org_id, correlation_key)
-    // This ensures services with the same stable dimensions are deduplicated
+    // Look up the exact row via (org_id, service_name, set_id, disambiguation).
+    // Scoping by set_id ensures records from different identity sets never merge.
     let existing = Entity::find()
-        .filter(Column::OrgId.eq(&record.org_id))
-        .filter(Column::CorrelationKey.eq(&record.correlation_key))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::ServiceName.eq(&record.service_name))
+        .filter(Column::SetId.eq(&record.set_id))
+        .filter(Expr::col(Column::Disambiguation).eq(record.disambiguation.clone()))
         .one(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    if let Some(existing_record) = existing {
-        log::debug!(
-            "[SERVICE_STREAMS] Found existing record for service={} existing_streams={}",
-            service_name_for_log,
-            existing_record.streams
-        );
+    // Build incoming disambiguation map once — used in both branches for orphan cleanup.
+    let incoming_map: std::collections::HashMap<String, String> = record
+        .disambiguation
+        .as_object()
+        .map(|m| {
+            m.iter()
+                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                .collect()
+        })
+        .unwrap_or_default();
 
-        // MERGE streams instead of overwriting to prevent race conditions
-        // between multiple ingesters processing different telemetry types
-        let merged_streams = merge_streams_json(&existing_record.streams, &record.streams);
+    if let Some(existing_model) = existing {
+        // Exact match: union streams
+        let kept_id = existing_model.id.clone();
+        let logs = union_stream_array(&existing_model.logs_streams, &record.logs_streams);
+        let traces = union_stream_array(&existing_model.traces_streams, &record.traces_streams);
+        let metrics = union_stream_array(&existing_model.metrics_streams, &record.metrics_streams);
 
-        log::debug!(
-            "[SERVICE_STREAMS_MERGE] service={}: existing={} + incoming={} => merged={}",
-            service_name_for_log,
-            existing_record.streams,
-            record.streams,
-            merged_streams
-        );
+        let mut active: ActiveModel = existing_model.into();
+        active.logs_streams = Set(logs);
+        active.traces_streams = Set(traces);
+        active.metrics_streams = Set(metrics);
+        active.last_seen = Set(record.last_seen);
 
-        // Keep the earliest first_seen and latest last_seen
-        let first_seen = existing_record.first_seen.min(record.first_seen);
-        let last_seen = existing_record.last_seen.max(record.last_seen);
-
-        // Update existing record with merged streams
-        let mut active_model: ActiveModel = existing_record.into();
-        active_model.service_key = Set(record.service_key);
-        active_model.correlation_key = Set(record.correlation_key);
-        active_model.service_name = Set(record.service_name);
-        active_model.dimensions = Set(record.dimensions);
-        active_model.streams = Set(merged_streams);
-        active_model.first_seen = Set(first_seen);
-        active_model.last_seen = Set(last_seen);
-        active_model.metadata = Set(record.metadata);
-
-        active_model
+        active
             .update(client)
             .await
             .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-        log::debug!(
-            "[SERVICE_STREAMS] Updated service={} successfully",
-            service_name_for_log
-        );
+        // Delete any orphaned rows that are strict subsets of the row we just updated.
+        // These accumulate when a record with fewer disambiguation fields was written before
+        // the richer variant existed.
+        delete_subset_orphans(
+            client,
+            org_id,
+            &record.service_name,
+            &record.set_id,
+            &incoming_map,
+            &kept_id,
+        )
+        .await?;
     } else {
-        log::debug!(
-            "[SERVICE_STREAMS] INSERT new service={} correlation_key={} streams={}",
-            service_name_for_log,
-            record.correlation_key,
-            record.streams
-        );
-
-        // Insert new record
-        let id = svix_ksuid::Ksuid::new(None, None).to_string();
-        let active_model = ActiveModel {
-            id: Set(id),
-            org_id: Set(record.org_id),
-            service_key: Set(record.service_key),
-            correlation_key: Set(record.correlation_key),
-            service_name: Set(record.service_name),
-            dimensions: Set(record.dimensions),
-            streams: Set(record.streams),
-            first_seen: Set(record.first_seen),
-            last_seen: Set(record.last_seen),
-            metadata: Set(record.metadata),
-        };
-
-        Entity::insert(active_model)
-            .exec(client)
+        // No exact match. Check if an existing row can be upgraded:
+        // A row is upgradeable if its disambiguation is a subset of the incoming one
+        // (all existing key-value pairs match in the incoming map, incoming may have more).
+        // This merges e.g. {} → {"k8s-cluster": "prod"} or
+        // {"k8s-cluster": "prod"} → {"k8s-cluster": "prod", "k8s-namespace": "ecommerce"}.
+        let candidates = Entity::find()
+            .filter(Column::OrgId.eq(org_id))
+            .filter(Column::ServiceName.eq(&record.service_name))
+            .filter(Column::SetId.eq(&record.set_id))
+            .all(client)
             .await
             .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+        // Find a compatible row in either direction:
+        //   Case A: existing ⊆ incoming → upgrade (adopt incoming's richer disambiguation)
+        //   Case B: incoming ⊆ existing → match (keep existing's richer disambiguation)
+        // In both cases the matching values for shared keys must be equal.
+        let upgradeable = candidates.into_iter().find(|row| {
+            let existing_map: std::collections::HashMap<String, String> = row
+                .disambiguation
+                .as_object()
+                .map(|m| {
+                    m.iter()
+                        .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                        .collect()
+                })
+                .unwrap_or_default();
+            // Case A: existing is a subset of incoming
+            let existing_subset_of_incoming = existing_map
+                .iter()
+                .all(|(k, v)| incoming_map.get(k).map(|iv| iv == v).unwrap_or(false));
+            // Case B: incoming is a subset of existing
+            let incoming_subset_of_existing = incoming_map
+                .iter()
+                .all(|(k, v)| existing_map.get(k).map(|ev| ev == v).unwrap_or(false));
+            existing_subset_of_incoming || incoming_subset_of_existing
+        });
+
+        if let Some(existing_model) = upgradeable {
+            let kept_id = existing_model.id.clone();
+            let logs = union_stream_array(&existing_model.logs_streams, &record.logs_streams);
+            let traces = union_stream_array(&existing_model.traces_streams, &record.traces_streams);
+            let metrics =
+                union_stream_array(&existing_model.metrics_streams, &record.metrics_streams);
+
+            // Keep whichever disambiguation is richer (more keys wins)
+            let existing_map: std::collections::HashMap<String, String> = existing_model
+                .disambiguation
+                .as_object()
+                .map(|m| {
+                    m.iter()
+                        .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                        .collect()
+                })
+                .unwrap_or_default();
+            let richer_map = if incoming_map.len() >= existing_map.len() {
+                &incoming_map
+            } else {
+                &existing_map
+            };
+            let richer_disambiguation = if incoming_map.len() >= existing_map.len() {
+                record.disambiguation
+            } else {
+                existing_model.disambiguation.clone()
+            };
+
+            let mut active: ActiveModel = existing_model.into();
+            active.disambiguation = Set(richer_disambiguation);
+            active.logs_streams = Set(logs);
+            active.traces_streams = Set(traces);
+            active.metrics_streams = Set(metrics);
+            active.last_seen = Set(record.last_seen);
+
+            active
+                .update(client)
+                .await
+                .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+            // Clean up any other orphaned subset rows for this service (same set_id)
+            delete_subset_orphans(
+                client,
+                org_id,
+                &record.service_name,
+                &record.set_id,
+                richer_map,
+                &kept_id,
+            )
+            .await?;
+        } else {
+            let active_model = ActiveModel {
+                id: Set(record.id),
+                org_id: Set(org_id.to_owned()),
+                service_name: Set(record.service_name),
+                set_id: Set(record.set_id),
+                disambiguation: Set(record.disambiguation),
+                all_dimensions: Set(record.all_dimensions),
+                logs_streams: Set(record.logs_streams),
+                traces_streams: Set(record.traces_streams),
+                metrics_streams: Set(record.metrics_streams),
+                last_seen: Set(record.last_seen),
+            };
+
+            Entity::insert(active_model)
+                .exec(client)
+                .await
+                .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+        }
     }
 
     Ok(())
 }
 
-/// Merge two streams JSON objects, combining logs/traces/metrics arrays
-///
-/// This prevents race conditions where one ingester overwrites streams
-/// discovered by another ingester. The merge is a union operation - all
-/// unique streams from both sources are preserved.
-fn merge_streams_json(existing_json: &str, new_json: &str) -> String {
-    use std::collections::HashSet;
+/// Delete rows for `service_name` that are strict subsets of `richer_map`, excluding `keep_id`.
+/// Called after a successful put/upgrade to clean up orphaned lower-specificity rows.
+async fn delete_subset_orphans(
+    client: &sea_orm::DatabaseConnection,
+    org_id: &str,
+    service_name: &str,
+    set_id: &str,
+    richer_map: &std::collections::HashMap<String, String>,
+    keep_id: &str,
+) -> Result<(), errors::Error> {
+    let candidates = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::ServiceName.eq(service_name))
+        .filter(Column::SetId.eq(set_id))
+        .all(client)
+        .await
+        .map_err(|e| errors::Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
 
-    // Parse both JSON strings
-    let existing: serde_json::Value = serde_json::from_str(existing_json).unwrap_or_default();
-    let new: serde_json::Value = serde_json::from_str(new_json).unwrap_or_default();
-
-    // Helper to merge arrays as sets (by stream_name to deduplicate)
-    let merge_array =
-        |existing_arr: &serde_json::Value, new_arr: &serde_json::Value| -> Vec<serde_json::Value> {
-            let mut seen: HashSet<String> = HashSet::new();
-            let mut result: Vec<serde_json::Value> = Vec::new();
-
-            // Add all existing streams
-            if let Some(arr) = existing_arr.as_array() {
-                for item in arr {
-                    // Use stream_name as dedup key, or serialize the whole object
-                    let key = item
-                        .get("stream_name")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(|| item.to_string());
-                    if seen.insert(key) {
-                        result.push(item.clone());
-                    }
-                }
-            }
-
-            // Add new streams that don't already exist
-            if let Some(arr) = new_arr.as_array() {
-                for item in arr {
-                    let key = item
-                        .get("stream_name")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(|| item.to_string());
-                    if seen.insert(key) {
-                        result.push(item.clone());
-                    }
-                }
-            }
-
-            result
-        };
-
-    // Merge each stream type
-    let logs = merge_array(
-        existing.get("logs").unwrap_or(&serde_json::Value::Null),
-        new.get("logs").unwrap_or(&serde_json::Value::Null),
-    );
-    let traces = merge_array(
-        existing.get("traces").unwrap_or(&serde_json::Value::Null),
-        new.get("traces").unwrap_or(&serde_json::Value::Null),
-    );
-    let metrics = merge_array(
-        existing.get("metrics").unwrap_or(&serde_json::Value::Null),
-        new.get("metrics").unwrap_or(&serde_json::Value::Null),
-    );
-
-    // Build merged result
-    let merged = serde_json::json!({
-        "logs": logs,
-        "traces": traces,
-        "metrics": metrics
-    });
-
-    merged.to_string()
+    for row in candidates {
+        if row.id == keep_id {
+            continue;
+        }
+        let row_map: std::collections::HashMap<String, String> = row
+            .disambiguation
+            .as_object()
+            .map(|m| {
+                m.iter()
+                    .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                    .collect()
+            })
+            .unwrap_or_default();
+        // Only delete if this row's keys are a strict subset of richer_map with matching values
+        let is_subset = row_map
+            .iter()
+            .all(|(k, v)| richer_map.get(k).map(|rv| rv == v).unwrap_or(false));
+        if is_subset && row_map.len() < richer_map.len() {
+            Entity::delete_by_id(row.id)
+                .exec(client)
+                .await
+                .map_err(|e| errors::Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
+        }
+    }
+    Ok(())
 }
 
-/// Get a specific service
-pub async fn get(org_id: &str, service_key: &str) -> Result<Option<ServiceRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
-    let record = Entity::find()
-        .filter(Column::OrgId.eq(org_id))
-        .filter(Column::ServiceKey.eq(service_key))
-        .one(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
-    Ok(record.map(|r| ServiceRecord {
-        org_id: r.org_id,
-        service_key: r.service_key,
-        correlation_key: r.correlation_key,
-        service_name: r.service_name,
-        dimensions: r.dimensions,
-        streams: r.streams,
-        first_seen: r.first_seen,
-        last_seen: r.last_seen,
-        metadata: r.metadata,
-    }))
+fn union_stream_array(existing: &serde_json::Value, new: &serde_json::Value) -> serde_json::Value {
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    // Compact existing, dropping any duplicates already in the stored array
+    let mut result: Vec<serde_json::Value> = existing
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|v| {
+            v.as_str()
+                .map(|s| seen.insert(s.to_string()))
+                .unwrap_or(false)
+        })
+        .collect();
+    // Add new entries that aren't already present
+    if let Some(arr) = new.as_array() {
+        for s in arr.iter().filter_map(|v| v.as_str()) {
+            if seen.insert(s.to_string()) {
+                result.push(serde_json::Value::String(s.to_string()));
+            }
+        }
+    }
+    serde_json::Value::Array(result)
 }
 
 /// List all services for an organization
@@ -365,23 +409,10 @@ pub async fn list(org_id: &str) -> Result<Vec<ServiceRecord>, errors::Error> {
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    Ok(records
-        .into_iter()
-        .map(|r| ServiceRecord {
-            org_id: r.org_id,
-            service_key: r.service_key,
-            correlation_key: r.correlation_key,
-            service_name: r.service_name,
-            dimensions: r.dimensions,
-            streams: r.streams,
-            first_seen: r.first_seen,
-            last_seen: r.last_seen,
-            metadata: r.metadata,
-        })
-        .collect())
+    Ok(records.into_iter().map(model_to_record).collect())
 }
 
-/// List services by service name (across all dimension combinations)
+/// List services by service name
 pub async fn list_by_name(
     org_id: &str,
     service_name: &str,
@@ -395,30 +426,18 @@ pub async fn list_by_name(
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    Ok(records
-        .into_iter()
-        .map(|r| ServiceRecord {
-            org_id: r.org_id,
-            service_key: r.service_key,
-            correlation_key: r.correlation_key,
-            service_name: r.service_name,
-            dimensions: r.dimensions,
-            streams: r.streams,
-            first_seen: r.first_seen,
-            last_seen: r.last_seen,
-            metadata: r.metadata,
-        })
-        .collect())
+    Ok(records.into_iter().map(model_to_record).collect())
 }
 
-/// Delete a specific service
-pub async fn delete(org_id: &str, service_key: &str) -> Result<(), errors::Error> {
+/// Delete all service records for a specific identity set within an organization.
+/// Called when a set is removed from the config to clean up stale data.
+pub async fn delete_by_set_id(org_id: &str, set_id: &str) -> Result<(), errors::Error> {
     let _lock = get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
-        .filter(Column::ServiceKey.eq(service_key))
+        .filter(Column::SetId.eq(set_id))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -426,7 +445,7 @@ pub async fn delete(org_id: &str, service_key: &str) -> Result<(), errors::Error
     Ok(())
 }
 
-/// Delete all services for an organization
+/// Delete all services for an organization (used on distinguish_by field-swap)
 pub async fn delete_all(org_id: &str) -> Result<(), errors::Error> {
     let _lock = get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
@@ -440,7 +459,22 @@ pub async fn delete_all(org_id: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
-/// Get total count of services for an organization
+/// Delete stale records (last_seen older than threshold)
+pub async fn delete_stale(org_id: &str, older_than_micros: i64) -> Result<u64, errors::Error> {
+    let _lock = get_lock().await;
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let result = Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::LastSeen.lt(older_than_micros))
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(result.rows_affected)
+}
+
+/// Get total row count for an organization
 pub async fn count(org_id: &str) -> Result<u64, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
@@ -451,315 +485,17 @@ pub async fn count(org_id: &str) -> Result<u64, errors::Error> {
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
-/// List services with scope dimension conflict filtering (SQL optimization)
-///
-/// Filters at SQL level by excluding services with conflicting scope dimensions.
-/// Only scope dimensions (k8s-cluster, k8s-namespace) are checked in SQL.
-/// All other filtering (workload, unstable) happens in-memory.
-///
-/// SQL: WHERE org_id = ? AND NOT (scope conflicts)
-/// Logic: Include service if scope dimension is missing OR matches
-///
-/// This reduces dataset loaded from DB (20k → 2-3k) while preserving
-/// all services needed for FQN discovery.
-pub async fn list_with_scope_filter(
-    org_id: &str,
-    scope_filters: &std::collections::HashMap<String, String>,
-) -> Result<Vec<ServiceRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let backend = client.get_database_backend();
-
-    if scope_filters.is_empty() {
-        return list(org_id).await;
-    }
-
-    let (sql, params) = build_scope_conflict_sql(org_id, scope_filters, backend);
-
-    let records = Entity::find()
-        .from_raw_sql(sea_orm::Statement::from_sql_and_values(
-            backend, sql, params,
-        ))
-        .all(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
-    Ok(records
-        .into_iter()
-        .map(|r| ServiceRecord {
-            org_id: r.org_id,
-            service_key: r.service_key,
-            correlation_key: r.correlation_key,
-            service_name: r.service_name,
-            dimensions: r.dimensions,
-            streams: r.streams,
-            first_seen: r.first_seen,
-            last_seen: r.last_seen,
-            metadata: r.metadata,
-        })
-        .collect())
-}
-
-fn build_scope_conflict_sql(
-    org_id: &str,
-    scope_filters: &std::collections::HashMap<String, String>,
-    backend: sea_orm::DatabaseBackend,
-) -> (String, Vec<sea_orm::Value>) {
-    let mut params: Vec<sea_orm::Value> = vec![org_id.into()];
-
-    let conflict_checks = match backend {
-        sea_orm::DatabaseBackend::Postgres => {
-            let mut checks = Vec::new();
-            for (key, value) in scope_filters {
-                params.push(value.clone().into());
-                let param_idx = params.len();
-                checks.push(format!(
-                    "(jsonb_exists(dimensions::jsonb, '{key}') AND (dimensions::jsonb->>'{key}') != ${param_idx})"
-                ));
-            }
-            checks
-        }
-        _ => {
-            let mut checks = Vec::new();
-            for (key, value) in scope_filters {
-                params.push(value.clone().into());
-                checks.push(format!(
-                    "(json_extract(dimensions, '$.{key}') IS NOT NULL AND json_extract(dimensions, '$.{key}') != ?)"
-                ));
-            }
-            checks
-        }
-    };
-
-    let where_clause = if conflict_checks.is_empty() {
-        match backend {
-            sea_orm::DatabaseBackend::Postgres => "org_id = $1".to_string(),
-            _ => "org_id = ?".to_string(),
-        }
-    } else {
-        let org_condition = match backend {
-            sea_orm::DatabaseBackend::Postgres => "org_id = $1",
-            _ => "org_id = ?",
-        };
-        format!(
-            "{} AND NOT ({})",
-            org_condition,
-            conflict_checks.join(" OR ")
-        )
-    };
-
-    let sql = format!(
-        "SELECT id, org_id, service_key, correlation_key, service_name, \
-         dimensions, streams, first_seen, last_seen, metadata \
-         FROM service_streams WHERE {}",
-        where_clause
-    );
-
-    (sql, params)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_build_scope_conflict_sql_postgres_single_dimension() {
-        let mut scope_filters = std::collections::HashMap::new();
-        scope_filters.insert("k8s-cluster".to_string(), "production".to_string());
-
-        let (sql, params) = super::build_scope_conflict_sql(
-            "test_org",
-            &scope_filters,
-            sea_orm::DatabaseBackend::Postgres,
-        );
-
-        assert!(sql.contains("org_id = $1"));
-        assert!(sql.contains("AND NOT"));
-        assert!(sql.contains("jsonb_exists(dimensions::jsonb, 'k8s-cluster')"));
-        assert!(sql.contains("dimensions::jsonb->>'k8s-cluster'") && sql.contains("!= $2"));
-        assert_eq!(params.len(), 2); // org_id + cluster value
-    }
-
-    #[test]
-    fn test_build_scope_conflict_sql_postgres_multiple_dimensions() {
-        let mut scope_filters = std::collections::HashMap::new();
-        scope_filters.insert("k8s-cluster".to_string(), "production".to_string());
-        scope_filters.insert("k8s-namespace".to_string(), "api".to_string());
-
-        let (sql, params) = super::build_scope_conflict_sql(
-            "test_org",
-            &scope_filters,
-            sea_orm::DatabaseBackend::Postgres,
-        );
-
-        assert!(sql.contains("org_id = $1"));
-        assert!(sql.contains("AND NOT"));
-        assert!(sql.contains("jsonb_exists(dimensions::jsonb, 'k8s-cluster')"));
-        assert!(sql.contains("jsonb_exists(dimensions::jsonb, 'k8s-namespace')"));
-        assert!(sql.contains(" OR ")); // Multiple conflict checks OR'd together
-        assert_eq!(params.len(), 3); // org_id + 2 dimension values
-    }
-
-    #[test]
-    fn test_build_scope_conflict_sql_sqlite() {
-        let mut scope_filters = std::collections::HashMap::new();
-        scope_filters.insert("k8s-cluster".to_string(), "production".to_string());
-
-        let (sql, params) = super::build_scope_conflict_sql(
-            "test_org",
-            &scope_filters,
-            sea_orm::DatabaseBackend::Sqlite,
-        );
-
-        assert!(sql.contains("org_id = ?"));
-        assert!(sql.contains("AND NOT"));
-        assert!(sql.contains("json_extract(dimensions, '$.k8s-cluster') IS NOT NULL"));
-        assert!(sql.contains("json_extract(dimensions, '$.k8s-cluster') != ?"));
-        assert_eq!(params.len(), 2);
-    }
-
-    #[test]
-    fn test_build_scope_conflict_sql_empty_filters() {
-        let scope_filters = std::collections::HashMap::new();
-
-        let (sql, params) = super::build_scope_conflict_sql(
-            "test_org",
-            &scope_filters,
-            sea_orm::DatabaseBackend::Postgres,
-        );
-
-        assert!(sql.contains("org_id = $1"));
-        assert!(!sql.contains("AND NOT")); // No conflict checks
-        assert_eq!(params.len(), 1); // Only org_id
-    }
-
-    #[test]
-    fn test_merge_streams_json_empty() {
-        let existing = r#"{"logs":[],"traces":[],"metrics":[]}"#;
-        let new = r#"{"logs":[],"traces":[],"metrics":[]}"#;
-
-        let merged = merge_streams_json(existing, new);
-        let parsed: serde_json::Value = serde_json::from_str(&merged).unwrap();
-
-        assert_eq!(parsed["logs"].as_array().unwrap().len(), 0);
-        assert_eq!(parsed["traces"].as_array().unwrap().len(), 0);
-        assert_eq!(parsed["metrics"].as_array().unwrap().len(), 0);
-    }
-
-    #[test]
-    fn test_merge_streams_json_logs_only_existing() {
-        let existing =
-            r#"{"logs":[{"stream_name":"default","filters":{}}],"traces":[],"metrics":[]}"#;
-        let new = r#"{"logs":[],"traces":[],"metrics":[]}"#;
-
-        let merged = merge_streams_json(existing, new);
-        let parsed: serde_json::Value = serde_json::from_str(&merged).unwrap();
-
-        assert_eq!(parsed["logs"].as_array().unwrap().len(), 1);
-        assert_eq!(parsed["logs"][0]["stream_name"], "default");
-    }
-
-    #[test]
-    fn test_merge_streams_json_logs_only_new() {
-        let existing = r#"{"logs":[],"traces":[],"metrics":[]}"#;
-        let new = r#"{"logs":[{"stream_name":"default","filters":{}}],"traces":[],"metrics":[]}"#;
-
-        let merged = merge_streams_json(existing, new);
-        let parsed: serde_json::Value = serde_json::from_str(&merged).unwrap();
-
-        assert_eq!(parsed["logs"].as_array().unwrap().len(), 1);
-        assert_eq!(parsed["logs"][0]["stream_name"], "default");
-    }
-
-    #[test]
-    fn test_merge_streams_json_different_types() {
-        // Simulates: Ingester 1 has logs, Ingester 2 has traces+metrics
-        let existing =
-            r#"{"logs":[{"stream_name":"default","filters":{}}],"traces":[],"metrics":[]}"#;
-        let new = r#"{"logs":[],"traces":[{"stream_name":"default","filters":{}}],"metrics":[{"stream_name":"otel_metrics","filters":{}}]}"#;
-
-        let merged = merge_streams_json(existing, new);
-        let parsed: serde_json::Value = serde_json::from_str(&merged).unwrap();
-
-        // Should have all three types merged
-        assert_eq!(parsed["logs"].as_array().unwrap().len(), 1);
-        assert_eq!(parsed["traces"].as_array().unwrap().len(), 1);
-        assert_eq!(parsed["metrics"].as_array().unwrap().len(), 1);
-        assert_eq!(parsed["logs"][0]["stream_name"], "default");
-        assert_eq!(parsed["traces"][0]["stream_name"], "default");
-        assert_eq!(parsed["metrics"][0]["stream_name"], "otel_metrics");
-    }
-
-    #[test]
-    fn test_merge_streams_json_deduplication() {
-        // Both have the same stream - should deduplicate
-        let existing = r#"{"logs":[{"stream_name":"default","filters":{"k8s_cluster":"prod"}}],"traces":[],"metrics":[]}"#;
-        let new = r#"{"logs":[{"stream_name":"default","filters":{"k8s_cluster":"staging"}}],"traces":[],"metrics":[]}"#;
-
-        let merged = merge_streams_json(existing, new);
-        let parsed: serde_json::Value = serde_json::from_str(&merged).unwrap();
-
-        // Should have only 1 log stream (deduplicated by stream_name)
-        assert_eq!(parsed["logs"].as_array().unwrap().len(), 1);
-        // Existing wins (first one added)
-        assert_eq!(parsed["logs"][0]["filters"]["k8s_cluster"], "prod");
-    }
-
-    #[test]
-    fn test_merge_streams_json_multiple_streams_same_type() {
-        let existing =
-            r#"{"logs":[{"stream_name":"app_logs","filters":{}}],"traces":[],"metrics":[]}"#;
-        let new =
-            r#"{"logs":[{"stream_name":"system_logs","filters":{}}],"traces":[],"metrics":[]}"#;
-
-        let merged = merge_streams_json(existing, new);
-        let parsed: serde_json::Value = serde_json::from_str(&merged).unwrap();
-
-        // Should have both streams (different names)
-        assert_eq!(parsed["logs"].as_array().unwrap().len(), 2);
-    }
-
-    #[test]
-    fn test_merge_streams_json_race_condition_scenario() {
-        // Simulates the exact race condition:
-        // Ingester 1 discovers logs for service
-        // Ingester 2 discovers traces and metrics for same service
-        // Without merge, last write wins and logs are lost
-
-        let ingester1_writes = r#"{"logs":[{"stream_name":"default","stream_type":"Logs","filters":{"service":"openobserve"}}],"traces":[],"metrics":[]}"#;
-        let ingester2_writes = r#"{"logs":[],"traces":[{"stream_name":"default","stream_type":"Traces","filters":{"service":"openobserve"}}],"metrics":[{"stream_name":"otel_collector_metrics","stream_type":"Metrics","filters":{}}]}"#;
-
-        // Ingester 2's write merges with Ingester 1's data
-        let merged = merge_streams_json(ingester1_writes, ingester2_writes);
-        let parsed: serde_json::Value = serde_json::from_str(&merged).unwrap();
-
-        // All telemetry types should be preserved
-        assert_eq!(
-            parsed["logs"].as_array().unwrap().len(),
-            1,
-            "Logs should be preserved after merge"
-        );
-        assert_eq!(
-            parsed["traces"].as_array().unwrap().len(),
-            1,
-            "Traces should be added"
-        );
-        assert_eq!(
-            parsed["metrics"].as_array().unwrap().len(),
-            1,
-            "Metrics should be added"
-        );
-    }
-
-    #[test]
-    fn test_merge_streams_json_malformed_input() {
-        // Handle malformed JSON gracefully
-        let existing = "not valid json";
-        let new = r#"{"logs":[{"stream_name":"default"}],"traces":[],"metrics":[]}"#;
-
-        let merged = merge_streams_json(existing, new);
-        let parsed: serde_json::Value = serde_json::from_str(&merged).unwrap();
-
-        // Should still work, treating existing as empty
-        assert_eq!(parsed["logs"].as_array().unwrap().len(), 1);
+fn model_to_record(r: Model) -> ServiceRecord {
+    ServiceRecord {
+        id: r.id,
+        org_id: r.org_id,
+        service_name: r.service_name,
+        set_id: r.set_id,
+        disambiguation: r.disambiguation,
+        all_dimensions: r.all_dimensions,
+        logs_streams: r.logs_streams,
+        traces_streams: r.traces_streams,
+        metrics_streams: r.metrics_streams,
+        last_seen: r.last_seen,
     }
 }

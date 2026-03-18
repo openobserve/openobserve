@@ -3041,7 +3041,8 @@
     "metricsError": "No se pueden cargar las métricas",
     "metricsErrorDetails": "Se ha producido un error al obtener los datos de las métricas. Por favor, inténtalo de nuevo.",
     "noMetricsDescription": "No se han encontrado métricas para esta correlación en el intervalo de tiempo seleccionado.",
-    "errorRetrievingTraces": "Se ha producido un error al recuperar los rastros."
+    "errorRetrievingTraces": "Se ha producido un error al recuperar los rastros.",
+    "serviceGroupProtected": "No se puede eliminar el grupo de servicios. Solo puede modificar los campos mapeados."
   },
   "sreChat": {
     "emptyMessage": "Pregúntame cualquier cosa sobre tus alertas e incidencias",

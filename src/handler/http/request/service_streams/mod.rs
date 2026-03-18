@@ -80,6 +80,32 @@ pub async fn get_dimension_analytics(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/{org_id}/service_streams",
+    tag = "Service Streams",
+    operation_id = "ListServiceStreams",
+    params(
+        ("org_id" = String, Path, description = "Organization ID")
+    ),
+    responses(
+        (status = 200, description = "List of discovered services"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - Enterprise feature"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("Authorization" = []))
+)]
+pub async fn list_services(
+    Path(org_id): Path<String>,
+    Headers(_user_email): Headers<UserEmail>,
+) -> Response {
+    match infra::table::service_streams::list(&org_id).await {
+        Ok(records) => MetaHttpResponse::json(records),
+        Err(e) => MetaHttpResponse::internal_error(format!("Failed to list services: {e}")),
+    }
+}
+
 /// POST /api/{org_id}/service_streams/_correlate
 ///
 /// Find related telemetry streams for a given log/trace/metric event
@@ -138,30 +164,27 @@ pub async fn correlate_streams(
 
     #[cfg(feature = "enterprise")]
     {
-        // Get FQN priority from DB/cache (org-level setting or system default)
-        let fqn_priority =
-            crate::service::db::system_settings::get_fqn_priority_dimensions(&org_id).await;
-
-        // Get semantic field groups - MUST use same source as UI to ensure consistency
-        // This resolves org-level custom groups or falls back to enterprise defaults
+        use config::meta::{correlation::ServiceIdentityConfig, system_settings::SettingScope};
+        let identity_config = match infra::table::system_settings::get(
+            &SettingScope::Org,
+            Some(&org_id),
+            None,
+            "service_identity",
+        )
+        .await
+        {
+            Ok(Some(s)) => serde_json::from_value::<ServiceIdentityConfig>(s.setting_value)
+                .unwrap_or_else(|_| ServiceIdentityConfig::default_config()),
+            _ => ServiceIdentityConfig::default_config(),
+        };
         let semantic_groups =
-            crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
+            o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file();
 
-        // Get the updated_at timestamp for semantic_field_groups setting
-        // This will be used for time-based FQN selection (prefer services processed after config
-        // change)
-        let semantic_groups_updated_at =
-            crate::service::db::system_settings::get_semantic_field_groups_updated_at(&org_id)
-                .await;
-
-        match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::correlate(
+        match o2_enterprise::enterprise::service_streams::storage::correlate(
             &org_id,
-            &req.source_stream,
-            &req.source_type,
             &req.available_dimensions,
-            &fqn_priority,
+            &identity_config,
             &semantic_groups,
-            semantic_groups_updated_at,
         )
         .await
         {
@@ -199,65 +222,91 @@ pub struct CorrelationRequest {
     pub available_dimensions: std::collections::HashMap<String, String>,
 }
 
-/// GET /api/{org_id}/service_streams/_grouped
-///
-/// Get services grouped by their Fully Qualified Name (FQN)
-///
-/// This endpoint is used by the Correlation Settings UI to display
-/// which services are correlated together via their shared FQN.
-///
-/// Response includes:
-/// - Services grouped by FQN
-/// - Each group shows which services share the FQN
-/// - Stream counts per group (logs/traces/metrics)
-/// - Whether each group has full telemetry coverage
 #[utoipa::path(
     get,
-    path = "/{org_id}/service_streams/_grouped",
+    path = "/{org_id}/service_streams/config/identity",
     tag = "Service Streams",
-    operation_id = "GetServiceStreamGrouped",
-    params(
-        ("org_id" = String, Path, description = "Organization ID")
-    ),
+    operation_id = "GetServiceIdentityConfig",
+    params(("org_id" = String, Path, description = "Organization ID")),
     responses(
-        (status = 200, description = "Services grouped by FQN", body = GroupedServicesResponse),
-        (status = 401, description = "Unauthorized - Authentication required"),
-        (status = 403, description = "Forbidden - Enterprise feature"),
+        (status = 200, description = "Current identity config"),
+        (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
-    security(
-        ("Authorization" = [])
-    )
+    security(("Authorization" = []))
 )]
-pub async fn get_services_grouped(
+pub async fn get_identity_config(
     Path(org_id): Path<String>,
-    Headers(_user_email): Headers<UserEmail>, // Require authentication
+    Headers(_user_email): Headers<UserEmail>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
+    use config::meta::{correlation::ServiceIdentityConfig, system_settings::SettingScope};
+
+    match infra::table::system_settings::get(
+        &SettingScope::Org,
+        Some(&org_id),
+        None,
+        "service_identity",
+    )
+    .await
     {
-        // Get FQN priority from DB/cache (org-level setting or system default)
-        let fqn_priority =
-            crate::service::db::system_settings::get_fqn_priority_dimensions(&org_id).await;
+        Ok(Some(s)) => match serde_json::from_value::<ServiceIdentityConfig>(s.setting_value) {
+            Ok(cfg) => MetaHttpResponse::json(cfg),
+            Err(e) => MetaHttpResponse::internal_error(format!("Failed to parse config: {e}")),
+        },
+        Ok(None) => MetaHttpResponse::json(ServiceIdentityConfig::default_config()),
+        Err(e) => MetaHttpResponse::internal_error(format!("Failed to load config: {e}")),
+    }
+}
 
-        // Get semantic groups to determine scope vs workload dimensions
-        let semantic_groups =
-            crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
+#[utoipa::path(
+    put,
+    path = "/{org_id}/service_streams/config/identity",
+    tag = "Service Streams",
+    operation_id = "SaveServiceIdentityConfig",
+    params(("org_id" = String, Path, description = "Organization ID")),
+    request_body(content = serde_json::Value, description = "ServiceIdentityConfig JSON"),
+    responses(
+        (status = 200, description = "Config saved"),
+        (status = 400, description = "Invalid config"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("Authorization" = []))
+)]
+pub async fn save_identity_config(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<config::meta::correlation::ServiceIdentityConfig>,
+) -> Response {
+    use config::meta::system_settings::{SettingScope, SystemSetting};
 
-        match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::list_grouped_by_fqn(&org_id, &fqn_priority, &semantic_groups)
-            .await
-        {
-            Ok(response) => MetaHttpResponse::json(response),
-            Err(e) => MetaHttpResponse::internal_error(
-                format!("Failed to get grouped services: {e}")
-            ),
-        }
+    if let Err(e) = body.validate() {
+        return MetaHttpResponse::bad_request(e);
     }
 
-    #[cfg(not(feature = "enterprise"))]
-    {
-        drop(org_id);
-        log::info!("Service Discovery is an enterprise-only feature");
-        MetaHttpResponse::forbidden("Service Discovery is an enterprise-only feature")
+    let value = match serde_json::to_value(&body) {
+        Ok(v) => v,
+        Err(e) => return MetaHttpResponse::internal_error(format!("Serialization error: {e}")),
+    };
+
+    let setting = SystemSetting {
+        id: None,
+        scope: SettingScope::Org,
+        org_id: Some(org_id),
+        user_id: None,
+        setting_key: "service_identity".to_string(),
+        setting_category: Some("service_streams".to_string()),
+        setting_value: value,
+        description: None,
+        created_at: 0,
+        updated_at: 0,
+        created_by: None,
+        updated_by: Some(user_email.user_id),
+    };
+
+    match infra::table::system_settings::set(&setting).await {
+        Ok(_) => MetaHttpResponse::json(serde_json::json!({"message": "saved"})),
+        Err(e) => MetaHttpResponse::internal_error(format!("Failed to save config: {e}")),
     }
 }
 
@@ -265,6 +314,5 @@ pub async fn get_services_grouped(
 // These types are the same for both enterprise and non-enterprise builds
 pub use config::meta::service_streams::{
     CardinalityClass, CorrelationResponse, DimensionAnalytics, DimensionAnalyticsSummary,
-    GroupedServicesResponse, RelatedStreams, ServiceFqnGroup, ServiceInGroup, ServiceStreams,
-    StreamInfo, StreamSummary,
+    RelatedStreams, ServiceStreams, StreamInfo, StreamSummary,
 };

@@ -524,7 +524,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(
         "service_streams_batch_processor",
-        get_enterprise_config().service_streams.batch_flush_interval_seconds,
+        get_enterprise_config().service_streams.batch_flush_interval_secs,
         {
             o2_enterprise::enterprise::service_streams::batch_processor::run_once().await;
         },

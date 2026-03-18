@@ -561,30 +561,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
 
-                    <!-- Correlation Key -->
-                    <div class="tw:grid tw:gap-2" style="grid-template-columns: 120px 1fr;">
-                      <div :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs tw:font-medium">
-                        Correlation Key
-                      </div>
-                      <div
-                        class="tw:flex tw:items-center tw:gap-2 tw:px-2.5 tw:py-1 tw:rounded tw:border tw:text-xs tw:font-mono tw:min-w-0"
-                        :style="{
-                          backgroundColor: store.state.theme === 'dark' ? '#1F2021' : '#F9FAFB',
-                          borderColor: store.state.theme === 'dark' ? '#444444' : '#E7EAEE',
-                          color: store.state.theme === 'dark' ? '#E5E7EB' : '#374151'
-                        }"
-                      >
-                        <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ incidentDetails?.correlation_key || 'N/A' }}</span>
-                        <q-icon
-                          :name="copiedField === 'correlation_key' ? 'check' : 'content_copy'"
-                          :class="copiedField === 'correlation_key' ? 'tw:text-green-500' : 'tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500'"
-                          class="tw:cursor-pointer tw:transition-all tw:flex-shrink-0"
-                          style="font-size: 14px; cursor: pointer;"
-                          @click="copyToClipboard(incidentDetails?.correlation_key, 'correlation_key')"
-                        />
-                      </div>
-                    </div>
-
                     <!-- Created At -->
                     <div class="tw:grid tw:gap-2" style="grid-template-columns: 120px 1fr;">
                       <div :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs tw:font-medium">
@@ -1047,18 +1023,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Error/No Data State -->
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
             <q-icon
-              :name="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'error_outline') : 'info_outline'"
-              :color="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'negative') : 'grey-5'"
+              :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error_outline') : 'info_outline'"
+              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
               size="4rem"
             />
             <div class="text-h6 q-mt-md">
               {{ correlationError || 'No correlated logs found' }}
             </div>
-            <div v-if="correlationError && correlationError.includes('FQN priority')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
-              The service discovery configuration (FQN priority dimensions) was changed after this incident was created.
+            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+              The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
             <q-btn
-              v-if="correlationError && !correlationError.includes('FQN priority')"
+              v-if="correlationError && !correlationError.includes('disambiguation fields')"
               color="primary"
               outline
               size="md"
@@ -1101,18 +1077,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Error/No Data State -->
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
             <q-icon
-              :name="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'error_outline') : 'info_outline'"
-              :color="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'negative') : 'grey-5'"
+              :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error_outline') : 'info_outline'"
+              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
               size="4rem"
             />
             <div class="text-h6 q-mt-md">
               {{ correlationError || 'No correlated metrics found' }}
             </div>
-            <div v-if="correlationError && correlationError.includes('FQN priority')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
-              The service discovery configuration (FQN priority dimensions) was changed after this incident was created.
+            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+              The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
             <q-btn
-              v-if="correlationError && !correlationError.includes('FQN priority')"
+              v-if="correlationError && !correlationError.includes('disambiguation fields')"
               color="primary"
               outline
               size="md"
@@ -1167,18 +1143,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Error/No Data State -->
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
             <q-icon
-              :name="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'error_outline') : 'info_outline'"
-              :color="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'negative') : 'grey-5'"
+              :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error_outline') : 'info_outline'"
+              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
               size="4rem"
             />
             <div class="text-h6 q-mt-md">
               {{ correlationError || 'No correlated traces found' }}
             </div>
-            <div v-if="correlationError && correlationError.includes('FQN priority')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
-              The service discovery configuration (FQN priority dimensions) was changed after this incident was created.
+            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+              The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
             <q-btn
-              v-if="correlationError && !correlationError.includes('FQN priority')"
+              v-if="correlationError && !correlationError.includes('disambiguation fields')"
               color="primary"
               outline
               size="md"
@@ -1586,7 +1562,7 @@ export default defineComponent({
             (!correlationData.value?.logStreams?.length &&
              !correlationData.value?.metricStreams?.length &&
              !correlationData.value?.traceStreams?.length)) {
-          // Fetch FQN priority config to check if it was modified after incident creation
+          // Fetch disambiguation fields config to check if it was modified after incident creation
           try {
             const fqnConfigResponse = await http().get(
               `/api/${org}/settings/v2/fqn_priority_dimensions`
@@ -1596,9 +1572,9 @@ export default defineComponent({
             // Compare timestamps (both in microseconds)
             if (fqnConfig.updated_at > incidentDetails.value.created_at) {
               correlationError.value =
-                "FQN priority was modified since this incident was created, cannot correlate";
+                "disambiguation fields were modified since this incident was created, cannot correlate";
               console.warn(
-                `[Incident Correlation] FQN config updated at ${fqnConfig.updated_at}, incident created at ${incidentDetails.value.created_at}`
+                `[Incident Correlation] Disambiguation fields config updated at ${fqnConfig.updated_at}, incident created at ${incidentDetails.value.created_at}`
               );
             } else {
               // Not a config issue - try building fallback correlation
@@ -1606,7 +1582,7 @@ export default defineComponent({
             }
           } catch (configError) {
             // If can't fetch config, try fallback anyway
-            console.error("Failed to fetch FQN config:", configError);
+            console.error("Failed to fetch disambiguation fields config:", configError);
             await buildFallbackCorrelation(org, incidentDetails.value);
           }
         }
