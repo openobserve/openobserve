@@ -114,7 +114,7 @@ describe("PatternCard", () => {
         '[data-test="pattern-card-0-anomaly-badge"]',
       );
       expect(anomalyBadge.exists()).toBe(true);
-      expect(anomalyBadge.text()).toContain("ANOMALY");
+      expect(anomalyBadge.text()).toContain("Rare Pattern");
     });
 
     it("should not display anomaly badge when pattern is not an anomaly", () => {
