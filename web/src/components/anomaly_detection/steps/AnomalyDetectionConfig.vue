@@ -316,13 +316,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Schedule Interval -->
+        <!-- Check Every (schedule interval) -->
         <div class="flex items-start alert-settings-row">
           <div
             class="tw:font-semibold flex items-center"
             style="width: 190px; height: 36px"
           >
-            Schedule Interval <span class="text-negative tw:ml-1">*</span>
+            Check Every <span class="text-negative tw:ml-1">*</span>
             <q-icon
               name="info"
               size="17px"
@@ -404,7 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <span style="font-size: 14px">
                   How far back each detection run queries. Caps the window even
-                  after a long pause. Defaults to Schedule Interval.
+                  after a long pause. Defaults to Check Every interval.
                 </span>
               </q-tooltip>
             </q-icon>
