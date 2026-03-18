@@ -427,18 +427,11 @@ pub async fn update_config(
             // hit the skip path, and delay the next run by 60 s.
             push_trigger_after_save = true;
         } else {
-            // Delete eagerly — no ordering requirement for disable.
-            if let Err(e) = crate::service::db::scheduler::delete(
-                org_id,
-                TriggerModule::AnomalyDetection,
-                anomaly_id,
-            )
-            .await
-            {
-                log::warn!(
-                    "[anomaly_detection {anomaly_id}] failed to delete trigger on disable: {e}"
-                );
-            }
+            // Do NOT delete the trigger on disable — the scheduler handler already
+            // skips and reschedules disabled configs (see handlers.rs). Keeping the
+            // trigger row preserves last_detection_run (trigger.start_time) and
+            // last_anomaly_detected_at (trigger.data.last_satisfied_at) so they
+            // remain visible in the UI after a pause + refresh.
         }
     }
     if let Some(name) = req.name {
