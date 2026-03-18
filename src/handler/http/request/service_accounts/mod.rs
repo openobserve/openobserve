@@ -64,7 +64,14 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List service accounts", "category": "users"}))
+        ("x-o2-mcp" = json!({
+            "description": "List service accounts",
+            "category": "users",
+            "summary_fields": {
+                "list_path": "data",
+                "fields": ["email", "role", "first_name", "last_name"]
+            }
+        }))
     )
 )]
 pub async fn list(Path(org_id): Path<String>, Headers(user_email): Headers<UserEmail>) -> Response {

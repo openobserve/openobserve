@@ -168,7 +168,14 @@ pub async fn save_pipeline(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all pipelines", "category": "pipelines"}))
+        ("x-o2-mcp" = json!({
+            "description": "List all pipelines",
+            "category": "pipelines",
+            "summary_fields": {
+                "list_path": "list",
+                "fields": ["pipeline_id", "name", "description", "enabled"]
+            }
+        }))
     )
 )]
 pub async fn list_pipelines(

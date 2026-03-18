@@ -530,4 +530,5 @@ mod tests {
 
         assert!(!is_llm_trace(&attrs, None));
     }
+
 }

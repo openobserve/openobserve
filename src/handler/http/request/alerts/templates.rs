@@ -181,7 +181,13 @@ pub async fn get_template(Path((org_id, name)): Path<(String, String)>) -> Respo
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all alert templates", "category": "alerts"}))
+        ("x-o2-mcp" = json!({
+            "description": "List all alert templates",
+            "category": "alerts",
+            "summary_fields": {
+                "fields": ["name", "type", "isDefault", "title"]
+            }
+        }))
     )
 )]
 pub async fn list_templates(

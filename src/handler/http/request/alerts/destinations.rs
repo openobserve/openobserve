@@ -424,7 +424,13 @@ pub async fn get_destination(Path((org_id, name)): Path<(String, String)>) -> Re
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all alert destinations", "category": "alerts"}))
+        ("x-o2-mcp" = json!({
+            "description": "List all alert destinations",
+            "category": "alerts",
+            "summary_fields": {
+                "fields": ["name", "type", "template"]
+            }
+        }))
     )
 )]
 pub async fn list_destinations(
