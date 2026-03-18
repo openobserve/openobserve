@@ -16,12 +16,12 @@
 //! Upgrades anomaly_detection_config from the P1 schema to the P2 schema.
 //!
 //! m20260310 creates the table with `alert_destination_id` (varchar). This migration:
-//! - Adds `folder_id` (varchar 256): backfilled from the "default" Alerts folder for each org.
-//!   If an org has anomaly configs but no default Alerts folder, one is auto-created so the
-//!   backfill always succeeds and folder_id can be set NOT NULL.
+//! - Adds `folder_id` (varchar 256): backfilled from the "default" Alerts folder for each org. If
+//!   an org has anomaly configs but no default Alerts folder, one is auto-created so the backfill
+//!   always succeeds and folder_id can be set NOT NULL.
 //! - Adds `owner` (varchar 256): nullable attributed owner.
-//! - Adds `alert_destinations` (jsonb): wraps the old `alert_destination_id` value in a JSON
-//!   array, then drops the old column.
+//! - Adds `alert_destinations` (jsonb): wraps the old `alert_destination_id` value in a JSON array,
+//!   then drops the old column.
 //!
 //! All three steps are guarded by column-existence checks so the migration is idempotent.
 
