@@ -289,7 +289,10 @@ pub async fn create_config(
         query_mode: Set(req.query_mode.clone()),
         filters: Set(req.filters.clone()),
         custom_sql: Set(req.custom_sql.clone()),
-        detection_function: Set(req.detection_function.clone()),
+        detection_function: Set(combine_detection_fn(
+            &req.detection_function,
+            req.detection_function_field.as_deref(),
+        )),
         histogram_interval: Set(req.histogram_interval.clone()),
         schedule_interval: Set(req.schedule_interval.clone()),
         detection_window_seconds: Set(req.detection_window_seconds),
@@ -466,7 +469,10 @@ pub async fn update_config(
         active_model.custom_sql = Set(Some(custom_sql));
     }
     if let Some(detection_function) = req.detection_function {
-        active_model.detection_function = Set(detection_function);
+        active_model.detection_function = Set(combine_detection_fn(
+            &detection_function,
+            req.detection_function_field.as_deref(),
+        ));
     }
     if let Some(histogram_interval) = req.histogram_interval {
         active_model.histogram_interval = Set(histogram_interval);
@@ -829,6 +835,7 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
             start_time_us,
             end_time_us,
             anomaly_id,
+            &anomaly_config.stream_type.to_string(),
         )
         .await?;
 
@@ -1065,6 +1072,23 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
     Ok(())
 }
 
+/// Combine a detection function name and optional field into the DB storage form.
+/// E.g. ("avg", Some("cpu_millicores")) → "avg(cpu_millicores)"
+///      ("count", _) → "count(*)"
+///      ("avg(cpu_millicores)", _) → "avg(cpu_millicores)"  (already combined, pass-through)
+fn combine_detection_fn(function: &str, field: Option<&str>) -> String {
+    if function.contains('(') {
+        return function.to_string();
+    }
+    match function {
+        "count" => "count(*)".to_string(),
+        other => match field {
+            Some(f) if !f.is_empty() => format!("{}({})", other, f),
+            _ => function.to_string(),
+        },
+    }
+}
+
 /// Parse interval string like "1h", "30m" into seconds
 fn parse_interval(interval: &str) -> Result<i64> {
     if let Some(interval) = interval.strip_suffix('h') {
@@ -1102,7 +1126,16 @@ pub fn config_to_training_config(
         query_mode: serde_json::from_str(&format!("\"{}\"", config.query_mode))?,
         filters,
         custom_sql: config.custom_sql.clone(),
-        detection_function: serde_json::from_str(&format!("\"{}\"", config.detection_function))?,
+        detection_function: {
+            use o2_enterprise::enterprise::anomaly_detection::detector::split_detection_function;
+            let (fn_name, _) = split_detection_function(&config.detection_function);
+            serde_json::from_str(&format!("\"{}\"", fn_name))?
+        },
+        detection_field: {
+            use o2_enterprise::enterprise::anomaly_detection::detector::split_detection_function;
+            let (_, field) = split_detection_function(&config.detection_function);
+            field
+        },
         histogram_interval: config.histogram_interval.clone(),
         schedule_interval: config.schedule_interval.clone(),
         detection_window_seconds: config.detection_window_seconds,
@@ -1146,6 +1179,7 @@ pub async fn execute_anomaly_query(
     start_time: i64,
     end_time: i64,
     anomaly_id: &str,
+    stream_type: &str,
 ) -> Result<Vec<o2_enterprise::enterprise::anomaly_detection::types::QueryDataPoint>> {
     log::info!(
         "[anomaly_detection {}] executing query: sql={}, start_time_us={}, end_time_us={}",
@@ -1178,8 +1212,9 @@ pub async fn execute_anomaly_query(
         local_mode: None,
     };
 
+    let parsed_stream_type = StreamType::from(stream_type);
     let trace_id = config::ider::generate_trace_id();
-    let search_result = search::search(&trace_id, org_id, StreamType::Logs, None, &search_req)
+    let search_result = search::search(&trace_id, org_id, parsed_stream_type, None, &search_req)
         .await
         .map_err(|e| anyhow::anyhow!("[anomaly_detection {}] search failed: {}", anomaly_id, e))?;
 

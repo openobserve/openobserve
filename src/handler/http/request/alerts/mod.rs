@@ -204,7 +204,9 @@ async fn create_anomaly_alert(
         query_mode: anomaly_fields.query_mode,
         filters: anomaly_fields.filters,
         custom_sql: anomaly_fields.custom_sql,
+        // detection_function is already in combined form "avg(field)" from anomaly_fields()
         detection_function: anomaly_fields.detection_function,
+        detection_function_field: None,
         histogram_interval: anomaly_fields.histogram_interval,
         schedule_interval: anomaly_fields.schedule_interval,
         detection_window_seconds: anomaly_fields.detection_window_seconds,
@@ -606,6 +608,8 @@ async fn build_and_run_anomaly_update(
         filters: fields.filters,
         custom_sql: fields.custom_sql,
         detection_function: fields.detection_function,
+        detection_function_field: None, /* already combined into detection_function by
+                                         * anomaly_fields() */
         histogram_interval: fields.histogram_interval,
         schedule_interval: fields.schedule_interval,
         detection_window_seconds: fields.detection_window_seconds,
