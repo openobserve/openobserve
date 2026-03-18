@@ -621,10 +621,10 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelConfigs.scrollSidebarToElement(nameLabelAfter);
     await expect(nameLabelAfter).toHaveValue("country_name");
 
-    // Map type wrapper should contain "World" (label shown in q-select display)
+    // Map type wrapper contains "world" (raw value — q-select uses emit-value without map-options)
     await pm.dashboardPanelConfigs.scrollSidebarToElement(mapTypeAfter);
     const mapTypeWrapper = mapTypeAfter.locator('xpath=ancestor::div[contains(@class,"q-field")][1]');
-    await expect(mapTypeWrapper).toContainText("World");
+    await expect(mapTypeWrapper).toContainText("world");
     testLogger.info("Maps name label and map type persisted after save");
 
     await pm.dashboardPanelActions.savePanel();
