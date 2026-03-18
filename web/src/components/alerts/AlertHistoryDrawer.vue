@@ -332,6 +332,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                         <span v-else class="tw:text-gray-400">—</span>
                       </template>
+                      <template v-else-if="col.name === 'actual_value' || col.name === 'score' || col.name === 'threshold_value'">
+                        <span class="tw:text-[13px] tw:tabular-nums">
+                          {{ props.row[col.field] != null ? Number(props.row[col.field]).toFixed(4) : "—" }}
+                        </span>
+                      </template>
+                      <template v-else-if="col.name === 'deviation_percent'">
+                        <span class="tw:text-[13px] tw:tabular-nums">
+                          {{ props.row.deviation_percent != null ? Number(props.row.deviation_percent).toFixed(2) + "%" : "—" }}
+                        </span>
+                      </template>
                     </q-td>
                   </q-tr>
                 </template>
@@ -476,7 +486,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
@@ -494,9 +504,12 @@ const $q = useQuasar();
 interface Props {
   alertDetails: any;
   alertId: string;
+  alertType?: string;
 }
 
 const props = defineProps<Props>();
+
+const isAnomaly = computed(() => props.alertType === "anomaly_detection");
 
 const emit = defineEmits(["edit"]);
 
@@ -570,8 +583,8 @@ const onPageChange = (page: number) => {
   });
 };
 
-// Constants
-const historyTableColumns = [
+// Columns
+const alertHistoryColumns = [
   {
     name: "#",
     label: "#",
@@ -621,14 +634,79 @@ const historyTableColumns = [
   },
 ];
 
+const anomalyHistoryColumns = [
+  {
+    name: "#",
+    label: "#",
+    field: "#",
+    align: "left" as const,
+    sortable: false,
+    style: "width: 48px;",
+  },
+  {
+    name: "timestamp",
+    label: t("alerts.historyTable.timestamp"),
+    field: "timestamp",
+    align: "left" as const,
+    sortable: true,
+    style: "width: 140px;",
+  },
+  {
+    name: "status",
+    label: "Result",
+    field: "status",
+    align: "left" as const,
+    sortable: true,
+    style: "width: 110px;",
+  },
+  {
+    name: "actual_value",
+    label: "Actual Value",
+    field: "actual_value",
+    align: "right" as const,
+    sortable: true,
+    style: "width: 120px;",
+  },
+  {
+    name: "score",
+    label: "Score",
+    field: "score",
+    align: "right" as const,
+    sortable: true,
+    style: "width: 100px;",
+  },
+  {
+    name: "threshold_value",
+    label: "Threshold",
+    field: "threshold_value",
+    align: "right" as const,
+    sortable: true,
+    style: "width: 110px;",
+  },
+  {
+    name: "deviation_percent",
+    label: "Deviation %",
+    field: "deviation_percent",
+    align: "right" as const,
+    sortable: true,
+    style: "width: 110px;",
+  },
+];
+
+const historyTableColumns = computed(() =>
+  isAnomaly.value ? anomalyHistoryColumns : alertHistoryColumns
+);
+
 // Helper Functions
 const getStatusDotClass = (status: string) => {
   switch (status?.toLowerCase()) {
     case "firing":
     case "error":
+    case "anomaly":
       return "status-dot-error";
     case "ok":
     case "success":
+    case "normal":
       return "status-dot-success";
     case "skipped":
       return "status-dot-warning";
@@ -643,9 +721,11 @@ const getStatusTextClass = (status: string) => {
   switch (status?.toLowerCase()) {
     case "firing":
     case "error":
+    case "anomaly":
       return "tw:text-red-500";
     case "ok":
     case "success":
+    case "normal":
       return "tw:text-green-600";
     case "skipped":
       return "tw:text-amber-600";
@@ -663,6 +743,7 @@ const getRowClass = (status: string) => {
     switch (status?.toLowerCase()) {
       case "firing":
       case "error":
+      case "anomaly":
         return "row-error-dark";
       default:
         return "";
@@ -671,6 +752,7 @@ const getRowClass = (status: string) => {
     switch (status?.toLowerCase()) {
       case "firing":
       case "error":
+      case "anomaly":
         return "row-error-light";
       default:
         return "";
@@ -717,15 +799,20 @@ const fetchAlertHistory = async (alertId: string) => {
     const endTime = dateTimeValues.value.endTime;
     const from = (currentPage.value - 1) * selectedPerPage.value;
 
+    const historyParams: Record<string, any> = {
+      size: selectedPerPage.value,
+      from: from,
+      start_time: startTime,
+      end_time: endTime,
+    };
+    if (isAnomaly.value) {
+      historyParams.anomaly_id = alertId;
+    } else {
+      historyParams.alert_id = alertId;
+    }
     const response = await alertsService.getHistory(
       store?.state?.selectedOrganization?.identifier,
-      {
-        alert_id: alertId,
-        size: selectedPerPage.value,
-        from: from,
-        start_time: startTime,
-        end_time: endTime,
-      },
+      historyParams,
     );
     alertHistory.value = response.data?.hits || [];
     resultTotal.value = response.data?.total || 0;
