@@ -237,8 +237,8 @@ fn create_anomaly_detection_config_table_stmt() -> TableCreateStatement {
                 .default(true),
         )
         .col(
-            ColumnDef::new(AnomalyDetectionConfig::AlertDestinationId)
-                .string_len(100)
+            ColumnDef::new(AnomalyDetectionConfig::AlertDestinations)
+                .text()
                 .null(),
         )
         // Scheduler Integration (for locking)
@@ -337,7 +337,7 @@ pub enum AnomalyDetectionConfig {
     RcfTreeSize,
     RcfShingleSize,
     AlertEnabled,
-    AlertDestinationId,
+    AlertDestinations,
     Status,
     Retries,
     LastUpdated,
