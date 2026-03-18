@@ -2659,7 +2659,9 @@
     "spanColorPalettePreview": "스팬 컬러 팔레트 미리보기",
     "errorsFound": "오류 추적",
     "spansTitle": "기간",
-    "spansFound": "스팬 발견"
+    "spansFound": "스팬 발견",
+    "errorTraces": "오류 추적",
+    "errorSpans": "오류 범위"
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",
