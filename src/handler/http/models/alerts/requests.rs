@@ -71,6 +71,8 @@ pub struct CreateAlertRequestBody {
     pub filters: Option<serde_json::Value>,
     pub custom_sql: Option<String>,
     pub detection_function: Option<String>,
+    /// Field to aggregate (required for avg/sum/min/max/pXX, ignored for count).
+    pub detection_function_field: Option<String>,
     pub histogram_interval: Option<String>,
     pub schedule_interval: Option<String>,
     pub detection_window_seconds: Option<i64>,
@@ -96,10 +98,12 @@ impl CreateAlertRequestBody {
     /// Returns `None` only if the result has no `detection_function` (required).
     pub fn anomaly_fields(&self) -> Option<AnomalyAlertFields> {
         let base = self.anomaly_config.clone();
-        let detection_function = self
-            .detection_function
-            .clone()
-            .or_else(|| base.as_ref().map(|b| b.detection_function.clone()))?;
+        let detection_function = combine_detection_function(
+            self.detection_function
+                .clone()
+                .or_else(|| base.as_ref().map(|b| b.detection_function.clone())),
+            self.detection_function_field.clone(),
+        )?;
         let query_mode = self
             .query_mode
             .clone()
@@ -210,6 +214,8 @@ pub struct UpdateAlertRequestBody {
     pub filters: Option<serde_json::Value>,
     pub custom_sql: Option<String>,
     pub detection_function: Option<String>,
+    /// Field to aggregate (required for avg/sum/min/max/pXX, ignored for count).
+    pub detection_function_field: Option<String>,
     pub histogram_interval: Option<String>,
     pub schedule_interval: Option<String>,
     pub detection_window_seconds: Option<i64>,
@@ -237,7 +243,10 @@ impl UpdateAlertRequestBody {
             query_mode: self.query_mode.clone().or(base.query_mode),
             filters: self.filters.clone().or(base.filters),
             custom_sql: self.custom_sql.clone().or(base.custom_sql),
-            detection_function: self.detection_function.clone().or(base.detection_function),
+            detection_function: combine_detection_function(
+                self.detection_function.clone().or(base.detection_function),
+                self.detection_function_field.clone(),
+            ),
             histogram_interval: self.histogram_interval.clone().or(base.histogram_interval),
             schedule_interval: self.schedule_interval.clone().or(base.schedule_interval),
             detection_window_seconds: self
@@ -386,6 +395,31 @@ pub struct CloneAlertRequestBody {
 
     /// Optional folder ID to place the clone in. Defaults to the source folder.
     pub folder_id: Option<String>,
+}
+
+/// Combine a detection function name and optional field into the stored form.
+///
+/// "avg" + Some("cpu_millicores") → Some("avg(cpu_millicores)")
+/// "count" + _ → Some("count(*)")
+/// "avg" + None → Some("avg")  (legacy — field will use fallback at query-build time)
+/// None → None
+pub fn combine_detection_function(
+    function: Option<String>,
+    field: Option<String>,
+) -> Option<String> {
+    let fn_name = function?;
+    if fn_name.contains('(') {
+        // Already in combined form (e.g. "avg(cpu_millicores)") — pass through.
+        return Some(fn_name);
+    }
+    let combined = match fn_name.as_str() {
+        "count" => "count(*)".to_string(),
+        other => match field {
+            Some(f) if !f.is_empty() => format!("{}({})", other, f),
+            _ => fn_name, // no field yet — store bare name, query builder will warn
+        },
+    };
+    Some(combined)
 }
 
 /// HTTP request body for `GenerateSql` endpoint.

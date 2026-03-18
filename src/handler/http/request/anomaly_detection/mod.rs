@@ -376,7 +376,12 @@ pub struct CreateAnomalyConfigRequest {
     pub query_mode: String,  // "filters" or "custom_sql"
     pub filters: Option<serde_json::Value>,
     pub custom_sql: Option<String>,
-    pub detection_function: String, // "count(*)", "avg(field)", etc.
+    /// Aggregate function name: "count", "avg", "sum", "min", "max", "p50", "p95", "p99".
+    /// For backwards compatibility, also accepts the combined form "avg(field)".
+    pub detection_function: String,
+    /// Field to aggregate (required for avg/sum/min/max/pXX, ignored for count).
+    /// Combined with `detection_function` into "avg(field)" before saving.
+    pub detection_function_field: Option<String>,
     /// SQL histogram bucket size, e.g. "5m", "1h".
     pub histogram_interval: String,
     /// How often the detection job fires, e.g. "1h", "30m".
@@ -414,6 +419,8 @@ pub struct UpdateAnomalyConfigRequest {
     pub filters: Option<serde_json::Value>,
     pub custom_sql: Option<String>,
     pub detection_function: Option<String>,
+    /// Field to aggregate (required for avg/sum/min/max/pXX).
+    pub detection_function_field: Option<String>,
     /// SQL histogram bucket size. Changing this requires retraining.
     pub histogram_interval: Option<String>,
     /// How often the detection job fires.
