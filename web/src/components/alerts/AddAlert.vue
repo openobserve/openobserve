@@ -516,7 +516,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-step
               v-if="isAnomalyMode"
               :name="2"
-              :title="t('alerts.anomalyDetectionConfig')"
+              :title="t('alerts.anomalyDetectionConfig') + ' *'"
               caption=""
               icon="manage_search"
               :done="wizardStep > 2"
@@ -552,7 +552,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-step
               v-if="isAnomalyMode"
               :name="3"
-              :title="t('alerts.alerting')"
+              :title="t('alerts.alerting') + (anomalyConfig.alert_enabled ? ' *' : '')"
               caption=""
               icon="notifications"
               :done="false"
@@ -958,7 +958,7 @@ const defaultAnomalyConfig = () => ({
   retrain_interval_days: 7,
   threshold: 97,
   alert_enabled: true,
-  alert_destination_id: undefined as string | undefined,
+  alert_destination_ids: [] as string[],
   folder_id: "default",
   status: undefined as string | undefined,
   is_trained: false,
@@ -1382,6 +1382,13 @@ export default defineComponent({
             : parseSeconds(
                 sched.value * (sched.unit === "h" ? 3600 : 60),
               );
+          // Normalize destinations: API may return a single id (string) or array
+          const rawDestIds = data.alert_destination_ids ?? data.alert_destination_id;
+          const destIds: string[] = Array.isArray(rawDestIds)
+            ? rawDestIds
+            : rawDestIds
+              ? [rawDestIds]
+              : [];
           anomalyConfig.value = {
             ...defaultAnomalyConfig(),
             ...data,
@@ -1393,6 +1400,7 @@ export default defineComponent({
             schedule_interval_unit: sched.unit,
             detection_window_value: win.value,
             detection_window_unit: win.unit,
+            alert_destination_ids: destIds,
           };
           formData.value.is_real_time = "anomaly";
           formData.value.name = data.name;
@@ -2919,7 +2927,13 @@ export default defineComponent({
     // Allow saving after completing all required steps
     const canSaveAlert = computed(() => {
       if (formData.value.is_real_time === "anomaly") {
-        // Anomaly: allow save from any step (save button always enabled)
+        // Block save when notifications are enabled but no destination is selected
+        if (
+          anomalyConfig.value.alert_enabled &&
+          anomalyConfig.value.alert_destination_ids.length === 0
+        ) {
+          return false;
+        }
         return true;
       }
       // Required steps: 1 (Alert Setup), 2 (Conditions), 4 (Alert Settings)
@@ -2931,6 +2945,24 @@ export default defineComponent({
     const anomalySaving = ref(false);
 
     const saveAnomalyDetection = async () => {
+      // Validate step 2 (detection config) before saving
+      if (anomalyStep2Ref.value) {
+        const step2Valid = await anomalyStep2Ref.value.validate();
+        if (!step2Valid) {
+          wizardStep.value = 2;
+          return;
+        }
+      }
+
+      // Validate step 3 (alerting) - destination required when notifications enabled
+      if (
+        anomalyConfig.value.alert_enabled &&
+        anomalyConfig.value.alert_destination_ids.length === 0
+      ) {
+        wizardStep.value = 3;
+        return;
+      }
+
       anomalySaving.value = true;
       try {
         const orgId = store.state.selectedOrganization.identifier;
@@ -2959,8 +2991,8 @@ export default defineComponent({
             retrain_interval_days: c.retrain_interval_days,
             percentile: c.threshold,
             alert_enabled: c.alert_enabled,
-            alert_destination_id: c.alert_enabled
-              ? c.alert_destination_id
+            alert_destination_ids: c.alert_enabled
+              ? c.alert_destination_ids
               : undefined,
           },
         };

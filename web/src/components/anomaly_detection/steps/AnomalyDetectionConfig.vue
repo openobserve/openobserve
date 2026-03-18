@@ -435,6 +435,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="anomaly-detection-window-unit"
               />
             </div>
+            <div
+              v-if="
+                !config.detection_window_value ||
+                config.detection_window_value < 1
+              "
+              class="text-red-8 q-pt-xs"
+              style="font-size: 11px; line-height: 12px"
+              data-test="anomaly-detection-window-error"
+            >
+              Field is required!
+            </div>
           </div>
         </div>
 
@@ -862,6 +873,32 @@ export default defineComponent({
       if (
         props.config.query_mode === "custom_sql" &&
         !props.config.custom_sql
+      ) {
+        return false;
+      }
+      if (
+        !props.config.histogram_interval_value ||
+        props.config.histogram_interval_value < 1
+      ) {
+        return false;
+      }
+      if (
+        !props.config.schedule_interval_value ||
+        props.config.schedule_interval_value < 1
+      ) {
+        return false;
+      }
+      if (
+        !props.config.detection_window_value ||
+        props.config.detection_window_value < 1
+      ) {
+        return false;
+      }
+      if (
+        props.config.query_mode === "filters" &&
+        props.config.detection_function &&
+        props.config.detection_function !== "count" &&
+        !props.config.detection_function_field
       ) {
         return false;
       }
