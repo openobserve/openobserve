@@ -6,24 +6,20 @@ const { waitForDashboardPage, deleteDashboard } = require('../dashboards/utils/d
 
 
 test.describe("Metrics PromQL Builder Mode testcases", () => {
-  test.describe.configure({ mode: 'parallel' });
-  let pm;
-
   test.beforeAll(async () => {
     await ensureMetricsIngested();
   });
 
-  test.beforeEach(async ({ page }, testInfo) => {
+  /** Create a fresh PageManager per test — avoids data races in parallel workers. */
+  async function setupTest(page, testInfo) {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
-    pm = new PageManager(page);
-
-    // Navigate to metrics page
+    const pm = new PageManager(page);
     await pm.metricsPage.gotoMetricsPage();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
     testLogger.info('Test setup completed - navigated to metrics page');
-  });
+    return pm;
+  }
 
   test.afterEach(async ({}, testInfo) => {
     testLogger.testEnd(testInfo.title, testInfo.status);
@@ -35,8 +31,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
   test("P0: Builder mode tabs, UI elements, and mode switching", {
     tag: ['@metrics', '@builder', '@smoke', '@P0', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing mode tabs and UI elements');
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
     // 1. Verify all mode buttons visible
@@ -91,8 +87,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
   test("P0: Stream selector, search filter, and run default query", {
     tag: ['@metrics', '@builder', '@smoke', '@P0', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing stream selector and default query');
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
     // 1. Verify stream selector visible with pre-selected value
@@ -143,8 +139,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
   test("P1: Label filters - add, configure, verify operators, multiple, remove", {
     tag: ['@metrics', '@builder', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing complete label filter workflows');
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
     // 1. Initial count is 0
@@ -234,8 +230,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
   test("P1: Operations - add, categories, search, params, reorder, remove", {
     tag: ['@metrics', '@builder', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing complete operations workflows');
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
     // 1. Open operation dialog and verify categories
@@ -336,8 +332,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
   test("P1: Builder options - legend, step value, query type switching", {
     tag: ['@metrics', '@builder', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing Builder options');
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
     // 1. Set legend
@@ -393,8 +389,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
   test("P1: Add to Dashboard - dialog fields, fill title, cancel", {
     tag: ['@metrics', '@builder', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing Add to Dashboard dialog');
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
     // Run query first to enable Add to Dashboard
@@ -429,8 +425,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
   test("P1: State persistence - filters, operations, step value across Builder/Custom switch", {
     tag: ['@metrics', '@builder', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing state persistence across mode switches');
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
     // Setup: add filter, operation, step value
@@ -472,8 +468,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
   test("P1: E2E - build query with Rate operation, step value, run and verify chart", {
     tag: ['@metrics', '@builder', '@e2e', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing full E2E builder workflow');
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
     // 1. Verify builder mode + metric pre-selected
@@ -521,8 +517,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
   test("P2: E2E - build query, switch to table chart, verify table renders with no errors", {
     tag: ['@metrics', '@builder', '@e2e', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing chart type switching to table');
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
     // 1. Set time range and run default query first
@@ -581,8 +577,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
   test("P2: E2E - build query, save to dashboard, verify panel, cleanup", {
     tag: ['@metrics', '@builder', '@e2e', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing full save-to-dashboard workflow');
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
     const uniqueId = Date.now().toString().slice(-6);
     const panelTitle = `E2E Builder Panel ${uniqueId}`;
@@ -657,8 +653,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
   test("P2: E2E - build query with Rate + Sum operations, set options, run query", {
     tag: ['@metrics', '@builder', '@e2e', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing multi-operation builder workflow');
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
     // 1. Set time range
@@ -707,8 +703,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
   test("P2: E2E - add filter + operation, switch to Instant query type, run and verify", {
     tag: ['@metrics', '@builder', '@e2e', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing Instant query type with filter and operation');
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
     // 1. Set time range
@@ -758,8 +754,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
   test("P1: E2E - build complete query (label filter + Sum + options), verify builder state and table chart", {
     tag: ['@metrics', '@builder', '@e2e', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing complete builder workflow: label filter + operation + options + table chart');
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
     // 1. Verify builder mode active with metric pre-selected
@@ -969,8 +965,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
   test("P2: E2E - label filter + Sum with by-label, verify query built correctly and table renders data", {
     tag: ['@metrics', '@builder', '@e2e', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing: label filter + Sum(by label) + table chart with data verification');
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
     // 1. Verify builder mode and pre-selected metric
@@ -1156,8 +1152,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
   test("P1: E2E - save metric query to dashboard, edit panel, verify builder config persisted", {
     tag: ['@metrics', '@builder', '@dashboard', '@e2e', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing: build query → save to dashboard → edit panel → verify config');
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
     const panelTitle = `test_panel_${Date.now()}`;
 

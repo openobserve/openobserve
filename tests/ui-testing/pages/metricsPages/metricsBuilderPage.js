@@ -635,7 +635,7 @@ export class MetricsBuilderPage {
      * Check if label select dropdown has options loaded
      */
     async hasLabelOptions() {
-        const options = this.page.locator('.q-menu .q-item');
+        const options = this.page.locator('.q-menu').last().locator('.q-item');
         const count = await options.count();
         return count > 0;
     }
