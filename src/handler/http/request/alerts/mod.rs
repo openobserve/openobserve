@@ -279,7 +279,7 @@ pub async fn get_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Resp
         Err(AlertError::AlertNotFound) => {
             #[cfg(not(feature = "enterprise"))]
             {
-                return MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"));
+                MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"))
             }
             #[cfg(feature = "enterprise")]
             {
@@ -354,7 +354,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
         Err(AlertError::AlertNotFound) => {
             #[cfg(not(feature = "enterprise"))]
             {
-                return MetaHttpResponse::not_found("alert not found");
+                MetaHttpResponse::not_found("alert not found")
             }
             #[cfg(feature = "enterprise")]
             {
@@ -452,7 +452,7 @@ pub async fn clone_alert(
         Err(AlertError::AlertNotFound) => {
             #[cfg(not(feature = "enterprise"))]
             {
-                return MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"));
+                MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"))
             }
             #[cfg(feature = "enterprise")]
             {
@@ -550,7 +550,7 @@ pub async fn update_alert(
         Err(AlertError::AlertNotFound) => {
             #[cfg(not(feature = "enterprise"))]
             {
-                return MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"));
+                MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"))
             }
             #[cfg(feature = "enterprise")]
             {
@@ -653,7 +653,7 @@ pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
         Err(AlertError::AlertNotFound) => {
             #[cfg(not(feature = "enterprise"))]
             {
-                return MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"));
+                MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"))
             }
             #[cfg(feature = "enterprise")]
             {
@@ -902,7 +902,7 @@ pub async fn enable_alert(
         Err(AlertError::AlertNotFound) => {
             #[cfg(not(feature = "enterprise"))]
             {
-                return MetaHttpResponse::not_found(format!("alert {alert_id} not found"));
+                MetaHttpResponse::not_found(format!("alert {alert_id} not found"))
             }
             #[cfg(feature = "enterprise")]
             {
@@ -1070,7 +1070,7 @@ pub async fn trigger_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
         Err(AlertError::AlertNotFound) => {
             #[cfg(not(feature = "enterprise"))]
             {
-                return MetaHttpResponse::not_found(format!("alert {alert_id} not found"));
+                MetaHttpResponse::not_found(format!("alert {alert_id} not found"))
             }
             #[cfg(feature = "enterprise")]
             {
@@ -1140,9 +1140,7 @@ pub async fn retrain_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        return MetaHttpResponse::bad_request(
-            "retrain is only supported for anomaly detection alerts",
-        );
+        MetaHttpResponse::bad_request("retrain is only supported for anomaly detection alerts")
     }
     #[cfg(feature = "enterprise")]
     match crate::service::anomaly_detection::train_model(&org_id, &alert_id_str).await {
@@ -1231,8 +1229,8 @@ pub async fn move_alerts(
     }
 
     // Move regular alerts in one batch
-    if !alert_ids.is_empty() {
-        if let Err(e) = alert::move_to_folder(
+    if !alert_ids.is_empty()
+        && let Err(e) = alert::move_to_folder(
             client,
             &org_id,
             &alert_ids,
@@ -1240,9 +1238,8 @@ pub async fn move_alerts(
             &user_email.user_id,
         )
         .await
-        {
-            return e.into();
-        }
+    {
+        return e.into();
     }
 
     let message = if req_body.alert_ids.len() == 1 {
