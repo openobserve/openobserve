@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Template rendered as tokenized chips so wildcards are visually distinct -->
       <div
         class="pattern-template-text tw-flex tw-flex-wrap tw-items-baseline tw-gap-x-[2px] tw-gap-y-[1px]"
-        :class="[store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8', wrap ? 'tw:break-all' : 'tw:truncate']"
+        :class="store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'"
         :data-test="`pattern-card-${index}-template`"
         :title="pattern.template"
       >
@@ -164,6 +164,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import {
   tokenizeTemplate,
   wildcardChipColor,
@@ -214,6 +215,15 @@ const anomalyExplanationText = computed(() => anomalyExplanation(props.pattern, 
 @import "@/assets/styles/log-highlighting.css";
 .pattern-details-btn > span.q-btn__content {
   display: block !important;
+.wildcard-chip {
+  font-family: monospace;
+  font-size: 10px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 3px;
+  line-height: 16px;
+  // Prevent chips from inheriting the truncate overflow of the parent row
+  flex-shrink: 0;
 }
 .wildcard-chip {
   font-family: monospace;
