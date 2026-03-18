@@ -655,11 +655,39 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
           testLogger.info('Navigated to dashboard after save');
 
           // 12. Verify panel exists
+          await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+          await page.waitForTimeout(2000);
           const panelVisible = await builder.isPanelVisibleOnDashboard(panelTitle);
           if (panelVisible) {
             testLogger.info(`Panel "${panelTitle}" visible on dashboard`);
           } else {
             testLogger.info('Panel may be rendered differently or page still loading');
+          }
+
+          // 13. Cleanup: delete the saved panel
+          const panelContainer = page.locator('[data-test="dashboard-panel-container"]').filter({ hasText: panelTitle });
+          if (await panelContainer.isVisible({ timeout: 5000 }).catch(() => false)) {
+            await panelContainer.hover();
+            await page.waitForTimeout(500);
+            const dropdownBtn = page.locator(`[data-test="dashboard-edit-panel-${panelTitle}-dropdown"]`);
+            if (await dropdownBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+              await dropdownBtn.click();
+              await page.waitForTimeout(500);
+              const deleteItem = page.locator('[data-test="dashboard-delete-panel"]');
+              await deleteItem.waitFor({ state: 'visible', timeout: 5000 });
+              await deleteItem.click();
+              await page.waitForTimeout(500);
+              const confirmBtn = page.locator('[data-test="confirm-button"]');
+              if (await confirmBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await confirmBtn.click();
+                await page.waitForTimeout(2000);
+              }
+              testLogger.info(`Cleanup: panel "${panelTitle}" deleted`);
+            } else {
+              testLogger.warn('Cleanup: could not find panel dropdown for deletion');
+            }
+          } else {
+            testLogger.warn('Cleanup: panel container not found for deletion');
           }
         } else {
           // Check for success/error notification
@@ -1175,5 +1203,333 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await builder.removeOperation(0);
     await builder.removeLabelFilter(0);
     testLogger.info('Cleanup complete');
+  });
+
+  // =========================================================================
+  // P1 - E2E: Build query in metrics, save to dashboard, edit dashboard panel,
+  //       verify all builder config (label filters, operations, options) persisted
+  // =========================================================================
+
+  test("P1: E2E - save metric query to dashboard, edit panel, verify builder config persisted", {
+    tag: ['@metrics', '@builder', '@dashboard', '@e2e', '@P1', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing: build query → save to dashboard → edit panel → verify config');
+    const builder = pm.metricsBuilderPage;
+    const panelTitle = `test_panel_${Date.now()}`;
+
+    // 1. Verify builder mode and pre-selected metric
+    expect(await builder.isModeSelected('builder')).toBe(true);
+    const streamInput = page.locator(builder.streamSelector);
+    const metricName = await streamInput.inputValue();
+    expect(metricName.length).toBeGreaterThan(0);
+    testLogger.info(`Metric: ${metricName}`);
+
+    // 2. Set time range
+    await pm.metricsPage.openDatePicker();
+    await pm.metricsPage.selectLast15Minutes();
+    await page.waitForTimeout(1000);
+
+    // 3. Add label filter with label + operator(=) + value
+    await builder.clickAddLabelFilter();
+    expect(await builder.getLabelFilterCount()).toBe(1);
+
+    await builder.openLabelFilterMenu(0);
+    const labelDropdown = page.locator(builder.labelSelect).last();
+    await labelDropdown.click();
+    await page.waitForTimeout(500);
+
+    const labelOptions = page.locator('.q-menu .q-item');
+    const labelCount = await labelOptions.count();
+    let selectedLabel = '';
+    let selectedValue = '';
+
+    if (labelCount > 0) {
+      selectedLabel = (await labelOptions.first().textContent()).trim();
+      await labelOptions.first().click();
+      await page.waitForTimeout(500);
+      testLogger.info(`Label: ${selectedLabel}`);
+
+      // Select value
+      const valueDropdown = page.locator(builder.valueSelect).last();
+      const isDisabled = await builder.isValueSelectDisabled();
+      if (!isDisabled) {
+        await valueDropdown.click();
+        await page.waitForTimeout(500);
+        const valueOptions = page.locator('.q-menu .q-item');
+        if (await valueOptions.count() > 0) {
+          selectedValue = (await valueOptions.first().textContent()).trim();
+          await valueOptions.first().click();
+          await page.waitForTimeout(500);
+          testLogger.info(`Value: ${selectedValue}`);
+        }
+      }
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+
+      // Assert chip text
+      const chipText = await builder.getLabelFilterText(0);
+      expect(chipText).toContain(selectedLabel);
+      testLogger.info(`Filter chip: "${chipText}"`);
+    } else {
+      await page.keyboard.press('Escape');
+    }
+
+    // 4. Add Sum operation
+    expect(await builder.addOperation('Sum')).toBe(true);
+    expect(await builder.getOperationCount()).toBe(1);
+    testLogger.info('Sum operation added');
+
+    // 5. Configure Sum's "by" label parameter
+    if (selectedLabel) {
+      const opBtn = page.locator('[data-test="promql-operation-0"]');
+      await opBtn.click();
+      await page.waitForTimeout(500);
+      const labelParam = page.locator('[data-test="promql-operation-param-0"]').last();
+      if (await labelParam.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await labelParam.click();
+        await page.waitForTimeout(500);
+        const paramOption = page.locator('.q-menu .q-item').filter({ hasText: selectedLabel }).first();
+        if (await paramOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await paramOption.click();
+          await page.waitForTimeout(500);
+          testLogger.info(`Sum by: ${selectedLabel}`);
+        }
+      }
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+    }
+
+    // 6. Set options
+    await builder.setLegend('{__hash__}');
+    testLogger.info(`Options set: legend={__hash__}`);
+
+    // 7. Run query to generate results before saving
+    await builder.clickRunQuery();
+    await page.waitForTimeout(3000);
+    expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
+    testLogger.info('Query ran successfully, no errors');
+
+    // 8. Save to dashboard via "Add To Dashboard" dialog
+    const addClicked = await builder.clickAddToDashboard();
+    expect(addClicked).toBe(true);
+    testLogger.info('Add To Dashboard dialog opened');
+
+    // Wait for dialog to load
+    const dialogVisible = await builder.isDashboardDialogVisible();
+    expect(dialogVisible).toBe(true);
+
+    // Select folder (default)
+    const folderDropdown = page.locator('[data-test="index-dropdown-stream_type"]');
+    if (await folderDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await folderDropdown.click();
+      await page.waitForTimeout(500);
+      const defaultFolder = page.locator('.q-menu .q-item').filter({ hasText: 'default' }).first();
+      if (await defaultFolder.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await defaultFolder.click();
+        await page.waitForTimeout(500);
+      }
+      testLogger.info('Folder: default');
+    }
+
+    // Select dashboard — pick the first available or create new
+    const dashDropdown = page.locator('[data-test="dashboard-dropdown-dashboard-selection"]');
+    await dashDropdown.waitFor({ state: 'visible', timeout: 5000 });
+    await dashDropdown.click();
+    await page.waitForTimeout(500);
+
+    let dashboardName = '';
+    const dashOptions = page.locator('.q-menu .q-item');
+    const dashCount = await dashOptions.count();
+    if (dashCount > 0) {
+      dashboardName = (await dashOptions.first().textContent()).trim();
+      await dashOptions.first().click();
+      await page.waitForTimeout(500);
+      testLogger.info(`Dashboard: ${dashboardName}`);
+    } else {
+      // Create a new dashboard
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+      const newDashBtn = page.locator('[data-test="dashboard-dashboard-new-add"]');
+      if (await newDashBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await newDashBtn.click();
+        await page.waitForTimeout(500);
+        const dashNameInput = page.locator('[data-test="dashboard-dashboard-add-dialog"] input, .q-dialog input').first();
+        dashboardName = `test_dash_${Date.now()}`;
+        await dashNameInput.fill(dashboardName);
+        await page.locator('.q-dialog .q-btn:has-text("Save"), .q-dialog .q-btn:has-text("OK")').first().click();
+        await page.waitForTimeout(1000);
+        testLogger.info(`Created new dashboard: ${dashboardName}`);
+      }
+    }
+
+    // Select tab (first available)
+    const tabDropdown = page.locator('[data-test="dashboard-dropdown-tab-selection"]');
+    if (await tabDropdown.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await tabDropdown.click();
+      await page.waitForTimeout(500);
+      const tabOptions = page.locator('.q-menu .q-item');
+      if (await tabOptions.count() > 0) {
+        await tabOptions.first().click();
+        await page.waitForTimeout(500);
+        testLogger.info('Tab selected');
+      }
+    }
+
+    // Fill panel title
+    await builder.fillPanelTitle(panelTitle);
+    testLogger.info(`Panel title: ${panelTitle}`);
+
+    // Click Add to save
+    await builder.clickDashboardAdd();
+    await page.waitForTimeout(3000);
+    testLogger.info('Panel saved to dashboard');
+
+    // 9. After save, we should be redirected to the dashboard view
+    // Wait for dashboard view to load
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    // Verify the panel is visible on the dashboard
+    const panelBar = page.locator('[data-test="dashboard-panel-bar"]').filter({ hasText: panelTitle });
+    const panelVisible = await panelBar.isVisible({ timeout: 10000 }).catch(() => false);
+    expect(panelVisible).toBe(true);
+    testLogger.info('Panel visible on dashboard');
+
+    // 10. Edit the panel — click dropdown menu and select Edit
+    const panelContainer = page.locator('[data-test="dashboard-panel-container"]').filter({ hasText: panelTitle });
+    await panelContainer.hover();
+    await page.waitForTimeout(500);
+
+    // Click the panel dropdown menu
+    const dropdownBtn = page.locator(`[data-test="dashboard-edit-panel-${panelTitle}-dropdown"]`);
+    if (await dropdownBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await dropdownBtn.click();
+    } else {
+      // Fallback: try generic dropdown on the panel container
+      const anyDropdown = panelContainer.locator('[data-test*="dropdown"]').first();
+      await anyDropdown.click();
+    }
+    await page.waitForTimeout(500);
+
+    // Click Edit Panel menu item
+    const editMenuItem = page.locator('[data-test="dashboard-edit-panel"]');
+    await editMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+    await editMenuItem.click();
+    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    testLogger.info('Opened panel editor');
+
+    // 11. Verify the panel edit view loads with correct builder config
+    // Check panel name
+    const panelNameInput = page.locator('[data-test="dashboard-panel-name"]');
+    if (await panelNameInput.isVisible({ timeout: 5000 }).catch(() => false)) {
+      const panelNameValue = await panelNameInput.inputValue().catch(() => '');
+      expect(panelNameValue).toContain(panelTitle);
+      testLogger.info(`Panel name: ${panelNameValue}`);
+    }
+
+    // Verify builder mode is active (PromQL + Builder tabs)
+    const builderBtn = page.locator('[data-test="dashboard-builder-query-type"]');
+    if (await builderBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      const classes = await builderBtn.getAttribute('class') || '';
+      expect(classes).toContain('selected');
+      testLogger.info('Builder mode active in panel editor');
+    }
+
+    // 12. Verify label filter persisted
+    const editFilterCount = await builder.getLabelFilterCount();
+    testLogger.info(`Panel editor label filters: ${editFilterCount}`);
+    if (selectedLabel) {
+      expect(editFilterCount).toBeGreaterThanOrEqual(1);
+      const filterText = await builder.getLabelFilterText(0);
+      expect(filterText).toContain(selectedLabel);
+      if (selectedValue) {
+        expect(filterText).toContain(selectedValue);
+      }
+      testLogger.info(`Panel editor filter chip: "${filterText}"`);
+    }
+
+    // 13. Verify operation persisted
+    const editOpCount = await builder.getOperationCount();
+    testLogger.info(`Panel editor operations: ${editOpCount}`);
+    expect(editOpCount).toBe(1);
+    const opText = await builder.getOperationText(0);
+    expect(opText.toLowerCase()).toContain('sum');
+    if (selectedLabel) {
+      expect(opText).toContain(selectedLabel);
+    }
+    testLogger.info(`Panel editor operation: "${opText}"`);
+
+    // 14. Verify options persisted (legend)
+    const legendField = page.locator('[data-test="dashboard-promql-builder-legend"]');
+    if (await legendField.isVisible({ timeout: 3000 }).catch(() => false)) {
+      const legendInput = legendField.locator('input').first();
+      const legendValue = await legendInput.inputValue().catch(() => '');
+      expect(legendValue).toBe('{__hash__}');
+      testLogger.info(`Panel editor legend: ${legendValue}`);
+    }
+
+    // 15. Verify the metric/stream is preserved
+    const editStreamInput = page.locator('[data-test="index-dropdown-stream"]');
+    if (await editStreamInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+      const editMetric = await editStreamInput.inputValue().catch(() => '');
+      expect(editMetric.toLowerCase()).toContain(metricName.toLowerCase());
+      testLogger.info(`Panel editor metric: ${editMetric}`);
+    }
+
+    // 16. Run query in panel editor to verify it works
+    const applyBtn = page.locator('[data-test="dashboard-apply"]');
+    if (await applyBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await applyBtn.click();
+      await page.waitForTimeout(3000);
+
+      // Verify chart/table renders
+      const chartRendered = await builder.isChartRendered();
+      const hasVis = await page.locator('[data-test="chart-renderer"]').isVisible({ timeout: 5000 }).catch(() => false);
+      expect(chartRendered || hasVis).toBe(true);
+      testLogger.info('Panel editor: query ran and chart rendered');
+    }
+
+    // 17. Discard and go back to dashboard (don't save changes)
+    const discardBtn = page.locator('[data-test="dashboard-panel-discard"]');
+    if (await discardBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await discardBtn.click();
+      await page.waitForTimeout(1000);
+      // Handle confirmation dialog if appears
+      const confirmBtn = page.locator('.q-dialog .q-btn:has-text("OK"), .q-dialog .q-btn:has-text("Confirm"), [data-test="confirm-button"]').first();
+      if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await confirmBtn.click();
+        await page.waitForTimeout(1000);
+      }
+    }
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    testLogger.info('Discarded panel editor');
+
+    // 18. Cleanup: delete the panel from the dashboard
+    await page.waitForTimeout(2000);
+    const panelContainerAfter = page.locator('[data-test="dashboard-panel-container"]').filter({ hasText: panelTitle });
+    if (await panelContainerAfter.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await panelContainerAfter.hover();
+      await page.waitForTimeout(500);
+      const deleteDropdown = page.locator(`[data-test="dashboard-edit-panel-${panelTitle}-dropdown"]`);
+      if (await deleteDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await deleteDropdown.click();
+        await page.waitForTimeout(500);
+        const deleteItem = page.locator('[data-test="dashboard-delete-panel"]');
+        await deleteItem.waitFor({ state: 'visible', timeout: 5000 });
+        await deleteItem.click();
+        await page.waitForTimeout(500);
+
+        // Confirm deletion
+        const confirmDelete = page.locator('[data-test="confirm-button"]');
+        if (await confirmDelete.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await confirmDelete.click();
+          await page.waitForTimeout(2000);
+        }
+        testLogger.info('Panel deleted from dashboard');
+      }
+    }
+
+    testLogger.info('Save → edit → verify → cleanup complete');
   });
 });
