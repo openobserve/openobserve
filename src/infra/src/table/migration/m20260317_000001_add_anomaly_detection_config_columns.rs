@@ -16,8 +16,8 @@
 //! Adds folder_id and owner columns to the anomaly_detection_config table.
 //!
 //! - folder_id (varchar 256, NOT NULL): stores the folders.id PK (same FK as alerts table).
-//!   Existing rows are backfilled from the "default" Alerts folder for each org. Then the column
-//!   is made NOT NULL, consistent with the alerts table.
+//!   Existing rows are backfilled from the "default" Alerts folder for each org. Then the column is
+//!   made NOT NULL, consistent with the alerts table.
 //! - owner (varchar 256): nullable, attributed owner of the config.
 //!
 //! Note: alert_destinations is already present in the CREATE TABLE statement
@@ -37,7 +37,8 @@ impl MigrationTrait for Migration {
         let db_backend = manager.get_database_backend();
 
         // --- Add folder_id and owner columns ---
-        // alert_destinations is already created by m20260310_000001_create_anomaly_detection_config_table.
+        // alert_destinations is already created by
+        // m20260310_000001_create_anomaly_detection_config_table.
         if matches!(db_backend, sea_orm::DbBackend::Sqlite) {
             // SQLite requires separate ALTER TABLE statements per column.
             manager
