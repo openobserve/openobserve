@@ -749,15 +749,27 @@ export default defineComponent({
 
     // Stream fields for filter field selector and detection function field
     const allStreamFields = ref<string[]>([]);
+    const numericStreamFields = ref<string[]>([]); // only numeric types for avg/sum/min/max/pXX
     const filteredStreamFields = ref<string[]>([]);
     const filteredDetectionFields = ref<string[]>([]);
     const loadingFields = ref(false);
+
+    const NUMERIC_FIELD_TYPES = new Set([
+      "Int8", "Int16", "Int32", "Int64",
+      "UInt8", "UInt16", "UInt32", "UInt64",
+      "Float16", "Float32", "Float64",
+      "Decimal128", "Decimal256",
+    ]);
+
+    const requiresNumericField = (fn: string) =>
+      ["avg", "sum", "min", "max", "p50", "p95", "p99"].includes(fn);
 
     const loadStreamFields = async () => {
       const streamName = props.config.stream_name;
       const streamType = props.config.stream_type;
       if (!streamName || !streamType) {
         allStreamFields.value = [];
+        numericStreamFields.value = [];
         filteredStreamFields.value = [];
         filteredDetectionFields.value = [];
         return;
@@ -775,10 +787,22 @@ export default defineComponent({
             ? schema.uds_schema
             : schema.schema || schema.fields || [];
         allStreamFields.value = fieldsArray.map((f: any) => f.name).sort();
+        numericStreamFields.value = fieldsArray
+          .filter((f: any) => {
+            const t: string = f.field_type || f.data_type || f.type || "";
+            return NUMERIC_FIELD_TYPES.has(t);
+          })
+          .map((f: any) => f.name)
+          .sort();
         filteredStreamFields.value = allStreamFields.value;
-        filteredDetectionFields.value = allStreamFields.value;
+        filteredDetectionFields.value = requiresNumericField(
+          props.config.detection_function,
+        )
+          ? numericStreamFields.value
+          : allStreamFields.value;
       } catch {
         allStreamFields.value = [];
+        numericStreamFields.value = [];
         filteredStreamFields.value = [];
         filteredDetectionFields.value = [];
       } finally {
@@ -800,16 +824,30 @@ export default defineComponent({
     const filterDetectionFieldOptions = (val: string, update: any) => {
       update(() => {
         const needle = val.toLowerCase();
-        filteredDetectionFields.value = needle
-          ? allStreamFields.value.filter((f) =>
-              f.toLowerCase().includes(needle),
-            )
+        const base = requiresNumericField(props.config.detection_function)
+          ? numericStreamFields.value
           : allStreamFields.value;
+        filteredDetectionFields.value = needle
+          ? base.filter((f) => f.toLowerCase().includes(needle))
+          : base;
       });
     };
 
     const onDetectionFunctionChange = (fn: string) => {
       if (fn === "count") {
+        props.config.detection_function_field = "";
+      }
+      // Refresh available fields based on whether the new function needs numeric fields.
+      const base = requiresNumericField(fn)
+        ? numericStreamFields.value
+        : allStreamFields.value;
+      filteredDetectionFields.value = base;
+      // Clear the selected field if it's no longer valid for the new function.
+      if (
+        requiresNumericField(fn) &&
+        props.config.detection_function_field &&
+        !numericStreamFields.value.includes(props.config.detection_function_field)
+      ) {
         props.config.detection_function_field = "";
       }
     };
