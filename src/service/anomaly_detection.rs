@@ -125,10 +125,7 @@ pub async fn list_configs(
     // (slug not found), no configs should match — return empty.
     let configs: Vec<_> = if folder_slug.is_some() {
         match &folder_pk_filter {
-            Some(pk) => configs
-                .into_iter()
-                .filter(|m| m.folder_id.as_deref() == Some(pk.as_str()))
-                .collect(),
+            Some(pk) => configs.into_iter().filter(|m| m.folder_id == *pk).collect(),
             None => vec![],
         }
     } else {
@@ -136,11 +133,8 @@ pub async fn list_configs(
     };
 
     // Collect unique folder PKs so we can batch-resolve them to slug + display name.
-    let unique_pks: std::collections::HashSet<String> = configs
-        .iter()
-        .filter_map(|m| m.folder_id.as_ref())
-        .cloned()
-        .collect();
+    let unique_pks: std::collections::HashSet<String> =
+        configs.iter().map(|m| m.folder_id.clone()).collect();
     // pk → (slug, display_name)
     let mut pk_to_folder_map: std::collections::HashMap<String, (String, String)> =
         std::collections::HashMap::new();
@@ -154,10 +148,8 @@ pub async fn list_configs(
         .into_iter()
         .map(|model| {
             let anomaly_id = model.anomaly_id.clone();
-            let (folder_slug, folder_name) = model
-                .folder_id
-                .as_deref()
-                .and_then(|pk| pk_to_folder_map.get(pk))
+            let (folder_slug, folder_name) = pk_to_folder_map
+                .get(&model.folder_id)
                 .cloned()
                 .unwrap_or_else(|| ("default".to_string(), String::new()));
             let mut val = model_to_api_json(serde_json::to_value(model).unwrap_or_default());
@@ -214,7 +206,7 @@ pub async fn get_config(org_id: &str, anomaly_id: &str) -> Result<Option<serde_j
     match config {
         None => Ok(None),
         Some(model) => {
-            let slug = pk_to_slug(model.folder_id.as_deref()).await;
+            let slug = pk_to_slug(Some(&model.folder_id)).await;
             let mut val = model_to_api_json(serde_json::to_value(model).unwrap_or_default());
             if let Some(obj) = val.as_object_mut() {
                 obj.insert("folder_id".to_string(), serde_json::Value::String(slug));
@@ -245,7 +237,9 @@ pub async fn create_config(
         .as_deref()
         .filter(|s| !s.is_empty())
         .unwrap_or("default");
-    let folder_pk = resolve_folder_pk(org_id, folder_slug).await;
+    let folder_pk = resolve_folder_pk(org_id, folder_slug)
+        .await
+        .ok_or_else(|| anyhow::anyhow!("Folder '{}' not found", folder_slug))?;
 
     let new_config = anomaly_detection_config::ActiveModel {
         anomaly_id: Set(anomaly_id.clone()),
@@ -447,7 +441,9 @@ pub async fn update_config(
         ));
     }
     if let Some(folder_id_str) = req.folder_id {
-        let pk = resolve_folder_pk(org_id, &folder_id_str).await;
+        let pk = resolve_folder_pk(org_id, &folder_id_str)
+            .await
+            .ok_or_else(|| anyhow::anyhow!("Folder '{}' not found", folder_id_str))?;
         active_model.folder_id = Set(pk);
     }
     if let Some(owner) = req.owner {
@@ -521,7 +517,7 @@ pub async fn update_config(
         }
     }
 
-    let slug = pk_to_slug(updated.folder_id.as_deref()).await;
+    let slug = pk_to_slug(Some(&updated.folder_id)).await;
     let mut val = serde_json::to_value(updated)?;
     if let Some(obj) = val.as_object_mut() {
         obj.insert("folder_id".to_string(), serde_json::Value::String(slug));
@@ -599,7 +595,7 @@ pub async fn clone_config(
     let resolved_folder_id = if let Some(slug) = folder_id {
         resolve_folder_pk(org_id, &slug)
             .await
-            .or_else(|| src.folder_id.clone())
+            .unwrap_or_else(|| src.folder_id.clone())
     } else {
         src.folder_id.clone()
     };
@@ -662,7 +658,7 @@ pub async fn clone_config(
         }
     }
 
-    let slug = pk_to_slug(result.folder_id.as_deref()).await;
+    let slug = pk_to_slug(Some(&result.folder_id)).await;
     let mut val = model_to_api_json(serde_json::to_value(result).unwrap_or_default());
     if let Some(obj) = val.as_object_mut() {
         obj.insert("folder_id".to_string(), serde_json::Value::String(slug));
