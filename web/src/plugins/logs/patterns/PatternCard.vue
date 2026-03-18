@@ -169,6 +169,7 @@ import {
   wildcardChipColor,
   anomalyExplanation,
 } from "@/composables/useLogs/useTemplateTokenizer";
+import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 
 const props = defineProps<{
   pattern: any;
@@ -190,6 +191,22 @@ const templateTokens = computed(() =>
 );
 
 const anomalyExplanationText = computed(() => anomalyExplanation(props.pattern, t));
+const { colorizeJson } = useLogsHighlighter();
+
+const highlightedTemplate = computed(() => {
+  const html = colorizeJson(
+    props.pattern.template,
+    store.state.theme === "dark",
+    false,
+    false,
+    "",
+    false,
+  );
+  return html.replace(
+    /&lt;\*&gt;/g,
+    '<span class="log-pattern-wildcard">&lt;*&gt;</span>',
+  );
+});
 </script>
 
 <style scoped lang="scss">
