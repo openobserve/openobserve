@@ -1187,50 +1187,13 @@ pub async fn move_alerts(
     Json(req_body): Json<MoveAlertsRequestBody>,
 ) -> Response {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let total_ids = req_body.alert_ids.len()
-        + req_body
-            .anomaly_config_ids
-            .as_deref()
-            .map_or(0, |v| v.len());
+    let total_ids = req_body.alert_ids.len() + req_body.anomaly_config_ids.len();
 
-    // Separate IDs into regular alerts and anomaly configs (anomaly is enterprise-only).
-    // If the caller supplies anomaly_config_ids, use that to skip per-ID DB lookups.
-    let alert_ids: Vec<Ksuid>;
+    // anomaly_config_ids is now a required Vec (defaults to empty), so no
+    // per-ID DB lookups are needed to classify IDs.
+    let alert_ids: Vec<Ksuid> = req_body.alert_ids;
     #[cfg(feature = "enterprise")]
-    let anomaly_ids: Vec<Ksuid>;
-
-    #[cfg(feature = "enterprise")]
-    if let Some(explicit_anomaly_ids) = req_body.anomaly_config_ids {
-        alert_ids = req_body.alert_ids;
-        anomaly_ids = explicit_anomaly_ids;
-    } else {
-        let mut classified_alert_ids: Vec<Ksuid> = Vec::new();
-        let mut classified_anomaly_ids: Vec<Ksuid> = Vec::new();
-        for id in &req_body.alert_ids {
-            match alert::get_by_id(client, &org_id, *id).await {
-                Ok(_) => classified_alert_ids.push(*id),
-                Err(AlertError::AlertNotFound) => classified_anomaly_ids.push(*id),
-                Err(e) => return e.into(),
-            }
-        }
-        alert_ids = classified_alert_ids;
-        anomaly_ids = classified_anomaly_ids;
-    }
-
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let mut classified_alert_ids: Vec<Ksuid> = Vec::new();
-        for id in &req_body.alert_ids {
-            match alert::get_by_id(client, &org_id, *id).await {
-                Ok(_) => classified_alert_ids.push(*id),
-                Err(AlertError::AlertNotFound) => {
-                    return MetaHttpResponse::not_found(format!("alert {id} not found"));
-                }
-                Err(e) => return e.into(),
-            }
-        }
-        alert_ids = classified_alert_ids;
-    }
+    let anomaly_ids: Vec<Ksuid> = req_body.anomaly_config_ids;
 
     // Move anomaly configs first (enterprise only) so that if this fails,
     // regular alerts have not yet been relocated (reduces partial-move risk).

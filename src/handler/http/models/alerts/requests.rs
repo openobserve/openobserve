@@ -149,12 +149,11 @@ pub struct MoveAlertsRequestBody {
     #[schema(value_type = Vec<String>)]
     pub alert_ids: Vec<Ksuid>,
 
-    /// IDs of anomaly detection configs to move. When provided, avoids a
-    /// per-ID database lookup to classify items as regular alerts vs. anomaly
-    /// configs — callers that know the type should always supply this field.
-    #[schema(value_type = Option<Vec<String>>)]
+    /// IDs of anomaly detection configs to move. Defaults to empty when not
+    /// provided. Callers should always supply this to avoid per-ID DB lookups.
+    #[schema(value_type = Vec<String>)]
     #[serde(default)]
-    pub anomaly_config_ids: Option<Vec<Ksuid>>,
+    pub anomaly_config_ids: Vec<Ksuid>,
 
     /// Indicates the folder to which alerts should be moved.
     pub dst_folder_id: String,
