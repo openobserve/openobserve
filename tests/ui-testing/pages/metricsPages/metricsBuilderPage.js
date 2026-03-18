@@ -640,6 +640,99 @@ export class MetricsBuilderPage {
     }
 
     /**
+     * Get the MetricSelector component's q-select element
+     */
+    getMetricSelectorLocator() {
+        return this.page.locator('[data-test="metric-selector"]');
+    }
+
+    /**
+     * Check if MetricSelector component is visible (builder mode metric dropdown)
+     */
+    async isBuilderMetricSelectorVisible() {
+        return await this.getMetricSelectorLocator().isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
+    /**
+     * Select a metric from the MetricSelector dropdown (builder mode)
+     * @param {string} metricName
+     */
+    async selectBuilderMetric(metricName) {
+        const selector = this.getMetricSelectorLocator();
+        if (!await selector.isVisible({ timeout: 5000 })) return false;
+
+        await selector.click();
+        await this.page.waitForTimeout(500);
+
+        // Type to filter
+        const input = selector.locator('input').first();
+        if (await input.isVisible({ timeout: 2000 })) {
+            await input.fill(metricName);
+            await this.page.waitForTimeout(1000);
+        }
+
+        // Select from dropdown options
+        const option = this.page.locator('.q-menu .q-item').filter({ hasText: metricName }).first();
+        if (await option.isVisible({ timeout: 5000 })) {
+            await option.click();
+            await this.page.waitForTimeout(1500);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Get the currently selected metric from MetricSelector
+     */
+    async getBuilderMetricValue() {
+        const selector = this.getMetricSelectorLocator();
+        // Try input value first (Quasar q-select with use-input)
+        const input = selector.locator('input').first();
+        if (await input.isVisible({ timeout: 2000 }).catch(() => false)) {
+            return await input.inputValue().catch(() => '');
+        }
+        return await selector.textContent().catch(() => '');
+    }
+
+    /**
+     * Get operation dialog categories (expansion panel labels)
+     */
+    async getOperationCategories() {
+        const dialog = this.page.locator('.q-dialog');
+        if (!await dialog.isVisible({ timeout: 3000 }).catch(() => false)) return [];
+
+        const headers = dialog.locator('.q-expansion-item .q-item__label');
+        const count = await headers.count();
+        const categories = [];
+        for (let i = 0; i < count; i++) {
+            const text = await headers.nth(i).textContent().catch(() => '');
+            if (text.trim()) categories.push(text.trim());
+        }
+        return categories;
+    }
+
+    /**
+     * Close operation selector dialog
+     */
+    async closeOperationDialog() {
+        const dialog = this.page.locator('.q-dialog');
+        const closeBtn = dialog.locator('button:has-text("Close")');
+        if (await closeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await closeBtn.click();
+            await this.page.waitForTimeout(300);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Check if operation selector dialog is visible
+     */
+    async isOperationDialogVisible() {
+        return await this.page.locator('.q-dialog').isVisible({ timeout: 2000 }).catch(() => false);
+    }
+
+    /**
      * Check if value dropdown is disabled (no label selected)
      */
     async isValueSelectDisabled() {
@@ -670,5 +763,353 @@ export class MetricsBuilderPage {
             return false;
         }).catch(() => false);
         return isDisabled;
+    }
+
+    // ===== Query Verification =====
+
+    /**
+     * Capture the PromQL query from the API request when Run Query is clicked.
+     * Stays in Builder mode — no mode switching needed.
+     * Sets up request interception, clicks Run Query, and returns the captured query.
+     * @returns {Promise<string>} The PromQL query string from the request
+     */
+    async captureQueryFromRunRequest() {
+        const requestPromise = this.page.waitForRequest(
+            (req) => req.url().includes('/prometheus/api/v1/query_range') ||
+                     req.url().includes('/prometheus/api/v1/query'),
+            { timeout: 15000 }
+        );
+
+        // Click Run Query
+        const runBtn = this.page.locator(this.runQueryButton).first();
+        await runBtn.click();
+
+        const request = await requestPromise;
+        const url = new URL(request.url(), 'http://localhost');
+        let query = url.searchParams.get('query') || '';
+
+        // If query is not in URL params, check POST body
+        if (!query) {
+            try {
+                const postData = request.postData();
+                if (postData) {
+                    const body = JSON.parse(postData);
+                    query = body.query || '';
+                }
+            } catch {
+                // not JSON body
+            }
+        }
+
+        // Wait for response to complete
+        await this.page.waitForTimeout(2000);
+        return decodeURIComponent(query);
+    }
+
+    /**
+     * Read the generated PromQL query text from the query preview area at the bottom.
+     * The query preview is a Monaco editor visible in Builder mode (data-test="dashboard-panel-query-editor").
+     * @returns {Promise<string>} The PromQL query string
+     */
+    async getQueryPreviewText() {
+        const queryEditor = this.page.locator('[data-test="dashboard-panel-query-editor"]').first();
+        if (await queryEditor.isVisible({ timeout: 5000 }).catch(() => false)) {
+            // Read from Monaco editor's .view-lines
+            const text = await queryEditor.locator('.view-lines').textContent().catch(() => '');
+            return text.trim();
+        }
+        // Fallback: try any visible .view-lines in the query area
+        const fallback = await this.page.locator('.view-lines').first().textContent().catch(() => '');
+        return fallback.trim();
+    }
+
+    /**
+     * Read the current builder UI state: metric, label filters, operations, and options.
+     * Stays in Builder mode — no mode switching needed.
+     * @returns {Promise<{metric: string, labelFilters: string[], operations: string[], legend: string, stepValue: string}>}
+     */
+    async verifyBuilderState() {
+        const state = {};
+
+        // 1. Read metric from stream selector
+        const streamInput = this.page.locator(this.streamSelector);
+        state.metric = await streamInput.inputValue().catch(() => '');
+
+        // 2. Read label filter chip texts
+        const filterCount = await this.getLabelFilterCount();
+        state.labelFilters = [];
+        for (let i = 0; i < filterCount; i++) {
+            const chipText = await this.getLabelFilterText(i);
+            state.labelFilters.push(chipText.trim());
+        }
+
+        // 3. Read operation chip texts
+        const opCount = await this.getOperationCount();
+        state.operations = [];
+        for (let i = 0; i < opCount; i++) {
+            const opText = await this.getOperationText(i);
+            state.operations.push(opText.trim());
+        }
+
+        // 4. Read options
+        const legendField = this.page.locator(this.legendInput);
+        if (await legendField.isVisible({ timeout: 2000 }).catch(() => false)) {
+            const legendInput = legendField.locator('input').first();
+            state.legend = await legendInput.inputValue().catch(() => '');
+        } else {
+            state.legend = '';
+        }
+
+        const stepField = this.page.locator(this.stepValueInput);
+        if (await stepField.isVisible({ timeout: 2000 }).catch(() => false)) {
+            const tagName = await stepField.evaluate(el => el.tagName).catch(() => '');
+            if (tagName === 'INPUT') {
+                state.stepValue = await stepField.inputValue().catch(() => '');
+            } else {
+                state.stepValue = await stepField.locator('input').first().inputValue().catch(() => '');
+            }
+        } else {
+            state.stepValue = '';
+        }
+
+        return state;
+    }
+
+    /**
+     * Verify the table chart has rendered with data rows.
+     * Checks for the q-table with headers and at least one data row.
+     * @returns {Promise<{visible: boolean, rowCount: number, headers: string[]}>}
+     */
+    async getTableChartData() {
+        const table = this.page.locator('[data-test="dashboard-panel-table"]');
+        const visible = await table.isVisible({ timeout: 5000 }).catch(() => false);
+        if (!visible) return { visible: false, rowCount: 0, headers: [] };
+
+        // Get header texts
+        const headers = [];
+        const thElements = table.locator('thead th, .q-table__top th');
+        const headerCount = await thElements.count().catch(() => 0);
+        for (let i = 0; i < headerCount; i++) {
+            const text = await thElements.nth(i).textContent().catch(() => '');
+            if (text.trim()) headers.push(text.trim());
+        }
+
+        // Count data rows (tbody tr or virtual scroll rows)
+        const rows = table.locator('tbody tr, .q-virtual-scroll__content tr');
+        const rowCount = await rows.count().catch(() => 0);
+
+        return { visible, rowCount, headers };
+    }
+
+    // ===== Chart Type Switching =====
+
+    /**
+     * Select a chart type by clicking its icon
+     * @param {string} chartType - e.g., 'line', 'bar', 'table', 'area', 'scatter', 'h-bar', 'stacked', 'h-stacked', 'pie', 'donut', 'heatmap', 'gauge'
+     */
+    async selectChartType(chartType) {
+        const chartItem = this.page.locator(`[data-test="selected-chart-${chartType}-item"]`);
+        if (await chartItem.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await chartItem.click();
+            await this.page.waitForTimeout(500);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Check if a chart type item is visible
+     * @param {string} chartType
+     */
+    async isChartTypeVisible(chartType) {
+        return await this.page.locator(`[data-test="selected-chart-${chartType}-item"]`).isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
+    /**
+     * Check if the chart/table rendered after query
+     */
+    async isChartRendered() {
+        // Check for chart-renderer canvas or table-renderer
+        const chartCanvas = this.page.locator('[data-test="chart-renderer"]');
+        const tableRenderer = this.page.locator('[data-test="dashboard-panel-table"]');
+        const chartVisible = await chartCanvas.isVisible({ timeout: 5000 }).catch(() => false);
+        const tableVisible = await tableRenderer.isVisible({ timeout: 5000 }).catch(() => false);
+        return chartVisible || tableVisible;
+    }
+
+    // ===== Add to Dashboard - Full Save Flow =====
+
+    /**
+     * Select a folder from the folder dropdown in Add to Dashboard dialog
+     * @param {string} folderName - folder name to select (default: "default")
+     */
+    async selectDashboardFolder(folderName = 'default') {
+        const folderDropdown = this.page.locator('[data-test="index-dropdown-stream_type"]');
+        if (await folderDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await folderDropdown.click();
+            await this.page.waitForTimeout(500);
+            const option = this.page.locator('.q-menu .q-item').filter({ hasText: folderName }).first();
+            if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await option.click();
+                await this.page.waitForTimeout(500);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Select a dashboard from the dashboard dropdown in Add to Dashboard dialog
+     * @param {string} dashboardName
+     */
+    async selectDashboardInDialog(dashboardName) {
+        const dashDropdown = this.page.locator('[data-test="dashboard-dropdown-dashboard-selection"]');
+        if (await dashDropdown.isVisible({ timeout: 5000 }).catch(() => false)) {
+            await dashDropdown.click();
+            await this.page.waitForTimeout(500);
+
+            // Type to filter
+            const input = dashDropdown.locator('input').first();
+            if (await input.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await input.fill(dashboardName);
+                await this.page.waitForTimeout(1000);
+            }
+
+            const option = this.page.locator('.q-menu .q-item').filter({ hasText: dashboardName }).first();
+            if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await option.click();
+                await this.page.waitForTimeout(500);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Select a tab from the tab dropdown in Add to Dashboard dialog
+     * @param {string} tabName
+     */
+    async selectDashboardTab(tabName = 'Default') {
+        const tabDropdown = this.page.locator('[data-test="dashboard-dropdown-tab-selection"]');
+        if (await tabDropdown.isVisible({ timeout: 5000 }).catch(() => false)) {
+            await tabDropdown.click();
+            await this.page.waitForTimeout(500);
+            const option = this.page.locator('.q-menu .q-item').filter({ hasText: tabName }).first();
+            if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await option.click();
+                await this.page.waitForTimeout(500);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Complete the Add to Dashboard save flow: folder, dashboard, tab, title, submit
+     * @param {object} options
+     * @param {string} options.folderName
+     * @param {string} options.dashboardName
+     * @param {string} options.tabName
+     * @param {string} options.panelTitle
+     */
+    async saveToDashboard({ folderName = 'default', dashboardName, tabName = 'Default', panelTitle }) {
+        // Click Add to Dashboard button
+        const addClicked = await this.clickAddToDashboard();
+        if (!addClicked) return false;
+
+        // Wait for dialog
+        const dialogVisible = await this.isDashboardDialogVisible();
+        if (!dialogVisible) return false;
+
+        // Select folder
+        await this.selectDashboardFolder(folderName);
+
+        // Select dashboard
+        if (dashboardName) {
+            await this.selectDashboardInDialog(dashboardName);
+        }
+
+        // Select tab
+        await this.selectDashboardTab(tabName);
+
+        // Fill panel title
+        await this.fillPanelTitle(panelTitle);
+
+        // Click Add button to save
+        await this.clickDashboardAdd();
+        await this.page.waitForTimeout(2000);
+
+        return true;
+    }
+
+    // ===== Dashboard Verification & Cleanup =====
+
+    /**
+     * Navigate to dashboards list page
+     */
+    async navigateToDashboards() {
+        const dashMenu = this.page.locator('[data-test="menu-link-\\/dashboards-item"]');
+        await dashMenu.click();
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    }
+
+    /**
+     * Verify a panel exists on the current dashboard page
+     * @param {string} panelTitle
+     */
+    async isPanelVisibleOnDashboard(panelTitle) {
+        const panel = this.page.locator(`[data-test="dashboard-panel-bar"]:has-text("${panelTitle}")`);
+        return await panel.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Delete a dashboard by name from the dashboards list
+     * @param {string} dashboardName
+     */
+    async deleteDashboard(dashboardName) {
+        await this.navigateToDashboards();
+        await this.page.waitForTimeout(1000);
+
+        // Search for the dashboard
+        const searchInput = this.page.locator('[data-test="dashboard-search"]');
+        if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await searchInput.fill(dashboardName);
+            await this.page.waitForTimeout(1000);
+        }
+
+        // Find the row and click delete
+        const dashboardRow = this.page.locator('tr, .q-tr').filter({ hasText: dashboardName }).first();
+        if (await dashboardRow.isVisible({ timeout: 5000 }).catch(() => false)) {
+            const deleteBtn = dashboardRow.locator('[data-test="dashboard-delete"]');
+            if (await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await deleteBtn.click();
+                await this.page.waitForTimeout(500);
+
+                // Confirm deletion
+                const confirmBtn = this.page.locator('[data-test="confirm-button"]');
+                if (await confirmBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+                    await confirmBtn.click();
+                    await this.page.waitForTimeout(2000);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check for success notification (positive toast)
+     */
+    async hasSuccessNotification() {
+        const notification = this.page.locator('.q-notification--standard.bg-positive, .q-notification:has-text("success"), .q-notification:has-text("added")');
+        return await notification.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Check for error notification (negative toast)
+     */
+    async hasErrorNotification() {
+        const notification = this.page.locator('.q-notification--standard.bg-negative, .q-notification:has-text("Error"), .q-notification:has-text("error")');
+        return await notification.isVisible({ timeout: 3000 }).catch(() => false);
     }
 }

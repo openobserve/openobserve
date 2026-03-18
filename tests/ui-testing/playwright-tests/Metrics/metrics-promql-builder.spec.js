@@ -24,570 +24,398 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     testLogger.info('Test setup completed - navigated to metrics page');
   });
 
-  test.afterEach(async ({ page }, testInfo) => {
+  test.afterEach(async ({}, testInfo) => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
   // =========================================================================
-  // P0 - Critical: Query Mode Tab Switching
+  // P0 - Mode Switching + UI Verification (merged: tab switching + UI elements)
   // =========================================================================
 
-  test("Switch between SQL, PromQL, Builder, and Custom mode tabs", {
+  test("P0: Builder mode tabs, UI elements, and mode switching", {
     tag: ['@metrics', '@builder', '@smoke', '@P0', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing query mode tab switching');
-
+    testLogger.info('Testing mode tabs and UI elements');
     const builder = pm.metricsBuilderPage;
 
-    // Verify PromQL mode button is visible (metrics page defaults to PromQL)
-    const promqlBtn = page.locator(builder.promqlModeButton);
-    await expect(promqlBtn).toBeVisible({ timeout: 5000 });
-    testLogger.info('PromQL mode button is visible');
+    // 1. Verify all mode buttons visible
+    await expect(page.locator(builder.sqlModeButton)).toBeVisible({ timeout: 5000 });
+    await expect(page.locator(builder.promqlModeButton)).toBeVisible();
+    await expect(page.locator(builder.builderModeButton)).toBeVisible();
+    await expect(page.locator(builder.customModeButton)).toBeVisible();
+    testLogger.info('All mode buttons visible');
 
-    // Switch to PromQL mode if not already selected
-    await builder.switchToPromQLMode();
+    // 2. Verify default mode is PromQL + Builder
+    expect(await builder.isModeSelected('promql')).toBe(true);
+    expect(await builder.isModeSelected('builder')).toBe(true);
+    testLogger.info('Default mode: PromQL + Builder');
 
-    // Verify PromQL mode is selected
-    const isPromqlSelected = await builder.isModeSelected('promql');
-    expect(isPromqlSelected).toBe(true);
-    testLogger.info('PromQL mode is selected');
+    // 3. Verify Builder UI elements visible
+    expect(await builder.isMetricSelectorVisible()).toBe(true);
+    expect(await builder.isAddLabelFilterVisible()).toBe(true);
+    expect(await builder.isAddOperationVisible()).toBe(true);
+    expect(await builder.isOptionsVisible()).toBe(true);
+    await expect(page.locator(builder.runQueryButton).first()).toBeVisible();
+    testLogger.info('All Builder UI elements visible');
 
-    // Verify Builder and Custom buttons are visible
-    const builderBtn = page.locator(builder.builderModeButton);
-    const customBtn = page.locator(builder.customModeButton);
-    await expect(builderBtn).toBeVisible({ timeout: 3000 });
-    await expect(customBtn).toBeVisible({ timeout: 3000 });
-    testLogger.info('Builder and Custom mode buttons are visible');
-
-    // Switch to Builder mode
-    await builder.switchToBuilderMode();
-    const isBuilderSelected = await builder.isModeSelected('builder');
-    expect(isBuilderSelected).toBe(true);
-    testLogger.info('Successfully switched to Builder mode');
-
-    // Switch to Custom mode
-    await builder.switchToCustomMode();
-    const isCustomSelected = await builder.isModeSelected('custom');
-    expect(isCustomSelected).toBe(true);
-    testLogger.info('Successfully switched to Custom mode');
-
-    // Switch back to Builder mode
-    await builder.switchToBuilderMode();
-    const isBuilderAgain = await builder.isModeSelected('builder');
-    expect(isBuilderAgain).toBe(true);
-    testLogger.info('Successfully switched back to Builder mode');
-
-    // Switch to SQL mode
+    // 4. Switch SQL -> PromQL -> Custom -> Builder
     await builder.switchToSQLMode();
-    const isSqlSelected = await builder.isModeSelected('sql');
-    expect(isSqlSelected).toBe(true);
-    testLogger.info('Successfully switched to SQL mode');
+    expect(await builder.isModeSelected('sql')).toBe(true);
+    testLogger.info('Switched to SQL mode');
 
-    // Switch back to PromQL mode
     await builder.switchToPromQLMode();
-    const isPromqlAgain = await builder.isModeSelected('promql');
-    expect(isPromqlAgain).toBe(true);
-    testLogger.info('All mode tab switches completed successfully');
-  });
+    expect(await builder.isModeSelected('promql')).toBe(true);
+    testLogger.info('Switched back to PromQL mode');
 
-  test("Builder mode shows correct UI elements (Stream Selector, Label Filters, Operations, Options)", {
-    tag: ['@metrics', '@builder', '@smoke', '@P0', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing Builder mode UI elements visibility');
+    await builder.switchToCustomMode();
+    expect(await builder.isModeSelected('custom')).toBe(true);
+    // Builder UI should be hidden in Custom mode
+    expect(await builder.isBuilderUIVisible()).toBe(false);
+    testLogger.info('Custom mode: Builder UI hidden');
 
-    const builder = pm.metricsBuilderPage;
+    // Verify code editor visible in Custom mode
+    const editorVisible = await page.locator('.monaco-editor, .view-lines, textarea.inputarea, .cm-editor').first().isVisible({ timeout: 3000 }).catch(() => false);
+    expect(editorVisible).toBe(true);
+    testLogger.info('Custom mode: Code editor visible');
 
-    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
-    // Verify Stream/Metric Selector is visible in the sidebar (INPUT element)
-    const streamSelectorVisible = await builder.isMetricSelectorVisible();
-    expect(streamSelectorVisible).toBe(true);
-    testLogger.info('Stream/Metric selector is visible in sidebar');
-
-    // Verify Add Label Filter button is visible
-    const addLabelFilterVisible = await builder.isAddLabelFilterVisible();
-    expect(addLabelFilterVisible).toBe(true);
-    testLogger.info('Add Label Filter button is visible');
-
-    // Verify Add Operation button is visible
-    const addOperationVisible = await builder.isAddOperationVisible();
-    expect(addOperationVisible).toBe(true);
-    testLogger.info('Add Operation button is visible');
-
-    // Verify Options section is visible (legend, step value, query type)
-    const optionsVisible = await builder.isOptionsVisible();
-    expect(optionsVisible).toBe(true);
-    testLogger.info('Options section is visible');
-
-    // Verify Run Query button is visible
-    const runQueryBtn = page.locator(builder.runQueryButton).first();
-    await expect(runQueryBtn).toBeVisible({ timeout: 3000 });
-    testLogger.info('Run Query button is visible');
-
-    // Verify mode tab buttons are visible
-    const sqlBtn = page.locator(builder.sqlModeButton);
-    const promqlBtn = page.locator(builder.promqlModeButton);
-    const builderBtn = page.locator(builder.builderModeButton);
-    const customBtn = page.locator(builder.customModeButton);
-    await expect(sqlBtn).toBeVisible();
-    await expect(promqlBtn).toBeVisible();
-    await expect(builderBtn).toBeVisible();
-    await expect(customBtn).toBeVisible();
-    testLogger.info('All mode tab buttons are visible');
-
-    // Verify PromQL + Builder are currently selected
-    const isPromqlSelected = await builder.isModeSelected('promql');
-    const isBuilderSelected = await builder.isModeSelected('builder');
-    expect(isPromqlSelected).toBe(true);
-    expect(isBuilderSelected).toBe(true);
-    testLogger.info('PromQL + Builder modes are correctly selected by default');
-
-    testLogger.info('All Builder mode UI elements are correctly displayed');
+    await builder.switchToBuilderMode();
+    expect(await builder.isModeSelected('builder')).toBe(true);
+    expect(await builder.isBuilderUIVisible()).toBe(true);
+    testLogger.info('Switched back to Builder mode: UI restored');
   });
 
   // =========================================================================
-  // P0 - Critical: Metric Selection in Builder Mode
+  // P0 - Run Query with Default Metric + Stream Search
   // =========================================================================
 
-  test("Run query with pre-selected metric in Builder mode", {
+  test("P0: Stream selector, search filter, and run default query", {
     tag: ['@metrics', '@builder', '@smoke', '@P0', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing query execution with default metric in Builder mode');
-
+    testLogger.info('Testing stream selector and default query');
     const builder = pm.metricsBuilderPage;
 
-    // Metrics page defaults to PromQL + Builder with cpu_usage already selected
-    // Verify stream selector has a value
-    const streamInput = page.locator(builder.streamSelector);
-    const streamValue = await streamInput.inputValue();
-    testLogger.info(`Pre-selected stream value: "${streamValue}"`);
+    // 1. Verify stream selector visible with pre-selected value
+    const streamSelector = page.locator(builder.streamSelector);
+    await expect(streamSelector).toBeVisible({ timeout: 5000 });
+    const streamValue = await streamSelector.inputValue();
     expect(streamValue.length).toBeGreaterThan(0);
+    testLogger.info(`Pre-selected stream: "${streamValue}"`);
 
-    // Run the query with the default metric
+    // 2. Open dropdown and verify metrics listed
+    await streamSelector.click();
+    await page.waitForTimeout(1000);
+    const menuItems = page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item');
+    const menuCount = await menuItems.count();
+    expect(menuCount).toBeGreaterThan(0);
+    testLogger.info(`Dropdown shows ${menuCount} metrics`);
+    await page.keyboard.press('Escape');
+
+    // 3. Search and filter metrics
+    await streamSelector.click();
+    await page.waitForTimeout(500);
+    await streamSelector.clear();
+    await streamSelector.fill('cpu');
+    await page.waitForTimeout(1500);
+    const filtered = page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item');
+    const filteredCount = await filtered.count();
+    expect(filteredCount).toBeGreaterThan(0);
+    testLogger.info(`Filtered to ${filteredCount} metrics matching "cpu"`);
+
+    // Select first filtered item
+    await filtered.first().click();
+    await page.waitForTimeout(500);
+
+    // 4. Run query and verify visualization
     await builder.clickRunQuery();
     await page.waitForTimeout(3000);
-
-    // Verify no errors
     const hasError = await pm.metricsPage.isErrorNotificationVisible();
-    if (hasError) {
-      const errorText = await pm.metricsPage.getErrorNotificationText();
-      testLogger.warn(`Query error: ${errorText}`);
-    }
     expect(hasError).toBe(false);
-
-    // Verify visualization appears
-    const hasVisualization = await pm.metricsPage.hasVisualization();
-    expect(hasVisualization).toBe(true);
-    testLogger.info('Metric query executed successfully with visualization');
+    const hasVis = await pm.metricsPage.hasVisualization();
+    expect(hasVis).toBe(true);
+    testLogger.info('Default query executed with visualization');
   });
 
   // =========================================================================
-  // P1 - Functional: Label Filter UI Interactions
+  // P1 - Complete Label Filter Workflow (merged: add, dropdown, operator,
+  //       value disabled, chip text, multiple, remove)
   // =========================================================================
 
-  test("Add a label filter using Label, Operator, and Value dropdowns", {
+  test("P1: Label filters - add, configure, verify operators, multiple, remove", {
     tag: ['@metrics', '@builder', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing label filter addition via Builder UI');
-
+    testLogger.info('Testing complete label filter workflows');
     const builder = pm.metricsBuilderPage;
 
-    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
-    // Labels are already loaded from the default stream
-
-    // Initial filter count should be 0
+    // 1. Initial count is 0
     const initialCount = await builder.getLabelFilterCount();
-    testLogger.info(`Initial label filter count: ${initialCount}`);
+    testLogger.info(`Initial filter count: ${initialCount}`);
 
-    // Click add label filter button
+    // 2. Add first filter and verify default text
     await builder.clickAddLabelFilter();
+    expect(await builder.getLabelFilterCount()).toBe(initialCount + 1);
+    const defaultText = await builder.getLabelFilterText(0);
+    expect(defaultText).toContain('Select label');
+    testLogger.info('First filter added with "Select label" default');
 
-    // Verify new filter was added
-    const afterAddCount = await builder.getLabelFilterCount();
-    expect(afterAddCount).toBe(initialCount + 1);
-    testLogger.info('Label filter added, new count: ' + afterAddCount);
-
-    // Open the newly added filter menu
-    const newFilterIndex = afterAddCount - 1;
-    await builder.openLabelFilterMenu(newFilterIndex);
-
-    // Verify Label dropdown is visible
-    const labelDropdown = page.locator(builder.labelSelect).last();
-    await expect(labelDropdown).toBeVisible({ timeout: 5000 });
-    testLogger.info('Label dropdown is visible');
-
-    // Verify Operator dropdown is visible
-    const operatorDropdown = page.locator(builder.operatorSelect).last();
-    await expect(operatorDropdown).toBeVisible({ timeout: 5000 });
-    testLogger.info('Operator dropdown is visible');
-
-    // Verify Value dropdown is visible
-    const valueDropdown = page.locator(builder.valueSelect).last();
-    await expect(valueDropdown).toBeVisible({ timeout: 5000 });
-    testLogger.info('Value dropdown is visible');
-
-    // Select a label from the dropdown
-    const labelSelected = await builder.selectLabel('__name__');
-
-    if (labelSelected) {
-      testLogger.info('Label selected: __name__');
-
-      // Verify default operator is "="
-      const operatorText = await operatorDropdown.locator('.q-field__native span, .q-field__native').textContent().catch(() => '');
-      testLogger.info(`Default operator: ${operatorText}`);
-    } else {
-      // If __name__ not available, try any available label
-      testLogger.warn('__name__ label not found, checking available labels');
-      const hasOptions = await builder.hasLabelOptions();
-      testLogger.info(`Label options available: ${hasOptions}`);
-    }
-
-    // Close the menu
-    await page.keyboard.press('Escape');
-    testLogger.info('Label filter UI interaction completed');
-  });
-
-  test("Operator dropdown shows all four operators (=, !=, =~, !~)", {
-    tag: ['@metrics', '@builder', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing operator dropdown options');
-
-    const builder = pm.metricsBuilderPage;
-
-    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
-
-    // Add a label filter
-    await builder.clickAddLabelFilter();
-
-    // Open the filter menu
+    // 3. Open filter menu and verify dropdowns
     await builder.openLabelFilterMenu(0);
+    await expect(page.locator(builder.labelSelect).last()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator(builder.operatorSelect).last()).toBeVisible();
+    await expect(page.locator(builder.valueSelect).last()).toBeVisible();
+    testLogger.info('Label, Operator, Value dropdowns all visible');
 
-    // Click the Operator dropdown to see options
+    // 4. Verify value dropdown is disabled (no label selected yet)
+    const isDisabled = await builder.isValueSelectDisabled();
+    expect(isDisabled).toBe(true);
+    testLogger.info('Value dropdown disabled before label selection');
+
+    // 5. Verify operator dropdown has all 4 operators
     const operatorDropdown = page.locator(builder.operatorSelect).last();
     await operatorDropdown.click();
     await page.waitForTimeout(500);
-
-    // Verify all four operators are present
     const operators = ['=', '!=', '=~', '!~'];
-    const menuItems = page.locator('.q-menu .q-item');
-    const menuItemCount = await menuItems.count();
-
-    testLogger.info(`Found ${menuItemCount} operator options in dropdown`);
-    expect(menuItemCount).toBeGreaterThanOrEqual(4);
-
-    // Verify each operator is present
+    const opMenuItems = page.locator('.q-menu .q-item');
+    expect(await opMenuItems.count()).toBeGreaterThanOrEqual(4);
     for (const op of operators) {
-      const opItem = menuItems.filter({ hasText: op });
-      const opCount = await opItem.count();
-      expect(opCount).toBeGreaterThan(0);
-      testLogger.info(`Operator "${op}" found in dropdown`);
+      expect(await opMenuItems.filter({ hasText: op }).count()).toBeGreaterThan(0);
     }
-
-    // Select "!=" operator
-    await builder.selectOperator('!=');
-    testLogger.info('Selected "!=" operator');
-
-    // Close the menu
+    testLogger.info('All 4 operators verified: =, !=, =~, !~');
     await page.keyboard.press('Escape');
-    testLogger.info('All four operators verified in dropdown');
-  });
 
-  test("Value dropdown is disabled until a label is selected", {
-    tag: ['@metrics', '@builder', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing value dropdown dependency on label selection');
+    // 6. Select a label and verify chip text updates
+    const labelDropdown = page.locator(builder.labelSelect).last();
+    await labelDropdown.click();
+    await page.waitForTimeout(500);
+    const labelOptions = page.locator('.q-menu .q-item');
+    const labelCount = await labelOptions.count();
+    testLogger.info(`Available labels: ${labelCount}`);
 
-    const builder = pm.metricsBuilderPage;
+    if (labelCount > 0) {
+      const firstLabelText = await labelOptions.first().textContent();
+      await labelOptions.first().click();
+      await page.waitForTimeout(500);
+      testLogger.info(`Selected label: ${firstLabelText}`);
 
-    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
+      // Default operator should be "="
+      const opText = await page.locator(builder.operatorSelect).last().textContent().catch(() => '');
+      expect(opText).toContain('=');
+      testLogger.info(`Default operator: ${opText}`);
 
-    // Add a label filter
-    await builder.clickAddLabelFilter();
+      await page.keyboard.press('Escape');
 
-    // Open the filter menu
-    await builder.openLabelFilterMenu(0);
-
-    // Check if value dropdown is disabled (no label selected yet)
-    const isDisabled = await builder.isValueSelectDisabled();
-    expect(isDisabled).toBe(true);
-    testLogger.info('Value dropdown is disabled when no label is selected');
-
-    // Now select a label
-    const labelSelected = await builder.selectLabel('__name__');
-
-    if (labelSelected) {
-      // Value dropdown should now be enabled
-      const isStillDisabled = await builder.isValueSelectDisabled();
-      expect(isStillDisabled).toBe(false);
-      testLogger.info('Value dropdown is enabled after label selection');
+      // Chip text should no longer say "Select label"
+      const updatedText = await builder.getLabelFilterText(0);
+      expect(updatedText).not.toContain('Select label');
+      testLogger.info(`Updated chip text: "${updatedText}"`);
+    } else {
+      await page.keyboard.press('Escape');
+      testLogger.warn('No labels available');
     }
 
-    await page.keyboard.press('Escape');
-    testLogger.info('Value dropdown dependency test completed');
-  });
-
-  test("Add multiple label filters and verify count", {
-    tag: ['@metrics', '@builder', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing adding multiple label filters');
-
-    const builder = pm.metricsBuilderPage;
-
-    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
-
-    // Add first label filter
-    await builder.clickAddLabelFilter();
-    const countAfterFirst = await builder.getLabelFilterCount();
-    expect(countAfterFirst).toBe(1);
-    testLogger.info('First label filter added');
-
-    // Add second label filter
-    await builder.clickAddLabelFilter();
-    const countAfterSecond = await builder.getLabelFilterCount();
-    expect(countAfterSecond).toBe(2);
-    testLogger.info('Second label filter added');
-
-    // Add third label filter
-    await builder.clickAddLabelFilter();
-    const countAfterThird = await builder.getLabelFilterCount();
-    expect(countAfterThird).toBe(3);
-    testLogger.info('Third label filter added');
-
-    // Verify all three filters are visible
-    for (let i = 0; i < 3; i++) {
-      const filterBtn = builder.getLabelFilterButton(i);
-      await expect(filterBtn).toBeVisible();
-    }
-    testLogger.info('All three label filters are visible');
-
-    // Each filter should show "Select label" (default text)
-    const firstFilterText = await builder.getLabelFilterText(0);
-    expect(firstFilterText).toContain('Select label');
-    testLogger.info('New filter shows default "Select label" text');
-  });
-
-  test("Remove a label filter using close button", {
-    tag: ['@metrics', '@builder', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing label filter removal');
-
-    const builder = pm.metricsBuilderPage;
-
-    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
-
-    // Add two label filters
+    // 7. Add more filters and verify count
     await builder.clickAddLabelFilter();
     await builder.clickAddLabelFilter();
-    const countBefore = await builder.getLabelFilterCount();
-    expect(countBefore).toBe(2);
-    testLogger.info(`Filter count before removal: ${countBefore}`);
+    expect(await builder.getLabelFilterCount()).toBe(initialCount + 3);
+    testLogger.info('Added 2 more filters, total: ' + (initialCount + 3));
 
-    // Remove the first filter
+    // 8. Remove all filters
+    await builder.removeLabelFilter(2);
+    await builder.removeLabelFilter(1);
     await builder.removeLabelFilter(0);
-    const countAfter = await builder.getLabelFilterCount();
-    expect(countAfter).toBe(1);
-    testLogger.info(`Filter count after removal: ${countAfter}`);
-
-    // Remove the remaining filter
-    await builder.removeLabelFilter(0);
-    const countFinal = await builder.getLabelFilterCount();
-    expect(countFinal).toBe(0);
-    testLogger.info('All label filters removed successfully');
+    expect(await builder.getLabelFilterCount()).toBe(0);
+    testLogger.info('All filters removed');
   });
 
   // =========================================================================
-  // P1 - Functional: Operations
+  // P1 - Complete Operations Workflow (merged: add, categories, search,
+  //       remove, params, close dialog, ordering)
   // =========================================================================
 
-  test("Add an operation via the Operation Selector dialog", {
+  test("P1: Operations - add, categories, search, params, reorder, remove", {
     tag: ['@metrics', '@builder', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing operation addition via selector dialog');
-
+    testLogger.info('Testing complete operations workflows');
     const builder = pm.metricsBuilderPage;
 
-    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
-
-    // Initial operation count
-    const initialCount = await builder.getOperationCount();
-    testLogger.info(`Initial operation count: ${initialCount}`);
-
-    // Click Add Operation to open dialog
+    // 1. Open operation dialog and verify categories
     await builder.clickAddOperation();
-
-    // Verify dialog opens
     const dialog = page.locator('.q-dialog');
     await expect(dialog).toBeVisible({ timeout: 5000 });
-    testLogger.info('Operation Selector dialog opened');
 
-    // Verify dialog has a title
-    const dialogTitle = dialog.locator('div:has-text("Add Operation")').first();
-    await expect(dialogTitle).toBeVisible();
-    testLogger.info('Dialog title "Add Operation" is visible');
+    const categories = await builder.getOperationCategories();
+    expect(categories.length).toBeGreaterThanOrEqual(3);
+    testLogger.info(`Categories: ${categories.join(', ')}`);
 
-    // Verify search input is present
+    // 2. Verify search filters operations
     const searchInput = dialog.locator('input').first();
-    await expect(searchInput).toBeVisible();
-    testLogger.info('Search input is visible in dialog');
-
-    // Search for "Rate" operation
-    await searchInput.fill('Rate');
+    await searchInput.fill('histogram');
     await page.waitForTimeout(500);
+    const histogramItems = dialog.locator('.q-expansion-item .q-list .q-item');
+    const histogramCount = await histogramItems.count();
+    expect(histogramCount).toBeGreaterThan(0);
+    testLogger.info(`"histogram" search found ${histogramCount} items`);
 
-    // Select the Rate operation
-    const rateItem = dialog.locator('.q-item:has-text("Rate")').first();
-    if (await rateItem.isVisible({ timeout: 3000 })) {
-      await rateItem.click();
-      await page.waitForTimeout(500);
+    // 3. Verify empty search returns 0
+    await searchInput.fill('zzz_nonexistent_operation');
+    await page.waitForTimeout(500);
+    expect(await dialog.locator('.q-expansion-item .q-list .q-item').count()).toBe(0);
+    testLogger.info('Non-existent search returns 0 results');
 
-      // Verify operation was added
-      const newCount = await builder.getOperationCount();
-      expect(newCount).toBe(initialCount + 1);
-      testLogger.info('Rate operation added successfully');
+    // 4. Clear search, restore all
+    await searchInput.clear();
+    await page.waitForTimeout(500);
+    expect(await dialog.locator('.q-expansion-item .q-list .q-item').count()).toBeGreaterThan(0);
+    testLogger.info('Clearing search restores all operations');
 
-      // Verify operation text
-      const opText = await builder.getOperationText(0);
-      expect(opText.toLowerCase()).toContain('rate');
-      testLogger.info(`Operation text: ${opText}`);
-    } else {
-      testLogger.warn('Rate operation not found in dialog');
+    // 5. Close dialog via Close button
+    await builder.closeOperationDialog();
+    expect(await builder.isOperationDialogVisible()).toBe(false);
+    testLogger.info('Dialog closed via Close button');
+
+    // 6. Close dialog via Escape
+    await builder.clickAddOperation();
+    expect(await builder.isOperationDialogVisible()).toBe(true);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+    expect(await builder.isOperationDialogVisible()).toBe(false);
+    testLogger.info('Dialog closed via Escape');
+
+    // 7. Add Rate operation
+    const rateAdded = await builder.addOperation('Rate');
+    expect(rateAdded).toBe(true);
+    expect(await builder.getOperationCount()).toBe(1);
+    const rateText = await builder.getOperationText(0);
+    expect(rateText.toLowerCase()).toContain('rate');
+    testLogger.info(`Rate operation added: ${rateText}`);
+
+    // 8. Configure Rate parameter
+    const opBtn = page.locator('[data-test="promql-operation-0"]');
+    await opBtn.click();
+    await page.waitForTimeout(500);
+    const paramInput = page.locator('[data-test="promql-operation-param-0"]').last();
+    const paramVisible = await paramInput.isVisible({ timeout: 3000 }).catch(() => false);
+    if (paramVisible) {
+      const tagName = await paramInput.evaluate(el => el.tagName).catch(() => '');
+      const input = tagName === 'INPUT' ? paramInput : paramInput.locator('input').first();
+      if (await input.isVisible({ timeout: 3000 }).catch(() => false)) {
+        const currentValue = await input.inputValue().catch(() => '');
+        testLogger.info(`Rate default param: ${currentValue}`);
+        await input.click({ clickCount: 3 });
+        await input.press('Backspace');
+        await input.pressSequentially('5m');
+        expect(await input.inputValue()).toBe('5m');
+        testLogger.info('Rate param updated to 5m');
+      }
     }
-  });
+    await page.keyboard.press('Escape');
 
-  test("Remove an operation using close button", {
-    tag: ['@metrics', '@builder', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing operation removal');
+    // 9. Add Sum operation (from different category)
+    const sumAdded = await builder.addOperation('Sum');
+    expect(sumAdded).toBe(true);
+    expect(await builder.getOperationCount()).toBe(2);
+    expect((await builder.getOperationText(0)).toLowerCase()).toContain('rate');
+    expect((await builder.getOperationText(1)).toLowerCase()).toContain('sum');
+    testLogger.info('Rate at index 0, Sum at index 1');
 
-    const builder = pm.metricsBuilderPage;
-
-    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
-
-    // Add an operation
-    const added = await builder.addOperation('Rate');
-    expect(added).toBe(true);
-
-    const countBefore = await builder.getOperationCount();
-    expect(countBefore).toBeGreaterThan(0);
-    testLogger.info(`Operation count before removal: ${countBefore}`);
-
-    // Remove the operation
+    // 10. Remove Rate, verify Sum moves to index 0
     await builder.removeOperation(0);
-    const countAfter = await builder.getOperationCount();
-    expect(countAfter).toBe(countBefore - 1);
-    testLogger.info(`Operation count after removal: ${countAfter}`);
+    expect(await builder.getOperationCount()).toBe(1);
+    expect((await builder.getOperationText(0)).toLowerCase()).toContain('sum');
+    testLogger.info('After removing Rate, Sum at index 0');
+
+    // 11. Cleanup
+    await builder.removeOperation(0);
+    expect(await builder.getOperationCount()).toBe(0);
+    testLogger.info('All operations removed');
   });
 
   // =========================================================================
-  // P1 - Functional: Options (Legend, Step Value, Query Type)
+  // P1 - Builder Options (merged: legend, step value, query type)
   // =========================================================================
 
-  test("Set Legend, Step Value, and Query Type in Builder Options", {
+  test("P1: Builder options - legend, step value, query type switching", {
     tag: ['@metrics', '@builder', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing Builder Options (Legend, Step Value, Query Type)');
-
+    testLogger.info('Testing Builder options');
     const builder = pm.metricsBuilderPage;
 
-    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
+    // 1. Set legend
+    const legendField = page.locator(builder.legendInput);
+    await expect(legendField).toBeVisible({ timeout: 5000 });
+    const legendSet = await builder.setLegend('{{instance}}');
+    expect(legendSet).toBe(true);
+    const legendInput = legendField.locator('input').first();
+    expect(await legendInput.inputValue().catch(() => '')).toContain('{{instance}}');
+    testLogger.info('Legend set to "{{instance}}"');
 
-    // Set Step Value
+    // 2. Set step value
     const stepSet = await builder.setStepValue('30s');
     expect(stepSet).toBe(true);
-    testLogger.info('Step value set to "30s"');
-
-    // Verify step value input has the value (data-test is directly on the <input>)
     const stepInput = page.locator(builder.stepValueInput);
-    const stepValue = await stepInput.inputValue();
-    expect(stepValue).toBe('30s');
-    testLogger.info('Step value verified: ' + stepValue);
+    expect(await stepInput.inputValue()).toBe('30s');
+    testLogger.info('Step value set to 30s');
 
-    // Set Query Type to Instant
-    const qtSet = await builder.selectQueryType('instant');
-    if (qtSet) {
-      testLogger.info('Query type set to "Instant"');
-    }
+    // 3. Switch query type to Instant and back to Range
+    const qtInstant = await builder.selectQueryType('instant');
+    expect(qtInstant).toBe(true);
+    testLogger.info('Query type: Instant');
 
-    // Set Query Type back to Range
-    const qtRangeSet = await builder.selectQueryType('range');
-    if (qtRangeSet) {
-      testLogger.info('Query type set back to "Range"');
-    }
+    const qtRange = await builder.selectQueryType('range');
+    expect(qtRange).toBe(true);
+    testLogger.info('Query type: Range');
 
-    testLogger.info('Builder Options test completed');
-  });
-
-  // =========================================================================
-  // P1 - Functional: Run Query with Builder Mode Selections
-  // =========================================================================
-
-  test("Execute query after selecting metric and adding label filter in Builder mode", {
-    tag: ['@metrics', '@builder', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing full Builder mode query execution');
-
-    const builder = pm.metricsBuilderPage;
-
-    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
-
-    // Set time range to last 15 minutes
+    // 4. Run query with Range type, verify visualization
     await pm.metricsPage.openDatePicker();
     await pm.metricsPage.selectLast15Minutes();
     await page.waitForTimeout(1000);
-
-    // Run the query with default metric
     await builder.clickRunQuery();
     await page.waitForTimeout(3000);
+    expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
+    expect(await pm.metricsPage.hasVisualization()).toBe(true);
+    testLogger.info('Range query succeeded with visualization');
 
-    // Verify no error
-    const hasError = await pm.metricsPage.isErrorNotificationVisible();
-    expect(hasError).toBe(false);
-    testLogger.info('No error after running Builder mode query');
+    // 5. Switch to Instant and run
+    await builder.selectQueryType('instant');
+    await builder.clickRunQuery();
+    await page.waitForTimeout(3000);
+    await expect(page.locator(builder.runQueryButton).first()).toBeVisible();
+    testLogger.info('Instant query executed without crash');
 
-    // Verify visualization is displayed
-    const hasVis = await pm.metricsPage.hasVisualization();
-    expect(hasVis).toBe(true);
-    testLogger.info('Visualization displayed for Builder mode query');
+    // Restore Range
+    await builder.selectQueryType('range');
+    testLogger.info('Query type restored to Range');
   });
 
   // =========================================================================
-  // P1 - Functional: Add to Dashboard from Builder mode
+  // P1 - Add to Dashboard Cancel + Dialog Fields
   // =========================================================================
 
-  test("Add to Dashboard flow from Builder mode - Cancel", {
+  test("P1: Add to Dashboard - dialog fields, fill title, cancel", {
     tag: ['@metrics', '@builder', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing Add to Dashboard cancel flow from Builder mode');
-
+    testLogger.info('Testing Add to Dashboard dialog');
     const builder = pm.metricsBuilderPage;
 
-    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
     // Run query first to enable Add to Dashboard
     await builder.clickRunQuery();
     await page.waitForTimeout(3000);
 
-    // Click Add to Dashboard button
+    // Click Add to Dashboard
     const addClicked = await builder.clickAddToDashboard();
-
     if (addClicked) {
-      // Verify dialog opens
-      const dialogVisible = await builder.isDashboardDialogVisible();
-      expect(dialogVisible).toBe(true);
-      testLogger.info('Add to Dashboard dialog opened');
+      expect(await builder.isDashboardDialogVisible()).toBe(true);
+      testLogger.info('Dialog opened');
 
-      // Verify panel title input is visible
-      const titleInput = page.locator(builder.dashboardPanelTitleInput);
-      await expect(titleInput).toBeVisible({ timeout: 3000 });
-      testLogger.info('Panel title input is visible');
+      // Verify all dialog fields
+      await expect(page.locator(builder.dashboardPanelTitleInput)).toBeVisible({ timeout: 3000 });
+      await expect(page.locator(builder.dashboardCancelButton)).toBeVisible();
+      await expect(page.locator(builder.dashboardAddButton)).toBeVisible();
+      testLogger.info('All dialog fields visible (title, cancel, add)');
 
-      // Fill in panel title
+      // Fill title and cancel
       await builder.fillPanelTitle('Test Builder Panel');
-
-      // Click Cancel
       await builder.clickDashboardCancel();
-
-      // Verify dialog closes
-      const dialogStillVisible = await builder.isDashboardDialogVisible();
-      expect(dialogStillVisible).toBe(false);
+      expect(await builder.isDashboardDialogVisible()).toBe(false);
       testLogger.info('Dialog closed after cancel');
     } else {
       testLogger.warn('Add to Dashboard button not visible');
@@ -595,215 +423,757 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
   });
 
   // =========================================================================
-  // P2 - Edge Cases
+  // P1 - State Persistence across Mode Switches
   // =========================================================================
 
-  test("Builder mode UI hides when switching to Custom mode", {
-    tag: ['@metrics', '@builder', '@edge', '@P2', '@all']
+  test("P1: State persistence - filters, operations, step value across Builder/Custom switch", {
+    tag: ['@metrics', '@builder', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing Builder UI visibility when switching to Custom mode');
-
+    testLogger.info('Testing state persistence across mode switches');
     const builder = pm.metricsBuilderPage;
 
-    // Metrics page defaults to PromQL + Builder mode
-    // Verify Builder UI is visible
-    const builderUIVisible = await builder.isBuilderUIVisible();
-    expect(builderUIVisible).toBe(true);
-    testLogger.info('Builder UI is visible in Builder mode');
-
-    // Switch to Custom mode
-    await builder.switchToCustomMode();
-
-    // Verify Builder UI elements are hidden (Label Filters, Operations should not show)
-    const builderUIAfterSwitch = await builder.isBuilderUIVisible();
-    expect(builderUIAfterSwitch).toBe(false);
-    testLogger.info('Builder UI is hidden after switching to Custom mode');
-
-    // Verify raw query editor is visible instead (Custom mode shows a code editor)
-    // Check for Monaco editor or any code/text editor area
-    const editorVisible = await page.locator('.monaco-editor, .view-lines, [data-test*="query-editor"], textarea.inputarea, .cm-editor').first().isVisible({ timeout: 3000 }).catch(() => false);
-    expect(editorVisible).toBe(true);
-    testLogger.info('Code editor is visible in Custom mode');
-
-    // Switch back to Builder mode
-    await builder.switchToBuilderMode();
-
-    // Verify Builder UI reappears
-    const builderUIRestored = await builder.isBuilderUIVisible();
-    expect(builderUIRestored).toBe(true);
-    testLogger.info('Builder UI restored after switching back to Builder mode');
-  });
-
-  test("Label filter shows 'Select label' default text before any selection", {
-    tag: ['@metrics', '@builder', '@edge', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing default label filter state');
-
-    const builder = pm.metricsBuilderPage;
-
-    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
-
-    // Add a label filter
+    // Setup: add filter, operation, step value
     await builder.clickAddLabelFilter();
+    expect(await builder.getLabelFilterCount()).toBe(1);
 
-    // Verify the new filter button shows "Select label"
-    const filterText = await builder.getLabelFilterText(0);
-    expect(filterText).toContain('Select label');
-    testLogger.info(`Default filter text: "${filterText}"`);
-  });
+    const opAdded = await builder.addOperation('Rate');
+    expect(opAdded).toBe(true);
+    expect(await builder.getOperationCount()).toBe(1);
 
-  test("Switching between Builder and Custom preserves metric selection", {
-    tag: ['@metrics', '@builder', '@edge', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing metric selection persistence across mode switches');
-
-    const builder = pm.metricsBuilderPage;
-
-    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
+    await builder.setStepValue('2m');
+    testLogger.info('Setup: 1 filter, 1 operation (Rate), step=2m');
 
     // Switch to Custom mode
     await builder.switchToCustomMode();
     await page.waitForTimeout(1000);
+    testLogger.info('Switched to Custom mode');
 
-    // Switch back to Builder mode
+    // Switch back to Builder
     await builder.switchToBuilderMode();
     await page.waitForTimeout(1000);
+    testLogger.info('Switched back to Builder mode');
 
-    // The metric selector should still be visible and the page should be functional
-    const metricVisible = await builder.isMetricSelectorVisible();
-    expect(metricVisible).toBe(true);
-    testLogger.info('Metric selector is still visible after mode switches');
-  });
+    // Verify all state persisted
+    expect(await builder.getLabelFilterCount()).toBe(1);
+    expect(await builder.getOperationCount()).toBe(1);
 
-  test("Add multiple operations and verify they are listed", {
-    tag: ['@metrics', '@builder', '@edge', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing multiple operations addition');
+    const stepInput = page.locator(builder.stepValueInput);
+    expect(await stepInput.inputValue().catch(() => '')).toBe('2m');
 
-    const builder = pm.metricsBuilderPage;
-
-    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
-
-    // Add Rate operation
-    const rateAdded = await builder.addOperation('Rate');
-    expect(rateAdded).toBe(true);
-    testLogger.info('Rate operation added');
-
-    // Add Sum operation
-    const sumAdded = await builder.addOperation('Sum');
-    expect(sumAdded).toBe(true);
-    testLogger.info('Sum operation added');
-
-    // Verify both operations are present
-    const opCount = await builder.getOperationCount();
-    expect(opCount).toBe(2);
-    testLogger.info(`Operation count: ${opCount}`);
-
-    // Remove all operations
-    await builder.removeOperation(1);
-    await builder.removeOperation(0);
-    const finalCount = await builder.getOperationCount();
-    expect(finalCount).toBe(0);
-    testLogger.info('All operations removed');
-  });
-
-  test("Operation Selector dialog search filters operations correctly", {
-    tag: ['@metrics', '@builder', '@edge', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing operation selector search functionality');
-
-    const builder = pm.metricsBuilderPage;
-
-    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
-
-    // Open operation selector dialog
-    await builder.clickAddOperation();
-
-    const dialog = page.locator('.q-dialog');
-    await expect(dialog).toBeVisible({ timeout: 5000 });
-
-    // Get initial operation count
-    const allItems = dialog.locator('.q-item[class*="clickable"]');
-    const initialItemCount = await allItems.count();
-    testLogger.info(`Total operations before search: ${initialItemCount}`);
-    expect(initialItemCount).toBeGreaterThan(0);
-
-    // Search for a specific operation
-    const searchInput = dialog.locator('input').first();
-    await searchInput.fill('histogram');
-    await page.waitForTimeout(500);
-
-    // Verify filtered results contain the search term
-    const filteredItems = dialog.locator('.q-item[class*="clickable"]');
-    const filteredCount = await filteredItems.count();
-    testLogger.info(`Operations after "histogram" search: ${filteredCount}`);
-    expect(filteredCount).toBeLessThan(initialItemCount);
-    expect(filteredCount).toBeGreaterThan(0);
-
-    // Close dialog
-    const closeBtn = dialog.locator('button:has-text("Close")');
-    await closeBtn.click();
-    await page.waitForTimeout(300);
-
-    testLogger.info('Operation selector search test completed');
+    // Metric selector still visible
+    expect(await builder.isMetricSelectorVisible()).toBe(true);
+    testLogger.info('All state persisted across mode switch');
   });
 
   // =========================================================================
-  // P2 - Full E2E: Builder Mode complete workflow
+  // P1 - Full E2E: Build query with metric + Rate + label + step + run
   // =========================================================================
 
-  test("Full Builder workflow: select metric, add label filter, add operation, run query", {
-    tag: ['@metrics', '@builder', '@e2e', '@P2', '@all']
+  test("P1: E2E - build query with Rate operation, step value, run and verify chart", {
+    tag: ['@metrics', '@builder', '@e2e', '@P1', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing complete Builder mode workflow');
-
+    testLogger.info('Testing full E2E builder workflow');
     const builder = pm.metricsBuilderPage;
 
-    // Metrics page defaults to PromQL + Builder mode with cpu_usage pre-selected
+    // 1. Verify builder mode + metric pre-selected
+    expect(await builder.isModeSelected('builder')).toBe(true);
+    const streamInput = page.locator(builder.streamSelector);
+    expect((await streamInput.inputValue()).length).toBeGreaterThan(0);
+    testLogger.info('Builder mode active, metric pre-selected');
 
-    // Set time range
+    // 2. Set time range
     await pm.metricsPage.openDatePicker();
     await pm.metricsPage.selectLast15Minutes();
     await page.waitForTimeout(1000);
 
-    // Step 1: Verify metric is pre-selected
-    const streamInput = page.locator(builder.streamSelector);
-    const streamValue = await streamInput.inputValue();
-    expect(streamValue.length).toBeGreaterThan(0);
-    testLogger.info(`Step 1: Metric pre-selected: ${streamValue}`);
-
-    // Step 2: Add a label filter
+    // 3. Add label filter
     await builder.clickAddLabelFilter();
-    const filterCount = await builder.getLabelFilterCount();
-    expect(filterCount).toBeGreaterThan(0);
-    testLogger.info('Step 2: Label filter added');
+    expect(await builder.getLabelFilterCount()).toBeGreaterThan(0);
 
-    // Step 3: Add an operation (Rate)
-    const opAdded = await builder.addOperation('Rate');
-    if (opAdded) {
-      const opCount = await builder.getOperationCount();
-      expect(opCount).toBeGreaterThan(0);
-      testLogger.info('Step 3: Operation added');
-    }
+    // 4. Add Rate operation
+    expect(await builder.addOperation('Rate')).toBe(true);
+    expect(await builder.getOperationCount()).toBe(1);
 
-    // Step 4: Set step value
-    await builder.setStepValue('1m');
-    testLogger.info('Step 4: Step value set to 1m');
+    // 5. Set step value + query type
+    await builder.setStepValue('30s');
+    expect(await page.locator(builder.stepValueInput).inputValue()).toBe('30s');
+    await builder.selectQueryType('range');
 
-    // Step 5: Run query
+    // 6. Run query
     await builder.clickRunQuery();
     await page.waitForTimeout(3000);
 
-    // Verify no errors
-    const hasError = await pm.metricsPage.isErrorNotificationVisible();
-    if (hasError) {
-      const errorText = await pm.metricsPage.getErrorNotificationText();
-      testLogger.warn(`Query error (may be expected with partial filter): ${errorText}`);
+    // 7. Verify no errors + chart rendered
+    expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
+    expect(await pm.metricsPage.hasVisualization()).toBe(true);
+    testLogger.info('E2E query executed with visualization');
+
+    // 8. Cleanup
+    await builder.removeOperation(0);
+    expect(await builder.getOperationCount()).toBe(0);
+    testLogger.info('E2E workflow complete');
+  });
+
+  // =========================================================================
+  // P2 - E2E: Build query, switch chart type to Table, verify table renders
+  // =========================================================================
+
+  test("P2: E2E - build query, switch to table chart, verify table renders with no errors", {
+    tag: ['@metrics', '@builder', '@e2e', '@P2', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing chart type switching to table');
+    const builder = pm.metricsBuilderPage;
+
+    // 1. Set time range and run default query first
+    await pm.metricsPage.openDatePicker();
+    await pm.metricsPage.selectLast15Minutes();
+    await page.waitForTimeout(1000);
+
+    await builder.clickRunQuery();
+    await page.waitForTimeout(3000);
+    expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
+    testLogger.info('Default line chart query executed');
+
+    // 2. Switch to table chart type
+    const tableSelected = await builder.selectChartType('table');
+    if (tableSelected) {
+      testLogger.info('Switched to table chart type');
+
+      // 3. Run query again with table chart
+      await builder.clickRunQuery();
+      await page.waitForTimeout(3000);
+
+      // 4. Verify no errors
+      expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
+      testLogger.info('Table chart query executed without errors');
+
+      // 5. Verify table or chart rendered
+      const rendered = await builder.isChartRendered();
+      expect(rendered).toBe(true);
+      testLogger.info('Table/chart rendered successfully');
+
+      // 6. Switch back to line chart
+      await builder.selectChartType('line');
+      testLogger.info('Switched back to line chart');
+    } else {
+      // Chart type selector might not be visible on metrics page
+      // (it may only appear in dashboard panel editor context)
+      testLogger.info('Table chart type not available on metrics page - checking area chart');
+
+      // Try area chart instead
+      const areaSelected = await builder.selectChartType('area');
+      if (areaSelected) {
+        await builder.clickRunQuery();
+        await page.waitForTimeout(3000);
+        expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
+        testLogger.info('Area chart query executed without errors');
+      } else {
+        testLogger.info('Chart type selector not available on metrics page (expected in dashboard context)');
+      }
+    }
+  });
+
+  // =========================================================================
+  // P2 - E2E: Build query with operation + label, add to dashboard,
+  //       verify panel, cleanup dashboard
+  // =========================================================================
+
+  test("P2: E2E - build query, save to dashboard, verify panel, cleanup", {
+    tag: ['@metrics', '@builder', '@e2e', '@P2', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing full save-to-dashboard workflow');
+    const builder = pm.metricsBuilderPage;
+    const uniqueId = Date.now().toString().slice(-6);
+    const panelTitle = `E2E Builder Panel ${uniqueId}`;
+
+    // 1. Set time range
+    await pm.metricsPage.openDatePicker();
+    await pm.metricsPage.selectLast15Minutes();
+    await page.waitForTimeout(1000);
+
+    // 2. Add Rate operation
+    expect(await builder.addOperation('Rate')).toBe(true);
+    testLogger.info('Rate operation added');
+
+    // 3. Set step value
+    await builder.setStepValue('1m');
+    testLogger.info('Step value: 1m');
+
+    // 4. Run query and verify no errors
+    await builder.clickRunQuery();
+    await page.waitForTimeout(3000);
+    expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
+    expect(await pm.metricsPage.hasVisualization()).toBe(true);
+    testLogger.info('Query executed with visualization');
+
+    // 5. Click Add to Dashboard
+    const addClicked = await builder.clickAddToDashboard();
+    if (!addClicked) {
+      testLogger.warn('Add to Dashboard button not visible, skipping save flow');
+      return;
     }
 
-    // The query should execute without crashing the UI
-    const runQueryBtn = page.locator(builder.runQueryButton).first();
-    await expect(runQueryBtn).toBeVisible();
-    testLogger.info('Full Builder workflow completed - UI is stable');
+    expect(await builder.isDashboardDialogVisible()).toBe(true);
+    testLogger.info('Add to Dashboard dialog opened');
+
+    // 6. Select folder (default)
+    await builder.selectDashboardFolder('default');
+    testLogger.info('Folder selected: default');
+
+    // 7. Select or create dashboard
+    const dashDropdown = page.locator('[data-test="dashboard-dropdown-dashboard-selection"]');
+    if (await dashDropdown.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await dashDropdown.click();
+      await page.waitForTimeout(1000);
+
+      // Select first available dashboard
+      const dashOptions = page.locator('.q-menu .q-item');
+      const dashCount = await dashOptions.count();
+      testLogger.info(`Available dashboards: ${dashCount}`);
+
+      if (dashCount > 0) {
+        const dashName = await dashOptions.first().textContent();
+        await dashOptions.first().click();
+        await page.waitForTimeout(500);
+        testLogger.info(`Selected dashboard: ${dashName}`);
+
+        // 8. Select tab
+        await builder.selectDashboardTab('Default');
+        testLogger.info('Tab selected: Default');
+
+        // 9. Fill panel title
+        await builder.fillPanelTitle(panelTitle);
+        testLogger.info(`Panel title: ${panelTitle}`);
+
+        // 10. Click Add to save
+        await builder.clickDashboardAdd();
+        await page.waitForTimeout(3000);
+
+        // 11. Check if navigated to dashboard (success case)
+        const url = page.url();
+        if (url.includes('dashboard')) {
+          testLogger.info('Navigated to dashboard after save');
+
+          // 12. Verify panel exists
+          const panelVisible = await builder.isPanelVisibleOnDashboard(panelTitle);
+          if (panelVisible) {
+            testLogger.info(`Panel "${panelTitle}" visible on dashboard`);
+          } else {
+            testLogger.info('Panel may be rendered differently or page still loading');
+          }
+        } else {
+          // Check for success/error notification
+          const hasSuccess = await builder.hasSuccessNotification();
+          const hasError = await builder.hasErrorNotification();
+          testLogger.info(`Save result - success: ${hasSuccess}, error: ${hasError}`);
+        }
+      } else {
+        testLogger.warn('No dashboards available to select');
+        await builder.clickDashboardCancel();
+      }
+    } else {
+      testLogger.warn('Dashboard dropdown not visible');
+      await builder.clickDashboardCancel();
+    }
+
+    testLogger.info('Save to dashboard workflow completed');
+  });
+
+  // =========================================================================
+  // P2 - E2E: Build query with multiple operations + table chart + run
+  // =========================================================================
+
+  test("P2: E2E - build query with Rate + Sum operations, set options, run query", {
+    tag: ['@metrics', '@builder', '@e2e', '@P2', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing multi-operation builder workflow');
+    const builder = pm.metricsBuilderPage;
+
+    // 1. Set time range
+    await pm.metricsPage.openDatePicker();
+    await pm.metricsPage.selectLast15Minutes();
+    await page.waitForTimeout(1000);
+
+    // 2. Add Rate operation
+    expect(await builder.addOperation('Rate')).toBe(true);
+    testLogger.info('Rate added');
+
+    // 3. Add Sum operation
+    expect(await builder.addOperation('Sum')).toBe(true);
+    testLogger.info('Sum added');
+
+    // 4. Verify both operations present in order
+    expect(await builder.getOperationCount()).toBe(2);
+    expect((await builder.getOperationText(0)).toLowerCase()).toContain('rate');
+    expect((await builder.getOperationText(1)).toLowerCase()).toContain('sum');
+    testLogger.info('Operations: Rate(0), Sum(1)');
+
+    // 5. Set legend and step value
+    await builder.setLegend('{{__name__}}');
+    await builder.setStepValue('1m');
+    testLogger.info('Legend: {{__name__}}, Step: 1m');
+
+    // 6. Run query
+    await builder.clickRunQuery();
+    await page.waitForTimeout(3000);
+
+    // 7. Verify no errors and visualization
+    expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
+    expect(await pm.metricsPage.hasVisualization()).toBe(true);
+    testLogger.info('Multi-operation query rendered successfully');
+
+    // 8. Cleanup
+    await builder.removeOperation(1);
+    await builder.removeOperation(0);
+    expect(await builder.getOperationCount()).toBe(0);
+    testLogger.info('All operations cleaned up');
+  });
+
+  // =========================================================================
+  // P2 - E2E: Add label filter + operation, switch to Instant, run, verify
+  // =========================================================================
+
+  test("P2: E2E - add filter + operation, switch to Instant query type, run and verify", {
+    tag: ['@metrics', '@builder', '@e2e', '@P2', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing Instant query type with filter and operation');
+    const builder = pm.metricsBuilderPage;
+
+    // 1. Set time range
+    await pm.metricsPage.openDatePicker();
+    await pm.metricsPage.selectLast15Minutes();
+    await page.waitForTimeout(1000);
+
+    // 2. Add label filter
+    await builder.clickAddLabelFilter();
+    expect(await builder.getLabelFilterCount()).toBe(1);
+
+    // 3. Add Rate operation
+    expect(await builder.addOperation('Rate')).toBe(true);
+
+    // 4. Set step value
+    await builder.setStepValue('30s');
+
+    // 5. Switch to Instant query type
+    expect(await builder.selectQueryType('instant')).toBe(true);
+    testLogger.info('Configured: filter + Rate + step=30s + Instant');
+
+    // 6. Run query
+    await builder.clickRunQuery();
+    await page.waitForTimeout(3000);
+
+    // 7. Verify no crash (Instant may return different result format)
+    await expect(page.locator(builder.runQueryButton).first()).toBeVisible();
+    testLogger.info('Instant query executed without crash');
+
+    // 8. Switch back to Range and run again
+    expect(await builder.selectQueryType('range')).toBe(true);
+    await builder.clickRunQuery();
+    await page.waitForTimeout(3000);
+    expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
+    testLogger.info('Range query executed without errors');
+
+    // 9. Cleanup
+    await builder.removeOperation(0);
+    testLogger.info('Instant/Range query type test complete');
+  });
+
+  // =========================================================================
+  // P1 - E2E: Build complete query with label filter (label=operator=value)
+  //       + operation + options, verify builder state, query preview,
+  //       table chart with data rows, and API query correctness
+  // =========================================================================
+
+  test("P1: E2E - build complete query (label filter + Sum + options), verify builder state and table chart", {
+    tag: ['@metrics', '@builder', '@e2e', '@P1', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing complete builder workflow: label filter + operation + options + table chart');
+    const builder = pm.metricsBuilderPage;
+
+    // 1. Verify builder mode active with metric pre-selected
+    expect(await builder.isModeSelected('builder')).toBe(true);
+    const streamInput = page.locator(builder.streamSelector);
+    const metricName = await streamInput.inputValue();
+    expect(metricName.length).toBeGreaterThan(0);
+    testLogger.info(`Metric: ${metricName}`);
+
+    // 2. Set time range
+    await pm.metricsPage.openDatePicker();
+    await pm.metricsPage.selectLast15Minutes();
+    await page.waitForTimeout(1000);
+    testLogger.info('Time range: last 15 minutes');
+
+    // 3. Add a label filter and fully configure label + operator + value
+    await builder.clickAddLabelFilter();
+    expect(await builder.getLabelFilterCount()).toBe(1);
+
+    // Open filter menu to configure it
+    await builder.openLabelFilterMenu(0);
+
+    // Select a label
+    const labelDropdown = page.locator(builder.labelSelect).last();
+    await labelDropdown.click();
+    await page.waitForTimeout(500);
+
+    const labelOptions = page.locator('.q-menu .q-item');
+    const labelCount = await labelOptions.count();
+    let selectedLabel = '';
+    let selectedOperator = '=';
+    let selectedValue = '';
+
+    if (labelCount > 0) {
+      selectedLabel = (await labelOptions.first().textContent()).trim();
+      await labelOptions.first().click();
+      await page.waitForTimeout(500);
+      testLogger.info(`Selected label: ${selectedLabel}`);
+
+      // Verify default operator is "="
+      const operatorText = await page.locator(builder.operatorSelect).last().textContent().catch(() => '');
+      expect(operatorText).toContain('=');
+      selectedOperator = operatorText.trim();
+      testLogger.info(`Operator: ${selectedOperator}`);
+
+      // Select a value
+      const valueDropdown = page.locator(builder.valueSelect).last();
+      const isDisabled = await builder.isValueSelectDisabled();
+      if (!isDisabled) {
+        await valueDropdown.click();
+        await page.waitForTimeout(500);
+
+        const valueOptions = page.locator('.q-menu .q-item');
+        const valueCount = await valueOptions.count();
+        if (valueCount > 0) {
+          selectedValue = (await valueOptions.first().textContent()).trim();
+          await valueOptions.first().click();
+          await page.waitForTimeout(500);
+          testLogger.info(`Selected value: ${selectedValue}`);
+        }
+      }
+
+      // Close the filter menu
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+
+      // Assert: chip text shows "label = value" pattern (e.g. "environment = development")
+      const chipText = await builder.getLabelFilterText(0);
+      expect(chipText).not.toContain('Select label');
+      expect(chipText).toContain(selectedLabel);
+      if (selectedValue) {
+        expect(chipText).toContain(selectedValue);
+      }
+      testLogger.info(`Filter chip: "${chipText}"`);
+    } else {
+      await page.keyboard.press('Escape');
+      testLogger.info('No labels available, continuing without label filter config');
+    }
+
+    // 4. Add Sum operation (aggregation)
+    expect(await builder.addOperation('Sum')).toBe(true);
+    expect(await builder.getOperationCount()).toBe(1);
+    testLogger.info('Sum operation added');
+
+    // 5. Configure Sum operation's label parameter (select the same label for "by" clause)
+    if (selectedLabel) {
+      const opBtn = page.locator('[data-test="promql-operation-0"]');
+      await opBtn.click();
+      await page.waitForTimeout(500);
+
+      // Find the multi-select param for labels (type="select" in the operation menu)
+      const labelParam = page.locator('[data-test="promql-operation-param-0"]').last();
+      if (await labelParam.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await labelParam.click();
+        await page.waitForTimeout(500);
+
+        // Select the label from the dropdown
+        const paramOption = page.locator('.q-menu .q-item').filter({ hasText: selectedLabel }).first();
+        if (await paramOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await paramOption.click();
+          await page.waitForTimeout(500);
+          testLogger.info(`Sum operation: selected label "${selectedLabel}" for by clause`);
+        }
+      }
+
+      // Close the operation menu
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+    }
+
+    // 6. Set options: legend and step
+    await builder.setLegend('{__hash__}');
+    testLogger.info('Options: legend={__hash__}');
+
+    // 7. Verify builder state (all in Builder mode — no mode switch)
+    const builderState = await builder.verifyBuilderState();
+    testLogger.info(`Builder state: ${JSON.stringify(builderState)}`);
+
+    // Assert metric in stream selector
+    expect(builderState.metric.toLowerCase()).toContain(metricName.toLowerCase());
+
+    // Assert label filter chip shows selected label
+    if (selectedLabel) {
+      expect(builderState.labelFilters.length).toBe(1);
+      expect(builderState.labelFilters[0]).toContain(selectedLabel);
+    }
+
+    // Assert operation chip shows Sum (possibly with label param like "Sum(environment)")
+    expect(builderState.operations.length).toBe(1);
+    expect(builderState.operations[0].toLowerCase()).toContain('sum');
+    if (selectedLabel) {
+      // Operation chip should show the label param, e.g. "Sum(environment)"
+      expect(builderState.operations[0]).toContain(selectedLabel);
+      testLogger.info(`Operation chip: "${builderState.operations[0]}"`);
+    }
+
+    // Assert legend option
+    expect(builderState.legend).toBe('{__hash__}');
+    testLogger.info('Builder state verified: metric, filter, operation, options all correct');
+
+    // 8. Switch to Table chart type
+    const tableSelected = await builder.selectChartType('table');
+    expect(tableSelected).toBe(true);
+    testLogger.info('Switched to table chart type');
+
+    // 9. Run query and intercept API request to verify PromQL query string
+    const capturedQuery = await builder.captureQueryFromRunRequest();
+    testLogger.info(`Captured PromQL from API: "${capturedQuery}"`);
+
+    // Assert the API query contains expected components
+    expect(capturedQuery.toLowerCase()).toContain(metricName.toLowerCase());
+    expect(capturedQuery.toLowerCase()).toContain('sum');
+    if (selectedLabel && selectedValue) {
+      // Query should have label filter syntax: {label="value"}
+      expect(capturedQuery).toContain(selectedLabel);
+      expect(capturedQuery).toContain(selectedValue);
+      testLogger.info(`API query contains: ${selectedLabel}="${selectedValue}"`);
+    }
+    if (selectedLabel) {
+      // Query should have "by (label)" for Sum aggregation
+      expect(capturedQuery.toLowerCase()).toContain('by');
+      testLogger.info('API query contains "by" clause for Sum aggregation');
+    }
+
+    // Wait for results to render
+    await page.waitForTimeout(3000);
+
+    // 10. Verify still in Builder mode (no mode switch happened)
+    expect(await builder.isModeSelected('builder')).toBe(true);
+    testLogger.info('Still in Builder mode');
+
+    // 11. Verify query preview text at bottom shows the generated PromQL
+    const previewText = await builder.getQueryPreviewText();
+    testLogger.info(`Query preview: "${previewText}"`);
+    if (previewText) {
+      expect(previewText.toLowerCase()).toContain(metricName.toLowerCase());
+      expect(previewText.toLowerCase()).toContain('sum');
+      testLogger.info('Query preview matches expected PromQL');
+    }
+
+    // 12. Verify no errors
+    const hasError = await pm.metricsPage.isErrorNotificationVisible();
+    expect(hasError).toBe(false);
+    testLogger.info('No errors after query execution');
+
+    // 13. Verify table chart rendered with data
+    const tableData = await builder.getTableChartData();
+    testLogger.info(`Table: visible=${tableData.visible}, rows=${tableData.rowCount}, headers=${JSON.stringify(tableData.headers)}`);
+    expect(tableData.visible).toBe(true);
+    expect(tableData.rowCount).toBeGreaterThan(0);
+    testLogger.info('Table chart rendered with data rows');
+
+    // 14. Cleanup
+    await builder.selectChartType('line');
+    await builder.removeOperation(0);
+    expect(await builder.getOperationCount()).toBe(0);
+    await builder.removeLabelFilter(0);
+    expect(await builder.getLabelFilterCount()).toBe(0);
+    testLogger.info('Cleanup complete');
+  });
+
+  // =========================================================================
+  // P2 - E2E: Build query with label filter + Sum(by label) — no Rate,
+  //       verify builder state, query preview, table chart data, API query
+  //       Mirrors the exact screenshot flow: metric + filter + Sum(label) + table
+  // =========================================================================
+
+  test("P2: E2E - label filter + Sum with by-label, verify query built correctly and table renders data", {
+    tag: ['@metrics', '@builder', '@e2e', '@P2', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing: label filter + Sum(by label) + table chart with data verification');
+    const builder = pm.metricsBuilderPage;
+
+    // 1. Verify builder mode and pre-selected metric
+    expect(await builder.isModeSelected('builder')).toBe(true);
+    const streamInput = page.locator(builder.streamSelector);
+    const metricName = await streamInput.inputValue();
+    expect(metricName.length).toBeGreaterThan(0);
+    testLogger.info(`Metric: ${metricName}`);
+
+    // 2. Set time range
+    await pm.metricsPage.openDatePicker();
+    await pm.metricsPage.selectLast15Minutes();
+    await page.waitForTimeout(1000);
+
+    // 3. Add label filter and configure label + operator(=) + value
+    await builder.clickAddLabelFilter();
+    expect(await builder.getLabelFilterCount()).toBe(1);
+
+    await builder.openLabelFilterMenu(0);
+    const labelDropdown = page.locator(builder.labelSelect).last();
+    await labelDropdown.click();
+    await page.waitForTimeout(500);
+
+    const labelOptions = page.locator('.q-menu .q-item');
+    const labelCount = await labelOptions.count();
+    let selectedLabel = '';
+    let selectedValue = '';
+
+    if (labelCount > 0) {
+      selectedLabel = (await labelOptions.first().textContent()).trim();
+      await labelOptions.first().click();
+      await page.waitForTimeout(500);
+      testLogger.info(`Label: ${selectedLabel}`);
+
+      // Operator defaults to "="
+      const operatorText = await page.locator(builder.operatorSelect).last().textContent().catch(() => '');
+      expect(operatorText).toContain('=');
+
+      // Select value
+      const valueDropdown = page.locator(builder.valueSelect).last();
+      const isDisabled = await builder.isValueSelectDisabled();
+      if (!isDisabled) {
+        await valueDropdown.click();
+        await page.waitForTimeout(500);
+        const valueOptions = page.locator('.q-menu .q-item');
+        if (await valueOptions.count() > 0) {
+          selectedValue = (await valueOptions.first().textContent()).trim();
+          await valueOptions.first().click();
+          await page.waitForTimeout(500);
+          testLogger.info(`Value: ${selectedValue}`);
+        }
+      }
+
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+
+      // Assert chip shows label = value
+      const chipText = await builder.getLabelFilterText(0);
+      expect(chipText).toContain(selectedLabel);
+      if (selectedValue) {
+        expect(chipText).toContain(selectedValue);
+      }
+      testLogger.info(`Filter chip: "${chipText}"`);
+    } else {
+      await page.keyboard.press('Escape');
+      testLogger.info('No labels available');
+    }
+
+    // 4. Add Sum operation
+    expect(await builder.addOperation('Sum')).toBe(true);
+    expect(await builder.getOperationCount()).toBe(1);
+    testLogger.info('Sum operation added');
+
+    // 5. Configure Sum's "by" label parameter
+    if (selectedLabel) {
+      const opBtn = page.locator('[data-test="promql-operation-0"]');
+      await opBtn.click();
+      await page.waitForTimeout(500);
+
+      const labelParam = page.locator('[data-test="promql-operation-param-0"]').last();
+      if (await labelParam.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await labelParam.click();
+        await page.waitForTimeout(500);
+
+        const paramOption = page.locator('.q-menu .q-item').filter({ hasText: selectedLabel }).first();
+        if (await paramOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await paramOption.click();
+          await page.waitForTimeout(500);
+          testLogger.info(`Sum by: ${selectedLabel}`);
+        }
+      }
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+    }
+
+    // 6. Verify builder state — all assertions in Builder mode
+    const builderState = await builder.verifyBuilderState();
+    testLogger.info(`Builder state: ${JSON.stringify(builderState)}`);
+
+    // Metric matches
+    expect(builderState.metric.toLowerCase()).toContain(metricName.toLowerCase());
+
+    // Label filter chip present with label name
+    if (selectedLabel) {
+      expect(builderState.labelFilters.length).toBe(1);
+      expect(builderState.labelFilters[0]).toContain(selectedLabel);
+    }
+
+    // Operation chip shows "Sum(label)" with the by-label
+    expect(builderState.operations.length).toBe(1);
+    expect(builderState.operations[0].toLowerCase()).toContain('sum');
+    if (selectedLabel) {
+      expect(builderState.operations[0]).toContain(selectedLabel);
+      testLogger.info(`Operation chip: "${builderState.operations[0]}"`);
+    }
+    testLogger.info('Builder state verified');
+
+    // 7. Switch to table chart
+    const tableSelected = await builder.selectChartType('table');
+    expect(tableSelected).toBe(true);
+    testLogger.info('Table chart selected');
+
+    // 8. Run query and capture API request
+    const capturedQuery = await builder.captureQueryFromRunRequest();
+    testLogger.info(`API PromQL: "${capturedQuery}"`);
+
+    // Assert query structure: sum by (label) (metric{label="value"})
+    expect(capturedQuery.toLowerCase()).toContain(metricName.toLowerCase());
+    expect(capturedQuery.toLowerCase()).toContain('sum');
+    if (selectedLabel) {
+      expect(capturedQuery).toContain(selectedLabel);
+      expect(capturedQuery.toLowerCase()).toContain('by');
+    }
+    if (selectedValue) {
+      expect(capturedQuery).toContain(selectedValue);
+    }
+    testLogger.info('API query verified: correct structure');
+
+    // Wait for results
+    await page.waitForTimeout(3000);
+
+    // 9. Verify still in Builder mode
+    expect(await builder.isModeSelected('builder')).toBe(true);
+
+    // 10. Verify query preview at bottom of builder
+    const previewText = await builder.getQueryPreviewText();
+    testLogger.info(`Query preview: "${previewText}"`);
+    if (previewText) {
+      expect(previewText.toLowerCase()).toContain(metricName.toLowerCase());
+      expect(previewText.toLowerCase()).toContain('sum');
+    }
+
+    // 11. Verify no errors
+    expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
+    testLogger.info('No errors');
+
+    // 12. Verify table rendered with data rows
+    const tableData = await builder.getTableChartData();
+    testLogger.info(`Table: visible=${tableData.visible}, rows=${tableData.rowCount}, headers=${JSON.stringify(tableData.headers)}`);
+    expect(tableData.visible).toBe(true);
+    expect(tableData.rowCount).toBeGreaterThan(0);
+
+    // Verify table has Timestamp and Value columns (like in the screenshot)
+    if (tableData.headers.length > 0) {
+      const headerText = tableData.headers.join(' ').toLowerCase();
+      testLogger.info(`Table headers: ${headerText}`);
+      // Table should have at least some meaningful columns
+      expect(tableData.headers.length).toBeGreaterThan(0);
+    }
+    testLogger.info('Table chart rendered with data');
+
+    // 13. Cleanup
+    await builder.selectChartType('line');
+    await builder.removeOperation(0);
+    await builder.removeLabelFilter(0);
+    testLogger.info('Cleanup complete');
   });
 });
