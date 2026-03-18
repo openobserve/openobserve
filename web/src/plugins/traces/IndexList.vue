@@ -65,8 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-tr :props="props" class="hover:tw:bg-[var(--o2-hover-accent)]!">
             <q-td
               :props="props"
-              class="field_list"
+              class="field_list tw:rounded"
               :class="
+                props.row.enableVisibility &&
                 searchObj.data.stream.selectedFields.includes(props.row.name)
                   ? 'selected'
                   : ''
@@ -75,9 +76,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <FieldRow
                 :field="props.row"
                 :selected-fields="searchObj.data.stream.selectedFields"
-                timestamp-column="_timestamp"
+                :timestamp-column="store.state.zoConfig.timestamp_column"
                 :theme="store.state.theme"
                 :show-quick-mode="false"
+                :show-visibility-toggle="props.row.enableVisibility"
                 @add-to-filter="addToFilter(`${props.row.name}=''`)"
                 @toggle-field="toggleField"
               >
@@ -91,6 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       activeExcludeFieldValues?.[props.row.name] ?? []
                     "
                     :selected-fields="searchObj.data.stream.selectedFields"
+                    :show-visibility-toggle="props.row.enableVisibility"
                     @toggle-field="toggleField"
                   />
                 </template>
@@ -139,7 +142,7 @@ import { defineComponent, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import useTraces from "../../composables/useTraces";
+import useTraces, { DEFAULT_TRACE_COLUMNS } from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
 import BasicValuesFilter from "./fields-sidebar/BasicValuesFilter.vue";
 import FieldRow from "@/components/common/FieldRow.vue";
@@ -246,8 +249,20 @@ export default defineComponent({
       (props.fieldList as any[]).map((f: any) => ({
         ...f,
         isSchemaField: true,
+        enableVisibility: !TRACES_LOCKED_FIELD_NAMES.has(f.name),
       })),
     );
+
+    // Column ID "status" maps to stream field "span_status" — the only mismatch.
+    const TRACES_LOCKED_FIELD_NAMES = new Set(
+      [...DEFAULT_TRACE_COLUMNS.traces].map((id) =>
+        id === "status" ? "span_status" : id,
+      ),
+    );
+
+    const isFieldEditable = (fieldName: string): boolean =>
+      searchObj.meta.searchMode === "traces" &&
+      !TRACES_LOCKED_FIELD_NAMES.has(fieldName);
 
     const toggleField = async (field: any) => {
       emit("update:selectedFields", field);
@@ -269,7 +284,9 @@ export default defineComponent({
       onStreamChange,
       showFtsFieldValues,
       normalizedFieldList,
+      isFieldEditable,
       toggleField,
+      TRACES_LOCKED_FIELD_NAMES,
     };
   },
 });
@@ -505,9 +522,7 @@ export default defineComponent({
 
     .field_list {
       &.selected {
-        .q-expansion-item {
-          background-color: rgba(89, 96, 178, 0.3);
-        }
+        background-color: rgba(89, 96, 178, 0.3);
 
         .field_overlay {
           // background-color: #ffffff;

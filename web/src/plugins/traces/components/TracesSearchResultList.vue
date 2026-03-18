@@ -118,6 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click:data-row="(row: any) => emit('row-click', row)"
           @sort-change="(by, order) => emit('sort-change', by, order)"
           @update:columnOrder="onColumnReorder"
+          @closeColumn="onCloseColumn"
         >
           <template #cell-actions="{ row, column, active }">
             <CellActions
@@ -385,14 +386,25 @@ const { searchObj, updatedLocalLogFilterField } = useTraces();
  */
 const onColumnReorder = (newOrder: string[]) => {
   const mode = props.searchMode ?? "traces";
-  console.log(newOrder);
-  // searchObj.data.stream.selectedFields = newOrder.filter(
-  //   (id) => !LLM_COLUMN_IDS.has(id),
-  // );
   searchObj.data.stream.selectedFields = newOrder.filter(
     (id) => id !== store.state.zoConfig.timestamp_column,
   );
   updatedLocalLogFilterField(mode);
+};
+
+const onCloseColumn = (columnDef: any) => {
+  const mode = props.searchMode ?? "traces";
+  const fieldIdx = searchObj.data.stream.selectedFields.indexOf(columnDef.id);
+  if (fieldIdx !== -1) {
+    searchObj.data.stream.selectedFields.splice(fieldIdx, 1);
+    updatedLocalLogFilterField(mode);
+  }
+  const colIdx = searchObj.data.resultGrid.columns.findIndex(
+    (c: any) => c.id === columnDef.id,
+  );
+  searchObj.data.resultGrid.columns = searchObj.data.resultGrid.columns.filter(
+    (c) => c.id !== columnDef.id,
+  );
 };
 
 const traceRowClass = (row: any) => {
