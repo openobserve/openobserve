@@ -1559,7 +1559,8 @@
     "pivotStickyRowTotals": "Gesamtwerte für wichtige Zeilen",
     "pivotStickyRowTotalsTooltip": "Stecken Sie die Ergebniszeile unten fest, damit sie beim vertikalen Scrollen sichtbar bleibt",
     "pivotStickyColTotals": "Gesamtwerte für wichtige Spalten",
-    "pivotStickyColTotalsTooltip": "Fixieren Sie die Summenspalte auf der rechten Seite, damit sie beim horizontalen Scrollen sichtbar bleibt"
+    "pivotStickyColTotalsTooltip": "Fixieren Sie die Summenspalte auf der rechten Seite, damit sie beim horizontalen Scrollen sichtbar bleibt",
+    "configSectionPromqlTable": "PromQL-Tabellenmodus"
   },
   "panel": {
     "header": "Panel",

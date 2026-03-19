@@ -1559,7 +1559,8 @@
     "pivotStickyRowTotals": "置顶行总数",
     "pivotStickyRowTotalsTooltip": "将总数行固定在底部，以便在垂直滚动时保持可见状态",
     "pivotStickyColTotals": "置顶栏总数",
-    "pivotStickyColTotalsTooltip": "将总数列固定在右侧，以便在水平滚动时保持可见"
+    "pivotStickyColTotalsTooltip": "将总数列固定在右侧，以便在水平滚动时保持可见",
+    "configSectionPromqlTable": "PromQL 表格模式"
   },
   "panel": {
     "header": "面板",
