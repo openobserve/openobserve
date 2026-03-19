@@ -34,7 +34,7 @@ vi.mock("@/services/segment_analytics", () => ({
 }));
 
 vi.mock("@/aws-exports", () => ({
-  default: { isCloud: "false" },
+  default: { isCloud: "false", isEnterprise: "true" },
 }));
 
 // getImageURL is called by the metricsIcon computed; stub to avoid asset loading.
@@ -332,9 +332,6 @@ describe("SearchBar", () => {
     // Fresh searchObj per test — mutations cannot bleed across tests.
     searchObjInstance = makeSearchObj();
 
-    // Ensure store flag is reset.
-    store.state.zoConfig.service_graph_enabled = true;
-
     // Spy on router so updateDateTime's route guard does not early-return.
     vi.spyOn(router, "currentRoute", "get").mockReturnValue({
       value: {
@@ -362,8 +359,7 @@ describe("SearchBar", () => {
 
   // -------------------------------------------------------------------------
   describe("tab toggle visibility", () => {
-    it("should render tab toggle buttons when service_graph_enabled is true", async () => {
-      store.state.zoConfig.service_graph_enabled = true;
+    it("should render tab toggle buttons on enterprise", async () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
@@ -376,19 +372,6 @@ describe("SearchBar", () => {
       expect(
         wrapper.find('[data-test="traces-service-graph-toggle"]').exists(),
       ).toBe(true);
-    });
-
-    it("should not render tab toggle buttons when service_graph_enabled is false", async () => {
-      store.state.zoConfig.service_graph_enabled = false;
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="traces-search-toggle"]').exists()).toBe(
-        false,
-      );
-      expect(
-        wrapper.find('[data-test="traces-service-graph-toggle"]').exists(),
-      ).toBe(false);
     });
   });
 
@@ -722,12 +705,12 @@ describe("SearchBar", () => {
       expect(wrapper.emitted("searchdata")).toHaveLength(1);
     });
 
-    it("should be disabled when isLoading prop is true", async () => {
+    it("should show cancel button when isLoading prop is true on enterprise", async () => {
       wrapper = mountSearchBar({ isLoading: true });
       await flushPromises();
 
-      const runBtn = wrapper.find('[data-test="logs-search-bar-refresh-btn"]');
-      expect(runBtn.classes()).toContain("disabled");
+      expect(wrapper.find('[data-test="traces-search-bar-cancel-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(false);
     });
 
     it("should not emit searchdata when searchObj.loading is true", async () => {
@@ -1205,15 +1188,17 @@ describe("SearchBar", () => {
       expect(wrapper.props("fieldValues")).toHaveProperty("service_name");
     });
 
-    it("should disable the run query button when isLoading changes to true", async () => {
+    it("should switch to cancel button when isLoading changes to true on enterprise", async () => {
       wrapper = mountSearchBar({ isLoading: false });
       await flushPromises();
+
+      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(true);
 
       await wrapper.setProps({ isLoading: true });
       await flushPromises();
 
-      const runBtn = wrapper.find('[data-test="logs-search-bar-refresh-btn"]');
-      expect(runBtn.classes()).toContain("disabled");
+      expect(wrapper.find('[data-test="traces-search-bar-cancel-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(false);
     });
   });
 });

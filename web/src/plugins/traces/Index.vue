@@ -44,10 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Service Graph Tab Content -->
       <div
-        v-if="
-          activeTab === 'service-graph' &&
-          store.state.zoConfig.service_graph_enabled
-        "
+        v-if="activeTab === 'service-graph' && config.isEnterprise == 'true'"
         class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-[calc(100vh-90px)] tw:overflow-hidden"
       >
         <service-graph
@@ -1293,14 +1290,8 @@ onBeforeMount(async () => {
   restoreUrlQueryParams();
   // Restore active tab from URL query params
   const queryParams = router.currentRoute.value.query;
-  if (queryParams.tab === "service-graph") {
-    // Only allow service-graph tab if service graph is enabled
-    if (store.state.zoConfig.service_graph_enabled) {
-      activeTab.value = "service-graph";
-    } else {
-      // If service graph is disabled, default to search tab
-      activeTab.value = "search";
-    }
+  if (queryParams.tab === "service-graph" && config.isEnterprise == "true") {
+    activeTab.value = "service-graph";
   }
   await importSqlParser();
   if (!searchObj.loading) {
@@ -1809,14 +1800,7 @@ watch(updateSelectedColumns, () => {
 watch(activeTab, (newTab) => {
   const query = { ...router.currentRoute.value.query };
   if (newTab === "service-graph") {
-    // Only set service-graph tab if service graph is enabled
-    if (store.state.zoConfig.service_graph_enabled) {
-      query.tab = "service-graph";
-    } else {
-      // If service graph is disabled, force back to search tab
-      activeTab.value = "search";
-      delete query.tab;
-    }
+    query.tab = "service-graph";
   } else {
     delete query.tab;
   }

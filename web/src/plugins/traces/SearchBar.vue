@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="float-right col flex items-center">
         <!-- Tab Toggle Buttons -->
         <div
-          v-if="store.state.zoConfig.service_graph_enabled"
+          v-if="config.isEnterprise == 'true'"
           class="button-group logs-visualize-toggle element-box-shadow tw:mr-[0.375rem]"
         >
           <div class="row">
