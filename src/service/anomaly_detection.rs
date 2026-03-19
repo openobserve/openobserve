@@ -171,7 +171,7 @@ pub async fn list_configs(
     };
 
     // Filter by name substring (case-insensitive) when provided.
-    let configs: Vec<_> = if let Some(substr) = name_substring {
+    let configs: Vec<_> = if let Some(substr) = name_substring.filter(|s| !s.is_empty()) {
         let lower = substr.to_lowercase();
         configs
             .into_iter()

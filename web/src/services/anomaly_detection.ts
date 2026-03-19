@@ -20,6 +20,10 @@ const anomaly_detection = {
     return http().get(`/api/${org_identifier}/anomaly_detection`);
   },
 
+  getConfig: (org_identifier: string, anomaly_id: string) => {
+    return http().get(`/api/${org_identifier}/anomaly_detection/${anomaly_id}`);
+  },
+
   // GET /api/v2/{org}/alerts/{id} — falls back to anomaly table when ID not in alerts
   get: (org_identifier: string, anomaly_id: string) => {
     return http().get(`/api/v2/${org_identifier}/alerts/${anomaly_id}`);

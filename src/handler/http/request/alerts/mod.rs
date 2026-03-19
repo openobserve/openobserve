@@ -828,9 +828,18 @@ pub async fn list_alerts(
     #[cfg(feature = "enterprise")]
     let folder_slug = query.folder.clone();
     #[cfg(feature = "enterprise")]
-    let alert_name_substring = query.alert_name_substring.clone();
-    let params = query.into(&org_id);
+    let name_substring = query.alert_name_substring.clone();
+    #[cfg(feature = "enterprise")]
+    let page_size_and_idx = query.page_size.map(|s| (s, query.page_idx.unwrap_or(0)));
+    let mut params = query.into(&org_id);
     let alert_type = params.alert_type;
+
+    // In enterprise builds, pagination is applied after merging regular alerts with
+    // anomaly detection configs, so we fetch all matching results from the DB here.
+    #[cfg(feature = "enterprise")]
+    {
+        params.page_size_and_idx = None;
+    }
 
     // Fetch regular (scheduled / realtime) alerts unless the filter is anomaly-only.
     let list: Vec<ListAlertsResponseBodyItem> = if alert_type != AlertTypeFilter::AnomalyDetection {
@@ -877,12 +886,24 @@ pub async fn list_alerts(
     ) && let Ok(configs) = crate::service::anomaly_detection::list_configs(
         &org_id,
         folder_slug.as_deref(),
-        alert_name_substring.as_deref(),
+        name_substring.as_deref(),
     )
     .await
     {
         list.extend(configs.iter().filter_map(anomaly_config_to_list_item));
     }
+
+    // Apply pagination to the combined list (regular alerts + anomaly configs).
+    #[cfg(feature = "enterprise")]
+    let list = if let Some((page_size, page_idx)) = page_size_and_idx {
+        let start = (page_idx * page_size) as usize;
+        list.into_iter()
+            .skip(start)
+            .take(page_size as usize)
+            .collect()
+    } else {
+        list
+    };
 
     MetaHttpResponse::json(ListAlertsResponseBody { list })
 }
