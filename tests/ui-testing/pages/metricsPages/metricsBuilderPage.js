@@ -54,7 +54,7 @@ export class MetricsBuilderPage {
         const promqlBtn = this.page.locator(this.promqlModeButton);
         if (await promqlBtn.isVisible({ timeout: 3000 })) {
             await promqlBtn.click();
-            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+            await this.page.waitForTimeout(500);
             return true;
         }
         return false;
@@ -69,7 +69,7 @@ export class MetricsBuilderPage {
             const classes = await builderBtn.getAttribute('class') || '';
             if (!classes.includes('selected')) {
                 await builderBtn.click();
-                await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+                await this.page.waitForTimeout(500);
 
                 // Handle confirmation dialog if it appears
                 await this.handleConfirmDialog();
@@ -88,7 +88,7 @@ export class MetricsBuilderPage {
             const classes = await customBtn.getAttribute('class') || '';
             if (!classes.includes('selected')) {
                 await customBtn.click();
-                await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+                await this.page.waitForTimeout(500);
             }
             return true;
         }
@@ -102,7 +102,7 @@ export class MetricsBuilderPage {
         const sqlBtn = this.page.locator(this.sqlModeButton);
         if (await sqlBtn.isVisible({ timeout: 3000 })) {
             await sqlBtn.click();
-            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+            await this.page.waitForTimeout(500);
             return true;
         }
         return false;
@@ -165,19 +165,19 @@ export class MetricsBuilderPage {
         // Clear and type to filter
         await input.clear();
         await input.fill(metricName);
-        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+        await this.page.waitForTimeout(1000);
 
         // Select from dropdown options
         const option = this.page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item').filter({ hasText: metricName }).first();
         if (await option.isVisible({ timeout: 5000 })) {
             await option.click();
-            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+            await this.page.waitForTimeout(1500);
             return true;
         }
 
         // If no dropdown option, press Enter to confirm
         await this.page.keyboard.press('Enter');
-        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+        await this.page.waitForTimeout(1000);
         return true;
     }
 
@@ -238,7 +238,7 @@ export class MetricsBuilderPage {
         const input = labelDropdown.locator('input').first();
         if (await input.isVisible({ timeout: 2000 })) {
             await input.fill(labelName);
-            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+            await this.page.waitForTimeout(1000);
         }
 
         // Select from dropdown options
@@ -283,7 +283,7 @@ export class MetricsBuilderPage {
         const input = valueDropdown.locator('input').first();
         if (await input.isVisible({ timeout: 2000 })) {
             await input.fill(value);
-            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+            await this.page.waitForTimeout(1000);
         }
 
         // Select from dropdown options
@@ -376,7 +376,7 @@ export class MetricsBuilderPage {
         const searchInput = dialog.locator('input').first();
         if (await searchInput.isVisible({ timeout: 2000 })) {
             await searchInput.fill(operationName);
-            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+            await this.page.waitForTimeout(500);
         }
 
         // Click on the operation item
@@ -525,7 +525,7 @@ export class MetricsBuilderPage {
     async clickRunQuery() {
         const runBtn = this.page.locator(this.runQueryButton).first();
         await runBtn.click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(2000);
     }
 
     // ===== Add to Dashboard =====
@@ -595,7 +595,7 @@ export class MetricsBuilderPage {
         const addBtn = this.page.locator(this.dashboardAddButton);
         if (await addBtn.isVisible({ timeout: 3000 })) {
             await addBtn.click();
-            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+            await this.page.waitForTimeout(1000);
             return true;
         }
         return false;
@@ -665,14 +665,14 @@ export class MetricsBuilderPage {
         const input = selector.locator('input').first();
         if (await input.isVisible({ timeout: 2000 })) {
             await input.fill(metricName);
-            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+            await this.page.waitForTimeout(1000);
         }
 
         // Select from dropdown options
         const option = this.page.locator('.q-menu .q-item').filter({ hasText: metricName }).first();
         if (await option.isVisible({ timeout: 5000 })) {
             await option.click();
-            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+            await this.page.waitForTimeout(1500);
             return true;
         }
         return false;
@@ -799,7 +799,7 @@ export class MetricsBuilderPage {
         }
 
         // Wait for response to complete
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(2000);
         return decodeURIComponent(query);
     }
 
@@ -908,7 +908,7 @@ export class MetricsBuilderPage {
         const chartItem = this.page.locator(`[data-test="selected-chart-${chartType}-item"]`);
         if (await chartItem.isVisible({ timeout: 3000 }).catch(() => false)) {
             await chartItem.click();
-            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+            await this.page.waitForTimeout(500);
             return true;
         }
         return false;
@@ -969,7 +969,7 @@ export class MetricsBuilderPage {
             const input = dashDropdown.locator('input').first();
             if (await input.isVisible({ timeout: 2000 }).catch(() => false)) {
                 await input.fill(dashboardName);
-                await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+                await this.page.waitForTimeout(1000);
             }
 
             const option = this.page.locator('.q-menu .q-item').filter({ hasText: dashboardName }).first();
@@ -1067,7 +1067,7 @@ export class MetricsBuilderPage {
 
         // Wait for the dialog to close and dashboard to be auto-selected
         await this.page.locator('[data-test="add-dashboard-name"]').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(3000);
     }
 
     /**
@@ -1081,7 +1081,7 @@ export class MetricsBuilderPage {
         await dashDropdown.waitFor({ state: 'visible', timeout: 5000 });
 
         // Wait for the dashboard list API to finish loading
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(2000);
 
         // Check if a dashboard is already auto-selected by reading the q-select's
         // displayed value. Quasar q-select (without use-input) renders the selected
@@ -1119,7 +1119,7 @@ export class MetricsBuilderPage {
     async navigateToDashboards() {
         const dashMenu = this.page.locator('[data-test="menu-link-\\/dashboards-item"]');
         await dashMenu.click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(2000);
     }
 
     /**
@@ -1137,13 +1137,13 @@ export class MetricsBuilderPage {
      */
     async deleteDashboard(dashboardName) {
         await this.navigateToDashboards();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(1000);
 
         // Search for the dashboard
         const searchInput = this.page.locator('[data-test="dashboard-search"]');
         if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
             await searchInput.fill(dashboardName);
-            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+            await this.page.waitForTimeout(1000);
         }
 
         // Find the row and click delete
@@ -1158,7 +1158,7 @@ export class MetricsBuilderPage {
                 const confirmBtn = this.page.locator('[data-test="confirm-button"]');
                 if (await confirmBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
                     await confirmBtn.click();
-                    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+                    await this.page.waitForTimeout(2000);
                     return true;
                 }
             }
