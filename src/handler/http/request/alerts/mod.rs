@@ -664,31 +664,37 @@ pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
         }
     };
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    match alert::delete_by_id(client, &org_id, alert_id).await {
-        Ok(_) => MetaHttpResponse::ok("Alert deleted"),
-        Err(AlertError::AlertNotFound) => {
-            #[cfg(not(feature = "enterprise"))]
-            {
-                MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"))
-            }
-            #[cfg(feature = "enterprise")]
-            {
-                match crate::service::anomaly_detection::delete_config(&org_id, &alert_id_str).await
-                {
-                    Ok(_) => MetaHttpResponse::ok("Alert deleted"),
-                    Err(e) => {
-                        let msg = e.to_string().to_lowercase();
-                        if msg.contains("not found") {
-                            MetaHttpResponse::not_found(e.to_string())
-                        } else {
-                            MetaHttpResponse::internal_error(e.to_string())
-                        }
-                    }
-                }
+
+    // Check whether this ID belongs to a regular alert before attempting delete.
+    // delete_by_id silently returns Ok(()) when the record is not found (required
+    // for super-cluster sync idempotency), so we must check existence explicitly.
+    let is_regular_alert = alert::get_by_id(client, &org_id, alert_id).await.is_ok();
+
+    if is_regular_alert {
+        return match alert::delete_by_id(client, &org_id, alert_id).await {
+            Ok(_) => MetaHttpResponse::ok("Alert deleted"),
+            Err(e) => e.into(),
+        };
+    }
+
+    // Not a regular alert — try anomaly detection config (enterprise only).
+    #[cfg(feature = "enterprise")]
+    {
+        match crate::service::anomaly_detection::delete_config(&org_id, &alert_id_str).await {
+            Ok(_) => return MetaHttpResponse::ok("Alert deleted"),
+            Err(e) => {
+                let msg = e.to_string().to_lowercase();
+                return if msg.contains("not found") {
+                    MetaHttpResponse::not_found(e.to_string())
+                } else {
+                    MetaHttpResponse::internal_error(e.to_string())
+                };
             }
         }
-        Err(e) => e.into(),
     }
+
+    #[cfg(not(feature = "enterprise"))]
+    MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"))
 }
 
 /// DeleteAlertBulk
@@ -752,20 +758,21 @@ pub async fn delete_alert_bulk(
     for id in req.ids {
         // already checked this is valid, so ok to unwrap
         let alert_id = Ksuid::from_str(&id).unwrap();
-        let result = match alert::delete_by_id(client, &org_id, alert_id).await {
-            Ok(_) => Ok(()),
-            Err(AlertError::AlertNotFound) => {
-                // Fall back to anomaly config delete (enterprise only).
-                #[cfg(not(feature = "enterprise"))]
-                {
-                    Err(format!("alert {id} not found"))
-                }
-                #[cfg(feature = "enterprise")]
-                crate::service::anomaly_detection::delete_config(&org_id, &id)
-                    .await
-                    .map_err(|e: anyhow::Error| e.to_string())
+        let is_regular_alert = alert::get_by_id(client, &org_id, alert_id).await.is_ok();
+        let result = if is_regular_alert {
+            alert::delete_by_id(client, &org_id, alert_id)
+                .await
+                .map_err(|e| e.to_string())
+        } else {
+            // Not a regular alert — fall back to anomaly config delete (enterprise only).
+            #[cfg(not(feature = "enterprise"))]
+            {
+                Err(format!("alert {id} not found"))
             }
-            Err(e) => Err(e.to_string()),
+            #[cfg(feature = "enterprise")]
+            crate::service::anomaly_detection::delete_config(&org_id, &id)
+                .await
+                .map_err(|e: anyhow::Error| e.to_string())
         };
         match result {
             Ok(_) => successful.push(id),
