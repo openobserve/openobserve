@@ -134,8 +134,10 @@ impl TreeNodeRewriter for PlanRewriter {
 
             // 5. Create new filter with rewritten predicate
             let new_filter = FilterExec::try_new(rewritten_predicate, input)?
-                .with_projection(add_fst_fields_to_projection.filter_projection.clone())?;
-            return Ok(Transformed::yes(Arc::new(new_filter)));
+                .with_projection(add_fst_fields_to_projection.filter_projection.clone())?
+                .with_fetch(filter.fetch())
+                .expect("Fetch is not set");
+            return Ok(Transformed::yes(new_filter));
         }
         Ok(Transformed::no(plan))
     }
