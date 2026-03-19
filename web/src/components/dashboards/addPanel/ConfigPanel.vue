@@ -1378,6 +1378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-table_transpose"
           class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
           size="lg"
+          :disable="isPivotMode"
           :class="
             store.state.theme === 'dark'
               ? 'o2-toggle-button-lg-dark'
@@ -1393,6 +1394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-table_dynamic_columns"
           class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
           size="lg"
+          :disable="isPivotMode"
           :class="
             store.state.theme === 'dark'
               ? 'o2-toggle-button-lg-dark'
