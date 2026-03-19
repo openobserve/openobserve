@@ -611,6 +611,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :destinations="destinations"
         :templates="templates"
         :alerts="store?.state?.organizationData?.allAlertsListByFolderId[activeFolderId]"
+        :folderId="activeFolderId"
         @update:alerts="refreshImportedAlerts"
         @update:destinations="refreshDestination"
         @update:templates="getTemplates"
