@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="col.classes"
                     :style="col.style"
                   >
-                    {{ col.label }}
+                    <span :style="col.name === 'name' ? 'padding-left: 21px' : ''">{{ col.label }}</span>
                   </q-th>
                 </q-tr>
               </template>
@@ -207,7 +207,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <q-td v-for="col in columns" :key="col.name" :props="props">
                       <template v-if="col.name === 'name'">
-                        <div class="tw:flex tw:items-center tw:gap-1">
+                        <div class="tw:flex tw:items-center tw:gap-1.5">
+                          <q-icon
+                            v-if="props.row.is_real_time === 'anomaly'"
+                            name="query_stats"
+                            size="15px"
+                            class="tw:text-blue-600 tw:shrink-0"
+                          />
+                          <q-icon
+                            v-else-if="props.row.is_real_time"
+                            name="bolt"
+                            size="15px"
+                            class="tw:text-orange-500 tw:shrink-0"
+                          />
+                          <q-icon
+                            v-else
+                            name="schedule"
+                            size="15px"
+                            class="tw:text-grey-7 tw:shrink-0"
+                          />
                           <span>{{ computedName(props.row[col.field]) }}</span>
                         </div>
                         <q-tooltip
@@ -258,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span v-if="props.row.status === '--'">--</span>
                       </template>
                       <template v-else-if="col.name === 'period'">
-                        {{ props.row[col.field] ?  props.row[col.field] + " Mins" : "--" }}
+                        {{ props.row[col.field] ? (props.row[col.field] >= 60 ? (props.row[col.field] % 60 === 0 ? `${Math.floor(props.row[col.field] / 60)} Hours` : `${Math.floor(props.row[col.field] / 60)} Hours ${props.row[col.field] % 60} Mins`) : `${props.row[col.field]} Mins`) : "--" }}
                       </template>
                       <template v-else-if="col.name === 'frequency'">
                         {{ props.row[col.field] ? props.row[col.field] + (props.row?.frequency_type == "cron" ? "" : " Mins") : "--" }}
@@ -1236,7 +1254,11 @@ export default defineComponent({
       detection_window: (() => {
         const mins = anomaly.trigger_condition?.period_minutes;
         if (!mins) return "--";
-        if (mins >= 60 && mins % 60 === 0) return `${mins / 60}h`;
+        if (mins >= 60) {
+          const h = Math.floor(mins / 60);
+          const m = mins % 60;
+          return m === 0 ? `${h} Hours` : `${h} Hours ${m} Mins`;
+        }
         return `${mins} mins`;
       })(),
       last_trained_at: anomaly.last_trained_at

@@ -574,10 +574,14 @@ const anomalyConditionMeta = computed(() => {
   // detection_window_seconds comes from the full config; format it for display.
   const windowSecs = d.detection_window_seconds;
   if (windowSecs) {
-    const windowStr =
-      windowSecs >= 3600 && windowSecs % 3600 === 0
-        ? `${windowSecs / 3600}h`
-        : `${Math.round(windowSecs / 60)} mins`;
+    const windowStr = (() => {
+      if (windowSecs >= 3600) {
+        const h = Math.floor(windowSecs / 3600);
+        const m = Math.round((windowSecs % 3600) / 60);
+        return m === 0 ? `${h} Hours` : `${h} Hours ${m} Mins`;
+      }
+      return `${Math.round(windowSecs / 60)} mins`;
+    })();
     items.push({ label: "Window", value: windowStr });
   } else if (d.detection_window && d.detection_window !== "--") {
     items.push({ label: "Window", value: d.detection_window });
@@ -836,7 +840,7 @@ const formatTimestamp = (timestamp: number) => {
     return `${minutes} min ago`;
   }
   if (diff < 86400000000) {
-    const hours = Math.floor(diff / 3600000000);
+    const Hours = Math.floor(diff / 3600000000);
     return `${hours}h ago`;
   }
   if (diff < 604800000000) {
