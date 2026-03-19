@@ -1743,6 +1743,7 @@
     "configSectionLabels": "Labels",
     "configSectionLineStyle": "Line Style",
     "configSectionTable": "Table",
+    "configSectionPivotTable": "Pivot Table",
     "configSectionValueTransformations": "Value Transformations",
     "configSectionValueTransformationsTooltip": "Enhance table readability by mapping values to custom text and background colors for clearer data visualization.",
     "addValueMapping": "Add Value Mapping",

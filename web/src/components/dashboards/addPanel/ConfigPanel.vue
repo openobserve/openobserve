@@ -298,280 +298,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         />
 
-    <div class="space"></div>
-
-    <q-toggle
-      v-if="dashboardPanelData.data.type == 'table'"
-      v-model="dashboardPanelData.data.config.wrap_table_cells"
-      :label="t('dashboard.wraptext')"
-      data-test="dashboard-config-wrap-table-cells"
-      class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
-      size="lg"
-      :class="
-        store.state.theme === 'dark'
-          ? 'o2-toggle-button-lg-dark'
-          : 'o2-toggle-button-lg-light'
-      "
-    />
-
-    <div class="space"></div>
-
-    <q-toggle
-      v-if="dashboardPanelData.data.type == 'table' && !promqlMode"
-      v-model="dashboardPanelData.data.config.table_transpose"
-      :label="t('dashboard.tableTranspose')"
-      data-test="dashboard-config-table_transpose"
-      class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
-      size="lg"
-      :class="
-        store.state.theme === 'dark'
-          ? 'o2-toggle-button-lg-dark'
-          : 'o2-toggle-button-lg-light'
-      "
-      :disable="isPivotMode"
-    />
-
-    <div class="space"></div>
-
-    <q-toggle
-      v-if="dashboardPanelData.data.type == 'table' && !promqlMode"
-      v-model="dashboardPanelData.data.config.table_dynamic_columns"
-      :label="t('dashboard.tableDynamicColumns')"
-      data-test="dashboard-config-table_dynamic_columns"
-      class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
-      size="lg"
-      :class="
-        store.state.theme === 'dark'
-          ? 'o2-toggle-button-lg-dark'
-          : 'o2-toggle-button-lg-light'
-      "
-      :disable="isPivotMode"
-    />
-    <div class="space"></div>
-
-   
-
-    <q-toggle
-      v-if="dashboardPanelData.data.type == 'table'"
-      v-model="dashboardPanelData.data.config.table_pagination"
-      :label="t('dashboard.pagination')"
-      data-test="dashboard-config-show-pagination"
-      class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
-      size="lg"
-      :class="
-        store.state.theme === 'dark'
-          ? 'o2-toggle-button-lg-dark'
-          : 'o2-toggle-button-lg-light'
-      "
-    />
-
-    <div class="space"></div>
-
-    <q-input
-      v-if="
-        dashboardPanelData.data.type == 'table' &&
-        dashboardPanelData.data.config.table_pagination
-      "
-      v-model.number="
-        dashboardPanelData.data.config.table_pagination_rows_per_page
-      "
-      color="input-border"
-      bg-color="input-bg"
-      class="q-py-md showLabelOnTop"
-      stack-label
-      dense
-      label-slot
-      data-test="dashboard-config-rows-per-page"
-      borderless
-      hide-bottom-space
-      type="number"
-      placeholder="Auto"
-      min="1"
-    >
-      <template v-slot:label>
-        <div class="row items-center all-pointer-events">
-          {{ t("dashboard.rowsPerPage") }}
-          <div>
-            <q-icon
-              class="q-ml-xs"
-              size="20px"
-              name="info"
-              data-test="dashboard-config-rows-per-page-info"
-            />
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-              max-width="250px"
-            >
-              {{ t("dashboard.rowsPerPageTooltip") }}
-            </q-tooltip>
-          </div>
-        </div>
-      </template>
-    </q-input>
-
-    <div class="space"></div>
-
-    <!-- Pivot Table Options (shown when pivot mode active) -->
-    <div
-      v-if="
-        dashboardPanelData.data.type == 'table' && !promqlMode && isPivotMode
-      "
-      class="q-mb-sm"
-    >
-      <div class="q-mb-xs" style="font-weight: 600; font-size: 12px">
-        {{ t("dashboard.pivotOptions") }}
-      </div>
-      <div class="row items-center">
-        <q-toggle
-          v-model="dashboardPanelData.data.config.table_pivot_show_row_totals"
-          :label="t('dashboard.pivotShowRowTotals')"
-          data-test="dashboard-config-pivot-row-totals"
-          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
-          size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
-        />
-        <div>
-          <q-icon
-            class="q-ml-xs"
-            size="20px"
-            name="info"
-            data-test="dashboard-config-pivot-row-totals-info"
-          />
-          <q-tooltip
-            class="bg-grey-8"
-            anchor="top middle"
-            self="bottom middle"
-            max-width="250px"
-          >
-            {{ t("dashboard.pivotShowRowTotalsTooltip") }}
-          </q-tooltip>
-        </div>
-      </div>
-      <div
-        v-if="dashboardPanelData.data.config.table_pivot_show_row_totals"
-        class="row items-center q-ml-md"
-      >
-        <q-toggle
-          v-model="dashboardPanelData.data.config.table_pivot_sticky_col_totals"
-          :label="t('dashboard.pivotStickyColTotals')"
-          data-test="dashboard-config-pivot-sticky-col-totals"
-          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
-          size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
-        />
-        <div>
-          <q-icon
-            class="q-ml-xs"
-            size="20px"
-            name="info"
-            data-test="dashboard-config-pivot-sticky-col-totals-info"
-          />
-          <q-tooltip
-            class="bg-grey-8"
-            anchor="top middle"
-            self="bottom middle"
-            max-width="250px"
-          >
-            {{ t("dashboard.pivotStickyColTotalsTooltip") }}
-          </q-tooltip>
-        </div>
-      </div>
-      <div class="row items-center">
-        <q-toggle
-          v-model="dashboardPanelData.data.config.table_pivot_show_col_totals"
-          :label="t('dashboard.pivotShowColTotals')"
-          data-test="dashboard-config-pivot-col-totals"
-          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
-          size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
-        />
-        <div>
-          <q-icon
-            class="q-ml-xs"
-            size="20px"
-            name="info"
-            data-test="dashboard-config-pivot-col-totals-info"
-          />
-          <q-tooltip
-            class="bg-grey-8"
-            anchor="top middle"
-            self="bottom middle"
-            max-width="250px"
-          >
-            {{ t("dashboard.pivotShowColTotalsTooltip") }}
-          </q-tooltip>
-        </div>
-      </div>
-      <div
-        v-if="dashboardPanelData.data.config.table_pivot_show_col_totals"
-        class="row items-center q-ml-md"
-      >
-        <q-toggle
-          v-model="dashboardPanelData.data.config.table_pivot_sticky_row_totals"
-          :label="t('dashboard.pivotStickyRowTotals')"
-          data-test="dashboard-config-pivot-sticky-row-totals"
-          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
-          size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
-        />
-        <div>
-          <q-icon
-            class="q-ml-xs"
-            size="20px"
-            name="info"
-            data-test="dashboard-config-pivot-sticky-row-totals-info"
-          />
-          <q-tooltip
-            class="bg-grey-8"
-            anchor="top middle"
-            self="bottom middle"
-            max-width="250px"
-          >
-            {{ t("dashboard.pivotStickyRowTotalsTooltip") }}
-          </q-tooltip>
-        </div>
-      </div>
-    </div>
-    <div class="space"></div>
-
-    <div class="o2-input">
-      <q-select
-        v-if="shouldShowLegendPosition(dashboardPanelData)"
-        borderless
-        v-model="dashboardPanelData.data.config.legends_position"
-        :options="legendsPositionOptions"
-        dense
-        :label="t('dashboard.legendsPositionLabel')"
-        class="showLabelOnTop"
-        stack-label
-        emit-value
-        :display-value="`${
-          dashboardPanelData.data.config.legends_position ?? 'Auto'
-        }`"
-        data-test="dashboard-config-legend-position"
-        hide-bottom-space
-      >
-      </q-select>
-
-      <div class="space"></div>
+        <q-select
+          v-if="shouldShowLegendPosition(dashboardPanelData)"
+          v-show="isConfigOptionVisible('legend', 'legend-position')"
+          borderless
+          v-model="dashboardPanelData.data.config.legends_position"
+          :options="legendsPositionOptions"
+          dense
+          :label="t('dashboard.legendsPositionLabel')"
+          class="showLabelOnTop"
+          stack-label
+          emit-value
+          :display-value="`${
+            dashboardPanelData.data.config.legends_position ?? 'Auto'
+          }`"
+          data-test="dashboard-config-legend-position"
+          hide-bottom-space
+        >
+        </q-select>
 
         <q-select
           v-if="shouldShowLegendType(dashboardPanelData)"
@@ -1687,6 +1431,122 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </q-input>
+
+      </div>
+    </q-expansion-item>
+
+    <!-- Section: Pivot Table -->
+    <q-expansion-item
+      v-show="isSectionVisible('pivotTable')"
+      :model-value="isExpanded('pivotTable')"
+      @update:model-value="
+        (v) => {
+          expandedSections.pivotTable = v;
+        }
+      "
+      :label="t('dashboard.configSectionPivotTable')"
+      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      switch-toggle-side
+      expand-icon="chevron_right"
+      expanded-icon="keyboard_arrow_down"
+      expand-icon-class="text-grey-6"
+    >
+      <div class="config-section-body">
+        <q-toggle
+          v-if="!promqlMode && isPivotMode"
+          v-show="isConfigOptionVisible('pivotTable', 'pivot-show-row-totals')"
+          v-model="dashboardPanelData.data.config.table_pivot_show_row_totals"
+          :label="t('dashboard.pivotShowRowTotals')"
+          data-test="dashboard-config-pivot-row-totals"
+          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
+          size="lg"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
+        >
+          <q-tooltip
+            class="bg-grey-8"
+            anchor="top middle"
+            self="bottom middle"
+            max-width="250px"
+          >
+            {{ t("dashboard.pivotShowRowTotalsTooltip") }}
+          </q-tooltip>
+        </q-toggle>
+
+        <q-toggle
+          v-if="!promqlMode && isPivotMode && dashboardPanelData.data.config.table_pivot_show_row_totals"
+          v-show="isConfigOptionVisible('pivotTable', 'pivot-sticky-col-totals')"
+          v-model="dashboardPanelData.data.config.table_pivot_sticky_col_totals"
+          :label="t('dashboard.pivotStickyColTotals')"
+          data-test="dashboard-config-pivot-sticky-col-totals"
+          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg tw:pl-4"
+          size="lg"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
+        >
+          <q-tooltip
+            class="bg-grey-8"
+            anchor="top middle"
+            self="bottom middle"
+            max-width="250px"
+          >
+            {{ t("dashboard.pivotStickyColTotalsTooltip") }}
+          </q-tooltip>
+        </q-toggle>
+
+        <q-toggle
+          v-if="!promqlMode && isPivotMode"
+          v-show="isConfigOptionVisible('pivotTable', 'pivot-show-col-totals')"
+          v-model="dashboardPanelData.data.config.table_pivot_show_col_totals"
+          :label="t('dashboard.pivotShowColTotals')"
+          data-test="dashboard-config-pivot-col-totals"
+          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
+          size="lg"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
+        >
+          <q-tooltip
+            class="bg-grey-8"
+            anchor="top middle"
+            self="bottom middle"
+            max-width="250px"
+          >
+            {{ t("dashboard.pivotShowColTotalsTooltip") }}
+          </q-tooltip>
+        </q-toggle>
+
+        <q-toggle
+          v-if="!promqlMode && isPivotMode && dashboardPanelData.data.config.table_pivot_show_col_totals"
+          v-show="isConfigOptionVisible('pivotTable', 'pivot-sticky-row-totals')"
+          v-model="dashboardPanelData.data.config.table_pivot_sticky_row_totals"
+          :label="t('dashboard.pivotStickyRowTotals')"
+          data-test="dashboard-config-pivot-sticky-row-totals"
+          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg tw:pl-4"
+          size="lg"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
+        >
+          <q-tooltip
+            class="bg-grey-8"
+            anchor="top middle"
+            self="bottom middle"
+            max-width="250px"
+          >
+            {{ t("dashboard.pivotStickyRowTotalsTooltip") }}
+          </q-tooltip>
+        </q-toggle>
       </div>
     </q-expansion-item>
 
@@ -2629,8 +2489,9 @@ export default defineComponent({
       "dashboardPanelDataPageKey",
       "dashboard",
     );
-    const { dashboardPanelData, promqlMode, isPivotMode } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData, promqlMode, isPivotMode } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+    );
 
     const { t } = useI18n();
     const store = useStore();
@@ -3309,128 +3170,8 @@ export default defineComponent({
       },
       { deep: true },
     );
-
     // When pivot mode activates: disable conflicting features and
-    // initialize pivot config values (undefined → false/0 defaults).
-    // Without this, q-toggle shows undefined as OFF but conversion
-    // may treat undefined differently — causing a mismatch.
-    
-    watch(
-      () => isPivotMode.value,
-      (active) => {
-        if (active) {
-          dashboardPanelData.data.config.table_transpose = false;
-          dashboardPanelData.data.config.table_dynamic_columns = false;
-          if (
-            dashboardPanelData.data.config.table_pivot_show_row_totals ===
-            undefined
-          ) {
-            dashboardPanelData.data.config.table_pivot_show_row_totals = false;
-          }
-          if (
-            dashboardPanelData.data.config.table_pivot_show_col_totals ===
-            undefined
-          ) {
-            dashboardPanelData.data.config.table_pivot_show_col_totals = false;
-          }
-          if (
-            dashboardPanelData.data.config.table_pivot_sticky_row_totals ===
-            undefined
-          ) {
-            dashboardPanelData.data.config.table_pivot_sticky_row_totals = false;
-          }
-          if (
-            dashboardPanelData.data.config.table_pivot_sticky_col_totals ===
-            undefined
-          ) {
-            dashboardPanelData.data.config.table_pivot_sticky_col_totals = false;
-          }
-        }
-      },
-      { immediate: true },
-    );
-
-    // When pivot mode activates: disable conflicting features and
-    // initialize pivot config values (undefined → false/0 defaults).
-    // Without this, q-toggle shows undefined as OFF but conversion
-    // may treat undefined differently — causing a mismatch.
-    watch(
-      () => isPivotMode.value,
-      (active) => {
-        if (active) {
-          dashboardPanelData.data.config.table_transpose = false;
-          dashboardPanelData.data.config.table_dynamic_columns = false;
-          if (
-            dashboardPanelData.data.config.table_pivot_show_row_totals ===
-            undefined
-          ) {
-            dashboardPanelData.data.config.table_pivot_show_row_totals = false;
-          }
-          if (
-            dashboardPanelData.data.config.table_pivot_show_col_totals ===
-            undefined
-          ) {
-            dashboardPanelData.data.config.table_pivot_show_col_totals = false;
-          }
-          if (
-            dashboardPanelData.data.config.table_pivot_sticky_row_totals ===
-            undefined
-          ) {
-            dashboardPanelData.data.config.table_pivot_sticky_row_totals = false;
-          }
-          if (
-            dashboardPanelData.data.config.table_pivot_sticky_col_totals ===
-            undefined
-          ) {
-            dashboardPanelData.data.config.table_pivot_sticky_col_totals = false;
-          }
-        }
-      },
-      { immediate: true },
-    );
-
-    // When pivot mode activates: disable conflicting features and
-    // initialize pivot config values (undefined → false/0 defaults).
-    // Without this, q-toggle shows undefined as OFF but conversion
-    // may treat undefined differently — causing a mismatch.
-
-    watch(
-      () => isPivotMode.value,
-      (active) => {
-        if (active) {
-          dashboardPanelData.data.config.table_transpose = false;
-          dashboardPanelData.data.config.table_dynamic_columns = false;
-          if (
-            dashboardPanelData.data.config.table_pivot_show_row_totals ===
-            undefined
-          ) {
-            dashboardPanelData.data.config.table_pivot_show_row_totals = false;
-          }
-          if (
-            dashboardPanelData.data.config.table_pivot_show_col_totals ===
-            undefined
-          ) {
-            dashboardPanelData.data.config.table_pivot_show_col_totals = false;
-          }
-          if (
-            dashboardPanelData.data.config.table_pivot_sticky_row_totals ===
-            undefined
-          ) {
-            dashboardPanelData.data.config.table_pivot_sticky_row_totals = false;
-          }
-          if (
-            dashboardPanelData.data.config.table_pivot_sticky_col_totals ===
-            undefined
-          ) {
-            dashboardPanelData.data.config.table_pivot_sticky_col_totals = false;
-          }
-        }
-      },
-      { immediate: true },
-    );
-
-    // When pivot mode activates: disable conflicting features and
-    // initialize pivot config values (undefined → false/0 defaults).
+    // initialize pivot config values (undefined → false defaults).
     // Without this, q-toggle shows undefined as OFF but conversion
     // may treat undefined differently — causing a mismatch.
     watch(
@@ -3487,6 +3228,7 @@ export default defineComponent({
       dashboardPanelDataPageKey,
       showTrellisConfig,
       showColorPalette,
+      isPivotMode,
     );
 
     const {

@@ -7,6 +7,7 @@ export type SectionId =
   | "labels"
   | "lineStyle"
   | "table"
+  | "pivotTable"
   | "valueTransformations"
   | "fieldOverrides"
   | "map"
@@ -27,6 +28,7 @@ export const ORDERED_SECTION_IDS: SectionId[] = [
   "labels",
   "lineStyle",
   "table",
+  "pivotTable",
   "valueTransformations",
   "fieldOverrides",
   "map",
@@ -48,6 +50,7 @@ export const DEFAULT_EXPANDED_SECTIONS: Record<SectionId, boolean> = {
   labels: true,
   lineStyle: true,
   table: true,
+  pivotTable: true,
   valueTransformations: true,
   fieldOverrides: true,
   map: true,

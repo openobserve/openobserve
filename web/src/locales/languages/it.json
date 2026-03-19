@@ -1505,6 +1505,7 @@
     "configSectionLabels": "Etichette",
     "configSectionLineStyle": "Stile della linea",
     "configSectionTable": "Tavolo",
+    "configSectionPivotTable": "Tabella pivot",
     "configSectionValueTransformations": "Trasformazioni di valore",
     "configSectionValueTransformationsTooltip": "Migliora la leggibilità delle tabelle mappando i valori su testo e colori di sfondo personalizzati per una visualizzazione più chiara dei dati.",
     "addValueMapping": "Mappatura del valore aggiunto",

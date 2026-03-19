@@ -1505,6 +1505,7 @@
     "configSectionLabels": "标签",
     "configSectionLineStyle": "线条风格",
     "configSectionTable": "桌子",
+    "configSectionPivotTable": "数据透视表",
     "configSectionValueTransformations": "价值转换",
     "configSectionValueTransformationsTooltip": "通过将值映射到自定义文本和背景颜色来增强表的可读性，以实现更清晰的数据可视化。",
     "addValueMapping": "增值映射",

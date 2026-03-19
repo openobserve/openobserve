@@ -1505,6 +1505,7 @@
     "configSectionLabels": "Étiquettes",
     "configSectionLineStyle": "Style de ligne",
     "configSectionTable": "Tableau",
+    "configSectionPivotTable": "Tableau croisé dynamique",
     "configSectionValueTransformations": "Transformations de valeur",
     "configSectionValueTransformationsTooltip": "Améliorez la lisibilité des tableaux en mappant les valeurs avec du texte personnalisé et des couleurs d'arrière-plan pour une visualisation plus claire des données.",
     "addValueMapping": "Cartographie de la valeur ajoutée",

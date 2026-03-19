@@ -24,7 +24,8 @@ export function useConfigOptions(
   promqlMode: Ref<boolean>,
   dashboardPanelDataPageKey: unknown,
   showTrellisConfig: ComputedRef<boolean>,
-  showColorPalette: ComputedRef<boolean>
+  showColorPalette: ComputedRef<boolean>,
+  isPivotMode: ComputedRef<boolean>
 ) {
   const { t } = useI18n();
 
@@ -207,6 +208,38 @@ export function useConfigOptions(
         visible:
           !!dashboardPanelData.data.config.table_pagination &&
           dashboardPanelData.data.type === "table",
+      },
+    },
+    pivotTable: {
+      "pivot-show-row-totals": {
+        label: t("dashboard.pivotShowRowTotals"),
+        visible:
+          !promqlMode.value &&
+          dashboardPanelData.data.type === "table" &&
+          isPivotMode.value,
+      },
+      "pivot-show-col-totals": {
+        label: t("dashboard.pivotShowColTotals"),
+        visible:
+          !promqlMode.value &&
+          dashboardPanelData.data.type === "table" &&
+          isPivotMode.value,
+      },
+      "pivot-sticky-row-totals": {
+        label: t("dashboard.pivotStickyRowTotals"),
+        visible:
+          !promqlMode.value &&
+          dashboardPanelData.data.type === "table" &&
+          isPivotMode.value &&
+          !!dashboardPanelData.data.config.table_pivot_show_col_totals,
+      },
+      "pivot-sticky-col-totals": {
+        label: t("dashboard.pivotStickyColTotals"),
+        visible:
+          !promqlMode.value &&
+          dashboardPanelData.data.type === "table" &&
+          isPivotMode.value &&
+          !!dashboardPanelData.data.config.table_pivot_show_row_totals,
       },
     },
     valueTransformations: {

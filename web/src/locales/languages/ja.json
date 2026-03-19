@@ -1522,6 +1522,7 @@
     "configSectionLabels": "[ラベル]",
     "configSectionLineStyle": "ラインスタイル",
     "configSectionTable": "テーブル",
+    "configSectionPivotTable": "ピボットテーブル",
     "configSectionValueTransformations": "バリュー・トランスフォーメーション",
     "configSectionValueTransformationsTooltip": "値をカスタムテキストと背景色にマッピングしてデータをより明確に視覚化することで、表の読みやすさを高めます。",
     "addValueMapping": "バリューマッピングを追加",
