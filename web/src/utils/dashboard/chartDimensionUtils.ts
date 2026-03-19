@@ -12,21 +12,15 @@ export const calculateWidthText = (
 ): number => {
   if (!text) return 0;
 
-  const span = document.createElement("span");
-  document.body.appendChild(span);
-
-  span.style.font = "sans-serif";
-  span.style.fontSize = fontSize || "12px";
-  span.style.height = "auto";
-  span.style.width = "auto";
-  span.style.top = "0px";
-  span.style.position = "absolute";
-  span.style.whiteSpace = "no-wrap";
-  span.innerHTML = text;
-
-  const width = Math.ceil(span.clientWidth);
-  span.remove();
-  return width;
+  try {
+    const canvas = new OffscreenCanvas(0, 0);
+    const ctx = canvas.getContext("2d")!;
+    ctx.font = `${fontSize || "12px"} sans-serif`;
+    return Math.ceil(ctx.measureText(text).width);
+  } catch {
+    // Fallback for environments without OffscreenCanvas (e.g. jsdom in tests)
+    return text.length * 7;
+  }
 };
 
 /**
@@ -132,7 +126,8 @@ export const calculateRotatedLabelBottomSpace = (
     // We just need to add enough space for the axis name itself (~20px)
     // and some buffer.
     const axisNameEstimatedHeight = 20;
-    const totalNeededSpace = (nameGap || verticalHeight + 10) + axisNameEstimatedHeight;
+    const totalNeededSpace =
+      (nameGap || verticalHeight + 10) + axisNameEstimatedHeight;
 
     // Default bottom spacing in charts is typically ~35-50px.
     // Only add if totalNeeded exceeds a reasonable base (e.g., 40px)

@@ -15,136 +15,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    style="width: 100%; height: 100%"
-    @mouseleave="hidePopupsAndOverlays"
-    @mouseenter="showPopupsAndOverlays"
-  >
-    <div
-      ref="chartPanelRef"
-      style="height: 100%; position: relative"
-      :class="chartPanelClass"
-    >
-      <div
-        v-if="!errorDetail?.message"
-        :style="{ height: chartPanelHeight, width: '100%' }"
-      >
-        <MapsRenderer
-          v-if="panelSchema.type == 'maps'"
-          :data="panelData.chartType == 'maps' ? panelData : { options: {} }"
-        ></MapsRenderer>
-        <GeoMapRenderer
-          v-else-if="panelSchema.type == 'geomap'"
-          :data="
-            panelData.chartType == 'geomap'
-              ? panelData
-              : { options: { backgroundColor: 'transparent' } }
-          "
-        />
-        <PromQLTableChart
-          v-else-if="
-            panelSchema.type == 'table' && panelSchema.queryType === 'promql'
-          "
-          :data="tableRendererData"
-          :config="panelSchema.config"
-          @row-click="onChartClick"
-        />
-        <TableRenderer
-          v-else-if="panelSchema.type == 'table'"
-          :data="
-            panelData.chartType == 'table'
-              ? panelData
-              : { options: { backgroundColor: 'transparent' } }
-          "
-          :value-mapping="panelSchema?.config?.mappings ?? []"
-          @row-click="onChartClick"
-          ref="tableRendererRef"
-          :wrap-cells="panelSchema.config?.wrap_table_cells"
-          :show-pagination="
-            panelSchema.config?.table_pagination && !store.state.printMode
-          "
-          :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
-        />
-        <div
-          v-else-if="panelSchema.type == 'html'"
-          class="col column"
-          style="width: 100%; height: 100%; flex: 1"
-        >
-          <HTMLRenderer
-            :htmlContent="panelSchema.htmlContent"
-            style="width: 100%; height: 100%"
-            class="col"
-            :variablesData="currentVariablesData || variablesData"
-            :tabId="tabId"
-            :panelId="panelSchema.id"
-          />
+  <div style="width: 100%; height: 100%" @mouseleave="hidePopupsAndOverlays" @mouseenter="showPopupsAndOverlays">
+    <div ref="chartPanelRef" style="height: 100%; position: relative" :class="chartPanelClass">
+      <div v-if="!errorDetail?.message" :style="{ height: chartPanelHeight, width: '100%' }">
+        <MapsRenderer v-if="panelSchema.type == 'maps'"
+          :data="panelData.chartType == 'maps' ? panelData : { options: {} }"></MapsRenderer>
+        <GeoMapRenderer v-else-if="panelSchema.type == 'geomap'" :data="panelData.chartType == 'geomap'
+          ? panelData
+          : { options: { backgroundColor: 'transparent' } }
+          " />
+        <PromQLTableChart v-else-if="
+          panelSchema.type == 'table' && panelSchema.queryType === 'promql'
+        " :data="tableRendererData" :config="panelSchema.config" @row-click="onChartClick" />
+        <TableRenderer v-else-if="panelSchema.type == 'table'" :data="panelData.chartType == 'table'
+          ? panelData
+          : { options: { backgroundColor: 'transparent' } }
+          " :value-mapping="panelSchema?.config?.mappings ?? []" @row-click="onChartClick" ref="tableRendererRef"
+          :wrap-cells="panelSchema.config?.wrap_table_cells" :show-pagination="panelSchema.config?.table_pagination && !store.state.printMode
+            " :rows-per-page="panelSchema.config?.table_pagination_rows_per_page" />
+        <div v-else-if="panelSchema.type == 'html'" class="col column" style="width: 100%; height: 100%; flex: 1">
+          <HTMLRenderer :htmlContent="panelSchema.htmlContent" style="width: 100%; height: 100%" class="col"
+            :variablesData="currentVariablesData || variablesData" :tabId="tabId" :panelId="panelSchema.id" />
         </div>
-        <div
-          v-else-if="panelSchema.type == 'markdown'"
-          class="col column"
-          style="width: 100%; height: 100%; flex: 1"
-        >
-          <MarkdownRenderer
-            :markdownContent="panelSchema.markdownContent"
-            style="width: 100%; height: 100%"
-            class="col"
-            :variablesData="currentVariablesData || variablesData"
-            :tabId="tabId"
-            :panelId="panelSchema.id"
-          />
+        <div v-else-if="panelSchema.type == 'markdown'" class="col column" style="width: 100%; height: 100%; flex: 1">
+          <MarkdownRenderer :markdownContent="panelSchema.markdownContent" style="width: 100%; height: 100%" class="col"
+            :variablesData="currentVariablesData || variablesData" :tabId="tabId" :panelId="panelSchema.id" />
         </div>
 
-        <CustomChartRenderer
-          v-else-if="panelSchema.type == 'custom_chart'"
-          :data="panelData"
-          style="width: 100%; height: 100%"
-          class="col"
-          @error="errorDetail = $event"
-        />
-        <ChartRenderer
-          v-else
-          :data="
-            panelSchema.queryType === 'promql' ||
-            (panelData.chartType != 'geomap' &&
-              panelData.chartType != 'table' &&
-              panelData.chartType != 'maps' &&
-              loading)
-              ? panelData
-              : noData == 'No Data'
-                ? {
-                    options: {
-                      backgroundColor: 'transparent',
-                    },
-                  }
-                : panelData
-          "
-          :height="chartPanelHeight"
-          @updated:data-zoom="onDataZoom"
-          @error="errorDetail = $event"
-          @click="onChartClick"
-          @contextmenu="onChartContextMenu"
-          @domcontextmenu="onChartDomContextMenu"
-        />
+        <CustomChartRenderer v-else-if="panelSchema.type == 'custom_chart'" :data="panelData"
+          style="width: 100%; height: 100%" class="col" @error="errorDetail = $event" />
+        <ChartRenderer v-else :data="panelSchema.queryType === 'promql' ||
+          (panelData.chartType != 'geomap' &&
+            panelData.chartType != 'table' &&
+            panelData.chartType != 'maps' &&
+            loading)
+          ? panelData
+          : noData == 'No Data'
+            ? {
+              options: {
+                backgroundColor: 'transparent',
+              },
+            }
+            : panelData
+          " :height="chartPanelHeight" @updated:data-zoom="onDataZoom" @error="errorDetail = $event"
+          @click="onChartClick" @contextmenu="onChartContextMenu" @domcontextmenu="onChartDomContextMenu" />
       </div>
-      <div
-        v-if="
-          !errorDetail?.message &&
-          panelSchema.type != 'geomap' &&
-          panelSchema.type != 'maps' &&
-          !loading
-        "
-        class="noData"
-        data-test="no-data"
-      >
+      <div v-if="
+        !errorDetail?.message &&
+        panelSchema.type != 'geomap' &&
+        panelSchema.type != 'maps' &&
+        !loading
+      " class="noData" data-test="no-data">
         {{ noData }}
       </div>
-      <div
-        v-if="
-          errorDetail?.message &&
-          !panelSchema?.error_config?.custom_error_handeling
-        "
-        class="errorMessage"
-      >
+      <div v-if="
+        errorDetail?.message &&
+        !panelSchema?.error_config?.custom_error_handeling
+      " class="errorMessage">
         <q-icon size="md" name="warning" />
         <div style="height: 80%; width: 100%">
           {{
@@ -154,91 +81,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
         </div>
       </div>
-      <div
-        v-if="
-          errorDetail?.message &&
-          panelSchema?.error_config?.custom_error_handeling &&
-          !panelSchema?.error_config?.default_data_on_error &&
-          panelSchema?.error_config?.custom_error_message
-        "
-        class="customErrorMessage"
-      >
+      <div v-if="
+        errorDetail?.message &&
+        panelSchema?.error_config?.custom_error_handeling &&
+        !panelSchema?.error_config?.default_data_on_error &&
+        panelSchema?.error_config?.custom_error_message
+      " class="customErrorMessage">
         {{ panelSchema?.error_config?.custom_error_message }}
       </div>
-      <div
-        class="row"
-        style="position: absolute; top: 0px; width: 100%; z-index: 999"
-      >
-        <LoadingProgress
-          :loading="loading"
-          :loadingProgressPercentage="loadingProgressPercentage"
-        />
+      <div class="row" style="position: absolute; top: 0px; width: 100%; z-index: 999">
+        <LoadingProgress :loading="loading" :loadingProgressPercentage="loadingProgressPercentage" />
       </div>
-      <div
-        v-if="isCursorOverPanel"
-        class="flex items-center q-gutter-x-xs"
-        style="
+      <div v-if="isCursorOverPanel" class="flex items-center q-gutter-x-xs" style="
           position: absolute;
           top: 0px;
           right: 0px;
           z-index: 9;
           padding-right: 2px;
           padding-top: 2px;
-        "
-        @click.stop
-      >
-        <q-btn
-          v-if="
-            showLegendsButton &&
-            noData !== 'No Data' &&
-            ![
-              'table',
-              'html',
-              'markdown',
-              'custom_chart',
-              'geomap',
-              'maps',
-              'heatmap',
-              'metric',
-              'gauge',
-            ].includes(panelSchema.type)
-          "
-          color="primary"
-          icon="format_list_bulleted"
-          round
-          outline
-          size="sm"
-          @click="$emit('show-legends')"
-          class="el-border"
-        >
+        " @click.stop>
+        <q-btn v-if="
+          showLegendsButton &&
+          noData !== 'No Data' &&
+          ![
+            'table',
+            'html',
+            'markdown',
+            'custom_chart',
+            'geomap',
+            'maps',
+            'heatmap',
+            'metric',
+            'gauge',
+          ].includes(panelSchema.type)
+        " color="primary" icon="format_list_bulleted" round outline size="sm" @click="$emit('show-legends')"
+          class="el-border">
           <q-tooltip anchor="top middle" self="bottom right">
             Show Legends
           </q-tooltip>
         </q-btn>
-        <q-btn
-          v-if="
-            [
-              'area',
-              'area-stacked',
-              'bar',
-              'h-bar',
-              'line',
-              'scatter',
-              'stacked',
-              'h-stacked',
-            ].includes(panelSchema.type) &&
-            checkIfPanelIsTimeSeries === true &&
-            allowAnnotationsAdd &&
-            !viewOnly
-          "
-          color="primary"
-          :icon="isAddAnnotationMode ? 'cancel' : 'edit'"
-          round
-          outline
-          size="sm"
-          @click="toggleAddAnnotationMode"
-          class="el-border"
-        >
+        <q-btn v-if="
+          [
+            'area',
+            'area-stacked',
+            'bar',
+            'h-bar',
+            'line',
+            'scatter',
+            'stacked',
+            'h-stacked',
+          ].includes(panelSchema.type) &&
+          checkIfPanelIsTimeSeries === true &&
+          allowAnnotationsAdd &&
+          !viewOnly
+        " color="primary" :icon="isAddAnnotationMode ? 'cancel' : 'edit'" round outline size="sm"
+          @click="toggleAddAnnotationMode" class="el-border">
           <q-tooltip anchor="top middle" self="bottom right">
             {{
               isAddAnnotationMode ? "Exit Annotations Mode" : "Add Annotations"
@@ -246,40 +143,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </q-btn>
       </div>
-      <div
-        class="crosslink-drilldown-menu"
-        :class="{
-          'crosslink-drilldown-menu--dark': store.state.theme === 'dark',
-        }"
-        ref="drilldownPopUpRef"
-        @mouseleave="hidePopupsAndOverlays"
-      >
-        <template
-          v-for="(drilldown, index) in drilldownArray"
-          :key="JSON.stringify(drilldown)"
-        >
-          <q-separator
-            v-if="
-              drilldown._isCrossLink &&
-              index > 0 &&
-              !drilldownArray[index - 1]._isCrossLink
-            "
-          />
-          <div
-            class="crosslink-drilldown-menu-item"
-            @click="openDrilldown(index)"
-          >
-            <q-icon
-              size="xs"
-              class="q-mr-sm"
-              :name="drilldown._isCrossLink ? 'open_in_new' : 'link'"
-            />
+      <div class="crosslink-drilldown-menu" :class="{
+        'crosslink-drilldown-menu--dark': store.state.theme === 'dark',
+      }" ref="drilldownPopUpRef" @mouseleave="hidePopupsAndOverlays">
+        <template v-for="(drilldown, index) in drilldownArray" :key="JSON.stringify(drilldown)">
+          <q-separator v-if="
+            drilldown._isCrossLink &&
+            index > 0 &&
+            !drilldownArray[index - 1]._isCrossLink
+          " />
+          <div class="crosslink-drilldown-menu-item" @click="openDrilldown(index)">
+            <q-icon size="xs" class="q-mr-sm" :name="drilldown._isCrossLink ? 'open_in_new' : 'link'" />
             <span>{{ drilldown.name }}</span>
           </div>
         </template>
       </div>
-      <div
-        style="
+      <div style="
           border: 1px solid gray;
           border-radius: 4px;
           padding: 3px;
@@ -292,42 +171,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           word-wrap: break-word;
           overflow-wrap: break-word;
           z-index: 9999999;
-        "
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-        ref="annotationPopupRef"
-      >
-        <div
-          class="q-px-sm q-py-xs"
-          style="
+        " :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'" ref="annotationPopupRef">
+        <div class="q-px-sm q-py-xs" style="
             display: flex;
             flex-direction: row;
             align-items: center;
             position: relative;
             word-break: break-word;
-          "
-        >
+          ">
           <span style="word-break: break-word">{{
             selectedAnnotationData.text
           }}</span>
         </div>
       </div>
       <!-- Annotation Dialog -->
-      <AddAnnotation
-        v-if="isAddAnnotationDialogVisible"
-        :dashboardId="dashboardId"
-        :annotation="annotationToAddEdit"
-        @close="closeAddAnnotation"
-        :panelsList="panelsList"
-      />
+      <AddAnnotation v-if="isAddAnnotationDialogVisible" :dashboardId="dashboardId" :annotation="annotationToAddEdit"
+        @close="closeAddAnnotation" :panelsList="panelsList" />
       <!-- Alert Context Menu -->
-      <AlertContextMenu
-        :visible="contextMenuVisible"
-        :x="contextMenuPosition.x"
-        :y="contextMenuPosition.y"
-        :value="contextMenuValue"
-        @select="handleCreateAlert"
-        @close="hideContextMenu"
-      />
+      <AlertContextMenu :visible="contextMenuVisible" :x="contextMenuPosition.x" :y="contextMenuPosition.y"
+        :value="contextMenuValue" @select="handleCreateAlert" @close="hideContextMenu" />
     </div>
   </div>
 </template>
@@ -349,6 +211,7 @@ import {
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
+import { useSQLDataWorker } from "@/composables/useSQLDataWorker";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { useRoute, useRouter } from "vue-router";
 import useNotifications from "@/composables/useNotifications";
@@ -799,6 +662,10 @@ export default defineComponent({
     });
     // ======= [END] dashboard PrintMode =======
 
+    // One SQL data worker per panel ΓÇö offloads processData/fillMissingValues
+    // to a background thread so streaming updates don't block the main thread.
+    const sqlDataWorker = useSQLDataWorker();
+
     onMounted(async () => {
       // fetch all panels
       await fetchAllPanels();
@@ -824,7 +691,9 @@ export default defineComponent({
       drilldownPopUpRef.value = null;
       annotationPopupRef.value = null;
       tableRendererRef.value = null;
+      sqlDataWorker.terminate();
     });
+
     const convertPanelDataCommon = async () => {
       if (
         !errorDetail?.value?.message &&
@@ -842,6 +711,7 @@ export default defineComponent({
             chartPanelStyle.value,
             annotations,
             loading.value,
+            sqlDataWorker,
           );
 
           limitNumberOfSeriesWarningMessage.value =
@@ -962,8 +832,10 @@ export default defineComponent({
           };
 
         // Check if this is the first chunk with actual data
+        // For PromQL: data[0] has a result array; for SQL: data[0] is directly an array of rows
         const hasData =
-          data.value?.length > 0 && data.value[0]?.result?.length > 0;
+          data.value?.length > 0 &&
+          (data.value[0]?.result?.length > 0 || data.value[0]?.length > 0);
 
         // Use throttled version during loading (streaming), immediate version when complete
         // This prevents excessive re-renders during PromQL data streaming

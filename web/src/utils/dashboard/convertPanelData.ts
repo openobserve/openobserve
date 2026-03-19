@@ -18,6 +18,7 @@ import {
   convertMultiSQLData,
   convertSQLData,
 } from "@/utils/dashboard/convertSQLData";
+import type { SQLDataWorker } from "@/utils/dashboard/sql/shared/workerContract";
 import { convertTableData } from "@/utils/dashboard/convertTableData";
 import { convertPivotTableData } from "@/utils/dashboard/convertPivotTableData";
 import { convertGeoMapData } from "@/utils/dashboard/convertGeoMapData";
@@ -42,6 +43,7 @@ export const convertPanelData = async (
   chartPanelStyle: any,
   annotations: any,
   loading: any = false,
+  worker?: SQLDataWorker,
 ) => {
   // based on the panel config, using the switch calling the appropriate converter
   // based on panel Data chartType is taken for ignoring unnecessary api calls
@@ -69,9 +71,7 @@ export const convertPanelData = async (
         !query?.fields?.y?.length &&
         !query?.fields?.breakdown?.length
       ) {
-        throw new Error(
-          "Please select required fields to render the chart",
-        );
+        throw new Error("Please select required fields to render the chart");
       }
 
       if (
@@ -107,6 +107,7 @@ export const convertPanelData = async (
               metadata,
               chartPanelStyle,
               annotations,
+              worker,
             )),
           };
         } catch (error) {

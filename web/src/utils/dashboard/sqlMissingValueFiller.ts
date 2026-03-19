@@ -16,7 +16,7 @@
 import { toZonedTime } from "date-fns-tz";
 import { dateBin } from "@/utils/dashboard/datetimeStartPoint";
 import { format } from "date-fns";
-import { isTimeSeries } from "./dateTimeUtils";
+import { isTimeSeries } from "./dateTimeUtilsCore";
 import { getDataValue } from "./aliasUtils";
 
 /**

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
   calculateWidthText,
   calculateOptimalFontSize,
@@ -21,21 +21,32 @@ import {
   calculateRotatedLabelBottomSpace,
 } from "@/utils/dashboard/chartDimensionUtils";
 
-// Mock DOM APIs used by calculateWidthText
-const mockSpan = {
-  style: {} as any,
-  innerHTML: "",
-  clientWidth: 0,
-  remove: vi.fn(),
-};
+// Mock objects for OffscreenCanvas ΓÇö populated per-test
+const mockMeasureText = vi.fn((text: string) => ({ width: text.length * 7 }));
+const mockCtx = { font: "", measureText: mockMeasureText };
 
 describe("chartDimensionUtils", () => {
   beforeEach(() => {
-    mockSpan.clientWidth = 0;
-    mockSpan.remove.mockClear();
+    mockCtx.font = "";
+    mockMeasureText.mockReset();
+    mockMeasureText.mockImplementation((text: string) => ({
+      width: text.length * 7,
+    }));
 
-    vi.spyOn(document, "createElement").mockReturnValue(mockSpan as any);
-    vi.spyOn(document.body, "appendChild").mockImplementation(() => mockSpan as any);
+    // Stub OffscreenCanvas with a proper class constructor so `new OffscreenCanvas()
+    // .getContext('2d')` returns our mockCtx in jsdom (which lacks OffscreenCanvas).
+    vi.stubGlobal(
+      "OffscreenCanvas",
+      class {
+        getContext() {
+          return mockCtx;
+        }
+      },
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   describe("calculateWidthText", () => {
@@ -47,79 +58,55 @@ describe("chartDimensionUtils", () => {
       expect(calculateWidthText(null as any)).toBe(0);
     });
 
-    it("calls document.createElement with span", () => {
-      mockSpan.clientWidth = 50;
-      calculateWidthText("Hello");
-      expect(document.createElement).toHaveBeenCalledWith("span");
+    it("returns a positive number for non-empty text", () => {
+      const result = calculateWidthText("Hello");
+      expect(result).toBeGreaterThan(0);
     });
 
-    it("appends span to body and removes it", () => {
-      mockSpan.clientWidth = 50;
-      calculateWidthText("Hello");
-      expect(document.body.appendChild).toHaveBeenCalled();
-      expect(mockSpan.remove).toHaveBeenCalled();
-    });
-
-    it("returns Math.ceil of clientWidth", () => {
-      mockSpan.clientWidth = 49.3;
+    it("returns Math.ceil of measureText width", () => {
+      // mockMeasureText returns text.length * 7; "Hello" = 5 chars ΓåÆ 35
+      mockMeasureText.mockReturnValueOnce({ width: 49.3 });
       const result = calculateWidthText("Hello");
       expect(result).toBe(50);
     });
 
-    it("uses default fontSize of 12px when not provided", () => {
-      mockSpan.clientWidth = 100;
+    it("sets font with default fontSize 12px", () => {
       calculateWidthText("Hello");
-      expect(mockSpan.style.fontSize).toBe("12px");
+      expect(mockCtx.font).toBe("12px sans-serif");
     });
 
-    it("uses provided fontSize", () => {
-      mockSpan.clientWidth = 100;
+    it("sets font with provided fontSize", () => {
       calculateWidthText("Hello", "16px");
-      expect(mockSpan.style.fontSize).toBe("16px");
+      expect(mockCtx.font).toBe("16px sans-serif");
     });
 
-    it("sets span innerHTML to text", () => {
-      mockSpan.clientWidth = 100;
+    it("calls measureText with the provided text", () => {
       calculateWidthText("TestText");
-      expect(mockSpan.innerHTML).toBe("TestText");
+      expect(mockMeasureText).toHaveBeenCalledWith("TestText");
     });
   });
 
   describe("calculateOptimalFontSize", () => {
     it("finds the largest font size that fits canvas width", () => {
-      // Mock: smaller fonts have smaller widths
-      let callCount = 0;
-      vi.spyOn(document, "createElement").mockReturnValue({
-        ...mockSpan,
-        get clientWidth() {
-          // Simulate: width = fontSize * 5 (approximation)
-          callCount++;
-          return parseInt(mockSpan.style.fontSize || "12") * 5;
-        },
-      } as any);
-
+      // Mock: width = fontSize * 5 (via measureText returning fontSize * 5)
+      mockMeasureText.mockImplementation(() => {
+        const fontSize = parseInt(mockCtx.font) || 12;
+        return { width: fontSize * 5 };
+      });
       const result = calculateOptimalFontSize("Hello", 200);
-      // With width = fontSize * 5, max fontSize where fontSize * 5 <= 200 is 40
-      // But this depends on the binary search logic
       expect(result).toBeGreaterThan(0);
       expect(result).toBeLessThanOrEqual(90);
     });
 
     it("returns a value between 1 and 90", () => {
-      mockSpan.clientWidth = 0; // Text always fits
+      mockMeasureText.mockReturnValue({ width: 0 }); // Text always fits
       const result = calculateOptimalFontSize("Hi", 1000);
       expect(result).toBeGreaterThanOrEqual(1);
       expect(result).toBeLessThanOrEqual(90);
     });
 
     it("returns 1 when text never fits", () => {
-      // Mock: text always too wide
-      vi.spyOn(document, "createElement").mockReturnValue({
-        ...mockSpan,
-        clientWidth: 9999,
-        remove: vi.fn(),
-      } as any);
-
+      mockMeasureText.mockReturnValue({ width: 9999 }); // Always too wide
       const result = calculateOptimalFontSize("VeryLongText", 10);
       expect(result).toBe(1);
     });

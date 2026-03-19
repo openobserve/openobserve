@@ -18,13 +18,10 @@ export const formatDate = (date: any) => {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
 
-// Check if the sample is time series
-export const isTimeSeries = (sample: any) => {
-  const iso8601Pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
-  return sample.every((value: any) => {
-    return iso8601Pattern.test(value);
-  });
-};
+// Re-exported from dateTimeUtilsCore for backward compatibility.
+// The implementation lives there so it can be imported by Web Worker code
+// without pulling in this file's Quasar dependency.
+export { isTimeSeries } from "./dateTimeUtilsCore";
 
 // Check if the sample is timestamp (16 digit microseconds)
 /**

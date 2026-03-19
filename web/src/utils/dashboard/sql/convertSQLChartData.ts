@@ -65,6 +65,32 @@ export const convertSQLChartData = async (
     return { options: null };
   }
 
+  return applyChartConversionsToCtx(
+    ctx,
+    panelSchema,
+    store,
+    chartPanelRef,
+    hoveredSeriesState,
+    metadata,
+  );
+};
+
+/**
+ * Applies chart-type conversion and post-processing to an already-built
+ * SQLContext.  Shared by both the normal path (convertSQLChartData) and the
+ * worker assembler path (assembleMultiSQLOptions).
+ *
+ * Does NOT call buildSQLContext ΓÇö the caller is responsible for providing a
+ * fully-populated ctx.
+ */
+export const applyChartConversionsToCtx = async (
+  ctx: any,
+  panelSchema: any,
+  store: any,
+  chartPanelRef: any,
+  hoveredSeriesState: any,
+  metadata: any,
+) => {
   const {
     options,
     extras,

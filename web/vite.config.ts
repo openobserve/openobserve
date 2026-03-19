@@ -98,6 +98,9 @@ export default defineConfig({
     __INTLIFY_PROD_DEVTOOLS__: false,
     __INTLIFY_JIT_COMPILATION__: true,
     __BUILD_TIME__: buildTime,
+    // Polyfill Node.js `global` for packages (e.g. d3-scale via
+    // @esbuild-plugins/node-globals-polyfill/process.js) that reference it.
+    global: "globalThis",
   },
   server: {
     port: 8081,
