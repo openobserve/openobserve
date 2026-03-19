@@ -6223,10 +6223,19 @@ export class LogsPage {
      */
     async getAnomalyColumnData() {
         const anomalyData = await this.page.evaluate(() => {
+            // Find anomaly column index by header text (more robust than hardcoded index)
+            const headers = Array.from(document.querySelectorAll('thead th'));
+            const anomalyColIndex = headers.findIndex(th =>
+                th.textContent?.trim().toLowerCase().includes('anomaly')
+            );
+
+            // Fallback to index 3 if header not found (backwards compatibility)
+            const colIndex = anomalyColIndex >= 0 ? anomalyColIndex : 3;
+
             const rows = Array.from(document.querySelectorAll('tbody tr'));
             return rows.map(row => {
                 const cells = Array.from(row.querySelectorAll('td'));
-                const anomalyCell = cells[3]; // Anomaly column is usually the 4th column (index 3)
+                const anomalyCell = cells[colIndex];
                 return {
                     hasIcon: anomalyCell?.querySelector('.q-icon, i') !== null,
                     hasWarning: anomalyCell?.innerHTML.includes('warning') || anomalyCell?.innerHTML.includes('⚠'),
