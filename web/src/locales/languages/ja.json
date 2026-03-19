@@ -1576,7 +1576,8 @@
     "pivotStickyRowTotals": "スティッキー行の合計",
     "pivotStickyRowTotalsTooltip": "合計行を下部に固定して、垂直方向にスクロールしても表示されたままにします",
     "pivotStickyColTotals": "スティッキーカラムの合計",
-    "pivotStickyColTotalsTooltip": "合計列を右側に固定して、横にスクロールしても表示されたままにします"
+    "pivotStickyColTotalsTooltip": "合計列を右側に固定して、横にスクロールしても表示されたままにします",
+    "configSectionPromqlTable": "プロムQL テーブルモード"
   },
   "panel": {
     "header": "パネル",
