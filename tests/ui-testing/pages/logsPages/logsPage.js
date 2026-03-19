@@ -6173,6 +6173,96 @@ export class LogsPage {
         testLogger.info(`Pattern details showing pattern ${expectedIndex}`);
     }
 
+    /**
+     * Inspect pattern card DOM structure for debugging
+     * Returns info about styled elements, classes, and HTML structure
+     * @param {number} index - The pattern card index (0-based)
+     */
+    async inspectPatternCardDOM(index = 0) {
+        const patternElements = await this.page.locator('tbody tr').nth(index).evaluate(el => {
+            const styledElements = el.querySelectorAll('[style*="background"], [class*="chip"], [class*="token"], [class*="highlight"], span[class*="tw:"], code');
+            return {
+                totalElements: styledElements.length,
+                classes: Array.from(styledElements).slice(0, 5).map(e => e.className).filter(c => c),
+                innerHTML: el.querySelector('td:first-child')?.innerHTML.substring(0, 200)
+            };
+        }).catch(() => ({ totalElements: 0, classes: [], innerHTML: '' }));
+        testLogger.info(`Pattern ${index} DOM inspection: ${JSON.stringify(patternElements)}`);
+        return patternElements;
+    }
+
+    /**
+     * Get wildcard chip element (for hover tests)
+     * @param {string} chipClass - Optional chip class selector
+     */
+    async getWildcardChip(chipClass = '.pattern-card .wildcard-chip, .pattern-card .q-chip') {
+        return this.page.locator(chipClass).first();
+    }
+
+    /**
+     * Get tooltip element
+     */
+    async getTooltip() {
+        return this.page.locator('.q-tooltip, .q-menu, [role="tooltip"]').first();
+    }
+
+    /**
+     * Get anomaly warning icon count
+     */
+    async getAnomalyWarningIconCount() {
+        const count = await this.page.locator('tbody tr .q-icon, tbody tr i').filter({ hasText: /warning|alert|error/ }).count();
+        testLogger.info(`Found ${count} anomaly warning icons`);
+        return count;
+    }
+
+    /**
+     * Get anomaly column data for all pattern rows
+     * Returns array of objects with hasIcon, hasWarning, content
+     */
+    async getAnomalyColumnData() {
+        const anomalyData = await this.page.evaluate(() => {
+            const rows = Array.from(document.querySelectorAll('tbody tr'));
+            return rows.map(row => {
+                const cells = Array.from(row.querySelectorAll('td'));
+                const anomalyCell = cells[3]; // Anomaly column is usually the 4th column (index 3)
+                return {
+                    hasIcon: anomalyCell?.querySelector('.q-icon, i') !== null,
+                    hasWarning: anomalyCell?.innerHTML.includes('warning') || anomalyCell?.innerHTML.includes('⚠'),
+                    content: anomalyCell?.textContent?.trim() || ''
+                };
+            });
+        });
+        testLogger.info(`Anomaly column data: ${JSON.stringify(anomalyData.slice(0, 3))}`);
+        return anomalyData;
+    }
+
+    /**
+     * Get pattern details dialog content
+     */
+    async getPatternDetailsDialogContent() {
+        const content = await this.page.locator('.q-dialog').innerText();
+        testLogger.info(`Dialog content length: ${content.length} chars`);
+        return content;
+    }
+
+    /**
+     * Check if pattern include button is active/selected
+     * @param {number} index - The pattern card index (0-based)
+     */
+    async expectPatternIncludeBtnActive(index = 0) {
+        await expect(this.page.locator(this.patternCardIncludeBtn(index))).toHaveClass(/active|selected/);
+        testLogger.info(`Pattern ${index} include button is active`);
+    }
+
+    /**
+     * Check if pattern exclude button is active/selected
+     * @param {number} index - The pattern card index (0-based)
+     */
+    async expectPatternExcludeBtnActive(index = 0) {
+        await expect(this.page.locator(this.patternCardExcludeBtn(index))).toHaveClass(/active|selected/);
+        testLogger.info(`Pattern ${index} exclude button is active`);
+    }
+
     // ============================================================================
     // BUILD TAB / QUERY BUILDER METHODS - PR #10305
     // These methods support the Auto Query Builder feature on the Logs page
