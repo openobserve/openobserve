@@ -29,14 +29,9 @@ use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 /// Called by compactor job
 #[cfg(feature = "enterprise")]
 pub async fn process_service_graph() -> Result<(), anyhow::Error> {
-    let cfg = get_o2_config();
-    if !cfg.service_graph.enabled {
-        return Ok(());
-    }
-    // Process last hour of traces (configurable window)
+    // Process last hour of traces
     let now = Utc::now().timestamp_micros();
-    let window_minutes = get_o2_config().service_graph.query_time_range_minutes;
-    let window_micros = window_minutes * 60 * 1_000_000;
+    let window_micros = super::DEFAULT_QUERY_WINDOW_MINUTES * 60 * 1_000_000;
     let start_time = now - window_micros;
 
     log::debug!(
