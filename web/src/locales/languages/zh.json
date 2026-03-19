@@ -2150,7 +2150,9 @@
       "detectionConfig": "配置查询和检测参数",
       "alerting": "在检测到异常时设置通知"
     },
-    "updateAnomalyDetection": "更新异常检测："
+    "updateAnomalyDetection": "更新异常检测：",
+    "anomalyCreated": "异常检测配置已创建。培训将很快开始。",
+    "editJson": "编辑警报 JSON"
   },
   "alert_templates": {
     "header": "模板",

@@ -2150,7 +2150,9 @@
       "detectionConfig": "Configurar los parámetros de consulta y detección",
       "alerting": "Configure las notificaciones cuando se detecten anomalías"
     },
-    "updateAnomalyDetection": "Actualizar la detección de anomalías:"
+    "updateAnomalyDetection": "Actualizar la detección de anomalías:",
+    "anomalyCreated": "Se creó una configuración de detección de anomalías. La formación comenzará en breve.",
+    "editJson": "Editar alerta JSON"
   },
   "alert_templates": {
     "header": "Plantillas",

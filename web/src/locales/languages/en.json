@@ -1987,9 +1987,9 @@
     "alertType": "Alert Type",
     "streamType": "Stream Type",
     "state": "State",
-    "realTime": "Real-Time Alert",
-    "scheduled": "Scheduled Alert",
-    "anomalyDetection": "Anomaly Detection",
+    "realTime": "Realtime",
+    "scheduled": "Scheduled",
+    "anomalyDetection": "Anomalies",
     "newAnomalyDetection": "New anomaly detection",
     "editAnomalyDetection": "Edit anomaly detection",
     "updateAnomalyDetection": "Update anomaly detection:",
@@ -1997,6 +1997,7 @@
     "anomalyDetectionConfig": "Detection Config",
     "alerting": "Alerting",
     "saveAndTrain": "Save & Train",
+    "anomalyCreated": "Anomaly detection config created. Training will start shortly.",
     "anomalyStepCaptions": {
       "alertSetup": "Name your detector and select a stream to monitor",
       "detectionConfig": "Configure the query and detection parameters",
@@ -2448,7 +2449,8 @@
       "variablesTooltip": "Variables are used to pass data from the alert to the destination.",
       "rowTemplateTooltip": "Row Template is used to format the alert message.",
       "templateType": "Template Type:"
-    }
+    },
+    "editJson": "Edit Alert JSON"
   },
   "alert_templates": {
     "header": "Templates",

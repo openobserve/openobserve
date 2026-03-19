@@ -25,22 +25,50 @@ export class AlertCreationWizard {
      * Typing the stream name triggers QSelect's built-in filter to narrow results.
      */
     async selectStreamByName(streamName) {
-        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(this.locators.streamNameDropdown).click();
-        await this.page.waitForTimeout(500);
-        await this.page.keyboard.type(streamName, { delay: 30 });
-        await this.page.waitForTimeout(1000);
-        try {
-            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
-        } catch (e) {
-            testLogger.warn('Stream not visible after typing, retrying dropdown', { streamName });
-            await this.page.keyboard.press('Escape');
-            await this.page.waitForTimeout(500);
+        const maxRetries = 3;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
             await this.page.locator(this.locators.streamNameDropdown).click();
             await this.page.waitForTimeout(500);
+            // Clear any previous text in the input
+            await this.page.keyboard.press('Control+a');
             await this.page.keyboard.type(streamName, { delay: 30 });
+            await this.page.waitForTimeout(1500);
+
+            const streamOption = this.page.getByText(streamName, { exact: true });
+            if (await streamOption.isVisible({ timeout: 5000 }).catch(() => false)) {
+                await streamOption.click();
+                testLogger.info('Stream selected successfully', { streamName, attempt });
+                return;
+            }
+
+            testLogger.warn('Stream not visible in dropdown, retrying', { streamName, attempt, maxRetries });
+            await this.page.keyboard.press('Escape');
             await this.page.waitForTimeout(1000);
+
+            if (attempt < maxRetries) {
+                // Navigate back and re-enter to force a fresh stream list fetch
+                await this.page.locator('[data-test="add-alert-back-btn"]').click();
+                await this.page.waitForTimeout(2000);
+                await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+                await this.page.locator(this.locators.addAlertButton).click();
+                await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+                await this.page.waitForTimeout(2000);
+
+                // Re-fill the alert name (it was lost when navigating back)
+                await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
+                await this.page.locator(this.locators.alertNameInput).click();
+                await this.page.locator(this.locators.alertNameInput).fill(this.currentAlertName);
+
+                // Re-select stream type
+                await this.page.locator(this.locators.streamTypeDropdown).click();
+                await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
+                await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+                await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+                await this.page.waitForTimeout(2000);
+            }
         }
+        // Final attempt - if it still fails, throw the original error
         await this.page.getByText(streamName, { exact: true }).click();
     }
 
@@ -69,7 +97,9 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.streamTypeDropdown).click();
         await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
         await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
-        await this.page.waitForTimeout(1000);
+        // Wait for stream list API call to complete after stream type selection
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(2000);
 
         await this.selectStreamByName(streamName);
 

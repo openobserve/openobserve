@@ -82,16 +82,22 @@ export function generateAnomalySummary(
         `✓ Alerting: <span class="summary-clickable">Disabled</span>`,
       );
     } else {
-      const dest = destinations?.find(
-        (d: any) =>
-          d.value === config.alert_destination_id ||
-          d.id === config.alert_destination_id ||
-          d.name === config.alert_destination_id,
-      );
-      const destName = dest?.name ?? dest?.label ?? config.alert_destination_id;
-      if (destName) {
+      const ids: string[] = Array.isArray(config.alert_destination_ids)
+        ? config.alert_destination_ids
+        : config.alert_destination_id
+          ? [config.alert_destination_id]
+          : [];
+      const destNames = ids
+        .map((id: string) => {
+          const d = destinations?.find(
+            (d: any) => d.value === id || d.id === id || d.name === id,
+          );
+          return d?.name ?? d?.label ?? id;
+        })
+        .filter(Boolean);
+      if (destNames.length > 0) {
         parts.push(
-          `✓ Alerting: Enabled → <span class="summary-clickable">${destName}</span>`,
+          `✓ Alerting: Enabled → <span class="summary-clickable">${destNames.join(", ")}</span>`,
         );
       } else {
         parts.push(
