@@ -218,7 +218,7 @@ async fn create_anomaly_alert(
         rcf_shingle_size: anomaly_fields.rcf_shingle_size,
         alert_enabled: anomaly_fields.alert_enabled,
         alert_destinations: req_body.alert.destinations,
-        enabled: req_body.alert.enabled.then_some(true),
+        enabled: Some(req_body.alert.enabled),
         // Prefer explicit folder_id in JSON body; fall back to the ?folder= query param
         // (same mechanism regular alerts use — the UI sends folder as a query param).
         folder_id: req_body
