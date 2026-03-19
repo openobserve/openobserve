@@ -15,7 +15,10 @@
 
 use std::str::FromStr;
 
-use config::meta::{alerts::alert as meta_alerts, folder as meta_folders, triggers::Trigger};
+use config::{
+    meta::{alerts::alert as meta_alerts, folder as meta_folders, triggers::Trigger},
+    utils::time::parse_interval_to_minutes,
+};
 use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
@@ -209,21 +212,6 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
             .filter(|s| !s.is_empty())
             .map(String::from),
     })
-}
-/// Parse an interval string like "5m", "1h", "30s" into minutes.
-/// Returns 0 for unrecognised formats.
-fn parse_interval_to_minutes(s: &str) -> i64 {
-    if let Some(n) = s.strip_suffix('m') {
-        n.parse().unwrap_or(0)
-    } else if let Some(n) = s.strip_suffix('h') {
-        n.parse::<i64>().unwrap_or(0) * 60
-    } else if let Some(n) = s.strip_suffix('s') {
-        n.parse::<i64>().unwrap_or(0) / 60
-    } else if let Some(n) = s.strip_suffix('d') {
-        n.parse::<i64>().unwrap_or(0) * 1440
-    } else {
-        s.parse().unwrap_or(0)
-    }
 }
 
 #[derive(Default, Serialize, ToSchema)]
