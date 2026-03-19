@@ -28,6 +28,7 @@ describe("searchLabelsConfig", () => {
     "labels",
     "lineStyle",
     "table",
+    "pivotTable",
     "valueTransformations",
     "fieldOverrides",
     "map",
@@ -42,7 +43,7 @@ describe("searchLabelsConfig", () => {
 
   describe("ORDERED_SECTION_IDS", () => {
     it("contains all 18 section IDs", () => {
-      expect(ORDERED_SECTION_IDS).toHaveLength(18);
+      expect(ORDERED_SECTION_IDS).toHaveLength(19);
     });
 
     it("contains every expected section ID", () => {
@@ -75,7 +76,7 @@ describe("searchLabelsConfig", () => {
     });
 
     it("has exactly 18 keys", () => {
-      expect(Object.keys(DEFAULT_EXPANDED_SECTIONS)).toHaveLength(18);
+      expect(Object.keys(DEFAULT_EXPANDED_SECTIONS)).toHaveLength(19);
     });
 
     it("has no section set to false", () => {

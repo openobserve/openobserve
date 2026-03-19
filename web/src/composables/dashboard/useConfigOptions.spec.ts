@@ -82,6 +82,7 @@ describe("useConfigOptions", () => {
     pMode = ref(false),
     trellisConfig = computed(() => false),
     colorPalette = computed(() => false),
+    isPivotMode = computed(() => false),
   ) => {
     const { configOptions } = useConfigOptions(
       panelData,
@@ -89,6 +90,7 @@ describe("useConfigOptions", () => {
       "dashboard",
       trellisConfig,
       colorPalette,
+      isPivotMode,
     );
     return configOptions.value;
   };
@@ -102,7 +104,7 @@ describe("useConfigOptions", () => {
   // -------------------------------------------------------------------------
 
   describe("structure", () => {
-    it("returns all 18 top-level section keys", () => {
+    it("returns all 19 top-level section keys", () => {
       const opts = getOptions();
       const expectedSections = [
         "general",
@@ -113,6 +115,7 @@ describe("useConfigOptions", () => {
         "labels",
         "lineStyle",
         "table",
+        "pivotTable",
         "valueTransformations",
         "fieldOverrides",
         "map",
