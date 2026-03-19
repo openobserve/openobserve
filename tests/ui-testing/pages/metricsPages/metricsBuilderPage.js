@@ -41,7 +41,7 @@ export class MetricsBuilderPage {
         this.dashboardAddButton = '[data-test="metrics-schema-update-settings-button"]';
 
         // Confirm dialog for mode switching
-        this.confirmDialogOk = '.q-dialog .q-btn:has-text("OK"), .q-dialog .q-btn:has-text("Confirm"), .q-dialog .q-card__actions .q-btn--flat:last-child';
+        this.confirmDialogOk = '.q-dialog .q-btn:has-text("OK"), .q-dialog .q-btn:has-text("Confirm")';
         this.confirmDialogCancel = '.q-dialog .q-btn:has-text("Cancel")';
     }
 
@@ -631,8 +631,8 @@ export class MetricsBuilderPage {
      * Check if label select dropdown has options loaded
      */
     async hasLabelOptions() {
-        const menu = this.page.locator('.q-menu').filter({ has: this.page.locator('.q-item') });
-        const count = await menu.last().locator('.q-item').count();
+        const menu = this.page.locator('.q-menu:visible').filter({ has: this.page.locator('.q-item') });
+        const count = await menu.first().locator('.q-item').count();
         return count > 0;
     }
 
