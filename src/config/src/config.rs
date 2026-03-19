@@ -810,11 +810,11 @@ pub struct Common {
     #[env_config(name = "ZO_FEATURE_INGESTER_NONE_COMPRESSION", default = false)]
     pub feature_ingester_none_compression: bool,
     #[env_config(
-        name = "ZO_FEATURE_FIELD_VALUES_FOR_FST",
+        name = "ZO_FEATURE_SHOW_FTS_FIELD_VALUES",
         default = false,
-        help = "Show field values dropdown for full text search (FST) fields in the logs page field list"
+        help = "Show field values dropdown for full text search fields in the logs page field list"
     )]
-    pub field_values_for_fst: bool,
+    pub show_fts_field_values: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
     pub feature_fulltext_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_INDEX_EXTRA_FIELDS", default = "")]

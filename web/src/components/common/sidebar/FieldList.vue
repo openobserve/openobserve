@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-td :props="props" class="field_list">
               <!-- TODO OK : Repeated code make separate component to display field  -->
               <div
-                v-if="(props.row.ftsKey && !fieldValuesForFst) || !props.row.showValues"
+                v-if="(props.row.ftsKey && !showFtsFieldValues) || !props.row.showValues"
                 class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
                 :title="props.row.name"
               >
@@ -321,8 +321,8 @@ export default defineComponent({
       };
     }> = ref({});
 
-    const fieldValuesForFst = computed(
-      () => store.state.zoConfig?.field_values_for_fst ?? false,
+    const showFtsFieldValues = computed(
+      () => store.state.zoConfig?.show_fts_field_values ?? false,
     );
 
     const filterFieldFn = (rows: any, terms: any) => {
@@ -409,7 +409,7 @@ export default defineComponent({
       outlinedAdd,
       filterFieldValue,
       copyContentValue,
-      fieldValuesForFst,
+      showFtsFieldValues,
     };
   },
 });

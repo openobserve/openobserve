@@ -122,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               (searchObj.data.stream.selectedStream.length + 1)
             : searchObj.data.stream.selectedStreamFields.length
         "
+        :show-fts-field-values="showFtsFieldValues"
         @add-to-filter="addToFilter"
         @toggle-field="clickFieldFn"
         @toggle-interesting="addToInterestingFieldList"
@@ -298,6 +299,10 @@ export default defineComponent({
         slot: "interesting_fields_slot",
       },
     ];
+
+    const showFtsFieldValues = computed(
+      () => store.state.zoConfig?.show_fts_field_values ?? false,
+    );
 
     const streamOptions: any = ref([]);
     const fieldValues: Ref<{
@@ -1470,6 +1475,7 @@ export default defineComponent({
       hasUserDefinedSchemas,
       setPage,
       resetPagination,
+      showFtsFieldValues,
     };
   },
 });

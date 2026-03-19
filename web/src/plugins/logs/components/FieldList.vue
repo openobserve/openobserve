@@ -94,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <FieldRow
             :field="props.row"
+            :show-fts-field-values="showFtsFieldValues"
             :selected-fields="selectedFields"
             :timestamp-column="timestampColumn"
             :theme="theme"
@@ -219,6 +220,7 @@ interface Props {
   userDefinedSchemaBtnGroupOption: any[];
   selectedFieldsBtnGroupOption: any[];
   totalFieldsCount: number;
+  showFtsFieldValues: boolean;
 }
 
 defineProps<Props>();
