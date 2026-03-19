@@ -1466,14 +1466,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         >
-          <q-tooltip
-            class="bg-grey-8"
-            anchor="top middle"
-            self="bottom middle"
-            max-width="250px"
+          <q-btn
+            no-caps
+            padding="xs"
+            size="sm"
+            flat
+            icon="info_outline"
+            @click.stop
           >
-            {{ t("dashboard.pivotShowRowTotalsTooltip") }}
-          </q-tooltip>
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="top middle"
+              self="bottom middle"
+              max-width="250px"
+            >
+              {{ t("dashboard.pivotShowRowTotalsTooltip") }}
+            </q-tooltip>
+          </q-btn>
         </q-toggle>
 
         <q-toggle
@@ -1490,14 +1499,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         >
-          <q-tooltip
-            class="bg-grey-8"
-            anchor="top middle"
-            self="bottom middle"
-            max-width="250px"
+          <q-btn
+            no-caps
+            padding="xs"
+            size="sm"
+            flat
+            icon="info_outline"
+            @click.stop
           >
-            {{ t("dashboard.pivotStickyColTotalsTooltip") }}
-          </q-tooltip>
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="top middle"
+              self="bottom middle"
+              max-width="250px"
+            >
+              {{ t("dashboard.pivotStickyColTotalsTooltip") }}
+            </q-tooltip>
+          </q-btn>
         </q-toggle>
 
         <q-toggle
@@ -1514,14 +1532,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         >
-          <q-tooltip
-            class="bg-grey-8"
-            anchor="top middle"
-            self="bottom middle"
-            max-width="250px"
+          <q-btn
+            no-caps
+            padding="xs"
+            size="sm"
+            flat
+            icon="info_outline"
+            @click.stop
           >
-            {{ t("dashboard.pivotShowColTotalsTooltip") }}
-          </q-tooltip>
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="top middle"
+              self="bottom middle"
+              max-width="250px"
+            >
+              {{ t("dashboard.pivotShowColTotalsTooltip") }}
+            </q-tooltip>
+          </q-btn>
         </q-toggle>
 
         <q-toggle
@@ -1538,14 +1565,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         >
-          <q-tooltip
-            class="bg-grey-8"
-            anchor="top middle"
-            self="bottom middle"
-            max-width="250px"
+          <q-btn
+            no-caps
+            padding="xs"
+            size="sm"
+            flat
+            icon="info_outline"
+            @click.stop
           >
-            {{ t("dashboard.pivotStickyRowTotalsTooltip") }}
-          </q-tooltip>
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="top middle"
+              self="bottom middle"
+              max-width="250px"
+            >
+              {{ t("dashboard.pivotStickyRowTotalsTooltip") }}
+            </q-tooltip>
+          </q-btn>
         </q-toggle>
       </div>
     </q-expansion-item>
