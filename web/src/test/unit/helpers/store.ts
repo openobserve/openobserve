@@ -90,7 +90,6 @@ const store = createStore({
       all_fields_name: "_all",
       default_secondary_index_fields: ["level"],
       default_quick_mode_fields: [],
-      service_graph_enabled: true,
     },
     organizationData: {
       organizationPasscode: "",

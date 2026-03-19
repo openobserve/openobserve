@@ -185,7 +185,6 @@ struct ConfigResponse<'a> {
     log_page_default_field_list: String,
     query_values_default_num: i64,
     alert_preview_timerange_minutes: i64,
-    service_graph_enabled: bool,
     incidents_enabled: bool,
     service_streams_enabled: bool,
     anomaly_detection_enabled: bool,
@@ -325,7 +324,6 @@ pub async fn zo_config() -> impl IntoResponse {
     let custom_hide_menus = enterprise_value!("", &o2cfg.common.custom_hide_menus);
     let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
     let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled);
-    let service_graph_enabled = enterprise_value!(false, o2cfg.service_graph.enabled);
     let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Anomaly detection is always on when the enterprise feature is compiled in — no runtime flag.
@@ -426,7 +424,6 @@ pub async fn zo_config() -> impl IntoResponse {
         ingestion_history,
         query_values_default_num: cfg.limit.query_values_default_num,
         alert_preview_timerange_minutes: cfg.limit.alert_preview_timerange_minutes,
-        service_graph_enabled,
         incidents_enabled,
         service_streams_enabled,
         anomaly_detection_enabled,
