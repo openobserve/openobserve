@@ -440,6 +440,10 @@ export default defineComponent({
       type: Array,
       default: () => [],
     },
+    folderId: {
+      type: String,
+      default: "",
+    },
   },
   emits: ["update:destinations", "update:templates", "update:alerts"],
   setup(props, { emit }) {
@@ -486,10 +490,11 @@ export default defineComponent({
     });
     const streamTypes = ["logs", "metrics", "traces"];
     const selectedFolderId = ref<any>(
-      router.currentRoute.value.query.folder || "default",
+      props.folderId || router.currentRoute.value.query.folder || "default",
     );
     const activeFolderId = ref(
-      router.currentRoute.value.query.folder ||
+      props.folderId ||
+        router.currentRoute.value.query.folder ||
         router.currentRoute.value.query?.folderId,
     );
     const activeFolderAlerts = ref<any>([]);
@@ -570,6 +575,7 @@ export default defineComponent({
 
     onMounted(() => {
       activeFolderId.value =
+        props.folderId ||
         router.currentRoute.value.query?.folder ||
         router.currentRoute.value.query?.folderId;
       getActiveFolderAlerts(activeFolderId.value as string);
