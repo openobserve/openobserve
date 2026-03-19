@@ -97,8 +97,6 @@ flat icon="cancel"></q-btn>
             outlined
             filled
             dense
-            emit-value
-            map-options
             :loading="loadingTemplates"
             data-test="llm-evaluation-template-select"
           >
@@ -243,7 +241,7 @@ export default defineComponent({
     const streamFields = ref<{ label: string; value: string }[]>([]);
     const filteredStreamFields = ref<{ label: string; value: string }[]>([]);
     const loadingFields = ref(false);
-    const selectedTemplate = ref<string | null>(null);
+    const selectedTemplate = ref<{ id: string; name: string } | null>(null);
     const availableTemplates = ref<any[]>([]);
     const loadingTemplates = ref(false);
 
@@ -294,14 +292,11 @@ export default defineComponent({
           return;
         }
 
-        // Check store cache first (unless force refresh requested)
+        // Use store cache unless force refresh requested
         if (!forceRefresh) {
           const cached = store.state.streams.evalTemplatesByOrg[orgId];
           if (cached && cached.length > 0) {
             availableTemplates.value = cached;
-            if (!selectedTemplate.value) {
-              selectedTemplate.value = cached[0].id;
-            }
             return;
           }
         }
@@ -311,22 +306,10 @@ export default defineComponent({
         const templates = await evalTemplateService.listTemplates(orgId);
         availableTemplates.value = templates || [];
 
-        // Cache in store for reuse across components
         store.dispatch("streams/setEvalTemplates", {
           orgId,
           templates: templates || [],
         });
-
-        // Set first template as default if available and none selected
-        // (But don't auto-select if user is editing - they'll manually restore their choice)
-        if (
-          templates &&
-          templates.length > 0 &&
-          !selectedTemplate.value &&
-          !pipelineObj.isEditNode
-        ) {
-          selectedTemplate.value = templates[0].id;
-        }
       } catch (e) {
         console.error("Failed to fetch evaluation templates:", e);
         availableTemplates.value = [];
@@ -386,9 +369,13 @@ export default defineComponent({
       await fetchSourceStreamFields();
       await fetchAvailableTemplates();
 
-      // Restore the saved template AFTER loading templates
       if (savedTemplate) {
-        selectedTemplate.value = savedTemplate;
+        // Editing: restore saved template by ID to get full object (needed to display name)
+        const match = availableTemplates.value.find((t: any) => t.id === savedTemplate);
+        selectedTemplate.value = match || null;
+      } else if (!pipelineObj.isEditNode && availableTemplates.value.length > 0) {
+        // New node: default to first template
+        selectedTemplate.value = availableTemplates.value[0];
       }
     });
 
@@ -433,7 +420,7 @@ export default defineComponent({
 
       // Add template if selected, otherwise explicitly set to null (to clear any previously saved value)
       if (selectedTemplate.value) {
-        nodeData.eval_template = selectedTemplate.value;
+        nodeData.eval_template = selectedTemplate.value.id;
       } else {
         nodeData.eval_template = null;
       }
