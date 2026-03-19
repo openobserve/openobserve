@@ -82,6 +82,20 @@ export default defineComponent({
 
     onBeforeMount(async () => {
       await getDestinations();
+      if (!destinations.value.length) {
+        $q.notify({
+          type: "warning",
+          message:
+            "No destinations found. Please create a destination first.",
+          timeout: 3000,
+        });
+        router.push({
+          name: "alertList",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+      }
     });
 
     return {
