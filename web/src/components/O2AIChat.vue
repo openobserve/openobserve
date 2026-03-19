@@ -4245,7 +4245,8 @@ export default defineComponent({
           return { text: 'Query failed', highlight: null, suffix: '' };
         }
         if (block.response?.total !== undefined) {
-          return { text: 'Queried logs ', highlight: `(${block.response.total} results)`, suffix: '' };
+          const streamType = block.context?.type || 'logs';
+          return { text: `Queried ${streamType} `, highlight: `(${block.response.total} results)`, suffix: '' };
         }
       }
       if (block.tool === 'StreamSchema' && block.context?.stream_name) {
