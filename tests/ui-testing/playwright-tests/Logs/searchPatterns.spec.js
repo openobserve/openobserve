@@ -646,38 +646,36 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
         const result = await pm.logsPage.waitForPatternsToLoad(60000);
 
-        if (result === 'patterns' || result === 'statistics') {
-            const cardCount = await pm.logsPage.getPatternCardCount();
+        // ASSERTION: Patterns must be available for this test
+        expect(['patterns', 'statistics']).toContain(result);
 
-            if (cardCount > 0) {
-                // Get pattern template text to check for wildcard tokens
-                const firstPatternText = await pm.logsPage.getPatternCardTemplateText(0);
-                testLogger.info(`First pattern: ${firstPatternText.substring(0, 100)}`);
+        const cardCount = await pm.logsPage.getPatternCardCount();
 
-                // Check if pattern contains wildcard indicators like <:TIMESTAMP>, <*>, etc.
-                const hasWildcards = firstPatternText.includes('<:') ||
-                                   firstPatternText.includes('<*>') ||
-                                   firstPatternText.includes('[<:');
+        // ASSERTION: Must have patterns to test tokenization
+        expect(cardCount).toBeGreaterThan(0);
 
-                // Inspect DOM structure for debugging
-                const patternElements = await pm.logsPage.inspectPatternCardDOM(0);
+        // Get pattern template text to check for wildcard tokens
+        const firstPatternText = await pm.logsPage.getPatternCardTemplateText(0);
+        testLogger.info(`First pattern: ${firstPatternText.substring(0, 100)}`);
 
-                testLogger.info(`Pattern DOM inspection: ${JSON.stringify(patternElements)}`);
-                testLogger.info(`Has wildcard tokens in text: ${hasWildcards}`);
+        // Check if pattern contains wildcard indicators like <:TIMESTAMP>, <*>, etc.
+        const hasWildcards = firstPatternText.includes('<:') ||
+                           firstPatternText.includes('<*>') ||
+                           firstPatternText.includes('[<:');
 
-                // Take screenshot for manual verification
-                await page.screenshot({ path: 'playwright-results/pattern-wildcard-chips.png', fullPage: true });
+        // Inspect DOM structure for debugging
+        const patternElements = await pm.logsPage.inspectPatternCardDOM(0);
 
-                // ASSERTION: Pattern should contain wildcard indicators
-                expect(hasWildcards || patternElements.totalElements > 0).toBeTruthy();
+        testLogger.info(`Pattern DOM inspection: ${JSON.stringify(patternElements)}`);
+        testLogger.info(`Has wildcard tokens in text: ${hasWildcards}`);
 
-                testLogger.info('✅ Wildcard tokenization verified');
-            } else {
-                testLogger.info('No pattern cards found for chip verification');
-            }
-        } else {
-            testLogger.info('No patterns found - skipping chip test');
-        }
+        // Take screenshot for manual verification
+        await page.screenshot({ path: 'playwright-results/pattern-wildcard-chips.png', fullPage: true });
+
+        // ASSERTION: Pattern must contain wildcard indicators (test the actual feature)
+        expect(hasWildcards).toBeTruthy();
+
+        testLogger.info('✅ Wildcard tokenization verified');
 
         testLogger.info('PASSED: Tokenized wildcard chips test complete');
     });
@@ -706,56 +704,54 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
         const result = await pm.logsPage.waitForPatternsToLoad(60000);
 
-        if (result === 'patterns' || result === 'statistics') {
-            const cardCount = await pm.logsPage.getPatternCardCount();
+        // ASSERTION: Patterns must be available for this test
+        expect(['patterns', 'statistics']).toContain(result);
 
-            if (cardCount > 0) {
-                // Find wildcard chips
-                const wildcardChip = await pm.logsPage.getWildcardChip();
-                const chipVisible = await wildcardChip.isVisible().catch(() => false);
+        const cardCount = await pm.logsPage.getPatternCardCount();
 
-                // NOTE: Wildcard chips may not be rendered as separate DOM elements in current implementation
-                // The tokenization shows wildcards inline in text (e.g., [<:TIMESTAMP>])
-                // This test verifies the feature without blocking if DOM structure changes
-                testLogger.info(`Wildcard chip element visible: ${chipVisible}`);
+        // ASSERTION: Must have patterns to test tooltips
+        expect(cardCount).toBeGreaterThan(0);
 
-                if (chipVisible) {
-                    // Hover over the chip
-                    await wildcardChip.hover();
-                    await page.waitForTimeout(1000);
+        // Find wildcard chips
+        const wildcardChip = await pm.logsPage.getWildcardChip();
+        const chipVisible = await wildcardChip.isVisible().catch(() => false);
 
-                    // Check for tooltip/popover
-                    const tooltip = await pm.logsPage.getTooltip();
-                    const tooltipVisible = await tooltip.isVisible({ timeout: 3000 }).catch(() => false);
+        // NOTE: Wildcard chips may not be rendered as separate DOM elements in current implementation
+        // The tokenization shows wildcards inline in text (e.g., [<:TIMESTAMP>])
+        // This test verifies the feature without blocking if DOM structure changes
+        testLogger.info(`Wildcard chip element visible: ${chipVisible}`);
 
-                    // ASSERTION: Tooltip should be visible on hover
-                    expect(tooltipVisible).toBeTruthy();
+        if (chipVisible) {
+            // Hover over the chip
+            await wildcardChip.hover();
+            await page.waitForTimeout(1000);
 
-                    if (tooltipVisible) {
-                        const tooltipText = await tooltip.innerText();
-                        testLogger.info(`Tooltip content: ${tooltipText.substring(0, 100)}`);
+            // Check for tooltip/popover
+            const tooltip = await pm.logsPage.getTooltip();
+            const tooltipVisible = await tooltip.isVisible({ timeout: 3000 }).catch(() => false);
 
-                        // ASSERTION: Tooltip should have content
-                        expect(tooltipText.length).toBeGreaterThan(0);
-                    }
+            // ASSERTION: Tooltip should be visible on hover
+            expect(tooltipVisible).toBeTruthy();
 
-                    await page.screenshot({ path: 'playwright-results/pattern-wildcard-tooltip.png', fullPage: true });
-                    testLogger.info('✅ Wildcard chip tooltip verified');
-                } else {
-                    // Wildcard chips not rendered as hover-able elements in current UI
-                    // Verify wildcards exist in text instead
-                    const firstPattern = await pm.logsPage.getPatternCardTemplateText(0);
-                    const hasWildcards = firstPattern.includes('<:') || firstPattern.includes('<*>');
+            if (tooltipVisible) {
+                const tooltipText = await tooltip.innerText();
+                testLogger.info(`Tooltip content: ${tooltipText.substring(0, 100)}`);
 
-                    // ASSERTION: Wildcards should exist in pattern text
-                    expect(hasWildcards).toBeTruthy();
-                    testLogger.info('✅ Wildcard tokenization verified in pattern text (chips not hover-able)');
-                }
-            } else {
-                testLogger.info('No pattern cards found for tooltip test');
+                // ASSERTION: Tooltip should have content
+                expect(tooltipText.length).toBeGreaterThan(0);
             }
+
+            await page.screenshot({ path: 'playwright-results/pattern-wildcard-tooltip.png', fullPage: true });
+            testLogger.info('✅ Wildcard chip tooltip verified');
         } else {
-            testLogger.info('No patterns found - skipping tooltip test');
+            // Wildcard chips not rendered as hover-able elements in current UI
+            // Verify wildcards exist in text instead
+            const firstPattern = await pm.logsPage.getPatternCardTemplateText(0);
+            const hasWildcards = firstPattern.includes('<:') || firstPattern.includes('<*>');
+
+            // ASSERTION: Wildcards should exist in pattern text
+            expect(hasWildcards).toBeTruthy();
+            testLogger.info('✅ Wildcard tokenization verified in pattern text (chips not hover-able)');
         }
 
         testLogger.info('PASSED: Wildcard chip tooltip test complete');
@@ -785,30 +781,28 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
         const result = await pm.logsPage.waitForPatternsToLoad(60000);
 
-        if (result === 'patterns' || result === 'statistics') {
-            const cardCount = await pm.logsPage.getPatternCardCount();
+        // ASSERTION: Patterns must be available for this test
+        expect(['patterns', 'statistics']).toContain(result);
 
-            if (cardCount > 0) {
-                // Get anomaly column data
-                const anomalyData = await pm.logsPage.getAnomalyColumnData();
+        const cardCount = await pm.logsPage.getPatternCardCount();
 
-                const patternsWithAnomalies = anomalyData.filter(d => d.hasIcon || d.hasWarning).length;
-                testLogger.info(`Patterns with anomaly indicators: ${patternsWithAnomalies}/${cardCount}`);
-                testLogger.info(`Anomaly data: ${JSON.stringify(anomalyData.slice(0, 3))}`);
+        // ASSERTION: Must have patterns to test anomaly badges
+        expect(cardCount).toBeGreaterThan(0);
 
-                await page.screenshot({ path: 'playwright-results/pattern-anomaly-badges.png', fullPage: true });
+        // Get anomaly column data
+        const anomalyData = await pm.logsPage.getAnomalyColumnData();
 
-                // ASSERTION: At least one pattern should have anomaly indicators
-                // (Test data includes rare ERROR patterns that should trigger anomaly detection)
-                expect(patternsWithAnomalies).toBeGreaterThan(0);
+        const patternsWithAnomalies = anomalyData.filter(d => d.hasIcon || d.hasWarning).length;
+        testLogger.info(`Patterns with anomaly indicators: ${patternsWithAnomalies}/${cardCount}`);
+        testLogger.info(`Anomaly data: ${JSON.stringify(anomalyData.slice(0, 3))}`);
 
-                testLogger.info('✅ Anomaly detection indicators found and verified');
-            } else {
-                testLogger.info('No pattern cards found for anomaly badge verification');
-            }
-        } else {
-            testLogger.info('No patterns found - skipping anomaly badge test');
-        }
+        await page.screenshot({ path: 'playwright-results/pattern-anomaly-badges.png', fullPage: true });
+
+        // ASSERTION: At least one pattern should have anomaly indicators
+        // (Test data includes rare ERROR patterns that should trigger anomaly detection)
+        expect(patternsWithAnomalies).toBeGreaterThan(0);
+
+        testLogger.info('✅ Anomaly detection indicators found and verified');
 
         testLogger.info('PASSED: Anomaly detection badge test complete');
     });
@@ -837,40 +831,38 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
         const result = await pm.logsPage.waitForPatternsToLoad(60000);
 
-        if (result === 'patterns' || result === 'statistics') {
-            const cardCount = await pm.logsPage.getPatternCardCount();
+        // ASSERTION: Patterns must be available for this test
+        expect(['patterns', 'statistics']).toContain(result);
 
-            if (cardCount > 0) {
-                // Open pattern details dialog
-                await pm.logsPage.clickPatternDetailsIcon(0);
-                await pm.logsPage.expectPatternDetailsDialogOpen();
+        const cardCount = await pm.logsPage.getPatternCardCount();
 
-                // Check for statistical information in the dialog
-                const dialogContent = await pm.logsPage.getPatternDetailsDialogContent();
+        // ASSERTION: Must have patterns to test statistics
+        expect(cardCount).toBeGreaterThan(0);
 
-                // Look for statistical terms
-                const hasFrequency = dialogContent.toLowerCase().includes('frequency') ||
-                                   dialogContent.toLowerCase().includes('occurrences');
-                const hasPercentage = dialogContent.includes('%');
-                const hasStats = dialogContent.toLowerCase().includes('z-score') ||
-                               dialogContent.toLowerCase().includes('average') ||
-                               dialogContent.toLowerCase().includes('rare');
+        // Open pattern details dialog
+        await pm.logsPage.clickPatternDetailsIcon(0);
+        await pm.logsPage.expectPatternDetailsDialogOpen();
 
-                testLogger.info(`Dialog statistics - Frequency: ${hasFrequency}, Percentage: ${hasPercentage}, Stats: ${hasStats}`);
+        // Check for statistical information in the dialog
+        const dialogContent = await pm.logsPage.getPatternDetailsDialogContent();
 
-                await page.screenshot({ path: 'playwright-results/pattern-details-statistics.png', fullPage: true });
+        // Look for statistical terms
+        const hasFrequency = dialogContent.toLowerCase().includes('frequency') ||
+                           dialogContent.toLowerCase().includes('occurrences');
+        const hasPercentage = dialogContent.includes('%');
+        const hasStats = dialogContent.toLowerCase().includes('z-score') ||
+                       dialogContent.toLowerCase().includes('average') ||
+                       dialogContent.toLowerCase().includes('rare');
 
-                // ASSERTION: Dialog should contain at least frequency and percentage
-                expect(hasFrequency || hasPercentage).toBeTruthy();
+        testLogger.info(`Dialog statistics - Frequency: ${hasFrequency}, Percentage: ${hasPercentage}, Stats: ${hasStats}`);
 
-                await pm.logsPage.closePatternDetailsDialog();
-                testLogger.info('Pattern statistics verified in details dialog');
-            } else {
-                testLogger.info('No pattern cards found for statistics test');
-            }
-        } else {
-            testLogger.info('No patterns found - skipping statistics test');
-        }
+        await page.screenshot({ path: 'playwright-results/pattern-details-statistics.png', fullPage: true });
+
+        // ASSERTION: Dialog should contain at least frequency and percentage
+        expect(hasFrequency || hasPercentage).toBeTruthy();
+
+        await pm.logsPage.closePatternDetailsDialog();
+        testLogger.info('Pattern statistics verified in details dialog');
 
         testLogger.info('PASSED: Pattern statistics test complete');
     });
