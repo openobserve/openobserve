@@ -2666,7 +2666,8 @@
     "errorGettingResults": "Erreur lors de l'obtention des résultats",
     "discardChangesTitle": "Ignorer les modifications",
     "deleteNodeTitle": "Supprimer le nœud",
-    "deleteNodeLlmEvalConfirm": "Êtes-vous sûr de vouloir supprimer ce nœud d'évaluation LLM ?"
+    "deleteNodeLlmEvalConfirm": "Êtes-vous sûr de vouloir supprimer ce nœud d'évaluation LLM ?",
+    "evalTemplates": "Modèles d'évaluation"
   },
   "reports": {
     "header": "Rapports",

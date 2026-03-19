@@ -2666,7 +2666,8 @@
     "errorGettingResults": "Fout bij het verkrijgen van resultaten",
     "discardChangesTitle": "Wijzigingen negeren",
     "deleteNodeTitle": "Knooppunt verwijderen",
-    "deleteNodeLlmEvalConfirm": "Weet u zeker dat u dit LLM-evaluatieknooppunt wilt verwijderen?"
+    "deleteNodeLlmEvalConfirm": "Weet u zeker dat u dit LLM-evaluatieknooppunt wilt verwijderen?",
+    "evalTemplates": "Evaluatiesjablonen"
   },
   "reports": {
     "header": "Rapporten",

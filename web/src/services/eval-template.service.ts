@@ -63,14 +63,14 @@ class EvalTemplateService {
   }
 
   /**
-   * Get a specific template by agent_type
+   * Get a specific template by UUID
    */
   async getTemplate(
     orgId: string,
-    agentType: string,
+    templateId: string,
   ): Promise<TemplateResponse> {
     try {
-      const url = `${this.getBaseURL(orgId)}/${agentType}`;
+      const url = `${this.getBaseURL(orgId)}/${templateId}`;
       const response = await http().get(url);
       return response.data;
     } catch (error) {
@@ -97,15 +97,15 @@ class EvalTemplateService {
   }
 
   /**
-   * Update an existing template
+   * Update an existing template by UUID
    */
   async updateTemplate(
     orgId: string,
-    agentType: string,
+    templateId: string,
     request: CreateTemplateRequest,
   ): Promise<TemplateResponse> {
     try {
-      const url = `${this.getBaseURL(orgId)}/${agentType}`;
+      const url = `${this.getBaseURL(orgId)}/${templateId}`;
       const response = await http().put(url, request);
       return response.data;
     } catch (error) {
@@ -115,11 +115,11 @@ class EvalTemplateService {
   }
 
   /**
-   * Delete a template
+   * Delete a template by UUID
    */
-  async deleteTemplate(orgId: string, agentType: string): Promise<void> {
+  async deleteTemplate(orgId: string, templateId: string): Promise<void> {
     try {
-      const url = `${this.getBaseURL(orgId)}/${agentType}`;
+      const url = `${this.getBaseURL(orgId)}/${templateId}`;
       await http().delete(url);
     } catch (error) {
       console.error("Failed to delete template:", error);
@@ -128,14 +128,14 @@ class EvalTemplateService {
   }
 
   /**
-   * Get usage statistics for a template
+   * Get usage statistics for a template by UUID
    */
   async getTemplateStats(
     orgId: string,
-    agentType: string,
+    templateId: string,
   ): Promise<TemplateStats> {
     try {
-      const url = `${this.getBaseURL(orgId)}/${agentType}/stats`;
+      const url = `${this.getBaseURL(orgId)}/${templateId}/stats`;
       const response = await http().get(url);
       return response.data;
     } catch (error) {
@@ -154,7 +154,7 @@ class EvalTemplateService {
     try {
       const url = this.getBaseURL(orgId);
       const response = await http().get(url);
-      return (response.data || []).filter((t) => t.agent_type === agentType);
+      return (response.data || []).filter((t: TemplateResponse) => t.agent_type === agentType);
     } catch (error) {
       console.error("Failed to get templates for comparison:", error);
       throw error;
