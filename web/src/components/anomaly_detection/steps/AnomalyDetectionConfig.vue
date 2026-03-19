@@ -181,6 +181,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               SQL is required in custom SQL mode
             </div>
             <div
+              v-if="hasTimestampAlias"
+              class="text-red-8 q-pt-xs"
+              data-test="anomaly-custom-sql-timestamp-alias-error"
+              style="font-size: 11px; line-height: 12px"
+            >
+              <code>{{
+                store.state.zoConfig.timestamp_column || "_timestamp"
+              }}</code>
+              cannot be used as a column alias. Use
+              <code>time_bucket</code> instead.
+            </div>
+            <div
               class="text-caption tw:mt-1"
               :class="
                 store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
@@ -689,7 +701,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, type PropType } from "vue";
+import { computed, defineComponent, ref, watch, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import streamService from "@/services/stream";
@@ -739,6 +751,18 @@ export default defineComponent({
       { label: "7 days", value: 7 },
       { label: "14 days", value: 14 },
     ];
+
+    // Check if the custom SQL uses the timestamp column name as an alias
+    const hasTimestampAlias = computed(() => {
+      const sql = props.config.custom_sql;
+      if (!sql || props.config.query_mode !== "custom_sql") return false;
+      const tsCol = store.state.zoConfig.timestamp_column || "_timestamp";
+      const escaped = tsCol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(
+        `\\bAS\\s+["'\`]?${escaped}["'\`]?\\s*(?:,|\\s|$)`,
+        "i",
+      ).test(sql);
+    });
 
     // Build default SQL template for a given stream name and histogram interval
     const buildDefaultSql = (
@@ -919,6 +943,9 @@ export default defineComponent({
         props.config.query_mode === "custom_sql" &&
         !props.config.custom_sql
       ) {
+        return false;
+      }
+      if (hasTimestampAlias.value) {
         return false;
       }
       if (
@@ -1173,6 +1200,7 @@ export default defineComponent({
       addFilter,
       removeFilter,
       validate,
+      hasTimestampAlias,
       thresholdRange,
       onThresholdRangeChange,
       previewActive,
