@@ -159,27 +159,27 @@ pub async fn delete(
     Ok(())
 }
 
-/// Returns the primary-key `id` of the folder identified by its slug and type.
+/// Returns the primary-key `id` of the folder identified by its name and type.
 ///
 /// Service-layer code that needs to store a proper FK (consistent with the alerts
 /// table, which stores `folders.id` not `folders.folder_id`) should use this instead
 /// of the `pub(crate)` `get_model` helper.
-pub async fn get_pk_by_slug(
+pub async fn get_pk_by_name(
     org_id: &str,
-    slug: &str,
+    name: &str,
     folder_type: FolderType,
 ) -> Result<Option<String>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Ok(get_model(client, org_id, slug, folder_type)
+    Ok(get_model(client, org_id, name, folder_type)
         .await?
         .map(|m| m.id))
 }
 
-/// Returns the folder slug (`folder_id` column) for the given primary-key `id`.
+/// Returns the folder name (`folder_id` column) for the given primary-key `id`.
 ///
-/// Used to translate the stored PK back to the user-visible slug when building
+/// Used to translate the stored PK back to the user-visible name when building
 /// API responses for anomaly detection configs.
-pub async fn get_slug_by_pk(pk: &str) -> Result<Option<String>, errors::Error> {
+pub async fn get_name_by_pk(pk: &str) -> Result<Option<String>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Ok(Entity::find_by_id(pk)
         .one(client)
@@ -187,11 +187,13 @@ pub async fn get_slug_by_pk(pk: &str) -> Result<Option<String>, errors::Error> {
         .map(|m| m.folder_id))
 }
 
-/// Returns `(folder_id slug, display name)` for the given primary-key `id`.
+/// Returns `(folder name, display name)` for the given primary-key `id`.
 ///
 /// Both values are needed when building API list responses for anomaly configs
 /// (mirrors the `folder_id` + `folder_name` fields returned for regular alerts).
-pub async fn get_slug_and_name_by_pk(pk: &str) -> Result<Option<(String, String)>, errors::Error> {
+pub async fn get_name_and_display_name_by_pk(
+    pk: &str,
+) -> Result<Option<(String, String)>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Ok(Entity::find_by_id(pk)
         .one(client)
