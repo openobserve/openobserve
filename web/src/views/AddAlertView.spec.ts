@@ -160,6 +160,7 @@ describe('AddAlertView.vue', () => {
       query: {
         org_identifier: 'test-org',
         folder: 'default',
+        tab: 'all',
       },
     });
   });

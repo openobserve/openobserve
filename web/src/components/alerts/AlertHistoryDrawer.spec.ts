@@ -132,9 +132,6 @@ describe("AlertHistoryDrawer.vue", () => {
         wrapper.find('[data-test="alert-details-title"]').exists(),
       ).toBe(true);
       expect(
-        wrapper.find('[data-test="alert-details-edit-btn"]').exists(),
-      ).toBe(true);
-      expect(
         wrapper.find('[data-test="alert-details-close-btn"]').exists(),
       ).toBe(true);
       expect(
@@ -438,18 +435,6 @@ describe("AlertHistoryDrawer.vue", () => {
   });
 
   describe("Actions", () => {
-    it("should emit edit event when edit button is clicked", async () => {
-      await mountComponent();
-
-      const editBtn = wrapper.find(
-        '[data-test="alert-details-edit-btn"]',
-      );
-      await editBtn.trigger("click");
-
-      expect(wrapper.emitted("edit")).toBeTruthy();
-      expect(wrapper.emitted("edit")![0]).toEqual([mockAlertDetails]);
-    });
-
     it("should not crash when alertDetails is null", async () => {
       await mountComponent({
         alertDetails: null,
