@@ -35,10 +35,10 @@ use datafusion::{
     physical_optimizer::PhysicalOptimizerRule,
     physical_plan::{
         ExecutionPlan, PhysicalExpr,
-        expressions::{BinaryExpr, Column, InListExpr, NotExpr},
+        expressions::{BinaryExpr, InListExpr, Literal, NotExpr},
         filter::FilterExec,
-        projection::ProjectionExec,
     },
+    scalar::ScalarValue,
 };
 use parking_lot::Mutex;
 
@@ -222,31 +222,21 @@ fn construct_filter_exec(
     exprs: Vec<Arc<dyn PhysicalExpr>>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     if exprs.is_empty() {
-        match filter.projection() {
-            Some(projection_indices) => {
-                let filter_child_schema = filter.input().schema();
-                let proj_exprs = projection_indices
-                    .iter()
-                    .map(|p| {
-                        let field = filter_child_schema.field(*p).clone();
-                        (
-                            Arc::new(Column::new(field.name(), *p)) as Arc<dyn PhysicalExpr>,
-                            field.name().to_string(),
-                        )
-                    })
-                    .collect::<Vec<_>>();
-                Ok(Arc::new(ProjectionExec::try_new(
-                    proj_exprs,
-                    filter.input().clone(),
-                )?))
-            }
-            None => Ok(filter.input().clone()),
-        }
+        let plan = FilterExec::try_new(
+            Arc::new(Literal::new(ScalarValue::Boolean(Some(true)))),
+            filter.input().clone(),
+        )?
+        .with_projection(filter.projection().cloned())?
+        .with_fetch(filter.fetch())
+        .expect("Fetch is not set");
+        Ok(plan)
     } else {
         // TODO: remove the unused column after extract index condition
         let plan = FilterExec::try_new(conjunction(exprs), filter.input().clone())?
-            .with_projection(filter.projection().cloned())?;
-        Ok(Arc::new(plan))
+            .with_projection(filter.projection().cloned())?
+            .with_fetch(filter.fetch())
+            .expect("Fetch is not set");
+        Ok(plan)
     }
 }
 
