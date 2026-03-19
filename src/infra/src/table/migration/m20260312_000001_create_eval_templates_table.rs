@@ -78,9 +78,10 @@ fn create_eval_templates_table_statement() -> TableCreateStatement {
     Table::create()
         .table(EvalTemplates::Table)
         .if_not_exists()
+        // The ID is 27-character human readable KSUID.
         .col(
             ColumnDef::new(EvalTemplates::Id)
-                .string_len(36)
+                .char_len(27)
                 .not_null()
                 .primary_key(),
         )

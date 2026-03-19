@@ -86,7 +86,7 @@ flat icon="cancel"></q-btn>
           <q-select
             v-model="selectedTemplate"
             :options="availableTemplates"
-            option-value="agent_type"
+            option-value="id"
             option-label="name"
             :label="t('pipeline.evaluationTemplate')"
             color="input-border"
@@ -300,7 +300,7 @@ export default defineComponent({
           if (cached && cached.length > 0) {
             availableTemplates.value = cached;
             if (!selectedTemplate.value) {
-              selectedTemplate.value = cached[0].agent_type;
+              selectedTemplate.value = cached[0].id;
             }
             return;
           }
@@ -325,7 +325,7 @@ export default defineComponent({
           !selectedTemplate.value &&
           !pipelineObj.isEditNode
         ) {
-          selectedTemplate.value = templates[0].agent_type;
+          selectedTemplate.value = templates[0].id;
         }
       } catch (e) {
         console.error("Failed to fetch evaluation templates:", e);

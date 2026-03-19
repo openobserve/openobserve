@@ -2618,7 +2618,8 @@
     "errorGettingResults": "获取结果时出错",
     "discardChangesTitle": "放弃更改",
     "deleteNodeTitle": "删除节点",
-    "deleteNodeLlmEvalConfirm": "您确定要删除此 LLM 评估节点吗？"
+    "deleteNodeLlmEvalConfirm": "您确定要删除此 LLM 评估节点吗？",
+    "evalTemplates": "评估模板"
   },
   "reports": {
     "header": "报表",
