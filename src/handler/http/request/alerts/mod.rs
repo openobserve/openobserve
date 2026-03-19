@@ -831,7 +831,12 @@ pub async fn list_alerts(
     let name_substring = query.alert_name_substring.clone();
     #[cfg(feature = "enterprise")]
     let page_size_and_idx = query.page_size.map(|s| (s, query.page_idx.unwrap_or(0)));
+
+    #[cfg(not(feature = "enterprise"))]
     let params = query.into(&org_id);
+    #[cfg(feature = "enterprise")]
+    let mut params = query.into(&org_id);
+
     let alert_type = params.alert_type;
 
     // In enterprise builds, pagination is applied after merging regular alerts with
