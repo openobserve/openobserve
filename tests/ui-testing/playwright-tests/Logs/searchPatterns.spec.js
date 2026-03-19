@@ -586,40 +586,38 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
         const result = await pm.logsPage.waitForPatternsToLoad(60000);
 
-        if (result === 'patterns' || result === 'statistics') {
-            const cardCount = await pm.logsPage.getPatternCardCount();
+        // CRITICAL: P0 test must have pattern data to be meaningful
+        expect(['patterns', 'statistics']).toContain(result);
 
-            if (cardCount > 0) {
-                // Get all pattern templates
-                const patternTemplates = [];
-                for (let i = 0; i < cardCount; i++) {
-                    const template = await pm.logsPage.getPatternCardTemplateText(i);
-                    patternTemplates.push(template);
-                }
+        const cardCount = await pm.logsPage.getPatternCardCount();
 
-                testLogger.info(`Total patterns found: ${cardCount}`);
-                testLogger.info(`Pattern templates: ${patternTemplates.map(t => t.substring(0, 50)).join(', ')}`);
+        // STRONG ASSERTION: Must have patterns for duplicate check (P0 test)
+        expect(cardCount).toBeGreaterThan(0);
 
-                // Check for duplicates
-                const uniqueTemplates = [...new Set(patternTemplates)];
-                const duplicateCount = cardCount - uniqueTemplates.length;
-
-                testLogger.info(`Unique patterns: ${uniqueTemplates.length}`);
-                testLogger.info(`Duplicate patterns: ${duplicateCount}`);
-
-                // STRONG ASSERTION: No duplicates should exist
-                expect(duplicateCount).toBe(0);
-                expect(uniqueTemplates.length).toBe(cardCount);
-
-                await page.screenshot({ path: 'playwright-results/pattern-no-duplicates.png', fullPage: true });
-
-                testLogger.info('✅ VERIFIED: All patterns are unique, no duplicates found');
-            } else {
-                testLogger.info('No pattern cards found for duplicate check');
-            }
-        } else {
-            testLogger.info('No patterns found - skipping duplicate test');
+        // Get all pattern templates
+        const patternTemplates = [];
+        for (let i = 0; i < cardCount; i++) {
+            const template = await pm.logsPage.getPatternCardTemplateText(i);
+            patternTemplates.push(template);
         }
+
+        testLogger.info(`Total patterns found: ${cardCount}`);
+        testLogger.info(`Pattern templates: ${patternTemplates.map(t => t.substring(0, 50)).join(', ')}`);
+
+        // Check for duplicates
+        const uniqueTemplates = [...new Set(patternTemplates)];
+        const duplicateCount = cardCount - uniqueTemplates.length;
+
+        testLogger.info(`Unique patterns: ${uniqueTemplates.length}`);
+        testLogger.info(`Duplicate patterns: ${duplicateCount}`);
+
+        // STRONG ASSERTION: No duplicates should exist
+        expect(duplicateCount).toBe(0);
+        expect(uniqueTemplates.length).toBe(cardCount);
+
+        await page.screenshot({ path: 'playwright-results/pattern-no-duplicates.png', fullPage: true });
+
+        testLogger.info('✅ VERIFIED: All patterns are unique, no duplicates found');
 
         testLogger.info('PASSED: No duplicate patterns test complete');
     });
@@ -714,8 +712,14 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
             if (cardCount > 0) {
                 // Find wildcard chips
                 const wildcardChip = await pm.logsPage.getWildcardChip();
+                const chipVisible = await wildcardChip.isVisible().catch(() => false);
 
-                if (await wildcardChip.isVisible().catch(() => false)) {
+                // NOTE: Wildcard chips may not be rendered as separate DOM elements in current implementation
+                // The tokenization shows wildcards inline in text (e.g., [<:TIMESTAMP>])
+                // This test verifies the feature without blocking if DOM structure changes
+                testLogger.info(`Wildcard chip element visible: ${chipVisible}`);
+
+                if (chipVisible) {
                     // Hover over the chip
                     await wildcardChip.hover();
                     await page.waitForTimeout(1000);
@@ -724,15 +728,28 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
                     const tooltip = await pm.logsPage.getTooltip();
                     const tooltipVisible = await tooltip.isVisible({ timeout: 3000 }).catch(() => false);
 
+                    // ASSERTION: Tooltip should be visible on hover
+                    expect(tooltipVisible).toBeTruthy();
+
                     if (tooltipVisible) {
                         const tooltipText = await tooltip.innerText();
                         testLogger.info(`Tooltip content: ${tooltipText.substring(0, 100)}`);
+
+                        // ASSERTION: Tooltip should have content
+                        expect(tooltipText.length).toBeGreaterThan(0);
                     }
 
                     await page.screenshot({ path: 'playwright-results/pattern-wildcard-tooltip.png', fullPage: true });
-                    testLogger.info('Wildcard chip tooltip interaction tested');
+                    testLogger.info('✅ Wildcard chip tooltip verified');
                 } else {
-                    testLogger.info('No wildcard chips found to hover');
+                    // Wildcard chips not rendered as hover-able elements in current UI
+                    // Verify wildcards exist in text instead
+                    const firstPattern = await pm.logsPage.getPatternCardTemplateText(0);
+                    const hasWildcards = firstPattern.includes('<:') || firstPattern.includes('<*>');
+
+                    // ASSERTION: Wildcards should exist in pattern text
+                    expect(hasWildcards).toBeTruthy();
+                    testLogger.info('✅ Wildcard tokenization verified in pattern text (chips not hover-able)');
                 }
             } else {
                 testLogger.info('No pattern cards found for tooltip test');
@@ -781,11 +798,11 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
                 await page.screenshot({ path: 'playwright-results/pattern-anomaly-badges.png', fullPage: true });
 
-                if (patternsWithAnomalies > 0) {
-                    testLogger.info('✅ Anomaly detection indicators found and verified');
-                } else {
-                    testLogger.info('No anomaly indicators found (may not have rare patterns in current data)');
-                }
+                // ASSERTION: At least one pattern should have anomaly indicators
+                // (Test data includes rare ERROR patterns that should trigger anomaly detection)
+                expect(patternsWithAnomalies).toBeGreaterThan(0);
+
+                testLogger.info('✅ Anomaly detection indicators found and verified');
             } else {
                 testLogger.info('No pattern cards found for anomaly badge verification');
             }
