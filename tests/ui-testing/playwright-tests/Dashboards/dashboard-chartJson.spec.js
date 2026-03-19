@@ -10,9 +10,6 @@ const testLogger = require('../utils/test-logger.js');
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
-const randomDashboardNameCustom =
-  "Dashboard_" + Math.random().toString(36).substr(2, 9);
-
 test.describe.configure({ mode: "parallel" });
 
 // Refactored test cases using Page Object Model
@@ -113,6 +110,7 @@ test.describe("dashboard custom query mode field options testcases", () => {
     tag: ['@dashboardChartJson', '@customMode', '@P0']
   }, async ({ page }) => {
     const pm = new PageManager(page);
+    const dashName = "Dashboard_" + Math.random().toString(36).substr(2, 9);
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("custom-nontimestamp");
 
@@ -123,7 +121,7 @@ test.describe("dashboard custom query mode field options testcases", () => {
     await waitForDashboardPage(page);
 
     // Create a new dashboard and add panel
-    await pm.dashboardCreate.createDashboard(randomDashboardNameCustom);
+    await pm.dashboardCreate.createDashboard(dashName);
     await pm.dashboardCreate.addPanel();
 
     // Select table chart type and switch to custom query mode
@@ -162,7 +160,7 @@ test.describe("dashboard custom query mode field options testcases", () => {
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.dashboardPanelActions.savePanel();
     await pm.dashboardCreate.backToDashboardList();
-    await deleteDashboard(page, randomDashboardNameCustom);
+    await deleteDashboard(page, dashName);
   });
 
   test("Should show 'Render Data as JSON / Array' checkbox in custom query mode for table chart", {
@@ -265,8 +263,9 @@ test.describe("dashboard custom query mode field options testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify JSON data is rendered in the table (element may be in overflow, check DOM presence)
-    await expect(page.locator('.json-field-renderer')).toHaveCount(1, { timeout: 30000 }).catch(() => {});
-    const jsonCount = await page.locator('.json-field-renderer').count();
+    const jsonRenderers = page.locator('.json-field-renderer');
+    await jsonRenderers.first().waitFor({ state: 'attached', timeout: 30000 });
+    const jsonCount = await jsonRenderers.count();
     expect(jsonCount).toBeGreaterThan(0);
 
     testLogger.info('JSON data rendered successfully in custom query mode', { jsonCount });
@@ -370,22 +369,24 @@ test.describe("dashboard custom query mode field options testcases", () => {
     await pm.chartTypeSelector.openFieldPropertyPopup("x_axis_1", "x");
 
     // Read initial states of both checkboxes
-    const nonTimestampInitial = await pm.chartTypeSelector.treatAsNonTimestampCheckbox.getAttribute('aria-checked');
-    const jsonInitial = await pm.chartTypeSelector.showFieldAsJsonCheckbox.getAttribute('aria-checked');
+    const nonTimestampBefore = await pm.chartTypeSelector.treatAsNonTimestampCheckbox.isChecked();
+    const jsonBefore = await pm.chartTypeSelector.showFieldAsJsonCheckbox.isChecked();
 
     // Toggle "Mark this field as non-timestamp" and verify state changed
     await pm.chartTypeSelector.toggleTreatAsNonTimestamp();
-    const nonTimestampAfter = nonTimestampInitial === 'true' ? 'false' : 'true';
-    await expect(pm.chartTypeSelector.treatAsNonTimestampCheckbox).toHaveAttribute('aria-checked', nonTimestampAfter);
+    const nonTimestampAfter = await pm.chartTypeSelector.treatAsNonTimestampCheckbox.isChecked();
+    expect(nonTimestampAfter).not.toBe(nonTimestampBefore);
 
     // Toggle "Render Data as JSON / Array" and verify state changed
     await pm.chartTypeSelector.toggleShowFieldAsJson();
-    const jsonAfter = jsonInitial === 'true' ? 'false' : 'true';
-    await expect(pm.chartTypeSelector.showFieldAsJsonCheckbox).toHaveAttribute('aria-checked', jsonAfter);
+    const jsonAfter = await pm.chartTypeSelector.showFieldAsJsonCheckbox.isChecked();
+    expect(jsonAfter).not.toBe(jsonBefore);
 
     // Verify both remain in their toggled state simultaneously
-    await expect(pm.chartTypeSelector.treatAsNonTimestampCheckbox).toHaveAttribute('aria-checked', nonTimestampAfter);
-    await expect(pm.chartTypeSelector.showFieldAsJsonCheckbox).toHaveAttribute('aria-checked', jsonAfter);
+    const nonTimestampFinal = await pm.chartTypeSelector.treatAsNonTimestampCheckbox.isChecked();
+    const jsonFinal = await pm.chartTypeSelector.showFieldAsJsonCheckbox.isChecked();
+    expect(nonTimestampFinal).toBe(nonTimestampAfter);
+    expect(jsonFinal).toBe(jsonAfter);
 
     testLogger.info('Both checkboxes enabled simultaneously in custom mode');
 

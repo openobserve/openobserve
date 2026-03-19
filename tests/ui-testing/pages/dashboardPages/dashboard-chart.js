@@ -402,9 +402,8 @@ export default class ChartTypeSelector {
    * Toggle "Mark this field as non-timestamp" checkbox
    */
   async toggleTreatAsNonTimestamp() {
-    const checkbox = this.page.getByRole('checkbox', { name: 'Mark this field as non-timestamp' });
-    await checkbox.waitFor({ state: "visible", timeout: 10000 });
-    await checkbox.click();
+    await this.treatAsNonTimestampCheckbox.waitFor({ state: "visible", timeout: 10000 });
+    await this.treatAsNonTimestampCheckbox.click();
     testLogger.debug('Toggled treat as non-timestamp checkbox');
   }
 
@@ -412,9 +411,8 @@ export default class ChartTypeSelector {
    * Toggle "Render Data as JSON / Array" checkbox
    */
   async toggleShowFieldAsJson() {
-    const checkbox = this.page.getByRole('checkbox', { name: 'Render Data as JSON / Array' });
-    await checkbox.waitFor({ state: "visible", timeout: 10000 });
-    await checkbox.click();
+    await this.showFieldAsJsonCheckbox.waitFor({ state: "visible", timeout: 10000 });
+    await this.showFieldAsJsonCheckbox.click();
     testLogger.debug('Toggled show field as JSON checkbox');
   }
 
