@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="!destinations.length ? t('alerts.noDestinations') : ''"
             :label="t(`alerts.add`)"
             @click="activeTab === 'anomalyDetection'
-              ? router.push({ name: 'addAnomalyDetection', query: { org_identifier: store.state.selectedOrganization.identifier } })
+              ? router.push({ name: 'addAnomalyDetection', query: { org_identifier: store.state.selectedOrganization.identifier, folder: activeFolderId, tab: activeTab } })
               : showAddUpdateFn({})"
           />
         </div>
@@ -852,6 +852,12 @@ export default defineComponent({
     const { track } = useReo();
     const formData: Ref<Alert | {}> = ref({});
     const toBeClonedAlert: Ref<any> = ref({});
+    // Flag to skip clearing search state on the first folder emission after mount.
+    // When returning from add/edit screens, the FolderList emits the active folder
+    // which would normally clear restored search filters. This flag prevents that.
+    const isRestoringState = ref(!!store.state.alertListFilters.searchQuery
+      || !!store.state.alertListFilters.filterQuery
+      || !!store.state.alertListFilters.searchAcrossFolders);
     const showAddAlertDialog: any = ref(false);
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const selectedDelete: any = ref(null);
@@ -1186,9 +1192,10 @@ export default defineComponent({
     const allSelectedAlerts = ref(false);
     const allAlerts: Ref<any[]> = ref([]);
 
-    const searchQuery = ref<any>("");
-    const filterQuery = ref<any>("");
-    const searchAcrossFolders = ref<any>(false);
+    const savedFilters = store.state.alertListFilters;
+    const searchQuery = ref<any>(savedFilters.searchQuery || "");
+    const filterQuery = ref<any>(savedFilters.filterQuery || "");
+    const searchAcrossFolders = ref<any>(savedFilters.searchAcrossFolders || false);
     const selectedAlertToMove: Ref<any[]> = ref([]);
     const selectedAnomalyConfigsToMove: Ref<any[]> = ref([]);
     const folderIdToBeCloned = ref<any>(router.currentRoute.value.query.folder ?? "default");
@@ -1874,7 +1881,12 @@ export default defineComponent({
       //this is done to avoid multiple api calls , when we assign the folderId before fetching it will trigger the watch and it will fetch the alerts again
       //and we dont need to fetch the alerts again because we are already fetching the alerts in the getAlertsFn
       const resolvedFolderId = folderId || activeFolderId.value || "default";
+      // Always fetch the latest alerts for the folder from backend
       await getAlertsFn(store, resolvedFolderId);
+      // Re-apply active search/filter on the freshly fetched data
+      if (filterQuery.value) {
+        filterAlertsByQuery(filterQuery.value);
+      }
       await hideForm();
       activeFolderId.value = resolvedFolderId;
     };
@@ -1885,6 +1897,7 @@ export default defineComponent({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           folder: activeFolderId.value,
+          tab: activeTab.value,
         },
       });
       track("Button Click", {
@@ -2156,11 +2169,37 @@ export default defineComponent({
 
     const updateActiveFolderId = async (newVal: any) => {
       //this is the condition we kept because when we we click on the any folder that is there in the the row when we do search across folders
-      //at that time if it is the same folder it wont trigger the watch and it will show the alerts of the filtered only 
+      //at that time if it is the same folder it wont trigger the watch and it will show the alerts of the filtered only
       //so we are fetching the alerts by the folderId and then filtering the alerts by the activeTab this is done explicitly on only if users clicks on same folder
       if(newVal == activeFolderId.value){
-        getAlertsByFolderId(store, newVal);
+        if (isRestoringState.value) {
+          // Force fresh fetch from backend (cache may be stale after add/edit on another route)
+          isRestoringState.value = false;
+          await getAlertsFn(store, newVal);
+          if (searchAcrossFolders.value && searchQuery.value) {
+            await getAlertsFn(store, activeFolderId.value, searchQuery.value);
+            filterAlertsByTab();
+          } else if (filterQuery.value) {
+            filterAlertsByQuery(filterQuery.value);
+          } else {
+            filterAlertsByTab();
+          }
+          return;
+        }
+        await getAlertsByFolderId(store, newVal);
         filterAlertsByTab();
+      }
+      // When restoring state from a prior navigation, skip clearing search filters
+      if (isRestoringState.value) {
+        isRestoringState.value = false;
+        await getAlertsFn(store, newVal);
+        if (filterQuery.value) {
+          filterAlertsByQuery(filterQuery.value);
+        } else {
+          filterAlertsByTab();
+        }
+        activeFolderId.value = newVal;
+        return;
       }
       //here we are resetting the searchQuery, filterQuery, searchAcrossFolders, allSelectedAlerts, selectedAlerts
       //here we only reset if the value is not null
@@ -2184,7 +2223,7 @@ export default defineComponent({
         await router.push({
           name: "editAnomalyDetection",
           params: { anomaly_id: row.alert_id },
-          query: { org_identifier: store.state.selectedOrganization.identifier },
+          query: { org_identifier: store.state.selectedOrganization.identifier, folder: activeFolderId.value, tab: activeTab.value },
         });
         return;
       }
@@ -2319,6 +2358,17 @@ export default defineComponent({
         searchQuery.value = null;
       }
     });
+    // Persist filter state to Vuex so it survives navigation to add/edit screens
+    watch(
+      [searchQuery, filterQuery, searchAcrossFolders],
+      () => {
+        store.commit("setAlertListFilters", {
+          searchQuery: searchQuery.value || "",
+          filterQuery: filterQuery.value || "",
+          searchAcrossFolders: !!searchAcrossFolders.value,
+        });
+      },
+    );
     watch(activeTab, async (newVal) => {
       //here we are resetting the filterQuery when the activeTab is changed
       //this is done because we need to trigger again the filterQuery watch

@@ -3070,6 +3070,7 @@ export default defineComponent({
           name: "alertList",
           query: {
             org_identifier: orgId,
+            folder: (activeFolderId.value as string) || "default",
             tab: "anomalyDetection",
           },
         });
