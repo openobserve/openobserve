@@ -104,8 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ml-sm o2-primary-button tw:h-[36px]"
             no-caps
             flat
-            :disable="activeTab !== 'anomalyDetection' && !destinations.length"
-            :title="activeTab !== 'anomalyDetection' && !destinations.length ? t('alerts.noDestinations') : ''"
+            :disable="!destinations.length || !templates.length"
+            :title="!destinations.length ? t('alerts.noDestinations') : ''"
             :label="t(`alerts.add`)"
             @click="activeTab === 'anomalyDetection'
               ? router.push({ name: 'addAnomalyDetection', query: { org_identifier: store.state.selectedOrganization.identifier } })
