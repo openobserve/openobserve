@@ -231,12 +231,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <PromQLChartConfig
           v-if="
             promqlMode &&
+            dashboardPanelData.data.type !== 'table' &&
             dashboardPanelData.data.type !== 'geomap' &&
             dashboardPanelData.data.type !== 'maps'
           "
           v-show="isConfigOptionVisible('general', 'promql-chart-config')"
           :chart-type="dashboardPanelData.data.type"
+          :is-config-option-visible="isConfigOptionVisible"
         />
+      </div>
+    </q-expansion-item>
+
+    <!-- Section: PromQL Table Configuration -->
+    <q-expansion-item
+      v-if="promqlMode && dashboardPanelData.data.type === 'table'"
+      v-show="isSectionVisible('promqlTable')"
+      :model-value="isExpanded('promqlTable')"
+      @update:model-value="
+        (v) => {
+          expandedSections.promqlTable = v;
+        }
+      "
+      :label="t('dashboard.configSectionPromqlTable')"
+      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      switch-toggle-side
+      expand-icon="chevron_right"
+      expanded-icon="keyboard_arrow_down"
+      expand-icon-class="text-grey-6"
+    >
+      <div class="config-section-body">
+        <PromQLChartConfig :chart-type="dashboardPanelData.data.type" />
       </div>
     </q-expansion-item>
 
