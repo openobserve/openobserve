@@ -758,8 +758,15 @@ pub fn build_quota_email_message(
     used: u64,
     limit: u64,
 ) -> (String, String) {
-    let display_name = if org_name.is_empty() { org_id } else { org_name };
-    let subject = format!("[OpenObserve] AI Credits: {}% used — {display_name}", checkpoint);
+    let display_name = if org_name.is_empty() {
+        org_id
+    } else {
+        org_name
+    };
+    let subject = format!(
+        "[OpenObserve] AI Credits: {}% used — {display_name}",
+        checkpoint
+    );
 
     let message = match (checkpoint, is_paid) {
         (80, false) => format!(
