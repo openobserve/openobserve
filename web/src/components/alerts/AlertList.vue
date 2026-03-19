@@ -855,9 +855,10 @@ export default defineComponent({
     // Flag to skip clearing search state on the first folder emission after mount.
     // When returning from add/edit screens, the FolderList emits the active folder
     // which would normally clear restored search filters. This flag prevents that.
-    const isRestoringState = ref(!!store.state.alertListFilters.searchQuery
-      || !!store.state.alertListFilters.filterQuery
-      || !!store.state.alertListFilters.searchAcrossFolders);
+    const savedAlertListFilters = store.state.alertListFilters || {};
+    const isRestoringState = ref(!!savedAlertListFilters.searchQuery
+      || !!savedAlertListFilters.filterQuery
+      || !!savedAlertListFilters.searchAcrossFolders);
     const showAddAlertDialog: any = ref(false);
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const selectedDelete: any = ref(null);
@@ -1192,10 +1193,9 @@ export default defineComponent({
     const allSelectedAlerts = ref(false);
     const allAlerts: Ref<any[]> = ref([]);
 
-    const savedFilters = store.state.alertListFilters;
-    const searchQuery = ref<any>(savedFilters.searchQuery || "");
-    const filterQuery = ref<any>(savedFilters.filterQuery || "");
-    const searchAcrossFolders = ref<any>(savedFilters.searchAcrossFolders || false);
+    const searchQuery = ref<any>(savedAlertListFilters.searchQuery || "");
+    const filterQuery = ref<any>(savedAlertListFilters.filterQuery || "");
+    const searchAcrossFolders = ref<any>(savedAlertListFilters.searchAcrossFolders || false);
     const selectedAlertToMove: Ref<any[]> = ref([]);
     const selectedAnomalyConfigsToMove: Ref<any[]> = ref([]);
     const folderIdToBeCloned = ref<any>(router.currentRoute.value.query.folder ?? "default");

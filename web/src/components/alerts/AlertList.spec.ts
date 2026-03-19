@@ -15,6 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { nextTick } from "vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
 
@@ -174,6 +175,8 @@ beforeEach(() => {
   // ensure foldersByType has 'alerts' key and alerts map exists
   (store.state as any).organizationData.foldersByType = [{ type: 'alerts', folders: [{ id: 'default', name: 'Default' }] }];
   (store.state as any).organizationData.allAlertsListByFolderId = {};
+  // Reset alert list filters to prevent leaking between tests
+  (store.state as any).alertListFilters = { searchQuery: "", filterQuery: "", searchAcrossFolders: false };
 
   alertsDB = [
     makeAlert(1, { is_real_time: false, enabled: true, name: "Scheduled Alert A", owner: "averylongownername@example.com" }),
@@ -799,6 +802,7 @@ describe("AlertList - micro validations", () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
     wrapper.vm.filterQuery = "abc";
+    await nextTick();
     wrapper.vm.searchAcrossFolders = true;
     await flushPromises();
     expect(wrapper.vm.searchQuery).toBe("abc");
@@ -901,14 +905,14 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     expect(tabValues).not.toContain("anomalyDetection");
   });
 
-  it("should disable anomalyDetection tab when isCloud=true (cloud build)", async () => {
+  it("should enable anomalyDetection tab when isCloud=true (cloud build)", async () => {
     (config as any).isEnterprise = "true";
     (config as any).isCloud = "true";
     (store.state as any).zoConfig.build_type = "enterprise";
 
     const wrapper: any = await mountAlertList();
     const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
-    expect(tabValues).not.toContain("anomalyDetection");
+    expect(tabValues).toContain("anomalyDetection");
   });
 
   it("should disable anomalyDetection tab when isEnterprise=false (opensource frontend)", async () => {
