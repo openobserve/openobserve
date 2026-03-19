@@ -118,7 +118,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import useTraces from "@/composables/useTraces";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
 import streamService from "@/services/stream";
@@ -147,8 +147,12 @@ const addSearchTerm = (term: string) => {
   searchObj.data.stream.addToFilter = term;
 };
 
+const showFtsFieldValues = computed(
+  () => store.state.zoConfig?.show_fts_field_values ?? false,
+);
+
 const openFilterCreator = (event: any, { name, ftsKey }: any) => {
-  if (ftsKey) {
+  if (ftsKey && !showFtsFieldValues.value) {
     event.stopPropagation();
     event.preventDefault();
     return;

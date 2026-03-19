@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- TODO OK : Repeated code make separate component to display field  -->
               <div
-                v-if="(props.row.ftsKey && !fieldValuesForFst) || !props.row.showValues"
+                v-if="(props.row.ftsKey && !showFtsFieldValues) || !props.row.showValues"
                 class="field-container flex content-center ellipsis q-pl-lg q-pr-sm hover:!tw-bg-[var(--o2-hover-accent)]"
                 :title="props.row.label || props.row.name"
               >
@@ -177,8 +177,8 @@ export default defineComponent({
       },
     });
 
-    const fieldValuesForFst = computed(
-      () => store.state.zoConfig?.field_values_for_fst ?? false,
+    const showFtsFieldValues = computed(
+      () => store.state.zoConfig?.show_fts_field_values ?? false,
     );
 
     const fnMarkerLabel = computed(() => {
@@ -250,7 +250,7 @@ export default defineComponent({
       fnMarkerLabel,
       duration,
       onStreamChange,
-      fieldValuesForFst,
+      showFtsFieldValues,
     };
   },
 });
