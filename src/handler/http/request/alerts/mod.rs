@@ -820,6 +820,8 @@ pub async fn list_alerts(
 
     #[cfg(feature = "enterprise")]
     let folder_slug = query.folder.clone();
+    #[cfg(feature = "enterprise")]
+    let alert_name_substring = query.alert_name_substring.clone();
     let params = query.into(&org_id);
     let alert_type = params.alert_type;
 
@@ -865,8 +867,12 @@ pub async fn list_alerts(
     if matches!(
         alert_type,
         AlertTypeFilter::All | AlertTypeFilter::AnomalyDetection
-    ) && let Ok(configs) =
-        crate::service::anomaly_detection::list_configs(&org_id, folder_slug.as_deref()).await
+    ) && let Ok(configs) = crate::service::anomaly_detection::list_configs(
+        &org_id,
+        folder_slug.as_deref(),
+        alert_name_substring.as_deref(),
+    )
+    .await
     {
         list.extend(configs.iter().filter_map(anomaly_config_to_list_item));
     }

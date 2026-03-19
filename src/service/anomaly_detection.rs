@@ -123,6 +123,7 @@ fn model_to_api_json(mut val: serde_json::Value) -> serde_json::Value {
 pub async fn list_configs(
     org_id: &str,
     folder_slug: Option<&str>,
+    name_substring: Option<&str>,
 ) -> Result<Vec<serde_json::Value>> {
     let db = ORM_CLIENT
         .get()
@@ -165,6 +166,17 @@ pub async fn list_configs(
             Some(pk) => configs.into_iter().filter(|m| m.folder_id == *pk).collect(),
             None => vec![],
         }
+    } else {
+        configs
+    };
+
+    // Filter by name substring (case-insensitive) when provided.
+    let configs: Vec<_> = if let Some(substr) = name_substring {
+        let lower = substr.to_lowercase();
+        configs
+            .into_iter()
+            .filter(|m| m.name.to_lowercase().contains(&lower))
+            .collect()
     } else {
         configs
     };
