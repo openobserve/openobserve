@@ -42,7 +42,66 @@ export function useConfigOptions(
         visible:
           !!promqlMode.value &&
           dashboardPanelData.data.type !== "geomap" &&
-          dashboardPanelData.data.type !== "maps",
+          dashboardPanelData.data.type !== "maps" &&
+          dashboardPanelData.data.type !== "table",
+      },
+    },
+    promqlTable: {
+      "promql-table-mode": {
+        label: t("dashboard.promqlTableMode"),
+        visible: !!promqlMode.value && dashboardPanelData.data.type === "table",
+      },
+      "table-aggregations": {
+        label: t("dashboard.tableAggregations"),
+        visible:
+          !!promqlMode.value &&
+          dashboardPanelData.data.type === "table" &&
+          dashboardPanelData.data.config?.promql_table_mode === "all",
+      },
+      "visible-columns": {
+        label: t("dashboard.visibleColumns"),
+        visible:
+          !!promqlMode.value &&
+          dashboardPanelData.data.type === "table" &&
+          (dashboardPanelData.data.config?.promql_table_mode === "all" ||
+            dashboardPanelData.data.config?.promql_table_mode ===
+              "expanded_timeseries"),
+      },
+      "hidden-columns": {
+        label: t("dashboard.hiddenColumns"),
+        visible:
+          !!promqlMode.value &&
+          dashboardPanelData.data.type === "table" &&
+          (dashboardPanelData.data.config?.promql_table_mode === "all" ||
+            dashboardPanelData.data.config?.promql_table_mode ===
+              "expanded_timeseries"),
+      },
+      "sticky-first-column": {
+        label: t("dashboard.stickyFirstColumn"),
+        visible:
+          !!promqlMode.value &&
+          dashboardPanelData.data.type === "table" &&
+          (dashboardPanelData.data.config?.promql_table_mode === "all" ||
+            dashboardPanelData.data.config?.promql_table_mode ===
+              "expanded_timeseries"),
+      },
+      "sticky-columns": {
+        label: t("dashboard.stickyColumns"),
+        visible:
+          !!promqlMode.value &&
+          dashboardPanelData.data.type === "table" &&
+          (dashboardPanelData.data.config?.promql_table_mode === "all" ||
+            dashboardPanelData.data.config?.promql_table_mode ===
+              "expanded_timeseries"),
+      },
+      "configure-column-order": {
+        label: t("dashboard.configureColumnOrder"),
+        visible:
+          !!promqlMode.value &&
+          dashboardPanelData.data.type === "table" &&
+          (dashboardPanelData.data.config?.promql_table_mode === "all" ||
+            dashboardPanelData.data.config?.promql_table_mode ===
+              "expanded_timeseries"),
       },
     },
     geographic: {

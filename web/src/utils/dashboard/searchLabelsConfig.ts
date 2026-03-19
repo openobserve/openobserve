@@ -1,5 +1,6 @@
 export type SectionId =
   | "general"
+  | "promqlTable"
   | "geographic"
   | "legend"
   | "data"
@@ -21,6 +22,7 @@ export type SectionId =
 
 export const ORDERED_SECTION_IDS: SectionId[] = [
   "general",
+  "promqlTable",
   "geographic",
   "legend",
   "data",
@@ -43,6 +45,7 @@ export const ORDERED_SECTION_IDS: SectionId[] = [
 
 export const DEFAULT_EXPANDED_SECTIONS: Record<SectionId, boolean> = {
   general: true,
+  promqlTable: true,
   geographic: true,
   legend: true,
   data: true,

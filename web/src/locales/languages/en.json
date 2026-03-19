@@ -1736,6 +1736,7 @@
     "seriesValue": "Series Value",
     "axisValue": "Axis Value",
     "configSectionGeneral": "General",
+    "configSectionPromqlTable": "PromQL Table Mode",
     "configSectionGeographic": "Geographic Configuration",
     "configSectionLegend": "Legend",
     "configSectionData": "Data",
