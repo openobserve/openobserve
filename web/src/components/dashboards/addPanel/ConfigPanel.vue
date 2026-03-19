@@ -260,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expand-icon-class="text-grey-6"
     >
       <div class="config-section-body">
-        <PromQLChartConfig :chart-type="dashboardPanelData.data.type" />
+        <PromQLChartConfig :chart-type="dashboardPanelData.data.type" :is-config-option-visible="isConfigOptionVisible" />
       </div>
     </q-expansion-item>
 
