@@ -2194,9 +2194,8 @@ export default defineComponent({
       // Close the drawer first
       showAlertDetailsDrawer.value = false;
 
-      // Get the full alert data and open the edit form
-      const selectedAlert = await getAlertById(selectedAlertDetails.value.alert_id);
-      showAddUpdateFn({ row: selectedAlert });
+      // Reuse the same edit flow as the listing page
+      await editAlert(selectedAlertDetails.value);
     };
 
     const moveAlertToAnotherFolder = (row: any) => {
