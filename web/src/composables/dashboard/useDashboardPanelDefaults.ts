@@ -118,9 +118,6 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
       table_pivot_sticky_col_totals: false,
       panel_time_enabled: false,
       panel_time_range: null,
-      // Multi-SQL query config
-      series_label_position: "prepend",
-      table_multi_query_mode: "union",
     },
     htmlContent: "",
     markdownContent: "",

@@ -413,8 +413,9 @@ export const convertMultiQueryTableData = (
   searchQueryData.forEach((queryData: any[], queryIndex: number) => {
     if (!queryData || !Array.isArray(queryData)) return;
 
+    const qConfig = panelSchema.queries[queryIndex]?.config;
     const queryLabel =
-      panelSchema.queries[queryIndex]?.config?.query_label ||
+      qConfig?.prepend_label || qConfig?.append_label ||
       `Q${queryIndex + 1}`;
 
     queryData.forEach((row: any) => {

@@ -75,25 +75,36 @@ export const convertMultiSQLData = async (
 
   const chartType = panelSchema.type;
 
+  // Helper: build labeled name with prepend/append labels + time shift suffix
+  const buildLabeledName = (
+    name: string,
+    queryConfig: any,
+    queryIndex: number,
+    periodAsStr?: string,
+  ) => {
+    const prepend = queryConfig?.prepend_label || `Q${queryIndex + 1}`;
+    const append = queryConfig?.append_label || "";
+    const parts = [prepend, name, append].filter(Boolean);
+    const labeled = parts.join("-");
+    return periodAsStr ? `${labeled} (${periodAsStr})` : labeled;
+  };
+
   // C5: Pie/Donut — merge data arrays into single series (not series concat)
   if (
     (chartType === "pie" || chartType === "donut") &&
     options.length > 1
   ) {
     const mergedData: any[] = [];
-    const labelPosition =
-      panelSchema.config?.series_label_position || "prepend";
 
     options.forEach((opt: any, queryIndex: number) => {
-      const queryLabel =
-        panelSchema.queries[queryIndex]?.config?.query_label ||
-        `Q${queryIndex + 1}`;
+      const queryConfig = panelSchema.queries[queryIndex]?.config;
 
       opt?.options?.series?.[0]?.data?.forEach((d: any) => {
-        const labeledName =
-          labelPosition === "append"
-            ? `${d.name}-${queryLabel}`
-            : `${queryLabel}-${d.name}`;
+        const labeledName = buildLabeledName(
+          d.name,
+          queryConfig,
+          queryIndex,
+        );
         mergedData.push({ ...d, name: labeledName });
       });
     });
@@ -112,11 +123,13 @@ export const convertMultiSQLData = async (
 
   // C6: Metric — collect values from all queries for grid display
   if (chartType === "metric" && options.length > 1) {
-    const additionalValues = options.slice(1).map((opt: any, idx: number) => ({
-      options: opt.options,
-      queryLabel:
-        panelSchema.queries[idx + 1]?.config?.query_label || "",
-    }));
+    const additionalValues = options.slice(1).map((opt: any, idx: number) => {
+      const qConfig = panelSchema.queries[idx + 1]?.config;
+      return {
+        options: opt.options,
+        queryLabel: qConfig?.prepend_label || qConfig?.append_label || "",
+      };
+    });
     options[0].extras = {
       ...options[0].extras,
       additionalMetricValues: additionalValues,
@@ -210,26 +223,9 @@ export const convertMultiSQLData = async (
 
   // C2: Series labeling + C4: Stack collision fix — apply to ALL queries when multi-query
   if (options && options.length > 1 && options[0]?.options) {
-    const labelPosition =
-      panelSchema.config?.series_label_position || "prepend";
-
-    // Helper: build labeled name with optional time shift suffix
-    const buildName = (
-      name: string,
-      queryLabel: string,
-      periodAsStr?: string,
-    ) => {
-      const labeled =
-        labelPosition === "append"
-          ? `${name}-${queryLabel}`
-          : `${queryLabel}-${name}`;
-      return periodAsStr ? `${labeled} (${periodAsStr})` : labeled;
-    };
-
     // Label Q1 series
     if (options[0].options.series) {
-      const q1Label =
-        panelSchema.queries[0]?.config?.query_label || "Q1";
+      const q1Config = panelSchema.queries[0]?.config;
       const q1Period =
         metadata?.queries[0]?.timeRangeGap?.periodAsStr || "";
 
@@ -238,7 +234,7 @@ export const convertMultiSQLData = async (
           if (isAnnotationSeries(it)) return it;
           return {
             ...it,
-            name: buildName(it.name, q1Label, q1Period),
+            name: buildLabeledName(it.name, q1Config, 0, q1Period),
             _queryIndex: 0,
           };
         },
@@ -248,8 +244,7 @@ export const convertMultiSQLData = async (
     // Label + merge Q2+ series
     for (let i = 1; i < options.length; i++) {
       if (options[i]?.options?.series) {
-        const queryLabel =
-          panelSchema.queries[i]?.config?.query_label || `Q${i + 1}`;
+        const qConfig = panelSchema.queries[i]?.config;
         const periodAsStr =
           metadata?.queries[i]?.timeRangeGap?.periodAsStr || "";
 
@@ -259,7 +254,7 @@ export const convertMultiSQLData = async (
             if (isAnnotationSeries(it)) return it;
             return {
               ...it,
-              name: buildName(it.name, queryLabel, periodAsStr),
+              name: buildLabeledName(it.name, qConfig, i, periodAsStr),
               _queryIndex: i,
               // C4: prefix stack names to prevent cross-query stacking
               stack: it.stack ? `q${i}-${it.stack}` : it.stack,

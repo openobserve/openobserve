@@ -1099,6 +1099,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- </q-input> -->
       <div class="space"></div>
 
+      <!-- Multi-Query Series Labels — visible when 2+ queries exist -->
+      <div
+        v-if="dashboardPanelData.data.queries.length > 1"
+        class="q-py-sm"
+      >
+        <div class="q-mb-sm" style="font-weight: 600">
+          {{ t("dashboard.multiSqlQueryLabel") }}
+        </div>
+
+        <div
+          v-for="(query, qIdx) in dashboardPanelData.data.queries"
+          :key="'label-' + qIdx"
+          class="row items-center q-mb-xs q-gutter-xs"
+        >
+          <span
+            class="text-caption"
+            style="min-width: 52px; opacity: 0.7"
+          >
+            Query {{ qIdx + 1 }}
+          </span>
+          <q-input
+            v-model="query.config.prepend_label"
+            dense
+            borderless
+            :placeholder="'Q' + (qIdx + 1)"
+            class="col showLabelOnTop el-border"
+            hide-bottom-space
+            :data-test="`dashboard-config-prepend-label-${qIdx}`"
+          >
+            <template v-slot:prepend>
+              <span class="text-caption" style="opacity: 0.5; font-size: 10px">Prepend</span>
+            </template>
+          </q-input>
+          <q-input
+            v-model="query.config.append_label"
+            dense
+            borderless
+            placeholder=""
+            class="col showLabelOnTop el-border"
+            hide-bottom-space
+            :data-test="`dashboard-config-append-label-${qIdx}`"
+          >
+            <template v-slot:prepend>
+              <span class="text-caption" style="opacity: 0.5; font-size: 10px">Append</span>
+            </template>
+          </q-input>
+        </div>
+        <div class="text-caption" style="opacity: 0.5; margin-top: 2px">
+          {{ t("dashboard.multiSqlQueryLabelHint") }}
+        </div>
+      </div>
+      <div
+        v-if="dashboardPanelData.data.queries.length > 1"
+        class="space"
+      ></div>
+
       <!-- for auto sql query limit -->
       <!-- it should not be promql and custom query -->
       <q-input
