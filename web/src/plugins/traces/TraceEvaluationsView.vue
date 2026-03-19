@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
       <q-select
         v-model="selectedTemplate"
         :options="availableTemplates"
-        option-value="agent_type"
+        option-value="id"
         option-label="name"
         emit-value
         map-options
@@ -542,9 +542,10 @@ color="info" size="sm" />
 </template>
 
 <script lang="ts">
-import { defineComponent, PropType, ref } from "vue";
+import { defineComponent, PropType, ref, watch, onMounted } from "vue";
 import { getQualityScoreColor } from "@/utils/llmUtils";
 import LLMContentRenderer from "./LLMContentRenderer.vue";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "TraceEvaluationsView",
@@ -561,7 +562,8 @@ export default defineComponent({
       default: false,
     },
   },
-  setup() {
+  setup(props) {
+    const store = useStore();
     const getBarWidth = (value: any): string => {
       if (value == null) return "0%";
       const num = parseFloat(value as any);
@@ -777,15 +779,23 @@ export default defineComponent({
     const loadTemplates = async (orgId: string) => {
       try {
         isLoadingTemplates.value = true;
-        // Import at runtime to avoid circular deps
         const { evalTemplateService } =
           await import("@/services/eval-template.service");
         const templates = await evalTemplateService.listTemplates(orgId);
         availableTemplates.value = templates;
 
-        // Set first template as default if available
+        // Auto-select based on llm_evaluation_template_id from the eval record
+        const templateIdFromRecord = props.evalData?.[0]?.llm_evaluation_template_id;
+        if (templateIdFromRecord) {
+          const matched = templates.find((t: any) => t.id === templateIdFromRecord);
+          if (matched) {
+            selectedTemplate.value = matched.id;
+            return;
+          }
+        }
+        // Fallback: first template
         if (templates.length > 0 && !selectedTemplate.value) {
-          selectedTemplate.value = templates[0].agent_type;
+          selectedTemplate.value = templates[0].id;
         }
       } catch (error) {
         console.error("Failed to load evaluation templates:", error);
@@ -795,12 +805,21 @@ export default defineComponent({
       }
     };
 
+    // Self-trigger when evalData arrives (handles async component mount timing)
+    const triggerLoad = (data: any[]) => {
+      if (data.length > 0) {
+        const orgId = store.state.selectedOrganization?.identifier;
+        if (orgId) loadTemplates(orgId);
+      }
+    };
+
+    onMounted(() => triggerLoad(props.evalData));
+    watch(() => props.evalData, triggerLoad);
+
     // Handle template selection change
     const onTemplateChange = (newTemplate: string | null) => {
       if (newTemplate) {
         console.log("Selected evaluation template:", newTemplate);
-        // Template is now selected - UI can use this for filtering or re-evaluation
-        // The actual re-evaluation would be handled by parent component or API
       }
     };
 

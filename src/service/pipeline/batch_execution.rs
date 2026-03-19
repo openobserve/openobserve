@@ -1421,6 +1421,7 @@ async fn process_node(
                         sampling_rate: params.sampling_rate,
                         enable_llm_judge: true,
                         llm_span_identifier: params.llm_span_identifier.clone(),
+                        eval_template: params.eval_template.clone(),
                         ..Default::default()
                     };
                 let params_name = params.name.clone();
