@@ -36,13 +36,37 @@ export default function (store: any) {
   // homeChildRoutes = homeChildRoutes.concat(envRoutes.homeChildRoutes);
   parentRoutes = mergeRoutes(parentRoutes, envRoutes.parentRoutes);
   homeChildRoutes = mergeRoutes(homeChildRoutes, envRoutes.homeChildRoutes);
+
+  // Merge enterprise pipeline children (eval templates, etc.) as direct children of pipeline
+  if (config.isEnterprise == "true" && envRoutes.pipelineChildren) {
+    const pipelineRoute = homeChildRoutes.find(
+      (r: any) => r.path === "pipeline",
+    );
+    if (pipelineRoute) {
+      pipelineRoute.children = mergeRoutes(
+        pipelineRoute.children || [],
+        envRoutes.pipelineChildren,
+      );
+    }
+  }
+
+  // Filter out catchall route from homeChildRoutes
+  const catchAllRoute = homeChildRoutes.find(
+    (r: any) => r.path === "/:catchAll(.*)*",
+  );
+  const nonCatchAllRoutes = homeChildRoutes.filter(
+    (r: any) => r.path !== "/:catchAll(.*)*",
+  );
+
   const routes = [
     ...parentRoutes,
     {
       path: "/",
       component: () => import("@/layouts/MainLayout.vue"),
-      children: [...homeChildRoutes],
+      children: [...nonCatchAllRoutes],
     },
+    // Add catchall at the end to match any unmatched routes
+    ...(catchAllRoute ? [catchAllRoute] : []),
   ];
 
   interface RouterMap {
@@ -62,7 +86,7 @@ export default function (store: any) {
     if (to.meta && to.meta.title) {
       document.title = `OpenObserve - ${to.meta.title}`;
     } else {
-      document.title = 'OpenObserve';
+      document.title = "OpenObserve";
     }
 
     const isAuthenticated = store.state.loggedIn;
