@@ -357,61 +357,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:pt-2 tw:pb-2"
           >
-            <!-- Anomaly detection condition view -->
+            <!-- Anomaly detection condition view — mirrors the alert SQL code block -->
             <template v-if="isAnomaly">
-              <div class="tw:flex tw:flex-col tw:gap-2 tw:flex-1 tw:overflow-y-auto">
-                <!-- Key-value metadata rows -->
-                <div
-                  v-for="item in anomalyConditionMeta"
-                  :key="item.label"
-                  class="tw:flex tw:items-start tw:gap-3 tw:px-1 tw:py-1 tw:rounded"
-                >
+            <div
+              class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'code-block-dark'
+                  : 'code-block-light'
+              "
+            >
+              <div
+                class="code-block-header tw:shrink-0"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'code-block-header-dark'
+                    : 'code-block-header-light'
+                "
+              >
+                <div class="tw:flex tw:items-center tw:gap-1.5">
                   <span
-                    class="tw:text-[11px] tw:font-semibold tw:uppercase tw:tracking-wide tw:w-36 tw:shrink-0 tw:pt-0.5"
-                    :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
-                  >{{ item.label }}</span>
-                  <span class="tw:text-[13px] tw:font-mono tw:break-all"
-                    :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-800'"
-                  >{{ item.value }}</span>
+                    class="tw:text-[11px] tw:font-medium"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:text-gray-400'
+                        : 'tw:text-gray-500'
+                    "
+                  >
+                    SQL
+                  </span>
                 </div>
-                <!-- SQL block (custom_sql mode) -->
-                <template v-if="(fullAnomalyConfig || alertDetails).query_mode === 'custom_sql' && (fullAnomalyConfig || alertDetails).custom_sql">
-                  <div
-                    class="code-block tw:flex tw:flex-col tw:overflow-hidden tw:mt-1"
-                    :class="store.state.theme === 'dark' ? 'code-block-dark' : 'code-block-light'"
-                  >
-                    <div
-                      class="code-block-header tw:shrink-0"
-                      :class="store.state.theme === 'dark' ? 'code-block-header-dark' : 'code-block-header-light'"
-                    >
-                      <span class="tw:text-[11px] tw:font-medium"
-                        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
-                      >SQL</span>
-                      <q-btn flat dense size="xs" icon="content_copy"
-                        :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
-                        @click="copyToClipboard((fullAnomalyConfig || alertDetails).custom_sql, 'SQL')"
-                      ><q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip></q-btn>
-                    </div>
-                    <pre class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:overflow-y-auto">{{ (fullAnomalyConfig || alertDetails).custom_sql }}</pre>
-                  </div>
-                </template>
-                <!-- Filters list (filters mode) -->
-                <template v-else-if="(fullAnomalyConfig || alertDetails).query_mode === 'filters' && (fullAnomalyConfig || alertDetails).filters?.length">
-                  <div
-                    class="tw:text-[11px] tw:font-semibold tw:uppercase tw:tracking-wide tw:px-1 tw:mt-1"
-                    :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
-                  >Filters</div>
-                  <div
-                    v-for="(f, i) in (fullAnomalyConfig || alertDetails).filters"
-                    :key="i"
-                    class="tw:flex tw:items-center tw:gap-1.5 tw:text-[13px] tw:font-mono tw:px-4 tw:py-0.5"
-                  >
-                    <span :class="store.state.theme === 'dark' ? 'tw:text-blue-300' : 'tw:text-blue-600'">{{ f.field }}</span>
-                    <span :class="store.state.theme === 'dark' ? 'tw:text-purple-400' : 'tw:text-purple-600'" class="tw:font-semibold">{{ f.operator }}</span>
-                    <span :class="store.state.theme === 'dark' ? 'tw:text-amber-300' : 'tw:text-amber-700'">"{{ f.value }}"</span>
-                  </div>
-                </template>
+                <q-btn
+                  v-if="anomalySql"
+                  @click="copyToClipboard(anomalySql, 'SQL')"
+                  flat
+                  dense
+                  size="xs"
+                  icon="content_copy"
+                  :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
+                  data-test="anomaly-details-copy-sql-btn"
+                >
+                  <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
+                </q-btn>
               </div>
+              <pre
+                class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
+                >{{ anomalySql || t("alerts.alertDetails.noCondition") }}</pre
+              >
+            </div>
             </template>
 
             <!-- Regular alert condition view -->
@@ -535,6 +528,7 @@ import DateTime from "@/components/DateTime.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
 import anomalyDetectionService from "@/services/anomaly_detection";
+import { buildAnomalyPreviewSql } from "@/utils/alerts/anomalySqlBuilder";
 import type { Ref } from "vue";
 
 // Composables
@@ -557,39 +551,10 @@ const isAnomaly = computed(() => props.alertType === "anomaly_detection");
 // The list API only returns summary fields; we need this for the Condition tab.
 const fullAnomalyConfig = ref<any>(null);
 
-const anomalyConditionMeta = computed(() => {
-  // Prefer the full config (has stream, detection function, etc.); fall back to list-item data.
+const anomalySql = computed(() => {
   const d = fullAnomalyConfig.value || props.alertDetails;
-  if (!d) return [];
-  const items = [];
-  if (d.stream_type && d.stream_name) {
-    items.push({ label: "Stream", value: `${d.stream_type} / ${d.stream_name}` });
-  }
-  if (d.detection_function) {
-    items.push({ label: "Detection", value: d.detection_function });
-  }
-  if (d.histogram_interval) {
-    items.push({ label: "Bucket Size", value: d.histogram_interval });
-  }
-  // detection_window_seconds comes from the full config; format it for display.
-  const windowSecs = d.detection_window_seconds;
-  if (windowSecs) {
-    const windowStr = (() => {
-      if (windowSecs >= 3600) {
-        const h = Math.floor(windowSecs / 3600);
-        const m = Math.round((windowSecs % 3600) / 60);
-        return m === 0 ? `${h} Hours` : `${h} Hours ${m} Mins`;
-      }
-      return `${Math.round(windowSecs / 60)} mins`;
-    })();
-    items.push({ label: "Window", value: windowStr });
-  } else if (d.detection_window && d.detection_window !== "--") {
-    items.push({ label: "Window", value: d.detection_window });
-  }
-  if (d.query_mode) {
-    items.push({ label: "Query Mode", value: d.query_mode === "custom_sql" ? "Custom SQL" : "Filters" });
-  }
-  return items;
+  if (!d) return "";
+  return buildAnomalyPreviewSql(d);
 });
 
 const emit = defineEmits([]);
