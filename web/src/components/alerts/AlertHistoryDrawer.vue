@@ -840,7 +840,7 @@ const formatTimestamp = (timestamp: number) => {
     return `${minutes} min ago`;
   }
   if (diff < 86400000000) {
-    const Hours = Math.floor(diff / 3600000000);
+    const hours = Math.floor(diff / 3600000000);
     return `${hours}h ago`;
   }
   if (diff < 604800000000) {
