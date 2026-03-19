@@ -215,15 +215,6 @@ const anomalyExplanationText = computed(() => anomalyExplanation(props.pattern, 
 @import "@/assets/styles/log-highlighting.css";
 .pattern-details-btn > span.q-btn__content {
   display: block !important;
-.wildcard-chip {
-  font-family: monospace;
-  font-size: 10px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 3px;
-  line-height: 16px;
-  // Prevent chips from inheriting the truncate overflow of the parent row
-  flex-shrink: 0;
 }
 .wildcard-chip {
   font-family: monospace;
@@ -232,7 +223,6 @@ const anomalyExplanationText = computed(() => anomalyExplanation(props.pattern, 
   padding: 0 4px;
   border-radius: 3px;
   line-height: 16px;
-  // Prevent chips from inheriting the truncate overflow of the parent row
   flex-shrink: 0;
 }
 </style>
