@@ -681,14 +681,14 @@ pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     #[cfg(feature = "enterprise")]
     {
         match crate::service::anomaly_detection::delete_config(&org_id, &alert_id_str).await {
-            Ok(_) => return MetaHttpResponse::ok("Alert deleted"),
+            Ok(_) => MetaHttpResponse::ok("Alert deleted"),
             Err(e) => {
                 let msg = e.to_string().to_lowercase();
-                return if msg.contains("not found") {
+                if msg.contains("not found") {
                     MetaHttpResponse::not_found(e.to_string())
                 } else {
                     MetaHttpResponse::internal_error(e.to_string())
-                };
+                }
             }
         }
     }
