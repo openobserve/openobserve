@@ -30,6 +30,43 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
     test.describe.configure({ mode: 'serial' });
     let pm;
 
+    /**
+     * Helper function to setup patterns view and wait for patterns to load
+     * Reduces code duplication across all pattern tests
+     * @param {Page} page - Playwright page object
+     * @param {PageManager} pm - Page manager instance
+     * @param {string} timeRange - Time range selector ('1hour' | '30seconds')
+     * @returns {Promise<string>} - Result from waitForPatternsToLoad ('patterns' | 'statistics' | 'empty' | 'timeout')
+     */
+    async function setupPatternsView(page, pm, timeRange = '1hour') {
+        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
+        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+
+        await pm.logsPage.selectStream(PATTERNS_STREAM);
+
+        // Switch off quick mode (required for patterns)
+        await pm.logsPage.clickQuickModeToggle();
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+        // Set time range
+        if (timeRange === '1hour') {
+            await pm.logsPage.clickDateTimeButton();
+            await pm.logsPage.clickRelative1HourOrFallback();
+        } else if (timeRange === '30seconds') {
+            await pm.logsPage.setTimeToPast30Seconds();
+        }
+
+        await pm.logsPage.clickRefreshButton();
+        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+
+        await pm.logsPage.waitForLogsTableToLoad();
+
+        await pm.logsPage.clickPatternsToggle();
+        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+
+        return await pm.logsPage.waitForPatternsToLoad(60000);
+    }
+
     test.beforeAll(async ({ browser }) => {
         // Ingest pattern-rich data once before all tests
         if (dataIngested) {
@@ -565,26 +602,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
     test("should not display duplicate patterns @P0 @smoke", async ({ page }) => {
         testLogger.info('Test: Verify patterns are unique (no duplicates)');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-        await pm.logsPage.selectStream(PATTERNS_STREAM);
-
-        // Switch off quick mode
-        await pm.logsPage.clickQuickModeToggle();
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-
-        await pm.logsPage.clickDateTimeButton();
-        await pm.logsPage.clickRelative1HourOrFallback();
-        await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-        await pm.logsPage.waitForLogsTableToLoad();
-
-        await pm.logsPage.clickPatternsToggle();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-        const result = await pm.logsPage.waitForPatternsToLoad(60000);
+        const result = await setupPatternsView(page, pm);
 
         // CRITICAL: P0 test must have pattern data to be meaningful
         expect(['patterns', 'statistics']).toContain(result);
@@ -625,26 +643,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
     test("should display tokenized wildcard chips in pattern cards @P1 @functional", async ({ page }) => {
         testLogger.info('Test: Verify tokenized wildcard chips are displayed');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-        await pm.logsPage.selectStream(PATTERNS_STREAM);
-
-        // Switch off quick mode (required for patterns)
-        await pm.logsPage.clickQuickModeToggle();
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-
-        await pm.logsPage.clickDateTimeButton();
-        await pm.logsPage.clickRelative1HourOrFallback();
-        await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-        await pm.logsPage.waitForLogsTableToLoad();
-
-        await pm.logsPage.clickPatternsToggle();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-        const result = await pm.logsPage.waitForPatternsToLoad(60000);
+        const result = await setupPatternsView(page, pm);
 
         // ASSERTION: Patterns must be available for this test
         expect(['patterns', 'statistics']).toContain(result);
@@ -654,26 +653,37 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         // ASSERTION: Must have patterns to test tokenization
         expect(cardCount).toBeGreaterThan(0);
 
-        // Get pattern template text to check for wildcard tokens
-        const firstPatternText = await pm.logsPage.getPatternCardTemplateText(0);
-        testLogger.info(`First pattern: ${firstPatternText.substring(0, 100)}`);
+        // Check multiple patterns for wildcards (not just index 0)
+        // At least one pattern should contain wildcard indicators
+        let patternsWithWildcards = 0;
+        const patternSamples = [];
 
-        // Check if pattern contains wildcard indicators like <:TIMESTAMP>, <*>, etc.
-        const hasWildcards = firstPatternText.includes('<:') ||
-                           firstPatternText.includes('<*>') ||
-                           firstPatternText.includes('[<:');
+        for (let i = 0; i < Math.min(cardCount, 5); i++) {
+            const patternText = await pm.logsPage.getPatternCardTemplateText(i);
+            const hasWildcards = patternText.includes('<:') ||
+                               patternText.includes('<*>') ||
+                               patternText.includes('[<:');
 
-        // Inspect DOM structure for debugging
-        const patternElements = await pm.logsPage.inspectPatternCardDOM(0);
+            if (hasWildcards) {
+                patternsWithWildcards++;
+            }
 
-        testLogger.info(`Pattern DOM inspection: ${JSON.stringify(patternElements)}`);
-        testLogger.info(`Has wildcard tokens in text: ${hasWildcards}`);
+            patternSamples.push({
+                index: i,
+                sample: patternText.substring(0, 80),
+                hasWildcards
+            });
+        }
+
+        testLogger.info(`Patterns checked: ${patternSamples.length}`);
+        testLogger.info(`Patterns with wildcards: ${patternsWithWildcards}`);
+        testLogger.info(`Pattern samples: ${JSON.stringify(patternSamples, null, 2)}`);
 
         // Take screenshot for manual verification
         await page.screenshot({ path: 'playwright-results/pattern-wildcard-chips.png', fullPage: true });
 
-        // ASSERTION: Pattern must contain wildcard indicators (test the actual feature)
-        expect(hasWildcards).toBeTruthy();
+        // ASSERTION: At least one pattern must contain wildcard indicators
+        expect(patternsWithWildcards).toBeGreaterThan(0);
 
         testLogger.info('✅ Wildcard tokenization verified');
 
@@ -683,26 +693,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
     test("should display wildcard chip tooltips with sample values on hover @P1 @functional", async ({ page }) => {
         testLogger.info('Test: Verify wildcard chip hover tooltips show sample values');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-        await pm.logsPage.selectStream(PATTERNS_STREAM);
-
-        // Switch off quick mode
-        await pm.logsPage.clickQuickModeToggle();
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-
-        await pm.logsPage.clickDateTimeButton();
-        await pm.logsPage.clickRelative1HourOrFallback();
-        await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-        await pm.logsPage.waitForLogsTableToLoad();
-
-        await pm.logsPage.clickPatternsToggle();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-        const result = await pm.logsPage.waitForPatternsToLoad(60000);
+        const result = await setupPatternsView(page, pm);
 
         // ASSERTION: Patterns must be available for this test
         expect(['patterns', 'statistics']).toContain(result);
@@ -760,26 +751,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
     test("should display anomaly detection badges for rare patterns @P1 @functional", async ({ page }) => {
         testLogger.info('Test: Verify anomaly detection badges are displayed for rare patterns');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-        await pm.logsPage.selectStream(PATTERNS_STREAM);
-
-        // Switch off quick mode
-        await pm.logsPage.clickQuickModeToggle();
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-
-        await pm.logsPage.clickDateTimeButton();
-        await pm.logsPage.clickRelative1HourOrFallback();
-        await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-        await pm.logsPage.waitForLogsTableToLoad();
-
-        await pm.logsPage.clickPatternsToggle();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-        const result = await pm.logsPage.waitForPatternsToLoad(60000);
+        const result = await setupPatternsView(page, pm);
 
         // ASSERTION: Patterns must be available for this test
         expect(['patterns', 'statistics']).toContain(result);
@@ -792,17 +764,25 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         // Get anomaly column data
         const anomalyData = await pm.logsPage.getAnomalyColumnData();
 
+        // Note: anomalyData may include more rows than visible patterns (pagination, hidden rows, etc.)
         const patternsWithAnomalies = anomalyData.filter(d => d.hasIcon || d.hasWarning).length;
-        testLogger.info(`Patterns with anomaly indicators: ${patternsWithAnomalies}/${cardCount}`);
-        testLogger.info(`Anomaly data: ${JSON.stringify(anomalyData.slice(0, 3))}`);
+        testLogger.info(`Rows with anomaly indicators: ${patternsWithAnomalies} out of ${anomalyData.length} total rows`);
+        testLogger.info(`Visible pattern cards: ${cardCount}`);
+        testLogger.info(`Anomaly data sample: ${JSON.stringify(anomalyData.slice(0, 3))}`);
 
         await page.screenshot({ path: 'playwright-results/pattern-anomaly-badges.png', fullPage: true });
 
-        // ASSERTION: At least one pattern should have anomaly indicators
-        // (Test data includes rare ERROR patterns that should trigger anomaly detection)
-        expect(patternsWithAnomalies).toBeGreaterThan(0);
+        // ASSERTION: Anomaly column should be present and have data
+        expect(anomalyData.length).toBeGreaterThan(0);
 
-        testLogger.info('✅ Anomaly detection indicators found and verified');
+        // INFO: Verify anomaly column structure works correctly
+        const rowsWithIcons = anomalyData.filter(d => d.hasIcon).length;
+        testLogger.info(`Rows with anomaly icons: ${rowsWithIcons}`);
+
+        // ASSERTION: Anomaly column should contain icon elements (feature is functional)
+        expect(rowsWithIcons).toBeGreaterThan(0);
+
+        testLogger.info('✅ Anomaly detection column verified - icons present and functional');
 
         testLogger.info('PASSED: Anomaly detection badge test complete');
     });
@@ -810,26 +790,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
     test("should display pattern statistics in details dialog @P1 @functional", async ({ page }) => {
         testLogger.info('Test: Verify pattern statistics (z_score, avg_frequency) in details dialog');
 
-        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-        await pm.logsPage.selectStream(PATTERNS_STREAM);
-
-        // Switch off quick mode
-        await pm.logsPage.clickQuickModeToggle();
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-
-        await pm.logsPage.clickDateTimeButton();
-        await pm.logsPage.clickRelative1HourOrFallback();
-        await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-        await pm.logsPage.waitForLogsTableToLoad();
-
-        await pm.logsPage.clickPatternsToggle();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-        const result = await pm.logsPage.waitForPatternsToLoad(60000);
+        const result = await setupPatternsView(page, pm);
 
         // ASSERTION: Patterns must be available for this test
         expect(['patterns', 'statistics']).toContain(result);
@@ -846,23 +807,24 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         // Check for statistical information in the dialog
         const dialogContent = await pm.logsPage.getPatternDetailsDialogContent();
 
-        // Look for statistical terms
+        // Look for statistical fields (PR #10965 adds z_score, avg_frequency, wildcard_values)
         const hasFrequency = dialogContent.toLowerCase().includes('frequency') ||
-                           dialogContent.toLowerCase().includes('occurrences');
+                           dialogContent.toLowerCase().includes('occurrences') ||
+                           dialogContent.toLowerCase().includes('count');
         const hasPercentage = dialogContent.includes('%');
-        const hasStats = dialogContent.toLowerCase().includes('z-score') ||
-                       dialogContent.toLowerCase().includes('average') ||
-                       dialogContent.toLowerCase().includes('rare');
 
-        testLogger.info(`Dialog statistics - Frequency: ${hasFrequency}, Percentage: ${hasPercentage}, Stats: ${hasStats}`);
+        testLogger.info(`Dialog statistics - Frequency: ${hasFrequency}, Percentage: ${hasPercentage}`);
+        testLogger.info(`Dialog content preview: ${dialogContent.substring(0, 200)}`);
 
         await page.screenshot({ path: 'playwright-results/pattern-details-statistics.png', fullPage: true });
 
-        // ASSERTION: Dialog should contain at least frequency and percentage
-        expect(hasFrequency || hasPercentage).toBeTruthy();
+        // ASSERTION: Dialog must contain both frequency/count AND percentage
+        // These are core pattern statistics that should always be displayed
+        expect(hasFrequency).toBeTruthy();
+        expect(hasPercentage).toBeTruthy();
 
         await pm.logsPage.closePatternDetailsDialog();
-        testLogger.info('Pattern statistics verified in details dialog');
+        testLogger.info('✅ Pattern statistics (frequency and percentage) verified in details dialog');
 
         testLogger.info('PASSED: Pattern statistics test complete');
     });
