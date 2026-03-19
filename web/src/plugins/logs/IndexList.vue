@@ -591,7 +591,7 @@ export default defineComponent({
       event: any,
       { name, ftsKey, isSchemaField, streams }: any,
     ) => {
-      if (ftsKey) {
+      if (ftsKey && !showFtsFieldValues.value) {
         event.stopPropagation();
         event.preventDefault();
         return;

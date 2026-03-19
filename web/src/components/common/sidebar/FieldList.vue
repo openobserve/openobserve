@@ -342,7 +342,7 @@ export default defineComponent({
       event: any,
       { name, ftsKey, stream_name }: any,
     ) => {
-      if (ftsKey) {
+      if (ftsKey && !showFtsFieldValues.value) {
         event.stopPropagation();
         event.preventDefault();
         return;
