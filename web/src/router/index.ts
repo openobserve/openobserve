@@ -26,15 +26,10 @@ export default function (store: any) {
   let { parentRoutes, homeChildRoutes } = userRoutes();
 
   let envRoutes: any;
-  let enterpriseRoutes: any;
-  if (config.isCloud == "true") {
+  if (config.isCloud == "true" || config.isEnterprise == "true") {
     envRoutes = userCloudRoutes();
-    enterpriseRoutes = envRoutes;
   } else {
     envRoutes = useOSRoutes();
-    if (config.isEnterprise == "true") {
-      enterpriseRoutes = userCloudRoutes();
-    }
   }
 
   // parentRoutes = parentRoutes.concat(envRoutes.parentRoutes);
@@ -43,14 +38,14 @@ export default function (store: any) {
   homeChildRoutes = mergeRoutes(homeChildRoutes, envRoutes.homeChildRoutes);
 
   // Merge enterprise pipeline children (eval templates, etc.) as direct children of pipeline
-  if (enterpriseRoutes?.pipelineChildren) {
+  if (envRoutes.pipelineChildren) {
     const pipelineRoute = homeChildRoutes.find(
       (r: any) => r.path === "pipeline",
     );
     if (pipelineRoute) {
       pipelineRoute.children = mergeRoutes(
         pipelineRoute.children || [],
-        enterpriseRoutes.pipelineChildren,
+        envRoutes.pipelineChildren,
       );
     }
   }
