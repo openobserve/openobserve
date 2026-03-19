@@ -2733,6 +2733,7 @@ export default defineComponent({
         q,
         store,
         streams,
+        getStreams,
         getParser,
         buildQueryPayload,
         prepareAndSaveAlert: prepareAndSaveAlertFunction,
@@ -3066,14 +3067,6 @@ export default defineComponent({
         }
 
         emit("update:list", (activeFolderId.value as string) || "default");
-        router.push({
-          name: "alertList",
-          query: {
-            org_identifier: orgId,
-            folder: (activeFolderId.value as string) || "default",
-            tab: "anomalyDetection",
-          },
-        });
       } catch (err: any) {
         q.notify({
           type: "negative",
