@@ -670,35 +670,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 borderless
                 dense
               />
-              <template v-if="!toBeClonedIsAnomaly">
-                <q-select
-                  data-test="to-be-clone-stream-type"
-                  v-model="toBeClonestreamType"
-                  label="Stream Type"
-                  :options="streamTypes"
-                  @update:model-value="updateStreams()"
-                  borderless
-                  dense
-                  class="showLabelOnTop no-case tw:mt-[1px]"
-                />
-                <q-select
-                  data-test="to-be-clone-stream-name"
-                  v-model="toBeClonestreamName"
-                  :loading="isFetchingStreams"
-                  :disable="!toBeClonestreamType"
-                  label="Stream Name"
-                  :options="streamNames"
-                  @change="updateStreamName"
-                  @filter="filterStreams"
-                  use-input
-                  fill-input
-                  hide-selected
-                  :input-debounce="400"
-                  borderless
-                  dense
-                  class="showLabelOnTop no-case tw:mt-[1px] q-mb-sm"
-                />
-              </template>
+              <q-select
+                data-test="to-be-clone-stream-type"
+                v-model="toBeClonestreamType"
+                label="Stream Type"
+                :options="streamTypes"
+                @update:model-value="updateStreams()"
+                borderless
+                dense
+                class="showLabelOnTop no-case tw:mt-[1px]"
+              />
+              <q-select
+                data-test="to-be-clone-stream-name"
+                v-model="toBeClonestreamName"
+                :loading="isFetchingStreams"
+                :disable="!toBeClonestreamType"
+                label="Stream Name"
+                :options="streamNames"
+                @change="updateStreamName"
+                @filter="filterStreams"
+                use-input
+                fill-input
+                hide-selected
+                :input-debounce="400"
+                borderless
+                dense
+                class="showLabelOnTop no-case tw:mt-[1px] q-mb-sm"
+              />
               <div class="q-mb-lg">
                 <SelectFolderDropDown
                   :type="'alerts'"
@@ -1667,6 +1665,22 @@ export default defineComponent({
 
       // Anomaly rows: use the dedicated /clone endpoint (no fetch+mutate dance needed)
       if (toBeClonedIsAnomaly.value) {
+        if (!toBeClonestreamType.value) {
+          $q.notify({
+            type: "negative",
+            message: "Please select stream type ",
+            timeout: 2000,
+          });
+          return;
+        }
+        if (!toBeClonestreamName.value) {
+          $q.notify({
+            type: "negative",
+            message: "Please select stream name",
+            timeout: 2000,
+          });
+          return;
+        }
         isSubmitting.value = true;
         const dismiss = $q.notify({
           spinner: true,
@@ -1680,6 +1694,8 @@ export default defineComponent({
             {
               name: toBeCloneAlertName.value,
               folder_id: (folderIdToBeCloned.value as string) || "default",
+              stream_type: toBeClonestreamType.value,
+              stream_name: toBeClonestreamName.value,
             },
           );
           dismiss();

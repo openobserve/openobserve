@@ -253,7 +253,7 @@ const alerts = {
   clone_by_id: (
     org_identifier: string,
     alert_id: string,
-    data: { name?: string; folder_id?: string },
+    data: { name?: string; folder_id?: string; stream_type?: string; stream_name?: string },
   ) => {
     return http().post(
       `/api/v2/${org_identifier}/alerts/${alert_id}/clone`,
