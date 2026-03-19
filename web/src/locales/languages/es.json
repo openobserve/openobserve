@@ -1505,6 +1505,7 @@
     "configSectionLabels": "Etiquetas",
     "configSectionLineStyle": "Estilo de línea",
     "configSectionTable": "Tabla",
+    "configSectionPivotTable": "Tabla dinámica",
     "configSectionValueTransformations": "Transformaciones de valor",
     "configSectionValueTransformationsTooltip": "Mejore la legibilidad de las tablas asignando valores a colores de fondo y texto personalizados para una visualización más clara de los datos.",
     "addValueMapping": "Asignación de valor agregado",

@@ -1505,6 +1505,7 @@
     "configSectionLabels": "Beschriftungen",
     "configSectionLineStyle": "Linienstil",
     "configSectionTable": "Tabelle",
+    "configSectionPivotTable": "Pivot-Tabelle",
     "configSectionValueTransformations": "Werttransformationen",
     "configSectionValueTransformationsTooltip": "Verbessern Sie die Lesbarkeit der Tabelle, indem Sie Werte für eine klarere Datenvisualisierung benutzerdefinierten Text- und Hintergrundfarben zuordnen.",
     "addValueMapping": "Wertzuordnung hinzufügen",

@@ -1505,6 +1505,7 @@
     "configSectionLabels": "레이블",
     "configSectionLineStyle": "선 스타일",
     "configSectionTable": "표",
+    "configSectionPivotTable": "피벗 테이블",
     "configSectionValueTransformations": "가치 변환",
     "configSectionValueTransformationsTooltip": "값을 사용자 지정 텍스트 및 배경색에 매핑하여 보다 명확한 데이터 시각화를 통해 테이블 가독성을 높입니다.",
     "addValueMapping": "가치 매핑 추가",
