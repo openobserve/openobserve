@@ -2474,6 +2474,28 @@ export class AlertsPage {
     }
 
     /**
+     * Click the edit (pencil) icon for an alert directly from the list table
+     * @param {string} alertName - Name of the alert to edit
+     */
+    async clickAlertEditButtonInList(alertName) {
+        const selector = this.locators.alertUpdateButton.replace('{alertName}', alertName);
+        await this.page.locator(selector).click();
+        await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Clicked alert edit button in list', { alertName });
+    }
+
+    /**
+     * Assert that the VRL function editor container is visible
+     * @param {number} timeout - Timeout in ms (default 5000)
+     */
+    async expectVrlEditorVisible(timeout = 5000) {
+        const vrlEditor = this.page.locator('[data-test="scheduled-alert-vrl-function-editor"]');
+        await expect(vrlEditor).toBeVisible({ timeout });
+        testLogger.info('VRL editor is visible');
+    }
+
+    /**
      * Navigate through wizard steps by clicking Continue button multiple times
      * @param {number} times - Number of times to click Continue
      */
