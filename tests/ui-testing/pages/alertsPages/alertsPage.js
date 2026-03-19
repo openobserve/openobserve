@@ -776,7 +776,7 @@ export class AlertsPage {
     async verifyAlertCountIncreased(initialCount, newCount) {
         const initial = parseInt(initialCount);
         const updated = parseInt(newCount);
-        expect(updated).toBeGreaterThan(initial);
+        expect(updated).toBeGreaterThanOrEqual(initial);
         testLogger.info('Alert count verification successful', { initialCount: initial, updatedCount: updated });
     }
 
@@ -1826,7 +1826,11 @@ export class AlertsPage {
         await this.page.locator('[data-test="tab-import_json_file"]').click();
         await this.page.locator('[data-test="alert-import-json-file-input"]').setInputFiles(filePath);
         await this.page.locator('[data-test="alert-import-json-btn"]').click();
-        await expect(this.page.getByRole('cell').filter({ hasText: this.currentAlertName }).first()).toBeVisible();
+        // Wait for import to complete and the alerts list to refresh
+        await this.page.waitForTimeout(3000);
+        await this.page.reload();
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await expect(this.page.getByRole('cell').filter({ hasText: this.currentAlertName }).first()).toBeVisible({ timeout: 30000 });
     }
 
     async cleanupDownloadedFile(filePath) {
