@@ -13,6 +13,10 @@ export default class ChartTypeSelector {
     this.buildTab = page.locator('[data-test="dynamic-function-popup-tab-build"]');
     this.rawTab = page.locator('[data-test="dynamic-function-popup-tab-raw"]');
 
+    // Field property checkboxes (visible on table chart type)
+    this.treatAsNonTimestampCheckbox = page.locator('[data-test="dynamic-function-popup-treat-as-non-timestamp"]');
+    this.showFieldAsJsonCheckbox = page.locator('[data-test="dynamic-function-popup-show-field-as-json"]');
+
     // Query type selectors
     this.sqlQueryTypeBtn = page.locator('[data-test="dashboard-sql-query-type"]');
     this.customQueryTypeBtn = page.locator('[data-test="dashboard-custom-query-type"]');
@@ -380,6 +384,38 @@ export default class ChartTypeSelector {
    */
   async verifyBuildRawTabsNotVisible(expect) {
     await expect(this.popupTabs).not.toBeVisible({ timeout: 5000 });
+  }
+
+  /**
+   * Open field property popup by clicking on an axis item
+   * @param {string} alias - The axis alias (e.g., "x_axis_1", "y_axis_1")
+   * @param {string} axis - The axis type ("x" or "y")
+   */
+  async openFieldPropertyPopup(alias, axis = "x") {
+    const itemLocator = this.page.locator(`[data-test="dashboard-${axis}-item-${alias}"]`);
+    await itemLocator.waitFor({ state: "visible", timeout: 10000 });
+    await itemLocator.click();
+    testLogger.debug('Opened field property popup', { alias, axis });
+  }
+
+  /**
+   * Toggle "Mark this field as non-timestamp" checkbox
+   */
+  async toggleTreatAsNonTimestamp() {
+    const checkbox = this.page.getByRole('checkbox', { name: 'Mark this field as non-timestamp' });
+    await checkbox.waitFor({ state: "visible", timeout: 10000 });
+    await checkbox.click();
+    testLogger.debug('Toggled treat as non-timestamp checkbox');
+  }
+
+  /**
+   * Toggle "Render Data as JSON / Array" checkbox
+   */
+  async toggleShowFieldAsJson() {
+    const checkbox = this.page.getByRole('checkbox', { name: 'Render Data as JSON / Array' });
+    await checkbox.waitFor({ state: "visible", timeout: 10000 });
+    await checkbox.click();
+    testLogger.debug('Toggled show field as JSON checkbox');
   }
 
   /**
