@@ -756,7 +756,7 @@ pub async fn delete_by_id<C: ConnectionTrait>(
         .await?
         .is_none()
     {
-        return Err(AlertError::AlertNotFound);
+        return Ok(());
     };
 
     let alert_id_str = alert_id.to_string();

@@ -664,31 +664,37 @@ pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
         }
     };
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    match alert::delete_by_id(client, &org_id, alert_id).await {
-        Ok(_) => MetaHttpResponse::ok("Alert deleted"),
-        Err(AlertError::AlertNotFound) => {
-            #[cfg(not(feature = "enterprise"))]
-            {
-                MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"))
-            }
-            #[cfg(feature = "enterprise")]
-            {
-                match crate::service::anomaly_detection::delete_config(&org_id, &alert_id_str).await
-                {
-                    Ok(_) => MetaHttpResponse::ok("Alert deleted"),
-                    Err(e) => {
-                        let msg = e.to_string().to_lowercase();
-                        if msg.contains("not found") {
-                            MetaHttpResponse::not_found(e.to_string())
-                        } else {
-                            MetaHttpResponse::internal_error(e.to_string())
-                        }
-                    }
-                }
+
+    // Check whether this ID belongs to a regular alert before attempting delete.
+    // delete_by_id silently returns Ok(()) when the record is not found (required
+    // for super-cluster sync idempotency), so we must check existence explicitly.
+    let is_regular_alert = alert::get_by_id(client, &org_id, alert_id).await.is_ok();
+
+    if is_regular_alert {
+        return match alert::delete_by_id(client, &org_id, alert_id).await {
+            Ok(_) => MetaHttpResponse::ok("Alert deleted"),
+            Err(e) => e.into(),
+        };
+    }
+
+    // Not a regular alert — try anomaly detection config (enterprise only).
+    #[cfg(feature = "enterprise")]
+    {
+        match crate::service::anomaly_detection::delete_config(&org_id, &alert_id_str).await {
+            Ok(_) => return MetaHttpResponse::ok("Alert deleted"),
+            Err(e) => {
+                let msg = e.to_string().to_lowercase();
+                return if msg.contains("not found") {
+                    MetaHttpResponse::not_found(e.to_string())
+                } else {
+                    MetaHttpResponse::internal_error(e.to_string())
+                };
             }
         }
-        Err(e) => e.into(),
     }
+
+    #[cfg(not(feature = "enterprise"))]
+    MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"))
 }
 
 /// DeleteAlertBulk
@@ -752,20 +758,21 @@ pub async fn delete_alert_bulk(
     for id in req.ids {
         // already checked this is valid, so ok to unwrap
         let alert_id = Ksuid::from_str(&id).unwrap();
-        let result = match alert::delete_by_id(client, &org_id, alert_id).await {
-            Ok(_) => Ok(()),
-            Err(AlertError::AlertNotFound) => {
-                // Fall back to anomaly config delete (enterprise only).
-                #[cfg(not(feature = "enterprise"))]
-                {
-                    Err(format!("alert {id} not found"))
-                }
-                #[cfg(feature = "enterprise")]
-                crate::service::anomaly_detection::delete_config(&org_id, &id)
-                    .await
-                    .map_err(|e: anyhow::Error| e.to_string())
+        let is_regular_alert = alert::get_by_id(client, &org_id, alert_id).await.is_ok();
+        let result = if is_regular_alert {
+            alert::delete_by_id(client, &org_id, alert_id)
+                .await
+                .map_err(|e| e.to_string())
+        } else {
+            // Not a regular alert — fall back to anomaly config delete (enterprise only).
+            #[cfg(not(feature = "enterprise"))]
+            {
+                Err(format!("alert {id} not found"))
             }
-            Err(e) => Err(e.to_string()),
+            #[cfg(feature = "enterprise")]
+            crate::service::anomaly_detection::delete_config(&org_id, &id)
+                .await
+                .map_err(|e: anyhow::Error| e.to_string())
         };
         match result {
             Ok(_) => successful.push(id),
@@ -820,8 +827,19 @@ pub async fn list_alerts(
 
     #[cfg(feature = "enterprise")]
     let folder_slug = query.folder.clone();
-    let params = query.into(&org_id);
+    #[cfg(feature = "enterprise")]
+    let name_substring = query.alert_name_substring.clone();
+    #[cfg(feature = "enterprise")]
+    let page_size_and_idx = query.page_size.map(|s| (s, query.page_idx.unwrap_or(0)));
+    let mut params = query.into(&org_id);
     let alert_type = params.alert_type;
+
+    // In enterprise builds, pagination is applied after merging regular alerts with
+    // anomaly detection configs, so we fetch all matching results from the DB here.
+    #[cfg(feature = "enterprise")]
+    {
+        params.page_size_and_idx = None;
+    }
 
     // Fetch regular (scheduled / realtime) alerts unless the filter is anomaly-only.
     let list: Vec<ListAlertsResponseBodyItem> = if alert_type != AlertTypeFilter::AnomalyDetection {
@@ -865,11 +883,27 @@ pub async fn list_alerts(
     if matches!(
         alert_type,
         AlertTypeFilter::All | AlertTypeFilter::AnomalyDetection
-    ) && let Ok(configs) =
-        crate::service::anomaly_detection::list_configs(&org_id, folder_slug.as_deref()).await
+    ) && let Ok(configs) = crate::service::anomaly_detection::list_configs(
+        &org_id,
+        folder_slug.as_deref(),
+        name_substring.as_deref(),
+    )
+    .await
     {
         list.extend(configs.iter().filter_map(anomaly_config_to_list_item));
     }
+
+    // Apply pagination to the combined list (regular alerts + anomaly configs).
+    #[cfg(feature = "enterprise")]
+    let list = if let Some((page_size, page_idx)) = page_size_and_idx {
+        let start = (page_idx * page_size) as usize;
+        list.into_iter()
+            .skip(start)
+            .take(page_size as usize)
+            .collect()
+    } else {
+        list
+    };
 
     MetaHttpResponse::json(ListAlertsResponseBody { list })
 }

@@ -3016,7 +3016,6 @@ export default defineComponent({
       }
 
       try {
-        // Build payload with flat structure matching the API response format
         const payload: any = {
           alert_type: "anomaly_detection",
           name: c.name,
@@ -3025,26 +3024,27 @@ export default defineComponent({
           stream_type: c.stream_type,
           enabled: c.enabled ?? true,
           folder_id: (activeFolderId.value as string) || "default",
-          query_mode: c.query_mode,
-          filters: c.query_mode === "filters" ? (c.filters ?? []) : null,
-          custom_sql: c.query_mode === "custom_sql" ? c.custom_sql : null,
-          detection_function:
-            c.query_mode === "filters" ? c.detection_function : undefined,
-          detection_function_field:
-            c.query_mode === "filters" && c.detection_function !== "count"
-              ? c.detection_function_field || undefined
-              : undefined,
-          histogram_interval: anomalyHistogramInterval.value,
-          schedule_interval: anomalyScheduleInterval.value,
-          detection_window_seconds: anomalyDetectionWindowSeconds.value,
-          training_window_days: c.training_window_days,
-          retrain_interval_days: c.retrain_interval_days,
-          threshold: c.threshold,
-          alert_enabled: c.alert_enabled,
           alert_destinations:
             c.alert_enabled && c.alert_destination_ids?.length
               ? c.alert_destination_ids
               : [],
+          anomaly_config: {
+            query_mode: c.query_mode,
+            filters: c.query_mode === "filters" ? (c.filters ?? []) : null,
+            custom_sql: c.query_mode === "custom_sql" ? c.custom_sql : null,
+            detection_function: c.detection_function || "count(*)",
+            detection_function_field:
+              c.query_mode === "filters" && c.detection_function !== "count"
+                ? c.detection_function_field || undefined
+                : undefined,
+            histogram_interval: anomalyHistogramInterval.value,
+            schedule_interval: anomalyScheduleInterval.value,
+            detection_window_seconds: anomalyDetectionWindowSeconds.value,
+            training_window_days: c.training_window_days,
+            retrain_interval_days: c.retrain_interval_days,
+            threshold: c.threshold,
+            alert_enabled: c.alert_enabled,
+          },
         };
 
         const routeAnomalyId = router.currentRoute.value.params

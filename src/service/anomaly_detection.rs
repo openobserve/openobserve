@@ -38,16 +38,16 @@ use crate::{
     service::{alerts::destinations, search},
 };
 
-/// Resolve a folder slug (e.g. "default") to the PK stored in `folders.id`.
+/// Resolve a folder name (e.g. "default") to the PK stored in `folders.id`.
 ///
 /// Anomaly detection configs store the same FK as the alerts table — the KSUID primary
-/// key of the folder row, NOT the human-readable slug.  This helper performs that
+/// key of the folder row, NOT the human-readable name.  This helper performs that
 /// lookup and is called whenever we write a folder_id value to the DB.
 ///
-/// If the slug is "default" and the folder does not yet exist it is auto-created,
+/// If the name is "default" and the folder does not yet exist it is auto-created,
 /// matching the behaviour of `alert::create` which calls `create_default_alerts_folder`.
-async fn resolve_folder_pk(org_id: &str, slug: &str) -> Option<String> {
-    let pk = infra::table::folders::get_pk_by_slug(org_id, slug, FolderType::Alerts)
+async fn resolve_folder_pk(org_id: &str, name: &str) -> Option<String> {
+    let pk = infra::table::folders::get_pk_by_name(org_id, name, FolderType::Alerts)
         .await
         .ok()
         .flatten();
@@ -57,7 +57,7 @@ async fn resolve_folder_pk(org_id: &str, slug: &str) -> Option<String> {
     }
 
     // Auto-create the default Alerts folder on first use, same as alert::create does.
-    if slug == DEFAULT_FOLDER {
+    if name == DEFAULT_FOLDER {
         let folder = Folder {
             folder_id: DEFAULT_FOLDER.to_owned(),
             name: "default".to_owned(),
@@ -67,7 +67,7 @@ async fn resolve_folder_pk(org_id: &str, slug: &str) -> Option<String> {
             .await
             .is_ok()
         {
-            return infra::table::folders::get_pk_by_slug(org_id, slug, FolderType::Alerts)
+            return infra::table::folders::get_pk_by_name(org_id, name, FolderType::Alerts)
                 .await
                 .ok()
                 .flatten();
@@ -77,12 +77,12 @@ async fn resolve_folder_pk(org_id: &str, slug: &str) -> Option<String> {
     None
 }
 
-/// Translate a stored folder PK back to the user-visible slug for API responses.
+/// Translate a stored folder PK back to the user-visible name for API responses.
 /// Falls back to "default" if the PK cannot be resolved (e.g. folder was deleted).
-async fn pk_to_slug(pk: Option<&str>) -> String {
+async fn pk_to_name(pk: Option<&str>) -> String {
     match pk {
         None => "default".to_string(),
-        Some(pk) => infra::table::folders::get_slug_by_pk(pk)
+        Some(pk) => infra::table::folders::get_name_by_pk(pk)
             .await
             .ok()
             .flatten()
@@ -122,7 +122,8 @@ fn model_to_api_json(mut val: serde_json::Value) -> serde_json::Value {
 ///     `trigger.data` JSON by the handler when `anomaly_count > 0`
 pub async fn list_configs(
     org_id: &str,
-    folder_slug: Option<&str>,
+    folder_name: Option<&str>,
+    name_substring: Option<&str>,
 ) -> Result<Vec<serde_json::Value>> {
     let db = ORM_CLIENT
         .get()
@@ -143,12 +144,12 @@ pub async fn list_configs(
             .map(|t| (t.module_key.clone(), t))
             .collect();
 
-    // Resolve the folder slug filter to a PK so we can filter the in-memory list.
-    // (Storing PKs in the DB means we must compare against the PK, not the slug.)
-    let folder_pk_filter: Option<String> = if let Some(slug) = folder_slug {
-        infra::table::folders::get_pk_by_slug(
+    // Resolve the folder name filter to a PK so we can filter the in-memory list.
+    // (Storing PKs in the DB means we must compare against the PK, not the name.)
+    let folder_pk_filter: Option<String> = if let Some(name) = folder_name {
+        infra::table::folders::get_pk_by_name(
             org_id,
-            slug,
+            name,
             config::meta::folder::FolderType::Alerts,
         )
         .await
@@ -158,9 +159,9 @@ pub async fn list_configs(
         None
     };
 
-    // Filter by folder if a slug was provided. When the PK lookup returns None
-    // (slug not found), no configs should match — return empty.
-    let configs: Vec<_> = if folder_slug.is_some() {
+    // Filter by folder if a name was provided. When the PK lookup returns None
+    // (folder not found), no configs should match — return empty.
+    let configs: Vec<_> = if folder_name.is_some() {
         match &folder_pk_filter {
             Some(pk) => configs.into_iter().filter(|m| m.folder_id == *pk).collect(),
             None => vec![],
@@ -169,14 +170,25 @@ pub async fn list_configs(
         configs
     };
 
-    // Collect unique folder PKs so we can batch-resolve them to slug + display name.
+    // Filter by name substring (case-insensitive) when provided.
+    let configs: Vec<_> = if let Some(substr) = name_substring.filter(|s| !s.is_empty()) {
+        let lower = substr.to_lowercase();
+        configs
+            .into_iter()
+            .filter(|m| m.name.to_lowercase().contains(&lower))
+            .collect()
+    } else {
+        configs
+    };
+
+    // Collect unique folder PKs so we can batch-resolve them to name + display name.
     let unique_pks: std::collections::HashSet<String> =
         configs.iter().map(|m| m.folder_id.clone()).collect();
-    // pk → (slug, display_name)
+    // pk → (name, display_name)
     let mut pk_to_folder_map: std::collections::HashMap<String, (String, String)> =
         std::collections::HashMap::new();
     for pk in unique_pks {
-        if let Ok(Some(info)) = infra::table::folders::get_slug_and_name_by_pk(&pk).await {
+        if let Ok(Some(info)) = infra::table::folders::get_name_and_display_name_by_pk(&pk).await {
             pk_to_folder_map.insert(pk, info);
         }
     }
@@ -185,20 +197,20 @@ pub async fn list_configs(
         .into_iter()
         .map(|model| {
             let anomaly_id = model.anomaly_id.clone();
-            let (folder_slug, folder_name) = pk_to_folder_map
+            let (folder_name, folder_display_name) = pk_to_folder_map
                 .get(&model.folder_id)
                 .cloned()
                 .unwrap_or_else(|| ("default".to_string(), String::new()));
             let mut val = model_to_api_json(serde_json::to_value(model).unwrap_or_default());
-            // Replace stored PK with the user-visible slug and add display name.
+            // Replace stored PK with the user-visible name and add display name.
             if let Some(obj) = val.as_object_mut() {
                 obj.insert(
                     "folder_id".to_string(),
-                    serde_json::Value::String(folder_slug),
+                    serde_json::Value::String(folder_name),
                 );
                 obj.insert(
                     "folder_name".to_string(),
-                    serde_json::Value::String(folder_name),
+                    serde_json::Value::String(folder_display_name),
                 );
             }
             if let Some(obj) = val.as_object_mut()
@@ -243,10 +255,10 @@ pub async fn get_config(org_id: &str, anomaly_id: &str) -> Result<Option<serde_j
     match config {
         None => Ok(None),
         Some(model) => {
-            let slug = pk_to_slug(Some(&model.folder_id)).await;
+            let name = pk_to_name(Some(&model.folder_id)).await;
             let mut val = model_to_api_json(serde_json::to_value(model).unwrap_or_default());
             if let Some(obj) = val.as_object_mut() {
-                obj.insert("folder_id".to_string(), serde_json::Value::String(slug));
+                obj.insert("folder_id".to_string(), serde_json::Value::String(name));
             }
             Ok(Some(val))
         }
@@ -268,15 +280,15 @@ pub async fn create_config(
     let anomaly_id = svix_ksuid::Ksuid::new(None, None).to_string();
     let now_us = Utc::now().timestamp_micros();
 
-    // Resolve the folder slug to the FK (folders.id PK), consistent with the alerts table.
-    let folder_slug = req
+    // Resolve the folder name to the FK (folders.id PK), consistent with the alerts table.
+    let folder_name = req
         .folder_id
         .as_deref()
         .filter(|s| !s.is_empty())
         .unwrap_or("default");
-    let folder_pk = resolve_folder_pk(org_id, folder_slug)
+    let folder_pk = resolve_folder_pk(org_id, folder_name)
         .await
-        .ok_or_else(|| anyhow::anyhow!("Folder '{}' not found", folder_slug))?;
+        .ok_or_else(|| anyhow::anyhow!("Folder '{}' not found", folder_name))?;
 
     let new_config = anomaly_detection_config::ActiveModel {
         anomaly_id: Set(anomaly_id.clone()),
@@ -341,7 +353,7 @@ pub async fn create_config(
     };
 
     let result = new_config.insert(db).await?;
-    let folder_slug_owned = folder_slug.to_string();
+    let folder_name_owned = folder_name.to_string();
 
     // Register a detection trigger in the shared scheduler so it is driven by the
     // same infrastructure as alerts.  The handler will check `is_trained` and skip
@@ -386,7 +398,7 @@ pub async fn create_config(
     if let Some(obj) = val.as_object_mut() {
         obj.insert(
             "folder_id".to_string(),
-            serde_json::Value::String(folder_slug_owned),
+            serde_json::Value::String(folder_name_owned),
         );
     }
     Ok(val)
@@ -571,10 +583,10 @@ pub async fn update_config(
         }
     }
 
-    let slug = pk_to_slug(Some(&updated.folder_id)).await;
+    let name = pk_to_name(Some(&updated.folder_id)).await;
     let mut val = serde_json::to_value(updated)?;
     if let Some(obj) = val.as_object_mut() {
-        obj.insert("folder_id".to_string(), serde_json::Value::String(slug));
+        obj.insert("folder_id".to_string(), serde_json::Value::String(name));
     }
     Ok(val)
 }
@@ -643,10 +655,10 @@ pub async fn clone_config(
     let new_id = svix_ksuid::Ksuid::new(None, None).to_string();
     let now_us = Utc::now().timestamp_micros();
 
-    // If a new folder slug is given, resolve it to the PK; otherwise inherit the
+    // If a new folder name is given, resolve it to the PK; otherwise inherit the
     // source's already-stored PK.
-    let resolved_folder_id = if let Some(slug) = folder_id {
-        resolve_folder_pk(org_id, &slug)
+    let resolved_folder_id = if let Some(name) = folder_id {
+        resolve_folder_pk(org_id, &name)
             .await
             .unwrap_or_else(|| src.folder_id.clone())
     } else {
@@ -710,10 +722,10 @@ pub async fn clone_config(
         }
     }
 
-    let slug = pk_to_slug(Some(&result.folder_id)).await;
+    let name = pk_to_name(Some(&result.folder_id)).await;
     let mut val = model_to_api_json(serde_json::to_value(result).unwrap_or_default());
     if let Some(obj) = val.as_object_mut() {
-        obj.insert("folder_id".to_string(), serde_json::Value::String(slug));
+        obj.insert("folder_id".to_string(), serde_json::Value::String(name));
     }
     Ok(val)
 }

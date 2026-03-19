@@ -47,7 +47,7 @@ use crate::{
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
 pub async fn list_configs(Path(org_id): Path<String>) -> Response {
-    match anomaly_service::list_configs(&org_id, None).await {
+    match anomaly_service::list_configs(&org_id, None, None).await {
         Ok(configs) => MetaHttpResponse::json(configs),
         Err(e) => {
             tracing::error!("Failed to list anomaly configs: {}", e);

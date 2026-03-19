@@ -1233,11 +1233,12 @@ export default defineComponent({
       last_satisfied_at: anomaly.last_satisfied_at
         ? convertUnixToQuasarFormat(anomaly.last_satisfied_at)
         : "",
-      detection_window: anomaly.detection_window_seconds
-        ? (anomaly.detection_window_seconds >= 3600 && anomaly.detection_window_seconds % 3600 === 0
-            ? `${anomaly.detection_window_seconds / 3600}h`
-            : `${Math.round(anomaly.detection_window_seconds / 60)} mins`)
-        : "--",
+      detection_window: (() => {
+        const mins = anomaly.trigger_condition?.period_minutes;
+        if (!mins) return "--";
+        if (mins >= 60 && mins % 60 === 0) return `${mins / 60}h`;
+        return `${mins} mins`;
+      })(),
       last_trained_at: anomaly.last_trained_at
         ? convertUnixToQuasarFormat(anomaly.last_trained_at)
         : "",

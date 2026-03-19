@@ -131,17 +131,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
           />
           <q-btn
-            data-test="alert-details-edit-btn"
-            flat
-            round
-            dense
-            size="sm"
-            icon="edit"
-            @click="editAlertFromDrawer"
-          >
-            <q-tooltip>{{ t("alerts.edit") }}</q-tooltip>
-          </q-btn>
-          <q-btn
             data-test="alert-details-close-btn"
             v-close-popup="true"
             flat
@@ -386,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >{{ item.value }}</span>
                 </div>
                 <!-- SQL block (custom_sql mode) -->
-                <template v-if="alertDetails.query_mode === 'custom_sql' && alertDetails.custom_sql">
+                <template v-if="(fullAnomalyConfig || alertDetails).query_mode === 'custom_sql' && (fullAnomalyConfig || alertDetails).custom_sql">
                   <div
                     class="code-block tw:flex tw:flex-col tw:overflow-hidden tw:mt-1"
                     :class="store.state.theme === 'dark' ? 'code-block-dark' : 'code-block-light'"
@@ -400,25 +389,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >SQL</span>
                       <q-btn flat dense size="xs" icon="content_copy"
                         :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
-                        @click="copyToClipboard(alertDetails.custom_sql, 'SQL')"
+                        @click="copyToClipboard((fullAnomalyConfig || alertDetails).custom_sql, 'SQL')"
                       ><q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip></q-btn>
                     </div>
-                    <pre class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:overflow-y-auto">{{ alertDetails.custom_sql }}</pre>
+                    <pre class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:overflow-y-auto">{{ (fullAnomalyConfig || alertDetails).custom_sql }}</pre>
                   </div>
                 </template>
                 <!-- Filters list (filters mode) -->
-                <template v-else-if="alertDetails.query_mode === 'filters' && alertDetails.filters?.length">
+                <template v-else-if="(fullAnomalyConfig || alertDetails).query_mode === 'filters' && (fullAnomalyConfig || alertDetails).filters?.length">
                   <div
                     class="tw:text-[11px] tw:font-semibold tw:uppercase tw:tracking-wide tw:px-1 tw:mt-1"
                     :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
                   >Filters</div>
                   <div
-                    v-for="(f, i) in alertDetails.filters"
+                    v-for="(f, i) in (fullAnomalyConfig || alertDetails).filters"
                     :key="i"
-                    class="tw:flex tw:items-center tw:gap-2 tw:text-[13px] tw:font-mono tw:px-1"
-                    :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-800'"
+                    class="tw:flex tw:items-center tw:gap-1.5 tw:text-[13px] tw:font-mono tw:px-4 tw:py-0.5"
                   >
-                    <span>{{ f.field }} {{ f.operator }} {{ f.value }}</span>
+                    <span :class="store.state.theme === 'dark' ? 'tw:text-blue-300' : 'tw:text-blue-600'">{{ f.field }}</span>
+                    <span :class="store.state.theme === 'dark' ? 'tw:text-purple-400' : 'tw:text-purple-600'" class="tw:font-semibold">{{ f.operator }}</span>
+                    <span :class="store.state.theme === 'dark' ? 'tw:text-amber-300' : 'tw:text-amber-700'">"{{ f.value }}"</span>
                   </div>
                 </template>
               </div>
@@ -544,6 +534,7 @@ import { useQuasar, date } from "quasar";
 import DateTime from "@/components/DateTime.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
+import anomalyDetectionService from "@/services/anomaly_detection";
 import type { Ref } from "vue";
 
 // Composables
@@ -562,8 +553,13 @@ const props = defineProps<Props>();
 
 const isAnomaly = computed(() => props.alertType === "anomaly_detection");
 
+// Full config fetched from the dedicated anomaly detection endpoint.
+// The list API only returns summary fields; we need this for the Condition tab.
+const fullAnomalyConfig = ref<any>(null);
+
 const anomalyConditionMeta = computed(() => {
-  const d = props.alertDetails;
+  // Prefer the full config (has stream, detection function, etc.); fall back to list-item data.
+  const d = fullAnomalyConfig.value || props.alertDetails;
   if (!d) return [];
   const items = [];
   if (d.stream_type && d.stream_name) {
@@ -575,14 +571,24 @@ const anomalyConditionMeta = computed(() => {
   if (d.histogram_interval) {
     items.push({ label: "Bucket Size", value: d.histogram_interval });
   }
-  if (d.detection_window) {
+  // detection_window_seconds comes from the full config; format it for display.
+  const windowSecs = d.detection_window_seconds;
+  if (windowSecs) {
+    const windowStr =
+      windowSecs >= 3600 && windowSecs % 3600 === 0
+        ? `${windowSecs / 3600}h`
+        : `${Math.round(windowSecs / 60)} mins`;
+    items.push({ label: "Window", value: windowStr });
+  } else if (d.detection_window && d.detection_window !== "--") {
     items.push({ label: "Window", value: d.detection_window });
   }
-  items.push({ label: "Query Mode", value: d.query_mode === "custom_sql" ? "Custom SQL" : "Filters" });
+  if (d.query_mode) {
+    items.push({ label: "Query Mode", value: d.query_mode === "custom_sql" ? "Custom SQL" : "Filters" });
+  }
   return items;
 });
 
-const emit = defineEmits(["edit"]);
+const emit = defineEmits([]);
 
 const resultTotal = ref(0);
 
@@ -916,11 +922,6 @@ const updateDateTime = (value: any) => {
   }
 };
 
-const editAlertFromDrawer = () => {
-  if (!props.alertDetails) return;
-  emit("edit", props.alertDetails);
-};
-
 const copyToClipboard = (text: string, type: string) => {
   navigator.clipboard
     .writeText(text)
@@ -955,6 +956,18 @@ watch(
         qTableRef.value?.requestServerInteraction({
           pagination: pagination.value,
         });
+      }
+      // Fetch full config for the Condition tab when this is an anomaly detection alert.
+      if (isAnomaly.value) {
+        try {
+          const org = store?.state?.selectedOrganization?.identifier;
+          const res = await anomalyDetectionService.getConfig(org, newVal);
+          fullAnomalyConfig.value = res.data;
+        } catch {
+          fullAnomalyConfig.value = null;
+        }
+      } else {
+        fullAnomalyConfig.value = null;
       }
     }
   },

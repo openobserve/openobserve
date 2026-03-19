@@ -61,30 +61,8 @@ pub struct CreateAlertRequestBody {
     /// Set to `"anomaly_detection"` to create an anomaly detection config instead.
     pub alert_type: Option<meta_alerts::AlertTypeFilter>,
 
-    /// Anomaly-detection-specific fields. Accepted as a nested object OR as
-    /// flat top-level fields (the frontend sends a flat payload).
+    /// Anomaly-detection-specific fields (nested object).
     pub anomaly_config: Option<AnomalyAlertFields>,
-
-    // Anomaly-detection fields accepted at the top level (flat payload from frontend).
-    // These take precedence over the nested `anomaly_config` when both are present.
-    pub query_mode: Option<String>,
-    pub filters: Option<serde_json::Value>,
-    pub custom_sql: Option<String>,
-    pub detection_function: Option<String>,
-    /// Field to aggregate (required for avg/sum/min/max/pXX, ignored for count).
-    pub detection_function_field: Option<String>,
-    pub histogram_interval: Option<String>,
-    pub schedule_interval: Option<String>,
-    pub detection_window_seconds: Option<i64>,
-    pub training_window_days: Option<i32>,
-    pub retrain_interval_days: Option<i32>,
-    /// Anomaly threshold as an integer percentile (e.g. 97 means 97th percentile).
-    /// Maps to the internal `percentile` field.
-    pub threshold: Option<i32>,
-    pub rcf_num_trees: Option<i32>,
-    pub rcf_tree_size: Option<i32>,
-    pub rcf_shingle_size: Option<i32>,
-    pub alert_enabled: Option<bool>,
 
     /// The alert configuration. All fields from Alert are flattened into this request body.
     #[serde(flatten)]
@@ -93,73 +71,17 @@ pub struct CreateAlertRequestBody {
 }
 
 impl CreateAlertRequestBody {
-    /// Merge flat top-level anomaly fields with any nested `anomaly_config`,
-    /// returning a single `AnomalyAlertFields`. Top-level fields win.
-    /// Returns `None` only if the result has no `detection_function` (required).
+    /// Return the anomaly config fields, combining `detection_function` +
+    /// `detection_function_field` into the canonical "avg(field)" form.
+    /// Returns `None` when no `anomaly_config` was supplied or when
+    /// `detection_function` is missing (required).
     pub fn anomaly_fields(&self) -> Option<AnomalyAlertFields> {
-        let base = self.anomaly_config.clone();
-        let detection_function = combine_detection_function(
-            self.detection_function
-                .clone()
-                .or_else(|| base.as_ref().map(|b| b.detection_function.clone())),
-            self.detection_function_field.clone(),
+        let mut base = self.anomaly_config.clone()?;
+        base.detection_function = combine_detection_function(
+            Some(base.detection_function),
+            base.detection_function_field.take(),
         )?;
-        let query_mode = self
-            .query_mode
-            .clone()
-            .or_else(|| base.as_ref().map(|b| b.query_mode.clone()))
-            .unwrap_or_else(|| "filters".to_string());
-        let histogram_interval = self
-            .histogram_interval
-            .clone()
-            .or_else(|| base.as_ref().map(|b| b.histogram_interval.clone()))
-            .unwrap_or_else(|| "5m".to_string());
-        let schedule_interval = self
-            .schedule_interval
-            .clone()
-            .or_else(|| base.as_ref().map(|b| b.schedule_interval.clone()))
-            .unwrap_or_else(|| "1h".to_string());
-        let detection_window_seconds = self
-            .detection_window_seconds
-            .or_else(|| base.as_ref().map(|b| b.detection_window_seconds))
-            .unwrap_or(3600);
-        Some(AnomalyAlertFields {
-            query_mode,
-            filters: self
-                .filters
-                .clone()
-                .or_else(|| base.as_ref().and_then(|b| b.filters.clone())),
-            custom_sql: self
-                .custom_sql
-                .clone()
-                .or_else(|| base.as_ref().and_then(|b| b.custom_sql.clone())),
-            detection_function,
-            histogram_interval,
-            schedule_interval,
-            detection_window_seconds,
-            training_window_days: self
-                .training_window_days
-                .or_else(|| base.as_ref().and_then(|b| b.training_window_days)),
-            retrain_interval_days: self
-                .retrain_interval_days
-                .or_else(|| base.as_ref().and_then(|b| b.retrain_interval_days)),
-            percentile: self
-                .threshold
-                .map(|t| t as f64)
-                .or_else(|| base.as_ref().and_then(|b| b.percentile)),
-            rcf_num_trees: self
-                .rcf_num_trees
-                .or_else(|| base.as_ref().and_then(|b| b.rcf_num_trees)),
-            rcf_tree_size: self
-                .rcf_tree_size
-                .or_else(|| base.as_ref().and_then(|b| b.rcf_tree_size)),
-            rcf_shingle_size: self
-                .rcf_shingle_size
-                .or_else(|| base.as_ref().and_then(|b| b.rcf_shingle_size)),
-            alert_enabled: self
-                .alert_enabled
-                .or_else(|| base.as_ref().and_then(|b| b.alert_enabled)),
-        })
+        Some(base)
     }
 }
 
@@ -172,6 +94,9 @@ pub struct AnomalyAlertFields {
     pub custom_sql: Option<String>,
     /// Aggregation function, e.g. "count(*)" or "avg(cpu_usage)"
     pub detection_function: String,
+    /// Field to aggregate (required for avg/sum/min/max/pXX, ignored for count).
+    /// Combined with `detection_function` into "avg(field)" before saving.
+    pub detection_function_field: Option<String>,
     /// SQL histogram bucket size, e.g. "5m", "1h"
     pub histogram_interval: String,
     /// How often the detection job fires, e.g. "1h", "30m"
@@ -182,6 +107,8 @@ pub struct AnomalyAlertFields {
     /// 0 = never retrain automatically; otherwise days between retrains
     pub retrain_interval_days: Option<i32>,
     /// Percentile threshold (50.0–99.9). Default: 97.0
+    /// Also accepts the name `threshold` (integer, e.g. 97) for API convenience.
+    #[serde(alias = "threshold")]
     pub percentile: Option<f64>,
     pub rcf_num_trees: Option<i32>,
     pub rcf_tree_size: Option<i32>,
@@ -205,26 +132,8 @@ pub struct UpdateAlertRequestBody {
     pub alert_type: Option<meta_alerts::AlertTypeFilter>,
 
     /// Anomaly-detection-specific fields to update (partial — only supplied fields
-    /// are changed). Accepted as a nested object OR as flat top-level fields.
+    /// are changed).
     pub anomaly_config: Option<UpdateAnomalyAlertFields>,
-
-    // Anomaly-detection fields accepted at the top level (flat payload from frontend).
-    // These take precedence over the nested `anomaly_config` when both are present.
-    pub query_mode: Option<String>,
-    pub filters: Option<serde_json::Value>,
-    pub custom_sql: Option<String>,
-    pub detection_function: Option<String>,
-    /// Field to aggregate (required for avg/sum/min/max/pXX, ignored for count).
-    pub detection_function_field: Option<String>,
-    pub histogram_interval: Option<String>,
-    pub schedule_interval: Option<String>,
-    pub detection_window_seconds: Option<i64>,
-    pub training_window_days: Option<i32>,
-    pub retrain_interval_days: Option<i32>,
-    /// Anomaly threshold as an integer percentile (e.g. 97 means 97th percentile).
-    /// Maps to the internal `percentile` field.
-    pub threshold: Option<i32>,
-    pub alert_enabled: Option<bool>,
 
     /// Alert configuration fields (used for scheduled/realtime alerts).
     #[serde(flatten)]
@@ -233,33 +142,18 @@ pub struct UpdateAlertRequestBody {
 }
 
 impl UpdateAlertRequestBody {
-    /// Merge flat top-level anomaly fields with any nested `anomaly_config`,
-    /// returning a single `UpdateAnomalyAlertFields`. Top-level fields win.
+    /// Return the anomaly config fields, combining `detection_function` +
+    /// `detection_function_field` into the canonical "avg(field)" form when both are present.
     pub fn anomaly_fields(&self) -> UpdateAnomalyAlertFields {
-        let base = self.anomaly_config.clone().unwrap_or_default();
-        UpdateAnomalyAlertFields {
-            name: base.name,
-            description: base.description,
-            query_mode: self.query_mode.clone().or(base.query_mode),
-            filters: self.filters.clone().or(base.filters),
-            custom_sql: self.custom_sql.clone().or(base.custom_sql),
-            detection_function: combine_detection_function(
-                self.detection_function.clone().or(base.detection_function),
-                self.detection_function_field.clone(),
-            ),
-            histogram_interval: self.histogram_interval.clone().or(base.histogram_interval),
-            schedule_interval: self.schedule_interval.clone().or(base.schedule_interval),
-            detection_window_seconds: self
-                .detection_window_seconds
-                .or(base.detection_window_seconds),
-            training_window_days: self.training_window_days.or(base.training_window_days),
-            retrain_interval_days: self.retrain_interval_days.or(base.retrain_interval_days),
-            percentile: self.threshold.map(|t| t as f64).or(base.percentile),
-            alert_enabled: self.alert_enabled.or(base.alert_enabled),
-            enabled: base.enabled,
-            folder_id: base.folder_id,
-            owner: base.owner,
+        let mut base = self.anomaly_config.clone().unwrap_or_default();
+        // Combine detection_function + detection_function_field if either is supplied.
+        if base.detection_function.is_some() || base.detection_function_field.is_some() {
+            base.detection_function = combine_detection_function(
+                base.detection_function,
+                base.detection_function_field.take(),
+            );
         }
+        base
     }
 }
 
@@ -272,6 +166,8 @@ pub struct UpdateAnomalyAlertFields {
     pub filters: Option<serde_json::Value>,
     pub custom_sql: Option<String>,
     pub detection_function: Option<String>,
+    /// Field to aggregate. Combined with `detection_function` into "avg(field)" before saving.
+    pub detection_function_field: Option<String>,
     pub histogram_interval: Option<String>,
     pub schedule_interval: Option<String>,
     pub detection_window_seconds: Option<i64>,
