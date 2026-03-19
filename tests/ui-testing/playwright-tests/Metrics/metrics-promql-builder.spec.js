@@ -1,8 +1,8 @@
-import { test, expect, navigateToBase } from '../utils/enhanced-baseFixtures.js';
-import testLogger from '../utils/test-logger.js';
-import PageManager from '../../pages/page-manager.js';
-import { ensureMetricsIngested } from '../utils/shared-metrics-setup.js';
-import { waitForDashboardPage, deleteDashboard } from '../dashboards/utils/dashCreation.js';
+const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const testLogger = require('../utils/test-logger.js');
+const PageManager = require('../../pages/page-manager.js');
+const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
+import { waitForDashboardPage, deleteDashboard } from '../Dashboards/utils/dashCreation.js';
 
 
 test.describe("Metrics PromQL Builder Mode testcases", () => {
