@@ -104,10 +104,11 @@ describe("useConfigOptions", () => {
   // -------------------------------------------------------------------------
 
   describe("structure", () => {
-    it("returns all 19 top-level section keys", () => {
+    it("returns all 20 top-level section keys", () => {
       const opts = getOptions();
       const expectedSections = [
         "general",
+        "promqlTable",
         "geographic",
         "legend",
         "data",
