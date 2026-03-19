@@ -227,8 +227,13 @@ export class AlertsPage {
             // Table of contents locators (inside incident detail)
             tocContainer: '[data-test="toc-container"]',
 
-            // Import button
+            // Import/Export locators
             alertImportButton: '[data-test="alert-import"]',
+            alertExportButton: '[data-test="alert-list-export-alerts-btn"]',
+            alertListHeaderCheckbox: '[data-test="alert-list-table"] thead .o2-table-checkbox',
+            alertImportJsonBtn: '[data-test="alert-import-json-btn"]',
+            alertImportJsonFileInput: '[data-test="alert-import-json-file-input"]',
+            alertImportFileTab: '[data-test="tab-import_json_file"]',
 
             // Page structure locators
             alertListPage: '[data-test="alert-list-page"]',
@@ -1775,7 +1780,7 @@ export class AlertsPage {
     // ==================== IMPORT/EXPORT OPERATIONS ====================
 
     async exportAlerts() {
-        const headerCheckbox = this.page.locator('[data-test="alert-list-table"] thead .o2-table-checkbox').first();
+        const headerCheckbox = this.page.locator(this.locators.alertListHeaderCheckbox).first();
         await headerCheckbox.waitFor({ state: 'visible', timeout: 10000 });
         await headerCheckbox.click();
         testLogger.info('Clicked select all checkbox for export');
@@ -1794,7 +1799,7 @@ export class AlertsPage {
             };
         });
 
-        await this.page.locator('[data-test="alert-list-export-alerts-btn"]').click();
+        await this.page.locator(this.locators.alertExportButton).click();
         await expect(this.page.getByText('Successfully exported')).toBeVisible({ timeout: 60000 });
         testLogger.info('Export success notification visible');
 
@@ -1815,22 +1820,58 @@ export class AlertsPage {
     }
 
     async importInvalidFile(filePath) {
-        await this.page.locator('[data-test="alert-import"]').click();
-        await expect(this.page.locator('[data-test="tab-import_json_file"]')).toBeVisible();
-        await this.page.locator('[data-test="alert-import-json-file-input"]').setInputFiles(filePath);
-        await this.page.locator('[data-test="alert-import-json-btn"]').click();
-        await expect(this.page.getByText('Error importing Alert(s)')).toBeVisible();
+        await this.page.locator(this.locators.alertImportButton).click();
+        // Wait for the import page to fully load (import button visible)
+        await expect(this.page.locator(this.locators.alertImportJsonBtn)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Import page loaded, uploading invalid file');
+
+        await this.page.locator(this.locators.alertImportJsonFileInput).setInputFiles(filePath);
+        // Wait for FileReader to process the uploaded file asynchronously
+        await this.page.waitForTimeout(2000);
+
+        await this.page.locator(this.locators.alertImportJsonBtn).click();
+        await expect(this.page.getByText('Error importing Alert(s)')).toBeVisible({ timeout: 15000 });
+        testLogger.info('Invalid file import error shown as expected');
     }
 
     async importValidFile(filePath) {
-        await this.page.locator('[data-test="tab-import_json_file"]').click();
-        await this.page.locator('[data-test="alert-import-json-file-input"]').setInputFiles(filePath);
-        await this.page.locator('[data-test="alert-import-json-btn"]').click();
-        // Wait for import to complete and the alerts list to refresh
+        // Click file tab to reset any previous state from invalid import
+        await this.page.locator(this.locators.alertImportFileTab).click();
+        // Allow tab change handler to reset state (clears jsonStr, jsonFiles, editor)
+        await this.page.waitForTimeout(1000);
+
+        await this.page.locator(this.locators.alertImportJsonFileInput).setInputFiles(filePath);
+        // Wait for FileReader to process the file and populate the Monaco editor
         await this.page.waitForTimeout(3000);
-        await this.page.reload();
+        testLogger.info('Valid file uploaded, clicking import button');
+
+        await this.page.locator(this.locators.alertImportJsonBtn).click();
+
+        // Wait for import to process — on success, ImportAlert.vue shows
+        // "Alert(s) imported successfully" notification and navigates back after 400ms
+        try {
+            await this.page.getByText('imported successfully').waitFor({ state: 'visible', timeout: 30000 });
+            testLogger.info('Import success notification visible');
+        } catch (e) {
+            // Capture diagnostic info from the import output panel
+            const creationMessages = await this.page.locator('[data-test^="alert-import-creation-"]').allTextContents().catch(() => []);
+            const validationErrors = await this.page.locator('[data-test^="alert-import-error-"]').allTextContents().catch(() => []);
+            const outputText = await this.page.locator('.error-report-container').textContent().catch(() => 'N/A');
+            testLogger.error('Import did not show success notification', {
+                creationMessages,
+                validationErrors,
+                outputText: outputText?.substring(0, 500),
+            });
+            throw new Error(`Import failed. Creation messages: ${JSON.stringify(creationMessages)}. Validation errors: ${JSON.stringify(validationErrors)}`);
+        }
+
+        // Wait for the router navigation back to alert list (setTimeout 400ms + route change)
+        // Then wait for the alert list page to stabilize
+        await this.page.waitForTimeout(3000);
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
         await expect(this.page.getByRole('cell').filter({ hasText: this.currentAlertName }).first()).toBeVisible({ timeout: 30000 });
+        testLogger.info('Imported alert visible in list', { alertName: this.currentAlertName });
     }
 
     async cleanupDownloadedFile(filePath) {
