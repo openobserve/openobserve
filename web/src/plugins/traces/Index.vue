@@ -243,6 +243,7 @@ import {
   ref,
   onDeactivated,
   onActivated,
+  onUnmounted,
   onBeforeMount,
   nextTick,
   defineAsyncComponent,
@@ -254,6 +255,10 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 
 import useTraces from "@/composables/useTraces";
+import {
+  contextRegistry,
+  createTracesContextProvider,
+} from "@/composables/contextProviders";
 
 import TransformService from "@/services/jstransform";
 import {
@@ -314,6 +319,18 @@ const { getStreams, getStream } = useStreams();
 const chartRedrawTimeout = ref(null);
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
   useHttpStreaming();
+// AI copilot context provider for traces page
+const setupContextProvider = () => {
+  const provider = createTracesContextProvider(searchObj, store);
+  contextRegistry.register("traces", provider);
+  contextRegistry.setActive("traces");
+};
+
+const cleanupContextProvider = () => {
+  contextRegistry.unregister("traces");
+  contextRegistry.setActive("");
+};
+
 // Track the current search stream so we can cancel it when a new search starts
 let currentSearchTraceId: string | null = null;
 // Track the count query stream so it can be cancelled independently
@@ -1272,6 +1289,7 @@ async function loadPageData() {
 }
 
 onBeforeMount(async () => {
+  setupContextProvider();
   restoreUrlQueryParams();
   // Restore active tab from URL query params
   const queryParams = router.currentRoute.value.query;
@@ -1291,10 +1309,16 @@ onBeforeMount(async () => {
 });
 
 onDeactivated(() => {
+  cleanupContextProvider();
   clearInterval(refreshIntervalID);
 });
 
+onUnmounted(() => {
+  cleanupContextProvider();
+});
+
 onActivated(() => {
+  setupContextProvider();
   const params = router.currentRoute.value.query;
   if (params.reload === "true") {
     restoreUrlQueryParams();
