@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Simple field without expansion (FTS keys or fields without values) -->
   <div
-    v-if="(field.ftsKey && !fieldValuesForFst) || !field.isSchemaField || !field.showValues"
+    v-if="(field.ftsKey && !showFtsFieldValues) || !field.isSchemaField || !field.showValues"
     class="field-container flex content-center ellipsis full-width hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
     :title="field.name"
   >
@@ -100,7 +100,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useStore } from "vuex";
 import {
   outlinedAdd,
   outlinedVisibility,
@@ -114,6 +113,7 @@ interface Props {
   timestampColumn: string;
   theme: string;
   showQuickMode: boolean;
+  showFtsFieldValues: boolean;
 }
 
 const props = defineProps<Props>();
@@ -123,12 +123,6 @@ defineEmits<{
   "toggle-field": [field: any];
   "toggle-interesting": [field: any, isInteresting: boolean];
 }>();
-
-const store = useStore();
-
-const fieldValuesForFst = computed(
-  () => store.state.zoConfig?.field_values_for_fst ?? false,
-);
 
 const isFieldSelected = computed(() =>
   props.selectedFields.includes(props.field.name),

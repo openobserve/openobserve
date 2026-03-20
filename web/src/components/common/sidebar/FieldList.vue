@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-td :props="props" class="field_list">
               <!-- Non-expandable field (ftsKey or no values to show) -->
               <div
-                v-if="(props.row.ftsKey && !fieldValuesForFst) || !props.row.showValues"
+                v-if="(props.row.ftsKey && !showFtsFieldValues) || !props.row.showValues"
                 class="field-container flex content-center ellipsis q-pr-sm"
                 :title="props.row.name"
               >
@@ -294,8 +294,8 @@ export default defineComponent({
       () => store.state.zoConfig?.query_values_default_num || 10,
     );
 
-    const fieldValuesForFst = computed(
-      () => store.state.zoConfig?.field_values_for_fst ?? false,
+    const showFtsFieldValues = computed(
+      () => store.state.zoConfig?.showFtsFieldValues ?? false,
     );
 
     const filteredFieldsCount = computed(() => {
@@ -368,7 +368,7 @@ export default defineComponent({
       event: any,
       { name, ftsKey, stream_name }: any,
     ) => {
-      if (ftsKey) {
+      if (ftsKey && !showFtsFieldValues.value) {
         event.stopPropagation();
         event.preventDefault();
         return;
@@ -524,7 +524,7 @@ export default defineComponent({
       handleAddMultipleSearchTerms,
       handleLoadMoreValues,
       handleSearchFieldValues,
-      fieldValuesForFst,
+      showFtsFieldValues,
     };
   },
 });
