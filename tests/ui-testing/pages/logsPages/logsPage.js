@@ -1126,8 +1126,9 @@ export class LogsPage {
 
     // Histogram methods
     async toggleHistogram() {
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
+        // await this.page.locator(this.utilitiesMenuButton).click();
+        // await this.page.waitForTimeout(200);
+        // await this.page.locator(this.histogramToggle).click();
         await this.page.locator(this.histogramToggle).click();
     }
 
