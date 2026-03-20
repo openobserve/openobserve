@@ -161,6 +161,26 @@ const defaultObject = {
 
 const searchObj = reactive(Object.assign({}, defaultObject));
 
+/** Default ordered column ID lists used when no localStorage entry exists. */
+export const DEFAULT_TRACE_COLUMNS: Record<"traces" | "spans", string[]> = {
+  spans: [
+    "service_name",
+    "operation_name",
+    "duration",
+    "status",
+    "status_code",
+    "method",
+  ],
+  traces: [
+    "service_name",
+    "operation_name",
+    "duration",
+    "spans",
+    "status",
+    "service_latency",
+  ],
+};
+
 const useTraces = () => {
   const store = useStore();
   const router = useRouter();
@@ -192,16 +212,37 @@ const useTraces = () => {
     searchObj.data.traceDetails.isLoadingTraceMeta = false;
   };
 
-  const updatedLocalLogFilterField = (): void => {
+  /**
+   * Persist the current selectedFields for the given mode.
+   * Stored as traceFilterField[orgId_stream][mode] = string[].
+   */
+  const updatedLocalLogFilterField = (
+    searchMode: "traces" | "spans" = "traces",
+  ): void => {
     const identifier: string = searchObj.organizationIdentifier || "default";
-    const selectedFields: any =
-      useLocalTraceFilterField()?.value != null
-        ? useLocalTraceFilterField()?.value
-        : {};
-    selectedFields[
-      `${identifier}_${searchObj.data.stream.selectedStream.value}`
-    ] = searchObj.data.stream.selectedFields;
-    useLocalTraceFilterField(selectedFields);
+    const key = `${identifier}_${searchObj.data.stream.selectedStream.value}`;
+    const all: any = useLocalTraceFilterField()?.value ?? {};
+    all[key] = {
+      ...(all[key] ?? {}),
+      [searchMode]: searchObj.data.stream.selectedFields,
+    };
+    useLocalTraceFilterField(all);
+  };
+
+  /**
+   * Restore selectedFields for the given mode from localStorage.
+   * Falls back to the default ordered column list when no saved value exists.
+   */
+  const loadLocalLogFilterField = (
+    searchMode: "traces" | "spans" = "traces",
+  ): void => {
+    const identifier: string = searchObj.organizationIdentifier || "default";
+    const key = `${identifier}_${searchObj.data.stream.selectedStream.value}`;
+    const saved = useLocalTraceFilterField()?.value?.[key];
+
+    searchObj.data.stream.selectedFields = saved?.[searchMode]?.length
+      ? saved?.[searchMode]
+      : [...DEFAULT_TRACE_COLUMNS[searchMode]];
   };
 
   function getUrlQueryParams(getShareLink: boolean = false) {
@@ -403,6 +444,7 @@ const useTraces = () => {
     searchObj,
     resetSearchObj,
     updatedLocalLogFilterField,
+    loadLocalLogFilterField,
     getUrlQueryParams,
     copyTracesUrl,
     buildQueryDetails,

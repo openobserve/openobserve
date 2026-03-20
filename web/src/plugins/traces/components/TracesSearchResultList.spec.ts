@@ -17,17 +17,35 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
 
-// Stub heavy child components — cell rendering is not under test here
-vi.mock("@/components/traces/TracesTable.vue", () => ({
+// Stub TenstackTable — cell rendering and virtualizer are not under test here
+vi.mock("@/components/TenstackTable.vue", () => ({
   default: {
-    name: "TracesTable",
-    props: ["columns", "rows", "rowClass", "loading"],
-    emits: ["row-click"],
-    // Render the loading slot when loading=true and rows is empty (first fetch),
-    // and the empty slot otherwise — matching TracesTable's real slot behaviour.
+    name: "TenstackTable",
+    props: [
+      "columns", "rows", "rowClass", "loading",
+      "sortBy", "sortOrder", "sortFieldMap", "rowHeight",
+      "enableColumnReorder", "enableRowExpand", "enableTextHighlight",
+      "enableCellActions", "enableStatusBar", "defaultColumns",
+      "selectedStreamFields",
+    ],
+    emits: ["click:data-row", "sort-change"],
+    // Mirror the real slot behaviour used by TracesSearchResultList
     template: `<div data-test="stub-traces-table"><slot v-if="loading && (!rows || rows.length === 0)" name="loading" /><slot v-else name="empty" /></div>`,
   },
+}));
+
+vi.mock("@/composables/useTraces", () => ({
+  default: () => ({
+    searchObj: {
+      data: {
+        stream: { selectedStreamFields: [], addToFilter: "" },
+        resultGrid: { columns: [] },
+      },
+    },
+    updatedLocalLogFilterField: vi.fn(),
+  }),
 }));
 
 vi.mock("./TraceTimestampCell.vue", () => ({
@@ -76,10 +94,10 @@ describe("TracesSearchResultList", () => {
     vi.clearAllMocks();
   });
 
-  const mount_ = (props: Record<string, any>) =>
+  const mount_ = (props: { hits: any[]; loading: boolean } & Record<string, any>) =>
     mount(TracesSearchResultList, {
-      props,
-      global: { plugins: [i18n] },
+      props: props as any,
+      global: { plugins: [i18n, store] },
     });
 
   // ─── Loading state ────────────────────────────────────────────────────────
@@ -193,8 +211,8 @@ describe("TracesSearchResultList", () => {
     it("re-emits row-click from TracesTable", async () => {
       const hits = [makeHit("t1")];
       wrapper = mount_({ hits, loading: false });
-      const table = wrapper.findComponent({ name: "TracesTable" });
-      await table.vm.$emit("row-click", hits[0]);
+      const table = wrapper.findComponent({ name: "TenstackTable" });
+      await table.vm.$emit("click:data-row", hits[0]);
       expect(wrapper.emitted("row-click")).toBeTruthy();
       expect(wrapper.emitted("row-click")![0]).toEqual([hits[0]]);
     });
@@ -204,7 +222,7 @@ describe("TracesSearchResultList", () => {
     it.skip("re-emits load-more from TracesTable", async () => {
       const hits = [makeHit("t1")];
       wrapper = mount_({ hits, loading: false });
-      const table = wrapper.findComponent({ name: "TracesTable" });
+      const table = wrapper.findComponent({ name: "TenstackTable" });
       await table.vm.$emit("load-more");
       expect(wrapper.emitted("load-more")).toBeTruthy();
     });
@@ -214,21 +232,21 @@ describe("TracesSearchResultList", () => {
   describe("row error class", () => {
     it("passes a rowClass function to TracesTable", () => {
       wrapper = mount_({ hits: [makeHit("t1")], loading: false });
-      const table = wrapper.findComponent({ name: "TracesTable" });
+      const table = wrapper.findComponent({ name: "TenstackTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       expect(typeof rowClassFn).toBe("function");
     });
 
     it("returns 'oz-table__row--error' for rows with errors", () => {
       wrapper = mount_({ hits: [makeHit("t1", 2)], loading: false });
-      const table = wrapper.findComponent({ name: "TracesTable" });
+      const table = wrapper.findComponent({ name: "TenstackTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       expect(rowClassFn(makeHit("t1", 2))).toBe("oz-table__row--error");
     });
 
     it("returns empty string for rows without errors", () => {
       wrapper = mount_({ hits: [makeHit("t1", 0)], loading: false });
-      const table = wrapper.findComponent({ name: "TracesTable" });
+      const table = wrapper.findComponent({ name: "TenstackTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       expect(rowClassFn(makeHit("t1", 0))).toBe("");
     });
@@ -279,21 +297,21 @@ describe("TracesSearchResultList", () => {
 
     it("uses span_status='ERROR' for error class in spans mode", () => {
       wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false, searchMode: "spans" });
-      const table = wrapper.findComponent({ name: "TracesTable" });
+      const table = wrapper.findComponent({ name: "TenstackTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       expect(rowClassFn(makeSpanHit("s1", "ERROR"))).toBe("oz-table__row--error");
     });
 
     it("returns empty string for non-error span_status in spans mode", () => {
       wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false, searchMode: "spans" });
-      const table = wrapper.findComponent({ name: "TracesTable" });
+      const table = wrapper.findComponent({ name: "TenstackTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       expect(rowClassFn(makeSpanHit("s1", "OK"))).toBe("");
     });
 
     it("uses errors count (not span_status) for error class in traces mode", () => {
       wrapper = mount_({ hits: [makeHit("t1", 0)], loading: false, searchMode: "traces" });
-      const table = wrapper.findComponent({ name: "TracesTable" });
+      const table = wrapper.findComponent({ name: "TenstackTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       // traces mode: errors > 0 triggers error class
       expect(rowClassFn({ ...makeHit("t1", 2), span_status: "OK" })).toBe("oz-table__row--error");
