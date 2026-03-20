@@ -171,10 +171,7 @@ pub async fn save_pipeline(
         ("x-o2-mcp" = json!({
             "description": "List all pipelines",
             "category": "pipelines",
-            "summary_fields": {
-                "list_path": "list",
-                "fields": ["pipeline_id", "name", "description", "enabled"]
-            }
+            "summary_fields": ["pipeline_id", "name", "description", "enabled"]
         }))
     )
 )]

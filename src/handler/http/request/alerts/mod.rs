@@ -815,10 +815,7 @@ pub async fn delete_alert_bulk(
         ("x-o2-mcp" = json!({
             "description": "List all alerts",
             "category": "alerts",
-            "summary_fields": {
-                "list_path": "list",
-                "fields": ["name", "stream_name", "stream_type", "enabled", "is_real_time", "folder_id", "folder_name"]
-            }
+            "summary_fields": ["name", "stream_name", "stream_type", "enabled", "is_real_time", "folder_id", "folder_name"]
         }))
     )
 )]

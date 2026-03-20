@@ -174,10 +174,7 @@ pub async fn update_folder(
         ("x-o2-mcp" = json!({
             "description": "List all folders",
             "category": "folders",
-            "summary_fields": {
-                "list_path": "list",
-                "fields": ["folderId", "name", "description"]
-            }
+            "summary_fields": ["folderId", "name", "description"]
         }))
     ),
 )]

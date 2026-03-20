@@ -87,10 +87,7 @@ pub mod service_accounts;
         ("x-o2-mcp" = json!({
             "description": "List all users",
             "category": "users",
-            "summary_fields": {
-                "list_path": "data",
-                "fields": ["email", "role", "first_name", "last_name"]
-            }
+            "summary_fields": ["email", "role", "first_name", "last_name"]
         }))
     )
 )]

@@ -67,10 +67,7 @@ use crate::{
         ("x-o2-mcp" = json!({
             "description": "List service accounts",
             "category": "users",
-            "summary_fields": {
-                "list_path": "data",
-                "fields": ["email", "role", "first_name", "last_name"]
-            }
+            "summary_fields": ["email", "role", "first_name", "last_name"]
         }))
     )
 )]

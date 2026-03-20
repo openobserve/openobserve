@@ -455,11 +455,7 @@ pub async fn delete(
         ("x-o2-mcp" = json!({
             "description": "List all streams",
             "category": "streams",
-            "summary_fields": {
-                "list_path": "list",
-                "fields": ["name", "stream_type", "stats.storage_size"],
-                "count_path": "total"
-            }
+            "summary_fields": ["name", "stream_type", "stats.storage_size"]
         }))
     )
 )]

@@ -184,9 +184,7 @@ pub async fn get_template(Path((org_id, name)): Path<(String, String)>) -> Respo
         ("x-o2-mcp" = json!({
             "description": "List all alert templates",
             "category": "alerts",
-            "summary_fields": {
-                "fields": ["name", "type", "isDefault", "title"]
-            }
+            "summary_fields": ["name", "type", "isDefault", "title"]
         }))
     )
 )]

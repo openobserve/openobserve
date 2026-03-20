@@ -189,9 +189,7 @@ pub async fn update_report(
         ("x-o2-mcp" = json!({
             "description": "List all reports",
             "category": "dashboards",
-            "summary_fields": {
-                "fields": ["name", "description", "enabled", "folder_name"]
-            }
+            "summary_fields": ["name", "description", "enabled", "folder_name"]
         }))
     )
 )]

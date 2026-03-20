@@ -427,9 +427,7 @@ pub async fn get_destination(Path((org_id, name)): Path<(String, String)>) -> Re
         ("x-o2-mcp" = json!({
             "description": "List all alert destinations",
             "category": "alerts",
-            "summary_fields": {
-                "fields": ["name", "type", "template"]
-            }
+            "summary_fields": ["name", "type", "template"]
         }))
     )
 )]

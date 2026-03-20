@@ -522,6 +522,31 @@
                           </div>
                         </div>
                       </template>
+                      <!-- Tool response: list items from normalized { total, items } -->
+                      <template v-else-if="block.response && block.response.items && Array.isArray(block.response.items)">
+                        <div v-if="block.response.items.length > 0" class="detail-item">
+                          <div class="detail-header">
+                            <span class="detail-label">Items</span>
+                            <q-btn
+                              flat
+                              dense
+                              size="xs"
+                              icon="content_copy"
+                              class="copy-btn"
+                              @click.stop="copyToClipboard(JSON.stringify(block.response.items, null, 2))"
+                            >
+                              <q-tooltip>Copy items</q-tooltip>
+                            </q-btn>
+                          </div>
+                          <div class="tool-response-hits">
+                            <div v-for="(item, iIdx) in block.response.items" :key="iIdx" class="tool-response-list-item">
+                              <div v-for="(val, key) in item" :key="key" class="hit-field">
+                                <span class="hit-key">{{ key }}:</span> {{ typeof val === 'object' ? JSON.stringify(val) : val }}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
                       <!-- Tool response: generic fallback (string or other) -->
                       <div v-else-if="block.response" class="detail-item">
                         <div class="detail-header">
@@ -1712,7 +1737,8 @@ export default defineComponent({
                         type: 'tool_call',
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
-                        context: activeToolCall.value.context
+                        context: activeToolCall.value.context,
+                        call_id: activeToolCall.value.call_id
                       };
                       let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                       if (lastMessage && lastMessage.role === 'assistant') {
@@ -1727,7 +1753,8 @@ export default defineComponent({
                     activeToolCall.value = {
                       tool: data.tool,
                       message: data.message,
-                      context: data.context || {}
+                      context: data.context || {},
+                      call_id: data.call_id || undefined
                     };
 
                     finalizeTextBlock();
@@ -1744,7 +1771,8 @@ export default defineComponent({
                         type: 'tool_call',
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
-                        context: activeToolCall.value.context
+                        context: activeToolCall.value.context,
+                        call_id: activeToolCall.value.call_id
                       };
                       if (lastMessage && lastMessage.role === 'assistant') {
                         if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
@@ -1811,7 +1839,8 @@ export default defineComponent({
                         type: 'tool_call',
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
-                        context: activeToolCall.value.context
+                        context: activeToolCall.value.context,
+                        call_id: activeToolCall.value.call_id
                       };
                       let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                       if (lastMessage && lastMessage.role === 'assistant') {
@@ -1847,13 +1876,20 @@ export default defineComponent({
                       );
                     }
 
+                    // Match by call_id if available, fall back to tool name
+                    const matchesActiveToolCall = activeToolCall.value && (
+                      (data.call_id && activeToolCall.value.call_id === data.call_id) ||
+                      (!data.call_id && activeToolCall.value.tool === data.tool)
+                    );
+
                     // If active tool call matches, complete it with result data
-                    if (activeToolCall.value && activeToolCall.value.tool === data.tool) {
+                    if (matchesActiveToolCall) {
                       const completedToolBlock: ContentBlock = {
                         type: 'tool_call',
-                        tool: activeToolCall.value.tool,
-                        message: activeToolCall.value.message,
-                        context: activeToolCall.value.context,
+                        tool: activeToolCall.value!.tool,
+                        message: activeToolCall.value!.message,
+                        context: activeToolCall.value!.context,
+                        call_id: activeToolCall.value!.call_id,
                         ...resultData,
                         ...(navigationAction && { navigationAction })
                       };
@@ -1871,7 +1907,10 @@ export default defineComponent({
                       if (lastMessage && lastMessage.contentBlocks) {
                         for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
                           const block = lastMessage.contentBlocks[i];
-                          if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
+                          const blockMatches = data.call_id
+                            ? (block.call_id === data.call_id)
+                            : (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined);
+                          if (blockMatches) {
                             Object.assign(block, resultData);
                             if (navigationAction) {
                               block.navigationAction = navigationAction;
@@ -1883,7 +1922,10 @@ export default defineComponent({
                       // Also check pending tool calls
                       for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
                         const block = pendingToolCalls.value[i];
-                        if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
+                        const blockMatches = data.call_id
+                          ? (block.call_id === data.call_id)
+                          : (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined);
+                        if (blockMatches) {
                           Object.assign(block, resultData);
                           break;
                         }
@@ -1959,6 +2001,7 @@ export default defineComponent({
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
                         context: activeToolCall.value.context,
+                        call_id: activeToolCall.value.call_id,
                         success: false,
                         resultMessage: data.message || 'Tool execution failed',
                         errorType: data.error_type || undefined,
@@ -2007,7 +2050,8 @@ export default defineComponent({
                         type: 'tool_call',
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
-                        context: activeToolCall.value.context
+                        context: activeToolCall.value.context,
+                        call_id: activeToolCall.value.call_id
                       };
                       let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                       if (lastMessage && lastMessage.role === 'assistant') {
@@ -2120,7 +2164,8 @@ export default defineComponent({
                       type: 'tool_call',
                       tool: activeToolCall.value.tool,
                       message: activeToolCall.value.message,
-                      context: activeToolCall.value.context
+                      context: activeToolCall.value.context,
+                      call_id: activeToolCall.value.call_id
                     };
                     let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                     if (lastMessage && lastMessage.role === 'assistant') {
@@ -2135,7 +2180,8 @@ export default defineComponent({
                   activeToolCall.value = {
                     tool: data.tool,
                     message: data.message,
-                    context: data.context || {}
+                    context: data.context || {},
+                    call_id: data.call_id || undefined
                   };
 
                   finalizeTextBlock();
@@ -2151,7 +2197,8 @@ export default defineComponent({
                       type: 'tool_call',
                       tool: activeToolCall.value.tool,
                       message: activeToolCall.value.message,
-                      context: activeToolCall.value.context
+                      context: activeToolCall.value.context,
+                      call_id: activeToolCall.value.call_id
                     };
                     if (lastMessage && lastMessage.role === 'assistant') {
                       if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
@@ -2218,7 +2265,8 @@ export default defineComponent({
                       type: 'tool_call',
                       tool: activeToolCall.value.tool,
                       message: activeToolCall.value.message,
-                      context: activeToolCall.value.context
+                      context: activeToolCall.value.context,
+                      call_id: activeToolCall.value.call_id
                     };
                     let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                     if (lastMessage && lastMessage.role === 'assistant') {
@@ -2241,14 +2289,22 @@ export default defineComponent({
                     errorType: data.error_type || undefined,
                     suggestion: data.suggestion || undefined,
                     details: data.details || undefined,
+                    response: data.response || undefined,
                   };
 
-                  if (activeToolCall.value && activeToolCall.value.tool === data.tool) {
+                  // Match by call_id if available, fall back to tool name
+                  const matchesActive = activeToolCall.value && (
+                    (data.call_id && activeToolCall.value.call_id === data.call_id) ||
+                    (!data.call_id && activeToolCall.value.tool === data.tool)
+                  );
+
+                  if (matchesActive) {
                     const completedToolBlock: ContentBlock = {
                       type: 'tool_call',
-                      tool: activeToolCall.value.tool,
-                      message: activeToolCall.value.message,
-                      context: activeToolCall.value.context,
+                      tool: activeToolCall.value!.tool,
+                      message: activeToolCall.value!.message,
+                      context: activeToolCall.value!.context,
+                      call_id: activeToolCall.value!.call_id,
                       ...resultData
                     };
                     let lastMessage = chatMessages.value[chatMessages.value.length - 1];
@@ -2264,7 +2320,10 @@ export default defineComponent({
                     if (lastMessage && lastMessage.contentBlocks) {
                       for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
                         const block = lastMessage.contentBlocks[i];
-                        if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
+                        const blockMatches = data.call_id
+                          ? (block.call_id === data.call_id)
+                          : (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined);
+                        if (blockMatches) {
                           Object.assign(block, resultData);
                           break;
                         }
@@ -2272,7 +2331,10 @@ export default defineComponent({
                     }
                     for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
                       const block = pendingToolCalls.value[i];
-                      if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
+                      const blockMatches = data.call_id
+                        ? (block.call_id === data.call_id)
+                        : (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined);
+                      if (blockMatches) {
                         Object.assign(block, resultData);
                         break;
                       }
@@ -2289,6 +2351,7 @@ export default defineComponent({
                       tool: activeToolCall.value.tool,
                       message: activeToolCall.value.message,
                       context: activeToolCall.value.context,
+                      call_id: activeToolCall.value.call_id,
                       success: false,
                       resultMessage: data.message || 'Tool execution failed',
                       errorType: data.error_type || undefined,
@@ -2335,7 +2398,8 @@ export default defineComponent({
                       type: 'tool_call',
                       tool: activeToolCall.value.tool,
                       message: activeToolCall.value.message,
-                      context: activeToolCall.value.context
+                      context: activeToolCall.value.context,
+                      call_id: activeToolCall.value.call_id
                     };
                     let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                     if (lastMessage && lastMessage.role === 'assistant') {
@@ -4261,6 +4325,11 @@ export default defineComponent({
       if (block.tool === 'GetDashboard' && block.context?.dashboard_id) {
         return { text: 'Fetched dashboard ', highlight: block.context.dashboard_id, suffix: '' };
       }
+      // List tools: show count from normalized { total, items } response
+      if (block.response?.total !== undefined && block.success !== false) {
+        const base = block.message || block.tool || 'Listed';
+        return { text: base + ' ', highlight: `(Found ${block.response.total})`, suffix: '' };
+      }
       // Generic fallback
       if (block.success === false && block.resultMessage) {
         // Truncate long error messages for the header
@@ -5907,6 +5976,18 @@ export default defineComponent({
     &:not(:last-child) {
       border-bottom: 1px solid rgba(128, 128, 128, 0.15);
       padding-bottom: 4px;
+    }
+  }
+
+  .tool-response-list-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 0;
+
+    &:not(:last-child) {
+      border-bottom: 1px solid rgba(128, 128, 128, 0.15);
+      padding-bottom: 6px;
     }
   }
 

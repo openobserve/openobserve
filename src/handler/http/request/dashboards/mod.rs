@@ -216,10 +216,7 @@ pub async fn update_dashboard(
         ("x-o2-mcp" = json!({
             "description": "List all dashboards in organization",
             "category": "dashboards",
-            "summary_fields": {
-                "list_path": "dashboards",
-                "fields": ["dashboard_id", "title", "description", "owner", "folder_name"]
-            }
+            "summary_fields": ["dashboard_id", "title", "description", "owner", "folder_name"]
         }))
     )
 )]
