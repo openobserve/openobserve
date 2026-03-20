@@ -146,7 +146,6 @@ import useTraces, { DEFAULT_TRACE_COLUMNS } from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
 import BasicValuesFilter from "./fields-sidebar/BasicValuesFilter.vue";
 import FieldRow from "@/components/common/FieldRow.vue";
-import { computed } from "vue";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
