@@ -650,6 +650,18 @@ export default defineComponent({
       );
       editorObj.onDidFocusEditorWidget(() => {
         emit("focus");
+
+        // added hack to handle case where ctrl+enter / cmd+enter stops working after 
+        // user click on the result row and open sidebase or opensidebar from schedule search
+        // This is because the editor loses focus and the context key "ctrlenter" is not active anymore, so we need to re-add the command on focus
+        editorObj.addCommand(
+          monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+          function () {
+            // Emit run-query event when Ctrl/Cmd+Enter is pressed
+            emit("run-query");
+          },
+          "ctrlenter",
+        );
       });
 
       editorObj.onDidBlurEditorWidget(() => {
