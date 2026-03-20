@@ -243,6 +243,7 @@ import {
   ref,
   onDeactivated,
   onActivated,
+  onUnmounted,
   onBeforeMount,
   nextTick,
   defineAsyncComponent,
@@ -1312,7 +1313,12 @@ onDeactivated(() => {
   clearInterval(refreshIntervalID);
 });
 
+onUnmounted(() => {
+  cleanupContextProvider();
+});
+
 onActivated(() => {
+  setupContextProvider();
   const params = router.currentRoute.value.query;
   if (params.reload === "true") {
     restoreUrlQueryParams();
