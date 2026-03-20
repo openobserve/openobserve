@@ -35,7 +35,7 @@ use datafusion::{
     physical_plan::{
         ExecutionPlan,
         expressions::{BinaryExpr, LikeExpr},
-        filter::FilterExec,
+        filter::{FilterExec, FilterExecBuilder},
     },
     scalar::ScalarValue,
 };
@@ -133,8 +133,10 @@ impl TreeNodeRewriter for PlanRewriter {
                 .data()?;
 
             // 5. Create new filter with rewritten predicate
-            let new_filter = FilterExec::try_new(rewritten_predicate, input)?
-                .with_projection(add_fst_fields_to_projection.filter_projection.clone())?;
+            let new_filter = FilterExecBuilder::new(rewritten_predicate, input)
+                .apply_projection(add_fst_fields_to_projection.filter_projection.clone())?
+                .with_fetch(filter.fetch())
+                .build()?;
             return Ok(Transformed::yes(Arc::new(new_filter)));
         }
         Ok(Transformed::no(plan))

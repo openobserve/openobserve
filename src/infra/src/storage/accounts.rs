@@ -22,7 +22,8 @@ use futures::stream::BoxStream;
 use hashbrown::{HashMap, HashSet};
 use object_store::{
     GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
-    PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, path::Path,
+    ObjectStoreExt as ObjStoreExt, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result,
+    path::Path,
 };
 
 use crate::storage::{ObjectStoreExt, get_stream_from_file, remote::StorageConfig};
@@ -329,14 +330,23 @@ impl ObjectStoreExt for StorageClientFactory {
     }
 
     async fn delete(&self, account: &str, location: &Path) -> Result<()> {
-        self.get_client_by_name(account).delete(location).await
+        let client = self.get_client_by_name(account);
+        let mut result: Result<()> = Ok(());
+        for _ in 0..3 {
+            result = client.delete(location).await;
+            if result.is_ok() {
+                break;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+        result
     }
 
-    fn delete_stream<'a>(
-        &'a self,
+    fn delete_stream(
+        &self,
         account: &str,
-        locations: BoxStream<'a, Result<Path>>,
-    ) -> BoxStream<'a, Result<Path>> {
+        locations: BoxStream<'static, Result<Path>>,
+    ) -> BoxStream<'static, Result<Path>> {
         self.get_client_by_name(account).delete_stream(locations)
     }
 

@@ -15,7 +15,10 @@
 
 use std::{io::Cursor, sync::Arc};
 
-use arrow::ipc::{CompressionType, writer::IpcWriteOptions};
+use arrow::{
+    compute::BatchCoalescer,
+    ipc::{CompressionType, writer::IpcWriteOptions},
+};
 use arrow_flight::{
     Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo,
     HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
@@ -27,7 +30,8 @@ use config::{
 };
 use datafusion::{
     common::{DataFusionError, Result},
-    physical_plan::{ExecutionPlan, coalesce_batches::CoalesceBatchesExec, execute_stream},
+    execution::SendableRecordBatchStream,
+    physical_plan::{execute_stream, stream::RecordBatchStreamAdapter},
 };
 use flight::common::{MetricsInfo, PreCustomMessage};
 use futures::{StreamExt, stream::BoxStream};
@@ -64,6 +68,37 @@ pub mod visitor;
 
 #[derive(Default)]
 pub struct FlightServiceImpl;
+
+fn coalesce_record_batches(
+    stream: SendableRecordBatchStream,
+    target_batch_size: usize,
+) -> SendableRecordBatchStream {
+    let schema = stream.schema();
+    let stream_schema = schema.clone();
+    let coalesced_stream = async_stream::try_stream! {
+        let mut input = stream;
+        let mut coalescer = BatchCoalescer::new(stream_schema, target_batch_size);
+
+        while let Some(batch) = input.next().await {
+            let batch = batch?;
+            coalescer
+                .push_batch(batch)
+                .map_err(|e| DataFusionError::ArrowError(Box::new(e), None))?;
+            while let Some(batch) = coalescer.next_completed_batch() {
+                yield batch;
+            }
+        }
+
+        coalescer
+            .finish_buffered_batch()
+            .map_err(|e| DataFusionError::ArrowError(Box::new(e), None))?;
+        while let Some(batch) = coalescer.next_completed_batch() {
+            yield batch;
+        }
+    };
+
+    Box::pin(RecordBatchStreamAdapter::new(schema, coalesced_stream))
+}
 
 #[tonic::async_trait]
 impl FlightService for FlightServiceImpl {
@@ -162,11 +197,6 @@ impl FlightService for FlightServiceImpl {
                 return Err(Status::internal(e.to_string()));
             }
         };
-        // https://github.com/openobserve/openobserve/issues/8280
-        // https://github.com/apache/datafusion/pull/11587
-        // add coalesce batches exec to trigger StringView gc to reduce memory usage
-        let physical_plan: Arc<dyn ExecutionPlan> =
-            Arc::new(CoalesceBatchesExec::new(physical_plan, get_batch_size()));
 
         log::info!(
             "[trace_id {trace_id}] flight->search: executing stream, is super cluster: {is_super_cluster}"
@@ -218,6 +248,10 @@ impl FlightService for FlightServiceImpl {
             );
             Status::internal(e.to_string())
         })?;
+        // https://github.com/openobserve/openobserve/issues/8280
+        // https://github.com/apache/datafusion/pull/11587
+        // Coalesce output batches to trigger StringView GC without relying on the deprecated exec.
+        let stream = coalesce_record_batches(stream, get_batch_size());
 
         let mut stream = FlightEncoderStreamBuilder::new(write_options, 33554432)
             .with_trace_id(trace_id.to_string())

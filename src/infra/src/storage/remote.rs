@@ -13,15 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{ops::Range, time::Duration};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::{get_config, metrics};
 use futures::stream::BoxStream;
 use object_store::{
-    Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
-    PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, limit::LimitStore, path::Path,
+    CopyOptions, Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta,
+    ObjectStore, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, limit::LimitStore,
+    path::Path,
 };
 
 use crate::storage::CONCURRENT_REQUESTS;
@@ -139,40 +140,6 @@ impl ObjectStore for Remote {
         }
     }
 
-    async fn get(&self, location: &Path) -> Result<GetResult> {
-        let start = std::time::Instant::now();
-        let file = location.to_string();
-        let result = self
-            .client
-            .get(&(self.format_key(&file).into()))
-            .await
-            .map_err(|e| {
-                if file.ne(TEST_FILE) {
-                    log::error!("[STORAGE] get remote file: {file}, error: {e:?}");
-                }
-                e
-            })?;
-
-        // metrics
-        let data_len = result.meta.size;
-        let columns = file.split('/').collect::<Vec<&str>>();
-        if columns[0] == "files" {
-            metrics::STORAGE_READ_BYTES
-                .with_label_values(&[columns[1], columns[2], "get", "remote"])
-                .inc_by(data_len);
-            metrics::STORAGE_READ_REQUESTS
-                .with_label_values(&[columns[1], columns[2], "get", "remote"])
-                .inc();
-            let time = start.elapsed().as_secs_f64();
-            metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get", "remote"])
-                .inc_by(time);
-        }
-        log::debug!("[STORAGE] get remote file: {file}");
-
-        Ok(result)
-    }
-
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
         let start = std::time::Instant::now();
         let file = location.to_string();
@@ -204,57 +171,11 @@ impl ObjectStore for Remote {
         Ok(result)
     }
 
-    async fn get_range(&self, location: &Path, range: Range<u64>) -> Result<Bytes> {
-        let start = std::time::Instant::now();
-        let file = location.to_string();
-        let data = self
-            .client
-            .get_range(&(self.format_key(&file).into()), range.clone())
-            .await
-            .map_err(|e| {
-                log::error!(
-                    "[STORAGE] get_range remote file: {file}, range: {range:?}, error: {e:?}"
-                );
-                e
-            })?;
-
-        // metrics
-        let data_len = data.len() as u64;
-        let columns = file.split('/').collect::<Vec<&str>>();
-        if columns[0] == "files" {
-            metrics::STORAGE_READ_BYTES
-                .with_label_values(&[columns[1], columns[2], "get_range", "remote"])
-                .inc_by(data_len);
-            metrics::STORAGE_READ_REQUESTS
-                .with_label_values(&[columns[1], columns[2], "get_range", "remote"])
-                .inc();
-            let time = start.elapsed().as_secs_f64();
-            metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get_range", "remote"])
-                .inc_by(time);
-        }
-
-        Ok(data)
-    }
-
-    async fn delete(&self, location: &Path) -> Result<()> {
-        let mut result: Result<()> = Ok(());
-        for _ in 0..3 {
-            result = self
-                .client
-                .delete(&(self.format_key(location.as_ref()).into()))
-                .await;
-            if result.is_ok() {
-                let file = location.to_string();
-                let columns = file.split('/').collect::<Vec<&str>>();
-                metrics::STORAGE_WRITE_REQUESTS
-                    .with_label_values(&[columns[1], columns[2], "remote"])
-                    .inc();
-                break;
-            }
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-        }
-        result
+    fn delete_stream(
+        &self,
+        locations: BoxStream<'static, Result<Path>>,
+    ) -> BoxStream<'static, Result<Path>> {
+        self.client.delete_stream(locations)
     }
 
     fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
@@ -264,15 +185,17 @@ impl ObjectStore for Remote {
     }
 
     async fn list_with_delimiter(&self, _prefix: Option<&Path>) -> Result<ListResult> {
-        Err(Error::NotImplemented)
+        Err(Error::NotImplemented {
+            operation: "list_with_delimiter".to_string(),
+            implementer: "Remote".to_string(),
+        })
     }
 
-    async fn copy(&self, _from: &Path, _to: &Path) -> Result<()> {
-        Err(Error::NotImplemented)
-    }
-
-    async fn copy_if_not_exists(&self, _from: &Path, _to: &Path) -> Result<()> {
-        Err(Error::NotImplemented)
+    async fn copy_opts(&self, _from: &Path, _to: &Path, _options: CopyOptions) -> Result<()> {
+        Err(Error::NotImplemented {
+            operation: "copy_opts".to_string(),
+            implementer: "Remote".to_string(),
+        })
     }
 }
 

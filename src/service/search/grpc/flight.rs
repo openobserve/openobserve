@@ -88,7 +88,7 @@ pub async fn search(
     log::info!("[trace_id {trace_id}] flight->search: start");
 
     // create datafusion context, just used for decode plan, the params can use default
-    let mut ctx = DataFusionContextBuilder::new()
+    let ctx = DataFusionContextBuilder::new()
         .trace_id(&trace_id)
         .work_group(work_group.clone())
         .build(cfg.limit.cpu_num)
@@ -96,7 +96,8 @@ pub async fn search(
 
     // register udf
     register_udf(&ctx, &org_id)?;
-    datafusion_functions_json::register_all(&mut ctx)?;
+    // TODO: re-enable when datafusion-functions-json is upgraded to datafusion 53
+    // datafusion_functions_json::register_all(&mut ctx)?;
 
     // Decode physical plan from bytes
     let proto = get_physical_extension_codec();

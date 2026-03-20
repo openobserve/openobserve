@@ -61,7 +61,10 @@ impl ObjectStoreExt for CacheFS {
         _location: &Path,
         _payload: PutPayload,
     ) -> Result<PutResult> {
-        Err(Error::NotImplemented)
+        Err(Error::NotImplemented {
+            operation: "put".to_string(),
+            implementer: "CacheFS".to_string(),
+        })
     }
 
     async fn put_opts(
@@ -71,7 +74,10 @@ impl ObjectStoreExt for CacheFS {
         _payload: PutPayload,
         _opts: PutOptions,
     ) -> Result<PutResult> {
-        Err(Error::NotImplemented)
+        Err(Error::NotImplemented {
+            operation: "put_opts".to_string(),
+            implementer: "CacheFS".to_string(),
+        })
     }
 
     async fn put_multipart(
@@ -79,7 +85,10 @@ impl ObjectStoreExt for CacheFS {
         _account: &str,
         _location: &Path,
     ) -> Result<Box<dyn MultipartUpload>> {
-        Err(Error::NotImplemented)
+        Err(Error::NotImplemented {
+            operation: "put_multipart".to_string(),
+            implementer: "CacheFS".to_string(),
+        })
     }
 
     async fn put_multipart_opts(
@@ -88,7 +97,10 @@ impl ObjectStoreExt for CacheFS {
         _location: &Path,
         _opts: PutMultipartOptions,
     ) -> Result<Box<dyn MultipartUpload>> {
-        Err(Error::NotImplemented)
+        Err(Error::NotImplemented {
+            operation: "put_multipart_opts".to_string(),
+            implementer: "CacheFS".to_string(),
+        })
     }
 
     async fn get(&self, account: &str, location: &Path) -> Result<GetResult> {
@@ -159,15 +171,24 @@ impl ObjectStoreExt for CacheFS {
     }
 
     async fn delete(&self, _account: &str, _location: &Path) -> Result<()> {
-        Err(Error::NotImplemented)
+        Err(Error::NotImplemented {
+            operation: "delete".to_string(),
+            implementer: "CacheFS".to_string(),
+        })
     }
 
-    fn delete_stream<'a>(
-        &'a self,
+    fn delete_stream(
+        &self,
         _account: &str,
-        _locations: BoxStream<'a, Result<Path>>,
-    ) -> BoxStream<'a, Result<Path>> {
-        futures::stream::once(async { Err(object_store::Error::NotImplemented {}) }).boxed()
+        _locations: BoxStream<'static, Result<Path>>,
+    ) -> BoxStream<'static, Result<Path>> {
+        futures::stream::once(async {
+            Err(object_store::Error::NotImplemented {
+                operation: "delete_stream".to_string(),
+                implementer: "CacheFS".to_string(),
+            })
+        })
+        .boxed()
     }
 
     fn list(
@@ -175,7 +196,13 @@ impl ObjectStoreExt for CacheFS {
         _account: &str,
         _prefix: Option<&Path>,
     ) -> BoxStream<'static, Result<ObjectMeta>> {
-        futures::stream::once(async { Err(object_store::Error::NotImplemented {}) }).boxed()
+        futures::stream::once(async {
+            Err(object_store::Error::NotImplemented {
+                operation: "list".to_string(),
+                implementer: "CacheFS".to_string(),
+            })
+        })
+        .boxed()
     }
 
     fn list_with_offset(
@@ -184,7 +211,13 @@ impl ObjectStoreExt for CacheFS {
         _prefix: Option<&Path>,
         _offset: &Path,
     ) -> BoxStream<'static, Result<ObjectMeta>> {
-        futures::stream::once(async { Err(object_store::Error::NotImplemented {}) }).boxed()
+        futures::stream::once(async {
+            Err(object_store::Error::NotImplemented {
+                operation: "list_with_offset".to_string(),
+                implementer: "CacheFS".to_string(),
+            })
+        })
+        .boxed()
     }
 
     async fn list_with_delimiter(
@@ -192,23 +225,38 @@ impl ObjectStoreExt for CacheFS {
         _account: &str,
         _prefix: Option<&Path>,
     ) -> Result<ListResult> {
-        Err(Error::NotImplemented)
+        Err(Error::NotImplemented {
+            operation: "list_with_delimiter".to_string(),
+            implementer: "CacheFS".to_string(),
+        })
     }
 
     async fn copy(&self, _account: &str, _from: &Path, _to: &Path) -> Result<()> {
-        Err(Error::NotImplemented)
+        Err(Error::NotImplemented {
+            operation: "copy".to_string(),
+            implementer: "CacheFS".to_string(),
+        })
     }
 
     async fn rename(&self, _account: &str, _from: &Path, _to: &Path) -> Result<()> {
-        Err(Error::NotImplemented)
+        Err(Error::NotImplemented {
+            operation: "rename".to_string(),
+            implementer: "CacheFS".to_string(),
+        })
     }
 
     async fn copy_if_not_exists(&self, _account: &str, _from: &Path, _to: &Path) -> Result<()> {
-        Err(Error::NotImplemented)
+        Err(Error::NotImplemented {
+            operation: "copy_if_not_exists".to_string(),
+            implementer: "CacheFS".to_string(),
+        })
     }
 
     async fn rename_if_not_exists(&self, _account: &str, _from: &Path, _to: &Path) -> Result<()> {
-        Err(Error::NotImplemented)
+        Err(Error::NotImplemented {
+            operation: "rename_if_not_exists".to_string(),
+            implementer: "CacheFS".to_string(),
+        })
     }
 }
 
@@ -264,7 +312,7 @@ mod tests {
 
         let result = cache_fs.put("default", &location, payload).await;
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), Error::NotImplemented));
+        assert!(matches!(result.unwrap_err(), Error::NotImplemented { .. }));
     }
 
     #[tokio::test]
@@ -276,7 +324,7 @@ mod tests {
 
         let result = cache_fs.put_opts("default", &location, payload, opts).await;
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), Error::NotImplemented));
+        assert!(matches!(result.unwrap_err(), Error::NotImplemented { .. }));
     }
 
     #[tokio::test]
@@ -286,7 +334,7 @@ mod tests {
 
         let result = cache_fs.put_multipart("default", &location).await;
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), Error::NotImplemented));
+        assert!(matches!(result.unwrap_err(), Error::NotImplemented { .. }));
     }
 
     #[tokio::test]
@@ -299,7 +347,7 @@ mod tests {
             .put_multipart_opts("default", &location, opts)
             .await;
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), Error::NotImplemented));
+        assert!(matches!(result.unwrap_err(), Error::NotImplemented { .. }));
     }
 
     #[tokio::test]
@@ -369,7 +417,7 @@ mod tests {
 
         let result = cache_fs.delete("default", &location).await;
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), Error::NotImplemented));
+        assert!(matches!(result.unwrap_err(), Error::NotImplemented { .. }));
     }
 
     #[tokio::test]
@@ -393,7 +441,7 @@ mod tests {
 
         let result = cache_fs.copy("default", &from, &to).await;
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), Error::NotImplemented));
+        assert!(matches!(result.unwrap_err(), Error::NotImplemented { .. }));
     }
 
     #[tokio::test]
@@ -404,7 +452,7 @@ mod tests {
 
         let result = cache_fs.rename("default", &from, &to).await;
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), Error::NotImplemented));
+        assert!(matches!(result.unwrap_err(), Error::NotImplemented { .. }));
     }
 
     #[tokio::test]
@@ -415,7 +463,7 @@ mod tests {
 
         let result = cache_fs.copy_if_not_exists("default", &from, &to).await;
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), Error::NotImplemented));
+        assert!(matches!(result.unwrap_err(), Error::NotImplemented { .. }));
     }
 
     #[tokio::test]
@@ -426,7 +474,7 @@ mod tests {
 
         let result = cache_fs.rename_if_not_exists("default", &from, &to).await;
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), Error::NotImplemented));
+        assert!(matches!(result.unwrap_err(), Error::NotImplemented { .. }));
     }
 
     // Test the public functions that use the DEFAULT instance

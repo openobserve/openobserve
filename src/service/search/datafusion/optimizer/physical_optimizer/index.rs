@@ -35,10 +35,10 @@ use datafusion::{
     physical_optimizer::PhysicalOptimizerRule,
     physical_plan::{
         ExecutionPlan, PhysicalExpr,
-        expressions::{BinaryExpr, Column, InListExpr, NotExpr},
-        filter::FilterExec,
-        projection::ProjectionExec,
+        expressions::{BinaryExpr, InListExpr, Literal, NotExpr},
+        filter::{FilterExec, FilterExecBuilder},
     },
+    scalar::ScalarValue,
 };
 use parking_lot::Mutex;
 
@@ -222,30 +222,20 @@ fn construct_filter_exec(
     exprs: Vec<Arc<dyn PhysicalExpr>>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     if exprs.is_empty() {
-        match filter.projection() {
-            Some(projection_indices) => {
-                let filter_child_schema = filter.input().schema();
-                let proj_exprs = projection_indices
-                    .iter()
-                    .map(|p| {
-                        let field = filter_child_schema.field(*p).clone();
-                        (
-                            Arc::new(Column::new(field.name(), *p)) as Arc<dyn PhysicalExpr>,
-                            field.name().to_string(),
-                        )
-                    })
-                    .collect::<Vec<_>>();
-                Ok(Arc::new(ProjectionExec::try_new(
-                    proj_exprs,
-                    filter.input().clone(),
-                )?))
-            }
-            None => Ok(filter.input().clone()),
-        }
+        let plan = FilterExecBuilder::new(
+            Arc::new(Literal::new(ScalarValue::Boolean(Some(true)))),
+            filter.input().clone(),
+        )
+        .apply_projection_by_ref(filter.projection().as_ref())?
+        .with_fetch(filter.fetch())
+        .build()?;
+        Ok(Arc::new(plan))
     } else {
         // TODO: remove the unused column after extract index condition
-        let plan = FilterExec::try_new(conjunction(exprs), filter.input().clone())?
-            .with_projection(filter.projection().cloned())?;
+        let plan = FilterExecBuilder::new(conjunction(exprs), filter.input().clone())
+            .apply_projection_by_ref(filter.projection().as_ref())?
+            .with_fetch(filter.fetch())
+            .build()?;
         Ok(Arc::new(plan))
     }
 }

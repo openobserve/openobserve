@@ -16,7 +16,9 @@
 use std::ops::Range;
 
 use config::get_config;
-use object_store::{GetOptions, GetResult, ObjectMeta, ObjectStore, Result, path::Path};
+use object_store::{
+    GetOptions, GetResult, ObjectMeta, ObjectStore, ObjectStoreExt as _, Result, path::Path,
+};
 use once_cell::sync::Lazy;
 
 static DEFAULT: Lazy<Box<dyn ObjectStore>> = Lazy::new(default);
@@ -126,7 +128,7 @@ mod tests {
 
         // Verify the error is NotImplemented (as implemented in local storage)
         if let Err(e) = result {
-            assert!(matches!(e, object_store::Error::NotImplemented));
+            assert!(matches!(e, object_store::Error::NotImplemented { .. }));
         }
     }
 
@@ -284,7 +286,7 @@ mod tests {
         ));
         assert!(matches!(
             head_result,
-            Err(object_store::Error::NotImplemented)
+            Err(object_store::Error::NotImplemented { .. })
         ));
     }
 }
