@@ -118,7 +118,9 @@
     "copySuccess": "Gekopieerd naar klembord",
     "copyError": "Kopiëren naar klembord is mislukt",
     "goBack": "Ga terug",
-    "stopGenerating": "Stop met genereren"
+    "stopGenerating": "Stop met genereren",
+    "version": "Versie",
+    "create": "Creëren"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -2614,7 +2616,11 @@
     "discardChangesTitle": "Wijzigingen negeren",
     "deleteNodeTitle": "Knooppunt verwijderen",
     "deleteNodeLlmEvalConfirm": "Weet u zeker dat u dit LLM-evaluatieknooppunt wilt verwijderen?",
-    "evalTemplates": "Evaluatiesjablonen"
+    "evalTemplates": "Evaluatiesjablonen",
+    "evaluationTemplate": "Evaluatiesjabloon",
+    "evaluationTemplateHelp": "Selecteer een evaluatiesjabloon dat de criteria en dimensies voor de LLM-jurylid definieert.",
+    "noTemplatesFound": "Geen evaluatiesjablonen gevonden. Maak er een op de pagina Evaluatiesjablonen.",
+    "evalTemplatesRefreshed": "Evaluatiesjablonen zijn succesvol vernieuwd"
   },
   "reports": {
     "header": "Rapporten",
@@ -3185,5 +3191,40 @@
     "guideQuery": "Huidige SQL-query",
     "guideQueryEncoded": "SQL-query met Base64-codering",
     "guideExampleHeader": "Voorbeeld"
+  },
+  "evalTemplate": {
+    "header": "Evaluatiesjablonen",
+    "newTemplate": "Nieuw sjabloon",
+    "editTemplate": "Evaluatiesjabloon bewerken",
+    "createTemplate": "Maak een nieuw evaluatiesjabloon",
+    "noTemplatesFound": "Geen evaluatiesjablonen gevonden",
+    "templateName": "Naam van de sjabloon",
+    "responseType": "Soort reactie",
+    "dimensions": "Afmetingen van de evaluatie",
+    "promptTemplate": "Prompt-sjabloon",
+    "statsTitle": "Sjabloonstatistieken",
+    "avgQualityScore": "Gemiddelde kwaliteitsscore",
+    "usageStats": "Gebruiksstatistieken",
+    "totalEvaluations": "Totaal aantal beoordelingen",
+    "lastUsed": "Laatst gebruikt",
+    "deleteTemplate": "Sjabloon verwijderen",
+    "deleteConfirmation": "Weet je zeker dat je „{name}” wilt verwijderen?",
+    "loadFailed": "Het laden van sjablonen is mislukt",
+    "saveRequiredFields": "Gelieve alle verplichte velden in te vullen",
+    "updateSuccess": "Sjabloon succesvol bijgewerkt",
+    "createSuccess": "Sjabloon succesvol aangemaakt",
+    "updateFailed": "Het bijwerken van de sjabloon is mislukt",
+    "createFailed": "Het aanmaken van een sjabloon is mislukt",
+    "deleteSuccess": "Sjabloon succesvol verwijderd",
+    "deleteFailed": "Het verwijderen van de sjabloon is mislukt",
+    "statsLoadFailed": "Het laden van sjabloonstatistieken is mislukt",
+    "nameRequired": "Naam is verplicht",
+    "responseTypeRequired": "Antwoordtype is vereist",
+    "dimensionRequired": "Er is minstens één dimensie vereist",
+    "contentRequired": "Inhoud is vereist",
+    "never": "Nooit",
+    "typeScore": "Numerieke score (bijvoorbeeld 0,0 - 1,0)",
+    "typeBoolean": "Binair/Pass-Fail (Booleaans)",
+    "typeCustom": "Categorische/aangepaste tekst"
   }
 }

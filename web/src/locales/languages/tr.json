@@ -118,7 +118,9 @@
     "copySuccess": "Panoya kopyalandı",
     "copyError": "Panoya kopyalanamadı",
     "goBack": "Geri Dön",
-    "stopGenerating": "Oluşturmayı bırak"
+    "stopGenerating": "Oluşturmayı bırak",
+    "version": "Versiyon",
+    "create": "Oluştur"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -2614,7 +2616,11 @@
     "discardChangesTitle": "Değişiklikleri Atma",
     "deleteNodeTitle": "Düğümü Sil",
     "deleteNodeLlmEvalConfirm": "Bu LLM değerlendirme düğümünü silmek istediğinizden emin misiniz?",
-    "evalTemplates": "Değerlendirme Şablonları"
+    "evalTemplates": "Değerlendirme Şablonları",
+    "evaluationTemplate": "Değerlendirme Şablonu",
+    "evaluationTemplateHelp": "LLM hakimi için kriterleri ve boyutları tanımlayan bir değerlendirme şablonu seçin.",
+    "noTemplatesFound": "Değerlendirme şablonu bulunamadı. Değerlendirme Şablonları sayfasında bir tane oluşturun.",
+    "evalTemplatesRefreshed": "Değerlendirme şablonları başarıyla yenilendi"
   },
   "reports": {
     "header": "Raporlar",
@@ -3185,5 +3191,40 @@
     "guideQuery": "Geçerli SQL sorgusu",
     "guideQueryEncoded": "Base64 kodlu SQL sorgusu",
     "guideExampleHeader": "Örnek"
+  },
+  "evalTemplate": {
+    "header": "Değerlendirme Şablonları",
+    "newTemplate": "Yeni Şablon",
+    "editTemplate": "Değerlendirme Şablonunu Düzenle",
+    "createTemplate": "Yeni Değerlendirme Şablonu Oluştur",
+    "noTemplatesFound": "Değerlendirme şablonu bulunamadı",
+    "templateName": "Şablon Adı",
+    "responseType": "Yanıt Türü",
+    "dimensions": "Değerlendirme Boyutları",
+    "promptTemplate": "İstemi Şablonu",
+    "statsTitle": "Şablon İstatistikleri",
+    "avgQualityScore": "Ortalama Kalite Puanı",
+    "usageStats": "Kullanım İstatistikleri",
+    "totalEvaluations": "Toplam Değerlendirmeler",
+    "lastUsed": "Son Kullanılan",
+    "deleteTemplate": "Şablonu Sil",
+    "deleteConfirmation": "“{name}” silmek istediğinizden emin misiniz?",
+    "loadFailed": "Şablonlar yüklenemedi",
+    "saveRequiredFields": "Lütfen tüm zorunlu alanları doldurun",
+    "updateSuccess": "Şablon başarıyla güncellendi",
+    "createSuccess": "Şablon başarıyla oluşturuldu",
+    "updateFailed": "Şablon güncellenemedi",
+    "createFailed": "Şablon oluşturulamadı",
+    "deleteSuccess": "Şablon başarıyla silindi",
+    "deleteFailed": "Şablon silinemedi",
+    "statsLoadFailed": "Şablon istatistikleri yüklenemedi",
+    "nameRequired": "İsim zorunludur",
+    "responseTypeRequired": "Yanıt türü gereklidir",
+    "dimensionRequired": "En az bir boyut gereklidir",
+    "contentRequired": "İçerik gereklidir",
+    "never": "Asla",
+    "typeScore": "Sayısal Skor (örn. 0.0 - 1.0)",
+    "typeBoolean": "İkili/Başarısız Oldu (Boolean)",
+    "typeCustom": "Kategorik/Özel Metin"
   }
 }

@@ -118,7 +118,9 @@
     "copySuccess": "Copiato negli appunti",
     "copyError": "Copia negli appunti non riuscita",
     "goBack": "Torna indietro",
-    "stopGenerating": "Smetti di generare"
+    "stopGenerating": "Smetti di generare",
+    "version": "Versione",
+    "create": "Crea"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
@@ -2612,7 +2614,11 @@
     "discardChangesTitle": "Ignora le modifiche",
     "deleteNodeTitle": "Elimina nodo",
     "deleteNodeLlmEvalConfirm": "Sei sicuro di voler eliminare questo nodo di valutazione LLM?",
-    "evalTemplates": "Modelli di valutazione"
+    "evalTemplates": "Modelli di valutazione",
+    "evaluationTemplate": "Modello di valutazione",
+    "evaluationTemplateHelp": "Seleziona un modello di valutazione che definisca i criteri e le dimensioni per il giudice LLM.",
+    "noTemplatesFound": "Nessun modello di valutazione trovato. Creane uno nella pagina Modelli di valutazione.",
+    "evalTemplatesRefreshed": "Modelli di valutazione aggiornati con successo"
   },
   "reports": {
     "header": "Rapporti",
@@ -3183,5 +3189,40 @@
     "guideQuery": "Query SQL corrente",
     "guideQueryEncoded": "Query SQL con codifica Base64",
     "guideExampleHeader": "Esempio"
+  },
+  "evalTemplate": {
+    "header": "Modelli di valutazione",
+    "newTemplate": "Nuovo modello",
+    "editTemplate": "Modifica modello di valutazione",
+    "createTemplate": "Crea un nuovo modello di valutazione",
+    "noTemplatesFound": "Nessun modello di valutazione trovato",
+    "templateName": "Nome del modello",
+    "responseType": "Tipo di risposta",
+    "dimensions": "Dimensioni della valutazione",
+    "promptTemplate": "Modello di richiesta",
+    "statsTitle": "Statistiche dei modelli",
+    "avgQualityScore": "Punteggio medio di qualità",
+    "usageStats": "Statistiche di utilizzo",
+    "totalEvaluations": "Valutazioni totali",
+    "lastUsed": "Ultimo utilizzo",
+    "deleteTemplate": "Elimina modello",
+    "deleteConfirmation": "Sei sicuro di voler eliminare «{name}»?",
+    "loadFailed": "Caricamento dei modelli non riuscito",
+    "saveRequiredFields": "Compila tutti i campi obbligatori",
+    "updateSuccess": "Modello aggiornato con successo",
+    "createSuccess": "Modello creato con successo",
+    "updateFailed": "Aggiornamento del modello non riuscito",
+    "createFailed": "Creazione del modello non riuscita",
+    "deleteSuccess": "Modello eliminato con successo",
+    "deleteFailed": "Eliminazione del modello non riuscita",
+    "statsLoadFailed": "Caricamento delle statistiche del modello non riuscito",
+    "nameRequired": "Il nome è obbligatorio",
+    "responseTypeRequired": "Il tipo di risposta è obbligatorio",
+    "dimensionRequired": "È richiesta almeno una dimensione",
+    "contentRequired": "Il contenuto è obbligatorio",
+    "never": "Mai",
+    "typeScore": "Punteggio numerico (ad es. 0,0 - 1,0)",
+    "typeBoolean": "Binario/Pass-Fail (booleano)",
+    "typeCustom": "Testo categoriale/personalizzato"
   }
 }
