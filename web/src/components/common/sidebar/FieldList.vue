@@ -337,6 +337,7 @@ export default defineComponent({
       return filtered;
     };
 
+    // ─── Field expand / collapse ─────────────────────────────────────────
     const openFilterCreator = (
       event: any,
       { name, ftsKey, stream_name }: any,

@@ -19,6 +19,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import { nextTick } from "vue";
 import FieldList from "./FieldList.vue";
 import streamService from "@/services/stream";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 
 // Mock streamService
 vi.mock("@/services/stream", () => ({

@@ -311,10 +311,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         name="preview"
         class="llm-preview-panel q-pa-md"
       >
-        <div class="llm-preview-container tw:overflow-x-auto">
+        <div class="llm-preview-container tw:overflow-x-auto tw:w-full">
           <!-- Input and Output Side by Side -->
           <div
-            class="flex q-col-gutter-md io-container"
+            class="flex io-container tw:w-full!"
             :class="{ 'io-container-dark': isDarkMode }"
             ref="ioContainerRef"
           >
@@ -1508,7 +1508,7 @@ export default defineComponent({
 
     const viewSpanLogs = () => {
       const queryDetails = buildQueryDetails(props.span);
-      navigateToLogs(queryDetails);
+      emit("view-logs", queryDetails);
     };
 
     const getStartTime = computed(() => {
@@ -2555,9 +2555,9 @@ body.body--dark {
     gap: 0.5rem;
     width: calc(100vw - 350px);
     height: calc(
-      100vh - 296px
+      100vh - 17.2rem
     ); // Fixed height for the container (with 2-row toolbar for LLM spans)
-    max-height: calc(100vh - 296px);
+    max-height: calc(100vh - 17.2rem);
     align-items: stretch; // Ensure equal heights
     overflow: hidden; // Prevent scroll at outer level
   }
@@ -2573,7 +2573,7 @@ body.body--dark {
     flex: 1; // Take all available space
     height: 100%; // Take full height of parent
     max-height: calc(
-      100vh - 338px
+      100% - 1.625rem
     ); // Container height minus label/button height (with 2-row toolbar)
     border: 1px solid var(--o2-border-color);
     border-radius: 4px;
@@ -2613,7 +2613,7 @@ body.body--dark {
   // Fullscreen styles for the entire IO container (both Input and Output side by side)
   .io-container:fullscreen {
     background-color: #f5f5f5;
-    padding-bottom: 1rem;
+    padding: 0.75rem;
     height: 100vh; // Full viewport height in fullscreen
     max-height: 100vh;
     display: flex;

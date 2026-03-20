@@ -2089,7 +2089,7 @@ export default defineComponent({
       return shareURL;
     });
 
-    const redirectToLogs = () => {
+    const redirectToLogs = (queryDetails: any) => {
       if (!searchObj.data.traceDetails.selectedTrace) {
         return;
       }
@@ -2099,14 +2099,18 @@ export default defineComponent({
       const stream: string =
         searchObj.data.traceDetails.selectedLogStreams.join(",");
       const from =
+        queryDetails?.from ||
         searchObj.data.traceDetails.selectedTrace?.trace_start_time - 60000000;
       const to =
+        queryDetails?.to ||
         searchObj.data.traceDetails.selectedTrace?.trace_end_time + 60000000;
       const refresh = 0;
 
-      const query = b64EncodeUnicode(
-        `${store.state.organizationData?.organizationSettings?.trace_id_field_name}='${spanList.value[0]["trace_id"]}'`,
-      );
+      const query =
+        queryDetails?.query ||
+        b64EncodeUnicode(
+          `${store.state.organizationData?.organizationSettings?.trace_id_field_name}='${spanList.value[0]["trace_id"]}'`,
+        );
 
       router.push({
         path: "/logs",

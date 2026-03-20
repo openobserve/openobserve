@@ -2561,7 +2561,9 @@
     "spanColorPalettePreview": "Span 调色板预览",
     "errorsFound": "错误跟踪",
     "spansTitle": "跨度",
-    "spansFound": "已找到跨度"
+    "spansFound": "已找到跨度",
+    "errorTraces": "错误跟踪",
+    "errorSpans": "错误跨度"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",

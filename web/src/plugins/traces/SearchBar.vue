@@ -299,14 +299,14 @@ const getFieldFromExpression = (expression: string): string | null => {
 
 /**
  * Tries to replace an existing condition for `fieldName` in `queryStr` with
- * `newExpression`. Returns the modified string, or the original if not found.
+ * `newExpression`. Returns the modified string if found, or null if not found.
  * Handles both parenthesized multi-value groups and single conditions.
  */
 const replaceExistingFieldCondition = (
   queryStr: string,
   fieldName: string,
   newExpression: string,
-): string => {
+): string | null => {
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
   const opPat = `(?:=|!=|>=|<=|>|<|is(?:\\s+not)?)`;
@@ -336,7 +336,7 @@ const replaceExistingFieldCondition = (
     return queryStr.replace(singleRegex, newExpression);
   }
 
-  return queryStr;
+  return null;
 };
 
 /**
@@ -361,8 +361,8 @@ const applyFilterTerm = (filterTerm: string, baseValue: string): string => {
       const fieldName = getFieldFromExpression(filter);
       const replaced = fieldName
         ? replaceExistingFieldCondition(parts[1], fieldName, filter)
-        : parts[1];
-      parts[1] = replaced !== parts[1] ? replaced : parts[1] + " and " + filter;
+        : null;
+      parts[1] = replaced !== null ? replaced : parts[1] + " and " + filter;
     } else {
       parts[1] = filter;
     }
@@ -371,8 +371,8 @@ const applyFilterTerm = (filterTerm: string, baseValue: string): string => {
     const fieldName = getFieldFromExpression(filter);
     const replaced = fieldName
       ? replaceExistingFieldCondition(parts[0] as string, fieldName, filter)
-      : (parts[0] as string);
-    if (replaced !== parts[0]) return replaced;
+      : null;
+    if (replaced !== null) return replaced;
     return (parts[0] as string) !== ""
       ? (parts[0] as string) + " and " + filter
       : filter;

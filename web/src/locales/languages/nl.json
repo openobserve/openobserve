@@ -2561,7 +2561,9 @@
     "spanColorPalettePreview": "Voorbeeld van het kleurenpalet van Span",
     "errorsFound": "Foutsporen",
     "spansTitle": "OVERSPANT",
-    "spansFound": "Overspanningen gevonden"
+    "spansFound": "Overspanningen gevonden",
+    "errorTraces": "Foutsporen",
+    "errorSpans": "Foutspanne"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
