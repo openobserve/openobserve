@@ -22,6 +22,7 @@ import { useRouter } from "vue-router";
 import { searchState } from "@/composables/useLogs/searchState";
 import useStreams from "@/composables/useStreams";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { captureFromSearchHits } from "@/composables/useFieldValueStore";
 
 import {
   useLocalLogFilterField,
@@ -53,13 +54,34 @@ export const useStreamFields = () => {
 
   const updateFieldValues = () => {
     try {
+      const hits = searchObj.data.queryResults.hits;
+
+      // [NEW] Background capture into IndexedDB — must be placed BEFORE the
+      // loop below because that loop contains an early `return` when it
+      // encounters excluded fields (pre-existing behaviour), which would
+      // prevent this code from running if placed after.
+      if (hits?.length > 0) {
+        const schemaFields = (
+          searchObj.data.stream.selectedStreamFields ?? []
+        ).map((f: any) => f.name ?? f);
+        captureFromSearchHits(
+          {
+            org: searchObj.organizationIdentifier,
+            streamType: searchObj.data.stream.streamType ?? "logs",
+            streamName: searchObj.data.stream.selectedStream?.[0] ?? "",
+          },
+          hits,
+          schemaFields,
+        );
+      }
+
       const excludedFields = [
         store.state.zoConfig.timestamp_column,
         "log",
         "msg",
       ];
       // searchObj.data.queryResults.hits.forEach((item: { [x: string]: any }) => {
-      for (const item of searchObj.data.queryResults.hits) {
+      for (const item of hits) {
         // Create set for each field values and add values to corresponding set
         // Object.keys(item).forEach((key) => {
         for (const key of Object.keys(item)) {

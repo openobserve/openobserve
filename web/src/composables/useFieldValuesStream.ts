@@ -17,6 +17,7 @@ import { ref, type Ref } from "vue";
 import store from "@/stores";
 import { generateTraceContext } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
+import { captureFromValuesApi } from "@/composables/useFieldValueStore";
 
 export interface FieldValueEntry {
   key: string;
@@ -158,6 +159,19 @@ const useFieldValuesStream = () => {
             });
           });
         });
+
+        // [NEW] Background capture — does not block handleResponse return
+        if (chunkValues.length > 0 && fieldName) {
+          captureFromValuesApi(
+            {
+              org: store.state.selectedOrganization.identifier,
+              streamType: payload?.queryReq?.stream_type ?? "logs",
+              streamName: streamName ?? "",
+            },
+            fieldName,
+            chunkValues,
+          );
+        }
 
         // Append in paginated (load-more) mode; replace on fresh load.
         if (isAppend) {
