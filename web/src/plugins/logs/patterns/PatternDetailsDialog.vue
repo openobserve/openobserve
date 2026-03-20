@@ -170,8 +170,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="
               store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
             "
-            v-html="highlightedTemplate"
-          />
+          >
+            <template v-for="(tok, i) in selectedTemplateTokens" :key="i">
+              <span v-if="tok.kind === 'text'" class="tw-whitespace-pre">{{ tok.value }}</span>
+              <q-chip
+                v-else
+                dense
+                size="xs"
+                class="wildcard-chip-detail q-my-none q-mx-none"
+                :class="wildcardChipColor(tok.value)"
+              >
+                {{ tok.value }}
+                <q-tooltip
+                  v-if="tok.sampleValues.length > 0"
+                  anchor="bottom middle"
+                  self="top middle"
+                  :delay="300"
+                >
+                  <div class="tw-font-mono tw-text-xs">
+                    <div class="tw-font-semibold tw-mb-1">{{ t("search.patternWildcardSampleValues") }}</div>
+                    <div
+                      v-for="(val, vi) in tok.sampleValues.slice(0, 10)"
+                      :key="vi"
+                      class="tw-truncate tw-max-w-[26rem]"
+                    >
+                      {{ val }}
+                    </div>
+                  </div>
+                </q-tooltip>
+              </q-chip>
+            </template>
+          </div>
         </div>
 
         <!-- Variables -->
@@ -293,7 +322,6 @@ import {
   wildcardChipColor,
   anomalyExplanation,
 } from "@/composables/useLogs/useTemplateTokenizer";
-import { escapeHtml } from "@/utils/html";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -319,14 +347,6 @@ const selectedTemplateTokens = computed(() =>
 const anomalyExplanationForSelected = computed(() =>
   anomalyExplanation(props.selectedPattern?.pattern ?? {}, t),
 );
-
-const highlightedTemplate = computed(() => {
-  if (!props.selectedPattern?.pattern?.template) return "";
-  return escapeHtml(props.selectedPattern.pattern.template).replace(
-    /&lt;\*&gt;/g,
-    '<span class="log-pattern-wildcard">&lt;*&gt;</span>',
-  );
-});
 
 const variableColumns = computed(() => [
   {
