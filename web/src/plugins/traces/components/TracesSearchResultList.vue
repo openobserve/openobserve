@@ -267,10 +267,6 @@ import { useI18n } from "vue-i18n";
 import { copyToClipboard as qCopyToClipboard } from "quasar";
 import TenstackTable from "@/components/TenstackTable.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
-import {
-  useTracesTableColumns,
-  LLM_COLUMN_IDS,
-} from "../composables/useTracesTableColumns";
 import useTraces from "@/composables/useTraces";
 import TraceTimestampCell from "./TraceTimestampCell.vue";
 import TraceServiceCell from "./TraceServiceCell.vue";
