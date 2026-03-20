@@ -265,11 +265,11 @@ export function useConfigPanel(
         visible: shouldShowCartesianAxisConfig(dashboardPanelData),
       },
       "label-rotate": {
-        label: t("dashboard.labelRotate"),
+        label: [t("dashboard.labelRotate")],
         visible: shouldShowCartesianAxisConfig(dashboardPanelData),
       },
       "axis-label": {
-        label: [t("dashboard.labelRotate"), t("dashboard.labelTruncate")],
+        label: [t("dashboard.axisLabelRotate"), t("dashboard.axisLabelTruncate")],
         visible: shouldShowAxisLabelConfig(dashboardPanelData),
       },
     },
@@ -387,11 +387,7 @@ export function useConfigPanel(
     },
     colors: {
       colors: {
-        label: [
-          t("dashboard.configSectionColors"),
-          t("dashboard.colorPalette"),
-          t("dashboard.colorBySeries"),
-        ],
+        label: [t("dashboard.colorPalette"), t("dashboard.colorBySeriesTitle")],
         visible: showColorPalette.value,
       },
     },
@@ -422,7 +418,7 @@ export function useConfigPanel(
     },
     background: {
       background: {
-        label: t("dashboard.configSectionBackground"),
+        label: t("dashboard.colorMode"),
         visible: dashboardPanelData.data.type === "metric",
       },
     },
