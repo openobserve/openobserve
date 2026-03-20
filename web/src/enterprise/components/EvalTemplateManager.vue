@@ -8,7 +8,7 @@
           class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:pl-4 tw:pr-2 tw:h-[68px]"
         >
           <h6 class="q-my-none q-ma-none tw:text-lg tw:font-semibold">
-            Evaluation Templates
+            {{ t("evalTemplate.header") }}
           </h6>
           <div class="tw:flex tw:gap-2 tw:items-center">
             <q-btn
@@ -17,12 +17,12 @@
               dense
               icon="refresh"
               :loading="loading"
-              title="Refresh"
+              :title="t('common.refresh')"
               @click="loadTemplates"
             />
             <q-btn
               color="primary"
-              label="New Template"
+              :label="t('evalTemplate.newTemplate')"
               icon="add"
               @click="startCreateForm"
             />
@@ -59,7 +59,7 @@
                 icon="edit"
                 size="sm"
                 @click="startEditForm(props.row)"
-                title="Edit"
+                :title="t('common.edit')"
               />
               <q-btn
                 flat
@@ -69,7 +69,7 @@
                 size="sm"
                 color="negative"
                 @click="deleteTemplate(props.row)"
-                title="Delete"
+                :title="t('common.delete')"
               />
               <q-btn
                 flat
@@ -78,14 +78,14 @@
                 icon="bar_chart"
                 size="sm"
                 @click="showStats(props.row)"
-                title="View Statistics"
+                :title="t('pipeline.statistics')"
               />
             </q-td>
           </template>
 
-          <template #no-data>
+           <template #no-data>
             <div class="tw:w-full tw:text-center tw:py-12 text-grey-6">
-              No evaluation templates found
+              {{ t("evalTemplate.noTemplatesFound") }}
             </div>
           </template>
         </q-table>
@@ -102,16 +102,15 @@
           <h6 class="q-my-none q-ma-none tw:text-lg tw:font-semibold">
             {{
               editingTemplate
-                ? "Edit Evaluation Template"
-                : "Create New Evaluation Template"
+                ? t("evalTemplate.editTemplate")
+                : t("evalTemplate.createTemplate")
             }}
           </h6>
           <div class="tw:flex tw:gap-2 tw:items-center">
-            <q-btn flat
-label="Cancel" @click="cancelForm" />
+            <q-btn flat :label="t('common.cancel')" @click="cancelForm" />
             <q-btn
               color="primary"
-              :label="editingTemplate ? 'Update' : 'Create'"
+              :label="editingTemplate ? t('common.update') : t('common.create')"
               @click="saveTemplate"
               :loading="saving"
             />
@@ -124,18 +123,18 @@ label="Cancel" @click="cancelForm" />
         <!-- Row 1: Name & Description -->
         <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
           <div style="flex: 1; display: flex; flex-direction: column;">
-            <label class="textarea-label">Template Name *</label>
+            <label class="textarea-label">{{ t("evalTemplate.templateName") }} *</label>
             <div class="o2-input">
               <q-input
                 v-model="form.name"
                 borderless
                 dense
-                :rules="[(val) => !!val || 'Name is required']"
+                :rules="[(val) => !!val || t('evalTemplate.nameRequired')]"
               />
             </div>
           </div>
           <div style="flex: 1; display: flex; flex-direction: column;">
-            <label class="textarea-label">Description</label>
+            <label class="textarea-label">{{ t("common.description") }}</label>
             <div class="o2-input">
               <q-input
                 v-model="form.description"
@@ -146,22 +145,24 @@ label="Cancel" @click="cancelForm" />
           </div>
         </div>
 
-        <!-- Row 2: Agent Type & Dimensions -->
+        <!-- Row 2: Response Type & Dimensions -->
         <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
           <div style="flex: 0 0 200px; display: flex; flex-direction: column;">
-            <label class="textarea-label">Agent Type *</label>
+            <label class="textarea-label">{{ t("evalTemplate.responseType") }} *</label>
             <div class="o2-input">
               <q-select
-                v-model="form.agent_type"
-                :options="agentTypes"
+                v-model="form.response_type"
+                :options="responseTypes"
+                emit-value
+                map-options
                 borderless
                 dense
-                :rules="[(val) => !!val || 'Agent type is required']"
+                :rules="[(val) => !!val || t('evalTemplate.responseTypeRequired')]"
               />
             </div>
           </div>
           <div style="flex: 1; display: flex; flex-direction: column;">
-            <label class="textarea-label">Evaluation Dimensions *</label>
+            <label class="textarea-label">{{ t("evalTemplate.dimensions") }} *</label>
             <div class="o2-input">
               <q-select
                 v-model="dimensionsInput"
@@ -175,7 +176,7 @@ label="Cancel" @click="cancelForm" />
                 input-debounce="0"
                 new-value-mode="add-unique"
                 @filter="filterDimensions"
-                :rules="[(val) => (val && val.length > 0) || 'At least one dimension is required']"
+                :rules="[(val) => (val && val.length > 0) || t('evalTemplate.dimensionRequired')]"
               />
             </div>
           </div>
@@ -183,7 +184,7 @@ label="Cancel" @click="cancelForm" />
 
         <!-- Row 3: Prompt Template (takes majority of space) -->
         <div style="display: flex; flex-direction: column; flex: 1; min-height: 0; margin-bottom: 1rem;">
-          <label class="textarea-label">Prompt Template *</label>
+          <label class="textarea-label">{{ t("evalTemplate.promptTemplate") }} *</label>
           <div class="textarea-border" style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
             <q-input
               v-model="form.content"
@@ -191,40 +192,13 @@ label="Cancel" @click="cancelForm" />
               dense
               type="textarea"
               class="prompt-input"
-              :rules="[(val) => !!val || 'Content is required']"
+              :rules="[(val) => !!val || t('evalTemplate.contentRequired')]"
               style="flex: 1; min-height: 0;"
               input-style="resize: none;"
             />
           </div>
         </div>
 
-        <!-- Row 4: Fail & Pass Patterns -->
-        <div style="display: flex; gap: 1rem; overflow-y: auto; max-height: 150px;">
-          <div style="flex: 1; display: flex; flex-direction: column;">
-            <label class="textarea-label">Fail Patterns (optional)</label>
-            <div class="textarea-border">
-              <q-input
-                v-model="failPatternsInput"
-                borderless
-                dense
-                type="textarea"
-                rows="2"
-              />
-            </div>
-          </div>
-          <div style="flex: 1; display: flex; flex-direction: column;">
-            <label class="textarea-label">Pass Patterns (optional)</label>
-            <div class="textarea-border">
-              <q-input
-                v-model="passPatternsInput"
-                borderless
-                dense
-                type="textarea"
-                rows="2"
-              />
-            </div>
-          </div>
-        </div>
       </div>
     </template>
 
@@ -232,7 +206,7 @@ label="Cancel" @click="cancelForm" />
     <q-dialog v-model="showStatsDialog">
       <q-card style="width: 500px">
         <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">Template Statistics</div>
+          <div class="text-h6">{{ t("evalTemplate.statsTitle") }}</div>
           <q-space />
           <q-btn icon="close"
 flat round
@@ -250,7 +224,7 @@ dense v-close-popup />
           </div>
 
           <div class="q-mb-lg">
-            <div class="text-subtitle2 q-mb-sm">Average Quality Score</div>
+            <div class="text-subtitle2 q-mb-sm">{{ t("evalTemplate.avgQualityScore") }}</div>
             <q-linear-progress
               :value="selectedStats.avg_quality_score"
               color="primary"
@@ -264,11 +238,11 @@ dense v-close-popup />
           <q-separator class="q-my-lg" />
 
           <div>
-            <div class="text-subtitle2 q-mb-md">Usage Statistics</div>
+            <div class="text-subtitle2 q-mb-md">{{ t("evalTemplate.usageStats") }}</div>
             <q-list bordered separator>
               <q-item>
                 <q-item-section>
-                  <div class="text-subtitle2">Total Evaluations</div>
+                  <div class="text-subtitle2">{{ t("evalTemplate.totalEvaluations") }}</div>
                 </q-item-section>
                 <q-item-section side>
                   <div class="text-weight-bold">
@@ -278,7 +252,7 @@ dense v-close-popup />
               </q-item>
               <q-item>
                 <q-item-section>
-                  <div class="text-subtitle2">Last Used</div>
+                  <div class="text-subtitle2">{{ t("evalTemplate.lastUsed") }}</div>
                 </q-item-section>
                 <q-item-section side>
                   <div class="text-caption">
@@ -293,7 +267,7 @@ dense v-close-popup />
         <q-separator />
 
         <q-card-actions align="right" class="q-pa-md">
-          <q-btn flat label="Close"
+          <q-btn flat :label="t('common.close')"
 color="primary" v-close-popup />
         </q-card-actions>
       </q-card>
@@ -303,6 +277,7 @@ color="primary" v-close-popup />
 
 <script lang="ts" setup>
 import { ref, onMounted, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useRoute } from "vue-router";
 import { evalTemplateService } from "@/services/eval-template.service";
@@ -310,7 +285,7 @@ import { evalTemplateService } from "@/services/eval-template.service";
 interface Template {
   id: string;
   org_id: string;
-  agent_type: string;
+  response_type: string;
   name: string;
   description?: string;
   content: string;
@@ -330,6 +305,7 @@ interface Stats {
 }
 
 const $q = useQuasar();
+const { t } = useI18n();
 const route = useRoute();
 
 const templates = ref<Template[]>([]);
@@ -342,14 +318,12 @@ const selectedStats = ref<Stats | null>(null);
 
 const form = ref({
   name: "",
-  agent_type: "",
+  response_type: "",
   description: "",
   content: "",
 });
 
 const dimensionsInput = ref<string[]>([]);
-const failPatternsInput = ref("");
-const passPatternsInput = ref("");
 
 const defaultDimensionOptions = [
   "accuracy",
@@ -380,7 +354,11 @@ const filterDimensions = (val: string, update: (fn: () => void) => void) => {
   });
 };
 
-const agentTypes = ["sre", "security", "custom", "unknown"];
+const responseTypes = [
+  { label: t("evalTemplate.typeScore"), value: "score" },
+  { label: t("evalTemplate.typeBoolean"), value: "boolean" },
+  { label: t("evalTemplate.typeCustom"), value: "custom" },
+];
 
 const pagination = ref({
   sortBy: "updated_at",
@@ -390,7 +368,7 @@ const pagination = ref({
 });
 
 const formatDate = (timestamp: number) => {
-  if (!timestamp) return "Never";
+  if (!timestamp) return t("evalTemplate.never");
   return new Date(timestamp).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
@@ -401,23 +379,23 @@ const formatDate = (timestamp: number) => {
 };
 
 const columns = [
-  { name: "name", label: "Name", field: "name", align: "left" },
+  { name: "name", label: t("common.name"), field: "name", align: "left" },
   {
-    name: "agent_type",
-    label: "Agent Type",
-    field: "agent_type",
+    name: "response_type",
+    label: t("evalTemplate.responseType"),
+    field: "response_type",
     align: "left",
   },
-  { name: "version", label: "Version", field: "version", align: "center" },
+  { name: "version", label: t("common.version"), field: "version", align: "center" },
   {
     name: "updated_at",
-    label: "Updated",
+    label: t("pipeline.updated"),
     field: "updated_at",
     align: "left",
     format: formatDate,
   },
-  { name: "stats", label: "Statistics", align: "center" },
-  { name: "actions", label: "Actions", align: "center" },
+  { name: "stats", label: t("pipeline.statistics"), align: "center" },
+  { name: "actions", label: t("common.actions"), align: "center" },
 ];
 
 onMounted(() => {
@@ -435,7 +413,7 @@ const loadTemplates = async () => {
   } catch (error) {
     $q.notify({
       type: "negative",
-      message: "Failed to load templates",
+      message: t("evalTemplate.loadFailed"),
       caption: String(error),
     });
   } finally {
@@ -453,13 +431,11 @@ const startEditForm = (template: Template) => {
   editingTemplate.value = template;
   form.value = {
     name: template.name,
-    agent_type: template.agent_type,
+    response_type: template.response_type,
     description: template.description || "",
     content: template.content,
   };
   dimensionsInput.value = [...template.dimensions];
-  failPatternsInput.value = "";
-  passPatternsInput.value = "";
   showCreateForm.value = true;
 };
 
@@ -472,13 +448,13 @@ const saveTemplate = async () => {
   // Validation
   if (
     !form.value.name ||
-    !form.value.agent_type ||
+    !form.value.response_type ||
     !form.value.content ||
     !dimensionsInput.value.length
   ) {
     $q.notify({
       type: "warning",
-      message: "Please fill in all required fields",
+      message: t("evalTemplate.saveRequiredFields"),
     });
     return;
   }
@@ -492,12 +468,6 @@ const saveTemplate = async () => {
     const payload = {
       ...form.value,
       dimensions: dimensionsInput.value,
-      fail_patterns: failPatternsInput.value
-        ? failPatternsInput.value.split(",").map((p) => p.trim())
-        : undefined,
-      pass_patterns: passPatternsInput.value
-        ? passPatternsInput.value.split(",").map((p) => p.trim())
-        : undefined,
     };
 
     if (editingTemplate.value) {
@@ -508,13 +478,13 @@ const saveTemplate = async () => {
       );
       $q.notify({
         type: "positive",
-        message: "Template updated successfully",
+        message: t("evalTemplate.updateSuccess"),
       });
     } else {
       await evalTemplateService.createTemplate(orgId, payload);
       $q.notify({
         type: "positive",
-        message: "Template created successfully",
+        message: t("evalTemplate.createSuccess"),
       });
     }
 
@@ -525,8 +495,8 @@ const saveTemplate = async () => {
     $q.notify({
       type: "negative",
       message: editingTemplate.value
-        ? "Failed to update template"
-        : "Failed to create template",
+        ? t("evalTemplate.updateFailed")
+        : t("evalTemplate.createFailed"),
       caption: String(error),
     });
   } finally {
@@ -536,8 +506,8 @@ const saveTemplate = async () => {
 
 const deleteTemplate = async (template: Template) => {
   $q.dialog({
-    title: "Delete Template",
-    message: `Are you sure you want to delete "${template.name}"?`,
+    title: t("evalTemplate.deleteTemplate"),
+    message: t("evalTemplate.deleteConfirmation", { name: template.name }),
     cancel: true,
     persistent: true,
   }).onOk(async () => {
@@ -549,7 +519,7 @@ const deleteTemplate = async (template: Template) => {
       await evalTemplateService.deleteTemplate(orgId, template.id);
       $q.notify({
         type: "positive",
-        message: "Template deleted successfully",
+        message: t("evalTemplate.deleteSuccess"),
       });
       await loadTemplates();
     } catch (error: any) {
@@ -557,7 +527,7 @@ const deleteTemplate = async (template: Template) => {
       const errorMessage =
         error?.response?.data?.message ||
         error?.message ||
-        "Failed to delete template";
+        t("evalTemplate.deleteFailed");
       $q.notify({
         type: "negative",
         message: errorMessage,
@@ -580,7 +550,7 @@ const showStats = async (template: Template) => {
   } catch (error) {
     $q.notify({
       type: "negative",
-      message: "Failed to load template statistics",
+      message: t("evalTemplate.statsLoadFailed"),
       caption: String(error),
     });
   }
@@ -589,13 +559,11 @@ const showStats = async (template: Template) => {
 const resetForm = () => {
   form.value = {
     name: "",
-    agent_type: "",
+    response_type: "",
     description: "",
     content: "",
   };
   dimensionsInput.value = [];
-  failPatternsInput.value = "";
-  passPatternsInput.value = "";
   editingTemplate.value = null;
 };
 </script>

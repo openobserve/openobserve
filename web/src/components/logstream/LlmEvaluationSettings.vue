@@ -127,6 +127,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             </small>
           </div>
 
+          <!-- Evaluation Template Selection -->
+          <div class="setting-group llm-eval-settings__field">
+            <label
+              class="llm-eval-settings__field-label"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'llm-eval-settings__label--dark'
+                  : 'llm-eval-settings__label--light'
+              "
+            >
+              {{ t("pipeline.evaluationTemplate") }}
+            </label>
+            <div class="tw:flex tw:items-center tw:gap-2">
+              <q-select
+                v-model="selectedTemplate"
+                :options="availableTemplates"
+                option-value="id"
+                option-label="name"
+                dense
+                borderless
+                emit-value
+                map-options
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-search-input-dark'
+                    : 'o2-search-input-light'
+                "
+                class="o2-search-input no-border llm-eval-settings__input tw:flex-1"
+                data-test="stream-llm-eval-template-select"
+                :loading="loadingTemplates"
+                @update:model-value="markDirty"
+              >
+                <template #no-option>
+                  <q-item>
+                    <q-item-section class="text-grey">
+                      {{ t("pipeline.noTemplatesFound") }}
+                    </q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
+              <q-btn
+                round
+                flat
+                dense
+                icon="refresh"
+                @click="refreshTemplates"
+                :loading="loadingTemplates"
+                :title="t('common.refresh')"
+                data-test="stream-llm-eval-template-refresh-btn"
+                class="tw:opacity-70 hover:tw:opacity-100"
+              />
+            </div>
+            <small
+              class="llm-eval-settings__hint"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'llm-eval-settings__hint--dark'
+                  : 'llm-eval-settings__hint--light'
+              "
+            >
+              {{ t("pipeline.evaluationTemplateHelp") }}
+            </small>
+          </div>
+
           <!-- Sampling toggle row -->
           <div
             class="llm-eval-settings__row llm-eval-settings__row--bordered"
@@ -294,6 +358,9 @@ export default defineComponent({
     const samplingRate = ref(0.01);
     const outputStream = ref("");
     const filteredFields = ref<{ label: string; value: string }[]>([]);
+    const selectedTemplate = ref<{ id: string; name: string } | null>(null);
+    const availableTemplates = ref<any[]>([]);
+    const loadingTemplates = ref(false);
 
     // Existing pipeline found on mount — needed for update vs create
     let existingPipeline: any = null;
@@ -326,6 +393,48 @@ export default defineComponent({
       });
     };
 
+    const fetchAvailableTemplates = async (forceRefresh: boolean = false) => {
+      loadingTemplates.value = true;
+      try {
+        const orgId = store.state.selectedOrganization?.identifier;
+        if (!orgId) return;
+
+        // Use store cache unless force refresh requested
+        if (!forceRefresh) {
+          const cached = store.state.streams.evalTemplatesByOrg[orgId];
+          if (cached && cached.length > 0) {
+            availableTemplates.value = cached;
+            return;
+          }
+        }
+
+        const { evalTemplateService } = await import(
+          "@/services/eval-template.service"
+        );
+        const templates = await evalTemplateService.listTemplates(orgId);
+        availableTemplates.value = templates || [];
+
+        store.dispatch("streams/setEvalTemplates", {
+          orgId,
+          templates: templates || [],
+        });
+      } catch (e) {
+        console.error("Failed to fetch evaluation templates:", e);
+        availableTemplates.value = [];
+      } finally {
+        loadingTemplates.value = false;
+      }
+    };
+
+    const refreshTemplates = async () => {
+      await fetchAvailableTemplates(true);
+      q.notify({
+        type: "positive",
+        message: t("pipeline.evalTemplatesRefreshed"),
+        timeout: 1500,
+      });
+    };
+
     // On mount: detect if an LLM evaluation pipeline already exists for this stream
     onMounted(async () => {
       if (!props.streamName) {
@@ -333,25 +442,31 @@ export default defineComponent({
         return;
       }
 
+      console.debug(`[LlmEvalSettings] Mounting for stream: ${props.streamName}`);
+      const orgId = store.state.selectedOrganization?.identifier;
+
       try {
-        const res = await pipelineService.getPipelines(
-          store.state.selectedOrganization.identifier,
-        );
+        // Fetch templates first so they are available for restoration
+        await fetchAvailableTemplates();
+        console.debug(`[LlmEvalSettings] Templates fetched: ${availableTemplates.value.length}`);
+
+        const res = await pipelineService.getPipelines(orgId);
         const pipelines: any[] = res.data?.list || [];
 
         const match = pipelines.find(
           (p: any) =>
             p.source?.stream_name === props.streamName &&
             p.source?.stream_type === "traces" &&
-            p.nodes?.some((n: any) => n.data?.node_type === "llm_evaluation"),
+            p.nodes?.some((n: any) => n.data?.node_type === "llm_evaluation")
         );
 
         if (match) {
           existingPipeline = match;
           enabled.value = true;
+          console.debug(`[LlmEvalSettings] Found existing pipeline: ${match.pipeline_id}`);
 
           const evalNode = match.nodes.find(
-            (n: any) => n.data?.node_type === "llm_evaluation",
+            (n: any) => n.data?.node_type === "llm_evaluation"
           );
           if (evalNode) {
             spanIdentifier.value =
@@ -359,29 +474,47 @@ export default defineComponent({
             const rate = evalNode.data.sampling_rate ?? 0.01;
             enableSampling.value = rate > 0;
             samplingRate.value = rate > 0 ? rate : 0.01;
+            
+            // Restore saved template ID
+            if (evalNode.data.eval_template) {
+              selectedTemplate.value = evalNode.data.eval_template;
+              console.debug(`[LlmEvalSettings] Restored template: ${selectedTemplate.value}`);
+            } else if (availableTemplates.value.length > 0) {
+              selectedTemplate.value = availableTemplates.value[0].id;
+              console.debug(`[LlmEvalSettings] No saved template, defaulting to first: ${selectedTemplate.value}`);
+            }
           }
 
           // Read output stream from the eval output node
           const evalOutputNode = match.nodes.find(
             (n: any) =>
-              n.io_type === "output" && n.data?.stream_type === "logs",
+              n.io_type === "output" && n.data?.stream_type === "logs"
           );
           outputStream.value =
             evalOutputNode?.data?.stream_name ||
             `${props.streamName}_evaluations`;
         } else {
-          // No existing pipeline — apply the default output stream name
+          // No existing pipeline — apply defaults
           outputStream.value = `${props.streamName}_evaluations`;
+          if (availableTemplates.value.length > 0) {
+            selectedTemplate.value = availableTemplates.value[0].id;
+          }
+          console.debug(`[LlmEvalSettings] No existing pipeline for ${props.streamName}`);
         }
-      } catch {
-        // Non-fatal: apply default so the field is not empty
+      } catch (e) {
+        console.error("[LlmEvalSettings] Data fetch failed:", e);
+        // Fallback for defaults
         outputStream.value = `${props.streamName}_evaluations`;
+        if (availableTemplates.value.length > 0 && !selectedTemplate.value) {
+          selectedTemplate.value = availableTemplates.value[0].id;
+        }
       } finally {
         loading.value = false;
+        console.debug(`[LlmEvalSettings] Loading complete. Selected: ${selectedTemplate.value}`);
       }
     });
 
-    // Called by schema.vue's Update Settings button via template ref
+    // Modified save() to handle template ID
     const save = async () => {
       const orgId = store.state.selectedOrganization.identifier;
       const streamName = props.streamName;
@@ -394,6 +527,8 @@ export default defineComponent({
         });
         return;
       }
+
+      console.debug("[LlmEvalSettings] Saving with template:", selectedTemplate.value);
 
       const ts = Date.now();
       const inputNodeId = `input-${ts}`;
@@ -434,6 +569,7 @@ export default defineComponent({
               enable_llm_judge: true,
               llm_span_identifier: spanIdentifier.value || "gen_ai_system",
               sampling_rate: enableSampling.value ? samplingRate.value : 0.0,
+              eval_template: selectedTemplate.value || null,
             },
           },
           {
@@ -526,6 +662,10 @@ export default defineComponent({
       outputStream,
       filteredFields,
       filterFields,
+      selectedTemplate,
+      availableTemplates,
+      loadingTemplates,
+      refreshTemplates,
       markDirty,
     };
   },
