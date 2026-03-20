@@ -29,38 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`pattern-card-${index}-template`"
         :title="pattern.template"
         v-html="highlightedTemplate"
-      >
-        <template v-for="(tok, i) in templateTokens" :key="i">
-          <span v-if="tok.kind === 'text'" class="tw-whitespace-pre">{{ tok.value }}</span>
-          <q-chip
-            v-else
-            dense
-            size="xs"
-            class="wildcard-chip q-my-none q-mx-none"
-            :class="wildcardChipColor(tok.value)"
-          >
-            {{ tok.value }}
-            <q-tooltip
-              v-if="tok.sampleValues.length > 0"
-              anchor="bottom middle"
-              self="top middle"
-              :delay="300"
-              class="wildcard-tooltip"
-            >
-              <div class="tw-font-mono tw-text-xs">
-                <div class="tw-font-semibold tw-mb-1">{{ t("search.wildcardSampleValues") }}</div>
-                <div
-                  v-for="(val, vi) in tok.sampleValues.slice(0, 10)"
-                  :key="vi"
-                  class="tw-truncate tw-max-w-[20rem]"
-                >
-                  {{ val }}
-                </div>
-              </div>
-            </q-tooltip>
-          </q-chip>
-        </template>
-      </div>
+      />
 
       <!-- Anomaly badge with explanation tooltip -->
       <span
