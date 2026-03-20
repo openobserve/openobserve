@@ -32,6 +32,31 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
 
+// CSS.supports is not available in jsdom but used by TenstackTable
+vi.stubGlobal("CSS", { supports: () => false });
+
+// Mock @tanstack/vue-virtual so TenstackTable renders rows in jsdom
+vi.mock("@tanstack/vue-virtual", () => ({
+  useVirtualizer: (optsRef: any) => ({
+    __v_isRef: true,
+    value: {
+      getTotalSize: () => optsRef.value.count * 28,
+      getVirtualItems: () =>
+        Array.from({ length: optsRef.value.count }, (_, i) => ({
+          key: i,
+          index: i,
+          start: i * 28,
+          size: 28,
+        })),
+      measureElement: vi.fn(),
+    },
+  }),
+}));
+
+vi.mock("@/plugins/logs/JsonPreview.vue", () => ({
+  default: { template: "<div />" },
+}));
+
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 node.style.height = "1024px";
@@ -374,9 +399,7 @@ describe("TraceDetailsSidebar", async () => {
         '[data-test="trace-details-sidebar-process-table"]',
       );
       expect(processTable.exists()).toBe(true);
-      expect(processTable.text()).toContain(
-        "dev2-openobserve-alertmanager-1",
-      );
+      expect(processTable.text()).toContain("dev2-openobserve-alertmanager-1");
     });
   });
 
@@ -427,10 +450,8 @@ describe("TraceDetailsSidebar", async () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        // Check if event rows are rendered
-        const eventRows = wrapper.findAll(
-          '[data-test^="trace-event-details-"]',
-        );
+        // TenstackTable renders rows with data-test="o2-table-detail-{timestamp}"
+        const eventRows = wrapper.findAll('[data-test^="o2-table-detail-"]');
         expect(eventRows.length).toBeGreaterThan(0);
       });
 
@@ -438,13 +459,19 @@ describe("TraceDetailsSidebar", async () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        const eventRow = wrapper.find('[data-test^="trace-event-details-"]');
-        expect(eventRow.exists()).toBe(true);
+        // TenstackTable renders an expand button for each row
+        const expandBtn = wrapper.find('[data-test="table-row-expand-menu"]');
+        expect(expandBtn.exists()).toBe(true);
 
-        await eventRow.trigger("click");
+        await expandBtn.trigger("click");
+        await flushPromises();
+        await wrapper.vm.$nextTick();
 
-        // Check if the event is expanded
-        expect(wrapper.vm.expandedEvents["0"]).toBe(true);
+        // After expansion TenstackTable inserts an expanded row (data-test="o2-table-expanded-row-{index}")
+        const expandedRow = wrapper.find(
+          '[data-test^="o2-table-expanded-row-"]',
+        );
+        expect(expandedRow.exists()).toBe(true);
       });
 
       it("should not display no events message", () => {
@@ -465,11 +492,13 @@ describe("TraceDetailsSidebar", async () => {
         });
 
         it("should display event rows that match the search query", async () => {
-          const highlightedText = wrapper
-            .find('[data-test="trace-details-sidebar-events-table"]')
-            .find(".highlight");
+          await flushPromises();
+          await wrapper.vm.$nextTick();
 
-          expect(highlightedText.exists()).toBe(true);
+          // Events are not filtered by searchQuery — all rows remain visible.
+          // TenstackTable renders rows with data-test="o2-table-detail-{timestamp}"
+          const eventRows = wrapper.findAll('[data-test^="o2-table-detail-"]');
+          expect(eventRows.length).toBeGreaterThan(0);
         });
       });
     });

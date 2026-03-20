@@ -37,6 +37,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ item.service_name }}
         </QTooltip>
       </span>
+
+      <QBadge
+        v-if="extraServices.length > 0"
+        data-test="trace-row-extra-services"
+        color="grey-7"
+        class="tw:text-[0.7rem]!"
+      >
+        +{{ extraServices.length }}
+      </QBadge>
     </div>
   </div>
 </template>

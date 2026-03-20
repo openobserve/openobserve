@@ -39,6 +39,8 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 vi.mock("@tanstack/vue-virtual", () => ({
   useVirtualizer: (optsRef: any) => ({
+    // __v_isRef makes Vue auto-unwrap this in templates so rowVirtualizer.measureElement works
+    __v_isRef: true,
     value: {
       getTotalSize: () => optsRef.value.count * 24,
       getVirtualItems: () =>
@@ -118,8 +120,8 @@ installQuasar();
 // ---------------------------------------------------------------------------
 
 const baseColumns = [
-  { id: "name", header: "NAME", size: 200 },
-  { id: "value", header: "VALUE", size: 300 },
+  { id: "name", accessorKey: "name", header: "NAME", size: 200 },
+  { id: "value", accessorKey: "value", header: "VALUE", size: 300 },
 ];
 
 const baseRows = [
@@ -194,7 +196,18 @@ describe("TenstackTable — generic features", () => {
   describe("cell slots", () => {
     it("should render a custom slot for a specific column", () => {
       wrapper = mountTable(
-        {},
+        {
+          columns: [
+            {
+              id: "name",
+              accessorKey: "name",
+              header: "NAME",
+              size: 200,
+              meta: { slot: true },
+            },
+            { id: "value", accessorKey: "value", header: "VALUE", size: 300 },
+          ],
+        },
         {
           "cell-name": ({ item }: any) =>
             h("span", { "data-test": "custom-name-cell" }, item.name),
@@ -219,6 +232,7 @@ describe("TenstackTable — generic features", () => {
         columns: [
           {
             id: "id",
+            accessorKey: "id",
             header: "ID",
             size: 100,
             meta: { align: "center" as const },
@@ -227,7 +241,7 @@ describe("TenstackTable — generic features", () => {
         rows: [{ id: "x" }],
       });
       const tds = wrapper.findAll("td[data-test]");
-      expect(tds[0].classes()).toContain("tw:text-center");
+      expect(tds[0].classes()).toContain("tw:text-center!");
     });
 
     it("should apply tw:text-right for right-aligned columns", () => {
@@ -235,6 +249,7 @@ describe("TenstackTable — generic features", () => {
         columns: [
           {
             id: "val",
+            accessorKey: "val",
             header: "VAL",
             size: 100,
             meta: { align: "right" as const },
@@ -242,9 +257,144 @@ describe("TenstackTable — generic features", () => {
         ],
         rows: [{ val: 42 }],
       });
-      const cell = wrapper.find(".oz-table__row div");
-      // happy-dom expands flex shorthand; check for flex-basis 0px in any form
-      expect(cell.attributes("style")).toMatch(/flex(?:-basis)?[^;]*0px/);
+      const tds = wrapper.findAll("td[data-test]");
+      expect(tds[0].classes()).toContain("tw:text-right!");
+    });
+
+    it("should apply no alignment class for default (left) columns", () => {
+      wrapper = mountTable({
+        columns: [{ id: "name", accessorKey: "name", header: "N", size: 100 }],
+        rows: [{ name: "x" }],
+      });
+      const tds = wrapper.findAll("td[data-test]");
+      expect(tds[0].classes()).not.toContain("tw:text-center");
+      expect(tds[0].classes()).not.toContain("tw:text-right");
+    });
+  });
+
+  // ── meta.cellClass ────────────────────────────────────────────────────────
+  describe("meta.cellClass", () => {
+    it("should apply cellClass to matching td elements", () => {
+      wrapper = mountTable({
+        columns: [
+          {
+            id: "svc",
+            accessorKey: "svc",
+            header: "SVC",
+            size: 150,
+            meta: { cellClass: "tw:text-[var(--o2-text-1)]" },
+          },
+        ],
+        rows: [{ svc: "auth" }],
+      });
+      const tds = wrapper.findAll("td[data-test]");
+      expect(tds[0].classes()).toContain("tw:text-[var(--o2-text-1)]");
+    });
+  });
+
+  // ── #loading slot ─────────────────────────────────────────────────────────
+  describe("loading slot", () => {
+    it("should render the loading slot when loading=true and no rows", () => {
+      wrapper = mountTable(
+        { rows: [], loading: true },
+        { loading: '<div data-test="custom-loading">Loading…</div>' },
+      );
+      expect(wrapper.find('[data-test="custom-loading"]').exists()).toBe(true);
+    });
+
+    it("should not render the loading slot when rows exist", () => {
+      wrapper = mountTable(
+        { loading: true },
+        { loading: '<div data-test="custom-loading">Loading…</div>' },
+      );
+      expect(wrapper.find('[data-test="custom-loading"]').exists()).toBe(false);
+    });
+  });
+
+  // ── #loading-banner slot ──────────────────────────────────────────────────
+  describe("loading-banner slot", () => {
+    it("should render the loading-banner slot when loading=true and rows exist", () => {
+      wrapper = mountTable(
+        { loading: true },
+        { "loading-banner": '<div data-test="banner">Fetching…</div>' },
+      );
+      expect(wrapper.find('[data-test="banner"]').exists()).toBe(true);
+    });
+
+    it("should not render loading-banner when rows are empty", () => {
+      wrapper = mountTable(
+        { rows: [], loading: true },
+        { "loading-banner": '<div data-test="banner">Fetching…</div>' },
+      );
+      expect(wrapper.find('[data-test="banner"]').exists()).toBe(false);
+    });
+  });
+
+  // ── #empty slot ───────────────────────────────────────────────────────────
+  describe("empty slot", () => {
+    it("should render the empty slot when rows is empty and not loading", () => {
+      wrapper = mountTable(
+        { rows: [], loading: false },
+        { empty: '<div data-test="custom-empty">No data</div>' },
+      );
+      expect(wrapper.find('[data-test="custom-empty"]').exists()).toBe(true);
+    });
+
+    it("should not render the empty slot when rows exist", () => {
+      wrapper = mountTable(
+        {},
+        { empty: '<div data-test="custom-empty">No data</div>' },
+      );
+      expect(wrapper.find('[data-test="custom-empty"]').exists()).toBe(false);
+    });
+  });
+
+  // ── sort-change emit ──────────────────────────────────────────────────────
+  describe("sort-change emit", () => {
+    it("should emit sort-change with desc on first click of an unsorted sortable column", async () => {
+      wrapper = mountTable({
+        columns: [
+          {
+            id: "timestamp",
+            header: "TIMESTAMP",
+            size: 160,
+            meta: { sortable: true },
+          },
+        ],
+        rows: [],
+        sortBy: "other_field",
+        sortOrder: "asc" as const,
+        sortFieldMap: { timestamp: "start_time" },
+      });
+      await wrapper
+        .find('[data-test="o2-table-th-sort-timestamp"]')
+        .trigger("click");
+      expect(wrapper.emitted("sort-change")).toBeTruthy();
+      expect(wrapper.emitted("sort-change")![0]).toEqual([
+        "start_time",
+        "desc",
+      ]);
+    });
+
+    it("should toggle sort order when clicking the active sort column", async () => {
+      wrapper = mountTable({
+        columns: [
+          {
+            id: "duration",
+            header: "DURATION",
+            size: 120,
+            meta: { sortable: true },
+          },
+        ],
+        rows: [],
+        sortBy: "duration",
+        sortOrder: "desc" as const,
+        sortFieldMap: {},
+      });
+      await wrapper
+        .find('[data-test="o2-table-th-sort-duration"]')
+        .trigger("click");
+      expect(wrapper.emitted("sort-change")![0]).toEqual(["duration", "asc"]);
     });
   });
 });
