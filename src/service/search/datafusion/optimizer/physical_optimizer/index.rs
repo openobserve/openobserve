@@ -247,9 +247,10 @@ fn construct_filter_exec(
     } else {
         // TODO: remove the unused column after extract index condition
         let plan = FilterExec::try_new(conjunction(exprs), filter.input().clone())?
-            .with_projection(filter.projection().cloned())?
+            .with_projection(filter.projection().cloned())?;
+        let plan = plan
             .with_fetch(filter.fetch())
-            .expect("Fetch is not set");
+            .unwrap_or_else(|| Arc::new(plan));
         Ok(plan)
     }
 }
