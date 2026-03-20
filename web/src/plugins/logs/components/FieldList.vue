@@ -100,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :timestamp-column="timestampColumn"
             :theme="theme"
             :show-quick-mode="showQuickMode"
+            :show-fts-field-values="showFtsFieldValues"
             @add-to-filter="$emit('add-to-filter', $event)"
             @toggle-field="$emit('toggle-field', $event)"
             @toggle-interesting="
@@ -238,6 +239,7 @@ interface Props {
   userDefinedSchemaBtnGroupOption: any[];
   selectedFieldsBtnGroupOption: any[];
   totalFieldsCount: number;
+  showFtsFieldValues: boolean;
 }
 
 const props = defineProps<Props>();
