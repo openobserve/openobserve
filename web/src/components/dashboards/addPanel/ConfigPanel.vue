@@ -1159,7 +1159,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :offset="[0, 8]"
                     class="bg-grey-8"
                   >
-                    <div v-html="t('dashboard.axisLabelRotateTooltip')"></div>
+                    <div>
+                      <span>{{ t('dashboard.axisLabelRotateTooltipText') }}</span>
+                      <br /><br />
+                      <b>{{ t('dashboard.axisLabelTooltipNotePrefix') }}</b>
+                      <span>{{ t('dashboard.axisLabelTooltipNoteText') }}</span>
+                    </div>
                   </q-tooltip>
                 </q-icon>
               </div>
@@ -1201,7 +1206,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :offset="[0, 8]"
                     class="bg-grey-8"
                   >
-                    <div v-html="t('dashboard.axisLabelTruncateTooltip')"></div>
+                    <div>
+                      <span>{{ t('dashboard.axisLabelTruncateTooltipText') }}</span>
+                      <br /><br />
+                      <b>{{ t('dashboard.axisLabelTooltipNotePrefix') }}</b>
+                      <span>{{ t('dashboard.axisLabelTooltipNoteText') }}</span>
+                    </div>
                   </q-tooltip>
                 </q-icon>
               </div>
