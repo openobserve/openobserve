@@ -177,14 +177,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon="psychology"
             :title="span._o2_llm_model_name"
           >
-            <<<<<<< HEAD
             <span class="chip-value text-bold">{{
               span._o2_llm_model_name
             }}</span>
-            =======
-            <span class="chip-value text-bold">{{ span.llm_model_name }}</span>
-            >>>>>>> 912d02ea08 (fix(traces): fixed trace explorer error spans
-            text (#10958))
           </q-chip>
 
           <!-- Token Usage Group -->
