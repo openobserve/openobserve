@@ -232,6 +232,17 @@ pub struct AlertListFilter {
     pub owner: Option<String>,
 }
 
+/// Filters the alert list by alert type (scheduled, realtime, anomaly detection, or all).
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AlertTypeFilter {
+    #[default]
+    All,
+    Scheduled,
+    Realtime,
+    AnomalyDetection,
+}
+
 /// Parameters for listing alerts.
 #[derive(Debug, Clone)]
 pub struct ListAlertsParams {
@@ -259,6 +270,9 @@ pub struct ListAlertsParams {
 
     /// The optional page size and page index of results to retrieve.
     pub page_size_and_idx: Option<(u64, u64)>,
+
+    /// The optional alert type filter. Defaults to `All`.
+    pub alert_type: AlertTypeFilter,
 }
 
 impl ListAlertsParams {
@@ -273,6 +287,7 @@ impl ListAlertsParams {
             enabled: None,
             owner: None,
             page_size_and_idx: None,
+            alert_type: AlertTypeFilter::All,
         }
     }
 

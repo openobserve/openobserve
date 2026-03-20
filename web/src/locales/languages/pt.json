@@ -351,7 +351,32 @@
     "collapseFields": "Colapsar campos",
     "openFields": "Campos abertos",
     "aiBarSuccessPlaceholder": "O que você gostaria de fazer a seguir?",
-    "nlpModeDisabledForVisualization": "O modo de linguagem natural não pode ser desativado durante a visualização com vários fluxos"
+    "nlpModeDisabledForVisualization": "O modo de linguagem natural não pode ser desativado durante a visualização com vários fluxos",
+    "patternDetailsTitle": "Detalhes do padrão",
+    "patternXofY": "Padrão {índice} de {total}",
+    "patternXofYShort": "{índice} de {total}",
+    "patternStatistics": "Estatísticas",
+    "patternOccurrences": "Ocorrências",
+    "patternPercentage": "Porcentagem",
+    "patternAnomalyDetected": "Anomalia detectada",
+    "patternAnomalyScore": "Esse padrão é detectado como um padrão raro (pontuação de anomalia: {score}%)",
+    "patternAnomalyRare": "Esse padrão é detectado como um padrão raro ({pct}% de registros, {freq} ocorrência)",
+    "patternAnomalyRarePlural": "Esse padrão é detectado como um padrão raro ({pct}% de registros, {freq} ocorrências)",
+    "patternAnomalyLowFreq": "Esse padrão aparece com menos frequência do que o esperado ({freq} vs avg {avg}, z-score: {z})",
+    "patternAnomalyLowFreqPlural": "Esse padrão aparece com menos frequência do que o esperado ({freq} vs avg {avg}, z-score: {z})",
+    "patternVariablesHeader": "Variáveis",
+    "patternVariablesDetected": "{count} variável (s) detectada (s)",
+    "patternNoVariablesDetected": "Nenhuma variável detectada",
+    "patternTemplate": "Modelo de padrão",
+    "patternVariablesWithCount": "Variáveis ({count})",
+    "patternVariableNameColumn": "Nome da variável",
+    "patternVariableTypeColumn": "Tipo",
+    "patternExampleLogsWithCount": "Exemplos de registros ({count})",
+    "patternNavPrevious": "Anterior",
+    "patternNavNext": "Próximo",
+    "patternWildcardSampleValues": "Valores da amostra",
+    "wildcardSampleValues": "Valores da amostra",
+    "patternZScore": "Pontuação Z: {zScore} (frequência média: {avgFrequency})"
   },
   "menu": {
     "home": "Início",
@@ -2125,7 +2150,9 @@
       "detectionConfig": "Configurar os parâmetros de consulta e detecção",
       "alerting": "Configure notificações quando anomalias forem detectadas"
     },
-    "updateAnomalyDetection": "Atualize a detecção de anomalias:"
+    "updateAnomalyDetection": "Atualize a detecção de anomalias:",
+    "anomalyCreated": "Configuração de detecção de anomalias criada. O treinamento começará em breve.",
+    "editJson": "Editar alerta JSON"
   },
   "alert_templates": {
     "header": "Modelos",

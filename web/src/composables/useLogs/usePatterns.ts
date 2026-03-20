@@ -74,6 +74,11 @@ export default function usePatterns() {
           count: pattern.frequency,
           // Ensure sample_logs maps to examples
           sample_logs: pattern.examples?.map((ex: any) => ex.log || ex) || [],
+          // Statistical context for anomaly explanation tooltips
+          z_score: pattern.z_score ?? 0,
+          avg_frequency: pattern.avg_frequency ?? 0,
+          // Per-wildcard value distributions for hover tooltips
+          wildcard_values: pattern.wildcard_values ?? [],
         }),
       );
 

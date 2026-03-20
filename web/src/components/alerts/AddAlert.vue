@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="pipeline-json-edit-btn"
             @click="openJsonEditor"
           >
-            <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
+            <q-tooltip>{{ t("alerts.editJson") }}</q-tooltip>
           </q-btn>
         </div>
       </div>
@@ -516,7 +516,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-step
               v-if="isAnomalyMode"
               :name="2"
-              :title="t('alerts.anomalyDetectionConfig')"
+              :title="t('alerts.anomalyDetectionConfig') + ' *'"
               caption=""
               icon="manage_search"
               :done="wizardStep > 2"
@@ -552,7 +552,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-step
               v-if="isAnomalyMode"
               :name="3"
-              :title="t('alerts.alerting')"
+              :title="t('alerts.alerting') + (anomalyConfig.alert_enabled ? ' *' : '')"
               caption=""
               icon="notifications"
               :done="false"
@@ -759,7 +759,7 @@ style="height: 36px" />
           <q-btn
             data-test="add-alert-submit-btn"
             class="o2-primary-button no-border tw:h-[36px]"
-            :label="isAnomalyMode ? t('alerts.saveAndTrain') : t('alerts.save')"
+            :label="isAnomalyMode && !anomalyEditMode ? t('alerts.saveAndTrain') : t('alerts.save')"
             no-caps
             flat
             :loading="anomalySaving"
@@ -867,6 +867,7 @@ import AnomalyDetectionConfig from "@/components/anomaly_detection/steps/Anomaly
 import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlerting.vue";
 import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
 import anomalyDetectionService from "@/services/anomaly_detection";
+import searchService from "@/services/search";
 import QueryEditor from "@/components/QueryEditor.vue";
 import { buildAnomalyFilterExpression, operatorNeedsValue } from "@/utils/alerts/anomalyFilterOperators";
 import {
@@ -943,7 +944,7 @@ const defaultAnomalyConfig = () => ({
   description: "",
   stream_type: "logs",
   stream_name: "",
-  query_mode: "filters" as const,
+  query_mode: "filters" as "filters" | "custom_sql",
   filters: [] as any[],
   custom_sql: "",
   detection_function: "count",
@@ -958,7 +959,7 @@ const defaultAnomalyConfig = () => ({
   retrain_interval_days: 7,
   threshold: 97,
   alert_enabled: true,
-  alert_destination_id: undefined as string | undefined,
+  alert_destination_ids: [] as string[],
   folder_id: "default",
   status: undefined as string | undefined,
   is_trained: false,
@@ -1382,9 +1383,25 @@ export default defineComponent({
             : parseSeconds(
                 sched.value * (sched.unit === "h" ? 3600 : 60),
               );
+          // Normalize destinations: API may return alert_destinations (array), alert_destination_ids, or alert_destination_id
+          const rawDestIds = data.alert_destinations ?? data.alert_destination_ids ?? data.alert_destination_id;
+          const destIds: string[] = Array.isArray(rawDestIds)
+            ? rawDestIds
+            : rawDestIds
+              ? [rawDestIds]
+              : [];
+          // Parse "avg(field)" → fn="avg", field="field"
+          const rawFn: string = data.detection_function || "count";
+          const fnMatch = rawFn.match(/^(\w+)\(([^)]*)\)$/);
+          const parsedFn = fnMatch ? fnMatch[1] : rawFn;
+          const parsedField =
+            data.detection_function_field ||
+            (fnMatch && fnMatch[2] !== "*" ? fnMatch[2] : "");
           anomalyConfig.value = {
             ...defaultAnomalyConfig(),
             ...data,
+            detection_function: parsedFn,
+            detection_function_field: parsedField,
             threshold: data.threshold ?? data.percentile ?? 97,
             filters: data.filters ?? [],
             histogram_interval_value: histInterval.value,
@@ -1393,6 +1410,7 @@ export default defineComponent({
             schedule_interval_unit: sched.unit,
             detection_window_value: win.value,
             detection_window_unit: win.unit,
+            alert_destination_ids: destIds,
           };
           formData.value.is_real_time = "anomaly";
           formData.value.name = data.name;
@@ -2715,6 +2733,7 @@ export default defineComponent({
         q,
         store,
         streams,
+        getStreams,
         getParser,
         buildQueryPayload,
         prepareAndSaveAlert: prepareAndSaveAlertFunction,
@@ -2919,7 +2938,13 @@ export default defineComponent({
     // Allow saving after completing all required steps
     const canSaveAlert = computed(() => {
       if (formData.value.is_real_time === "anomaly") {
-        // Anomaly: allow save from any step (save button always enabled)
+        // Block save when notifications are enabled but no destination is selected
+        if (
+          anomalyConfig.value.alert_enabled &&
+          anomalyConfig.value.alert_destination_ids.length === 0
+        ) {
+          return false;
+        }
         return true;
       }
       // Required steps: 1 (Alert Setup), 2 (Conditions), 4 (Alert Settings)
@@ -2931,34 +2956,96 @@ export default defineComponent({
     const anomalySaving = ref(false);
 
     const saveAnomalyDetection = async () => {
+      // Validate step 2 (detection config) before saving
+      if (anomalyStep2Ref.value) {
+        const step2Valid = await anomalyStep2Ref.value.validate();
+        if (!step2Valid) {
+          wizardStep.value = 2;
+          return;
+        }
+      }
+
+      // Validate step 3 (alerting) - destination required when notifications enabled
+      if (
+        anomalyConfig.value.alert_enabled &&
+        anomalyConfig.value.alert_destination_ids.length === 0
+      ) {
+        wizardStep.value = 3;
+        return;
+      }
+
       anomalySaving.value = true;
+      const orgId = store.state.selectedOrganization.identifier;
+      const c = anomalyConfig.value;
+
+      // Validate custom SQL against the search API before saving
+      if (c.query_mode === "custom_sql") {
+        if (!c.custom_sql?.trim()) {
+          q.notify({
+            type: "negative",
+            message: "Custom SQL is required in custom SQL mode.",
+          });
+          wizardStep.value = 2;
+          anomalySaving.value = false;
+          return;
+        }
+        try {
+          await searchService.search({
+            org_identifier: orgId,
+            query: {
+              query: {
+                sql: c.custom_sql,
+                start_time: (Date.now() - 3600000) * 1000,
+                end_time: Date.now() * 1000,
+                from: 0,
+                size: 1,
+              },
+            },
+            page_type: c.stream_type,
+          });
+        } catch (sqlErr: any) {
+          const msg =
+            sqlErr?.response?.data?.message || "Invalid SQL query";
+          q.notify({
+            type: "negative",
+            message: `SQL validation error: ${msg}`,
+          });
+          wizardStep.value = 2;
+          anomalySaving.value = false;
+          return;
+        }
+      }
+
       try {
-        const orgId = store.state.selectedOrganization.identifier;
-        const c = anomalyConfig.value;
         const payload: any = {
+          alert_type: "anomaly_detection",
           name: c.name,
           description: c.description || undefined,
           stream_name: c.stream_name,
           stream_type: c.stream_type,
-          query_mode: c.query_mode,
-          filters: c.query_mode === "filters" ? c.filters : undefined,
-          custom_sql: c.query_mode === "custom_sql" ? c.custom_sql : undefined,
-          detection_function: c.detection_function,
-          detection_function_field:
-            c.detection_function !== "count"
-              ? c.detection_function_field || undefined
-              : undefined,
-          histogram_interval: anomalyHistogramInterval.value,
-          schedule_interval: anomalyScheduleInterval.value,
-          detection_window_seconds: anomalyDetectionWindowSeconds.value,
-          training_window_days: c.training_window_days,
-          retrain_interval_days: c.retrain_interval_days,
-          percentile: c.threshold,
-          alert_enabled: c.alert_enabled,
-          alert_destination_id: c.alert_enabled
-            ? c.alert_destination_id
-            : undefined,
+          enabled: c.enabled ?? true,
           folder_id: (activeFolderId.value as string) || "default",
+          alert_destinations:
+            c.alert_enabled && c.alert_destination_ids?.length
+              ? c.alert_destination_ids
+              : [],
+          anomaly_config: {
+            query_mode: c.query_mode,
+            filters: c.query_mode === "filters" ? (c.filters ?? []) : null,
+            custom_sql: c.query_mode === "custom_sql" ? c.custom_sql : null,
+            detection_function: c.detection_function || "count(*)",
+            detection_function_field:
+              c.query_mode === "filters" && c.detection_function !== "count"
+                ? c.detection_function_field || undefined
+                : undefined,
+            histogram_interval: anomalyHistogramInterval.value,
+            schedule_interval: anomalyScheduleInterval.value,
+            detection_window_seconds: anomalyDetectionWindowSeconds.value,
+            training_window_days: c.training_window_days,
+            retrain_interval_days: c.retrain_interval_days,
+            threshold: c.threshold,
+            alert_enabled: c.alert_enabled,
+          },
         };
 
         const routeAnomalyId = router.currentRoute.value.params
@@ -2979,14 +3066,7 @@ export default defineComponent({
           });
         }
 
-        emit("update:list");
-        router.push({
-          name: "alertList",
-          query: {
-            org_identifier: orgId,
-            tab: "anomalyDetection",
-          },
-        });
+        emit("update:list", (activeFolderId.value as string) || "default");
       } catch (err: any) {
         q.notify({
           type: "negative",

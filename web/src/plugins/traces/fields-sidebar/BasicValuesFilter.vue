@@ -255,6 +255,10 @@ const defaultValuesCount = computed(
   () => store.state.zoConfig?.query_values_default_num || 10,
 );
 
+const showFtsFieldValues = computed(
+  () => store.state.zoConfig?.show_fts_field_values ?? false,
+);
+
 const addSearchTerm = (term: string) => {
   searchObj.data.stream.addToFilter = term;
 };
@@ -334,7 +338,7 @@ const fetchValues = (from: number = 0, keyword: string = "") => {
 };
 
 const openFilterCreator = (event: any, { ftsKey }: any) => {
-  if (ftsKey) {
+  if (ftsKey && !showFtsFieldValues.value) {
     event.stopPropagation();
     event.preventDefault();
     return;

@@ -181,6 +181,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               SQL is required in custom SQL mode
             </div>
             <div
+              v-if="hasTimestampAlias"
+              class="text-red-8 q-pt-xs"
+              data-test="anomaly-custom-sql-timestamp-alias-error"
+              style="font-size: 11px; line-height: 12px"
+            >
+              <code>{{
+                store.state.zoConfig.timestamp_column || "_timestamp"
+              }}</code>
+              cannot be used as a column alias. Use
+              <code>time_bucket</code> instead.
+            </div>
+            <div
               class="text-caption tw:mt-1"
               :class="
                 store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
@@ -316,13 +328,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Schedule Interval -->
+        <!-- Check Every (schedule interval) -->
         <div class="flex items-start alert-settings-row">
           <div
             class="tw:font-semibold flex items-center"
             style="width: 190px; height: 36px"
           >
-            Schedule Interval <span class="text-negative tw:ml-1">*</span>
+            Check Every <span class="text-negative tw:ml-1">*</span>
             <q-icon
               name="info"
               size="17px"
@@ -404,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <span style="font-size: 14px">
                   How far back each detection run queries. Caps the window even
-                  after a long pause. Defaults to Schedule Interval.
+                  after a long pause. Defaults to Check Every interval.
                 </span>
               </q-tooltip>
             </q-icon>
@@ -434,6 +446,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="min-width: 100px; background: none"
                 data-test="anomaly-detection-window-unit"
               />
+            </div>
+            <div
+              v-if="
+                !config.detection_window_value ||
+                config.detection_window_value < 1
+              "
+              class="text-red-8 q-pt-xs"
+              style="font-size: 11px; line-height: 12px"
+              data-test="anomaly-detection-window-error"
+            >
+              Field is required!
             </div>
           </div>
         </div>
@@ -589,14 +612,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   no-caps
                   size="sm"
                   icon="refresh"
-                  :loading="historyLoading"
-                  :disable="!config.id || historyLoading"
+                  :disable="
+                    !config.stream_name ||
+                    (config.query_mode === 'custom_sql' && !config.custom_sql)
+                  "
                   class="text-caption"
                   data-test="anomaly-sensitivity-load-btn"
-                  @click="loadSensitivityHistory"
+                  @click="loadPreview"
                 >
-                  <q-tooltip v-if="!config.id"
-                    >Available after saving</q-tooltip
+                  <q-tooltip v-if="!config.stream_name"
+                    >Select a stream first</q-tooltip
+                  >
+                  <q-tooltip
+                    v-else-if="
+                      config.query_mode === 'custom_sql' && !config.custom_sql
+                    "
+                    >Enter a SQL query first</q-tooltip
                   >
                   <span v-else class="q-ml-xs">Load Data</span>
                 </q-btn>
@@ -604,54 +635,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Chart + Vertical Slider row -->
               <div class="tw:flex tw:gap-3">
-                <!-- ECharts time series chart -->
+                <!-- Time series chart -->
                 <div class="sensitivity-chart-wrapper tw:flex-1">
                   <div
-                    v-if="!config.id"
+                    v-if="!previewActive"
                     class="sensitivity-empty-state"
                     :class="
                       store.state.theme === 'dark'
                         ? 'text-grey-5'
                         : 'text-grey-6'
                     "
+                    data-test="anomaly-sensitivity-empty"
                   >
                     <q-icon
                       name="bar_chart"
                       size="2rem"
                       class="tw:mb-2 tw:opacity-40"
                     />
-                    <span class="text-caption"
-                      >Save first to load historical data</span
-                    >
+                    <span class="text-caption">{{
+                      !config.stream_name
+                        ? "Select a stream first"
+                        : "Click Load Data to preview the time series"
+                    }}</span>
                   </div>
-                  <div
-                    v-else-if="historyLoading"
-                    class="sensitivity-empty-state"
-                  >
-                    <q-spinner size="1.5rem" color="primary" />
-                  </div>
-                  <div
-                    v-else-if="historyPoints.length === 0"
-                    class="sensitivity-empty-state"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'text-grey-5'
-                        : 'text-grey-6'
-                    "
-                  >
-                    <q-icon
-                      name="timeline"
-                      size="2rem"
-                      class="tw:mb-2 tw:opacity-40"
-                    />
-                    <span class="text-caption"
-                      >No history data yet. Click Load Data.</span
-                    >
-                  </div>
-                  <div
+                  <PanelSchemaRenderer
                     v-else
-                    ref="chartRef"
-                    class="sensitivity-chart"
+                    :key="previewKey"
+                    :panelSchema="previewPanelSchema"
+                    :selectedTimeObj="previewTimeObj"
+                    :variablesData="{}"
+                    :forceLoad="true"
+                    searchType="UI"
+                    style="height: 180px; width: 100%"
                     data-test="anomaly-sensitivity-chart"
                   />
                 </div>
@@ -686,22 +701,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, onUnmounted, type PropType } from "vue";
+import { computed, defineComponent, ref, watch, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import * as echarts from "echarts";
 import streamService from "@/services/stream";
-import anomalyDetectionService from "@/services/anomaly_detection";
 import {
   ANOMALY_FILTER_OPERATORS,
+  buildAnomalyFilterExpression,
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
 import QueryEditor from "@/components/QueryEditor.vue";
+import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 
 export default defineComponent({
   name: "AnomalyDetectionConfig",
 
-  components: { QueryEditor },
+  components: { QueryEditor, PanelSchemaRenderer },
 
   props: {
     config: {
@@ -722,6 +737,7 @@ export default defineComponent({
       "sum",
       "min",
       "max",
+      "p50",
       "p95",
       "p99",
     ];
@@ -736,6 +752,18 @@ export default defineComponent({
       { label: "14 days", value: 14 },
     ];
 
+    // Check if the custom SQL uses the timestamp column name as an alias
+    const hasTimestampAlias = computed(() => {
+      const sql = props.config.custom_sql;
+      if (!sql || props.config.query_mode !== "custom_sql") return false;
+      const tsCol = store.state.zoConfig.timestamp_column || "_timestamp";
+      const escaped = tsCol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(
+        `\\bAS\\s+["'\`]?${escaped}["'\`]?\\s*(?:,|\\s|$)`,
+        "i",
+      ).test(sql);
+    });
+
     // Build default SQL template for a given stream name and histogram interval
     const buildDefaultSql = (
       streamName: string,
@@ -746,15 +774,26 @@ export default defineComponent({
 
     // Stream fields for filter field selector and detection function field
     const allStreamFields = ref<string[]>([]);
+    const numericStreamFields = ref<string[]>([]); // only numeric types for avg/sum/min/max/pXX
     const filteredStreamFields = ref<string[]>([]);
     const filteredDetectionFields = ref<string[]>([]);
     const loadingFields = ref(false);
+
+    const NUMERIC_FIELD_TYPES = new Set([
+      "Int8", "Int16", "Int32", "Int64",
+      "UInt8", "UInt16", "UInt32", "UInt64",
+      "Float16", "Float32", "Float64",
+    ]);
+
+    const requiresNumericField = (fn: string) =>
+      ["avg", "sum", "min", "max", "p50", "p95", "p99"].includes(fn);
 
     const loadStreamFields = async () => {
       const streamName = props.config.stream_name;
       const streamType = props.config.stream_type;
       if (!streamName || !streamType) {
         allStreamFields.value = [];
+        numericStreamFields.value = [];
         filteredStreamFields.value = [];
         filteredDetectionFields.value = [];
         return;
@@ -772,10 +811,22 @@ export default defineComponent({
             ? schema.uds_schema
             : schema.schema || schema.fields || [];
         allStreamFields.value = fieldsArray.map((f: any) => f.name).sort();
+        numericStreamFields.value = fieldsArray
+          .filter((f: any) => {
+            const t: string = f.field_type || f.data_type || f.type || "";
+            return NUMERIC_FIELD_TYPES.has(t);
+          })
+          .map((f: any) => f.name)
+          .sort();
         filteredStreamFields.value = allStreamFields.value;
-        filteredDetectionFields.value = allStreamFields.value;
+        filteredDetectionFields.value = requiresNumericField(
+          props.config.detection_function,
+        )
+          ? numericStreamFields.value
+          : allStreamFields.value;
       } catch {
         allStreamFields.value = [];
+        numericStreamFields.value = [];
         filteredStreamFields.value = [];
         filteredDetectionFields.value = [];
       } finally {
@@ -797,16 +848,30 @@ export default defineComponent({
     const filterDetectionFieldOptions = (val: string, update: any) => {
       update(() => {
         const needle = val.toLowerCase();
-        filteredDetectionFields.value = needle
-          ? allStreamFields.value.filter((f) =>
-              f.toLowerCase().includes(needle),
-            )
+        const base = requiresNumericField(props.config.detection_function)
+          ? numericStreamFields.value
           : allStreamFields.value;
+        filteredDetectionFields.value = needle
+          ? base.filter((f) => f.toLowerCase().includes(needle))
+          : base;
       });
     };
 
     const onDetectionFunctionChange = (fn: string) => {
       if (fn === "count") {
+        props.config.detection_function_field = "";
+      }
+      // Refresh available fields based on whether the new function needs numeric fields.
+      const base = requiresNumericField(fn)
+        ? numericStreamFields.value
+        : allStreamFields.value;
+      filteredDetectionFields.value = base;
+      // Clear the selected field if it's no longer valid for the new function.
+      if (
+        requiresNumericField(fn) &&
+        props.config.detection_function_field &&
+        !numericStreamFields.value.includes(props.config.detection_function_field)
+      ) {
         props.config.detection_function_field = "";
       }
     };
@@ -849,6 +914,21 @@ export default defineComponent({
       },
     );
 
+    // Sync histogram interval changes into the custom SQL histogram() call
+    watch(
+      () => [
+        props.config.histogram_interval_value,
+        props.config.histogram_interval_unit,
+      ],
+      ([newValue, newUnit]) => {
+        if (props.config.query_mode !== "custom_sql" || !props.config.custom_sql) return;
+        props.config.custom_sql = props.config.custom_sql.replace(
+          /histogram\(\s*_timestamp\s*,\s*'[^']+'\s*\)/gi,
+          `histogram(_timestamp, '${newValue}${newUnit}')`,
+        );
+      },
+    );
+
     const addFilter = () => {
       props.config.filters.push({ field: "", operator: "=", value: "" });
     };
@@ -865,162 +945,231 @@ export default defineComponent({
       ) {
         return false;
       }
+      if (hasTimestampAlias.value) {
+        return false;
+      }
+      if (
+        !props.config.histogram_interval_value ||
+        props.config.histogram_interval_value < 1
+      ) {
+        return false;
+      }
+      if (
+        !props.config.schedule_interval_value ||
+        props.config.schedule_interval_value < 1
+      ) {
+        return false;
+      }
+      if (
+        !props.config.detection_window_value ||
+        props.config.detection_window_value < 1
+      ) {
+        return false;
+      }
+      if (
+        props.config.query_mode === "filters" &&
+        props.config.detection_function &&
+        props.config.detection_function !== "count" &&
+        !props.config.detection_function_field
+      ) {
+        return false;
+      }
       return formValid;
     };
 
-    // ── Sensitivity chart ───────────────────────────────────────────────────
-    const chartRef = ref<HTMLElement | null>(null);
-    const historyLoading = ref(false);
-    const historyPoints = ref<
-      Array<{ ts: number; value: number; score: number }>
-    >([]);
+    // ── Data Preview chart ──────────────────────────────────────────────────
+    const previewActive = ref(false);
+    const previewKey = ref(0);
+    const previewPanelSchema = ref<any>(null);
+    const previewTimeObj = ref<any>(null);
+
+    const buildPreviewSql = () => {
+      let sql: string;
+      if (props.config.query_mode === "custom_sql") {
+        sql = props.config.custom_sql || "";
+      } else {
+        const streamName = props.config.stream_name;
+        if (!streamName) {
+          sql = "";
+        } else {
+          const intervalValue = props.config.histogram_interval_value ?? 5;
+          const intervalUnit = props.config.histogram_interval_unit ?? "m";
+          const interval = `${intervalValue}${intervalUnit}`;
+          const fn =
+            props.config.detection_function === "count" ||
+            !props.config.detection_function
+              ? "count(*)"
+              : `${props.config.detection_function}(${props.config.detection_function_field || "*"})`;
+          const filterLines = (props.config.filters || [])
+            .filter(
+              (f: any) =>
+                f.field &&
+                (operatorNeedsValue(f.operator) ? f.value : true),
+            )
+            .map(
+              (f: any) =>
+                `  AND ${buildAnomalyFilterExpression(f.field, f.operator, f.value)}`,
+            );
+          const where = filterLines.length
+            ? [
+                "WHERE",
+                ...filterLines.map((l: string, i: number) =>
+                  i === 0 ? l.replace(/^\s+AND /, "  ") : l,
+                ),
+              ].join("\n")
+            : "";
+          sql = [
+            `SELECT histogram(_timestamp, '${interval}') AS time_bucket,`,
+            `       ${fn} AS value`,
+            `FROM "${streamName}"`,
+            where,
+            `GROUP BY time_bucket`,
+            `ORDER BY time_bucket`,
+          ]
+            .filter(Boolean)
+            .join("\n");
+        }
+      }
+      // Normalize multiline SQL to a single line — the dashboard panel
+      // query executor can truncate at newlines in some code paths
+      return sql.replace(/\s+/g, " ").trim();
+    };
+
+    const loadPreview = () => {
+      const sql = buildPreviewSql();
+      if (!sql || !props.config.stream_name) return;
+
+      const windowValue = props.config.detection_window_value ?? 30;
+      const windowUnit = props.config.detection_window_unit ?? "m";
+      const windowMs =
+        windowValue * (windowUnit === "h" ? 3600000 : 60000);
+      // The dashboard DateTime picker returns microseconds (ms * 1000).
+      // viewDashboard wraps those with new Date(microseconds), so the Date
+      // object's internal value IS the microsecond number.
+      // usePanelDataLoader then calls .getTime() which returns the microsecond
+      // value unchanged. We must replicate that convention here.
+      const endMicros = new Date().getTime() * 1000;
+      const startMicros = endMicros - windowMs * 1000;
+
+      previewTimeObj.value = {
+        start_time: new Date(startMicros),
+        end_time: new Date(endMicros),
+      };
+      // PanelSchemaRenderer expects the inner data object directly (not wrapped)
+      previewPanelSchema.value = {
+        version: 2,
+        id: "anomaly-preview",
+        type: "line",
+        title: "",
+        description: "",
+        config: {
+          show_legends: false,
+          legends_position: "bottom",
+          unit: "short",
+          unit_custom: "",
+          promql_legend: "",
+          axis_border_show: false,
+          connect_nulls: true,
+          no_value_replacement: "",
+          wrap_table_cells: false,
+          table_transpose: false,
+          table_dynamic_columns: false,
+          base_map: { type: "osm" },
+          map_view: { zoom: 1, lat: 0, lng: 0 },
+          custom_chart_options: {
+            tooltip: { appendToBody: true, confine: false },
+          },
+        },
+        queryType: "sql",
+        queries: [
+          {
+            query: sql,
+            customQuery: true,
+            vrlFunctionQuery: null,
+            query_fn: null,
+            fields: {
+              stream: props.config.stream_name,
+              stream_type: props.config.stream_type || "logs",
+              x: [
+                {
+                  alias: "time_bucket",
+                  column: "time_bucket",
+                  label: "time_bucket",
+                  color: null,
+                },
+              ],
+              y: [
+                {
+                  alias: "value",
+                  column: "value",
+                  label: "value",
+                  color: "#5960b2",
+                },
+              ],
+              z: [],
+              breakdown: [],
+              filter: {
+                filterType: "group",
+                logicalOperator: "AND",
+                conditions: [],
+              },
+              latitude: null,
+              longitude: null,
+              weight: null,
+            },
+            config: {
+              promql_legend: "",
+              layer_type: "scatter",
+              weight_fixed: 1,
+              limit: 0,
+              min: 0,
+              max: 100,
+              time_shift: [],
+            },
+          },
+        ],
+      };
+      previewKey.value++;
+      previewActive.value = true;
+    };
+
+    // Auto-refresh when Look Back Window, Detection Resolution, filters, or
+    // detection function changes
+    let previewRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+    watch(
+      () => [
+        props.config.detection_window_value,
+        props.config.detection_window_unit,
+        props.config.histogram_interval_value,
+        props.config.histogram_interval_unit,
+        props.config.query_mode,
+        props.config.custom_sql,
+        props.config.detection_function,
+        props.config.detection_function_field,
+        props.config.filters,
+      ],
+      () => {
+        if (!previewActive.value) return;
+        if (previewRefreshTimer) clearTimeout(previewRefreshTimer);
+        previewRefreshTimer = setTimeout(() => {
+          loadPreview();
+        }, 600);
+      },
+      { deep: true },
+    );
+
+    // ── Sensitivity slider ──────────────────────────────────────────────────
     const thresholdRange = ref<{ min: number; max: number }>({
       min: props.config.threshold_min ?? 0,
       max: props.config.threshold ?? 97,
     });
-
-    let chartInstance: echarts.ECharts | null = null;
-
-    const isDark = () => store.state.theme === "dark";
-
-    const buildChartOption = () => {
-      const pts = historyPoints.value;
-      const scatterData = pts.map((p) => [p.ts, p.value, p.score]);
-      const lineData = pts.map((p) => [p.ts, p.value]);
-      const scores = pts.map((p) => p.score);
-      const minScore = scores.length ? Math.min(...scores) : 0;
-      const maxScore = scores.length ? Math.max(...scores) : 100;
-
-      return {
-        backgroundColor: "transparent",
-        animation: false,
-        grid: { left: 50, right: 90, top: 10, bottom: 30 },
-        xAxis: {
-          type: "time",
-          axisLabel: {
-            color: isDark() ? "#9e9e9e" : "#666",
-            fontSize: 10,
-            formatter: (val: number) => {
-              const d = new Date(val);
-              return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
-            },
-          },
-          axisLine: { lineStyle: { color: isDark() ? "#444" : "#ddd" } },
-          splitLine: { show: false },
-        },
-        yAxis: {
-          type: "value",
-          name: "Value",
-          nameTextStyle: { color: isDark() ? "#9e9e9e" : "#666", fontSize: 10 },
-          axisLabel: { color: isDark() ? "#9e9e9e" : "#666", fontSize: 10 },
-          axisLine: { lineStyle: { color: isDark() ? "#444" : "#ddd" } },
-          splitLine: { lineStyle: { color: isDark() ? "#333" : "#eee" } },
-        },
-        visualMap: {
-          min: minScore,
-          max: maxScore,
-          dimension: 2,
-          orient: "vertical",
-          right: 0,
-          top: "center",
-          text: ["High", "Low"],
-          textStyle: { color: isDark() ? "#9e9e9e" : "#666", fontSize: 10 },
-          calculable: false,
-          inRange: {
-            color: ["#5470c6", "#91cc75", "#fac858", "#ee6666"],
-          },
-          width: 12,
-          itemHeight: 100,
-        },
-        tooltip: {
-          trigger: "item",
-          formatter: (params: any) => {
-            if (params.seriesIndex === 0) {
-              const [ts, val, score] = params.data;
-              const d = new Date(ts);
-              return `${d.toLocaleString()}<br/>Value: ${Number(val).toFixed(4)}<br/>Score: ${Number(score).toFixed(2)}`;
-            }
-            return "";
-          },
-        },
-        series: [
-          {
-            name: "Data",
-            type: "scatter",
-            data: scatterData,
-            symbolSize: 6,
-            encode: { x: 0, y: 1, tooltip: [0, 1, 2] },
-          },
-          {
-            name: "Baseline",
-            type: "line",
-            data: lineData,
-            lineStyle: { color: isDark() ? "#555" : "#ccc", width: 1 },
-            symbol: "none",
-            z: 0,
-          },
-        ],
-      };
-    };
-
-    const renderChart = () => {
-      if (!chartRef.value || historyPoints.value.length === 0) return;
-      if (!chartInstance) {
-        chartInstance = echarts.init(
-          chartRef.value,
-          isDark() ? "dark" : undefined,
-        );
-      }
-      chartInstance.setOption(buildChartOption(), true);
-    };
-
-    watch(historyPoints, () => {
-      setTimeout(renderChart, 50);
-    });
-
-    watch(
-      () => store.state.theme,
-      () => {
-        if (chartInstance) {
-          chartInstance.dispose();
-          chartInstance = null;
-        }
-        setTimeout(renderChart, 50);
-      },
-    );
-
-    const loadSensitivityHistory = async () => {
-      const orgId = store.state.selectedOrganization?.identifier;
-      if (!orgId || !props.config.id) return;
-      historyLoading.value = true;
-      try {
-        const res = await anomalyDetectionService.getHistory(
-          orgId,
-          props.config.id,
-          200,
-        );
-        const raw: any[] = res.data?.history ?? res.data?.list ?? [];
-        historyPoints.value = raw
-          .map((r: any) => ({
-            ts: r.timestamp ?? r._timestamp ?? r.ts ?? 0,
-            value: r.actual_value ?? r.value ?? 0,
-            score: r.anomaly_score ?? r.score ?? 0,
-          }))
-          .filter((p) => p.ts > 0)
-          .sort((a, b) => a.ts - b.ts);
-      } catch {
-        historyPoints.value = [];
-      } finally {
-        historyLoading.value = false;
-      }
-    };
 
     const onThresholdRangeChange = (val: { min: number; max: number }) => {
       props.config.threshold_min = val.min;
       props.config.threshold = val.max;
     };
 
-    // init range from config
+    // sync range when config changes externally
     watch(
       () => [props.config.threshold, props.config.threshold_min],
       ([max, min]) => {
@@ -1031,10 +1180,6 @@ export default defineComponent({
       },
     );
 
-    onUnmounted(() => {
-      chartInstance?.dispose();
-      chartInstance = null;
-    });
 
     return {
       t,
@@ -1055,12 +1200,14 @@ export default defineComponent({
       addFilter,
       removeFilter,
       validate,
-      chartRef,
-      historyLoading,
-      historyPoints,
+      hasTimestampAlias,
       thresholdRange,
-      loadSensitivityHistory,
       onThresholdRangeChange,
+      previewActive,
+      previewKey,
+      previewPanelSchema,
+      previewTimeObj,
+      loadPreview,
     };
   },
 });
@@ -1121,10 +1268,6 @@ export default defineComponent({
   position: relative;
 }
 
-.sensitivity-chart {
-  width: 100%;
-  height: 180px;
-}
 
 .sensitivity-empty-state {
   width: 100%;
@@ -1239,4 +1382,5 @@ export default defineComponent({
     }
   }
 }
+
 </style>
