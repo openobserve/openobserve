@@ -1091,7 +1091,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     it.value ==
                     dashboardPanelData.data.config.label_option.position,
                 )?.label
-              : 'None'
+              : t('dashboard.none')
           }`"
           data-test="dashboard-config-label-position"
         >
@@ -1159,14 +1159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :offset="[0, 8]"
                     class="bg-grey-8"
                   >
-                    <div>
-                      Rotate the x-axis label text by a chosen angle (in
-                      degrees) to improve readability when labels are long or
-                      crowded.
-                      <br /><br />
-                      <strong>Note:</strong> This option is not supported for
-                      time-series x-axis fields.
-                    </div>
+                    <div v-html="t('dashboard.axisLabelRotateTooltip')"></div>
                   </q-tooltip>
                 </q-icon>
               </div>
@@ -1208,12 +1201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :offset="[0, 8]"
                     class="bg-grey-8"
                   >
-                    <div>
-                      Truncate x-axis labels to the specified width (in pixels).
-                      <br /><br />
-                      <strong>Note:</strong> This option is not supported for
-                      time-series x-axis fields.
-                    </div>
+                    <div v-html="t('dashboard.axisLabelTruncateTooltip')"></div>
                   </q-tooltip>
                 </q-icon>
               </div>
@@ -2105,7 +2093,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           stack-label
           emit-value
           :display-value="`${
-            dashboardPanelData.data.config.trellis?.layout ?? 'None'
+            dashboardPanelData.data.config.trellis?.layout ?? t('dashboard.none')
           }`"
           :disable="isBreakdownFieldEmpty || hasTimeShifts"
           hide-bottom-space
