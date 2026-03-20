@@ -154,8 +154,8 @@ describe("AnomalyDetectionList - formatSeconds", () => {
   it("formats exact hours correctly", async () => {
     const w = await mountComp();
     await flushPromises();
-    expect((w.vm as any).formatSeconds(3600)).toBe("1h");
-    expect((w.vm as any).formatSeconds(7200)).toBe("2h");
+    expect((w.vm as any).formatSeconds(3600)).toBe("1 Hours");
+    expect((w.vm as any).formatSeconds(7200)).toBe("2 Hours");
   });
 
   it("formats minutes for non-hourly seconds", async () => {
@@ -163,6 +163,12 @@ describe("AnomalyDetectionList - formatSeconds", () => {
     await flushPromises();
     expect((w.vm as any).formatSeconds(1800)).toBe("30 mins");
     expect((w.vm as any).formatSeconds(600)).toBe("10 mins");
+  });
+
+  it("formats hours and minutes correctly", async () => {
+    const w = await mountComp();
+    await flushPromises();
+    expect((w.vm as any).formatSeconds(5400)).toBe("1 Hours 30 Mins");
   });
 });
 

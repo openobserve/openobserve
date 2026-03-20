@@ -34,7 +34,7 @@ import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlertin
 
 const makeConfig = (overrides: Record<string, any> = {}) => ({
   alert_enabled: true,
-  alert_destination_id: undefined as string | undefined,
+  alert_destination_ids: [] as string[],
   ...overrides,
 });
 
@@ -82,16 +82,16 @@ describe("AnomalyAlerting - rendering", () => {
 
   it("shows required field error when alert_enabled and no destination", async () => {
     const w = await mountComp({
-      config: makeConfig({ alert_enabled: true, alert_destination_id: undefined }),
+      config: makeConfig({ alert_enabled: true, alert_destination_ids: [] }),
     });
-    expect(w.text()).toContain("Field is required");
+    expect(w.text()).toContain("At least one destination is required!");
   });
 
   it("does not show required field error when destination is selected", async () => {
     const w = await mountComp({
-      config: makeConfig({ alert_enabled: true, alert_destination_id: "slack-dest" }),
+      config: makeConfig({ alert_enabled: true, alert_destination_ids: ["slack-dest"] }),
     });
-    expect(w.text()).not.toContain("Field is required");
+    expect(w.text()).not.toContain("At least one destination is required!");
   });
 });
 
