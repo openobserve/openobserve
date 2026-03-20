@@ -2483,12 +2483,8 @@ import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
 import BackGroundColorConfig from "./BackGroundColorConfig.vue";
 import OverrideConfig from "./OverrideConfig.vue";
 import ConfigPanelSearch from "./ConfigPanelSearch.vue";
-import { useConfigPanelSearch } from "../../../composables/dashboard/useConfigPanelSearch";
-import { useConfigOptions } from "../../../composables/dashboard/useConfigOptions";
-import {
-  ORDERED_SECTION_IDS,
-  SectionId,
-} from "../../../utils/dashboard/searchLabelsConfig";
+import { useConfigPanel } from "../../../composables/dashboard/useConfigPanel";
+import { SectionId } from "../../../utils/dashboard/searchLabelsConfig";
 import LinearIcon from "@/components/icons/dashboards/LinearIcon.vue";
 import NoSymbol from "@/components/icons/dashboards/NoSymbol.vue";
 import Smooth from "@/components/icons/dashboards/Smooth.vue";
@@ -3284,7 +3280,18 @@ export default defineComponent({
       };
     };
 
-    const { configOptions } = useConfigOptions(
+    const {
+      searchQuery,
+      expandedSections,
+      isConfigOptionVisible,
+      isSectionVisible,
+      isExpanded,
+      toggleSection,
+      resetSearch,
+      allSectionsExpanded,
+      toggleAllSections,
+      anySectionVisible,
+    } = useConfigPanel(
       dashboardPanelData,
       promqlMode,
       dashboardPanelDataPageKey,
@@ -3292,48 +3299,6 @@ export default defineComponent({
       showColorPalette,
       isPivotMode,
     );
-
-    const {
-      searchQuery,
-      expandedSections,
-      normalizedSearchQuery,
-      isConfigOptionVisible: composableIsConfigOptionVisible,
-      isSectionVisible: composableIsSectionVisible,
-      isExpanded,
-      toggleSection,
-      resetSearch,
-    } = useConfigPanelSearch();
-
-    const isConfigOptionVisible = (sectionId: SectionId, optionId: string) => {
-      return composableIsConfigOptionVisible(
-        configOptions.value as any,
-        sectionId,
-        optionId,
-      );
-    };
-
-    const isSectionVisible = (sectionId: SectionId) => {
-      return composableIsSectionVisible(configOptions.value as any, sectionId);
-    };
-
-    // Global expand / collapse toggle
-    const allSectionsExpanded = computed(() =>
-      Object.values(expandedSections.value).every((v) => v === true),
-    );
-
-    const toggleAllSections = () => {
-      const expand = !allSectionsExpanded.value;
-      Object.keys(expandedSections.value).forEach((key) => {
-        expandedSections.value[key] = expand;
-      });
-    };
-
-    // anySectionVisible - drives the "No results" empty state
-    const anySectionVisible = computed(() => {
-      return ORDERED_SECTION_IDS.some((sectionId) =>
-        isSectionVisible(sectionId),
-      );
-    });
 
     // Clear legend width when switching away from plain type or when position is not right
     watchEffect(() => {

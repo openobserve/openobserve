@@ -1,4 +1,4 @@
-import { computed, Ref, ComputedRef } from "vue";
+import { computed, ref, watch, Ref, ComputedRef } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   shouldShowLegendsToggle,
@@ -18,18 +18,76 @@ import {
   shouldShowDrilldown,
   shouldShowTimeShift,
 } from "@/utils/dashboard/configUtils";
+import {
+  SectionId,
+  ORDERED_SECTION_IDS,
+  DEFAULT_EXPANDED_SECTIONS,
+} from "@/utils/dashboard/searchLabelsConfig";
 
-export function useConfigOptions(
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface ConfigOption {
+  label: string | string[];
+  visible?: boolean;
+}
+
+export interface ConfigOptions {
+  [sectionId: string]: {
+    [optionId: string]: ConfigOption;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Pure filter helpers (exported so they can be unit-tested independently)
+// ---------------------------------------------------------------------------
+
+export function filterOption(
+  option: ConfigOption | undefined,
+  normalizedQuery: string,
+): boolean {
+  if (!option || option.visible === false) return false;
+  if (!normalizedQuery) return true;
+  const labels = Array.isArray(option.label) ? option.label : [option.label];
+  return labels.some((l) => l.toLowerCase().includes(normalizedQuery));
+}
+
+export function filterSection(
+  sectionOptions: Record<string, ConfigOption> | undefined,
+  normalizedQuery: string,
+): boolean {
+  if (!sectionOptions) return false;
+  return Object.values(sectionOptions).some((opt) =>
+    filterOption(opt, normalizedQuery),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main composable
+// ---------------------------------------------------------------------------
+
+/**
+ * Single composable for the config panel.
+ *
+ * To add a new config section:
+ *   1. Add one entry in searchLabelsConfig.ts  (SECTION_DEFS)
+ *   2. Add its options in the configOptions computed below
+ *   3. Add its UI in ConfigPanel.vue
+ */
+export function useConfigPanel(
   dashboardPanelData: any,
   promqlMode: Ref<boolean>,
   dashboardPanelDataPageKey: unknown,
   showTrellisConfig: ComputedRef<boolean>,
   showColorPalette: ComputedRef<boolean>,
-  isPivotMode: ComputedRef<boolean>
+  isPivotMode: ComputedRef<boolean>,
 ) {
   const { t } = useI18n();
 
-  const configOptions = computed(() => ({
+  // ── Config options ────────────────────────────────────────────────────────
+
+  const configOptions = computed<ConfigOptions>(() => ({
     general: {
       description: { label: t("dashboard.description") },
       step: {
@@ -106,7 +164,7 @@ export function useConfigOptions(
     },
     geographic: {
       "geographic-config": {
-        label: t("dashboard.geographicConfig"),
+        label: t("dashboard.configSectionGeographic"),
         visible:
           !!promqlMode.value &&
           (dashboardPanelData.data.type === "geomap" ||
@@ -152,16 +210,12 @@ export function useConfigOptions(
       },
     },
     data: {
-      unit: {
-        label: t("dashboard.unitLabel"),
-      },
+      unit: { label: t("dashboard.unitLabel") },
       "custom-unit": {
         label: t("dashboard.customunitLabel"),
         visible: dashboardPanelData.data.config.unit === "custom",
       },
-      decimals: {
-        label: t("dashboard.decimals"),
-      },
+      decimals: { label: t("dashboard.decimals") },
       limit: {
         label: t("dashboard.queryLimit"),
         visible:
@@ -172,17 +226,11 @@ export function useConfigOptions(
       },
       "top-results": {
         label: t("dashboard.showTopNValues"),
-        visible: shouldShowTopResultsConfig(
-          dashboardPanelData,
-          promqlMode.value,
-        ),
+        visible: shouldShowTopResultsConfig(dashboardPanelData, promqlMode.value),
       },
       "top-results-others": {
         label: t("dashboard.addOthersSeries"),
-        visible: shouldShowTopResultsConfig(
-          dashboardPanelData,
-          promqlMode.value,
-        ),
+        visible: shouldShowTopResultsConfig(dashboardPanelData, promqlMode.value),
       },
       "connect-nulls": {
         label: t("dashboard.connectNullValues"),
@@ -190,10 +238,7 @@ export function useConfigOptions(
       },
       "no-value-replacement": {
         label: t("dashboard.noValueReplacement"),
-        visible: shouldShowNoValueReplacement(
-          dashboardPanelData,
-          promqlMode.value,
-        ),
+        visible: shouldShowNoValueReplacement(dashboardPanelData, promqlMode.value),
       },
     },
     axis: {
@@ -239,10 +284,7 @@ export function useConfigOptions(
       },
       "line-thickness": {
         label: t("dashboard.lineThickness"),
-        visible: shouldShowLineThickness(
-          dashboardPanelData,
-          promqlMode.value,
-        ),
+        visible: shouldShowLineThickness(dashboardPanelData, promqlMode.value),
       },
     },
     table: {
@@ -302,18 +344,14 @@ export function useConfigOptions(
       },
     },
     valueTransformations: {
-      "value-transformations": {
-        label: t("dashboard.valueTransformations"),
-      },
+      "value-transformations": { label: t("dashboard.configSectionValueTransformations") },
     },
     fieldOverrides: {
-      "field-overrides": {
-        label: t("dashboard.fieldOverrides"),
-      },
+      "field-overrides": { label: t("dashboard.configSectionFieldOverrides") },
     },
     map: {
       "map-config": {
-        label: t("dashboard.map"),
+        label: t("dashboard.configSectionMap"),
         visible:
           dashboardPanelData.data.type === "geomap" ||
           dashboardPanelData.data.type === "maps",
@@ -321,11 +359,11 @@ export function useConfigOptions(
     },
     gauge: {
       "gauge-min": {
-        label: t("dashboard.gaugeMinimum"),
+        label: t("dashboard.gaugeMinValue"),
         visible: dashboardPanelData.data.type === "gauge",
       },
       "gauge-max": {
-        label: t("dashboard.gaugeMaximum"),
+        label: t("dashboard.gaugeMaxValue"),
         visible: dashboardPanelData.data.type === "gauge",
       },
     },
@@ -335,13 +373,13 @@ export function useConfigOptions(
         visible: showTrellisConfig.value,
       },
       "trellis-columns": {
-        label: t("dashboard.trellisColumns"),
+        label: t("dashboard.numOfColumns"),
         visible:
           showTrellisConfig.value &&
           dashboardPanelData.data.config.trellis?.layout === "custom",
       },
       "trellis-group-by": {
-        label: t("dashboard.trellisGroupBy"),
+        label: t("dashboard.groupMultiYAxisTrellis"),
         visible:
           showTrellisConfig.value &&
           dashboardPanelData.data.config.trellis?.layout != null,
@@ -349,7 +387,11 @@ export function useConfigOptions(
     },
     colors: {
       colors: {
-        label: t("dashboard.colors"),
+        label: [
+          t("dashboard.configSectionColors"),
+          t("dashboard.colorPalette"),
+          t("dashboard.colorBySeries"),
+        ],
         visible: showColorPalette.value,
       },
     },
@@ -358,7 +400,7 @@ export function useConfigOptions(
         label: t("dashboard.drilldown"),
         visible: shouldShowDrilldown(
           dashboardPanelData,
-          dashboardPanelDataPageKey,
+          dashboardPanelDataPageKey as string,
         ),
       },
     },
@@ -368,7 +410,7 @@ export function useConfigOptions(
         visible: shouldShowTimeShift(
           dashboardPanelData,
           promqlMode.value,
-          dashboardPanelDataPageKey,
+          dashboardPanelDataPageKey as string,
         ),
       },
     },
@@ -380,13 +422,98 @@ export function useConfigOptions(
     },
     background: {
       background: {
-        label: t("dashboard.background"),
+        label: t("dashboard.configSectionBackground"),
         visible: dashboardPanelData.data.type === "metric",
       },
     },
   }));
 
+  // ── Search state ──────────────────────────────────────────────────────────
+
+  const searchQuery = ref("");
+  const expandedSections = ref<Record<string, boolean>>({
+    ...DEFAULT_EXPANDED_SECTIONS,
+  });
+  const beforeSearchExpandedSections = ref<Record<string, boolean> | null>(
+    null,
+  );
+
+  const normalizedSearchQuery = computed(() =>
+    (searchQuery.value ?? "").trim().toLowerCase(),
+  );
+
+  const saveExpansionState = () => {
+    beforeSearchExpandedSections.value = { ...expandedSections.value };
+    Object.keys(expandedSections.value).forEach((key) => {
+      expandedSections.value[key] = true;
+    });
+  };
+
+  const restoreExpansionState = () => {
+    if (beforeSearchExpandedSections.value) {
+      expandedSections.value = { ...beforeSearchExpandedSections.value };
+      beforeSearchExpandedSections.value = null;
+    }
+  };
+
+  watch(searchQuery, (newQ, oldQ) => {
+    if (newQ && !oldQ) saveExpansionState();
+    else if (!newQ && oldQ) restoreExpansionState();
+  });
+
+  // ── Bound filter helpers ──────────────────────────────────────────────────
+
+  const isConfigOptionVisible = (sectionId: SectionId, optionId: string): boolean =>
+    filterOption(
+      configOptions.value[sectionId]?.[optionId],
+      normalizedSearchQuery.value,
+    );
+
+  const isSectionVisible = (sectionId: SectionId): boolean =>
+    filterSection(
+      configOptions.value[sectionId],
+      normalizedSearchQuery.value,
+    );
+
+  // ── Expand / collapse ─────────────────────────────────────────────────────
+
+  const isExpanded = (key: string): boolean =>
+    expandedSections.value[key] ?? true;
+
+  const toggleSection = (sectionId: SectionId) => {
+    expandedSections.value[sectionId] = !isExpanded(sectionId);
+  };
+
+  const resetSearch = () => {
+    searchQuery.value = "";
+    restoreExpansionState();
+  };
+
+  const allSectionsExpanded = computed(() =>
+    Object.values(expandedSections.value).every((v) => v === true),
+  );
+
+  const toggleAllSections = () => {
+    const expand = !allSectionsExpanded.value;
+    Object.keys(expandedSections.value).forEach((key) => {
+      expandedSections.value[key] = expand;
+    });
+  };
+
+  const anySectionVisible = computed(() =>
+    ORDERED_SECTION_IDS.some((id) => isSectionVisible(id)),
+  );
+
   return {
-    configOptions,
+    searchQuery,
+    expandedSections,
+    isConfigOptionVisible,
+    isSectionVisible,
+    isExpanded,
+    toggleSection,
+    resetSearch,
+    allSectionsExpanded,
+    toggleAllSections,
+    anySectionVisible,
   };
 }
