@@ -2285,7 +2285,7 @@ checksum = "fe6d2e5af09e8c8ad56c969f2157a3d4238cebc7c55f0a517728c38f7b200f81"
 dependencies = [
  "serde",
  "termcolor",
- "unicode-width 0.2.2",
+ "unicode-width 0.1.14",
 ]
 
 [[package]]
@@ -2977,7 +2977,7 @@ checksum = "d7a1e2f27636f116493b8b860f5546edb47c8d8f8ea73e1d2a20be88e28d1fea"
 [[package]]
 name = "datafusion"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "arrow-schema 58.0.0",
@@ -3031,7 +3031,7 @@ dependencies = [
 [[package]]
 name = "datafusion-catalog"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "async-trait",
@@ -3055,7 +3055,7 @@ dependencies = [
 [[package]]
 name = "datafusion-catalog-listing"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "async-trait",
@@ -3077,7 +3077,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "ahash 0.8.12",
  "arrow",
@@ -3101,7 +3101,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common-runtime"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "futures",
  "log",
@@ -3111,7 +3111,7 @@ dependencies = [
 [[package]]
 name = "datafusion-datasource"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "async-compression",
@@ -3145,7 +3145,7 @@ dependencies = [
 [[package]]
 name = "datafusion-datasource-arrow"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "arrow-ipc",
@@ -3168,7 +3168,7 @@ dependencies = [
 [[package]]
 name = "datafusion-datasource-csv"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "async-trait",
@@ -3190,7 +3190,7 @@ dependencies = [
 [[package]]
 name = "datafusion-datasource-json"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "async-trait",
@@ -3213,7 +3213,7 @@ dependencies = [
 [[package]]
 name = "datafusion-datasource-parquet"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "async-trait",
@@ -3242,12 +3242,12 @@ dependencies = [
 [[package]]
 name = "datafusion-doc"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 
 [[package]]
 name = "datafusion-execution"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "arrow-buffer 58.0.0",
@@ -3269,7 +3269,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "async-trait",
@@ -3291,7 +3291,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr-common"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "datafusion-common",
@@ -3303,7 +3303,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "arrow-buffer 58.0.0",
@@ -3334,7 +3334,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-aggregate"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "ahash 0.8.12",
  "arrow",
@@ -3355,7 +3355,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-aggregate-common"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "ahash 0.8.12",
  "arrow",
@@ -3367,7 +3367,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-nested"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "arrow-ord 58.0.0",
@@ -3391,7 +3391,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-table"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "async-trait",
@@ -3406,7 +3406,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-window"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "datafusion-common",
@@ -3423,7 +3423,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-window-common"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "datafusion-common",
  "datafusion-physical-expr-common",
@@ -3432,7 +3432,7 @@ dependencies = [
 [[package]]
 name = "datafusion-macros"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "datafusion-doc",
  "quote",
@@ -3442,7 +3442,7 @@ dependencies = [
 [[package]]
 name = "datafusion-optimizer"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "chrono",
@@ -3461,7 +3461,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "ahash 0.8.12",
  "arrow",
@@ -3484,7 +3484,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr-adapter"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "datafusion-common",
@@ -3498,7 +3498,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr-common"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "ahash 0.8.12",
  "arrow",
@@ -3514,7 +3514,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-optimizer"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "datafusion-common",
@@ -3532,7 +3532,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-plan"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "ahash 0.8.12",
  "arrow",
@@ -3563,7 +3563,7 @@ dependencies = [
 [[package]]
 name = "datafusion-proto"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "chrono",
@@ -3590,7 +3590,7 @@ dependencies = [
 [[package]]
 name = "datafusion-proto-common"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "datafusion-common",
@@ -3600,7 +3600,7 @@ dependencies = [
 [[package]]
 name = "datafusion-pruning"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "datafusion-common",
@@ -3616,7 +3616,7 @@ dependencies = [
 [[package]]
 name = "datafusion-session"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "async-trait",
  "datafusion-common",
@@ -3629,7 +3629,7 @@ dependencies = [
 [[package]]
 name = "datafusion-sql"
 version = "53.0.0"
-source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#60c831097cfb5d1007bf542b7f22467d4b17be2a"
+source = "git+https://github.com/openobserve/datafusion.git?branch=branch-53-modify#727fc8479b1e90537d9e94ed13e3694b05a3d963"
 dependencies = [
  "arrow",
  "bigdecimal",
@@ -5134,7 +5134,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.2",
+ "socket2 0.5.10",
  "tokio",
  "tower-service",
  "tracing",
@@ -7966,8 +7966,8 @@ version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "343d3bd7056eda839b03204e68deff7d1b13aba7af2b2fd16890697274262ee7"
 dependencies = [
- "heck 0.5.0",
- "itertools 0.14.0",
+ "heck 0.4.1",
+ "itertools 0.10.5",
  "log",
  "multimap",
  "petgraph 0.8.3",
@@ -8001,7 +8001,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
@@ -8014,7 +8014,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "27c6023962132f4b30eb4c172c91ce92d933da334c59c23cddee82358ddafb0b"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
@@ -8070,7 +8070,7 @@ version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe500dc80e757a75e1e8fb7290e448d62dfba3105ece1d058579cb00b58151cd"
 dependencies = [
- "heck 0.5.0",
+ "heck 0.4.1",
  "prost 0.14.3",
  "prost-build",
  "prost-types 0.14.3",
@@ -8359,7 +8359,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash 2.1.1",
  "rustls 0.23.37",
- "socket2 0.6.2",
+ "socket2 0.5.10",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -8397,7 +8397,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.2",
+ "socket2 0.5.10",
  "tracing",
  "windows-sys 0.60.2",
 ]
@@ -10023,7 +10023,7 @@ version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1c97747dbf44bb1ca44a561ece23508e99cb592e862f22222dcf42f51d1e451"
 dependencies = [
- "heck 0.5.0",
+ "heck 0.4.1",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
@@ -10035,7 +10035,7 @@ version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "54254b8531cafa275c5e096f62d48c81435d1015405a91198ddb11e967301d40"
 dependencies = [
- "heck 0.5.0",
+ "heck 0.4.1",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
@@ -12718,7 +12718,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
