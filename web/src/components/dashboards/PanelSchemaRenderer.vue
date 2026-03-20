@@ -60,7 +60,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @row-click="onChartClick"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
-        />
+        >
+          <template #bottom>
+            <div class="q-pr-md text-body2" style="margin-left: auto">
+              1-{{ panelData.rows?.length ?? 0 }} of {{ panelData.rows?.length ?? 0 }}
+            </div>
+          </template>
+        </TableRenderer>
         <div
           v-else-if="panelSchema.type == 'html'"
           class="col column"
