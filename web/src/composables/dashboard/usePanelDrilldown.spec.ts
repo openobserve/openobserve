@@ -12,7 +12,7 @@ vi.mock("@/services/search", () => ({
 
 vi.mock("@/utils/zincutils", () => ({
   b64EncodeUnicode: (v: string) => `b64(${v})`,
-  escapeSingleQuotes: (v: string) => v.replace(/'/g, "\\'"),
+  escapeSingleQuotes: (v: string) => v,
 }));
 
 describe("usePanelDrilldown", () => {
