@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <table
       v-if="table"
-      data-test="logs-search-result-logs-table"
-      class="tw:w-full tw:table-auto logs-table"
+      data-test="o2-table"
+      class="tw:w-full tw:table-auto"
       :style="{
         minWidth: '100%',
         ...columnSizeVars,
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-icon
                   v-if="(header.column.columnDef.meta as any).closable"
-                  :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
+                  :data-test="`o2-table-th-remove-${header.column.columnDef.header}-btn`"
                   name="cancel"
                   class="q-ma-none close-icon cursor-pointer"
                   :class="
@@ -279,14 +279,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </td>
         </tr>
       </thead>
-      <tbody
-        data-test="logs-search-result-table-body"
-        ref="tableBodyRef"
-        class="tw:relative"
-      >
+      <tbody data-test="o2-table-body" ref="tableBodyRef" class="tw:relative">
         <template v-for="virtualRow in virtualRows" :key="virtualRow.id">
           <tr
-            :data-test="`logs-search-result-detail-${
+            :data-test="`o2-table-detail-${
               (tableRows[virtualRow.index] as any)[
                 store.state.zoConfig.timestamp_column || '_timestamp'
               ]

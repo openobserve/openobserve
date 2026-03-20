@@ -36,7 +36,6 @@
 
 import { ref } from "vue";
 import { type ColumnDef } from "@tanstack/vue-table";
-import { useStore } from "vuex";
 
 /** IDs of LLM columns injected at runtime — never stored in selectedFields. */
 export const LLM_COLUMN_IDS = new Set([
@@ -156,29 +155,22 @@ export function useTracesTableColumns() {
    * Rebuild the `columns` ref from the given parameters.
    * Call this whenever selectedFields, searchMode, or showLlmColumns changes.
    */
-  const store = useStore();
+  const columns = ref<ColumnDef<Record<string, any>>[]>([]);
 
   const buildColumns = (
     showLlmColumns: boolean,
     searchMode: "traces" | "spans",
     selectedFields: string[],
-  ): ColumnDef<Record<string, any>>[] => {
+  ): void => {
     const cols: ColumnDef<Record<string, any>>[] = selectedFields.map((field) =>
       toColumnDef(field),
     );
-
-    cols.unshift({
-      id: store.state.zoConfig.timestamp_column,
-      header: "Timestamp",
-      size: 160,
-      meta: { slot: true, sortable: true },
-    });
 
     // Inject LLM columns just before service_latency in traces mode.
     // They are not stored in selectedFields — managed by the showLlmColumns flag.
     if (searchMode === "traces" && showLlmColumns) {
       const tailIdx = cols.findIndex((c) => c.id === "service_latency");
-      const llm = [];
+      const llm: ColumnDef<Record<string, any>>[] = [];
 
       if (!selectedFields.includes("input_tokens")) {
         llm.push(toColumnDef("input_tokens"));
@@ -197,8 +189,8 @@ export function useTracesTableColumns() {
       }
     }
 
-    return cols;
+    columns.value = cols;
   };
 
-  return { buildColumns };
+  return { columns, buildColumns };
 }
