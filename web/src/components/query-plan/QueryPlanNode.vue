@@ -165,7 +165,7 @@ export default defineComponent({
     };
 
     const formatNumber = (num: number): string => {
-      return num.toLocaleString();
+      return num.toLocaleString('en-US');
     };
 
     return {
