@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-btn flat color="primary" label="Try Again" @click="fetchModels()" class="q-mt-md" />
     </div>
 
-    <div v-else class="q-pb-md q-px-md">
+    <div v-else class="q-mb-md q-px-md">
         <q-table
           :rows="filteredModels"
           :columns="columns"
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           :pagination="{ rowsPerPage: 0 }"
           hide-pagination
-          class="o2-quasar-table tw:h-[calc(100vh-100px)] o2-row-md o2-quasar-table-header-sticky"
+          class="o2-quasar-table tw:h-[calc(100vh-120px)] o2-row-md o2-quasar-table-header-sticky"
           data-test="built-in-model-pricing-table"
         >
           <!-- Checkbox -->
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-checkbox
                 v-model="props.row.selected"
                 dense
-                size="sm"
+                size="xs"
                 :data-test="`built-in-model-pricing-checkbox-${props.rowIndex}`"
               />
             </q-td>

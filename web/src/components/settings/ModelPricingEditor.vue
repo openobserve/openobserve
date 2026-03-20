@@ -108,6 +108,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div v-for="ex in patternExamples" :key="ex.name" class="examples-table-row">
                         <span class="examples-model-name">{{ ex.name }}</span>
                         <code class="examples-pattern">{{ ex.match_pattern }}</code>
+                        <q-btn
+                          :icon="copiedPattern === ex.match_pattern ? 'check' : 'content_copy'"
+                          flat round dense size="xs"
+                          :color="copiedPattern === ex.match_pattern ? 'positive' : undefined"
+                          class="examples-copy-btn"
+                          @click="copyPattern(ex.match_pattern)"
+                        >
+                          <q-tooltip :offset="[0, 4]">{{ copiedPattern === ex.match_pattern ? 'Copied!' : 'Copy pattern' }}</q-tooltip>
+                        </q-btn>
                       </div>
                     </div>
                   </q-card-section>
@@ -336,6 +345,13 @@ const q = useQuasar();
 const saving = ref(false);
 const addState = ref<Array<{ key: string; value: number }>>([{ key: "", value: 0 }]);
 const showExamples = ref(false);
+const copiedPattern = ref<string | null>(null);
+
+function copyPattern(pattern: string) {
+  navigator.clipboard.writeText(pattern);
+  copiedPattern.value = pattern;
+  setTimeout(() => { copiedPattern.value = null; }, 1500);
+}
 
 const patternExamples = [
   { name: "GPT-4o",           match_pattern: "(?i)gpt-4o(?:-\\d{4}[-\\d]*)?$" },
@@ -814,7 +830,7 @@ onBeforeMount(async () => {
 
 .examples-table-head {
   display: grid;
-  grid-template-columns: 180px 1fr;
+  grid-template-columns: 180px 1fr auto;
   gap: 12px;
   padding: 6px 12px;
   background: rgba(0, 0, 0, 0.03);
@@ -828,7 +844,7 @@ onBeforeMount(async () => {
 
 .examples-table-row {
   display: grid;
-  grid-template-columns: 180px 1fr;
+  grid-template-columns: 180px 1fr auto;
   gap: 12px;
   align-items: center;
   padding: 8px 12px;
@@ -840,6 +856,11 @@ onBeforeMount(async () => {
 
 .examples-model-name {
   font-weight: 500;
+}
+
+.examples-copy-btn {
+  opacity: 0.4;
+  &:hover { opacity: 1; }
 }
 
 .examples-pattern {
