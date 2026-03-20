@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { nextTick } from "vue";
 
 // Mock all lazy-loaded view/plugin modules so no real filesystem imports happen.
 vi.mock("@/views/HomeView.vue", () => ({ default: {} }));
@@ -46,20 +47,20 @@ describe("useRoutePrefetch", () => {
     it("adds a known route to prefetchedRoutes after prefetching", async () => {
       await composable.prefetchRoute("/logs");
       // Allow the async moduleLoader().catch() chain to settle
-      await Promise.resolve();
+      await nextTick();
       expect(composable.prefetchedRoutes.has("/logs")).toBe(true);
     });
 
     it("adds the home route '/' to prefetchedRoutes", async () => {
       await composable.prefetchRoute("/");
-      await Promise.resolve();
+      await nextTick();
       expect(composable.prefetchedRoutes.has("/")).toBe(true);
     });
 
     it("does not add a route twice when called multiple times", async () => {
       await composable.prefetchRoute("/metrics");
       await composable.prefetchRoute("/metrics");
-      await Promise.resolve();
+      await nextTick();
       // Set.size must still be 1
       expect(
         [...composable.prefetchedRoutes].filter((r) => r === "/metrics").length
@@ -68,7 +69,7 @@ describe("useRoutePrefetch", () => {
 
     it("does nothing for an unknown route path", async () => {
       await composable.prefetchRoute("/nonexistent-route");
-      await Promise.resolve();
+      await nextTick();
       expect(composable.prefetchedRoutes.has("/nonexistent-route")).toBe(false);
       expect(composable.prefetchedRoutes.size).toBe(0);
     });
@@ -92,7 +93,7 @@ describe("useRoutePrefetch", () => {
       // happy-path cache-removal indirectly: an already-failed route can be
       // retried (it is not stuck in the cache).
       await failingComposable.prefetchRoute("/traces");
-      await Promise.resolve();
+      await nextTick();
       // Whether it stayed or was removed depends on the catch; both states are
       // valid observable outcomes — what we must confirm is no exception thrown.
     });
@@ -101,18 +102,18 @@ describe("useRoutePrefetch", () => {
   describe("prefetchRoutes", () => {
     it("prefetches multiple routes at once", async () => {
       await composable.prefetchRoutes(["/", "/metrics"]);
-      await Promise.resolve();
+      await nextTick();
       expect(composable.prefetchedRoutes.has("/")).toBe(true);
       expect(composable.prefetchedRoutes.has("/metrics")).toBe(true);
     });
 
     it("skips routes that are already cached", async () => {
       await composable.prefetchRoute("/dashboards");
-      await Promise.resolve();
+      await nextTick();
       const sizeBefore = composable.prefetchedRoutes.size;
 
       await composable.prefetchRoutes(["/dashboards", "/streams"]);
-      await Promise.resolve();
+      await nextTick();
       // /dashboards should not create a duplicate; /streams should be added
       expect(composable.prefetchedRoutes.size).toBe(sizeBefore + 1);
       expect(composable.prefetchedRoutes.has("/streams")).toBe(true);
@@ -125,7 +126,7 @@ describe("useRoutePrefetch", () => {
 
     it("handles arrays with unknown routes gracefully", async () => {
       await composable.prefetchRoutes(["/unknown-a", "/unknown-b"]);
-      await Promise.resolve();
+      await nextTick();
       expect(composable.prefetchedRoutes.size).toBe(0);
     });
   });
@@ -133,7 +134,7 @@ describe("useRoutePrefetch", () => {
   describe("resetPrefetchCache", () => {
     it("clears all cached routes", async () => {
       await composable.prefetchRoutes(["/", "/logs", "/metrics"]);
-      await Promise.resolve();
+      await nextTick();
       composable.resetPrefetchCache();
       expect(composable.prefetchedRoutes.size).toBe(0);
     });
@@ -144,10 +145,10 @@ describe("useRoutePrefetch", () => {
 
     it("allows routes to be prefetched again after reset", async () => {
       await composable.prefetchRoute("/alerts");
-      await Promise.resolve();
+      await nextTick();
       composable.resetPrefetchCache();
       await composable.prefetchRoute("/alerts");
-      await Promise.resolve();
+      await nextTick();
       expect(composable.prefetchedRoutes.has("/alerts")).toBe(true);
     });
   });

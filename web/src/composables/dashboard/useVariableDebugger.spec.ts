@@ -2,9 +2,10 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const watchMock = vi.fn();
 
-vi.mock("vue", () => ({
-  watch: (...args: any[]) => watchMock(...args),
-}));
+vi.mock("vue", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("vue")>();
+  return { ...actual, watch: (...args: any[]) => watchMock(...args) };
+});
 
 import { useVariablesWatcher, variableLog } from "./useVariableDebugger";
 
