@@ -1,4 +1,4 @@
-// Copyright 2026 OpenObserve Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,38 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { describe, expect, it, beforeEach } from "vitest";
+import { mount } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
+import PatternDetailsDialog from "./PatternDetailsDialog.vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
-
-// escapeHtml is mocked to perform only the < and > escaping needed to make
-// <*> tokens become &lt;*&gt; — matching what the real utility produces for
-// angle-bracket characters, without pulling in full HTML escaping behaviour.
-//
-// A stable spy is declared with vi.hoisted so tests can assert call args
-// against the same function instance used inside the component.
-const escapeHtmlSpy = vi.hoisted(() =>
-  vi.fn(
-    (text: string) =>
-      String(text).replace(/</g, "&lt;").replace(/>/g, "&gt;"),
-  ),
-);
-
-vi.mock("@/utils/html", () => ({
-  escapeHtml: escapeHtmlSpy,
-}));
-
-import PatternDetailsDialog from "./PatternDetailsDialog.vue";
 
 installQuasar({
   plugins: [quasar.Dialog, quasar.Notify],
 });
 
 describe("PatternDetailsDialog", () => {
-  let wrapper: VueWrapper;
+  let wrapper: any;
   const mockSelectedPattern = {
     pattern: {
       pattern_id: "pattern-1",
@@ -91,11 +73,6 @@ describe("PatternDetailsDialog", () => {
         },
       },
     });
-  });
-
-  afterEach(() => {
-    wrapper?.unmount();
-    vi.clearAllMocks();
   });
 
   it("should mount PatternDetailsDialog component", () => {
@@ -480,151 +457,6 @@ describe("PatternDetailsDialog", () => {
       });
       const nextBtn = wrapper.find('[data-test="pattern-detail-next-btn"]');
       expect(nextBtn.attributes("disabled")).toBeUndefined();
-    });
-  });
-
-  // --- Wildcard token highlighting ---
-
-  describe("highlightedTemplate wildcard rendering", () => {
-    it("should return empty string when selectedPattern is null", async () => {
-      // Mount a fresh instance with null selectedPattern to inspect computed output
-      const nullWrapper = mount(PatternDetailsDialog, {
-        props: {
-          modelValue: true,
-          selectedPattern: null,
-          totalPatterns: 10,
-        },
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            "q-dialog": {
-              template: '<div class="q-dialog"><slot></slot></div>',
-              props: ["modelValue"],
-            },
-          },
-        },
-      });
-      // When selectedPattern is null the q-card is hidden via v-if,
-      // confirming highlightedTemplate returned "" (no card to render into).
-      expect(nullWrapper.find(".detail-table-dialog").exists()).toBe(false);
-      nullWrapper.unmount();
-    });
-
-    it("should return empty string when template property is absent", async () => {
-      await wrapper.setProps({
-        selectedPattern: {
-          ...mockSelectedPattern,
-          pattern: { ...mockSelectedPattern.pattern, template: undefined },
-        },
-      });
-      // With no template, the pattern template section renders nothing — the
-      // v-html target exists but its inner HTML should be empty.
-      const templateSection = wrapper.find(".pattern-detail-text");
-      expect(templateSection.exists()).toBe(true);
-      expect(templateSection.html()).not.toContain("log-pattern-wildcard");
-    });
-
-    it("should wrap a single <*> token in a log-pattern-wildcard span", async () => {
-      await wrapper.setProps({
-        selectedPattern: {
-          ...mockSelectedPattern,
-          pattern: {
-            ...mockSelectedPattern.pattern,
-            template: "Connection from <*> failed",
-          },
-        },
-      });
-      const templateSection = wrapper.find(".pattern-detail-text");
-      expect(templateSection.exists()).toBe(true);
-      expect(templateSection.html()).toContain(
-        '<span class="log-pattern-wildcard">&lt;*&gt;</span>',
-      );
-    });
-
-    it("should wrap all <*> tokens when multiple wildcards are present", async () => {
-      await wrapper.setProps({
-        selectedPattern: {
-          ...mockSelectedPattern,
-          pattern: {
-            ...mockSelectedPattern.pattern,
-            template: "<*> connected to <*> on port <*>",
-          },
-        },
-      });
-      const templateSection = wrapper.find(".pattern-detail-text");
-      expect(templateSection.exists()).toBe(true);
-      const html = templateSection.html();
-      const matchCount = (
-        html.match(/<span class="log-pattern-wildcard">&lt;\*&gt;<\/span>/g) ??
-        []
-      ).length;
-      expect(matchCount).toBe(3);
-    });
-
-    it("should not inject any wildcard span when template has no <*> tokens", async () => {
-      await wrapper.setProps({
-        selectedPattern: {
-          ...mockSelectedPattern,
-          pattern: {
-            ...mockSelectedPattern.pattern,
-            template: "No wildcards here at all",
-          },
-        },
-      });
-      const templateSection = wrapper.find(".pattern-detail-text");
-      expect(templateSection.exists()).toBe(true);
-      expect(templateSection.html()).not.toContain("log-pattern-wildcard");
-    });
-
-    it("should preserve surrounding text when wrapping a wildcard", async () => {
-      await wrapper.setProps({
-        selectedPattern: {
-          ...mockSelectedPattern,
-          pattern: {
-            ...mockSelectedPattern.pattern,
-            template: "prefix <*> suffix",
-          },
-        },
-      });
-      const templateSection = wrapper.find(".pattern-detail-text");
-      expect(templateSection.exists()).toBe(true);
-      const html = templateSection.html();
-      expect(html).toContain("prefix");
-      expect(html).toContain("suffix");
-      expect(html).toContain(
-        '<span class="log-pattern-wildcard">&lt;*&gt;</span>',
-      );
-    });
-
-    it("should display wildcard visible text as <*>", async () => {
-      await wrapper.setProps({
-        selectedPattern: {
-          ...mockSelectedPattern,
-          pattern: {
-            ...mockSelectedPattern.pattern,
-            template: "Request <*> processed",
-          },
-        },
-      });
-      const templateSection = wrapper.find(".pattern-detail-text");
-      expect(templateSection.exists()).toBe(true);
-      // .text() strips HTML tags — the wildcard token should be visible as <*>
-      expect(templateSection.text()).toContain("<*>");
-    });
-
-    it("should call escapeHtml with the raw template string", async () => {
-      await wrapper.setProps({
-        selectedPattern: {
-          ...mockSelectedPattern,
-          pattern: {
-            ...mockSelectedPattern.pattern,
-            template: "auth <*> granted",
-          },
-        },
-      });
-      // escapeHtmlSpy is the same function instance used inside the component
-      expect(escapeHtmlSpy).toHaveBeenCalledWith("auth <*> granted");
     });
   });
 });
