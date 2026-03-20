@@ -1469,6 +1469,8 @@
     "unitLabel": "Unit",
     "labelPosition": "Value Position",
     "labelRotate": "Value Rotate",
+    "axisLabelRotate": "Label Rotate",
+    "axisLabelTruncate": "Label Truncate",
     "basemapLabel": "Base Map",
     "world": "World",
     "mapTypeLabel": "Map Type",

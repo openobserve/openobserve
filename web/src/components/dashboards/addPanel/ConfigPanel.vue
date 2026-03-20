@@ -1146,7 +1146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template v-slot:label>
               <div style="display: flex; align-items: center; gap: 4px">
-                <span>Label Rotate</span>
+                <span>{{ t('dashboard.axisLabelRotate') }}</span>
                 <q-icon
                   name="info"
                   size="20px"
@@ -1195,7 +1195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template v-slot:label>
               <div style="display: flex; align-items: center; gap: 4px">
-                <span>Label Truncate</span>
+                <span>{{ t('dashboard.axisLabelTruncate') }}</span>
                 <q-icon
                   name="info"
                   size="20px"
