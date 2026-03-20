@@ -1562,7 +1562,9 @@
     "pivotStickyColTotalsTooltip": "합계 열을 오른쪽에 고정하여 가로로 스크롤할 때 계속 표시되도록 합니다.",
     "configSectionPromqlTable": "ProMQL 테이블 모드",
     "axisLabelRotate": "라벨 회전",
-    "axisLabelTruncate": "레이블 잘림"
+    "axisLabelTruncate": "레이블 잘림",
+    "axisLabelRotateTooltip": "레이블이 길거나 혼잡할 때 가독성을 높이려면 x축 레이블 텍스트를 선택한 각도 (도) 만큼 회전합니다.<br /><br /><strong>참고:</strong> 시계열 x축 필드에서는 이 옵션이 지원되지 않습니다.",
+    "axisLabelTruncateTooltip": "x축 레이블을 지정된 너비 (픽셀 단위) 로 자릅니다.<br /><br /><strong>참고:</strong> 시계열 x축 필드에는 이 옵션이 지원되지 않습니다."
   },
   "panel": {
     "header": "패널",

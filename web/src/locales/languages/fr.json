@@ -1562,7 +1562,9 @@
     "pivotStickyColTotalsTooltip": "Épinglez la colonne des totaux sur la droite pour qu'elle reste visible lors du défilement horizontal",
     "configSectionPromqlTable": "Mode Tableau ProMQL",
     "axisLabelRotate": "Rotation des étiquettes",
-    "axisLabelTruncate": "Libellé tronqué"
+    "axisLabelTruncate": "Libellé tronqué",
+    "axisLabelRotateTooltip": "Faites pivoter le texte de l'étiquette sur l'axe X selon un angle choisi (en degrés) pour améliorer la lisibilité lorsque les étiquettes sont longues ou encombrées. <br /><br /><strong>Remarque :</strong> Cette option n'est pas prise en charge pour les champs de l'axe X de séries chronologiques.",
+    "axisLabelTruncateTooltip": "Tronquez les étiquettes de l'axe X à la largeur spécifiée (en pixels). <br /><br /><strong>Remarque :</strong> Cette option n'est pas prise en charge pour les champs de l'axe X de séries chronologiques."
   },
   "panel": {
     "header": "Panneau",

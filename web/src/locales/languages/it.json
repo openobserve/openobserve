@@ -1562,7 +1562,9 @@
     "pivotStickyColTotalsTooltip": "Appunta la colonna dei totali sulla destra in modo che rimanga visibile quando scorri orizzontalmente",
     "configSectionPromqlTable": "Modalità tabella ProMQL",
     "axisLabelRotate": "Etichetta Rotate",
-    "axisLabelTruncate": "Etichetta Truncate"
+    "axisLabelTruncate": "Etichetta Truncate",
+    "axisLabelRotateTooltip": "Ruota il testo dell'etichetta sull'asse x di un angolo scelto (in gradi) per migliorare la leggibilità quando le etichette sono lunghe o affollate. <br /><br /><strong>Nota:</strong> questa opzione non è supportata per i campi sull'asse x delle serie temporali.",
+    "axisLabelTruncateTooltip": "Tronca le etichette dell'asse x alla larghezza specificata (in pixel). <br /><br /><strong>Nota:</strong> questa opzione non è supportata per i campi sull'asse x delle serie temporali."
   },
   "panel": {
     "header": "Pannello",
