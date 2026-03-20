@@ -283,8 +283,25 @@ describe("Logs Index", async () => {
     await flushPromises();
 
     // Verify the query was transformed correctly
-    expect(wrapper.vm.searchObj.data.query).toBe('SELECT field1,field2 FROM "stream1" WHERE field2 > 5');
-    expect(wrapper.vm.searchObj.data.editorValue).toBe('SELECT field1,field2 FROM "stream1" WHERE field2 > 5');
+    expect(wrapper.vm.searchObj.data.query).toBe('SELECT "field1","field2" FROM "stream1" WHERE "field2" > 5');
+    expect(wrapper.vm.searchObj.data.editorValue).toBe('SELECT "field1","field2" FROM "stream1" WHERE "field2" > 5');
+  });
+
+  it("Should quote filter fields when converting to SQL mode", async () => {
+    wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
+    wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "user" }];
+    wrapper.vm.searchObj.meta.quickMode = false;
+    wrapper.vm.searchObj.data.query = "user='asdf'";
+
+    await wrapper.vm.setQuery(true);
+    await flushPromises();
+
+    expect(wrapper.vm.searchObj.data.query).toBe(
+      'SELECT * FROM "stream1" WHERE "user" = \'asdf\'',
+    );
+    expect(wrapper.vm.searchObj.data.editorValue).toBe(
+      'SELECT * FROM "stream1" WHERE "user" = \'asdf\'',
+    );
   });
 
   it("Should modify SQL query when adding/removing interesting fields", async () => {
@@ -360,8 +377,8 @@ describe("Logs Index", async () => {
     await flushPromises();
 
     // Verify field was added to the query
-    expect(wrapper.vm.searchObj.data.query).toBe('SELECT field1, field2 FROM "my_stream1" WHERE field1 > 5');
-    expect(wrapper.vm.searchObj.data.editorValue).toBe('SELECT field1, field2 FROM "my_stream1" WHERE field1 > 5');
+    expect(wrapper.vm.searchObj.data.query).toBe('SELECT field1, "field2" FROM "my_stream1" WHERE field1 > 5');
+    expect(wrapper.vm.searchObj.data.editorValue).toBe('SELECT field1, "field2" FROM "my_stream1" WHERE field1 > 5');
 
     // Remove an existing field (field2) from the query
     await wrapper.vm.setInterestingFieldInSQLQuery({
@@ -402,7 +419,7 @@ describe("Logs Index", async () => {
     await flushPromises();
 
     // Verify the query was updated with interesting fields
-    expect(wrapper.vm.searchObj.data.query).toBe('SELECT timestamp,level,message FROM "my_stream1" WHERE level = "error"');
+    expect(wrapper.vm.searchObj.data.query).toBe('SELECT "timestamp","level","message" FROM "my_stream1" WHERE level = "error"');
     expect(setQuerySpy).toHaveBeenCalledWith(true);
     expect(updateUrlQueryParamsSpy).toHaveBeenCalled();
 
@@ -419,6 +436,44 @@ describe("Logs Index", async () => {
     // Cleanup
     setQuerySpy.mockRestore();
     updateUrlQueryParamsSpy.mockRestore();
+  });
+
+  it('Should quote newly added interesting fields after enabling quick mode in SQL mode', async () => {
+    wrapper.vm.searchObj.meta.sqlMode = true;
+    wrapper.vm.searchObj.meta.quickMode = true;
+    wrapper.vm.searchObj.data.stream.selectedStream = ["my_stream1"];
+    wrapper.vm.searchObj.data.stream.interestingFieldList = ["field1"];
+    wrapper.vm.searchObj.data.query = 'SELECT * FROM "my_stream1" WHERE field1 = 5';
+    wrapper.vm.searchObj.data.editorValue = wrapper.vm.searchObj.data.query;
+    wrapper.vm.searchObj.data.streamResults.list = [
+      {
+        name: "my_stream1",
+        schema: [
+          { name: "field1" },
+          { name: "user" },
+        ],
+      },
+    ];
+
+    await wrapper.vm.handleQuickModeChange();
+    await flushPromises();
+
+    await wrapper.vm.setInterestingFieldInSQLQuery(
+      {
+        name: "user",
+        ftsKey: false,
+        isSchemaField: true,
+        group: "my_stream1",
+        streams: ["my_stream1"],
+        showValues: true,
+        isInterestingField: false,
+      },
+      false,
+    );
+    await flushPromises();
+
+    expect(wrapper.vm.searchObj.data.query).toContain('SELECT "field1", "user" FROM "my_stream1"');
+    expect(wrapper.vm.searchObj.data.editorValue).toContain('SELECT "field1", "user" FROM "my_stream1"');
   });
 
   it.skip("Should properly set fields and conditions for dashboard panel", async () => {
