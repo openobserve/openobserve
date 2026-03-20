@@ -83,12 +83,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               (header.column.columnDef.meta as any)?.headerClass ?? '',
             ]"
             :style="{
-              width: `calc(var(--header-${header?.id}-size) * 1px)`,
+              width: `calc(var(--header-${sanitizeCssId(header?.id)}-size) * 1px)`,
               height: rowHeight + 'px',
             }"
             :data-test="`o2-table-th-${header.id}`"
           >
-            <div class="tw:h-full tw:w-full tw:flex tw:items-center">
+            <div
+              class="tw:h-full tw:w-full tw:flex tw:items-center"
+              :class="[
+                (header.column.columnDef.meta as any)?.align === 'center'
+                  ? 'tw:justify-center! tw:text-center!'
+                  : '',
+                (header.column.columnDef.meta as any)?.align === 'right'
+                  ? 'tw:justify-end! tw:text-right!'
+                  : '',
+              ]"
+            >
               <div
                 v-if="header.column.getCanResize()"
                 @dblclick="header.column.resetSize()"
@@ -296,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               !wrap &&
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? 'tw:table-row'
-                : 'tw:block',
+                : 'tw:flex',
               (tableRows[virtualRow.index] as any)[
                 store.state.zoConfig.timestamp_column
               ] === highlightTimestamp &&
@@ -374,7 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:py-none tw:px-2 tw:items-center tw:justify-start tw:relative table-cell"
                 :class="[
                   ...tableCellClass,
-                  { 'tw:pl-4': cellIndex === 0 },
+                  { 'tw:pl-2': cellIndex === 0 },
                   (cell.column.columnDef.meta as any)?.align === 'center'
                     ? 'tw:justify-center! tw:text-center!'
                     : '',
@@ -387,74 +397,104 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   width:
                     cell.column.columnDef.id !== 'source' ||
                     cell.column.columnDef.enableResizing
-                      ? `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`
+                      ? `calc(var(--col-${sanitizeCssId(cell.column.columnDef.id)}-size) * 1px)`
                       : wrap
                         ? width - 260 - 12 + 'px'
                         : 'auto',
-                  height: wrap ? '100%' : rowHeight + 'px',
+                  height: wrap ? 'stretch' : rowHeight + 'px',
                 }"
                 @mouseover="handleCellMouseOver(cell)"
                 @mouseleave="handleCellMouseLeave()"
               >
-                <q-btn
-                  v-if="enableRowExpand && cellIndex == 0"
-                  :icon="
-                    expandedRowIndices.has(virtualRow.index)
-                      ? 'expand_more'
-                      : 'chevron_right'
-                  "
-                  dense
-                  size="xs"
-                  flat
-                  class="q-mr-xs"
-                  data-test="table-row-expand-menu"
-                  @click.capture.stop="handleExpandRow(virtualRow.index)"
-                ></q-btn>
-                <slot
-                  name="cell-actions"
-                  :row="cell.row.original"
-                  :column="cell.column"
-                  :active="
-                    activeCellActionId === `${cell.id}_${cell.column.id}`
-                  "
-                />
-                <!-- If column.meta.slot is set, delegate to the named cell slot -->
-                <slot
-                  v-if="(cell.column.columnDef.meta as any)?.slot"
-                  :name="`cell-${cell.column.id}`"
-                  :item="cell.row.original"
-                  :cell="cell"
-                />
-                <!-- Otherwise render the default cell content inline -->
-                <template v-else>
-                  <span
-                    v-if="
-                      processedResults[
-                        `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
-                      ]
+                <div
+                  class="tw:h-full tw:w-full tw:flex tw:items-center"
+                  :class="[
+                    (cell.column.columnDef.meta as any)?.align === 'center'
+                      ? 'tw:justify-center! tw:text-center!'
+                      : '',
+                    (cell.column.columnDef.meta as any)?.align === 'right'
+                      ? 'tw:justify-end! tw:text-right!'
+                      : '',
+                  ]"
+                >
+                  <q-btn
+                    v-if="enableRowExpand && cellIndex == 0"
+                    :icon="
+                      expandedRowIndices.has(virtualRow.index)
+                        ? 'expand_more'
+                        : 'chevron_right'
                     "
-                    :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
-                    :class="store.state.theme === 'dark' ? 'dark' : ''"
-                    v-html="
-                      processedResults[
-                        `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
-                      ]
+                    dense
+                    size="xs"
+                    flat
+                    class="q-mr-xs"
+                    data-test="table-row-expand-menu"
+                    @click.capture.stop="handleExpandRow(virtualRow.index)"
+                  ></q-btn>
+                  <slot
+                    name="cell-actions"
+                    :row="cell.row.original"
+                    :column="cell.column"
+                    :active="
+                      activeCellActionId === `${cell.id}_${cell.column.id}`
                     "
                   />
-                  <span v-else>
-                    {{ cell.renderValue() }}
-                  </span>
-                  <O2AIContextAddBtn
-                    v-if="
-                      cell.column.columnDef.id ===
-                      store.state.zoConfig.timestamp_column
-                    "
-                    class="tw:absolute tw:top-[14px] tw:left-[18px] tw:transform tw:invisible tw:-translate-y-1/2 ai-btn"
-                    @send-to-ai-chat="
-                      sendToAiChat(JSON.stringify(cell.row.original), true)
-                    "
+                  <!-- If column.meta.slot is set, delegate to the named cell slot -->
+                  <slot
+                    v-if="(cell.column.columnDef.meta as any)?.slot"
+                    :name="`cell-${cell.column.id}`"
+                    :item="cell.row.original"
+                    :cell="cell"
                   />
-                </template>
+                  <!-- Otherwise render the default cell content inline -->
+                  <template v-else>
+                    <span
+                      v-if="
+                        processedResults[
+                          `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
+                        ]
+                      "
+                      :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
+                      :class="store.state.theme === 'dark' ? 'dark' : ''"
+                      v-html="
+                        processedResults[
+                          `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
+                        ]
+                      "
+                    />
+                    <span
+                      :style="{
+                        width:
+                          cell.column.columnDef.id !== 'source' ||
+                          cell.column.columnDef.enableResizing
+                            ? `calc((var(--col-${sanitizeCssId(cell.column.columnDef.id)}-size) * 1px) - 0.5rem)`
+                            : wrap
+                              ? width - 260 - 12 + 'px'
+                              : 'auto',
+                      }"
+                      :class="[
+                        !props.wrap
+                          ? 'tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap'
+                          : '',
+                        props.wrap ? 'tw:break-words' : '',
+                      ]"
+                      v-else
+                    >
+                      {{ cell.renderValue() }}
+                    </span>
+                    <O2AIContextAddBtn
+                      v-if="
+                        enableAiContextButton &&
+                        cell.column.columnDef.id ===
+                          store.state.zoConfig.timestamp_column
+                      "
+                      class="tw:absolute tw:top-[14px] tw:left-[18px] tw:transform tw:invisible tw:-translate-y-1/2 ai-btn"
+                      @send-to-ai-chat="
+                        sendToAiChat(JSON.stringify(cell.row.original), true)
+                      "
+                    />
+                  </template>
+                </div>
               </td>
             </template>
           </tr>
@@ -617,6 +657,10 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  enableAiContextButton: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 const { t } = useI18n();
@@ -637,6 +681,9 @@ const emits = defineEmits([
 ]);
 
 const sorting = ref<SortingState>([]);
+
+/** Replace characters invalid in CSS custom property names (e.g. dots) with underscores. */
+const sanitizeCssId = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, "_");
 
 const store = useStore();
 const { isFTSColumn } = useTextHighlighter();
@@ -795,14 +842,25 @@ const columnSizeVars = computed(() => {
   const colSizes: { [key: string]: number } = {};
   for (let i = 0; i < headers.length; i++) {
     const header = headers[i]!;
-    colSizes[`--header-${header.id}-size`] = header.getSize();
-    colSizes[`--col-${header.column.id}-size`] = header.column.getSize();
+    colSizes[`--header-${sanitizeCssId(header.id)}-size`] = header.getSize();
+    colSizes[`--col-${sanitizeCssId(header.column.id)}-size`] =
+      header.column.getSize();
   }
   return colSizes;
 });
 
+/** Maps sanitized column id → original column id for all current columns. */
+const columnIdMap = computed(() => {
+  const map: Record<string, string> = {};
+  const headers = table?.getFlatHeaders() ?? [];
+  for (const header of headers) {
+    map[sanitizeCssId(header.column.id)] = header.column.id;
+  }
+  return map;
+});
+
 watch(columnSizeVars, (newColSizes) => {
-  debouncedUpdate(newColSizes);
+  debouncedUpdate(newColSizes, columnIdMap.value);
 });
 
 onMounted(() => {
@@ -827,7 +885,9 @@ watch(
   () => [hasDefaultSourceColumn.value, props.wrap],
   () => {
     tableCellClass.value = [
-      hasDefaultSourceColumn.value && !props.wrap ? "tw:table-cell" : "tw:flex",
+      hasDefaultSourceColumn.value && !props.wrap
+        ? "tw:table-cell"
+        : "tw:block height-stretch",
       !props.wrap
         ? "tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap"
         : "",
@@ -854,8 +914,8 @@ const updateTableWidth = async () => {
   }, 0);
 };
 
-const debouncedUpdate = debounce((newColSizes) => {
-  emits("update:columnSizes", newColSizes);
+const debouncedUpdate = debounce((newColSizes, idMap) => {
+  emits("update:columnSizes", newColSizes, idMap);
 }, 500);
 
 const formattedRows = computed(() => {
