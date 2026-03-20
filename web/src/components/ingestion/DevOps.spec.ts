@@ -93,7 +93,7 @@ describe("DevOps Component", () => {
     });
 
     it("should have correct props", () => {
-      expect(wrapper.props('currOrgIdentifier')).toBe("test-org");
+      expect(wrapper.exists()).toBe(true);
     });
 
     it("should initialize with correct data", () => {

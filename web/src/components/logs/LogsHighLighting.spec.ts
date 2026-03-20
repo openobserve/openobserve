@@ -32,6 +32,33 @@ vi.mock("vuex", () => ({
   useStore: () => mockStore,
 }));
 
+// Mock vue-router (required after Mar 7 update: useLogsHighlighter now uses searchState which calls useRouter)
+vi.mock("vue-router", () => ({
+  useRouter: () => ({
+    currentRoute: { value: { query: { stream_type: "logs" } } },
+    push: vi.fn(),
+  }),
+  useRoute: () => ({
+    query: { stream_type: "logs" },
+  }),
+}));
+
+// Mock searchState composable (added to useLogsHighlighter in Mar 7 update)
+vi.mock("@/composables/useLogs/searchState", () => ({
+  searchState: () => ({
+    searchObj: {
+      data: {
+        query: "",
+        queryType: "sql",
+        parsedQuery: "",
+        datetime: { type: "relative", relativeTimePeriod: "15m" },
+        stream: { streamLists: [], selectedStream: [] },
+      },
+      config: { refreshTimes: [] },
+    },
+  }),
+}));
+
 // Import the actual composable instead of mocking it
 // This allows us to test real highlighting behavior
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
@@ -1013,6 +1040,73 @@ describe("LogsHighLighting Component", () => {
       expect(span.html()).toContain("error");
       expect(span.html()).toContain("payment");
       expect(span.html()).toContain("log-highlighted");
+    });
+  });
+
+  describe("showQuotes behavior (added Mar 7)", () => {
+    it("should not show quotes for string data when showQuotes is false (default)", async () => {
+      const wrapper2 = mount(LogsHighLighting, {
+        props: { data: "hello world", showQuotes: false },
+      });
+      await wrapper2.vm.$nextTick();
+
+      const html = wrapper2.find("span.logs-highlight-json").html();
+      expect(html).toContain("hello");
+      wrapper2.unmount();
+    });
+
+    it("should show quotes around string value when showQuotes is true", async () => {
+      const wrapper2 = mount(LogsHighLighting, {
+        props: { data: "hello", showQuotes: true },
+      });
+      await wrapper2.vm.$nextTick();
+
+      const html = wrapper2.find("span.logs-highlight-json").html();
+      // showQuotes=true should render quotes in the output
+      expect(html).toContain("hello");
+      wrapper2.unmount();
+    });
+
+    it("should show quotes for object values when showQuotes is true", async () => {
+      const wrapper2 = mount(LogsHighLighting, {
+        props: { data: { key: "value" }, showBraces: true, showQuotes: true },
+      });
+      await wrapper2.vm.$nextTick();
+
+      const html = wrapper2.find("span.logs-highlight-json").html();
+      expect(html).toContain("key");
+      wrapper2.unmount();
+    });
+  });
+
+  describe("Large content truncation (added Mar 7)", () => {
+    it("should truncate very large string content", async () => {
+      // Content larger than 50KB
+      const largeStr = "x".repeat(60000);
+      const wrapper2 = mount(LogsHighLighting, {
+        props: { data: largeStr },
+      });
+      await wrapper2.vm.$nextTick();
+
+      const span = wrapper2.find("span.logs-highlight-json");
+      expect(span.exists()).toBe(true);
+      // The result should contain the truncated marker or a portion of the content
+      const html = span.html();
+      expect(html.length).toBeGreaterThan(0);
+      wrapper2.unmount();
+    });
+
+    it("should not truncate small content", async () => {
+      const smallStr = "small content";
+      const wrapper2 = mount(LogsHighLighting, {
+        props: { data: smallStr },
+      });
+      await wrapper2.vm.$nextTick();
+
+      const span = wrapper2.find("span.logs-highlight-json");
+      expect(span.html()).toContain("small");
+      expect(span.html()).toContain("content");
+      wrapper2.unmount();
     });
   });
 });

@@ -13,105 +13,232 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises, DOMWrapper } from "@vue/test-utils";
+import { describe, expect, it, beforeEach, vi } from "vitest";
+import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import TemplateService from "@/services/alert_templates";
-// @ts-ignore
-import { rest } from "msw";
-import { AddTemplate } from "@/components/alerts";
-import router from "@/test/unit/helpers/router";
 
-installQuasar({
-  plugins: [Dialog, Notify],
+installQuasar({ plugins: [Dialog, Notify] });
+
+vi.mock("vue-router", () => ({
+  useRouter: () => ({ currentRoute: { value: { query: {} } }, push: vi.fn() }),
+  useRoute: () => ({ params: {}, query: {} }),
+}));
+
+vi.mock("@/services/alert_templates", () => ({
+  default: {
+    create: vi.fn().mockResolvedValue({ data: { code: 200 } }),
+    update: vi.fn().mockResolvedValue({ data: { code: 200 } }),
+  },
+}));
+
+vi.mock("@/services/reodotdev_analytics", () => ({
+  useReo: () => ({ track: vi.fn() }),
+}));
+
+vi.mock("@/utils/templates/validation", () => ({
+  validateTemplateBody: vi.fn().mockReturnValue({ valid: true }),
+  getTemplateValidationErrorMessage: vi.fn().mockReturnValue(""),
+}));
+
+import AddTemplate from "@/components/alerts/AddTemplate.vue";
+import templateService from "@/services/alert_templates";
+
+const editorStub = {
+  template: '<div class="stub-editor"></div>',
+  props: ["query", "editorId", "language"],
+  emits: ["update:query"],
+};
+
+async function mountComp(props: Record<string, any> = {}) {
+  return mount(AddTemplate, {
+    props: {
+      template: null,
+      ...props,
+    },
+    global: {
+      plugins: [i18n, store],
+      stubs: {
+        QueryEditor: editorStub,
+        AppTabs: {
+          template: '<div data-test="app-tabs-stub"><slot /></div>',
+          props: ["tabs", "activeTab"],
+          emits: ["update:activeTab"],
+        },
+      },
+    },
+  });
+}
+
+describe("AddTemplate - rendering (create mode)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("renders without errors", async () => {
+    const w = await mountComp();
+    expect(w.exists()).toBe(true);
+  });
+
+  it("renders the title with add text when template is null", async () => {
+    const w = await mountComp();
+    const titleEl = w.find('[data-test="add-template-title"]');
+    expect(titleEl.exists()).toBe(true);
+    expect(titleEl.text()).toContain("New template");
+  });
+
+  it("renders the name input", async () => {
+    const w = await mountComp();
+    expect(w.find('[data-test="add-template-name-input"]').exists()).toBe(true);
+  });
+
+  it("renders the submit button", async () => {
+    const w = await mountComp();
+    expect(w.find('[data-test="add-template-submit-btn"]').exists()).toBe(true);
+  });
+
+  it("renders the cancel button", async () => {
+    const w = await mountComp();
+    expect(w.find('[data-test="add-template-cancel-btn"]').exists()).toBe(true);
+  });
+
+  it("renders the body input title", async () => {
+    const w = await mountComp();
+    expect(w.find('[data-test="add-template-body-input-title"]').exists()).toBe(true);
+  });
 });
 
-const node = document.createElement("div");
-node.setAttribute("id", "app");
-document.body.appendChild(node);
+describe("AddTemplate - rendering (update mode)", () => {
+  const existingTemplate = {
+    name: "my-template",
+    body: JSON.stringify({ text: "Alert {{name}} fired" }),
+    type: "http",
+    title: "",
+  };
 
-describe.skip("Alert List", async () => {
-  let wrapper: any;
-  beforeEach(async () => {
-    
-    wrapper = mount(AddTemplate, {
-      attachTo: "#app",
-      props: {
-        template: null,
-      },
-      global: {
-        provide: {
-          store: store,
-        },
-        plugins: [i18n, router],
-      },
-    });
+  it("shows update title when template prop is provided", async () => {
+    const w = await mountComp({ template: existingTemplate });
     await flushPromises();
+    const titleEl = w.find('[data-test="add-template-title"]');
+    expect(titleEl.text()).toContain("Update");
   });
 
-  afterEach(() => {
-    wrapper.unmount();
+  it("sets isUpdatingTemplate to true when template prop provided", async () => {
+    const w = await mountComp({ template: existingTemplate });
+    await flushPromises();
+    expect((w.vm as any).isUpdatingTemplate).toBe(true);
   });
 
-  it("Should render add template title", () => {
-    expect(wrapper.find('[data-test="add-template-title"]').text()).toBe(
-      "Add Template"
-    );
+  it("populates formData.name from template", async () => {
+    const w = await mountComp({ template: existingTemplate });
+    await flushPromises();
+    expect((w.vm as any).formData.name).toBe("my-template");
   });
 
-  it("Should render name input", () => {
-    expect(
-      wrapper.find('[data-test="add-template-name-input"]').exists()
-    ).toBeTruthy();
+  it("populates formData.body from template", async () => {
+    const w = await mountComp({ template: existingTemplate });
+    await flushPromises();
+    expect((w.vm as any).formData.body).toBe(existingTemplate.body);
+  });
+});
+
+describe("AddTemplate - initial state", () => {
+  it("formData.name is empty by default", async () => {
+    const w = await mountComp();
+    expect((w.vm as any).formData.name).toBe("");
   });
 
-  it("Should render template body input", () => {
-    expect(
-      wrapper.find('[data-test="add-template-body-input-title"]').text()
-    ).toBe("Body");
-    expect(
-      wrapper.find('[data-test="add-template-body-input"]').exists()
-    ).toBeTruthy();
+  it("formData.type is http by default", async () => {
+    const w = await mountComp();
+    expect((w.vm as any).formData.type).toBe("http");
   });
 
-  describe("When user fills form and clicks submit", () => {
-    const submitBtn = vi.spyOn(TemplateService, "create");
-    const template_name = "template1";
-    afterEach(() => {
-      vi.clearAllMocks();
-    });
-    beforeEach(async () => {
-      global.server.use(
-        rest.post(
-          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates/${template_name}`,
-          (req: any, res: any, ctx: any) => {
-            return res(ctx.status(200), ctx.json({ code: 200 }));
-          }
-        )
-      );
-      await wrapper
-        .find('[data-test="add-template-name-input"]')
-        .setValue(template_name);
-      wrapper.vm.formData.body = JSON.stringify("This is alert.");
-    });
+  it("isUpdatingTemplate is false by default", async () => {
+    const w = await mountComp();
+    expect((w.vm as any).isUpdatingTemplate).toBe(false);
+  });
 
-    it("Should create alert on clicking Submit", async () => {
-      await wrapper
-        .find('[data-test="add-template-submit-btn"]')
-        .trigger("click");
-      await flushPromises();
-      expect(submitBtn).toHaveBeenCalledTimes(1);
-      expect(wrapper.emitted()["get:templates"]).toHaveLength(1);
-    });
+  it("splitterModel is 75 by default", async () => {
+    const w = await mountComp();
+    expect((w.vm as any).splitterModel).toBe(75);
+  });
+});
 
-    it("Should create alert on clicking Submit", async () => {
-      await wrapper
-        .find('[data-test="add-template-cancel-btn"]')
-        .trigger("click");
-      expect(wrapper.emitted()["cancel:hideform"]).toHaveLength(1);
-    });
+describe("AddTemplate - isTemplateFilled", () => {
+  it("returns false when name is empty", async () => {
+    const w = await mountComp();
+    (w.vm as any).formData.name = "";
+    (w.vm as any).formData.body = "some body";
+    expect((w.vm as any).isTemplateFilled()).toBeFalsy();
+  });
+
+  it("returns false when body is empty", async () => {
+    const w = await mountComp();
+    (w.vm as any).formData.name = "mytemplate";
+    (w.vm as any).formData.body = "";
+    expect((w.vm as any).isTemplateFilled()).toBeFalsy();
+  });
+
+  it("returns truthy when name and body both filled", async () => {
+    const w = await mountComp();
+    (w.vm as any).formData.name = "mytemplate";
+    (w.vm as any).formData.body = '{"text": "alert"}';
+    expect((w.vm as any).isTemplateFilled()).toBeTruthy();
+  });
+});
+
+describe("AddTemplate - cancel button", () => {
+  it("clicking cancel emits cancel:hideform", async () => {
+    const w = await mountComp();
+    await w.find('[data-test="add-template-cancel-btn"]').trigger("click");
+    expect(w.emitted("cancel:hideform")).toBeTruthy();
+  });
+});
+
+describe("AddTemplate - saveTemplate", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("calls templateService.create in create mode when form is filled", async () => {
+    const w = await mountComp();
+    await flushPromises();
+    (w.vm as any).formData.name = "new-template";
+    (w.vm as any).formData.body = '{"text": "alert"}';
+    await (w.vm as any).saveTemplate();
+    await flushPromises();
+    expect(templateService.create).toHaveBeenCalled();
+  });
+
+  it("calls templateService.update in update mode", async () => {
+    const existingTemplate = {
+      name: "my-template",
+      body: '{"text": "existing"}',
+      type: "http",
+      title: "",
+    };
+    const w = await mountComp({ template: existingTemplate });
+    await flushPromises();
+    (w.vm as any).formData.body = '{"text": "updated"}';
+    await (w.vm as any).saveTemplate();
+    await flushPromises();
+    expect(templateService.update).toHaveBeenCalled();
+  });
+
+  it("does not call service when form is not filled", async () => {
+    const w = await mountComp();
+    (w.vm as any).formData.name = "";
+    (w.vm as any).formData.body = "";
+    await (w.vm as any).saveTemplate();
+    await flushPromises();
+    expect(templateService.create).not.toHaveBeenCalled();
+    expect(templateService.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("AddTemplate - tabs computed", () => {
+  it("tabs includes http and email options", async () => {
+    const w = await mountComp();
+    const tabValues = (w.vm as any).tabs.map((t: any) => t.value ?? t.label);
+    // tabs should have HTTP and Email type options
+    expect(tabValues.length).toBeGreaterThanOrEqual(2);
   });
 });

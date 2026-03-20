@@ -213,7 +213,11 @@ pub async fn update_dashboard(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all dashboards in organization", "category": "dashboards"}))
+        ("x-o2-mcp" = json!({
+            "description": "List all dashboards in organization",
+            "category": "dashboards",
+            "summary_fields": ["dashboard_id", "title", "description", "owner", "folder_name"]
+        }))
     )
 )]
 pub async fn list_dashboards(
