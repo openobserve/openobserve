@@ -17,6 +17,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
 
 // Stub TenstackTable — cell rendering and virtualizer are not under test here
 vi.mock("@/components/TenstackTable.vue", () => ({
@@ -38,8 +39,12 @@ vi.mock("@/components/TenstackTable.vue", () => ({
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
     searchObj: {
-      data: { stream: { selectedStreamFields: [] } },
+      data: {
+        stream: { selectedStreamFields: [], addToFilter: "" },
+        resultGrid: { columns: [] },
+      },
     },
+    updatedLocalLogFilterField: vi.fn(),
   }),
 }));
 
@@ -92,7 +97,7 @@ describe("TracesSearchResultList", () => {
   const mount_ = (props: { hits: any[]; loading: boolean } & Record<string, any>) =>
     mount(TracesSearchResultList, {
       props: props as any,
-      global: { plugins: [i18n] },
+      global: { plugins: [i18n, store] },
     });
 
   // ─── Loading state ────────────────────────────────────────────────────────
@@ -207,7 +212,7 @@ describe("TracesSearchResultList", () => {
       const hits = [makeHit("t1")];
       wrapper = mount_({ hits, loading: false });
       const table = wrapper.findComponent({ name: "TenstackTable" });
-      await table.vm.$emit("row-click", hits[0]);
+      await table.vm.$emit("click:data-row", hits[0]);
       expect(wrapper.emitted("row-click")).toBeTruthy();
       expect(wrapper.emitted("row-click")![0]).toEqual([hits[0]]);
     });
@@ -292,21 +297,21 @@ describe("TracesSearchResultList", () => {
 
     it("uses span_status='ERROR' for error class in spans mode", () => {
       wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false, searchMode: "spans" });
-      const table = wrapper.findComponent({ name: "TracesTable" });
+      const table = wrapper.findComponent({ name: "TenstackTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       expect(rowClassFn(makeSpanHit("s1", "ERROR"))).toBe("oz-table__row--error");
     });
 
     it("returns empty string for non-error span_status in spans mode", () => {
       wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false, searchMode: "spans" });
-      const table = wrapper.findComponent({ name: "TracesTable" });
+      const table = wrapper.findComponent({ name: "TenstackTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       expect(rowClassFn(makeSpanHit("s1", "OK"))).toBe("");
     });
 
     it("uses errors count (not span_status) for error class in traces mode", () => {
       wrapper = mount_({ hits: [makeHit("t1", 0)], loading: false, searchMode: "traces" });
-      const table = wrapper.findComponent({ name: "TracesTable" });
+      const table = wrapper.findComponent({ name: "TenstackTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       // traces mode: errors > 0 triggers error class
       expect(rowClassFn({ ...makeHit("t1", 2), span_status: "OK" })).toBe("oz-table__row--error");
