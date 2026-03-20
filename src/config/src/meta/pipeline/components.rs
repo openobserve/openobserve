@@ -275,8 +275,8 @@ pub struct LlmEvaluationParams {
     /// Only spans containing this field (with a non-empty value) are considered LLM spans.
     #[serde(default = "default_llm_span_identifier")]
     pub llm_span_identifier: String,
-    /// Optional template to use for evaluation (agent_type name).
-    /// If specified, overrides auto-resolution by agent_type.
+    /// Optional template to use for evaluation (response_type name).
+    /// If specified, overrides auto-resolution by response_type.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub eval_template: Option<String>,
 }

@@ -37,9 +37,9 @@ impl MigrationTrait for Migration {
         manager
             .create_index(
                 Index::create()
-                    .name("idx_eval_templates_agent_type")
+                    .name("idx_eval_templates_response_type")
                     .table(EvalTemplates::Table)
-                    .col(EvalTemplates::AgentType)
+                    .col(EvalTemplates::ResponseType)
                     .col(EvalTemplates::IsActive)
                     .to_owned(),
             )
@@ -91,7 +91,7 @@ fn create_eval_templates_table_statement() -> TableCreateStatement {
                 .not_null(),
         )
         .col(
-            ColumnDef::new(EvalTemplates::AgentType)
+            ColumnDef::new(EvalTemplates::ResponseType)
                 .string_len(100)
                 .not_null(),
         )
@@ -103,8 +103,6 @@ fn create_eval_templates_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(EvalTemplates::Description).text().null())
         .col(ColumnDef::new(EvalTemplates::Content).text().not_null())
         .col(ColumnDef::new(EvalTemplates::Dimensions).json().not_null())
-        .col(ColumnDef::new(EvalTemplates::FailPatterns).json().null())
-        .col(ColumnDef::new(EvalTemplates::PassPatterns).json().null())
         .col(
             ColumnDef::new(EvalTemplates::Version)
                 .integer()
@@ -148,8 +146,8 @@ enum EvalTemplates {
     Id,
     #[sea_orm(rename = "org_id")]
     OrgId,
-    #[sea_orm(rename = "agent_type")]
-    AgentType,
+    #[sea_orm(rename = "response_type")]
+    ResponseType,
     #[sea_orm(rename = "name")]
     Name,
     #[sea_orm(rename = "description")]
@@ -158,10 +156,6 @@ enum EvalTemplates {
     Content,
     #[sea_orm(rename = "dimensions")]
     Dimensions,
-    #[sea_orm(rename = "fail_patterns")]
-    FailPatterns,
-    #[sea_orm(rename = "pass_patterns")]
-    PassPatterns,
     #[sea_orm(rename = "version")]
     Version,
     #[sea_orm(rename = "is_active")]

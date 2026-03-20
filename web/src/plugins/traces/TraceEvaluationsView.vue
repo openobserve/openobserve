@@ -15,34 +15,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
 <template>
   <div class="eval-container">
-    <!-- Template Selector -->
-    <div class="eval-template-selector">
-      <div class="eval-template-label">Evaluation Template:</div>
-      <q-select
-        v-model="selectedTemplate"
-        :options="availableTemplates"
-        option-value="id"
-        option-label="name"
-        emit-value
-        map-options
-        dense
-        outlined
-        class="eval-template-dropdown"
-        @update:model-value="onTemplateChange"
-      >
-        <template v-slot:prepend>
-          <q-icon name="assignment" />
-        </template>
-        <template v-slot:no-option>
-          <q-item>
-            <q-item-section class="text-grey">
-              No templates available
-            </q-item-section>
-          </q-item>
-        </template>
-      </q-select>
-    </div>
-
     <!-- Loading state -->
     <div v-if="isLoading" class="eval-loading">
       <q-spinner color="primary" size="60px" />
@@ -63,475 +35,328 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
     <!-- Evaluation records -->
     <template v-else>
-      <div v-for="(record, idx) in evalData"
-:key="idx" class="eval-record">
-        <!-- Compact Header with Score -->
-        <div class="eval-header-compact">
-          <div
-            class="eval-score-badge"
-            :class="getScoreClass(record.llm_evaluation_quality_score)"
-          >
-            <div class="eval-score-number">
-              {{
-                formatScore(record.llm_evaluation_quality_score).replace(
-                  "%",
-                  "",
-                )
-              }}
-            </div>
-            <div class="eval-score-label">Quality</div>
+      <div v-for="(record, idx) in evalData" :key="idx" class="eval-record-v2">
+        <!-- Header with Template Selector integrated -->
+        <div class="tw:flex tw:justify-end tw:items-center tw:mb-4">
+          <div class="tw:flex tw:items-center tw:gap-2">
+            <span class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-secondary)]">Evaluation Template:</span>
+            <q-select
+              v-model="selectedTemplate"
+              :options="availableTemplates"
+              option-value="id"
+              option-label="name"
+              emit-value
+              map-options
+              dense
+              outlined
+              class="eval-template-dropdown"
+              style="width: 260px;"
+              @update:model-value="onTemplateChange"
+            >
+              <template v-slot:prepend>
+                <q-icon name="assignment" size="14px" color="primary" />
+              </template>
+            </q-select>
           </div>
-
-          <div class="eval-header-middle">
-            <div class="eval-header-row">
-              <q-badge
-                v-if="record.llm_evaluation_judge_verdict"
-                :color="
-                  record.llm_evaluation_judge_verdict === 'PASS'
-                    ? 'positive'
-                    : 'negative'
-                "
-                :label="record.llm_evaluation_judge_verdict"
-                class="eval-verdict-badge"
-              />
-              <span
-                v-if="record.llm_evaluation_judge_confidence"
-                class="eval-confidence-text"
-              >
-                {{ formatScore(record.llm_evaluation_judge_confidence) }}
-                confidence
-              </span>
+        </div>
+        <!-- SECTION 1: Hero Metrics (Top Row) -->
+        <div class="tw:flex tw:gap-3 tw:mb-4" style="height: 100px;">
+          <!-- 1. Quality Score Card -->
+          <div
+            class="tw:flex-1 tw:flex tw:flex-col tw:justify-between el-border el-border-radius o2-incident-card-bg tw:p-3"
+          >
+            <div class="tw:flex tw:justify-between tw:items-start">
+              <div class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-secondary)]">
+                Quality Score
+              </div>
+              <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center"
+                   :class="getScoreClass(record.llm_evaluation_quality_score) === 'score-excellent' ? 'tw:bg-green-500/10' : (getScoreClass(record.llm_evaluation_quality_score) === 'score-good' ? 'tw:bg-amber-500/10' : 'tw:bg-red-500/10')">
+                <q-icon name="insights"
+                        :class="getScoreClass(record.llm_evaluation_quality_score) === 'score-excellent' ? 'tw:text-green-500' : (getScoreClass(record.llm_evaluation_quality_score) === 'score-good' ? 'tw:text-amber-500' : 'tw:text-red-500')"
+                        style="font-size: 20px;" />
+              </div>
             </div>
-            <div class="eval-header-row eval-judge-row">
-              <span class="eval-judge-label"
-                >Evaluated by
-                {{ record.llm_evaluation_judge_model || "LLM Judge" }}</span
-              >
-              <span class="eval-time-text">{{
-                formatTimestampDisplay(record._timestamp)
-              }}</span>
+            <div class="tw:text-3xl tw:font-bold tw:tracking-tight tw:leading-none tw:text-[var(--o2-text-primary)]">
+              {{ formatScore(record.llm_evaluation_quality_score) }}
             </div>
           </div>
 
+          <!-- 2. Verdict Card -->
           <div
-            class="eval-aggregate-mini"
-            v-if="record.llm_evaluation_judge_aggregate_score != null"
+            class="tw:flex-1 tw:flex tw:flex-col tw:justify-between el-border el-border-radius o2-incident-card-bg tw:p-3"
           >
-            <div class="eval-aggregate-mini-label">Aggregate</div>
-            <div class="eval-aggregate-mini-value">
-              {{ formatScore(record.llm_evaluation_judge_aggregate_score) }}
+            <div class="tw:flex tw:justify-between tw:items-start">
+              <div class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-secondary)]">
+                Verdict
+              </div>
+              <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center"
+                   :class="getVerdict(record) === 'PASS' ? 'tw:bg-green-500/10' : 'tw:bg-red-500/10'">
+                <q-icon :name="getVerdict(record) === 'PASS' ? 'check_circle' : 'cancel'"
+                        :class="getVerdict(record) === 'PASS' ? 'tw:text-green-500' : 'tw:text-red-500'"
+                        style="font-size: 20px;" />
+              </div>
             </div>
-            <div class="eval-aggregate-mini-bar">
-              <div
-                class="eval-aggregate-mini-fill"
-                :style="{
-                  width:
-                    parseFloat(record.llm_evaluation_judge_aggregate_score) *
-                      100 +
-                    '%',
-                }"
-              ></div>
+            <div class="tw:text-2xl tw:font-bold tw:tracking-tight tw:leading-none tw:text-[var(--o2-text-primary)]">
+              {{ getVerdict(record) }}
+            </div>
+          </div>
+
+          <!-- 3. Steps Card -->
+          <div
+            class="tw:flex-1 tw:flex tw:flex-col tw:justify-between el-border el-border-radius o2-incident-card-bg tw:p-3"
+          >
+            <div class="tw:flex tw:justify-between tw:items-start">
+              <div class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-secondary)]">
+                Trace Steps
+              </div>
+              <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:bg-blue-500/10">
+                <q-icon name="layers" class="tw:text-blue-500" style="font-size: 20px;" />
+              </div>
+            </div>
+            <div class="tw:text-3xl tw:font-bold tw:tracking-tight tw:leading-none tw:text-[var(--o2-text-primary)]">
+              {{ record.total_steps || "0" }}
+            </div>
+          </div>
+
+          <!-- 4. Tools Card -->
+          <div
+            class="tw:flex-1 tw:flex tw:flex-col tw:justify-between el-border el-border-radius o2-incident-card-bg tw:p-3"
+          >
+            <div class="tw:flex tw:justify-between tw:items-start">
+              <div class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-secondary)]">
+                Tool Calls
+              </div>
+              <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:bg-purple-500/10">
+                <q-icon name="build" class="tw:text-purple-500" style="font-size: 20px;" />
+              </div>
+            </div>
+            <div class="tw:text-3xl tw:font-bold tw:leading-none tw:text-[var(--o2-text-primary)]">
+              {{ record.total_tool_calls || "0" }}
+            </div>
+          </div>
+
+          <!-- 5. Completion Card -->
+          <div
+            class="tw:flex-1 tw:flex tw:flex-col tw:justify-between el-border el-border-radius o2-incident-card-bg tw:p-3"
+          >
+            <div class="tw:flex tw:justify-between tw:items-start">
+              <div class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-secondary)]">
+                Done Via
+              </div>
+              <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:bg-teal-500/10">
+                <q-icon name="flag" class="tw:text-teal-500" style="font-size: 20px;" />
+              </div>
+            </div>
+            <div class="tw:text-lg tw:font-semibold tw:leading-tight tw:text-[var(--o2-text-primary)] tw:truncate" :title="record.completion_signal">
+              {{ record.completion_signal || "N/A" }}
             </div>
           </div>
         </div>
 
-        <!-- Dimensions Grid - Full Width -->
-        <div v-if="hasDimensionScores(record)" class="eval-dimensions-full">
-          <div class="eval-dimensions-label">Evaluation Dimensions</div>
-          <div class="eval-dimensions-compact-grid">
-            <div
-              v-if="record.llm_evaluation_judge_relevance != null"
-              class="eval-dimension-compact"
-            >
-              <div class="eval-dimension-header-compact">
-                <q-icon name="done_all"
-color="primary" size="xs" />
-                <span class="eval-dimension-name">Relevance</span>
+        <!-- SECTION 2: Main Content (2:1 Ratio Layout) -->
+        <div class="tw:flex tw:gap-4">
+          <!-- PART 1: Primary Content (Analysis & reasoning) - 2/3 Width -->
+          <div class="tw:flex tw:flex-col tw:gap-4" style="width: 66.67%;">
+            <!-- 2.1A: Issues & Analysis Card -->
+            <div class="el-border el-border-radius o2-incident-card-bg tw:p-4">
+              <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3">
+                <q-icon name="rule" color="primary" size="sm" />
+                <div class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-primary)]">Issues & Analysis</div>
               </div>
-              <div
-                class="eval-dimension-bar-compact"
-                :style="{ '--bar-color': '#2196F3' }"
-              >
-                <div
-                  class="eval-dimension-bar-fill"
-                  :style="{
-                    width: getBarWidth(record.llm_evaluation_judge_relevance),
-                  }"
-                ></div>
-              </div>
-              <div class="eval-dimension-score-compact">
-                {{ formatScore(record.llm_evaluation_judge_relevance) }}
-              </div>
-            </div>
 
-            <div
-              v-if="record.llm_evaluation_judge_groundedness != null"
-              class="eval-dimension-compact"
-            >
-              <div class="eval-dimension-header-compact">
-                <q-icon name="verified"
-color="positive" size="xs" />
-                <span class="eval-dimension-name">Groundedness</span>
-              </div>
-              <div
-                class="eval-dimension-bar-compact"
-                :style="{ '--bar-color': '#4CAF50' }"
-              >
-                <div
-                  class="eval-dimension-bar-fill"
-                  :style="{
-                    width: getBarWidth(
-                      record.llm_evaluation_judge_groundedness,
-                    ),
-                  }"
-                ></div>
-              </div>
-              <div class="eval-dimension-score-compact">
-                {{ formatScore(record.llm_evaluation_judge_groundedness) }}
-              </div>
-            </div>
-
-            <div
-              v-if="record.llm_evaluation_judge_conciseness != null"
-              class="eval-dimension-compact"
-            >
-              <div class="eval-dimension-header-compact">
-                <q-icon name="summarize"
-color="deep-purple" size="xs" />
-                <span class="eval-dimension-name">Conciseness</span>
-              </div>
-              <div
-                class="eval-dimension-bar-compact"
-                :style="{ '--bar-color': '#9C27B0' }"
-              >
-                <div
-                  class="eval-dimension-bar-fill"
-                  :style="{
-                    width: getBarWidth(record.llm_evaluation_judge_conciseness),
-                  }"
-                ></div>
-              </div>
-              <div class="eval-dimension-score-compact">
-                {{ formatScore(record.llm_evaluation_judge_conciseness) }}
-              </div>
-            </div>
-
-            <div
-              v-if="record.llm_evaluation_judge_instruction_following != null"
-              class="eval-dimension-compact"
-            >
-              <div class="eval-dimension-header-compact">
-                <q-icon name="rule"
-color="orange" size="xs" />
-                <span class="eval-dimension-name">Instructions</span>
-              </div>
-              <div
-                class="eval-dimension-bar-compact"
-                :style="{ '--bar-color': '#FF9800' }"
-              >
-                <div
-                  class="eval-dimension-bar-fill"
-                  :style="{
-                    width: getBarWidth(
-                      record.llm_evaluation_judge_instruction_following,
-                    ),
-                  }"
-                ></div>
-              </div>
-              <div class="eval-dimension-score-compact">
-                {{
-                  formatScore(record.llm_evaluation_judge_instruction_following)
-                }}
-              </div>
-            </div>
-
-            <div
-              v-if="record.llm_evaluation_judge_accuracy != null"
-              class="eval-dimension-compact"
-            >
-              <div class="eval-dimension-header-compact">
-                <q-icon name="check_circle"
-color="negative" size="xs" />
-                <span class="eval-dimension-name">Accuracy</span>
-              </div>
-              <div
-                class="eval-dimension-bar-compact"
-                :style="{ '--bar-color': '#F44336' }"
-              >
-                <div
-                  class="eval-dimension-bar-fill"
-                  :style="{
-                    width: getBarWidth(record.llm_evaluation_judge_accuracy),
-                  }"
-                ></div>
-              </div>
-              <div class="eval-dimension-score-compact">
-                {{ formatScore(record.llm_evaluation_judge_accuracy) }}
-              </div>
-            </div>
-
-            <div
-              v-if="record.llm_evaluation_judge_trajectory_efficiency != null"
-              class="eval-dimension-compact"
-            >
-              <div class="eval-dimension-header-compact">
-                <q-icon name="flash_on"
-color="info" size="xs" />
-                <span class="eval-dimension-name">Efficiency</span>
-              </div>
-              <div
-                class="eval-dimension-bar-compact"
-                :style="{ '--bar-color': '#00BCD4' }"
-              >
-                <div
-                  class="eval-dimension-bar-fill"
-                  :style="{
-                    width: getBarWidth(
-                      record.llm_evaluation_judge_trajectory_efficiency,
-                    ),
-                  }"
-                ></div>
-              </div>
-              <div class="eval-dimension-score-compact">
-                {{
-                  formatScore(record.llm_evaluation_judge_trajectory_efficiency)
-                }}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Three Column Layout -->
-        <div class="eval-three-column">
-          <!-- Column 1: Metadata & Analysis -->
-          <div class="eval-column">
-            <div class="eval-column-title">Metadata</div>
-            <div class="eval-info-grid">
-              <div v-if="record.is_multi_step" class="eval-info-item">
-                <q-icon
-                  name="account_tree"
-                  color="primary"
-                  size="sm"
-                  class="eval-info-icon"
-                />
-                <div class="eval-info-content">
-                  <span class="eval-info-label">Multi-step</span>
-                  <q-badge label="Yes"
-color="info" size="sm" />
+              <!-- Critical Issues -->
+              <div v-if="record.llm_evaluation_judge_critical_issues" class="tw:mb-4">
+                <div class="tw:flex tw:flex-wrap tw:gap-2">
+                  <div
+                    v-for="(issue, i) in parseCriticalIssues(record.llm_evaluation_judge_critical_issues)"
+                    :key="i"
+                    class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:rounded-md tw:bg-red-500/10 tw:text-red-600 tw:text-xs tw:font-medium tw:border tw:border-red-500/20"
+                  >
+                    <q-icon name="report_problem" size="xs" />
+                    <span>{{ issue }}</span>
+                  </div>
                 </div>
               </div>
-              <div v-if="record.total_steps" class="eval-info-item">
-                <q-icon
-                  name="layers"
-                  color="primary"
-                  size="sm"
-                  class="eval-info-icon"
-                />
-                <div class="eval-info-content">
-                  <span class="eval-info-label">Steps</span>
-                  <span class="eval-info-value">{{ record.total_steps }}</span>
+
+              <!-- Fix Suggestions Card (Phase 2) -->
+              <div v-if="getFixSuggestions(record).length > 0" class="tw:mb-4">
+                <div class="tw:text-[10px] tw:font-bold tw:text-[var(--o2-text-secondary)] tw:uppercase tw:mb-2 text-primary">💡 Recommended Fixes</div>
+                <div class="tw:space-y-2">
+                  <div v-for="(fix, i) in getFixSuggestions(record)" :key="i"
+                       class="tw:flex tw:items-start tw:gap-2 tw:p-3 tw:bg-blue-500/5 tw:border tw:border-blue-500/20 tw:rounded-lg tw:border-dashed">
+                    <q-icon name="lightbulb" color="primary" size="18px" class="tw:mt-1" />
+                    <div class="tw:text-xs tw:text-[var(--o2-text-primary)] tw:flex-1 tw:leading-relaxed">
+                      <strong>Suggestion:</strong> {{ fix }}
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div v-if="record.total_tool_calls" class="eval-info-item">
-                <q-icon
-                  name="build"
-                  color="primary"
-                  size="sm"
-                  class="eval-info-icon"
-                />
-                <div class="eval-info-content">
-                  <span class="eval-info-label">Tools</span>
-                  <span class="eval-info-value">{{
-                    record.total_tool_calls
-                  }}</span>
+
+              <div v-if="getWeakestDimension(record)" class="tw:mb-4">
+                <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
+                  <q-icon name="trending_down" color="negative" size="xs" />
+                  <span class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-secondary)]">Weakest Dimension:</span>
+                  <q-badge color="warning" text-color="dark" :label="formatDimLabel(getWeakestDimension(record)!.dimension)" />
                 </div>
-              </div>
-              <div v-if="record.exit_status" class="eval-info-item">
-                <q-icon
-                  :name="record.exit_status === 'ok' ? 'check_circle' : 'error'"
-                  :color="record.exit_status === 'ok' ? 'positive' : 'negative'"
-                  size="sm"
-                  class="eval-info-icon"
-                />
-                <div class="eval-info-content">
-                  <span class="eval-info-label">Status</span>
-                  <q-badge
-                    :color="
-                      record.exit_status === 'ok' ? 'positive' : 'negative'
-                    "
-                    :label="record.exit_status.toUpperCase()"
-                    size="sm"
-                  />
-                </div>
-              </div>
-              <div v-if="record.completion_signal" class="eval-info-item">
-                <q-icon
-                  name="done"
-                  color="primary"
-                  size="sm"
-                  class="eval-info-icon"
-                />
-                <div class="eval-info-content">
-                  <span class="eval-info-label">Completed</span>
-                  <span class="eval-info-value">{{
-                    record.completion_signal
-                  }}</span>
+                <div v-if="getWeakestDimension(record)!.reasoning" class="tw:text-sm tw:bg-[var(--o2-border-color)] tw:p-3 tw:rounded-md tw:leading-relaxed">
+                  {{ getWeakestDimension(record)!.reasoning }}
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- Column 2: Issues & Analysis -->
-          <div class="eval-column">
-            <div class="eval-column-title">Issues & Analysis</div>
-
-            <div
-              v-if="record.llm_evaluation_judge_failure_category"
-              class="eval-analysis-item"
-            >
-              <q-icon name="category"
-color="warning" size="sm" />
-              <span class="eval-analysis-label">Category</span>
-              <q-badge
-                color="warning"
-                text-color="dark"
-                :label="record.llm_evaluation_judge_failure_category"
-              />
+            <!-- 2.1B: Score Reasoning Card -->
+            <div class="el-border el-border-radius o2-incident-card-bg tw:p-4">
+              <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3">
+                <q-icon name="psychology" color="primary" size="sm" />
+                <div class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-primary)]">Dimension Reasoning</div>
+              </div>
+              <div class="tw:grid tw:grid-cols-2 tw:gap-3">
+                <div v-for="dim in getDimensionScores(record).filter(d => d.reasoning)" :key="dim.dimension" 
+                     class="tw:bg-[var(--o2-border-color)] tw:p-3 tw:rounded-md tw:flex tw:flex-col tw:gap-1">
+                  <div class="tw:text-[10px] tw:font-bold tw:text-[var(--o2-text-secondary)] tw:uppercase tw:tracking-wider">
+                    {{ formatDimLabel(dim.dimension) }}
+                  </div>
+                  <div class="tw:text-xs tw:leading-relaxed tw:text-[var(--o2-text-primary)]">
+                    {{ truncateContent(dim.reasoning, 200) }}
+                  </div>
+                </div>
+                <div v-if="!getDimensionScores(record).some(d => d.reasoning)" class="tw:text-sm tw:italic tw:text-[var(--o2-text-secondary)]">
+                  No per-dimension reasoning available.
+                </div>
+              </div>
             </div>
 
-            <div
-              v-if="record.llm_evaluation_judge_component_at_fault"
-              class="eval-analysis-item"
-            >
-              <q-icon name="build"
-color="info" size="sm" />
-              <span class="eval-analysis-label">Component</span>
-              <q-badge
-                :label="record.llm_evaluation_judge_component_at_fault"
-                color="info"
-              />
-            </div>
+            <!-- 2.1C: Query & Response Card (Full Width in column) -->
+            <div class="el-border el-border-radius o2-incident-card-bg tw:overflow-hidden">
+              <div class="tw:px-4 tw:py-3 tw:border-b tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-border-color)]/30">
+                <div class="tw:flex tw:items-center tw:gap-2">
+                  <q-icon name="code" color="primary" size="sm" />
+                  <div class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-primary)]">Query & Response</div>
+                </div>
+              </div>
 
-            <div
-              v-if="record.llm_evaluation_judge_critical_issues"
-              class="eval-analysis-item eval-issues-item"
-            >
-              <div class="eval-analysis-label">Issues</div>
-              <div class="eval-issues-compact">
-                <div
-                  v-for="(issue, i) in parseCriticalIssues(
-                    record.llm_evaluation_judge_critical_issues,
-                  ).slice(0, 3)"
-                  :key="i"
-                  class="eval-issue-tag"
+              <div class="tw:flex tw:flex-col tw:divide-y tw:divide-[var(--o2-border-color)]">
+                <!-- System Prompt (Expandable) -->
+                <q-expansion-item
+                  v-if="parseMessages(record.llm_input).system"
+                  icon="settings"
+                  label="System Prompt"
+                  header-class="tw:text-xs tw:font-medium"
                 >
-                  <q-icon name="warning" size="xs" />
-                  <span>{{ issue }}</span>
-                </div>
+                  <div class="tw:p-4 tw:bg-[var(--o2-code-bg)]">
+                    <LLMContentRenderer
+                      :content="JSON.stringify([{ role: 'system', content: parseMessages(record.llm_input).system }])"
+                      :contentType="'input'"
+                      :viewMode="'formatted'"
+                    />
+                  </div>
+                </q-expansion-item>
+
+                <!-- User Messages -->
+                <q-expansion-item
+                  v-if="parseMessages(record.llm_input).user.length > 0"
+                  icon="person"
+                  label="User Messages"
+                  default-opened
+                  header-class="tw:text-xs tw:font-medium"
+                >
+                  <div class="tw:p-4 tw:bg-[var(--o2-code-bg)]">
+                    <LLMContentRenderer
+                      :content="JSON.stringify(parseMessages(record.llm_input).user)"
+                      :contentType="'input'"
+                      :viewMode="'formatted'"
+                    />
+                  </div>
+                </q-expansion-item>
+
+                <!-- Assistant Response -->
+                <q-expansion-item
+                  v-if="record.llm_output"
+                  icon="smart_toy"
+                  label="Assistant Response"
+                  default-opened
+                  header-class="tw:text-xs tw:font-medium"
+                >
+                  <div class="tw:p-4 tw:bg-[var(--o2-code-bg)]">
+                    <LLMContentRenderer
+                      :content="getHighlightedResponse(record)"
+                      :contentType="'output'"
+                      :viewMode="'json'"
+                    />
+                  </div>
+                </q-expansion-item>
               </div>
             </div>
           </div>
 
-          <!-- Column 3: Recommendations -->
-          <div class="eval-column">
-            <div class="eval-column-title">Recommendations</div>
-
-            <div
-              v-if="record.llm_evaluation_judge_failure_rationale"
-              class="eval-text-box eval-rationale-box"
-            >
-              <div class="eval-text-label">Rationale</div>
-              <div class="eval-text-value">
-                {{
-                  truncateContent(
-                    record.llm_evaluation_judge_failure_rationale,
-                    150,
-                  )
-                }}
+          <!-- PART 2: Sidebar Content (Dimensions & Metadata) - 1/3 Width -->
+          <div class="tw:flex tw:flex-col tw:gap-4" style="width: 33.33%;">
+            <!-- 2.2A: Dimensions Card -->
+            <div class="el-border el-border-radius o2-incident-card-bg tw:p-4 tw:flex tw:flex-col tw:gap-4">
+              <div class="tw:flex tw:items-center tw:gap-2">
+                <q-icon name="analytics" color="primary" size="sm" />
+                <div class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-primary)]">Dimensions</div>
               </div>
-            </div>
-
-            <div
-              v-if="record.llm_evaluation_judge_suggested_fix"
-              class="eval-text-box eval-fix-box"
-            >
-              <div class="eval-text-label">Suggested Fix</div>
-              <div class="eval-text-value">
-                {{
-                  truncateContent(
-                    record.llm_evaluation_judge_suggested_fix,
-                    150,
-                  )
-                }}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Input/Output Section - Full Width Below -->
-        <div v-if="record.llm_input || record.llm_output" class="eval-io-full">
-          <div class="eval-io-label">Query & Response</div>
-          <div class="eval-io-row">
-            <div v-if="record.llm_input" class="eval-io-sections">
-              <!-- System Prompt Section -->
-              <div
-                v-if="parseMessages(record.llm_input).system"
-                class="eval-io-section"
-              >
-                <div class="eval-io-header">
-                  <q-icon name="settings"
-color="warning" size="sm" />
-                  <span>System Prompt</span>
-                </div>
-                <div class="eval-io-content-wrapper">
-                  <LLMContentRenderer
-                    :content="
-                      JSON.stringify([
-                        {
-                          role: 'system',
-                          content: parseMessages(record.llm_input).system,
-                        },
-                      ])
-                    "
-                    :contentType="'input'"
-                    :viewMode="'formatted'"
-                  />
-                </div>
-              </div>
-
-              <!-- User Messages Section -->
-              <div
-                v-if="parseMessages(record.llm_input).user.length > 0"
-                class="eval-io-section"
-              >
-                <div class="eval-io-header">
-                  <q-icon name="person"
-color="info" size="sm" />
-                  <span>User Messages</span>
-                </div>
-                <div class="eval-io-content-wrapper">
-                  <LLMContentRenderer
-                    :content="
-                      JSON.stringify(parseMessages(record.llm_input).user)
-                    "
-                    :contentType="'input'"
-                    :viewMode="'formatted'"
-                  />
+              
+              <div class="tw:flex tw:flex-col tw:gap-4">
+                <div v-for="dim in getDimensionScores(record)" :key="dim.dimension" class="tw:flex tw:flex-col tw:gap-1.5">
+                  <div class="tw:flex tw:justify-between tw:items-center">
+                    <div class="tw:flex tw:items-center tw:gap-2">
+                      <q-icon :name="getDimIcon(dim.dimension)" :color="getDimColor(dim.dimension)" size="14px" />
+                      <span class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-primary)]">{{ formatDimLabel(dim.dimension) }}</span>
+                    </div>
+                    <span class="tw:text-xs tw:font-bold tw:text-[var(--o2-text-primary)]">{{ formatScore(dim.score) }}</span>
+                  </div>
+                  <div class="tw:h-1.5 tw:w-full tw:bg-[var(--o2-border-color)] tw:rounded-full tw:overflow-hidden">
+                    <div
+                      class="tw:h-full tw:transition-all tw:duration-500"
+                      :style="{ 
+                        width: getBarWidth(dim.score),
+                        backgroundColor: getDimBarColor(dim.dimension)
+                      }"
+                    ></div>
+                  </div>
+                  <q-tooltip v-if="dim.reasoning" class="tw:text-xs" max-width="250px">
+                    {{ dim.reasoning }}
+                  </q-tooltip>
                 </div>
               </div>
             </div>
 
-            <div v-if="record.llm_output" class="eval-io-box eval-io-output">
-              <div class="eval-io-header">
-                <q-icon name="output" size="sm" />
-                <span>Assistant Response</span>
+            <!-- 2.2B: Metadata Details Card -->
+            <div class="el-border el-border-radius o2-incident-card-bg tw:p-4">
+              <div class="tw:flex tw:items-center tw:gap-2 tw:mb-4">
+                <q-icon name="info" color="primary" size="sm" />
+                <div class="tw:text-sm tw:font-semibold">Technical Details</div>
               </div>
-              <div class="eval-io-content-wrapper">
-                <LLMContentRenderer
-                  :content="record.llm_output"
-                  :contentType="'output'"
-                  :viewMode="'json'"
-                />
+
+              <div class="tw:flex tw:flex-col tw:gap-3">
+                <div class="tw:grid tw:gap-1" style="grid-template-columns: 80px 1fr;">
+                  <div class="tw:text-[10px] tw:font-bold tw:text-[var(--o2-text-secondary)] tw:uppercase">Judge</div>
+                  <div class="tw:text-xs tw:truncate">{{ getJudgeModel(record) }}</div>
+                </div>
+                <div class="tw:grid tw:gap-1" style="grid-template-columns: 80px 1fr;">
+                  <div class="tw:text-[10px] tw:font-bold tw:text-[var(--o2-text-secondary)] tw:uppercase">Time</div>
+                  <div class="tw:text-xs">{{ formatTimestampDisplay(record._timestamp) }}</div>
+                </div>
+                <div class="tw:grid tw:gap-1" style="grid-template-columns: 80px 1fr;">
+                  <div class="tw:text-[10px] tw:font-bold tw:text-[var(--o2-text-secondary)] tw:uppercase">Confidence</div>
+                  <div class="tw:text-xs">{{ formatScore(record.llm_evaluation_judge_confidence) }}</div>
+                </div>
+                <div class="tw:grid tw:gap-1" style="grid-template-columns: 80px 1fr;">
+                  <div class="tw:text-[10px] tw:font-bold tw:text-[var(--o2-text-secondary)] tw:uppercase">Status</div>
+                  <div>
+                    <q-badge
+                      :color="record.exit_status === 'ok' ? 'positive' : 'negative'"
+                      :label="record.exit_status?.toUpperCase() || 'UNKNOWN'"
+                      size="sm"
+                    />
+                  </div>
+                </div>
+                <div v-if="record.is_multi_step" class="tw:grid tw:gap-1" style="grid-template-columns: 80px 1fr;">
+                  <div class="tw:text-[10px] tw:font-bold tw:text-[var(--o2-text-secondary)] tw:uppercase">Type</div>
+                  <div class="tw:text-xs">Multi-step Agent</div>
+                </div>
               </div>
             </div>
           </div>
@@ -601,16 +426,199 @@ export default defineComponent({
       }
     };
 
-    const hasDimensionScores = (record: any): boolean => {
-      return !!(
-        record.llm_evaluation_judge_relevance != null ||
-        record.llm_evaluation_judge_groundedness != null ||
-        record.llm_evaluation_judge_conciseness != null ||
-        record.llm_evaluation_judge_instruction_following != null ||
-        record.llm_evaluation_judge_accuracy != null ||
-        record.llm_evaluation_judge_trajectory_efficiency != null
-      );
+    // Normalise a flat span attribute (old schema) or a scores[] entry (new schema).
+    // Returns an array of { dimension, score (0.0-1.0), reasoning } objects.
+    type DimScore = { dimension: string; score: number; reasoning: string };
+
+    const LEGACY_DIM_FIELDS: Record<string, string> = {
+      llm_evaluation_judge_relevance: "relevance",
+      llm_evaluation_judge_groundedness: "groundedness",
+      llm_evaluation_judge_conciseness: "conciseness",
+      llm_evaluation_judge_instruction_following: "instruction_following",
+      llm_evaluation_judge_accuracy: "accuracy",
+      llm_evaluation_judge_trajectory_efficiency: "trajectory_efficiency",
     };
+
+    const getDimensionScores = (record: any): DimScore[] => {
+      const dimsMap = new Map<string, DimScore>();
+
+      // 1. New Braintrust-style: llm_evaluation_judge_scores is a JSON string or array
+      const rawScores = record.llm_evaluation_judge_scores;
+      if (rawScores) {
+        try {
+          const parsed = typeof rawScores === "string" ? JSON.parse(rawScores) : rawScores;
+          if (Array.isArray(parsed)) {
+            parsed.forEach((s: any) => {
+              const dim = s.dimension ?? "unknown";
+              dimsMap.set(dim, {
+                dimension: dim,
+                score: parseFloat(s.score) ?? 0,
+                reasoning: s.reasoning ?? "",
+              });
+            });
+          }
+        } catch { /* ignore */ }
+      }
+
+      // 2. Scan for "evaluators" pattern: llm_evaluation_evaluators_{dim}_score
+      Object.keys(record).forEach(key => {
+        // Handle llm_evaluation_evaluators_{dim}_score
+        if (key.startsWith("llm_evaluation_evaluators_") && key.endsWith("_score")) {
+          const dim = key.replace("llm_evaluation_evaluators_", "").replace("_score", "");
+          // Skip if it's the main judge aggregate (we handled it or will handle it separately)
+          if (dim === "llm_judge") return;
+
+          const score = parseFloat(record[key]);
+          const reasoning = record[`llm_evaluation_evaluators_${dim}_reasoning`] || 
+                           record[`llm_evaluation_evaluators_${dim}_metadata`]?.reasoning || "";
+          
+          if (!dimsMap.has(dim)) {
+            dimsMap.set(dim, { dimension: dim, score, reasoning });
+          }
+        }
+        
+        // Handle other llm_evaluation_{dim}_score patterns
+        if (key.startsWith("llm_evaluation_") && key.endsWith("_score") && 
+            !key.includes("quality_score") && !key.includes("judge_scores") && !key.includes("evaluators")) {
+          const dim = key.replace("llm_evaluation_", "").replace("_score", "");
+          const score = parseFloat(record[key]);
+          const reasoning = record[`llm_evaluation_${dim}_reasoning`] || "";
+          
+          if (!dimsMap.has(dim)) {
+            dimsMap.set(dim, { dimension: dim, score, reasoning });
+          }
+        }
+      });
+
+      // 3. Overall Judge as a dimension if available
+      if (record.llm_evaluation_evaluators_llm_judge_score != null && !dimsMap.has("llm_judge")) {
+        dimsMap.set("llm_judge", {
+          dimension: "llm_judge",
+          score: parseFloat(record.llm_evaluation_evaluators_llm_judge_score),
+          reasoning: record.llm_evaluation_evaluators_llm_judge_reasoning || ""
+        });
+      }
+
+      // 4. Legacy flat fields
+      for (const [field, dim] of Object.entries(LEGACY_DIM_FIELDS)) {
+        if (record[field] != null && !dimsMap.has(dim)) {
+          const raw = parseFloat(record[field]);
+          dimsMap.set(dim, { 
+            dimension: dim, 
+            score: raw > 1 ? raw / 100 : raw, 
+            reasoning: "" 
+          });
+        }
+      }
+
+      return Array.from(dimsMap.values());
+    };
+
+    const getVerdict = (record: any): string => {
+      if (record.llm_evaluation_judge_verdict) return record.llm_evaluation_judge_verdict;
+      
+      // Try to extract from llm_judge_metadata
+      const metaStr = record.llm_evaluation_evaluators_llm_judge_metadata;
+      if (metaStr) {
+        try {
+          const meta = typeof metaStr === "string" ? JSON.parse(metaStr) : metaStr;
+          if (meta.verdict) return meta.verdict;
+        } catch { /* ignore */ }
+      }
+      
+      return "N/A";
+    };
+
+    const getJudgeModel = (record: any): string => {
+      if (record.llm_evaluation_judge_model) return record.llm_evaluation_judge_model;
+      
+      const metaStr = record.llm_evaluation_evaluators_llm_judge_metadata;
+      if (metaStr) {
+        try {
+          const meta = typeof metaStr === "string" ? JSON.parse(metaStr) : metaStr;
+          if (meta.model) return meta.model;
+        } catch { /* ignore */ }
+      }
+      
+      return "LLM Judge";
+    };
+
+    const getWeakestDimension = (record: any): DimScore | null => {
+      const dims = getDimensionScores(record);
+      if (!dims.length) return null;
+      return dims.reduce((min, d) => d.score < min.score ? d : min, dims[0]);
+    };
+
+    const hasDimensionScores = (record: any): boolean => getDimensionScores(record).length > 0;
+
+    // Dimension label / icon / colour helpers
+    const DIM_LABELS: Record<string, string> = {
+      relevance: "Relevance",
+      groundedness: "Groundedness",
+      conciseness: "Conciseness",
+      instruction_following: "Instructions",
+      accuracy: "Accuracy",
+      trajectory_efficiency: "Efficiency",
+      completeness: "Completeness",
+      safety: "Safety",
+      slop_filter: "Slop Filter",
+      technical_question_retrieval: "Retrieval",
+      tool_effectiveness: "Tool Usage",
+      llm_judge: "Overall Judge",
+      numeric_grounding: "Numeric Grounding",
+    };
+    const DIM_ICONS: Record<string, string> = {
+      relevance: "done_all",
+      groundedness: "verified",
+      conciseness: "summarize",
+      instruction_following: "rule",
+      accuracy: "check_circle",
+      trajectory_efficiency: "flash_on",
+      completeness: "task_alt",
+      safety: "security",
+      slop_filter: "filter_alt",
+      technical_question_retrieval: "find_in_page",
+      tool_effectiveness: "build_circle",
+      llm_judge: "gavel",
+      numeric_grounding: "numbers",
+    };
+    const DIM_COLORS: Record<string, string> = {
+      relevance: "primary",
+      groundedness: "positive",
+      conciseness: "deep-purple",
+      instruction_following: "orange",
+      accuracy: "negative",
+      trajectory_efficiency: "info",
+      completeness: "teal",
+      safety: "red",
+      slop_filter: "grey-7",
+      technical_question_retrieval: "blue-grey",
+      tool_effectiveness: "indigo",
+      llm_judge: "brown",
+      numeric_grounding: "cyan",
+    };
+    const DIM_BAR_COLORS: Record<string, string> = {
+      relevance: "#2196F3",
+      groundedness: "#4CAF50",
+      conciseness: "#9C27B0",
+      instruction_following: "#FF9800",
+      accuracy: "#F44336",
+      trajectory_efficiency: "#00BCD4",
+      completeness: "#009688",
+      safety: "#F44336",
+      slop_filter: "#616161",
+      technical_question_retrieval: "#607D8B",
+      tool_effectiveness: "#3F51B5",
+      llm_judge: "#795548",
+      numeric_grounding: "#00BCD4",
+    };
+    const DIM_COLOR_CYCLE = ["#7C3AED","#0891B2","#D97706","#059669","#DC2626","#2563EB"];
+
+    const formatDimLabel = (dim: string): string =>
+      DIM_LABELS[dim] ?? dim.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    const getDimIcon = (dim: string): string => DIM_ICONS[dim] ?? "star_rate";
+    const getDimColor = (dim: string): string => DIM_COLORS[dim] ?? "grey";
+    const getDimBarColor = (dim: string): string => DIM_BAR_COLORS[dim] ?? DIM_COLOR_CYCLE[Math.abs(dim.charCodeAt(0)) % DIM_COLOR_CYCLE.length];
 
     const parseCriticalIssues = (value: string | any[]): string[] => {
       try {
@@ -621,8 +629,65 @@ export default defineComponent({
         }
         return [];
       } catch {
-        return typeof value === "string" ? [value] : [];
+        // Fallback: check llm_judge_metadata for critical_issues
+        return [];
       }
+    };
+
+    const getFixSuggestions = (record: any): string[] => {
+      const suggestions: string[] = [];
+      
+      // 1. Try llm_evaluation_evaluators_llm_judge_metadata
+      const metaStr = record.llm_evaluation_evaluators_llm_judge_metadata;
+      if (metaStr) {
+        try {
+          const meta = typeof metaStr === "string" ? JSON.parse(metaStr) : metaStr;
+          if (Array.isArray(meta.improvement_suggestions) && meta.improvement_suggestions.length > 0) {
+            suggestions.push(...meta.improvement_suggestions);
+          } else if (meta.fix_recommendation) {
+            suggestions.push(meta.fix_recommendation);
+          }
+        } catch { /* ignore */ }
+      }
+
+      // 2. Fallback to generic reasoning if score is very low
+      if (suggestions.length === 0) {
+        const weakest = getWeakestDimension(record);
+        if (weakest && weakest.score < 0.3 && weakest.reasoning) {
+          suggestions.push(`Focus on improving ${formatDimLabel(weakest.dimension)}: ${weakest.reasoning}`);
+        }
+      }
+
+      return suggestions;
+    };
+
+    const getHighlightedResponse = (record: any): string => {
+      let content = record.llm_output || "N/A";
+      if (content === "N/A") return content;
+
+      // 1. Try to get ungrounded numbers from metadata
+      const ungrounded: string[] = [];
+      const numericMetaStr = record.llm_evaluation_evaluators_numeric_grounding_metadata;
+      if (numericMetaStr) {
+        try {
+          const meta = typeof numericMetaStr === "string" ? JSON.parse(numericMetaStr) : numericMetaStr;
+          if (Array.isArray(meta.ungrounded)) {
+            ungrounded.push(...meta.ungrounded);
+          }
+        } catch { /* ignore */ }
+      }
+
+      if (ungrounded.length === 0) return content;
+
+      // 2. Highlight ungrounded numbers with a special class
+      // We wrap them in a span that we'll style to be prominent
+      ungrounded.forEach(val => {
+        // Simple string replacement for now, could be improved with regex
+        const regex = new RegExp(`\\b${val}\\b`, 'g');
+        content = content.replace(regex, `<span class="ungrounded-highlight" title="Ungrounded value detected">${val}</span>`);
+      });
+
+      return content;
     };
 
     const truncateContent = (content: any, maxLength: number = 250): string => {
@@ -695,8 +760,16 @@ export default defineComponent({
             messages = parsed;
           } else if (parsed?.messages && Array.isArray(parsed.messages)) {
             messages = parsed.messages;
+            system = parsed.system_instruction || null;
           } else {
             // If it's just a JSON object (not array), treat the whole thing as content
+            // but check for system_instruction first
+            if (parsed?.config?.system_instruction) {
+               return {
+                 system: parsed.config.system_instruction,
+                 user: [{ role: "user", content: "Original Input Full JSON: " + JSON.stringify(parsed, null, 2) }]
+               };
+            }
             return {
               system:
                 typeof input === "string"
@@ -829,12 +902,21 @@ export default defineComponent({
       getScoreClass,
       formatTimestampDisplay,
       hasDimensionScores,
+      getDimensionScores,
+      getWeakestDimension,
+      formatDimLabel,
+      getDimIcon,
+      getDimColor,
+      getDimBarColor,
       parseCriticalIssues,
       truncateContent,
       parseInputForMessages,
       transformInputForRenderer,
       parseMessages,
-      getQualityScoreColor,
+      getJudgeModel,
+      getVerdict,
+      getFixSuggestions,
+      getHighlightedResponse,
       selectedTemplate,
       availableTemplates,
       isLoadingTemplates,
@@ -852,12 +934,12 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  background: var(--o2-card-bg);
-  padding: 16px 20px;
+  background: var(--o2-surface);
+  padding: 16px;
   gap: 16px;
 
   &::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
   }
 
   &::-webkit-scrollbar-track {
@@ -865,41 +947,21 @@ export default defineComponent({
   }
 
   &::-webkit-scrollbar-thumb {
-    background: var(--o2-border-color);
-    border-radius: 4px;
-
-    &:hover {
-      background: var(--o2-border-color-hover);
-    }
+    background: #cbd5e1;
+    border-radius: 3px;
   }
 }
 
-// Template Selector
-.eval-template-selector {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  background: var(--o2-card-bg);
-  border: 1px solid var(--o2-border-color);
-  border-radius: 8px;
-  margin-bottom: 8px;
+body.body--dark .eval-container::-webkit-scrollbar-thumb {
+  background: #475569;
+}
 
-  .eval-template-label {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--o2-text-secondary);
-    white-space: nowrap;
-  }
-
-  .eval-template-dropdown {
-    flex: 1;
-    max-width: 300px;
-
-    :deep(.q-field__control) {
-      height: 32px;
-      font-size: 13px;
-    }
+// Modern Template Selector
+.eval-template-dropdown {
+  width: 280px;
+  :deep(.q-field__control) {
+    height: 36px;
+    border-radius: 6px;
   }
 }
 
@@ -910,545 +972,118 @@ export default defineComponent({
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  height: 60vh;
   gap: 16px;
   color: var(--o2-text-secondary);
 }
 
 .eval-empty-icon {
   font-size: 64px;
-  color: var(--o2-text-secondary);
-  opacity: 0.5;
+  opacity: 0.3;
 }
 
-.eval-loading-text {
-  font-size: 14px;
-  margin-top: 8px;
-}
-
-.eval-empty-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--o2-text-primary);
-}
-
-.eval-empty-subtitle {
-  font-size: 14px;
-  color: var(--o2-text-secondary);
-  text-align: center;
-  max-width: 400px;
-  line-height: 1.6;
-}
-
-// Record Container
-.eval-record {
-  background: var(--o2-card-bg);
-  border: 1px solid var(--o2-border-color);
-  border-radius: 12px;
-  padding: 16px;
+.eval-record-v2 {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-// Compact Header
-.eval-header-compact {
-  display: flex;
   gap: 16px;
-  align-items: flex-start;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--o2-border-color);
-}
-
-.eval-score-badge {
-  width: 70px;
-  height: 70px;
-  border-radius: 50%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 600;
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-
-  &.score-excellent {
-    background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
-  }
-
-  &.score-good {
-    background: linear-gradient(135deg, #ffc107 0%, #ffb300 100%);
-  }
-
-  &.score-poor {
-    background: linear-gradient(135deg, #f44336 0%, #da190b 100%);
-  }
-}
-
-.eval-score-number {
-  font-size: 28px;
-  line-height: 1;
-}
-
-.eval-score-label {
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.9;
-  margin-top: 3px;
-}
-
-.eval-header-middle {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-}
-
-.eval-header-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  flex-wrap: wrap;
-}
-
-.eval-verdict-badge {
-  font-weight: 600;
-  padding: 3px 10px !important;
-}
-
-.eval-confidence-text {
-  color: var(--o2-text-secondary);
-}
-
-.eval-judge-row {
-  gap: 12px;
-  padding-top: 4px;
-  border-top: 1px solid var(--o2-border-color);
-}
-
-.eval-judge-label {
-  font-size: 11px;
-  color: var(--o2-text-secondary);
-  font-weight: 500;
-}
-
-.eval-time-text {
-  font-size: 11px;
-  color: var(--o2-text-secondary);
-  white-space: nowrap;
-}
-
-.eval-aggregate-mini {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 120px;
-  padding: 8px;
-  background: var(--o2-border-color);
-  border-radius: 6px;
-  align-items: center;
-}
-
-.eval-aggregate-mini-label {
-  font-size: 10px;
-  color: var(--o2-text-secondary);
-  text-transform: uppercase;
-  font-weight: 600;
-}
-
-.eval-aggregate-mini-value {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--o2-text-primary);
-}
-
-.eval-aggregate-mini-bar {
   width: 100%;
-  height: 6px;
-  background: var(--o2-card-bg);
-  border-radius: 3px;
-  overflow: hidden;
 }
 
-.eval-aggregate-mini-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #2196f3, #1976d2);
-  border-radius: 3px;
+.score-excellent { color: #10b981; }
+.score-good { color: #f59e0b; }
+.score-poor { color: #ef4444; }
+
+// Component-specific overrides
+.o2-incident-card-bg {
+  background-color: var(--o2-card-bg);
 }
 
-// Dimensions Full Width
-.eval-dimensions-full {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.el-border {
+  border: 1px solid var(--o2-border);
 }
 
-.eval-dimensions-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--o2-text-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+.el-border-radius {
+  border-radius: 8px;
 }
 
-.eval-dimensions-compact-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 12px;
-}
-
-.eval-dimension-compact {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px;
-  background: var(--o2-border-color);
-  border-radius: 6px;
-}
-
-.eval-dimension-header-compact {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 4px;
-}
-
-.eval-dimension-name {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--o2-text-primary);
-  text-transform: uppercase;
-}
-
-.eval-dimension-bar-compact {
-  height: 6px;
-  background: var(--o2-card-bg);
-  border-radius: 3px;
-  overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.eval-dimension-bar-fill {
-  height: 100%;
-  background: var(--bar-color);
-  border-radius: 3px;
-  transition: width 0.3s ease;
-}
-
-.eval-dimension-score-compact {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--o2-text-primary);
-  text-align: right;
-}
-
-// Three Column Layout
-.eval-three-column {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-.eval-column {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.eval-column-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--o2-text-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--o2-border-color);
-}
-
-.eval-info-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.eval-info-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px;
-  background: var(--o2-border-color);
-  border-radius: 4px;
-  font-size: 12px;
-}
-
-.eval-info-icon {
-  flex-shrink: 0;
-}
-
-.eval-info-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex: 1;
-}
-
-.eval-info-label {
-  color: var(--o2-text-secondary);
-  font-weight: 500;
-  font-size: 11px;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.eval-info-value {
-  color: var(--o2-text-primary);
-  font-weight: 600;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.eval-analysis-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px;
-  background: var(--o2-border-color);
-  border-radius: 4px;
-}
-
-.eval-analysis-label {
-  font-size: 10px;
-  color: var(--o2-text-secondary);
-  text-transform: uppercase;
-  font-weight: 600;
-  flex: 1;
-}
-
-.eval-issues-item {
-  gap: 4px;
-}
-
-.eval-issues-compact {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.eval-issue-tag {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 6px;
-  background: rgba(244, 67, 54, 0.1);
-  border-radius: 3px;
-  font-size: 11px;
-  color: #d32f2f;
-  font-weight: 500;
-}
-
-.eval-text-box {
-  padding: 8px;
-  background: var(--o2-border-color);
-  border-radius: 4px;
-  border-left: 3px solid transparent;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.eval-rationale-box {
-  border-left-color: #2196f3;
-}
-
-.eval-fix-box {
-  border-left-color: #4caf50;
-}
-
-.eval-text-label {
-  font-size: 10px;
-  color: var(--o2-text-secondary);
-  text-transform: uppercase;
-  font-weight: 600;
-}
-
-.eval-text-value {
-  font-size: 12px;
-  color: var(--o2-text-primary);
-  line-height: 1.4;
-}
-
-// Input/Output Full Width
-.eval-io-full {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--o2-border-color);
-}
-
-.eval-io-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--o2-text-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.eval-io-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 12px;
-}
-
-.eval-io-box {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  border-radius: 6px;
-  border-left: 4px solid transparent;
-  overflow: visible;
-}
-
-.eval-io-input {
-  border-left-color: #2196f3;
-}
-
-.eval-io-output {
-  border-left-color: #4caf50;
-}
-
-.eval-io-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  border-radius: 6px;
-  border-left: 4px solid #2196f3;
-  overflow: hidden;
-}
-
-.eval-io-section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  overflow: hidden;
-}
-
-.eval-io-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px;
-  background: var(--o2-border-color);
-  font-weight: 600;
-  font-size: 11px;
-  color: var(--o2-text-primary);
-  text-transform: uppercase;
-}
-
-.eval-io-content-wrapper {
-  overflow-y: auto;
-  flex: 1;
-  min-height: 200px;
-
-  &::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+// LLM Content Renderer Tweaks
+:deep(.llm-content-renderer) {
+  background: transparent !important;
+  .plain-text-content {
+    background: transparent !important;
+    padding: 0 !important;
+    font-size: 13px;
   }
+}
 
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: var(--o2-border-color);
-    border-radius: 3px;
-
+// Expansion Item Tweaks
+:deep(.q-expansion-item__container) {
+  .q-item {
+    min-height: 40px;
+    padding: 8px 16px;
     &:hover {
-      background: var(--o2-border-color-hover);
-    }
-  }
-
-  :deep(.llm-content-renderer) {
-    max-height: none;
-  }
-
-  :deep(.text-content .plain-text-content) {
-    background-color: var(--o2-code-bg);
-  }
-}
-
-.eval-io-content {
-  margin: 0;
-  padding: 0.5rem;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: monospace;
-  font-size: 13px;
-  line-height: 1.5;
-  background-color: var(--o2-code-bg);
-  border-radius: 4px;
-  overflow-x: auto;
-  overflow-y: auto;
-  max-height: 300px;
-
-  &::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: var(--o2-border-color);
-    border-radius: 3px;
-
-    &:hover {
-      background: var(--o2-border-color-hover);
+      background: var(--o2-surface);
     }
   }
 }
 
-// Responsive
-@media (max-width: 1200px) {
-  .eval-three-column {
-    grid-template-columns: repeat(2, 1fr);
-  }
+// Ungrounded highlighting
+:deep(.ungrounded-highlight) {
+  background-color: rgba(239, 68, 68, 0.15);
+  border-bottom: 2px dashed #ef4444;
+  padding: 0 2px;
+  border-radius: 2px;
+  font-weight: bold;
+  cursor: help;
+  color: #ef4444;
 }
 
-@media (max-width: 768px) {
-  .eval-container {
-    padding: 12px 16px;
-    gap: 12px;
-  }
+body.body--dark :deep(.ungrounded-highlight) {
+  background-color: rgba(239, 68, 68, 0.25);
+}
 
-  .eval-record {
-    padding: 12px;
-    gap: 10px;
-  }
+// Typography Polish
+.line-height-relaxed {
+  line-height: 1.625 !important;
+}
 
-  .eval-header-compact {
+// Mobile responsiveness
+@media (max-width: 1024px) {
+  .tw\:flex.tw\:mb-4.tw\:h-28 {
+    flex-wrap: wrap;
+    height: auto !important;
+    .tw\:flex-1 {
+      min-width: calc(33.33% - 8px);
+      height: 112px;
+    }
+  }
+  
+  .tw\:flex.tw\:gap-4 {
     flex-direction: column;
-    gap: 10px;
+    .tw\:flex-col {
+      width: 100% !important;
+    }
   }
+}
 
-  .eval-three-column {
-    grid-template-columns: 1fr;
+@media (max-width: 640px) {
+  .tw\:flex.tw\:mb-4 .tw\:flex-1 {
+    min-width: calc(50% - 8px);
   }
+}
 
-  .eval-dimensions-compact-grid {
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  }
+// Ungrounded highlighting
+:deep(.ungrounded-highlight) {
+  background-color: rgba(239, 68, 68, 0.15);
+  border-bottom: 2px dashed #ef4444;
+  padding: 0 2px;
+  border-radius: 2px;
+  font-weight: 600;
+  cursor: help;
+  color: #ef4444;
+}
 
-  .eval-io-row {
-    grid-template-columns: 1fr;
-  }
+body.body--dark :deep(.ungrounded-highlight) {
+  background-color: rgba(239, 68, 68, 0.25);
 }
 </style>

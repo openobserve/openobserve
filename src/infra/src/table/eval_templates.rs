@@ -28,13 +28,11 @@ use crate::{
 pub struct EvalTemplate {
     pub id: String,
     pub org_id: String,
-    pub agent_type: String,
+    pub response_type: String,
     pub name: String,
     pub description: Option<String>,
     pub content: String,
     pub dimensions: Vec<String>,
-    pub fail_patterns: Option<Vec<String>>,
-    pub pass_patterns: Option<Vec<String>>,
     pub version: i32,
     pub is_active: bool,
     pub created_by: Option<String>,
@@ -48,17 +46,11 @@ impl From<Model> for EvalTemplate {
         Self {
             id: model.id,
             org_id: model.org_id,
-            agent_type: model.agent_type,
+            response_type: model.response_type,
             name: model.name,
             description: model.description,
             content: model.content,
             dimensions: serde_json::from_value(model.dimensions).unwrap_or_default(),
-            fail_patterns: model
-                .fail_patterns
-                .and_then(|j| serde_json::from_value(j).ok()),
-            pass_patterns: model
-                .pass_patterns
-                .and_then(|j| serde_json::from_value(j).ok()),
             version: model.version,
             is_active: model.is_active,
             created_by: model.created_by,
@@ -90,19 +82,11 @@ pub async fn add(template: &EvalTemplate) -> Result<(), errors::Error> {
     let record = ActiveModel {
         id: Set(template.id.clone()),
         org_id: Set(template.org_id.clone()),
-        agent_type: Set(template.agent_type.clone()),
+        response_type: Set(template.response_type.clone()),
         name: Set(template.name.clone()),
         description: Set(template.description.clone()),
         content: Set(template.content.clone()),
         dimensions: Set(serde_json::json!(template.dimensions)),
-        fail_patterns: Set(template
-            .fail_patterns
-            .as_ref()
-            .map(|p| serde_json::json!(p))),
-        pass_patterns: Set(template
-            .pass_patterns
-            .as_ref()
-            .map(|p| serde_json::json!(p))),
         version: Set(template.version),
         is_active: Set(template.is_active),
         created_by: Set(template.created_by.clone()),
@@ -123,19 +107,11 @@ pub async fn update(template: &EvalTemplate) -> Result<(), errors::Error> {
     let record = ActiveModel {
         id: Set(template.id.clone()),
         org_id: Set(template.org_id.clone()),
-        agent_type: Set(template.agent_type.clone()),
+        response_type: Set(template.response_type.clone()),
         name: Set(template.name.clone()),
         description: Set(template.description.clone()),
         content: Set(template.content.clone()),
         dimensions: Set(serde_json::json!(template.dimensions)),
-        fail_patterns: Set(template
-            .fail_patterns
-            .as_ref()
-            .map(|p| serde_json::json!(p))),
-        pass_patterns: Set(template
-            .pass_patterns
-            .as_ref()
-            .map(|p| serde_json::json!(p))),
         version: Set(template.version),
         is_active: Set(template.is_active),
         created_by: Set(template.created_by.clone()),
@@ -162,15 +138,15 @@ pub async fn get(id: &str) -> Result<Option<EvalTemplate>, errors::Error> {
     Ok(record)
 }
 
-pub async fn get_by_agent_type(
+pub async fn get_by_response_type(
     org_id: &str,
-    agent_type: &str,
+    response_type: &str,
 ) -> Result<Vec<EvalTemplate>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     let records = Entity::find()
         .filter(Column::OrgId.eq(org_id))
-        .filter(Column::AgentType.eq(agent_type))
+        .filter(Column::ResponseType.eq(response_type))
         .filter(Column::IsActive.eq(true))
         .order_by(Column::Version, Order::Desc)
         .all(client)

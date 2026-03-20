@@ -7,25 +7,21 @@ import http from "@/services/http";
 
 export interface CreateTemplateRequest {
   org_id: string;
-  agent_type: string;
+  response_type: string;
   name: string;
   description?: string;
   content: string;
   dimensions: string[];
-  fail_patterns?: string[];
-  pass_patterns?: string[];
 }
 
 export interface TemplateResponse {
   id: string;
   org_id: string;
-  agent_type: string;
+  response_type: string;
   name: string;
   description?: string;
   content: string;
   dimensions: string[];
-  fail_patterns?: string[];
-  pass_patterns?: string[];
   version: number;
   is_active: boolean;
   created_at: number;
@@ -35,7 +31,7 @@ export interface TemplateResponse {
 export interface TemplateStats {
   template_id: string;
   org_id: string;
-  agent_type: string;
+  response_type: string;
   name: string;
   version: number;
   total_evaluations: number;
@@ -149,12 +145,12 @@ class EvalTemplateService {
    */
   async getTemplatesForComparison(
     orgId: string,
-    agentType: string,
+    responseType: string,
   ): Promise<TemplateResponse[]> {
     try {
       const url = this.getBaseURL(orgId);
       const response = await http().get(url);
-      return (response.data || []).filter((t: TemplateResponse) => t.agent_type === agentType);
+      return (response.data || []).filter((t: TemplateResponse) => t.response_type === responseType);
     } catch (error) {
       console.error("Failed to get templates for comparison:", error);
       throw error;
