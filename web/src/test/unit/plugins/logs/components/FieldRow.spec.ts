@@ -22,7 +22,7 @@ vi.mock("vuex", () => ({
   useStore: () => ({
     state: {
       zoConfig: {
-        showFtsFieldValues: false,
+        show_fts_field_values: false,
       },
     },
   }),
