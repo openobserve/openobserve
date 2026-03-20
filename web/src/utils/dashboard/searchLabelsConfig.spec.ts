@@ -21,6 +21,7 @@ import {
 describe("searchLabelsConfig", () => {
   const EXPECTED_SECTIONS = [
     "general",
+    "promqlTable",
     "geographic",
     "legend",
     "data",
@@ -42,8 +43,8 @@ describe("searchLabelsConfig", () => {
   ] as const;
 
   describe("ORDERED_SECTION_IDS", () => {
-    it("contains all 18 section IDs", () => {
-      expect(ORDERED_SECTION_IDS).toHaveLength(19);
+    it("contains all 20 section IDs", () => {
+      expect(ORDERED_SECTION_IDS).toHaveLength(20);
     });
 
     it("contains every expected section ID", () => {
@@ -75,8 +76,8 @@ describe("searchLabelsConfig", () => {
       }
     });
 
-    it("has exactly 18 keys", () => {
-      expect(Object.keys(DEFAULT_EXPANDED_SECTIONS)).toHaveLength(19);
+    it("has exactly 20 keys", () => {
+      expect(Object.keys(DEFAULT_EXPANDED_SECTIONS)).toHaveLength(20);
     });
 
     it("has no section set to false", () => {
