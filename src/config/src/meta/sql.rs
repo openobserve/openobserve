@@ -13,9 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use datafusion::sql::{TableReference, parser::DFParser, resolve::resolve_table_references};
+use datafusion::sql::{parser::DFParser, resolve::resolve_table_references, TableReference};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use sqlparser::dialect::PostgreSqlDialect;
+use sqlparser::{
+    ast::{Expr, SelectItem, SetExpr, Statement},
+    dialect::PostgreSqlDialect,
+    keywords::ALL_KEYWORDS,
+    parser::Parser,
+};
 use utoipa::ToSchema;
 
 use super::stream::StreamType;
@@ -23,12 +29,61 @@ use super::stream::StreamType;
 pub const MAX_LIMIT: i64 = 100000;
 pub const MAX_OFFSET: i64 = 100000;
 
+pub static SQL_RESERVED_KEYWORDS: Lazy<Vec<String>> = Lazy::new(|| {
+    ALL_KEYWORDS
+        .iter()
+        .filter(|kw| is_reserved_identifier(kw))
+        .map(|kw| kw.to_ascii_lowercase())
+        .collect()
+});
+
+fn is_reserved_identifier(keyword: &str) -> bool {
+    let quoted = format!("SELECT \"{keyword}\" FROM t");
+    let unquoted = format!("SELECT {keyword} FROM t");
+    parses_as_identifier(&quoted, keyword) && !parses_as_identifier(&unquoted, keyword)
+}
+
+fn parses_as_identifier(sql: &str, keyword: &str) -> bool {
+    Parser::parse_sql(&PostgreSqlDialect {}, sql)
+        .ok()
+        .and_then(|mut s| s.pop())
+        .and_then(|s| extract_projection_identifier(&s))
+        .is_some_and(|id| id.eq_ignore_ascii_case(keyword))
+        && DFParser::parse_sql_with_dialect(sql, &PostgreSqlDialect {})
+            .ok()
+            .and_then(|mut s| s.pop_front())
+            .is_some()
+}
+
+fn extract_projection_identifier(stmt: &Statement) -> Option<String> {
+    match stmt {
+        Statement::Query(q) => match q.body.as_ref() {
+            SetExpr::Select(s) => s.projection.first().and_then(|item| match item {
+                SelectItem::UnnamedExpr(e) | SelectItem::ExprWithAlias { expr: e, .. } => match e {
+                    Expr::Identifier(id) => Some(id.value.clone()),
+                    Expr::CompoundIdentifier(ids) if ids.len() == 1 => {
+                        Some(ids[0].value.clone())
+                    }
+                    _ => None,
+                },
+                _ => None,
+            }),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ToSchema, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum OrderBy {
     #[default]
     Desc,
     Asc,
+}
+
+pub fn sql_reserved_keywords() -> &'static [String] {
+    SQL_RESERVED_KEYWORDS.as_slice()
 }
 
 /// get stream name from a sql
@@ -119,5 +174,14 @@ mod tests {
                 .to_string()
                 .contains("Failed to parse sql")
         );
+    }
+
+    #[test]
+    fn test_sql_reserved_keywords() {
+        let reserved = sql_reserved_keywords();
+        assert!(!reserved.is_empty());
+        assert!(reserved.contains(&"from".to_string()));
+        assert!(reserved.contains(&"user".to_string()));
+        assert!(!reserved.contains(&"message".to_string()));
     }
 }

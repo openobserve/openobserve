@@ -2358,6 +2358,7 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import {
@@ -2400,7 +2401,7 @@ const getFieldFromExpression = (expression: string): string | null => {
   const cleaned = expression.trim().replace(/^\(\s*/, "");
   const match =
     cleaned.match(/^"[^"]+"\."?(\w+)"?\s*(?:=|!=|is)/i) ||
-    cleaned.match(/^(\w+)\s*(?:=|!=|is)/i);
+    cleaned.match(/^"?(\w+)"?\s*(?:=|!=|is)/i);
   return match ? match[1] : null;
 };
 
@@ -2417,7 +2418,8 @@ const replaceExistingFieldCondition = (
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
   const opPat = `(?:=|!=|is(?:\\s+not)?)`;
-  const condPat = `(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
+  const fieldPat = `(?:"${esc}"|${esc})`;
+  const condPat = `(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;
 
   // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
   const multiRegex = new RegExp(
@@ -4468,9 +4470,16 @@ export default defineComponent({
     }
 
     function buildStreamQuery(stream, fieldList, isQuickMode) {
+      const selectFields =
+        fieldList.length > 0 && isQuickMode
+          ? fieldList
+              .map((field) => quoteSqlIdentifierIfNeeded(field))
+              .join(",")
+          : "*";
+
       return QUERY_TEMPLATE.replace("[STREAM_NAME]", stream).replace(
         "[FIELD_LIST]",
-        fieldList.length > 0 && isQuickMode ? fieldList.join(",") : "*",
+        selectFields,
       );
     }
 
