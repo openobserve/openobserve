@@ -1562,7 +1562,9 @@
     "pivotStickyColTotalsTooltip": "Yatay kaydırırken görünür kalması için sağdaki toplamlar sütununu sabitleyin",
     "configSectionPromqlTable": "PromQL Tablo Modu",
     "axisLabelRotate": "Etiketi Döndür",
-    "axisLabelTruncate": "Küçülmüş Etiket"
+    "axisLabelTruncate": "Küçülmüş Etiket",
+    "axisLabelRotateTooltip": "Etiketler uzun veya kalabalık olduğunda okunabilirliği artırmak için x ekseni etiket metnini seçilen bir açıyla (derece cinsinden) döndürün. <br /><br /><strong>Not:</strong> Bu seçenek zaman serisi x ekseni alanları için desteklenmez.",
+    "axisLabelTruncateTooltip": "X ekseni etiketlerini belirtilen genişliğe (piksel cinsinden) kesin. <br /><br /><strong>Not:</strong> Bu seçenek zaman serisi x ekseni alanları için desteklenmez."
   },
   "panel": {
     "header": "Panel",

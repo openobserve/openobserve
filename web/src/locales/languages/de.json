@@ -1562,7 +1562,9 @@
     "pivotStickyColTotalsTooltip": "Fixieren Sie die Summenspalte auf der rechten Seite, damit sie beim horizontalen Scrollen sichtbar bleibt",
     "configSectionPromqlTable": "PromQL-Tabellenmodus",
     "axisLabelRotate": "Etikett rotieren",
-    "axisLabelTruncate": "Bezeichnung Abschneiden"
+    "axisLabelTruncate": "Bezeichnung Abschneiden",
+    "axisLabelRotateTooltip": "Drehen Sie den Beschriftungstext auf der X-Achse um einen bestimmten Winkel (in Grad), um die Lesbarkeit zu verbessern, wenn Beschriftungen lang oder überfüllt sind. <br /><br /><strong>Hinweis:</strong> Diese Option wird für X-Achsenfelder mit Zeitreihen nicht unterstützt.",
+    "axisLabelTruncateTooltip": "Kürzt die Beschriftungen der X-Achse auf die angegebene Breite (in Pixeln). <br /><br /><strong>Hinweis:</strong> Diese Option wird für X-Achsenfelder mit Zeitreihen nicht unterstützt."
   },
   "panel": {
     "header": "Panel",

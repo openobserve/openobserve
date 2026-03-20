@@ -1562,7 +1562,9 @@
     "pivotStickyColTotalsTooltip": "Zet de kolom met totalen aan de rechterkant vast, zodat deze zichtbaar blijft wanneer u horizontaal scrolt",
     "configSectionPromqlTable": "ProMQL-tabelmodus",
     "axisLabelRotate": "Label roteren",
-    "axisLabelTruncate": "Label Truncate"
+    "axisLabelTruncate": "Label Truncate",
+    "axisLabelRotateTooltip": "Roteer de labeltekst op de x-as met een gekozen hoek (in graden) om de leesbaarheid te verbeteren wanneer labels lang of vol zitten. <br /><br /><strong>Opmerking:</strong> Deze optie wordt niet ondersteund voor velden met de x-as van tijdreeksen.",
+    "axisLabelTruncateTooltip": "Snijd labels op de x-as af tot de opgegeven breedte (in pixels). <br /><br /><strong>Opmerking:</strong> Deze optie wordt niet ondersteund voor velden met de x-as van tijdreeksen."
   },
   "panel": {
     "header": "Paneel",
