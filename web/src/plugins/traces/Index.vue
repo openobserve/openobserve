@@ -793,7 +793,6 @@ async function getQueryData(
     searchObj.searchApplied = true;
     searchObj.loading = true;
 
-    console.log("get Query Data");
     if (!isPagination) {
       searchObj.data.sortedQueryResults = [];
       searchObj.data.histogram = {
@@ -913,8 +912,6 @@ async function getQueryData(
       },
       {
         data: (_payload: any, response: any) => {
-          console.log("Update hits --------------");
-
           // Each metadata event signals a new backend partition — advance the counter
           if (response.type === "search_response_metadata") {
             tracesPartitionMap[searchTraceId].partition++;
