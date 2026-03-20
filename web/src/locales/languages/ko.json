@@ -1564,7 +1564,11 @@
     "axisLabelRotate": "라벨 회전",
     "axisLabelTruncate": "레이블 잘림",
     "axisLabelRotateTooltip": "레이블이 길거나 혼잡할 때 가독성을 높이려면 x축 레이블 텍스트를 선택한 각도 (도) 만큼 회전합니다.<br /><br /><strong>참고:</strong> 시계열 x축 필드에서는 이 옵션이 지원되지 않습니다.",
-    "axisLabelTruncateTooltip": "x축 레이블을 지정된 너비 (픽셀 단위) 로 자릅니다.<br /><br /><strong>참고:</strong> 시계열 x축 필드에는 이 옵션이 지원되지 않습니다."
+    "axisLabelTruncateTooltip": "x축 레이블을 지정된 너비 (픽셀 단위) 로 자릅니다.<br /><br /><strong>참고:</strong> 시계열 x축 필드에는 이 옵션이 지원되지 않습니다.",
+    "axisLabelRotateTooltipText": "레이블이 길거나 혼잡할 때 가독성을 높이려면 x축 레이블 텍스트를 선택한 각도 (도) 만큼 회전합니다.",
+    "axisLabelTruncateTooltipText": "x축 레이블을 지정된 너비 (픽셀 단위) 로 자릅니다.",
+    "axisLabelTooltipNotePrefix": "노트:",
+    "axisLabelTooltipNoteText": " 이 옵션은 시계열 x축 필드에는 지원되지 않습니다."
   },
   "panel": {
     "header": "패널",

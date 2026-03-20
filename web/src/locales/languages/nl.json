@@ -1564,7 +1564,11 @@
     "axisLabelRotate": "Label roteren",
     "axisLabelTruncate": "Label Truncate",
     "axisLabelRotateTooltip": "Roteer de labeltekst op de x-as met een gekozen hoek (in graden) om de leesbaarheid te verbeteren wanneer labels lang of vol zitten. <br /><br /><strong>Opmerking:</strong> Deze optie wordt niet ondersteund voor velden met de x-as van tijdreeksen.",
-    "axisLabelTruncateTooltip": "Snijd labels op de x-as af tot de opgegeven breedte (in pixels). <br /><br /><strong>Opmerking:</strong> Deze optie wordt niet ondersteund voor velden met de x-as van tijdreeksen."
+    "axisLabelTruncateTooltip": "Snijd labels op de x-as af tot de opgegeven breedte (in pixels). <br /><br /><strong>Opmerking:</strong> Deze optie wordt niet ondersteund voor velden met de x-as van tijdreeksen.",
+    "axisLabelRotateTooltipText": "Roteer de labeltekst op de x-as met een gekozen hoek (in graden) om de leesbaarheid te verbeteren wanneer labels lang of vol zitten.",
+    "axisLabelTruncateTooltipText": "Snijd labels op de x-as af tot de opgegeven breedte (in pixels).",
+    "axisLabelTooltipNotePrefix": "Opmerking:",
+    "axisLabelTooltipNoteText": " Deze optie wordt niet ondersteund voor velden met de x-as van tijdreeksen."
   },
   "panel": {
     "header": "Paneel",

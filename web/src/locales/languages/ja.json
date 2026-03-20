@@ -1581,7 +1581,11 @@
     "axisLabelRotate": "ラベル回転",
     "axisLabelTruncate": "ラベルトランケート",
     "axisLabelRotateTooltip": "X 軸のラベルテキストを選択した角度 (度単位) で回転させると、ラベルが長い場合やラベルが混み合っている場合に読みやすくなります。<br /><br /><strong>注:</strong>このオプションは時系列の X 軸フィールドではサポートされていません。",
-    "axisLabelTruncateTooltip": "X 軸のラベルを指定された幅 (ピクセル単位) に切り捨てます。<br /><br /><strong>注:</strong>このオプションは時系列の X 軸フィールドではサポートされていません。"
+    "axisLabelTruncateTooltip": "X 軸のラベルを指定された幅 (ピクセル単位) に切り捨てます。<br /><br /><strong>注:</strong>このオプションは時系列の X 軸フィールドではサポートされていません。",
+    "axisLabelRotateTooltipText": "X 軸のラベルテキストを選択した角度 (度単位) で回転させると、ラベルが長い場合やラベルが混み合っている場合に読みやすくなります。",
+    "axisLabelTruncateTooltipText": "X 軸のラベルを指定された幅 (ピクセル単位) に切り捨てます。",
+    "axisLabelTooltipNotePrefix": "注記:",
+    "axisLabelTooltipNoteText": " このオプションは、時系列の X 軸フィールドではサポートされていません。"
   },
   "panel": {
     "header": "パネル",
