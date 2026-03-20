@@ -1086,8 +1086,6 @@ export default defineComponent({
         searchObj.meta.clearCache = clear_cache;
         searchObj.meta.refreshHistogram = true;
 
-        // Fetch histogram data only (not logs) for patterns mode
-        await getHistogramData();
         refreshHistogramChart();
         console.log("[Index] Patterns extracted successfully");
       } catch (error) {
