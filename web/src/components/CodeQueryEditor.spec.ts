@@ -13,45 +13,49 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import CodeQueryEditor from "./CodeQueryEditor.vue";
 import { createStore } from "vuex";
 
 installQuasar();
 
+// Shared mock editor instance — stable reference so tests can inspect
+// addCommand, onDidFocusEditorWidget, etc. after async mount.
+const mockEditorObj = {
+  onDidChangeModelContent: vi.fn(),
+  createContextKey: vi.fn(),
+  addCommand: vi.fn(),
+  onDidFocusEditorWidget: vi.fn(),
+  onDidBlurEditorWidget: vi.fn(),
+  dispose: vi.fn(),
+  getValue: vi.fn(() => ""),
+  setValue: vi.fn(),
+  layout: vi.fn(),
+  getModel: vi.fn(() => ({
+    getValue: vi.fn(() => ""),
+    setValue: vi.fn(),
+    getLineCount: vi.fn(() => 1),
+    getLineLength: vi.fn(() => 0),
+    pushEditOperations: vi.fn(),
+    getOffsetAt: vi.fn(() => 0),
+  })),
+  updateOptions: vi.fn(),
+  hasWidgetFocus: vi.fn(() => false),
+  getRawOptions: vi.fn(() => ({ readOnly: false })),
+  deltaDecorations: vi.fn(() => []),
+  getPosition: vi.fn(() => ({ lineNumber: 1, column: 1 })),
+  trigger: vi.fn(),
+  getAction: vi.fn(() => ({ run: vi.fn(() => Promise.resolve()) })),
+};
+
 // Simple mock for monaco editor
 vi.mock("monaco-editor/esm/vs/editor/editor.all.js", () => ({}));
 vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
   default: {},
   editor: {
-    create: vi.fn(() => ({
-      onDidChangeModelContent: vi.fn(),
-      createContextKey: vi.fn(),
-      addCommand: vi.fn(),
-      onDidFocusEditorWidget: vi.fn(),
-      onDidBlurEditorWidget: vi.fn(),
-      dispose: vi.fn(),
-      getValue: vi.fn(() => ""),
-      setValue: vi.fn(),
-      layout: vi.fn(),
-      getModel: vi.fn(() => ({
-        getValue: vi.fn(() => ""),
-        setValue: vi.fn(),
-        getLineCount: vi.fn(() => 1),
-        getLineLength: vi.fn(() => 0),
-        pushEditOperations: vi.fn(),
-        getOffsetAt: vi.fn(() => 0),
-      })),
-      updateOptions: vi.fn(),
-      hasWidgetFocus: vi.fn(() => false),
-      getRawOptions: vi.fn(() => ({ readOnly: false })),
-      deltaDecorations: vi.fn(() => []),
-      getPosition: vi.fn(() => ({ lineNumber: 1, column: 1 })),
-      trigger: vi.fn(),
-      getAction: vi.fn(() => ({ run: vi.fn(() => Promise.resolve()) })),
-    })),
+    create: vi.fn(() => mockEditorObj),
     defineTheme: vi.fn(),
     setTheme: vi.fn(),
     setModelMarkers: vi.fn(),
@@ -463,6 +467,129 @@ describe("CodeQueryEditor", () => {
 
       await wrapper.setProps({ language: "json" });
       expect(wrapper.props("language")).toBe("json");
+    });
+  });
+
+  describe("Ctrl+Enter / Cmd+Enter keyboard shortcut", () => {
+    let wrapper: VueWrapper;
+    let monacoMock: any;
+
+    beforeEach(async () => {
+      // Clear call history on the shared mock editor spies
+      mockEditorObj.addCommand.mockClear();
+      mockEditorObj.createContextKey.mockClear();
+      mockEditorObj.onDidFocusEditorWidget.mockClear();
+      mockEditorObj.onDidBlurEditorWidget.mockClear();
+      mockEditorObj.onDidChangeModelContent.mockClear();
+
+      monacoMock = await import("monaco-editor/esm/vs/editor/editor.api");
+
+      const container = document.createElement("div");
+      container.id = "app";
+      document.body.appendChild(container);
+
+      wrapper = mount(CodeQueryEditor, {
+        props: {
+          editorId: "shortcut-test-editor",
+          query: "SELECT * FROM logs",
+        },
+        global: {
+          plugins: [store],
+        },
+        attachTo: container,
+      });
+
+      // Flush async: onMounted → language import → loadMonaco → setupEditor
+      for (let i = 0; i < 10; i++) {
+        await flushPromises();
+      }
+    });
+
+    afterEach(() => {
+      wrapper?.unmount();
+      const container = document.getElementById("app");
+      if (container) document.body.removeChild(container);
+    });
+
+    it("should call addCommand with CtrlCmd+Enter keybinding", () => {
+      expect(mockEditorObj.addCommand).toHaveBeenCalled();
+      const firstCall = mockEditorObj.addCommand.mock.calls[0];
+      expect(firstCall[0]).toBe(
+        monacoMock.KeyMod.CtrlCmd | monacoMock.KeyCode.Enter,
+      );
+    });
+
+    it("should call addCommand with ctrlenter context key condition", () => {
+      const firstCall = mockEditorObj.addCommand.mock.calls[0];
+      expect(firstCall[2]).toBe("ctrlenter");
+    });
+
+    it("should create the ctrlenter context key", () => {
+      expect(mockEditorObj.createContextKey).toHaveBeenCalledWith(
+        "ctrlenter",
+        true,
+      );
+    });
+
+    it("should emit run-query when the addCommand callback is invoked", () => {
+      const firstCall = mockEditorObj.addCommand.mock.calls[0];
+      const addCommandCallback = firstCall[1];
+
+      addCommandCallback();
+
+      expect(wrapper.emitted("run-query")).toBeTruthy();
+      expect(wrapper.emitted("run-query")!.length).toBe(1);
+    });
+
+    it("should register an onDidFocusEditorWidget callback", () => {
+      expect(mockEditorObj.onDidFocusEditorWidget).toHaveBeenCalled();
+    });
+
+    it("should re-register addCommand when editor regains focus", () => {
+      const focusCallback =
+        mockEditorObj.onDidFocusEditorWidget.mock.calls[0][0];
+
+      mockEditorObj.addCommand.mockClear();
+      focusCallback();
+
+      expect(mockEditorObj.addCommand).toHaveBeenCalledTimes(1);
+      const reRegisteredCall = mockEditorObj.addCommand.mock.calls[0];
+      expect(reRegisteredCall[0]).toBe(
+        monacoMock.KeyMod.CtrlCmd | monacoMock.KeyCode.Enter,
+      );
+      expect(reRegisteredCall[2]).toBe("ctrlenter");
+    });
+
+    it("should emit run-query when the re-registered focus addCommand callback is invoked", () => {
+      const focusCallback =
+        mockEditorObj.onDidFocusEditorWidget.mock.calls[0][0];
+
+      focusCallback();
+
+      const lastCall =
+        mockEditorObj.addCommand.mock.calls[
+          mockEditorObj.addCommand.mock.calls.length - 1
+        ];
+      const reRegisteredCallback = lastCall[1];
+
+      reRegisteredCallback();
+
+      expect(wrapper.emitted("run-query")).toBeTruthy();
+      expect(wrapper.emitted("run-query")!.length).toBe(1);
+    });
+
+    it("should emit focus event when editor widget gains focus", () => {
+      const focusCallback =
+        mockEditorObj.onDidFocusEditorWidget.mock.calls[0][0];
+
+      focusCallback();
+
+      expect(wrapper.emitted("focus")).toBeTruthy();
+      expect(wrapper.emitted("focus")!.length).toBe(1);
+    });
+
+    it("should register an onDidBlurEditorWidget callback", () => {
+      expect(mockEditorObj.onDidBlurEditorWidget).toHaveBeenCalled();
     });
   });
 });
