@@ -153,6 +153,24 @@
 
 }
 
+/* Pattern wildcard token <*> */
+.log-pattern-wildcard {
+  background-color: rgba(234, 88, 12, 0.12);
+  color: #c2410c;
+  border: 1px solid rgba(234, 88, 12, 0.3);
+  border-radius: 3px;
+  padding: 0 2px;
+  font-weight: 600;
+
+}
+
+.dark .log-pattern-wildcard {
+  background-color: rgba(251, 146, 60, 0.18);
+  color: #fb923c;
+  border-color: rgba(251, 146, 60, 0.35);
+
+}
+
 /* Combined utility classes */
 .log-quote::before,
 .log-quote::after {

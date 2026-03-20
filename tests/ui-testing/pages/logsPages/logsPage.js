@@ -1126,8 +1126,9 @@ export class LogsPage {
 
     // Histogram methods
     async toggleHistogram() {
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
+        // await this.page.locator(this.utilitiesMenuButton).click();
+        // await this.page.waitForTimeout(200);
+        // await this.page.locator(this.histogramToggle).click();
         await this.page.locator(this.histogramToggle).click();
     }
 
@@ -1157,13 +1158,9 @@ export class LogsPage {
     }
 
     async verifyHistogramState() {
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
-        const isHistogramOff = await this.page.locator(this.histogramToggle)
-            .locator('[role="switch"]')
-            .evaluate(el => el.getAttribute('aria-checked') === 'false');
-        await this.page.keyboard.press('Escape');
-        expect(isHistogramOff).toBeTruthy();
+        // Histogram toggle is now directly visible in the toolbar (moved out of utilities menu)
+        const isChecked = await this.page.locator(this.histogramToggle).getAttribute('aria-checked');
+        expect(isChecked).toBe('false');
     }
 
     // Error handling methods
@@ -5493,10 +5490,9 @@ export class LogsPage {
     /**
      * Toggle histogram on/off
      * Bug #8928 - Histogram rendering
+     * Histogram toggle is now directly visible in the toolbar (moved out of utilities menu)
      */
     async toggleHistogram() {
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
         const histogramToggle = this.page.locator(this.histogramToggle);
         await histogramToggle.click();
         await this.page.waitForTimeout(500);
