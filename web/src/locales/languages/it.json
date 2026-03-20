@@ -1560,7 +1560,9 @@
     "pivotStickyRowTotalsTooltip": "Appunta la riga dei totali in basso in modo che rimanga visibile quando scorri verticalmente",
     "pivotStickyColTotals": "Totali delle colonne permanenti",
     "pivotStickyColTotalsTooltip": "Appunta la colonna dei totali sulla destra in modo che rimanga visibile quando scorri orizzontalmente",
-    "configSectionPromqlTable": "Modalità tabella ProMQL"
+    "configSectionPromqlTable": "Modalità tabella ProMQL",
+    "axisLabelRotate": "Etichetta Rotate",
+    "axisLabelTruncate": "Etichetta Truncate"
   },
   "panel": {
     "header": "Pannello",

@@ -1560,7 +1560,9 @@
     "pivotStickyRowTotalsTooltip": "Toplamlar satırını dikey olarak kaydırırken görünür kalması için alttaki sabitleyin",
     "pivotStickyColTotals": "Yapışkan Sütun Toplamları",
     "pivotStickyColTotalsTooltip": "Yatay kaydırırken görünür kalması için sağdaki toplamlar sütununu sabitleyin",
-    "configSectionPromqlTable": "PromQL Tablo Modu"
+    "configSectionPromqlTable": "PromQL Tablo Modu",
+    "axisLabelRotate": "Etiketi Döndür",
+    "axisLabelTruncate": "Küçülmüş Etiket"
   },
   "panel": {
     "header": "Panel",
