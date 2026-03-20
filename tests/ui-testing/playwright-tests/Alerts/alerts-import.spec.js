@@ -103,6 +103,13 @@ test.describe("Alerts Import/Export", () => {
     const downloadPath = `./alerts-${new Date().toISOString().split('T')[0]}-${triggerStreamName}.json`;
     await download.saveAs(downloadPath);
 
+    // Delete the original alert before importing to avoid duplicate ID/name conflicts.
+    // The import API (POST /api/v2/{org}/alerts) creates a new alert — if the same
+    // alert ID or name already exists, the API rejects it.
+    await pm.alertsPage.deleteAlertByRow(alertName);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+    testLogger.info('Deleted original alert before import round-trip test', { alertName });
+
     await pm.alertsPage.importInvalidFile('../test-data/invalid-alert.json');
     await pm.alertsPage.importValidFile(downloadPath);
     await pm.alertsPage.deleteImportedAlert(alertName);

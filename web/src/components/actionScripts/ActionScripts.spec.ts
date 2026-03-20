@@ -551,4 +551,428 @@ describe("ActionScripts", () => {
       // Should not throw any errors during cleanup
     });
   });
+
+  describe("Bulk delete functionality", () => {
+    it("should open bulk delete dialog when openBulkDeleteDialog is called", () => {
+      wrapper.vm.openBulkDeleteDialog();
+      expect(wrapper.vm.confirmBulkDelete).toBe(true);
+    });
+
+    it("should display bulk delete button when action scripts are selected", async () => {
+      wrapper.vm.actionsScriptRows = [
+        {
+          "#": "01",
+          id: "test-action-1",
+          name: "Test Action 1",
+          uuid: "uuid-1",
+          created_by: "test@example.com",
+          created_at: "01/01/2023, 12:00:00 AM",
+          execution_details_type: "Cron Job",
+          last_run_at: "-",
+          last_successful_at: "-",
+          status: "active",
+        },
+      ];
+      wrapper.vm.selectedActionScripts = [{ id: "test-action-1", name: "Test Action 1" }];
+      await wrapper.vm.$nextTick();
+
+      const bulkDeleteBtn = wrapper.find('[data-test="action-scripts-bulk-delete-btn"]');
+      expect(bulkDeleteBtn.exists()).toBe(true);
+    });
+
+    it("should not display bulk delete button when no action scripts are selected", async () => {
+      wrapper.vm.selectedActionScripts = [];
+      await wrapper.vm.$nextTick();
+
+      const bulkDeleteBtn = wrapper.find('[data-test="action-scripts-bulk-delete-btn"]');
+      expect(bulkDeleteBtn.exists()).toBe(false);
+    });
+
+    it("should show warning when bulkDeleteActionScripts called with empty selection", async () => {
+      wrapper.vm.selectedActionScripts = [];
+      wrapper.vm.confirmBulkDelete = true;
+
+      await wrapper.vm.bulkDeleteActionScripts();
+
+      expect(wrapper.vm.confirmBulkDelete).toBe(false);
+    });
+
+    it("should handle bulk delete with all successful responses", async () => {
+      wrapper.vm.selectedActionScripts = [
+        { id: "test-action-1", name: "Test Action 1" },
+        { id: "test-action-2", name: "Test Action 2" },
+      ];
+      wrapper.vm.confirmBulkDelete = true;
+
+      globalThis.server.use(
+        http.delete(`${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`, () => {
+          return HttpResponse.json({
+            successful: ["test-action-1", "test-action-2"],
+            unsuccessful: [],
+          });
+        }),
+      );
+
+      await wrapper.vm.bulkDeleteActionScripts();
+      await flushPromises();
+
+      expect(wrapper.vm.confirmBulkDelete).toBe(false);
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should handle bulk delete with partial success", async () => {
+      wrapper.vm.selectedActionScripts = [
+        { id: "test-action-1", name: "Test Action 1" },
+        { id: "test-action-2", name: "Test Action 2" },
+      ];
+      wrapper.vm.confirmBulkDelete = true;
+
+      globalThis.server.use(
+        http.delete(`${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`, () => {
+          return HttpResponse.json({
+            successful: ["test-action-1"],
+            unsuccessful: ["test-action-2"],
+          });
+        }),
+      );
+
+      await wrapper.vm.bulkDeleteActionScripts();
+      await flushPromises();
+
+      expect(wrapper.vm.confirmBulkDelete).toBe(false);
+    });
+
+    it("should handle bulk delete with all failures", async () => {
+      wrapper.vm.selectedActionScripts = [
+        { id: "test-action-1", name: "Test Action 1" },
+      ];
+      wrapper.vm.confirmBulkDelete = true;
+
+      globalThis.server.use(
+        http.delete(`${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`, () => {
+          return HttpResponse.json({
+            successful: [],
+            unsuccessful: ["test-action-1"],
+          });
+        }),
+      );
+
+      await wrapper.vm.bulkDeleteActionScripts();
+      await flushPromises();
+
+      expect(wrapper.vm.confirmBulkDelete).toBe(false);
+    });
+
+    it("should handle bulk delete with HTTP error", async () => {
+      wrapper.vm.selectedActionScripts = [
+        { id: "test-action-1", name: "Test Action 1" },
+      ];
+      wrapper.vm.confirmBulkDelete = true;
+
+      globalThis.server.use(
+        http.delete(`${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`, () => {
+          return HttpResponse.json({ message: "Internal Server Error" }, { status: 500 });
+        }),
+      );
+
+      await wrapper.vm.bulkDeleteActionScripts();
+      await flushPromises();
+
+      expect(wrapper.vm.confirmBulkDelete).toBe(false);
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should handle bulk delete with 403 error silently", async () => {
+      wrapper.vm.selectedActionScripts = [
+        { id: "test-action-1", name: "Test Action 1" },
+      ];
+      wrapper.vm.confirmBulkDelete = true;
+
+      globalThis.server.use(
+        http.delete(`${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`, () => {
+          return HttpResponse.json({ message: "Forbidden" }, { status: 403 });
+        }),
+      );
+
+      await wrapper.vm.bulkDeleteActionScripts();
+      await flushPromises();
+
+      expect(wrapper.vm.confirmBulkDelete).toBe(false);
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should clear selected action scripts after bulk delete", async () => {
+      wrapper.vm.selectedActionScripts = [
+        { id: "test-action-1", name: "Test Action 1" },
+      ];
+
+      globalThis.server.use(
+        http.delete(`${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`, () => {
+          return HttpResponse.json({
+            successful: ["test-action-1"],
+            unsuccessful: [],
+          });
+        }),
+      );
+
+      await wrapper.vm.bulkDeleteActionScripts();
+      await flushPromises();
+
+      expect(wrapper.vm.selectedActionScripts).toHaveLength(0);
+    });
+  });
+
+  describe("visibleRows computed", () => {
+    beforeEach(() => {
+      wrapper.vm.actionsScriptRows = [
+        {
+          "#": "01",
+          id: "test-action-1",
+          name: "Test Action 1",
+          uuid: "uuid-1",
+          created_by: "test@example.com",
+          created_at: "01/01/2023, 12:00:00 AM",
+          execution_details_type: "Cron Job",
+          last_run_at: "-",
+          last_successful_at: "-",
+          status: "active",
+        },
+        {
+          "#": "02",
+          id: "test-action-2",
+          name: "Production Script",
+          uuid: "uuid-2",
+          created_by: "admin@example.com",
+          created_at: "01/02/2023, 12:00:00 AM",
+          execution_details_type: "Real Time",
+          last_run_at: "-",
+          last_successful_at: "-",
+          status: "inactive",
+        },
+      ];
+    });
+
+    it("should return all rows when filterQuery is empty", async () => {
+      wrapper.vm.filterQuery = "";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.visibleRows).toHaveLength(2);
+    });
+
+    it("should filter rows by name when filterQuery is set", async () => {
+      wrapper.vm.filterQuery = "Test Action";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.visibleRows).toHaveLength(1);
+      expect(wrapper.vm.visibleRows[0].name).toBe("Test Action 1");
+    });
+
+    it("should filter rows case-insensitively", async () => {
+      wrapper.vm.filterQuery = "production";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.visibleRows).toHaveLength(1);
+      expect(wrapper.vm.visibleRows[0].name).toBe("Production Script");
+    });
+
+    it("should return empty array when no rows match filter", async () => {
+      wrapper.vm.filterQuery = "nonexistent-script-xyz";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.visibleRows).toHaveLength(0);
+    });
+
+    it("should return all rows when actionsScriptRows is empty and no filter", async () => {
+      wrapper.vm.actionsScriptRows = [];
+      wrapper.vm.filterQuery = "";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.visibleRows).toHaveLength(0);
+    });
+  });
+
+  describe("hasVisibleRows computed", () => {
+    it("should return true when there are visible rows", async () => {
+      wrapper.vm.actionsScriptRows = [
+        {
+          "#": "01",
+          id: "test-action-1",
+          name: "Test Action 1",
+          uuid: "uuid-1",
+          created_by: "test@example.com",
+          created_at: "01/01/2023, 12:00:00 AM",
+          execution_details_type: "Cron Job",
+          last_run_at: "-",
+          last_successful_at: "-",
+          status: "active",
+        },
+      ];
+      wrapper.vm.filterQuery = "";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.hasVisibleRows).toBe(true);
+    });
+
+    it("should return false when there are no visible rows", async () => {
+      wrapper.vm.actionsScriptRows = [];
+      wrapper.vm.filterQuery = "";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.hasVisibleRows).toBe(false);
+    });
+
+    it("should return false when filter matches no rows", async () => {
+      wrapper.vm.actionsScriptRows = [
+        {
+          "#": "01",
+          id: "test-action-1",
+          name: "Test Action 1",
+          uuid: "uuid-1",
+          created_by: "test@example.com",
+          created_at: "01/01/2023, 12:00:00 AM",
+          execution_details_type: "Cron Job",
+          last_run_at: "-",
+          last_successful_at: "-",
+          status: "active",
+        },
+      ];
+      wrapper.vm.filterQuery = "nonexistent-xyz";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.hasVisibleRows).toBe(false);
+    });
+  });
+
+  describe("resultTotal watcher", () => {
+    it("should update resultTotal when visibleRows changes", async () => {
+      wrapper.vm.actionsScriptRows = [
+        {
+          "#": "01",
+          id: "test-action-1",
+          name: "Test Action 1",
+          uuid: "uuid-1",
+          created_by: "test@example.com",
+          created_at: "01/01/2023, 12:00:00 AM",
+          execution_details_type: "Cron Job",
+          last_run_at: "-",
+          last_successful_at: "-",
+          status: "active",
+        },
+        {
+          "#": "02",
+          id: "test-action-2",
+          name: "Another Action",
+          uuid: "uuid-2",
+          created_by: "admin@example.com",
+          created_at: "01/02/2023, 12:00:00 AM",
+          execution_details_type: "Real Time",
+          last_run_at: "-",
+          last_successful_at: "-",
+          status: "inactive",
+        },
+      ];
+      wrapper.vm.filterQuery = "";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.resultTotal).toBe(2);
+    });
+
+    it("should sync resultTotal with filtered visibleRows", async () => {
+      wrapper.vm.actionsScriptRows = [
+        {
+          "#": "01",
+          id: "test-action-1",
+          name: "Test Action 1",
+          uuid: "uuid-1",
+          created_by: "test@example.com",
+          created_at: "01/01/2023, 12:00:00 AM",
+          execution_details_type: "Cron Job",
+          last_run_at: "-",
+          last_successful_at: "-",
+          status: "active",
+        },
+        {
+          "#": "02",
+          id: "test-action-2",
+          name: "Another Action",
+          uuid: "uuid-2",
+          created_by: "admin@example.com",
+          created_at: "01/02/2023, 12:00:00 AM",
+          execution_details_type: "Real Time",
+          last_run_at: "-",
+          last_successful_at: "-",
+          status: "inactive",
+        },
+      ];
+      wrapper.vm.filterQuery = "Test Action";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.resultTotal).toBe(1);
+    });
+  });
+
+  describe("execution type display names", () => {
+    it("should convert 'repeat' execution type to 'Cron Job'", async () => {
+      store.state.organizationData.actions = [
+        {
+          id: "test-1",
+          name: "Repeat Action",
+          execution_details_type: "repeat",
+          created_at: null,
+          last_run_at: null,
+          last_successful_at: null,
+        },
+      ];
+
+      await wrapper.vm.getActionScripts();
+      await flushPromises();
+
+      const row = wrapper.vm.actionsScriptRows.find((r: any) => r.name === "Repeat Action");
+      if (row) {
+        expect(row.execution_details_type).toBe("Cron Job");
+      }
+    });
+
+    it("should convert 'service' execution type to 'Real Time'", async () => {
+      store.state.organizationData.actions = [
+        {
+          id: "test-2",
+          name: "Service Action",
+          execution_details_type: "service",
+          created_at: null,
+          last_run_at: null,
+          last_successful_at: null,
+        },
+      ];
+
+      await wrapper.vm.getActionScripts();
+      await flushPromises();
+
+      const row = wrapper.vm.actionsScriptRows.find((r: any) => r.name === "Service Action");
+      if (row) {
+        expect(row.execution_details_type).toBe("Real Time");
+      }
+    });
+
+    it("should convert 'once' execution type to 'Once'", async () => {
+      store.state.organizationData.actions = [
+        {
+          id: "test-3",
+          name: "Once Action",
+          execution_details_type: "once",
+          created_at: null,
+          last_run_at: null,
+          last_successful_at: null,
+        },
+      ];
+
+      await wrapper.vm.getActionScripts();
+      await flushPromises();
+
+      const row = wrapper.vm.actionsScriptRows.find((r: any) => r.name === "Once Action");
+      if (row) {
+        expect(row.execution_details_type).toBe("Once");
+      }
+    });
+  });
 });

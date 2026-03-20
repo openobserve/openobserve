@@ -2150,7 +2150,9 @@
       "detectionConfig": "Configureer de query- en detectieparameters",
       "alerting": "Meldingen instellen wanneer er afwijkingen worden gedetecteerd"
     },
-    "updateAnomalyDetection": "Anomaliedetectie bijwerken:"
+    "updateAnomalyDetection": "Anomaliedetectie bijwerken:",
+    "anomalyCreated": "Configuratie voor anomaliedetectie gemaakt. De training start binnenkort.",
+    "editJson": "Waarschuwings-JSON bewerken"
   },
   "alert_templates": {
     "header": "Sjablonen",

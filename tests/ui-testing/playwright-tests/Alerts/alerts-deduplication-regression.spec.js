@@ -249,11 +249,12 @@ test.describe("Deduplication Regression Tests", {
         // Note: PUT endpoint uses alertId, not alertName
         let capturedPutPayload = null;
 
-        await page.route(`**/api/v2/${orgId}/alerts/${alertId}`, async (route) => {
+        await page.route(`**/api/v2/${orgId}/alerts/**`, async (route) => {
             const request = route.request();
-            if (request.method() === 'PUT') {
+            if (request.method() === 'PUT' && request.url().includes(alertId)) {
                 capturedPutPayload = request.postDataJSON();
                 testLogger.info('Captured PUT payload', {
+                    url: request.url(),
                     deduplication: capturedPutPayload?.deduplication
                 });
             }
@@ -305,45 +306,26 @@ test.describe("Deduplication Regression Tests", {
         testLogger.info('Opened alert for editing');
 
         // Navigate through wizard to Step 5: Deduplication
-        // Use waitForSelector for deduplication section instead of fixed loop count
-        // This is more robust against wizard step changes
-        const dedupSectionSelector = '[data-test="alert-deduplication-section"], [data-test*="dedup"], :text("Deduplication"), :text("Fingerprint Fields")';
-
-        // Keep clicking Continue until we see the deduplication section
-        let maxAttempts = 10;
-        while (maxAttempts > 0) {
-            // Check if we're already at the deduplication step
-            const dedupSection = page.locator(dedupSectionSelector).first();
-            if (await dedupSection.isVisible({ timeout: 500 }).catch(() => false)) {
-                testLogger.info('Found deduplication section');
-                break;
-            }
-
-            // Click Continue if visible
-            const continueBtn = page.getByRole('button', { name: 'Continue' });
-            if (await continueBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-                await continueBtn.click();
-                await page.waitForTimeout(500);
-            } else {
-                break;
-            }
-            maxAttempts--;
+        // Scheduled alert wizard: Step 1 (Setup) → 2 (Conditions) → 3 (Compare) → 4 (Settings) → 5 (Dedup) → 6 (Advanced)
+        // When editing, wizard opens on Step 1. Click Continue 4 times to reach Step 5.
+        const continueBtn = page.getByRole('button', { name: 'Continue' });
+        for (let step = 1; step <= 4; step++) {
+            await expect(continueBtn).toBeVisible({ timeout: 5000 });
+            await continueBtn.click();
+            await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+            await page.waitForTimeout(500);
+            testLogger.info(`Advanced past step ${step}`);
         }
 
+        // Verify we're on the Deduplication step by checking the fingerprint select is visible
+        const fingerprintSelect = page.locator('.fingerprint-select');
+        await expect(fingerprintSelect).toBeVisible({ timeout: 5000 });
         testLogger.info('Navigated to deduplication step');
 
-        // Remove all fingerprint field chips
-        // Scope to deduplication section to avoid clicking unrelated chips (filter chips, tag chips, etc.)
-        const dedupContainer = page.locator('[data-test*="dedup"], [data-test*="fingerprint"], .q-card:has-text("Fingerprint"), .q-card:has-text("Deduplication")').first();
-        const chipSelector = '.q-chip__icon--remove';
-
-        // Keep removing chips until none remain (re-query after each removal)
+        // Remove all fingerprint field chips from the fingerprint select
         let removedCount = 0;
         while (true) {
-            // Scope chip search to deduplication container if found, otherwise use page
-            const container = await dedupContainer.isVisible({ timeout: 500 }).catch(() => false) ? dedupContainer : page;
-            const chipRemoveBtn = container.locator(chipSelector).first();
-
+            const chipRemoveBtn = fingerprintSelect.locator('.q-chip__icon--remove').first();
             if (await chipRemoveBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
                 await chipRemoveBtn.click();
                 await page.waitForTimeout(300);
@@ -353,32 +335,20 @@ test.describe("Deduplication Regression Tests", {
                 break;
             }
         }
-
+        expect(removedCount).toBeGreaterThan(0);
         testLogger.info('Chip removal complete', { removedCount });
-
-        // If no chips were removed, try the select clear button within dedup section
-        if (removedCount === 0) {
-            testLogger.info('No chips found, trying select clear');
-            const container = await dedupContainer.isVisible({ timeout: 500 }).catch(() => false) ? dedupContainer : page;
-            const clearBtn = container.locator('.q-select__clear, [class*="clear"]').first();
-            if (await clearBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-                await clearBtn.click();
-                testLogger.info('Clicked select clear button');
-            }
-        }
 
         await page.waitForTimeout(SHORT_WAIT_MS);
 
-        // Navigate to Step 6 (Advanced) and submit
-        const continueToAdvanced = page.getByRole('button', { name: 'Continue' });
-        if (await continueToAdvanced.isVisible({ timeout: 3000 })) {
-            await continueToAdvanced.click();
-            await page.waitForTimeout(500);
-        }
+        // Navigate to Step 6 (Advanced)
+        await expect(continueBtn).toBeVisible({ timeout: 5000 });
+        await continueBtn.click();
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await page.waitForTimeout(500);
 
         // Submit the alert
         const submitBtn = page.locator('[data-test="add-alert-submit-btn"]');
-        await expect(submitBtn).toBeVisible({ timeout: 5000 });
+        await expect(submitBtn).toBeEnabled({ timeout: 5000 });
         await submitBtn.click();
 
         // Wait for success

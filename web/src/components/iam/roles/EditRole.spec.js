@@ -459,3 +459,117 @@ describe('EditRole - micro validations', () => {
     expect(wrapper.vm.permissionsState.permissions.some((r) => r.resourceName === 'stream')).toBe(true);
   });
 });
+
+// 11. New resource type permission flags (logs_pattern, logs_insights, logs_cache)
+describe('EditRole - modifyResourcePermissions new resource types', () => {
+  const makeResource = (name) => ({
+    resourceName: name,
+    permission: {
+      AllowAll: { show: true },
+      AllowList: { show: true },
+      AllowGet: { show: true },
+      AllowDelete: { show: true },
+      AllowPost: { show: true },
+      AllowPut: { show: true },
+    },
+  });
+
+  it('logs_pattern hides AllowList, AllowDelete, AllowPost, AllowPut', async () => {
+    const wrapper = await mountEditRole();
+    const r = makeResource('logs_pattern');
+    wrapper.vm.modifyResourcePermissions(r);
+    expect(r.permission.AllowList.show).toBe(false);
+    expect(r.permission.AllowDelete.show).toBe(false);
+    expect(r.permission.AllowPost.show).toBe(false);
+    expect(r.permission.AllowPut.show).toBe(false);
+  });
+
+  it('logs_pattern keeps AllowAll and AllowGet visible', async () => {
+    const wrapper = await mountEditRole();
+    const r = makeResource('logs_pattern');
+    wrapper.vm.modifyResourcePermissions(r);
+    expect(r.permission.AllowAll.show).toBe(true);
+    expect(r.permission.AllowGet.show).toBe(true);
+  });
+
+  it('logs_insights hides AllowList, AllowDelete, AllowPost, AllowPut', async () => {
+    const wrapper = await mountEditRole();
+    const r = makeResource('logs_insights');
+    wrapper.vm.modifyResourcePermissions(r);
+    expect(r.permission.AllowList.show).toBe(false);
+    expect(r.permission.AllowDelete.show).toBe(false);
+    expect(r.permission.AllowPost.show).toBe(false);
+    expect(r.permission.AllowPut.show).toBe(false);
+  });
+
+  it('logs_insights keeps AllowAll and AllowGet visible', async () => {
+    const wrapper = await mountEditRole();
+    const r = makeResource('logs_insights');
+    wrapper.vm.modifyResourcePermissions(r);
+    expect(r.permission.AllowAll.show).toBe(true);
+    expect(r.permission.AllowGet.show).toBe(true);
+  });
+
+  it('logs_cache hides AllowList, AllowGet, AllowPost, AllowPut', async () => {
+    const wrapper = await mountEditRole();
+    const r = makeResource('logs_cache');
+    wrapper.vm.modifyResourcePermissions(r);
+    expect(r.permission.AllowList.show).toBe(false);
+    expect(r.permission.AllowGet.show).toBe(false);
+    expect(r.permission.AllowPost.show).toBe(false);
+    expect(r.permission.AllowPut.show).toBe(false);
+  });
+
+  it('logs_cache keeps AllowAll and AllowDelete visible', async () => {
+    const wrapper = await mountEditRole();
+    const r = makeResource('logs_cache');
+    wrapper.vm.modifyResourcePermissions(r);
+    expect(r.permission.AllowAll.show).toBe(true);
+    expect(r.permission.AllowDelete.show).toBe(true);
+  });
+
+  it('logs_pattern and logs_insights have identical permission restrictions', async () => {
+    const wrapper = await mountEditRole();
+    const r1 = makeResource('logs_pattern');
+    const r2 = makeResource('logs_insights');
+    wrapper.vm.modifyResourcePermissions(r1);
+    wrapper.vm.modifyResourcePermissions(r2);
+    expect(r1.permission.AllowList.show).toBe(r2.permission.AllowList.show);
+    expect(r1.permission.AllowDelete.show).toBe(r2.permission.AllowDelete.show);
+    expect(r1.permission.AllowPost.show).toBe(r2.permission.AllowPost.show);
+    expect(r1.permission.AllowPut.show).toBe(r2.permission.AllowPut.show);
+    expect(r1.permission.AllowGet.show).toBe(r2.permission.AllowGet.show);
+  });
+
+  it('logs_cache hides AllowGet but logs_pattern does not', async () => {
+    const wrapper = await mountEditRole();
+    const rCache = makeResource('logs_cache');
+    const rPattern = makeResource('logs_pattern');
+    wrapper.vm.modifyResourcePermissions(rCache);
+    wrapper.vm.modifyResourcePermissions(rPattern);
+    expect(rCache.permission.AllowGet.show).toBe(false);
+    expect(rPattern.permission.AllowGet.show).toBe(true);
+  });
+
+  it('logs_pattern hides AllowDelete but logs_cache does not', async () => {
+    const wrapper = await mountEditRole();
+    const rCache = makeResource('logs_cache');
+    const rPattern = makeResource('logs_pattern');
+    wrapper.vm.modifyResourcePermissions(rCache);
+    wrapper.vm.modifyResourcePermissions(rPattern);
+    expect(rPattern.permission.AllowDelete.show).toBe(false);
+    expect(rCache.permission.AllowDelete.show).toBe(true);
+  });
+
+  it('unrelated resource type is not affected by new type checks', async () => {
+    const wrapper = await mountEditRole();
+    const r = makeResource('some_other_resource');
+    wrapper.vm.modifyResourcePermissions(r);
+    // No flags should be hidden for an unrelated resource type
+    expect(r.permission.AllowList.show).toBe(true);
+    expect(r.permission.AllowGet.show).toBe(true);
+    expect(r.permission.AllowDelete.show).toBe(true);
+    expect(r.permission.AllowPost.show).toBe(true);
+    expect(r.permission.AllowPut.show).toBe(true);
+  });
+});

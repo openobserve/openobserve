@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-else-if="col.field === 'permission'">
                 <q-checkbox
                   :data-test="`edit-role-permissions-table-body-row-${row.name}-col-${col.name}-checkbox`"
-                  v-if="row.permission[col.name]?.show"
+                  v-if="row.permission?.[col.name]?.show"
                   size="xs"
                   v-model="row.permission[col.name].value"
                   :val="col.name"

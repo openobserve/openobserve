@@ -423,6 +423,7 @@ export default defineComponent({
       confirmAcceptInvitation,
       confirmRejectInvitation,
       fetchPendingInvitations,
+      formatExpiry,
     };
   },
 });

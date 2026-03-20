@@ -6,7 +6,7 @@
 import searchService from "@/services/search";
 import CronExpressionParser from "cron-parser";
 import { b64EncodeUnicode } from "@/utils/zincutils";
-import useStreams from "@/composables/useStreams";
+
 
 interface QueryCondition {
   conditions?: {
@@ -362,6 +362,7 @@ export interface JsonValidationContext {
   q: any;
   store: any;
   streams: any;
+  getStreams: (streamType: string, schema: boolean) => Promise<any>;
   getParser: (sql: string) => boolean;
   buildQueryPayload: (options: any) => any;
   prepareAndSaveAlert: (data: any) => Promise<void>;
@@ -570,10 +571,9 @@ export const saveAlertJson = async (
     streams,
     getParser,
     buildQueryPayload,
+    getStreams,
     prepareAndSaveAlert,
   } = context;
-
-  const { getStreams } = useStreams();
 
   let jsonPayload = JSON.parse(json);
   let destinationsList = [];
