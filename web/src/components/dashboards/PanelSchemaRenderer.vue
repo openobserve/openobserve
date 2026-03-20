@@ -218,7 +218,6 @@ import useNotifications from "@/composables/useNotifications";
 import { validateSQLPanelFields } from "@/utils/dashboard/panelValidation";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
-import { throttle } from "lodash-es";
 import {
   usePanelAlertCreation,
   usePanelDownload,
@@ -749,13 +748,17 @@ export default defineComponent({
     // Track if we've rendered the first chunk with actual data
     let hasRenderedFirstDataChunk = ref(false);
 
-    // Create a throttled version for streaming updates (350ms throttle)
-    // Chunks arrive ~300-400ms apart, so 350ms ensures updates every 2-3 chunks
-    // This prevents excessive re-renders while showing progressive updates
-    const convertPanelDataThrottled = throttle(convertPanelDataCommon, 350, {
-      leading: true, // Call immediately on first invocation
-      trailing: true, // Ensure final call after throttle period
-    });
+    // Microtask-based chunk coalescing: batches multiple rapid data mutations
+    // into a single render without using timers (no setTimeout/setInterval)
+    let hasPendingConversion = false;
+    const scheduleConversion = () => {
+      if (hasPendingConversion) return;
+      hasPendingConversion = true;
+      queueMicrotask(async () => {
+        hasPendingConversion = false;
+        await convertPanelDataCommon();
+      });
+    };
 
     // Watch for panel schema changes to re-convert panel data
     watch(
@@ -837,22 +840,19 @@ export default defineComponent({
           data.value?.length > 0 &&
           (data.value[0]?.result?.length > 0 || data.value[0]?.length > 0);
 
-        // Use throttled version during loading (streaming), immediate version when complete
-        // This prevents excessive re-renders during PromQL data streaming
         if (loading.value) {
-          // First chunk with actual data: render immediately!
+          // First chunk with actual data: render immediately
           if (hasData && !hasRenderedFirstDataChunk.value) {
             hasRenderedFirstDataChunk.value = true;
             await convertPanelDataCommon();
-          } else {
-            // Subsequent chunks: throttle to reduce re-render frequency
-            await convertPanelDataThrottled();
+          } else if (hasData) {
+            // Subsequent chunks: coalesce via microtask
+            scheduleConversion();
           }
         } else {
-          // Loading complete: immediate final render with full data
-          // Cancel any pending throttled calls and render immediately
-          convertPanelDataThrottled.cancel();
-          hasRenderedFirstDataChunk.value = false; // Reset for next query
+          // Not loading (theme/timezone change, etc.): render immediately
+          hasPendingConversion = false;
+          hasRenderedFirstDataChunk.value = false;
           await convertPanelDataCommon();
         }
       },

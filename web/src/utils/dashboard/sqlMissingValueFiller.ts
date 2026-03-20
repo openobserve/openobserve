@@ -70,9 +70,6 @@ export const fillMissingValues = (
   const origin = new Date(Date.UTC(2001, 0, 1, 0, 0, 0, 0));
   const binnedDate = dateBin(interval, startTime, origin);
 
-  // Convert interval to milliseconds
-  const intervalMillis = interval * 1000;
-
   // Identify the time-based key
   const searchQueryDataFirstEntry = processedData[0];
 
@@ -84,10 +81,6 @@ export const fillMissingValues = (
   if (!timeBasedKey) {
     return JSON.parse(JSON.stringify(processedData));
   }
-
-  // Extract and process metaDataEndTime
-  const metaDataEndTime = metadata?.queries[0]?.endTime?.toString() ?? 0;
-  const endTime = new Date(parseInt(metaDataEndTime) / 1000);
 
   const xAxisKeysWithoutTimeStamp = xAxisKeys.filter(
     (key: any) => key !== timeBasedKey,
@@ -108,66 +101,107 @@ export const fillMissingValues = (
   );
 
   const filledData: any = [];
-  let currentTime = binnedDate;
-  // Create a map of existing data
-  const searchDataMap = new Map();
-  processedData?.forEach((d: any) => {
-    const key =
-      xAxisKeysWithoutTimeStamp.length > 0 ||
-      breakdownAxisKeysWithoutTimeStamp.length > 0
-        ? `${getDataValue(d, timeKey)}-${getDataValue(d, uniqueKey)}`
-        : `${getDataValue(d, timeKey)}`;
 
-    searchDataMap.set(key, d);
-  });
+  // Anchor entry: add null at user's selected start time so ECharts x-axis is stable
+  // Format using same method as processedData — no UTC conversion
+  const anchorFormattedTime = format(toZonedTime(binnedDate, "UTC"), "yyyy-MM-dd'T'HH:mm:ss");
 
-  while (currentTime <= endTime) {
-    const currentFormattedTime = format(
-      toZonedTime(currentTime, "UTC"),
-      "yyyy-MM-dd'T'HH:mm:ss",
-    );
-
-    if (
-      xAxisKeysWithoutTimeStamp.length === 0 &&
-      breakdownAxisKeysWithoutTimeStamp.length === 0
-    ) {
-      const key = `${currentFormattedTime}`;
-      const currentData = searchDataMap.get(key);
-      const nullEntry: any = {
-        [timeKey]: currentFormattedTime,
-        ...currentData,
+  if (
+    xAxisKeysWithoutTimeStamp.length === 0 &&
+    breakdownAxisKeysWithoutTimeStamp.length === 0
+  ) {
+    const anchorEntry: any = { [timeKey]: anchorFormattedTime };
+    keys.forEach((key) => {
+      if (key !== timeKey) anchorEntry[key] = noValueConfigOption;
+    });
+    filledData.push(anchorEntry);
+  } else {
+    uniqueXAxisValues.forEach((uniqueValue: any) => {
+      const anchorEntry: any = {
+        [timeKey]: anchorFormattedTime,
+        [uniqueKey]: uniqueValue,
       };
-      if (!currentData) {
-        keys.forEach((key) => {
-          if (key !== timeKey) nullEntry[key] = noValueConfigOption;
+      keys.forEach((key) => {
+        if (key !== timeKey && key !== uniqueKey) {
+          anchorEntry[key] = noValueConfigOption;
+        }
+      });
+      filledData.push(anchorEntry);
+    });
+  }
+
+  // Add all existing processedData after the anchor
+  filledData.push(...processedData);
+
+  const intervalMillis = interval * 1000;
+
+  // Fill gaps only within the received data range (firstDataTimestamp to lastDataTimestamp)
+  // Data arrives from the end (descending), so early chunks only have the latest timestamps.
+  // We don't fill before firstDataTimestamp (data hasn't arrived there yet)
+  // and we don't fill after lastDataTimestamp (that's the end of current data)
+  const firstDataTimestamp = processedData.length > 0
+    ? getDataValue(processedData[0], timeKey)
+    : null;
+  const lastDataTimestamp = processedData.length > 0
+    ? getDataValue(processedData[processedData.length - 1], timeKey)
+    : null;
+
+  if (firstDataTimestamp && lastDataTimestamp) {
+    const firstDataDate = new Date(firstDataTimestamp + "Z");
+    const lastDataDate = new Date(lastDataTimestamp + "Z");
+    const binnedFillStart = dateBin(interval, firstDataDate, origin);
+    const endTimeForFill = format(toZonedTime(lastDataDate, "UTC"), "yyyy-MM-dd'T'HH:mm:ss");
+
+    // Build map from processedData for O(1) lookup
+    const searchDataMap = new Map();
+    processedData?.forEach((d: any) => {
+      const key =
+        xAxisKeysWithoutTimeStamp.length > 0 ||
+        breakdownAxisKeysWithoutTimeStamp.length > 0
+          ? `${getDataValue(d, timeKey)}-${getDataValue(d, uniqueKey)}`
+          : `${getDataValue(d, timeKey)}`;
+      searchDataMap.set(key, d);
+    });
+
+    let currentTime = binnedFillStart;
+    let currentFormattedTime = format(toZonedTime(currentTime, "UTC"), "yyyy-MM-dd'T'HH:mm:ss");
+    while (currentFormattedTime <= endTimeForFill) {
+
+      if (
+        xAxisKeysWithoutTimeStamp.length === 0 &&
+        breakdownAxisKeysWithoutTimeStamp.length === 0
+      ) {
+        const key = `${currentFormattedTime}`;
+        const currentData = searchDataMap.get(key);
+        if (!currentData) {
+          const nullEntry: any = { [timeKey]: currentFormattedTime };
+          keys.forEach((key) => {
+            if (key !== timeKey) nullEntry[key] = noValueConfigOption;
+          });
+          filledData.push(nullEntry);
+        }
+      } else {
+        uniqueXAxisValues.forEach((uniqueValue: any) => {
+          const key = `${currentFormattedTime}-${uniqueValue}`;
+          const currentData = searchDataMap.get(key);
+          if (!currentData) {
+            const nullEntry: any = {
+              [timeKey]: currentFormattedTime,
+              [uniqueKey]: uniqueValue,
+            };
+            keys.forEach((key) => {
+              if (key !== timeKey && key !== uniqueKey) {
+                nullEntry[key] = noValueConfigOption;
+              }
+            });
+            filledData.push(nullEntry);
+          }
         });
       }
 
-      filledData.push(nullEntry);
-    } else {
-      uniqueXAxisValues.forEach((uniqueValue: any) => {
-        const key = `${currentFormattedTime}-${uniqueValue}`;
-        const currentData = searchDataMap.get(key);
-        if (currentData) {
-          filledData.push(currentData);
-        } else {
-          const nullEntry: any = {
-            [timeKey]: currentFormattedTime,
-            [uniqueKey]: uniqueValue,
-          };
-
-          keys.forEach((key) => {
-            if (key !== timeKey && key !== uniqueKey) {
-              nullEntry[key] = noValueConfigOption;
-            }
-          });
-
-          filledData.push(nullEntry);
-        }
-      });
+      currentTime = new Date(currentTime.getTime() + intervalMillis);
+      currentFormattedTime = format(toZonedTime(currentTime, "UTC"), "yyyy-MM-dd'T'HH:mm:ss");
     }
-
-    currentTime = new Date(currentTime.getTime() + intervalMillis);
   }
 
   return filledData;
