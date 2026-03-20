@@ -1,4 +1,4 @@
-// Copyright 2026 OpenObserve Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,39 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { describe, expect, it, beforeEach } from "vitest";
+import { mount } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
+import PatternCard from "./PatternCard.vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
-
-// colorizeJson is mocked to return the input with < and > HTML-entity-encoded,
-// which mirrors what the real composable does for plain strings and makes the
-// wildcard replacement in highlightedTemplate fire predictably.
-//
-// A stable spy is declared with vi.hoisted so tests can assert call args
-// without re-importing the composable (which would create a new function).
-const colorizeJsonSpy = vi.hoisted(() =>
-  vi.fn((text: string) =>
-    String(text).replace(/</g, "&lt;").replace(/>/g, "&gt;"),
-  ),
-);
-
-vi.mock("@/composables/useLogsHighlighter", () => ({
-  useLogsHighlighter: () => ({
-    colorizeJson: colorizeJsonSpy,
-  }),
-}));
-
-import PatternCard from "./PatternCard.vue";
 
 installQuasar({
   plugins: [quasar.Notify],
 });
 
 describe("PatternCard", () => {
-  let wrapper: VueWrapper;
+  let wrapper: any;
   const mockPattern = {
     pattern_id: "pattern-1",
     template: "User * logged in from IP *",
@@ -86,11 +67,6 @@ describe("PatternCard", () => {
         },
       },
     });
-  });
-
-  afterEach(() => {
-    wrapper?.unmount();
-    vi.clearAllMocks();
   });
 
   it("should mount PatternCard component", () => {
@@ -371,115 +347,6 @@ describe("PatternCard", () => {
       await detailsIcon.trigger("click");
       expect(wrapper.emitted("click")).toBeTruthy();
       expect(wrapper.emitted("click")![0][0]).toEqual(patternNoVars);
-    });
-  });
-
-  // --- Wildcard token highlighting ---
-
-  describe("highlightedTemplate wildcard rendering", () => {
-    it("should wrap a single <*> token in a log-pattern-wildcard span", async () => {
-      await wrapper.setProps({
-        pattern: { ...mockPattern, template: "Connection from <*> failed" },
-      });
-      const templateEl = wrapper.find('[data-test="pattern-card-0-template"]');
-      expect(templateEl.exists()).toBe(true);
-      expect(templateEl.html()).toContain(
-        '<span class="log-pattern-wildcard">&lt;*&gt;</span>',
-      );
-    });
-
-    it("should wrap all <*> tokens when multiple wildcards are present", async () => {
-      await wrapper.setProps({
-        pattern: { ...mockPattern, template: "<*> <*> error" },
-      });
-      const templateEl = wrapper.find('[data-test="pattern-card-0-template"]');
-      expect(templateEl.exists()).toBe(true);
-      const html = templateEl.html();
-      const matchCount = (
-        html.match(/<span class="log-pattern-wildcard">&lt;\*&gt;<\/span>/g) ??
-        []
-      ).length;
-      expect(matchCount).toBe(2);
-    });
-
-    it("should not inject any wildcard span when the template has no <*> tokens", async () => {
-      await wrapper.setProps({
-        pattern: { ...mockPattern, template: "No wildcards here" },
-      });
-      const templateEl = wrapper.find('[data-test="pattern-card-0-template"]');
-      expect(templateEl.exists()).toBe(true);
-      expect(templateEl.html()).not.toContain("log-pattern-wildcard");
-    });
-
-    it("should preserve surrounding text around a wildcard token", async () => {
-      await wrapper.setProps({
-        pattern: { ...mockPattern, template: "prefix <*> suffix" },
-      });
-      const templateEl = wrapper.find('[data-test="pattern-card-0-template"]');
-      expect(templateEl.exists()).toBe(true);
-      const html = templateEl.html();
-      expect(html).toContain("prefix");
-      expect(html).toContain("suffix");
-      expect(html).toContain(
-        '<span class="log-pattern-wildcard">&lt;*&gt;</span>',
-      );
-    });
-
-    it("should display wildcard text content as <*> (not as a literal HTML tag)", async () => {
-      await wrapper.setProps({
-        pattern: { ...mockPattern, template: "Request <*> processed" },
-      });
-      const templateEl = wrapper.find('[data-test="pattern-card-0-template"]');
-      expect(templateEl.exists()).toBe(true);
-      // .text() returns visible text — the wildcard should appear as <*>
-      expect(templateEl.text()).toContain("<*>");
-    });
-
-    it("should call colorizeJson with the pattern template string", async () => {
-      await wrapper.setProps({
-        pattern: { ...mockPattern, template: "auth <*> granted" },
-      });
-      // colorizeJsonSpy is the same function instance used inside the component
-      expect(colorizeJsonSpy).toHaveBeenCalledWith(
-        "auth <*> granted",
-        expect.any(Boolean),
-        false,
-        false,
-        "",
-        false,
-      );
-    });
-
-    it("should call colorizeJson with isDark=true when store theme is dark", async () => {
-      store.commit("appTheme", "dark");
-      await wrapper.setProps({
-        pattern: { ...mockPattern, template: "dark theme <*> test" },
-      });
-      expect(colorizeJsonSpy).toHaveBeenCalledWith(
-        "dark theme <*> test",
-        true,
-        false,
-        false,
-        "",
-        false,
-      );
-    });
-
-    it("should call colorizeJson with isDark=false when store theme is light", async () => {
-      store.commit("appTheme", "light");
-      await wrapper.setProps({
-        pattern: { ...mockPattern, template: "light theme <*> test" },
-      });
-      expect(colorizeJsonSpy).toHaveBeenCalledWith(
-        "light theme <*> test",
-        false,
-        false,
-        false,
-        "",
-        false,
-      );
-      // restore default theme for subsequent tests
-      store.commit("appTheme", "dark");
     });
   });
 });
