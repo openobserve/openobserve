@@ -114,8 +114,7 @@ describe("PatternCard", () => {
         '[data-test="pattern-card-0-anomaly-badge"]',
       );
       expect(anomalyBadge.exists()).toBe(true);
-      // The badge now shows only the warning icon, not the text
-      expect(anomalyBadge.text()).toContain("⚠️");
+      expect(anomalyBadge.text()).toContain("Rare Pattern");
     });
 
     it("should not display anomaly badge when pattern is not an anomaly", () => {

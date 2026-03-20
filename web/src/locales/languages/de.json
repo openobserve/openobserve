@@ -351,7 +351,32 @@
     "collapseFields": "Felder ausblenden",
     "openFields": "Felder öffnen",
     "aiBarSuccessPlaceholder": "Was möchtest du als Nächstes tun?",
-    "nlpModeDisabledForVisualization": "Der Natural Language-Modus kann bei einer Visualisierung mit mehreren Streams nicht deaktiviert werden"
+    "nlpModeDisabledForVisualization": "Der Natural Language-Modus kann bei einer Visualisierung mit mehreren Streams nicht deaktiviert werden",
+    "patternDetailsTitle": "Einzelheiten zum Muster",
+    "patternXofY": "Muster {index} von {total}",
+    "patternXofYShort": "{index} von {total}",
+    "patternStatistics": "Statistiken",
+    "patternOccurrences": "Vorkommen",
+    "patternPercentage": "Prozentsatz",
+    "patternAnomalyDetected": "Anomalie erkannt",
+    "patternAnomalyScore": "Dieses Muster wird als seltenes Muster erkannt (Anomalie-Score: {score}%)",
+    "patternAnomalyRare": "Dieses Muster wird als seltenes Muster erkannt ({pct}% der Logs, {freq} Vorkommen)",
+    "patternAnomalyRarePlural": "Dieses Muster wird als seltenes Muster erkannt ({pct}% der Logs, {freq} Vorkommen)",
+    "patternAnomalyLowFreq": "Dieses Muster tritt seltener als erwartet auf ({freq} vs avg {avg}, Z-Score: {z})",
+    "patternAnomalyLowFreqPlural": "Dieses Muster tritt seltener als erwartet auf ({freq} vs avg {avg}, Z-Score: {z})",
+    "patternVariablesHeader": "Variablen",
+    "patternVariablesDetected": "{count} Variable (n) wurde (n) erkannt",
+    "patternNoVariablesDetected": "Keine Variablen erkannt",
+    "patternTemplate": "Muster-Vorlage",
+    "patternVariablesWithCount": "Variablen ({count})",
+    "patternVariableNameColumn": "Variablenname",
+    "patternVariableTypeColumn": "Typ",
+    "patternExampleLogsWithCount": "Beispielprotokolle ({count})",
+    "patternNavPrevious": "Bisherige",
+    "patternNavNext": "Weiter",
+    "patternWildcardSampleValues": "Beispielwerte",
+    "wildcardSampleValues": "Beispielwerte",
+    "patternZScore": "Z-Score: {zScore} (durchschnittliche Häufigkeit: {avgFrequency})"
   },
   "menu": {
     "home": "Startseite",
@@ -2129,7 +2154,9 @@
       "detectionConfig": "Konfiguration der Abfrage- und Erkennungsparameter",
       "alerting": "Richten Sie Benachrichtigungen ein, wenn Anomalien erkannt werden"
     },
-    "updateAnomalyDetection": "Anomalieerkennung aktualisieren:"
+    "updateAnomalyDetection": "Anomalieerkennung aktualisieren:",
+    "anomalyCreated": "Konfiguration zur Erkennung von Anomalien wurde erstellt. Die Schulung beginnt in Kürze.",
+    "editJson": "Alert-JSON bearbeiten"
   },
   "alert_templates": {
     "header": "Vorlagen",
@@ -2663,7 +2690,9 @@
     "spanColorPalettePreview": "Vorschau der Span-Farbpalette",
     "errorsFound": "Fehlerspuren",
     "spansTitle": "SPANNT",
-    "spansFound": "Gefundene Spannweiten"
+    "spansFound": "Gefundene Spannweiten",
+    "errorTraces": "Fehlerspuren",
+    "errorSpans": "Fehlerspannen"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",

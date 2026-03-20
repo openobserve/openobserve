@@ -351,7 +351,32 @@
     "collapseFields": "Alanları Daralt",
     "openFields": "Açık Alanlar",
     "aiBarSuccessPlaceholder": "Bundan sonra ne yapmak istersin?",
-    "nlpModeDisabledForVisualization": "Birden çok akışla görselleştirme sırasında Doğal Dil modu devre dışı bırakılamaz"
+    "nlpModeDisabledForVisualization": "Birden çok akışla görselleştirme sırasında Doğal Dil modu devre dışı bırakılamaz",
+    "patternDetailsTitle": "Desen Detayları",
+    "patternXofY": "{total} {index} kalıbı",
+    "patternXofYShort": "{total} 'in {index}",
+    "patternStatistics": "İstatistikler",
+    "patternOccurrences": "Olaylar",
+    "patternPercentage": "Yüzde",
+    "patternAnomalyDetected": "Anomali Algılandı",
+    "patternAnomalyScore": "Bu model nadir bir model olarak algılanır (anomali puanı: {score} %)",
+    "patternAnomalyRare": "Bu desen nadir bir model olarak algılanır ({pct} %log, {freq} oluşum)",
+    "patternAnomalyRarePlural": "Bu desen nadir bir desen olarak algılanır ({pct} %log, {freq} oluşum)",
+    "patternAnomalyLowFreq": "Bu model beklenenden daha az sıklıkta görünür ({freq} vs avg {avg}, z-score: {z})",
+    "patternAnomalyLowFreqPlural": "Bu model beklenenden daha az sıklıkta görünür ({freq} vs avg {avg}, z-score: {z})",
+    "patternVariablesHeader": "Değişkenler",
+    "patternVariablesDetected": "{count} değişken (ler) algılandı",
+    "patternNoVariablesDetected": "Değişken tespit edilmedi",
+    "patternTemplate": "Desen şablonu",
+    "patternVariablesWithCount": "Değişkenler ({count})",
+    "patternVariableNameColumn": "Değişken Adı",
+    "patternVariableTypeColumn": "Tür",
+    "patternExampleLogsWithCount": "Örnek Günlükler ({count})",
+    "patternNavPrevious": "Önceki",
+    "patternNavNext": "Sonraki",
+    "patternWildcardSampleValues": "Örnek değerler",
+    "wildcardSampleValues": "Örnek değerler",
+    "patternZScore": "Z puanı: {zScore} (ortalama frekans: {avgFrequency})"
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -2129,7 +2154,9 @@
       "detectionConfig": "Sorgu ve algılama parametrelerini yapılandırma",
       "alerting": "Anormallikler tespit edildiğinde bildirimleri ayarlayın"
     },
-    "updateAnomalyDetection": "Anomali algılamayı güncelle:"
+    "updateAnomalyDetection": "Anomali algılamayı güncelle:",
+    "anomalyCreated": "Anomali algılama yapılandırması oluşturuldu. Eğitim kısa süre içinde başlayacak.",
+    "editJson": "Uyarı JSON'unu Düzenle"
   },
   "alert_templates": {
     "header": "Şablonlar",
@@ -2663,7 +2690,9 @@
     "spanColorPalettePreview": "Span Renk Paleti Önizlemesi",
     "errorsFound": "Hata İzleri",
     "spansTitle": "YAYILIMLAR",
-    "spansFound": "Bulunan Açıklıklar"
+    "spansFound": "Bulunan Açıklıklar",
+    "errorTraces": "Hata İzleri",
+    "errorSpans": "Hata Aralıkları"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",

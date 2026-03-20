@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-show="!displayValues.length && !fieldValues?.isLoading"
         class="q-pl-md q-py-xs text-subtitle2"
+        data-test="field-values-panel-no-values-msg"
       >
         {{ fieldValues?.errMsg || "No values found" }}
       </div>

@@ -15,6 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { nextTick } from "vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
 
@@ -35,6 +36,8 @@ vi.mock("@/services/alerts", () => ({
     delete_by_alert_id: vi.fn(),
     create_by_alert_id: vi.fn(),
     getHistory: vi.fn(),
+    export_by_id: vi.fn(),
+    retrain_by_id: vi.fn(),
   },
 }));
 vi.mock("@/services/alert_templates", () => ({
@@ -172,6 +175,8 @@ beforeEach(() => {
   // ensure foldersByType has 'alerts' key and alerts map exists
   (store.state as any).organizationData.foldersByType = [{ type: 'alerts', folders: [{ id: 'default', name: 'Default' }] }];
   (store.state as any).organizationData.allAlertsListByFolderId = {};
+  // Reset alert list filters to prevent leaking between tests
+  (store.state as any).alertListFilters = { searchQuery: "", filterQuery: "", searchAcrossFolders: false };
 
   alertsDB = [
     makeAlert(1, { is_real_time: false, enabled: true, name: "Scheduled Alert A", owner: "averylongownername@example.com" }),
@@ -207,6 +212,15 @@ beforeEach(() => {
 
   (alertsSvc.getHistory as any) = vi.fn().mockImplementation(async () => {
     return Promise.resolve({ data: { total: 0, hits: [] } } as any);
+  });
+
+  (alertsSvc.export_by_id as any) = vi.fn().mockImplementation(async (_org: any, id: string) => {
+    const alert = alertsDB.find((a) => a.alert_id === id) ?? { name: "exported" };
+    return Promise.resolve({ data: { ...alert } } as any);
+  });
+
+  (alertsSvc.retrain_by_id as any) = vi.fn().mockImplementation(async () => {
+    return Promise.resolve({ data: { code: 200 } } as any);
   });
 
   (alertsSvc.create_by_alert_id as any) = vi.fn().mockImplementation(async (_org: any, body: any, folder?: string) => {
@@ -788,6 +802,7 @@ describe("AlertList - micro validations", () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
     wrapper.vm.filterQuery = "abc";
+    await nextTick();
     wrapper.vm.searchAcrossFolders = true;
     await flushPromises();
     expect(wrapper.vm.searchQuery).toBe("abc");
@@ -890,14 +905,14 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     expect(tabValues).not.toContain("anomalyDetection");
   });
 
-  it("should disable anomalyDetection tab when isCloud=true (cloud build)", async () => {
+  it("should enable anomalyDetection tab when isCloud=true (cloud build)", async () => {
     (config as any).isEnterprise = "true";
     (config as any).isCloud = "true";
     (store.state as any).zoConfig.build_type = "enterprise";
 
     const wrapper: any = await mountAlertList();
     const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
-    expect(tabValues).not.toContain("anomalyDetection");
+    expect(tabValues).toContain("anomalyDetection");
   });
 
   it("should disable anomalyDetection tab when isEnterprise=false (opensource frontend)", async () => {
