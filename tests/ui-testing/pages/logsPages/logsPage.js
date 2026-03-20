@@ -6197,7 +6197,7 @@ export class LogsPage {
      * Get wildcard chip element (for hover tests)
      * @param {string} chipClass - Optional chip class selector
      */
-    async getWildcardChip(chipClass = '.pattern-card .wildcard-chip, .pattern-card .q-chip') {
+    async getWildcardChip(chipClass = '[data-test^="pattern-card-"] .wildcard-chip, [data-test^="pattern-card-"] .q-chip') {
         return this.page.locator(chipClass).first();
     }
 
