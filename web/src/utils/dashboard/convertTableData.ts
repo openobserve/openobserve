@@ -414,9 +414,10 @@ export const convertMultiQueryTableData = (
     if (!queryData || !Array.isArray(queryData)) return;
 
     const qConfig = panelSchema.queries[queryIndex]?.config;
-    const queryLabel =
-      qConfig?.prepend_label || qConfig?.append_label ||
-      `Q${queryIndex + 1}`;
+    let queryLabel = `Q${queryIndex + 1}`;
+    if (qConfig?.query_label) {
+      queryLabel = qConfig.query_label.replace(/\{[^}]+\}/g, "").trim() || queryLabel;
+    }
 
     queryData.forEach((row: any) => {
       Object.keys(row).forEach((key) => allColumnNames.add(key));

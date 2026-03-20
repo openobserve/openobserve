@@ -1068,11 +1068,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label dense label-slot borderless hide-bottom-space> -->
       <div
         v-if="
-          promqlMode &&
+          ((promqlMode && dashboardPanelData.data.queries.length > 0) ||
+           (!promqlMode && dashboardPanelData.data.queries.length > 1)) &&
           dashboardPanelData.data.type != 'geomap' &&
           dashboardPanelData.data.type != 'maps'
         "
-        class="q-py-md showLabelOnTop"
+        class="showLabelOnTop"
         style="font-weight: 600"
       >
         {{ t("dashboard.query") }}
@@ -1099,55 +1100,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- </q-input> -->
       <div class="space"></div>
 
-      <!-- Multi-Query Series Labels — visible when 2+ queries exist -->
+      <!-- Multi-Query Series Labels — visible when 2+ queries exist for SQL -->
       <div
-        v-if="dashboardPanelData.data.queries.length > 1"
-        class="q-py-sm"
+        v-if="!promqlMode && dashboardPanelData.data.queries.length > 1"
+        class=""
       >
-        <div class="q-mb-sm" style="font-weight: 600">
+        <div class="q-mb-md row items-center" style="font-weight: 600">
           {{ t("dashboard.multiSqlQueryLabel") }}
+          <q-icon
+            class="q-ml-xs text-grey"
+            size="16px"
+            name="info"
+            style="cursor: pointer"
+          >
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="top middle"
+              self="bottom middle"
+              max-width="250px"
+              style="font-weight: normal;"
+            >
+              {{ t("dashboard.multiSqlQueryLabelHint") }}
+            </q-tooltip>
+          </q-icon>
         </div>
 
         <div
-          v-for="(query, qIdx) in dashboardPanelData.data.queries"
-          :key="'label-' + qIdx"
-          class="row items-center q-mb-xs q-gutter-xs"
+          class="row items-center q-mb-sm"
         >
-          <span
-            class="text-caption"
-            style="min-width: 52px; opacity: 0.7"
-          >
-            Query {{ qIdx + 1 }}
-          </span>
-          <q-input
-            v-model="query.config.prepend_label"
-            dense
-            borderless
-            :placeholder="'Q' + (qIdx + 1)"
-            class="col showLabelOnTop el-border"
-            hide-bottom-space
-            :data-test="`dashboard-config-prepend-label-${qIdx}`"
-          >
-            <template v-slot:prepend>
-              <span class="text-caption" style="opacity: 0.5; font-size: 10px">Prepend</span>
-            </template>
-          </q-input>
-          <q-input
-            v-model="query.config.append_label"
-            dense
-            borderless
-            placeholder=""
-            class="col showLabelOnTop el-border"
-            hide-bottom-space
-            :data-test="`dashboard-config-append-label-${qIdx}`"
-          >
-            <template v-slot:prepend>
-              <span class="text-caption" style="opacity: 0.5; font-size: 10px">Append</span>
-            </template>
-          </q-input>
-        </div>
-        <div class="text-caption" style="opacity: 0.5; margin-top: 2px">
-          {{ t("dashboard.multiSqlQueryLabelHint") }}
+          <div class="col row q-gutter-x-sm">
+            <q-input
+              v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.query_label"
+              dense
+              outlined
+              placeholder="e.g. {field_name}"
+              class="col"
+              hide-bottom-space
+              :data-test="`dashboard-config-legend-${dashboardPanelData.layout.currentQueryIndex}`"
+            />
+          </div>
         </div>
       </div>
       <div

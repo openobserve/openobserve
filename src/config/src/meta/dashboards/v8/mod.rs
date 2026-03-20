@@ -625,9 +625,7 @@ pub struct QueryConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     time_shift: Option<Vec<TimeShift>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    prepend_label: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    append_label: Option<String>,
+    query_label: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]

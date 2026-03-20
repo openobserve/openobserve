@@ -152,10 +152,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       },
       config: {
         promql_legend: "",
+        query_label: "",
         layer_type: "scatter",
         weight_fixed: 1,
-        prepend_label: "",
-        append_label: "",
       },
     };
     dashboardPanelData.data.queries.push(newQuery);

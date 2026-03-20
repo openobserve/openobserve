@@ -75,17 +75,21 @@ export const convertMultiSQLData = async (
 
   const chartType = panelSchema.type;
 
-  // Helper: build labeled name with prepend/append labels + time shift suffix
+  // Helper: build labeled name with promql_legend template + time shift suffix
   const buildLabeledName = (
     name: string,
     queryConfig: any,
     queryIndex: number,
     periodAsStr?: string,
   ) => {
-    const prepend = queryConfig?.prepend_label || `Q${queryIndex + 1}`;
-    const append = queryConfig?.append_label || "";
-    const parts = [prepend, name, append].filter(Boolean);
-    const labeled = parts.join("-");
+    let labeled = name;
+
+    // Apply template replacement if query_label is provided
+    if (queryConfig?.query_label) {
+      // Replace any {placeholder} with the generated series name
+      labeled = queryConfig.query_label.replace(/\{[^}]+\}/g, name);
+    }
+
     return periodAsStr ? `${labeled} (${periodAsStr})` : labeled;
   };
 
@@ -127,7 +131,7 @@ export const convertMultiSQLData = async (
       const qConfig = panelSchema.queries[idx + 1]?.config;
       return {
         options: opt.options,
-        queryLabel: qConfig?.prepend_label || qConfig?.append_label || "",
+        queryLabel: qConfig?.query_label || "",
       };
     });
     options[0].extras = {
