@@ -1560,7 +1560,9 @@
     "pivotStickyRowTotalsTooltip": "총계 행을 아래쪽에 고정하여 세로로 스크롤할 때 계속 표시되도록 합니다.",
     "pivotStickyColTotals": "고정 컬럼 합계",
     "pivotStickyColTotalsTooltip": "합계 열을 오른쪽에 고정하여 가로로 스크롤할 때 계속 표시되도록 합니다.",
-    "configSectionPromqlTable": "ProMQL 테이블 모드"
+    "configSectionPromqlTable": "ProMQL 테이블 모드",
+    "axisLabelRotate": "라벨 회전",
+    "axisLabelTruncate": "레이블 잘림"
   },
   "panel": {
     "header": "패널",

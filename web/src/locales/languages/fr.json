@@ -1560,7 +1560,9 @@
     "pivotStickyRowTotalsTooltip": "Épinglez la ligne des totaux en bas pour qu'elle reste visible lorsque vous faites défiler la page verticalement",
     "pivotStickyColTotals": "Totaux des colonnes adhésives",
     "pivotStickyColTotalsTooltip": "Épinglez la colonne des totaux sur la droite pour qu'elle reste visible lors du défilement horizontal",
-    "configSectionPromqlTable": "Mode Tableau ProMQL"
+    "configSectionPromqlTable": "Mode Tableau ProMQL",
+    "axisLabelRotate": "Rotation des étiquettes",
+    "axisLabelTruncate": "Libellé tronqué"
   },
   "panel": {
     "header": "Panneau",

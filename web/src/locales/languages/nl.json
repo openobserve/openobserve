@@ -1560,7 +1560,9 @@
     "pivotStickyRowTotalsTooltip": "Zet de rij met totalen onderaan vast, zodat deze zichtbaar blijft wanneer je verticaal scrolt.",
     "pivotStickyColTotals": "Totalen van plakkerige kolommen",
     "pivotStickyColTotalsTooltip": "Zet de kolom met totalen aan de rechterkant vast, zodat deze zichtbaar blijft wanneer u horizontaal scrolt",
-    "configSectionPromqlTable": "ProMQL-tabelmodus"
+    "configSectionPromqlTable": "ProMQL-tabelmodus",
+    "axisLabelRotate": "Label roteren",
+    "axisLabelTruncate": "Label Truncate"
   },
   "panel": {
     "header": "Paneel",

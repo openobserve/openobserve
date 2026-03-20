@@ -1560,7 +1560,9 @@
     "pivotStickyRowTotalsTooltip": "Fixe a linha de totais na parte inferior para que ela permaneça visível ao rolar verticalmente",
     "pivotStickyColTotals": "Totais de colunas fixas",
     "pivotStickyColTotalsTooltip": "Fixe a coluna de totais à direita para que ela permaneça visível ao rolar horizontalmente",
-    "configSectionPromqlTable": "Modo de tabela ProMQL"
+    "configSectionPromqlTable": "Modo de tabela ProMQL",
+    "axisLabelRotate": "Rotação de etiqueta",
+    "axisLabelTruncate": "Etiqueta: Truncate"
   },
   "panel": {
     "header": "Painel",
