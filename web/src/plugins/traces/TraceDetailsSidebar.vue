@@ -1508,7 +1508,7 @@ export default defineComponent({
 
     const viewSpanLogs = () => {
       const queryDetails = buildQueryDetails(props.span);
-      navigateToLogs(queryDetails);
+      emit("view-logs", queryDetails);
     };
 
     const getStartTime = computed(() => {
