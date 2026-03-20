@@ -2,6 +2,7 @@ export interface ToolCall {
   tool: string;
   message: string;
   context: Record<string, any>;
+  call_id?: string; // Unique ID from ADK function_call.id for matching tool_result to tool_call
 }
 
 // Navigation action for UI navigation
@@ -36,6 +37,7 @@ export interface ContentBlock {
   tool?: string;
   message?: string;
   context?: Record<string, any>;
+  call_id?: string; // Unique ID for matching tool_result to tool_call
   // For text type:
   text?: string;
   // Confirmation state (from confirmation_required events):

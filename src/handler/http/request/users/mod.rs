@@ -84,7 +84,11 @@ pub mod service_accounts;
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all users", "category": "users"}))
+        ("x-o2-mcp" = json!({
+            "description": "List all users",
+            "category": "users",
+            "summary_fields": ["email", "role", "first_name", "last_name"]
+        }))
     )
 )]
 pub async fn list(
