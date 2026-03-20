@@ -1564,7 +1564,11 @@
     "axisLabelRotate": "Rotação de etiqueta",
     "axisLabelTruncate": "Etiqueta: Truncate",
     "axisLabelRotateTooltip": "Gire o texto do rótulo do eixo x em um ângulo escolhido (em graus) para melhorar a legibilidade quando os rótulos estiverem longos ou cheios. <br /><br /><strong>Nota:</strong> Essa opção não é suportada para campos do eixo x de séries temporais.",
-    "axisLabelTruncateTooltip": "Trunque os rótulos do eixo x na largura especificada (em pixels). <br /><br /><strong>Nota:</strong> Essa opção não é suportada para campos do eixo x de séries temporais."
+    "axisLabelTruncateTooltip": "Trunque os rótulos do eixo x na largura especificada (em pixels). <br /><br /><strong>Nota:</strong> Essa opção não é suportada para campos do eixo x de séries temporais.",
+    "axisLabelRotateTooltipText": "Gire o texto do rótulo do eixo x em um ângulo escolhido (em graus) para melhorar a legibilidade quando os rótulos estiverem longos ou cheios.",
+    "axisLabelTruncateTooltipText": "Trunque os rótulos do eixo x na largura especificada (em pixels).",
+    "axisLabelTooltipNotePrefix": "Nota:",
+    "axisLabelTooltipNoteText": " Essa opção não é suportada para campos do eixo x de séries temporais."
   },
   "panel": {
     "header": "Painel",
