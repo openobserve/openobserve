@@ -1507,7 +1507,11 @@
     "pivotStickyRowTotals": "고정 행 합계",
     "pivotStickyRowTotalsTooltip": "총계 행을 아래쪽에 고정하여 세로로 스크롤할 때 계속 표시되도록 합니다.",
     "pivotStickyColTotals": "고정 컬럼 합계",
-    "pivotStickyColTotalsTooltip": "합계 열을 오른쪽에 고정하여 가로로 스크롤할 때 계속 표시되도록 합니다."
+    "pivotStickyColTotalsTooltip": "합계 열을 오른쪽에 고정하여 가로로 스크롤할 때 계속 표시되도록 합니다.",
+    "multiSqlQueryLabel": "쿼리 라벨",
+    "multiSqlQueryLabelHint": "범례로 표시된 이 쿼리의 사용자 지정 이름 (예: 'Production')",
+    "multiQueryWarning": "{ChartType} 에 대해서는 쿼리 1만 렌더링됩니다.",
+    "trellisNotSupportedWithMultiQuery": "다중 쿼리에서 격자 레이아웃을 사용할 수 없습니다.격자를 사용하려면 추가 쿼리를 제거하세요."
   },
   "panel": {
     "header": "패널",

@@ -1507,7 +1507,11 @@
     "pivotStickyRowTotals": "Totali di Sticky Row",
     "pivotStickyRowTotalsTooltip": "Appunta la riga dei totali in basso in modo che rimanga visibile quando scorri verticalmente",
     "pivotStickyColTotals": "Totali delle colonne permanenti",
-    "pivotStickyColTotalsTooltip": "Appunta la colonna dei totali sulla destra in modo che rimanga visibile quando scorri orizzontalmente"
+    "pivotStickyColTotalsTooltip": "Appunta la colonna dei totali sulla destra in modo che rimanga visibile quando scorri orizzontalmente",
+    "multiSqlQueryLabel": "Etichetta di interrogazione",
+    "multiSqlQueryLabelHint": "Nome personalizzato per questa query nelle legende (ad esempio, 'Produzione')",
+    "multiQueryWarning": "Viene renderizzato solo l'interrogazione 1 per {chartType}",
+    "trellisNotSupportedWithMultiQuery": "Il layout di Trellis è disabilitato con più query. Rimuovi le query aggiuntive per utilizzare trellis."
   },
   "panel": {
     "header": "Pannello",

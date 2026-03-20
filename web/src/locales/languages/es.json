@@ -1507,7 +1507,11 @@
     "pivotStickyRowTotals": "Totales de Sticky Row",
     "pivotStickyRowTotalsTooltip": "Fija la fila de totales en la parte inferior para que permanezca visible al desplazarte verticalmente",
     "pivotStickyColTotals": "Totales de columnas fijas",
-    "pivotStickyColTotalsTooltip": "Fija la columna de totales a la derecha para que permanezca visible al desplazarte horizontalmente"
+    "pivotStickyColTotalsTooltip": "Fija la columna de totales a la derecha para que permanezca visible al desplazarte horizontalmente",
+    "multiSqlQueryLabel": "Etiqueta de consulta",
+    "multiSqlQueryLabelHint": "Nombre personalizado para esta consulta en las leyendas (p. ej., «Producción»)",
+    "multiQueryWarning": "Solo se representa la consulta 1 para {chartType}",
+    "trellisNotSupportedWithMultiQuery": "El diseño de Trellis está desactivado con varias consultas. Elimine las consultas adicionales para usar Trellis."
   },
   "panel": {
     "header": "Panel",

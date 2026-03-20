@@ -391,3 +391,79 @@ const isSampleValuesNumbers = (arr: any, key: string, sampleSize: number) => {
     );
   });
 };
+
+/**
+ * Merges table data from multiple SQL queries in UNION mode.
+ * Each query's rows are appended with a __query identifier column.
+ * Column set is the union of all queries' columns.
+ */
+export const convertMultiQueryTableData = (
+  panelSchema: any,
+  searchQueryData: any[],
+  store: any,
+): { rows: any[]; columns: any[] } => {
+  if (!searchQueryData || searchQueryData.length <= 1) {
+    return convertTableData(panelSchema, searchQueryData, store);
+  }
+
+  const allRows: any[] = [];
+  const allColumnNames = new Set<string>();
+
+  // Collect rows and discover all column names
+  searchQueryData.forEach((queryData: any[], queryIndex: number) => {
+    if (!queryData || !Array.isArray(queryData)) return;
+
+    const qConfig = panelSchema.queries[queryIndex]?.config;
+    let queryLabel = `Q${queryIndex + 1}`;
+    if (qConfig?.query_label) {
+      queryLabel = qConfig.query_label.replace(/\{[^}]+\}/g, "").trim() || queryLabel;
+    }
+
+    queryData.forEach((row: any) => {
+      Object.keys(row).forEach((key) => allColumnNames.add(key));
+      allRows.push({ __query: queryLabel, ...row });
+    });
+  });
+
+  // Remove __query from discovered columns (we add it manually as first column)
+  allColumnNames.delete("__query");
+
+  // Build column definitions
+  const columns: any[] = [
+    {
+      name: "__query",
+      field: "__query",
+      label: "Query",
+      align: "left",
+      sortable: true,
+    },
+  ];
+
+  // Try to use field configs from queries for known columns
+  const knownAliases = new Map<string, any>();
+  panelSchema.queries.forEach((query: any) => {
+    const allFields = [
+      ...(query.fields?.x || []),
+      ...(query.fields?.y || []),
+      ...(query.fields?.breakdown || []),
+    ];
+    allFields.forEach((f: any) => {
+      if (f.alias && !knownAliases.has(f.alias)) {
+        knownAliases.set(f.alias, f);
+      }
+    });
+  });
+
+  allColumnNames.forEach((colName) => {
+    const fieldConfig = knownAliases.get(colName);
+    columns.push({
+      name: colName,
+      field: colName,
+      label: fieldConfig?.label || colName,
+      align: fieldConfig?.aggregationFunction ? "right" : "left",
+      sortable: true,
+    });
+  });
+
+  return { rows: allRows, columns };
+};

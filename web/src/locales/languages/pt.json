@@ -1507,7 +1507,11 @@
     "pivotStickyRowTotals": "Totais de linhas fixas",
     "pivotStickyRowTotalsTooltip": "Fixe a linha de totais na parte inferior para que ela permaneça visível ao rolar verticalmente",
     "pivotStickyColTotals": "Totais de colunas fixas",
-    "pivotStickyColTotalsTooltip": "Fixe a coluna de totais à direita para que ela permaneça visível ao rolar horizontalmente"
+    "pivotStickyColTotalsTooltip": "Fixe a coluna de totais à direita para que ela permaneça visível ao rolar horizontalmente",
+    "multiSqlQueryLabel": "Rótulo de consulta",
+    "multiSqlQueryLabelHint": "Nome personalizado para essa consulta em legendas (por exemplo, 'Produção')",
+    "multiQueryWarning": "Somente a consulta 1 é renderizada para {chartType}",
+    "trellisNotSupportedWithMultiQuery": "O layout do Trellis está desativado com várias consultas. Remova consultas extras para usar a treliça."
   },
   "panel": {
     "header": "Painel",

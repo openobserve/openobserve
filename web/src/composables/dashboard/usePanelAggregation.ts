@@ -62,8 +62,6 @@ export const usePanelAggregation = ({
         });
         if (dashboardPanelData.data.queryType === "sql") {
           dashboardPanelData.layout.currentQueryIndex = 0;
-          dashboardPanelData.data.queries =
-            dashboardPanelData.data.queries.slice(0, 1);
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
@@ -119,8 +117,6 @@ export const usePanelAggregation = ({
         });
         if (dashboardPanelData.data.queryType === "sql") {
           dashboardPanelData.layout.currentQueryIndex = 0;
-          dashboardPanelData.data.queries =
-            dashboardPanelData.data.queries.slice(0, 1);
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
@@ -155,8 +151,6 @@ export const usePanelAggregation = ({
         });
         if (dashboardPanelData.data.queryType === "sql") {
           dashboardPanelData.layout.currentQueryIndex = 0;
-          dashboardPanelData.data.queries =
-            dashboardPanelData.data.queries.slice(0, 1);
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
@@ -209,8 +203,6 @@ export const usePanelAggregation = ({
         });
         if (dashboardPanelData.data.queryType === "sql") {
           dashboardPanelData.layout.currentQueryIndex = 0;
-          dashboardPanelData.data.queries =
-            dashboardPanelData.data.queries.slice(0, 1);
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
@@ -258,8 +250,6 @@ export const usePanelAggregation = ({
         });
         if (dashboardPanelData.data.queryType === "sql") {
           dashboardPanelData.layout.currentQueryIndex = 0;
-          dashboardPanelData.data.queries =
-            dashboardPanelData.data.queries.slice(0, 1);
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";

@@ -1507,7 +1507,11 @@
     "pivotStickyRowTotals": "Totalen van Sticky Row",
     "pivotStickyRowTotalsTooltip": "Zet de rij met totalen onderaan vast, zodat deze zichtbaar blijft wanneer je verticaal scrolt.",
     "pivotStickyColTotals": "Totalen van plakkerige kolommen",
-    "pivotStickyColTotalsTooltip": "Zet de kolom met totalen aan de rechterkant vast, zodat deze zichtbaar blijft wanneer u horizontaal scrolt"
+    "pivotStickyColTotalsTooltip": "Zet de kolom met totalen aan de rechterkant vast, zodat deze zichtbaar blijft wanneer u horizontaal scrolt",
+    "multiSqlQueryLabel": "Query-label",
+    "multiSqlQueryLabelHint": "Aangepaste naam voor deze zoekopdracht in legenda's (bijvoorbeeld 'Productie')",
+    "multiQueryWarning": "Alleen Query 1 wordt weergegeven voor {chartType}",
+    "trellisNotSupportedWithMultiQuery": "De Trellis-indeling is uitgeschakeld bij meerdere zoekopdrachten. Verwijder extra zoekopdrachten om trellis te gebruiken."
   },
   "panel": {
     "header": "Paneel",

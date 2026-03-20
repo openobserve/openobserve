@@ -42,12 +42,19 @@ export const convertMultiSQLData = async (
     searchQueryData = [[]];
   }
 
-  // loop on all search query data
+  // C1: loop on all search query data with per-query schema
   const options: any = [];
   for (let i = 0; i < searchQueryData.length; i++) {
+    // Create a per-query schema view: set queries[0] to the current query
+    // so contextBuilder.ts reads the correct query's fields
+    const querySchema = {
+      ...panelSchema,
+      queries: [panelSchema.queries[i]],
+    };
+
     options.push(
       await convertSQLData(
-        panelSchema,
+        querySchema,
         [searchQueryData[i]],
         store,
         chartPanelRef,
@@ -66,8 +73,202 @@ export const convertMultiSQLData = async (
     if (!series.name) return true;
   };
 
-  // loop on all options
-  if (options && options[0] && options[0].options) {
+  const chartType = panelSchema.type;
+
+  // Helper: build labeled name with promql_legend template + time shift suffix
+  const buildLabeledName = (
+    name: string,
+    queryConfig: any,
+    queryIndex: number,
+    periodAsStr?: string,
+  ) => {
+    let labeled = name;
+
+    // Apply template replacement if query_label is provided
+    if (queryConfig?.query_label) {
+      // Replace any {placeholder} with the generated series name
+      labeled = queryConfig.query_label.replace(/\{[^}]+\}/g, name);
+    }
+
+    return periodAsStr ? `${labeled} (${periodAsStr})` : labeled;
+  };
+
+  // C5: Pie/Donut — merge data arrays into single series (not series concat)
+  if (
+    (chartType === "pie" || chartType === "donut") &&
+    options.length > 1
+  ) {
+    const mergedData: any[] = [];
+
+    options.forEach((opt: any, queryIndex: number) => {
+      const queryConfig = panelSchema.queries[queryIndex]?.config;
+
+      opt?.options?.series?.[0]?.data?.forEach((d: any) => {
+        const labeledName = buildLabeledName(
+          d.name,
+          queryConfig,
+          queryIndex,
+        );
+        mergedData.push({ ...d, name: labeledName });
+      });
+    });
+
+    if (options[0]?.options?.series?.[0]) {
+      options[0].options.series[0].data = mergedData;
+    }
+
+    applySeriesColorMappings(
+      options[0]?.options?.series,
+      panelSchema?.config?.color?.colorBySeries,
+      store.state.theme,
+    );
+    return options[0];
+  }
+
+  // C6: Metric — collect values from all queries for grid display
+  if (chartType === "metric" && options.length > 1) {
+    const additionalValues = options.slice(1).map((opt: any, idx: number) => {
+      const qConfig = panelSchema.queries[idx + 1]?.config;
+      return {
+        options: opt.options,
+        queryLabel: qConfig?.query_label || "",
+      };
+    });
+    options[0].extras = {
+      ...options[0].extras,
+      additionalMetricValues: additionalValues,
+    };
+    return options[0];
+  }
+
+  // C6: Gauge — collect all dials and recalculate grid positions
+  if (chartType === "gauge" && options.length > 1) {
+    const allSeries: any[] = [];
+    options.forEach((opt: any) => {
+      if (opt?.options?.series) {
+        allSeries.push(...opt.options.series);
+      }
+    });
+    const total = allSeries.length;
+    allSeries.forEach((s: any, idx: number) => {
+      const col = idx % 3;
+      const row = Math.floor(idx / 3);
+      s.center = [
+        `${(col + 1) * 25}%`,
+        `${(row + 1) * (100 / (Math.ceil(total / 3) + 1))}%`,
+      ];
+      s.gridIndex = idx;
+    });
+    options[0].options.series = allSeries;
+    applySeriesColorMappings(
+      options[0].options.series,
+      panelSchema?.config?.color?.colorBySeries,
+      store.state.theme,
+    );
+    return options[0];
+  }
+
+  // C3: X-axis merge + reindex for time-series charts
+  const needsXAxisMerge =
+    options.length > 1 &&
+    options[0]?.options?.xAxis?.[0]?.data &&
+    !["pie", "donut", "metric", "gauge"].includes(chartType);
+
+  if (needsXAxisMerge) {
+    // Save each query's original xAxis BEFORE merging
+    const originalXAxes = options.map(
+      (opt: any) => [...(opt?.options?.xAxis?.[0]?.data || [])],
+    );
+
+    // Build merged xAxis (union of all queries' values)
+    const mergedXAxisSet = new Set<any>();
+    originalXAxes.forEach((xData: any[]) => {
+      xData.forEach((v: any) => mergedXAxisSet.add(v));
+    });
+
+    // Sort: timestamps numerically, categorical strings alphabetically
+    const mergedXAxis = Array.from(mergedXAxisSet).sort((a: any, b: any) =>
+      typeof a === "number" ? a - b : String(a).localeCompare(String(b)),
+    );
+
+    // Optimization: skip reindexing if merged === original Q1 xAxis
+    const q1Unchanged =
+      mergedXAxis.length === originalXAxes[0].length &&
+      mergedXAxis.every((v: any, idx: number) => v === originalXAxes[0][idx]);
+
+    // Apply merged xAxis to result
+    options[0].options.xAxis[0].data = mergedXAxis;
+
+    // Reindex every query's series data to align with merged xAxis
+    options.forEach((opt: any, queryIdx: number) => {
+      if (queryIdx === 0 && q1Unchanged) return;
+
+      const originalXAxis = originalXAxes[queryIdx];
+      if (!originalXAxis?.length) return;
+
+      // Build value→mergedIndex lookup
+      const valueToMergedIdx = new Map<any, number>();
+      mergedXAxis.forEach((val: any, idx: number) =>
+        valueToMergedIdx.set(val, idx),
+      );
+
+      // Reindex each series' data array
+      opt?.options?.series?.forEach((series: any) => {
+        if (!Array.isArray(series.data)) return;
+        const newData = new Array(mergedXAxis.length).fill(null);
+        series.data.forEach((val: any, origIdx: number) => {
+          const mergedIdx = valueToMergedIdx.get(originalXAxis[origIdx]);
+          if (mergedIdx !== undefined) newData[mergedIdx] = val;
+        });
+        series.data = newData;
+      });
+    });
+  }
+
+  // C2: Series labeling + C4: Stack collision fix — apply to ALL queries when multi-query
+  if (options && options.length > 1 && options[0]?.options) {
+    // Label Q1 series
+    if (options[0].options.series) {
+      const q1Config = panelSchema.queries[0]?.config;
+      const q1Period =
+        metadata?.queries[0]?.timeRangeGap?.periodAsStr || "";
+
+      options[0].options.series = options[0].options.series.map(
+        (it: any) => {
+          if (isAnnotationSeries(it)) return it;
+          return {
+            ...it,
+            name: buildLabeledName(it.name, q1Config, 0, q1Period),
+            _queryIndex: 0,
+          };
+        },
+      );
+    }
+
+    // Label + merge Q2+ series
+    for (let i = 1; i < options.length; i++) {
+      if (options[i]?.options?.series) {
+        const qConfig = panelSchema.queries[i]?.config;
+        const periodAsStr =
+          metadata?.queries[i]?.timeRangeGap?.periodAsStr || "";
+
+        options[0].options.series = [
+          ...options[0].options.series,
+          ...options[i].options.series.map((it: any) => {
+            if (isAnnotationSeries(it)) return it;
+            return {
+              ...it,
+              name: buildLabeledName(it.name, qConfig, i, periodAsStr),
+              _queryIndex: i,
+              // C4: prefix stack names to prevent cross-query stacking
+              stack: it.stack ? `q${i}-${it.stack}` : it.stack,
+            };
+          }),
+        ];
+      }
+    }
+  } else if (options && options[0] && options[0].options) {
+    // Single query with time shift: preserve existing time shift naming
     for (let i = 1; i < options.length; i++) {
       if (options[i] && options[i].options && options[i].options.series) {
         options[0].options.series = [
@@ -76,7 +277,7 @@ export const convertMultiSQLData = async (
             if (isAnnotationSeries(it)) return it;
             return {
               ...it,
-              name: metadata?.queries[i]?.timeRangeGap.periodAsStr
+              name: metadata?.queries[i]?.timeRangeGap?.periodAsStr
                 ? `${it.name} (${metadata?.queries[i]?.timeRangeGap.periodAsStr})`
                 : it.name,
             };
@@ -86,9 +287,7 @@ export const convertMultiSQLData = async (
     }
   }
 
-  // Re-apply color mappings on the fully merged+renamed series so that
-  // comparison-against series (which now carry the "(X ago)" suffix) match
-  // any user-configured colorBySeries entries that include the suffix.
+  // Re-apply color mappings on the fully merged+renamed series
   if (options[0]?.options?.series) {
     applySeriesColorMappings(
       options[0].options.series,

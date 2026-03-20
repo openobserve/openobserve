@@ -152,6 +152,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       },
       config: {
         promql_legend: "",
+        query_label: "",
         layer_type: "scatter",
         weight_fixed: 1,
       },
@@ -161,6 +162,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
   const removeQuery = (index: number) => {
     dashboardPanelData.data.queries.splice(index, 1);
+
+    // Fix hiddenQueries indices after removal
+    dashboardPanelData.layout.hiddenQueries =
+      dashboardPanelData.layout.hiddenQueries
+        .filter((i: number) => i !== index)
+        .map((i: number) => (i > index ? i - 1 : i));
   };
 
   const resetDashboardPanelData = () => {

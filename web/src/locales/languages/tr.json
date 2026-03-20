@@ -1507,7 +1507,11 @@
     "pivotStickyRowTotals": "Yapışkan Satır Toplamları",
     "pivotStickyRowTotalsTooltip": "Toplamlar satırını dikey olarak kaydırırken görünür kalması için alttaki sabitleyin",
     "pivotStickyColTotals": "Yapışkan Sütun Toplamları",
-    "pivotStickyColTotalsTooltip": "Yatay kaydırırken görünür kalması için sağdaki toplamlar sütununu sabitleyin"
+    "pivotStickyColTotalsTooltip": "Yatay kaydırırken görünür kalması için sağdaki toplamlar sütununu sabitleyin",
+    "multiSqlQueryLabel": "Sorgu Etiketi",
+    "multiSqlQueryLabelHint": "Açıklamalarda bu sorgu için özel ad (örn., 'Üretim')",
+    "multiQueryWarning": "{chartType} için yalnızca Sorgu 1 oluşturulur",
+    "trellisNotSupportedWithMultiQuery": "Kafes düzeni birden çok sorgu ile devre dışı bırakılır. Kafes kullanmak için ekstra sorguları kaldırın."
   },
   "panel": {
     "header": "Panel",

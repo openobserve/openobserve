@@ -219,7 +219,16 @@ const useHttpStreaming = () => {
 
       if(type === "histogram") {
         let is_multi_stream_search = false;
-        if (queryReq.query?.sql.indexOf(' UNION ALL ') !== -1) is_multi_stream_search = true;
+        const sqlValue = queryReq.query?.sql;
+        if (typeof sqlValue === "string") {
+          is_multi_stream_search = sqlValue.indexOf(' UNION ALL ') !== -1;
+        } else if (Array.isArray(sqlValue)) {
+          is_multi_stream_search = sqlValue.some((q: any) =>
+            typeof q === "string"
+              ? q.indexOf(' UNION ALL ') !== -1
+              : q?.sql?.indexOf?.(' UNION ALL ') !== -1
+          );
+        }
         url += `&is_multi_stream_search=${is_multi_stream_search}`;
       }
 

@@ -22,26 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click.stop="onDropDownClick"
     >
       <div
-        style="display: flex; flex-direction: row; align-items: center"
-        :style="
-          promqlMode || dashboardPanelData.data.type == 'geomap'
-            ? 'flex: 1; min-width: 0'
-            : ''
-        "
+        style="display: flex; flex-direction: row; align-items: center; flex: 1; min-width: 0"
         data-test="dashboard-query-data"
       >
-        <q-space
-          v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap')"
-        />
-        <span
-          v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap')"
-          class="text-subtitle2 text-weight-bold"
-          >{{ t("panel.sql") }}</span
-        >
-        <div
-          v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
-          style="max-width: 600px; overflow: hidden"
-        >
+        <div style="max-width: 600px; overflow: hidden">
           <q-tabs
             v-model="dashboardPanelData.layout.currentQueryIndex"
             narrow-indicator
@@ -63,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`dashboard-panel-query-tab-${index}`"
             >
               <q-icon
-                v-if="promqlMode"
+                v-if="dashboardPanelData.data.queries.length > 1"
                 :name="
                   dashboardPanelData.layout.hiddenQueries.includes(index)
                     ? 'visibility_off'
@@ -96,17 +80,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </q-tab>
           </q-tabs>
-          <!-- <div v-if="promqlMode" class="query-tabs-container">
-                    <div v-for="(tab, index) in dashboardPanelData.data.queries" :key="index" class="query-tab" :class="{ 'active': index === activeTab }" @click="handleActiveTab(index)">
-                        <div class="tab-label">{{ 'Query ' + (index + 1) }}</div>
-                        <div v-if="index > 0 || (index === 0 && dashboardPanelData.data.queries.length > 1)" @click.stop="removeTab(index)">
-                            <i class="material-icons">cancel</i>
-                        </div>
-                    </div>
-                </div> -->
         </div>
         <q-btn
-          v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
+          v-if="canAddQuery"
           round
           flat
           @click.stop="addTab"
@@ -114,6 +90,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="margin-right: 10px"
           data-test="`dashboard-panel-query-tab-add`"
         ></q-btn>
+        <!-- D5: Warning for restricted chart types with multiple queries -->
+        <div
+          v-if="multiQueryWarning"
+          class="dashboard-multi-query-warning"
+        >
+          <q-icon name="info" size="14px" />
+          <span>{{ multiQueryWarning }}</span>
+        </div>
       </div>
       <div style="display: flex; gap: 4px; flex-shrink: 0">
         <q-toggle
@@ -430,6 +414,47 @@ export default defineComponent({
     const functionEditorPlaceholderFlag = ref(true);
     const vrlFnEditorRef = ref(null);
 
+    // D2: Controls whether the "+" button is visible
+    const canAddQuery = computed(() => {
+      // PromQL always supports multi-query
+      if (promqlMode.value) return true;
+
+      const type = dashboardPanelData.data.type;
+
+      // Heatmap uses x+y+z grid — multi-query would be ambiguous
+      if (type === "heatmap") return false;
+
+      // Pivot table requires consistent field aliases — single query only
+      const isPivot =
+        type === "table" &&
+        (dashboardPanelData.data.queries?.[0]?.fields?.breakdown?.length ?? 0) > 0;
+      if (isPivot) return false;
+
+      return true;
+    });
+
+    // D5: Warning banner for restricted chart types with multiple queries
+    const multiQueryWarning = computed(() => {
+      if (dashboardPanelData.data.queries.length <= 1) return null;
+      if (promqlMode.value) return null;
+
+      const type = dashboardPanelData.data.type;
+
+      if (type === "heatmap") {
+        return t("dashboard.multiQueryWarning", { chartType: "Heatmap" });
+      }
+
+      const pivotQuery = dashboardPanelData.data.queries?.[0];
+      const isPivot =
+        type === "table" &&
+        (pivotQuery?.fields?.breakdown?.length ?? 0) > 0;
+      if (isPivot) {
+        return t("dashboard.multiQueryWarning", { chartType: "Pivot Table" });
+      }
+
+      return null;
+    });
+
     const addTab = () => {
       addQuery();
       dashboardPanelData.layout.currentQueryIndex =
@@ -726,6 +751,8 @@ export default defineComponent({
       onFunctionSelect,
       selectedStreamFieldsBasedOnUserDefinedSchema,
       store,
+      canAddQuery,
+      multiQueryWarning,
       handleQueryUpdate,
       handleLanguageChange,
       handleAskAI,
@@ -747,14 +774,39 @@ export default defineComponent({
   // cursor: pointer;
 }
 
-.dashboard-query-remove-icon:hover {
-  background-color: #eaeaeaa5;
-  border-radius: 50%;
+.dashboard-query-remove-icon {
+  opacity: 0.6;
+  transition: opacity 0.15s, background-color 0.15s;
+
+  &:hover {
+    opacity: 1;
+    background-color: var(--o2-hover-gray);
+    border-radius: 50%;
+  }
 }
 
-.dashboard-query-visibility-icon:hover {
-  background-color: #eaeaeaa5;
-  border-radius: 50%;
+.dashboard-query-visibility-icon {
+  opacity: 0.7;
+  transition: opacity 0.15s, background-color 0.15s;
+
+  &:hover {
+    opacity: 1;
+    background-color: var(--o2-hover-gray);
+    border-radius: 50%;
+  }
+}
+
+.dashboard-multi-query-warning {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: var(--o2-status-warning-text);
+  background: var(--o2-status-warning-bg);
+  border-radius: 4px;
+  white-space: nowrap;
+  margin-right: 8px;
 }
 
 .empty-function .monaco-editor-background {
