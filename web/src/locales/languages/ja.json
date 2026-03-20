@@ -2167,7 +2167,9 @@
       "detectionConfig": "クエリと検出パラメータの設定",
       "alerting": "異常が検出されたときの通知を設定する"
     },
-    "updateAnomalyDetection": "異常検出の更新:"
+    "updateAnomalyDetection": "異常検出の更新:",
+    "anomalyCreated": "異常検知設定が作成されました。トレーニングはまもなく開始されます。",
+    "editJson": "アラート JSON の編集"
   },
   "alert_templates": {
     "header": "テンプレート",

@@ -342,7 +342,11 @@ export default defineComponent({
     };
 
     const formatSeconds = (secs: number) => {
-      if (secs >= 3600 && secs % 3600 === 0) return `${secs / 3600}h`;
+      if (secs >= 3600) {
+        const h = Math.floor(secs / 3600);
+        const m = Math.round((secs % 3600) / 60);
+        return m === 0 ? `${h} Hours` : `${h} Hours ${m} Mins`;
+      }
       return `${Math.round(secs / 60)} mins`;
     };
 

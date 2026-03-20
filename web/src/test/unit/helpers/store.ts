@@ -109,7 +109,12 @@ const store = createStore({
       isDataIngested: false,
       allDashboardData: {},
       foldersByType: [],
-    }
+    },
+    alertListFilters: {
+      searchQuery: "",
+      filterQuery: "",
+      searchAcrossFolders: false,
+    },
   },
   mutations: {
     login(state, payload) {
@@ -259,6 +264,9 @@ const store = createStore({
     },
     clearPendingShortURL(state) {
       // Mock mutation for tests - clears pending short URL state
+    },
+    setAlertListFilters(state, payload) {
+      state.alertListFilters = { ...state.alertListFilters, ...payload };
     },
   },
   modules: {

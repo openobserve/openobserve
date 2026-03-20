@@ -2150,7 +2150,9 @@
       "detectionConfig": "Configurar os parâmetros de consulta e detecção",
       "alerting": "Configure notificações quando anomalias forem detectadas"
     },
-    "updateAnomalyDetection": "Atualize a detecção de anomalias:"
+    "updateAnomalyDetection": "Atualize a detecção de anomalias:",
+    "anomalyCreated": "Configuração de detecção de anomalias criada. O treinamento começará em breve.",
+    "editJson": "Editar alerta JSON"
   },
   "alert_templates": {
     "header": "Modelos",
