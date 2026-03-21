@@ -286,7 +286,8 @@ jobs:
                 "metrics-visualizations.spec.js",
                 "metrics-config.spec.js",
                 "metrics-promql-query-persistence.spec.js",
-                "metrics-table-column-order.spec.js"
+                "metrics-table-column-order.spec.js",
+                "metrics-promql-builder.spec.js",
               ]
           - testfolder: "Dashboards-Variables"
             browser: "chrome"

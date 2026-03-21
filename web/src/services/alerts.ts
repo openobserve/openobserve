@@ -37,6 +37,7 @@ const alerts = {
     org_identifier: string,
     folder_id?: string,
     query?: string,
+    alert_type?: string,
   ) => {
     let url = `/api/v2/${org_identifier}/alerts?sort_by=${sort_by}&desc=${desc}&name=${name}`;
     if (folder_id) {
@@ -44,6 +45,9 @@ const alerts = {
     }
     if (query) {
       url += `&alert_name_substring=${query}`;
+    }
+    if (alert_type) {
+      url += `&alert_type=${alert_type}`;
     }
     return http().get(url);
   },
@@ -193,6 +197,7 @@ const alerts = {
   },
   getHistory: (org_identifier: string, query: any) => {
     const params = new URLSearchParams();
+    if (query.anomaly_id) params.append("anomaly_id", query.anomaly_id);
     if (query.alert_id) params.append("alert_id", query.alert_id);
     if (query.start_time) params.append("start_time", query.start_time);
     if (query.end_time) params.append("end_time", query.end_time);
@@ -243,6 +248,25 @@ const alerts = {
       `/api/v2/${org_identifier}/alerts/generate_sql`,
       data,
     );
+  },
+  // POST /api/v2/{org}/alerts/{id}/clone — clones regular alert or anomaly config
+  clone_by_id: (
+    org_identifier: string,
+    alert_id: string,
+    data: { name?: string; folder_id?: string; stream_type?: string; stream_name?: string },
+  ) => {
+    return http().post(
+      `/api/v2/${org_identifier}/alerts/${alert_id}/clone`,
+      data,
+    );
+  },
+  // POST /api/v2/{org}/alerts/{id}/export — returns config with runtime fields stripped
+  export_by_id: (org_identifier: string, alert_id: string) => {
+    return http().post(`/api/v2/${org_identifier}/alerts/${alert_id}/export`);
+  },
+  // PATCH /api/v2/{org}/alerts/{id}/retrain — triggers model retrain (anomaly configs only)
+  retrain_by_id: (org_identifier: string, alert_id: string) => {
+    return http().patch(`/api/v2/${org_identifier}/alerts/${alert_id}/retrain`);
   },
 };
 

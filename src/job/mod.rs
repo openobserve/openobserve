@@ -409,16 +409,21 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(service_graph::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(incidents::run());
+    // Register anomaly detection callbacks on every node.  The HTTP handlers
+    // for /retrain and /trigger can land on any node (querier, ingester, etc.),
+    // not just the alert_manager, so all nodes need the callbacks available.
     #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_alert_manager() {
-        // Register the OSS search layer as the query executor for anomaly detection.
-        // Must happen before start_scheduler() so the training/detection jobs can
-        // call execute_anomaly_query() via the registered callback.
+    {
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_query_executor(
-            |org_id, sql, start, end, cfg_id| {
+            |org_id, sql, start, end, cfg_id, stream_type| {
                 Box::pin(async move {
                     crate::service::anomaly_detection::execute_anomaly_query(
-                        &org_id, &sql, start, end, &cfg_id,
+                        &org_id,
+                        &sql,
+                        start,
+                        end,
+                        &cfg_id,
+                        &stream_type,
                     )
                     .await
                 })
@@ -515,7 +520,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 })
             },
         );
+    }
 
+    // The scheduler and startup recovery only run on alert_manager nodes.
+    #[cfg(feature = "enterprise")]
+    if LOCAL_NODE.is_alert_manager() {
         // Ensure every enabled anomaly config has a live detection trigger after restart.
         // Handles: trigger row missing, or stuck in Processing from a previous crash.
         crate::service::anomaly_detection::recover_detection_triggers_on_startup().await;

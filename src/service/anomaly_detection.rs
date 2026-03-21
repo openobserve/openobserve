@@ -15,6 +15,15 @@
 
 use anyhow::Result;
 use chrono::Utc;
+use config::{
+    meta::{
+        destinations::{DestinationType, Module},
+        folder::{DEFAULT_FOLDER, Folder, FolderType},
+        stream::StreamType,
+        triggers::{ScheduledTriggerData, TriggerModule},
+    },
+    utils::time::now_micros,
+};
 use infra::{db::ORM_CLIENT, table::entity::anomaly_detection_config};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter,
@@ -22,9 +31,64 @@ use sea_orm::{
 };
 use svix_ksuid::KsuidLike;
 
-use crate::handler::http::request::anomaly_detection::{
-    CreateAnomalyConfigRequest, UpdateAnomalyConfigRequest,
+use crate::{
+    handler::http::request::anomaly_detection::{
+        CreateAnomalyConfigRequest, UpdateAnomalyConfigRequest,
+    },
+    service::{alerts::destinations, search},
 };
+
+/// Resolve a folder name (e.g. "default") to the PK stored in `folders.id`.
+///
+/// Anomaly detection configs store the same FK as the alerts table — the KSUID primary
+/// key of the folder row, NOT the human-readable name.  This helper performs that
+/// lookup and is called whenever we write a folder_id value to the DB.
+///
+/// If the name is "default" and the folder does not yet exist it is auto-created,
+/// matching the behaviour of `alert::create` which calls `create_default_alerts_folder`.
+async fn resolve_folder_pk(org_id: &str, name: &str) -> Option<String> {
+    let pk = infra::table::folders::get_pk_by_name(org_id, name, FolderType::Alerts)
+        .await
+        .ok()
+        .flatten();
+
+    if pk.is_some() {
+        return pk;
+    }
+
+    // Auto-create the default Alerts folder on first use, same as alert::create does.
+    if name == DEFAULT_FOLDER {
+        let folder = Folder {
+            folder_id: DEFAULT_FOLDER.to_owned(),
+            name: "default".to_owned(),
+            description: "default".to_owned(),
+        };
+        if crate::service::folders::save_folder(org_id, folder, FolderType::Alerts, true)
+            .await
+            .is_ok()
+        {
+            return infra::table::folders::get_pk_by_name(org_id, name, FolderType::Alerts)
+                .await
+                .ok()
+                .flatten();
+        }
+    }
+
+    None
+}
+
+/// Translate a stored folder PK back to the user-visible name for API responses.
+/// Falls back to "default" if the PK cannot be resolved (e.g. folder was deleted).
+async fn pk_to_name(pk: Option<&str>) -> String {
+    match pk {
+        None => "default".to_string(),
+        Some(pk) => infra::table::folders::get_name_by_pk(pk)
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or_else(|| "default".to_string()),
+    }
+}
 
 /// Convert an integer status code to its human-readable string label.
 /// This is applied when serializing configs to API responses so the UI
@@ -56,9 +120,11 @@ fn model_to_api_json(mut val: serde_json::Value) -> serde_json::Value {
 ///     Waiting→Processing, i.e. the actual trigger-fired wall-clock time)
 ///   - `last_anomaly_detected_at` ← `ScheduledTriggerData.last_satisfied_at` stored in
 ///     `trigger.data` JSON by the handler when `anomaly_count > 0`
-pub async fn list_configs(org_id: &str) -> Result<Vec<serde_json::Value>> {
-    use config::meta::triggers::{ScheduledTriggerData, TriggerModule};
-
+pub async fn list_configs(
+    org_id: &str,
+    folder_name: Option<&str>,
+    name_substring: Option<&str>,
+) -> Result<Vec<serde_json::Value>> {
     let db = ORM_CLIENT
         .get()
         .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
@@ -78,11 +144,75 @@ pub async fn list_configs(org_id: &str) -> Result<Vec<serde_json::Value>> {
             .map(|t| (t.module_key.clone(), t))
             .collect();
 
+    // Resolve the folder name filter to a PK so we can filter the in-memory list.
+    // (Storing PKs in the DB means we must compare against the PK, not the name.)
+    let folder_pk_filter: Option<String> = if let Some(name) = folder_name {
+        infra::table::folders::get_pk_by_name(
+            org_id,
+            name,
+            config::meta::folder::FolderType::Alerts,
+        )
+        .await
+        .ok()
+        .flatten()
+    } else {
+        None
+    };
+
+    // Filter by folder if a name was provided. When the PK lookup returns None
+    // (folder not found), no configs should match — return empty.
+    let configs: Vec<_> = if folder_name.is_some() {
+        match &folder_pk_filter {
+            Some(pk) => configs.into_iter().filter(|m| m.folder_id == *pk).collect(),
+            None => vec![],
+        }
+    } else {
+        configs
+    };
+
+    // Filter by name substring (case-insensitive) when provided.
+    let configs: Vec<_> = if let Some(substr) = name_substring.filter(|s| !s.is_empty()) {
+        let lower = substr.to_lowercase();
+        configs
+            .into_iter()
+            .filter(|m| m.name.to_lowercase().contains(&lower))
+            .collect()
+    } else {
+        configs
+    };
+
+    // Collect unique folder PKs so we can batch-resolve them to name + display name.
+    let unique_pks: std::collections::HashSet<String> =
+        configs.iter().map(|m| m.folder_id.clone()).collect();
+    // pk → (name, display_name)
+    let mut pk_to_folder_map: std::collections::HashMap<String, (String, String)> =
+        std::collections::HashMap::new();
+    for pk in unique_pks {
+        if let Ok(Some(info)) = infra::table::folders::get_name_and_display_name_by_pk(&pk).await {
+            pk_to_folder_map.insert(pk, info);
+        }
+    }
+
     let result: Vec<serde_json::Value> = configs
         .into_iter()
         .map(|model| {
             let anomaly_id = model.anomaly_id.clone();
+            let (folder_name, folder_display_name) = pk_to_folder_map
+                .get(&model.folder_id)
+                .cloned()
+                .unwrap_or_else(|| ("default".to_string(), String::new()));
             let mut val = model_to_api_json(serde_json::to_value(model).unwrap_or_default());
+            // Replace stored PK with the user-visible name and add display name.
+            if let Some(obj) = val.as_object_mut() {
+                obj.insert(
+                    "folder_id".to_string(),
+                    serde_json::Value::String(folder_name),
+                );
+                obj.insert(
+                    "folder_name".to_string(),
+                    serde_json::Value::String(folder_display_name),
+                );
+            }
             if let Some(obj) = val.as_object_mut()
                 && let Some(trigger) = trigger_map.get(&anomaly_id)
             {
@@ -122,7 +252,17 @@ pub async fn get_config(org_id: &str, anomaly_id: &str) -> Result<Option<serde_j
         .one(db)
         .await?;
 
-    Ok(config.map(|model| model_to_api_json(serde_json::to_value(model).unwrap_or_default())))
+    match config {
+        None => Ok(None),
+        Some(model) => {
+            let name = pk_to_name(Some(&model.folder_id)).await;
+            let mut val = model_to_api_json(serde_json::to_value(model).unwrap_or_default());
+            if let Some(obj) = val.as_object_mut() {
+                obj.insert("folder_id".to_string(), serde_json::Value::String(name));
+            }
+            Ok(Some(val))
+        }
+    }
 }
 
 /// Create a new anomaly detection configuration
@@ -140,6 +280,16 @@ pub async fn create_config(
     let anomaly_id = svix_ksuid::Ksuid::new(None, None).to_string();
     let now_us = Utc::now().timestamp_micros();
 
+    // Resolve the folder name to the FK (folders.id PK), consistent with the alerts table.
+    let folder_name = req
+        .folder_id
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .unwrap_or("default");
+    let folder_pk = resolve_folder_pk(org_id, folder_name)
+        .await
+        .ok_or_else(|| anyhow::anyhow!("Folder '{}' not found", folder_name))?;
+
     let new_config = anomaly_detection_config::ActiveModel {
         anomaly_id: Set(anomaly_id.clone()),
         org_id: Set(org_id.to_string()),
@@ -151,7 +301,10 @@ pub async fn create_config(
         query_mode: Set(req.query_mode.clone()),
         filters: Set(req.filters.clone()),
         custom_sql: Set(req.custom_sql.clone()),
-        detection_function: Set(req.detection_function.clone()),
+        detection_function: Set(combine_detection_fn(
+            &req.detection_function,
+            req.detection_function_field.as_deref(),
+        )),
         histogram_interval: Set(req.histogram_interval.clone()),
         schedule_interval: Set(req.schedule_interval.clone()),
         detection_window_seconds: Set(req.detection_window_seconds),
@@ -184,7 +337,11 @@ pub async fn create_config(
                 .rcf_shingle_size as i32,
         )),
         alert_enabled: Set(req.alert_enabled.unwrap_or(true)),
-        alert_destination_id: Set(req.alert_destination_id.clone()),
+        alert_destinations: Set(Some(
+            serde_json::to_value(&req.alert_destinations).unwrap_or(serde_json::json!([])),
+        )),
+        folder_id: Set(folder_pk),
+        owner: Set(req.owner.clone()),
         status: Set(0i32), // 0 = waiting
         retries: Set(0),
         last_updated: Set(now_us),
@@ -196,12 +353,12 @@ pub async fn create_config(
     };
 
     let result = new_config.insert(db).await?;
+    let folder_name_owned = folder_name.to_string();
 
     // Register a detection trigger in the shared scheduler so it is driven by the
     // same infrastructure as alerts.  The handler will check `is_trained` and skip
     // until training is complete.
     {
-        use config::{meta::triggers::TriggerModule, utils::time::now_micros};
         let trigger = crate::service::db::scheduler::Trigger {
             org: org_id.to_string(),
             module: TriggerModule::AnomalyDetection,
@@ -237,7 +394,14 @@ pub async fn create_config(
         });
     }
 
-    Ok(serde_json::to_value(result)?)
+    let mut val = serde_json::to_value(result)?;
+    if let Some(obj) = val.as_object_mut() {
+        obj.insert(
+            "folder_id".to_string(),
+            serde_json::Value::String(folder_name_owned),
+        );
+    }
+    Ok(val)
 }
 
 /// Update an existing anomaly detection configuration
@@ -267,7 +431,7 @@ pub async fn update_config(
     let mut reset_trigger_after_save = false;
     if let Some(enabled) = req.enabled {
         active_model.enabled = Set(enabled);
-        use config::meta::triggers::TriggerModule;
+
         if enabled {
             // Defer the push until after active_model.update() so the scheduler
             // always reads enabled=true from the DB when it picks up the trigger.
@@ -275,18 +439,11 @@ pub async fn update_config(
             // hit the skip path, and delay the next run by 60 s.
             push_trigger_after_save = true;
         } else {
-            // Delete eagerly — no ordering requirement for disable.
-            if let Err(e) = crate::service::db::scheduler::delete(
-                org_id,
-                TriggerModule::AnomalyDetection,
-                anomaly_id,
-            )
-            .await
-            {
-                log::warn!(
-                    "[anomaly_detection {anomaly_id}] failed to delete trigger on disable: {e}"
-                );
-            }
+            // Do NOT delete the trigger on disable — the scheduler handler already
+            // skips and reschedules disabled configs (see handlers.rs). Keeping the
+            // trigger row preserves last_detection_run (trigger.start_time) and
+            // last_anomaly_detected_at (trigger.data.last_satisfied_at) so they
+            // remain visible in the UI after a pause + refresh.
         }
     }
     if let Some(name) = req.name {
@@ -295,8 +452,32 @@ pub async fn update_config(
     if let Some(description) = req.description {
         active_model.description = Set(Some(description));
     }
+    if let Some(query_mode) = req.query_mode {
+        // Clear the opposing field so the DB doesn't hold stale data from the
+        // previous mode. query_builder selects the path based on query_mode alone,
+        // but stale fields in the DB are confusing when inspecting records.
+        match query_mode.as_str() {
+            "custom_sql" => {
+                active_model.filters = Set(None);
+            }
+            "filters" => {
+                active_model.custom_sql = Set(None);
+            }
+            _ => {}
+        }
+        active_model.query_mode = Set(query_mode);
+    }
+    if let Some(filters) = req.filters {
+        active_model.filters = Set(Some(filters));
+    }
+    if let Some(custom_sql) = req.custom_sql {
+        active_model.custom_sql = Set(Some(custom_sql));
+    }
     if let Some(detection_function) = req.detection_function {
-        active_model.detection_function = Set(detection_function);
+        active_model.detection_function = Set(combine_detection_fn(
+            &detection_function,
+            req.detection_function_field.as_deref(),
+        ));
     }
     if let Some(histogram_interval) = req.histogram_interval {
         active_model.histogram_interval = Set(histogram_interval);
@@ -322,8 +503,19 @@ pub async fn update_config(
     if let Some(alert_enabled) = req.alert_enabled {
         active_model.alert_enabled = Set(alert_enabled);
     }
-    if let Some(alert_destination_id) = req.alert_destination_id {
-        active_model.alert_destination_id = Set(Some(alert_destination_id));
+    if let Some(destinations) = req.alert_destinations {
+        active_model.alert_destinations = Set(Some(
+            serde_json::to_value(&destinations).unwrap_or(serde_json::json!([])),
+        ));
+    }
+    if let Some(folder_id_str) = req.folder_id {
+        let pk = resolve_folder_pk(org_id, &folder_id_str)
+            .await
+            .ok_or_else(|| anyhow::anyhow!("Folder '{}' not found", folder_id_str))?;
+        active_model.folder_id = Set(pk);
+    }
+    if let Some(owner) = req.owner {
+        active_model.owner = Set(Some(owner));
     }
 
     active_model.updated_at = Set(Utc::now().timestamp_micros());
@@ -333,7 +525,6 @@ pub async fn update_config(
     // Push the trigger AFTER the DB save so the scheduler always sees enabled=true
     // when it picks up the newly inserted trigger row.
     if push_trigger_after_save {
-        use config::{meta::triggers::TriggerModule, utils::time::now_micros};
         let trigger = crate::service::db::scheduler::Trigger {
             org: org_id.to_string(),
             module: TriggerModule::AnomalyDetection,
@@ -354,7 +545,6 @@ pub async fn update_config(
     // so the new cadence takes effect immediately (push() alone would be a no-op on an
     // existing row due to ON CONFLICT DO NOTHING).  Only applicable for enabled configs.
     if reset_trigger_after_save && updated.enabled {
-        use config::{meta::triggers::TriggerModule, utils::time::now_micros};
         let now = now_micros();
         match crate::service::db::scheduler::get(
             org_id,
@@ -393,7 +583,12 @@ pub async fn update_config(
         }
     }
 
-    Ok(serde_json::to_value(updated)?)
+    let name = pk_to_name(Some(&updated.folder_id)).await;
+    let mut val = serde_json::to_value(updated)?;
+    if let Some(obj) = val.as_object_mut() {
+        obj.insert("folder_id".to_string(), serde_json::Value::String(name));
+    }
+    Ok(val)
 }
 
 /// Delete an anomaly detection configuration
@@ -412,7 +607,6 @@ pub async fn delete_config(org_id: &str, anomaly_id: &str) -> Result<()> {
 
     // Remove the detection trigger from the shared scheduler.
     {
-        use config::meta::triggers::TriggerModule;
         if let Err(e) = crate::service::db::scheduler::delete(
             org_id,
             TriggerModule::AnomalyDetection,
@@ -424,7 +618,116 @@ pub async fn delete_config(org_id: &str, anomaly_id: &str) -> Result<()> {
         }
     }
 
+    // Delete stored model files and clear cache (enterprise only).
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::anomaly_detection::delete_config_models(org_id, anomaly_id).await;
+
     Ok(())
+}
+
+/// Clone an anomaly detection configuration.
+///
+/// Copies all configuration fields from the source config to a new config with a new
+/// KSUID. Runtime/training state is reset: `is_trained=false`, all training timestamps
+/// cleared, `status=0` (waiting), and counters zeroed.
+///
+/// If `new_name` is provided it is used as the cloned config's name; otherwise the
+/// source name is suffixed with `"_copy"`.
+///
+/// If `folder_id` is provided the clone is placed in that folder; otherwise the same
+/// folder as the source is used.
+pub async fn clone_config(
+    org_id: &str,
+    anomaly_id: &str,
+    new_name: Option<String>,
+    folder_id: Option<String>,
+) -> Result<serde_json::Value> {
+    let db = ORM_CLIENT
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+
+    let src = anomaly_detection_config::Entity::find_by_id(anomaly_id)
+        .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
+        .one(db)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
+
+    let new_id = svix_ksuid::Ksuid::new(None, None).to_string();
+    let now_us = Utc::now().timestamp_micros();
+
+    // If a new folder name is given, resolve it to the PK; otherwise inherit the
+    // source's already-stored PK.
+    let resolved_folder_id = if let Some(name) = folder_id {
+        resolve_folder_pk(org_id, &name)
+            .await
+            .unwrap_or_else(|| src.folder_id.clone())
+    } else {
+        src.folder_id.clone()
+    };
+
+    let cloned = anomaly_detection_config::ActiveModel {
+        anomaly_id: Set(new_id.clone()),
+        org_id: Set(src.org_id.clone()),
+        stream_name: Set(src.stream_name.clone()),
+        stream_type: Set(src.stream_type.clone()),
+        enabled: Set(src.enabled),
+        name: Set(new_name.unwrap_or_else(|| format!("{}_copy", src.name))),
+        description: Set(src.description.clone()),
+        query_mode: Set(src.query_mode.clone()),
+        filters: Set(src.filters.clone()),
+        custom_sql: Set(src.custom_sql.clone()),
+        detection_function: Set(src.detection_function.clone()),
+        histogram_interval: Set(src.histogram_interval.clone()),
+        schedule_interval: Set(src.schedule_interval.clone()),
+        detection_window_seconds: Set(src.detection_window_seconds),
+        training_window_days: Set(src.training_window_days),
+        retrain_interval_days: Set(src.retrain_interval_days),
+        threshold: Set(src.threshold),
+        seasonality: Set(src.seasonality.clone()),
+        is_trained: Set(false),
+        training_started_at: Set(None),
+        training_completed_at: Set(None),
+        last_error: Set(None),
+        last_processed_timestamp: Set(None),
+        current_model_version: Set(0),
+        rcf_num_trees: Set(src.rcf_num_trees),
+        rcf_tree_size: Set(src.rcf_tree_size),
+        rcf_shingle_size: Set(src.rcf_shingle_size),
+        alert_enabled: Set(src.alert_enabled),
+        alert_destinations: Set(src.alert_destinations.clone()),
+        folder_id: Set(resolved_folder_id),
+        owner: Set(src.owner.clone()),
+        status: Set(0i32),
+        retries: Set(0),
+        last_updated: Set(now_us),
+        created_at: Set(now_us),
+        updated_at: Set(now_us),
+    };
+
+    let result = cloned.insert(db).await?;
+
+    // Register detection trigger for the new config
+    {
+        let trigger = crate::service::db::scheduler::Trigger {
+            org: org_id.to_string(),
+            module: TriggerModule::AnomalyDetection,
+            module_key: new_id.clone(),
+            next_run_at: now_micros(),
+            is_realtime: false,
+            is_silenced: false,
+            ..Default::default()
+        };
+        if let Err(e) = crate::service::db::scheduler::push(trigger).await {
+            log::warn!("[anomaly_detection {new_id}] failed to push detection trigger: {e}");
+        }
+    }
+
+    let name = pk_to_name(Some(&result.folder_id)).await;
+    let mut val = model_to_api_json(serde_json::to_value(result).unwrap_or_default());
+    if let Some(obj) = val.as_object_mut() {
+        obj.insert("folder_id".to_string(), serde_json::Value::String(name));
+    }
+    Ok(val)
 }
 
 /// Cancel an in-progress training run.
@@ -537,6 +840,7 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
             start_time_us,
             end_time_us,
             anomaly_id,
+            &anomaly_config.stream_type.to_string(),
         )
         .await?;
 
@@ -580,61 +884,67 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
         }
 
         // Send alert if anomalies found and alert is configured
-        if result.anomaly_count > 0
-            && config.alert_enabled
-            && let Some(ref dest_id) = config.alert_destination_id
-        {
-            let anomaly_pts: Vec<_> = result
-                .scored_points
-                .iter()
-                .filter(|p| p.is_anomaly)
-                .collect();
-            let max_dev = anomaly_pts
-                .iter()
-                .map(|p| p.deviation_percent)
-                .fold(0.0f64, f64::max);
-            let worst_val = anomaly_pts
-                .iter()
-                .max_by(|a, b| {
-                    a.deviation_percent
-                        .partial_cmp(&b.deviation_percent)
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                })
-                .map(|p| p.actual_value)
-                .unwrap_or(0.0);
-            let window_start = result
-                .scored_points
-                .iter()
-                .map(|p| p.timestamp)
-                .min()
-                .unwrap_or(start_time_us);
-            let window_end = result
-                .scored_points
-                .iter()
-                .map(|p| p.timestamp)
-                .max()
-                .unwrap_or(end_time_us);
+        if result.anomaly_count > 0 && config.alert_enabled {
+            let destinations: Vec<String> = config
+                .alert_destinations
+                .as_ref()
+                .and_then(|v| serde_json::from_value::<Vec<String>>(v.clone()).ok())
+                .unwrap_or_default();
+            if !destinations.is_empty() {
+                let anomaly_pts: Vec<_> = result
+                    .scored_points
+                    .iter()
+                    .filter(|p| p.is_anomaly)
+                    .collect();
+                let max_dev = anomaly_pts
+                    .iter()
+                    .map(|p| p.deviation_percent)
+                    .fold(0.0f64, f64::max);
+                let worst_val = anomaly_pts
+                    .iter()
+                    .max_by(|a, b| {
+                        a.deviation_percent
+                            .partial_cmp(&b.deviation_percent)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .map(|p| p.actual_value)
+                    .unwrap_or(0.0);
+                let window_start = result
+                    .scored_points
+                    .iter()
+                    .map(|p| p.timestamp)
+                    .min()
+                    .unwrap_or(start_time_us);
+                let window_end = result
+                    .scored_points
+                    .iter()
+                    .map(|p| p.timestamp)
+                    .max()
+                    .unwrap_or(end_time_us);
 
-            if let Err(e) = send_anomaly_alert(
-                org_id.to_string(),
-                dest_id.clone(),
-                config.name.clone(),
-                anomaly_id.to_string(),
-                result.anomaly_count,
-                config.stream_name.clone(),
-                max_dev,
-                worst_val,
-                window_start,
-                window_end,
-            )
-            .await
-            {
-                log::warn!(
-                    "[anomaly_detection {}] failed to send alert to '{}': {}",
-                    anomaly_id,
-                    dest_id,
-                    e
-                );
+                for dest_id in destinations {
+                    if let Err(e) = send_anomaly_alert(
+                        org_id.to_string(),
+                        dest_id.clone(),
+                        config.name.clone(),
+                        anomaly_id.to_string(),
+                        result.anomaly_count,
+                        config.stream_name.clone(),
+                        max_dev,
+                        worst_val,
+                        window_start,
+                        window_end,
+                    )
+                    .await
+                    {
+                        log::warn!(
+                            "[anomaly_detection {}] failed to send alert to '{}': {}",
+                            anomaly_id,
+                            dest_id,
+                            e
+                        );
+                    }
+                }
             }
         }
 
@@ -687,8 +997,6 @@ pub struct DetectionHistoryItem {
 /// scheduler's `watch_timeout()` job already resets any `Processing` rows whose
 /// `end_time` has passed, exactly as it does for alert triggers.
 pub async fn recover_detection_triggers_on_startup() {
-    use config::{meta::triggers::TriggerModule, utils::time::now_micros};
-
     let db = match ORM_CLIENT.get() {
         Some(db) => db,
         None => {
@@ -769,6 +1077,23 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
     Ok(())
 }
 
+/// Combine a detection function name and optional field into the DB storage form.
+/// E.g. ("avg", Some("cpu_millicores")) → "avg(cpu_millicores)"
+///      ("count", _) → "count(*)"
+///      ("avg(cpu_millicores)", _) → "avg(cpu_millicores)"  (already combined, pass-through)
+fn combine_detection_fn(function: &str, field: Option<&str>) -> String {
+    if function.contains('(') {
+        return function.to_string();
+    }
+    match function {
+        "count" => "count(*)".to_string(),
+        other => match field {
+            Some(f) if !f.is_empty() => format!("{}({})", other, f),
+            _ => function.to_string(),
+        },
+    }
+}
+
 /// Parse interval string like "1h", "30m" into seconds
 fn parse_interval(interval: &str) -> Result<i64> {
     if let Some(interval) = interval.strip_suffix('h') {
@@ -806,7 +1131,16 @@ pub fn config_to_training_config(
         query_mode: serde_json::from_str(&format!("\"{}\"", config.query_mode))?,
         filters,
         custom_sql: config.custom_sql.clone(),
-        detection_function: serde_json::from_str(&format!("\"{}\"", config.detection_function))?,
+        detection_function: {
+            use o2_enterprise::enterprise::anomaly_detection::detector::split_detection_function;
+            let (fn_name, _) = split_detection_function(&config.detection_function);
+            serde_json::from_str(&format!("\"{}\"", fn_name))?
+        },
+        detection_field: {
+            use o2_enterprise::enterprise::anomaly_detection::detector::split_detection_function;
+            let (_, field) = split_detection_function(&config.detection_function);
+            field
+        },
         histogram_interval: config.histogram_interval.clone(),
         schedule_interval: config.schedule_interval.clone(),
         detection_window_seconds: config.detection_window_seconds,
@@ -824,7 +1158,11 @@ pub fn config_to_training_config(
         rcf_tree_size: config.rcf_tree_size as usize,
         rcf_shingle_size: config.rcf_shingle_size as usize,
         alert_enabled: config.alert_enabled,
-        alert_destination_id: config.alert_destination_id.clone(),
+        alert_destinations: config
+            .alert_destinations
+            .as_ref()
+            .and_then(|v| serde_json::from_value::<Vec<String>>(v.clone()).ok())
+            .unwrap_or_default(),
         status: o2_enterprise::enterprise::anomaly_detection::types::Status::from_i32(
             config.status,
         ),
@@ -846,11 +1184,8 @@ pub async fn execute_anomaly_query(
     start_time: i64,
     end_time: i64,
     anomaly_id: &str,
+    stream_type: &str,
 ) -> Result<Vec<o2_enterprise::enterprise::anomaly_detection::types::QueryDataPoint>> {
-    use config::meta::stream::StreamType;
-
-    use crate::service::search;
-
     log::info!(
         "[anomaly_detection {}] executing query: sql={}, start_time_us={}, end_time_us={}",
         anomaly_id,
@@ -882,8 +1217,9 @@ pub async fn execute_anomaly_query(
         local_mode: None,
     };
 
+    let parsed_stream_type = StreamType::from(stream_type);
     let trace_id = config::ider::generate_trace_id();
-    let search_result = search::search(&trace_id, org_id, StreamType::Logs, None, &search_req)
+    let search_result = search::search(&trace_id, org_id, parsed_stream_type, None, &search_req)
         .await
         .map_err(|e| anyhow::anyhow!("[anomaly_detection {}] search failed: {}", anomaly_id, e))?;
 
@@ -1139,10 +1475,6 @@ pub async fn send_anomaly_alert(
     // Detection window end (Unix microseconds).
     window_end_us: i64,
 ) -> anyhow::Result<()> {
-    use config::meta::destinations::{DestinationType, Module};
-
-    use crate::service::alerts::destinations;
-
     let dest = match destinations::get(&org_id, &destination_id).await {
         Ok(d) => d,
         Err(e) => {

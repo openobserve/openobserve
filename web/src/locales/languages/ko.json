@@ -2150,7 +2150,9 @@
       "detectionConfig": "쿼리 및 탐지 매개변수 구성",
       "alerting": "이상 징후 감지 시 알림 설정"
     },
-    "updateAnomalyDetection": "이상 탐지 업데이트:"
+    "updateAnomalyDetection": "이상 탐지 업데이트:",
+    "anomalyCreated": "이상 탐지 구성이 생성되었습니다.훈련이 곧 시작될 예정입니다.",
+    "editJson": "알림 JSON 편집"
   },
   "alert_templates": {
     "header": "템플릿",

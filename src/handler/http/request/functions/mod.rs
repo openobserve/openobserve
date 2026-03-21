@@ -94,7 +94,11 @@ pub async fn save_function(Path(org_id): Path<String>, Json(func): Json<Transfor
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all functions", "category": "functions"}))
+        ("x-o2-mcp" = json!({
+            "description": "List all functions",
+            "category": "functions",
+            "summary_fields": ["name", "transType", "streams"]
+        }))
     )
 )]
 pub async fn list_functions(

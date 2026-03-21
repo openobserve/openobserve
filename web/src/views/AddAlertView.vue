@@ -64,13 +64,24 @@ export default defineComponent({
       }
     };
 
-    const handleUpdateList = () => {
+    const handleUpdateList = (folderId?: string) => {
+      const resolvedFolder = folderId || (route.query.folder as string) || "default";
+
+      // Invalidate cached alerts for this folder so the AlertList
+      // component fetches fresh data when it mounts.
+      const cached = store.state.organizationData.allAlertsListByFolderId;
+      if (cached && cached[resolvedFolder]) {
+        const { [resolvedFolder]: _, ...rest } = cached;
+        store.dispatch("setAllAlertsListByFolderId", rest);
+      }
+
       // Navigate back to alert list after successful save
       router.push({
         name: "alertList",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          folder: route.query.folder || "default",
+          folder: resolvedFolder,
+          tab: route.query.tab || "all",
         },
       });
     };
@@ -82,6 +93,20 @@ export default defineComponent({
 
     onBeforeMount(async () => {
       await getDestinations();
+      if (!destinations.value.length) {
+        $q.notify({
+          type: "warning",
+          message:
+            "No destinations found. Please create a destination first.",
+          timeout: 3000,
+        });
+        router.push({
+          name: "alertList",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+      }
     });
 
     return {

@@ -2150,7 +2150,9 @@
       "detectionConfig": "Configurazione dei parametri di interrogazione e rilevamento",
       "alerting": "Imposta notifiche quando vengono rilevate anomalie"
     },
-    "updateAnomalyDetection": "Aggiorna il rilevamento delle anomalie:"
+    "updateAnomalyDetection": "Aggiorna il rilevamento delle anomalie:",
+    "anomalyCreated": "Configurazione di rilevamento delle anomalie creata. La formazione inizierà a breve.",
+    "editJson": "Modifica avviso JSON"
   },
   "alert_templates": {
     "header": "Modelli",

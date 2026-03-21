@@ -59,20 +59,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex tw:flex-col">
           <div class="tw:flex tw:items-center">
             <q-select
-              v-model="config.alert_destination_id"
+              v-model="config.alert_destination_ids"
               :options="filteredDestinations"
               option-label="name"
               option-value="name"
               emit-value
               map-options
+              multiple
+              use-chips
               dense
               borderless
               use-input
               input-debounce="300"
-              style="width: 300px; background: none"
+              style="min-width: 300px; max-width: 420px; background: none"
               data-test="anomaly-destination"
               @filter="filterDestinations"
             >
+              <template #option="{ itemProps, opt, selected, toggleOption }">
+                <q-item v-bind="itemProps">
+                  <q-item-section side>
+                    <q-checkbox
+                      :model-value="selected"
+                      dense
+                      @update:model-value="toggleOption(opt)"
+                    />
+                  </q-item-section>
+                  <q-item-section>
+                    <q-item-label>{{ opt.name }}</q-item-label>
+                  </q-item-section>
+                </q-item>
+              </template>
               <template #no-option>
                 <q-item>
                   <q-item-section class="text-grey">No destinations found</q-item-section>
@@ -101,11 +117,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div
-            v-if="config.alert_enabled && !config.alert_destination_id"
+            v-if="config.alert_enabled && config.alert_destination_ids.length === 0"
             class="text-red-8 q-pt-xs"
             style="font-size: 11px; line-height: 12px"
+            data-test="anomaly-destination-error"
           >
-            Field is required!
+            At least one destination is required!
           </div>
         </div>
       </div>
