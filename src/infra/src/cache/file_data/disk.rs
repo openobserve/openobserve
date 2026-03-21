@@ -854,7 +854,7 @@ async fn gc() -> Result<(), anyhow::Error> {
 
     for file in FILES.iter() {
         let r = file.read().await;
-        if r.cur_size + cfg.disk_cache.release_size < r.max_size {
+        if r.cur_size == 0 || r.cur_size + cfg.disk_cache.release_size < r.max_size {
             continue;
         }
         drop(r);
