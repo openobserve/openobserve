@@ -186,7 +186,11 @@ pub async fn update_report(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all reports", "category": "dashboards"}))
+        ("x-o2-mcp" = json!({
+            "description": "List all reports",
+            "category": "dashboards",
+            "summary_fields": ["name", "description", "enabled", "folder_name"]
+        }))
     )
 )]
 pub async fn list_reports(
