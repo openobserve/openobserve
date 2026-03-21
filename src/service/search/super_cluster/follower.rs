@@ -206,6 +206,7 @@ pub async fn search(
     );
 
     // check work group
+    let stream_key = format!("{}/{}", stream_type, stream.stream_name());
     let _lock = crate::service::search::work_group::acquire_work_group_lock(
         &trace_id,
         &req,
@@ -213,6 +214,7 @@ pub async fn search(
         "super_cluster_follower",
         &nodes,
         &file_id_list_vec,
+        &stream_key,
     )
     .await?;
 

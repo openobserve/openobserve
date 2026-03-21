@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Alert deduplication logic (Enterprise only)
+//! Alert deduplication logic
 //!
 //! This module provides the deduplication interface that delegates to the enterprise
 //! implementation. It is only compiled when the enterprise feature is enabled.

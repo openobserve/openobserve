@@ -191,13 +191,13 @@ pub async fn extract_patterns(
         // Pattern extraction benefits from sampling to improve performance on large datasets
         if req.query.sampling_ratio.is_none() {
             let o2_config = get_o2_config();
-            let default_ratio = o2_config.search_group.query_default_sampling_ratio / 100.0;
+            let default_ratio = o2_config.common.query_default_sampling_ratio / 100.0;
             if default_ratio > 0.0 && default_ratio <= 1.0 {
                 req.query.sampling_ratio = Some(default_ratio);
                 log::info!(
                     "[PATTERNS trace_id {}] Applied default sampling_ratio for pattern extraction: {}%",
                     trace_id,
-                    o2_config.search_group.query_default_sampling_ratio
+                    o2_config.common.query_default_sampling_ratio
                 );
             }
         }

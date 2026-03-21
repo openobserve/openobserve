@@ -118,6 +118,7 @@ pub async fn search(
 
     let mut stop_watch = TookWatcher::new();
 
+    let start_queue_time = std::time::Instant::now();
     // Check work group (OSS uses dist_lock, Enterprise uses WorkGroup::Short)
     #[cfg(not(feature = "enterprise"))]
     let _lock = crate::service::search::work_group::check_work_group(
@@ -143,6 +144,42 @@ pub async fn search(
     )
     .await
     .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+
+    // Node-level slot admission for PromQL (enterprise, O2_WORK_GROUP_SLOT_ENABLED=true).
+    // Placed here alongside the work_group check so both admission stages are co-located.
+    // The guard is held for the duration of search_in_cluster via the select! below.
+    // PromQL always runs as "short". Nodes are cached so the extra call is cheap.
+    #[cfg(feature = "enterprise")]
+    let _node_slot_guard = {
+        use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+        let wg = &get_o2_config().work_group;
+        if wg.slot_enabled {
+            let nodes = infra::cluster::get_cached_online_querier_nodes(Some(
+                config::meta::cluster::RoleGroup::Interactive,
+            ))
+            .await
+            .unwrap_or_default();
+            let elapsed_ms = stop_watch.total_millis();
+            let remaining_ms = (timeout * 1000).saturating_sub(elapsed_ms);
+            Some(
+                o2_enterprise::enterprise::search::admission::acquire_node_slots(
+                    trace_id,
+                    &nodes,
+                    "short",
+                    wg.short_per_node_slots as u32,
+                    wg.slot_reserved_ttl_ms,
+                    remaining_ms,
+                )
+                .await
+                .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?,
+            )
+        } else {
+            None
+        }
+    };
+
+    let took_wait = start_queue_time.elapsed().as_millis() as usize;
+    log::info!("[trace_id {trace_id}] promql->search: wait in queue took: {took_wait} ms");
 
     #[cfg(feature = "enterprise")]
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
@@ -258,6 +295,7 @@ async fn search_in_cluster(
             "no querier node found".to_string(),
         )));
     }
+
     let nr_queriers = nodes.len() as i64;
 
     // The number of resolution steps; see the diagram at

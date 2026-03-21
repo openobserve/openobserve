@@ -33,6 +33,8 @@ pub struct FlightEncoderStreamBuilder {
     custom_messages: Vec<PreCustomMessage>,
     // query context
     trace_id: String,
+    /// Base trace_id used for slot admission (no job suffix). Empty on OSS builds.
+    orig_trace_id: String,
     is_super: bool,
     defer_lock: Option<DeferredLock>,
     start: std::time::Instant,
@@ -45,6 +47,7 @@ impl FlightEncoderStreamBuilder {
             queue: VecDeque::new(),
             custom_messages: vec![],
             trace_id: String::new(),
+            orig_trace_id: String::new(),
             is_super: false,
             defer_lock: None,
             start: std::time::Instant::now(),
@@ -58,6 +61,11 @@ impl FlightEncoderStreamBuilder {
 
     pub fn with_trace_id(mut self, trace_id: String) -> Self {
         self.trace_id = trace_id;
+        self
+    }
+
+    pub fn with_orig_trace_id(mut self, orig_trace_id: String) -> Self {
+        self.orig_trace_id = orig_trace_id;
         self
     }
 
@@ -90,6 +98,7 @@ impl FlightEncoderStreamBuilder {
             done: false,
             custom_messages: self.custom_messages,
             trace_id: self.trace_id,
+            orig_trace_id: self.orig_trace_id,
             is_super: self.is_super,
             defer_lock: self.defer_lock,
             start: self.start,
@@ -112,6 +121,8 @@ pub struct FlightEncoderStream {
     custom_messages: Vec<PreCustomMessage>,
     // query context
     trace_id: String,
+    /// Base trace_id for slot admission release (no job suffix). Empty on OSS builds.
+    orig_trace_id: String,
     is_super: bool,
     defer_lock: Option<DeferredLock>,
     start: std::time::Instant,
@@ -267,6 +278,21 @@ impl Drop for FlightEncoderStream {
         metrics::GRPC_INCOMING_REQUESTS
             .with_label_values(&["/search/flight/do_get", "200", "", "", "", ""])
             .inc();
+
+        // Release the node-level slot reservation for this Follow node.
+        // orig_trace_id is the base trace_id (no job suffix) that matches the
+        // key stored in NODE_LEDGER by the Leader's TryAcquire call.
+        // release() is idempotent, so it is safe even if already released.
+        let _orig_trace_id = &self.orig_trace_id;
+        #[cfg(feature = "enterprise")]
+        if !_orig_trace_id.is_empty() {
+            log::info!(
+                "[trace_id {trace_id}] flight->search: follow releasing slot for {}",
+                _orig_trace_id
+            );
+            o2_enterprise::enterprise::search::admission::ledger::NODE_LEDGER
+                .release(_orig_trace_id);
+        }
 
         // defer is only set for super cluster follower leader
         if let Some(defer) = self.defer_lock.take() {

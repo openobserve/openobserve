@@ -1125,8 +1125,8 @@ pub struct QueryStatus {
     pub query: ::core::option::Option<Query>,
     #[prost(message, optional, tag = "9")]
     pub scan_stats: ::core::option::Option<ScanStats>,
-    #[prost(enumeration = "WorkGroup", optional, tag = "10")]
-    pub work_group: ::core::option::Option<i32>,
+    #[prost(string, optional, tag = "10")]
+    pub work_group: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "11")]
     pub search_type: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(message, optional, tag = "12")]
@@ -1151,31 +1151,47 @@ pub struct GetTableResponse {
     #[prost(bytes = "vec", tag = "1")]
     pub data: ::prost::alloc::vec::Vec<u8>,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
-#[repr(i32)]
-pub enum WorkGroup {
-    Short = 0,
-    Long = 1,
+/// Slot-based admission messages
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct TryAcquireRequest {
+    #[prost(string, tag = "1")]
+    pub trace_id: ::prost::alloc::string::String,
+    /// "short" | "long" | "background"
+    #[prost(string, tag = "2")]
+    pub group: ::prost::alloc::string::String,
+    #[prost(uint32, tag = "3")]
+    pub slots: u32,
+    #[prost(uint64, tag = "4")]
+    pub ttl_ms: u64,
 }
-impl WorkGroup {
-    /// String value of the enum field names used in the ProtoBuf definition.
-    ///
-    /// The values are not transformed in any way and thus are considered stable
-    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
-    pub fn as_str_name(&self) -> &'static str {
-        match self {
-            Self::Short => "SHORT",
-            Self::Long => "LONG",
-        }
-    }
-    /// Creates an enum from field names used in the ProtoBuf definition.
-    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
-        match value {
-            "SHORT" => Some(Self::Short),
-            "LONG" => Some(Self::Long),
-            _ => None,
-        }
-    }
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct TryAcquireResponse {
+    #[prost(bool, tag = "1")]
+    pub success: bool,
+    #[prost(string, tag = "2")]
+    pub reason: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct StartQueryRequest {
+    #[prost(string, tag = "1")]
+    pub trace_id: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct StartQueryResponse {
+    #[prost(bool, tag = "1")]
+    pub success: bool,
+    #[prost(string, tag = "2")]
+    pub reason: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct ReleaseQueryRequest {
+    #[prost(string, tag = "1")]
+    pub trace_id: ::prost::alloc::string::String,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct ReleaseQueryResponse {
+    #[prost(bool, tag = "1")]
+    pub success: bool,
 }
 /// Generated client implementations.
 pub mod search_client {
@@ -1469,6 +1485,77 @@ pub mod search_client {
             req.extensions_mut().insert(GrpcMethod::new("cluster.Search", "GetTable"));
             self.inner.unary(req, path, codec).await
         }
+        /// Slot-based admission RPCs
+        pub async fn try_acquire(
+            &mut self,
+            request: impl tonic::IntoRequest<super::TryAcquireRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::TryAcquireResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.Search/TryAcquire",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("cluster.Search", "TryAcquire"));
+            self.inner.unary(req, path, codec).await
+        }
+        pub async fn start_query(
+            &mut self,
+            request: impl tonic::IntoRequest<super::StartQueryRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::StartQueryResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.Search/StartQuery",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("cluster.Search", "StartQuery"));
+            self.inner.unary(req, path, codec).await
+        }
+        pub async fn release_query(
+            &mut self,
+            request: impl tonic::IntoRequest<super::ReleaseQueryRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::ReleaseQueryResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.Search/ReleaseQuery",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("cluster.Search", "ReleaseQuery"));
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -1539,6 +1626,28 @@ pub mod search_server {
             request: tonic::Request<super::GetTableRequest>,
         ) -> std::result::Result<
             tonic::Response<super::GetTableResponse>,
+            tonic::Status,
+        >;
+        /// Slot-based admission RPCs
+        async fn try_acquire(
+            &self,
+            request: tonic::Request<super::TryAcquireRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::TryAcquireResponse>,
+            tonic::Status,
+        >;
+        async fn start_query(
+            &self,
+            request: tonic::Request<super::StartQueryRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::StartQueryResponse>,
+            tonic::Status,
+        >;
+        async fn release_query(
+            &self,
+            request: tonic::Request<super::ReleaseQueryRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::ReleaseQueryResponse>,
             tonic::Status,
         >;
     }
@@ -2000,6 +2109,137 @@ pub mod search_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = GetTableSvc(inner);
+                        let codec = tonic_prost::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.Search/TryAcquire" => {
+                    #[allow(non_camel_case_types)]
+                    struct TryAcquireSvc<T: Search>(pub Arc<T>);
+                    impl<T: Search> tonic::server::UnaryService<super::TryAcquireRequest>
+                    for TryAcquireSvc<T> {
+                        type Response = super::TryAcquireResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::TryAcquireRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Search>::try_acquire(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = TryAcquireSvc(inner);
+                        let codec = tonic_prost::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.Search/StartQuery" => {
+                    #[allow(non_camel_case_types)]
+                    struct StartQuerySvc<T: Search>(pub Arc<T>);
+                    impl<T: Search> tonic::server::UnaryService<super::StartQueryRequest>
+                    for StartQuerySvc<T> {
+                        type Response = super::StartQueryResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::StartQueryRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Search>::start_query(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = StartQuerySvc(inner);
+                        let codec = tonic_prost::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.Search/ReleaseQuery" => {
+                    #[allow(non_camel_case_types)]
+                    struct ReleaseQuerySvc<T: Search>(pub Arc<T>);
+                    impl<
+                        T: Search,
+                    > tonic::server::UnaryService<super::ReleaseQueryRequest>
+                    for ReleaseQuerySvc<T> {
+                        type Response = super::ReleaseQueryResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::ReleaseQueryRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Search>::release_query(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = ReleaseQuerySvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
