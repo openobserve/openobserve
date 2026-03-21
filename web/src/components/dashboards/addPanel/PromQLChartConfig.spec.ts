@@ -200,9 +200,10 @@ describe("PromQLChartConfig", () => {
       expect(
         wrapper.find('[data-test="dashboard-config-maps-name-label"]').exists(),
       ).toBe(true);
+      // dashboard-config-maps-type (mapsMapType q-select) was removed in config redesign (PR #10917)
       expect(
         wrapper.find('[data-test="dashboard-config-maps-type"]').exists(),
-      ).toBe(true);
+      ).toBe(false);
     });
 
     it("should not render maps config for other chart types", () => {
