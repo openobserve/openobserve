@@ -287,9 +287,7 @@ async fn work_group_need_wait(
                 // Need to wait - concurrency limit reached
                 if !log_wait {
                     log::info!(
-                        "[trace_id {trace_id}] user: {user_id:?} is waiting in work_group {work_group:?}[global:{}/{}, org:{}/{}, user:{}/{}]",
-                        status.global_current,
-                        status.global_limit,
+                        "[trace_id {trace_id}] user: {user_id:?} is waiting in work_group {work_group:?}[org:{}/{}, user:{}/{}]",
                         status.org_current,
                         status.org_limit,
                         status.user_current,
@@ -303,9 +301,7 @@ async fn work_group_need_wait(
                 // Got approval - slot available
                 if log_wait {
                     log::info!(
-                        "[trace_id {trace_id}] user: {user_id:?} get approved in work_group {work_group:?}[global:{}/{}, org:{}/{}, user:{}/{}]",
-                        status.global_current,
-                        status.global_limit,
+                        "[trace_id {trace_id}] user: {user_id:?} get approved in work_group {work_group:?}[org:{}/{}, user:{}/{}]",
                         status.org_current,
                         status.org_limit,
                         status.user_current,
@@ -326,8 +322,8 @@ async fn work_group_need_wait(
 ///
 /// This is a high-level helper that encapsulates:
 /// - Determining if request is a background task
-/// - Predicting appropriate work group (enterprise only)
-/// - Adding work group to search server (enterprise only)
+/// - Predicting appropriate work group
+/// - Adding work group to search server
 /// - Acquiring the work group lock
 #[cfg(not(feature = "enterprise"))]
 pub async fn acquire_work_group_lock(
@@ -337,6 +333,7 @@ pub async fn acquire_work_group_lock(
     caller: &str,
     _nodes: &[Node],
     _file_id_list_vec: &[&FileId],
+    _stream_key: &str,
 ) -> Result<DeferredLock> {
     check_work_group(
         trace_id,
@@ -348,14 +345,6 @@ pub async fn acquire_work_group_lock(
     .await
 }
 
-/// Acquire work group lock with automatic work group prediction (enterprise)
-/// or simple distributed lock (OSS)
-///
-/// This is a high-level helper that encapsulates:
-/// - Determining if request is a background task
-/// - Predicting appropriate work group (enterprise only)
-/// - Adding work group to search server (enterprise only)
-/// - Acquiring the work group lock
 #[cfg(feature = "enterprise")]
 pub async fn acquire_work_group_lock(
     trace_id: &str,
@@ -364,8 +353,8 @@ pub async fn acquire_work_group_lock(
     caller: &str,
     nodes: &[Node],
     file_id_list_vec: &[&FileId],
+    stream_key: &str,
 ) -> Result<DeferredLock> {
-    // Predict workgroup first
     let is_background_task = req
         .search_event_type
         .as_ref()
@@ -374,6 +363,8 @@ pub async fn acquire_work_group_lock(
         .unwrap_or(false);
 
     let work_group = o2_enterprise::enterprise::search::work_group::predict(
+        &req.org_id,
+        stream_key,
         nodes,
         file_id_list_vec,
         is_background_task,

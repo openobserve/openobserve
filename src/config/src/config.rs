@@ -3320,6 +3320,13 @@ fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub fn ensure_not_empty(s: &str, name: &str) -> Result<(), anyhow::Error> {
+    if s.trim().is_empty() {
+        return Err(anyhow::anyhow!("{} is empty", name));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3447,5 +3454,25 @@ mod tests {
         unsafe {
             std::env::remove_var("ZO_USAGE_REPORT_TO_OWN_ORG");
         }
+    }
+
+    #[test]
+    fn test_ensure_not_empty_valid() {
+        assert!(ensure_not_empty("valid", "TEST").is_ok());
+    }
+
+    #[test]
+    fn test_ensure_not_empty_invalid() {
+        assert!(ensure_not_empty("", "TEST").is_err());
+    }
+
+    #[test]
+    fn test_ensure_not_empty_with_whitespace() {
+        assert!(ensure_not_empty("  value  ", "TEST").is_ok());
+    }
+
+    #[test]
+    fn test_ensure_not_empty_single_char() {
+        assert!(ensure_not_empty("a", "TEST").is_ok());
     }
 }

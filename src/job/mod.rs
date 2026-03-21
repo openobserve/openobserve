@@ -14,11 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{cluster::LOCAL_NODE, spawn_pausable_job};
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::config::get_config as get_enterprise_config;
-#[cfg(feature = "enterprise")]
-use o2_openfga::config::get_config as get_openfga_config;
 use regex::Regex;
+#[cfg(feature = "enterprise")]
+use {
+    o2_enterprise::enterprise::{
+        common::config::get_config as get_enterprise_config, search::admission,
+    },
+    o2_openfga::config::get_config as get_openfga_config,
+};
 
 use crate::{
     common::meta::{
@@ -388,6 +391,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 .expect("load system prompt failed");
         });
     }
+    // Initialize slot-based admission ledger on querier nodes
+    // (enterprise only, requires O2_WORK_GROUP_SLOT_ENABLED=true).
+    #[cfg(feature = "enterprise")]
+    if LOCAL_NODE.is_querier() && get_enterprise_config().work_group.slot_enabled {
+        let cpu = cfg.limit.real_cpu_num as f64;
+        let mem_gib = cfg.limit.mem_total as f64 / (1024.0 * 1024.0 * 1024.0);
+        admission::init_slot_ledger(cpu, mem_gib);
+        admission::ledger::spawn_ttl_cleanup_task(500);
+    }
+
     tokio::task::spawn(files::run());
     tokio::task::spawn(stats::run());
     tokio::task::spawn(compactor::run());

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,6 +22,11 @@ use proto::cluster_rpc::{
     GetResultRequest, GetResultResponse, GetTableRequest, GetTableResponse, QueryStatusRequest,
     QueryStatusResponse, SearchPartitionRequest, SearchPartitionResponse, SearchRequest,
     SearchResponse, search_server::Search,
+};
+#[cfg(feature = "enterprise")]
+use proto::cluster_rpc::{
+    ReleaseQueryRequest, ReleaseQueryResponse, StartQueryRequest, StartQueryResponse,
+    TryAcquireRequest, TryAcquireResponse,
 };
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -377,6 +382,81 @@ impl Search for Searcher {
         &self,
         _req: Request<CancelQueryRequest>,
     ) -> Result<Response<CancelQueryResponse>, Status> {
+        Err(Status::unimplemented("Not Supported"))
+    }
+
+    // --- Slot-based admission RPCs ---
+
+    #[cfg(feature = "enterprise")]
+    async fn try_acquire(
+        &self,
+        req: Request<TryAcquireRequest>,
+    ) -> Result<Response<TryAcquireResponse>, Status> {
+        let r = req.into_inner();
+        let ledger = &o2_enterprise::enterprise::search::admission::ledger::NODE_LEDGER;
+        match ledger.try_acquire(&r.trace_id, &r.group, r.slots, r.ttl_ms) {
+            Ok(()) => Ok(Response::new(TryAcquireResponse {
+                success: true,
+                reason: String::new(),
+            })),
+            Err(reason) => Ok(Response::new(TryAcquireResponse {
+                success: false,
+                reason,
+            })),
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn try_acquire(
+        &self,
+        _req: Request<proto::cluster_rpc::TryAcquireRequest>,
+    ) -> Result<Response<proto::cluster_rpc::TryAcquireResponse>, Status> {
+        Err(Status::unimplemented("Not Supported"))
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn start_query(
+        &self,
+        req: Request<StartQueryRequest>,
+    ) -> Result<Response<StartQueryResponse>, Status> {
+        let trace_id = req.into_inner().trace_id;
+        let ledger = &o2_enterprise::enterprise::search::admission::ledger::NODE_LEDGER;
+        match ledger.start(&trace_id) {
+            Ok(()) => Ok(Response::new(StartQueryResponse {
+                success: true,
+                reason: String::new(),
+            })),
+            Err(reason) => Ok(Response::new(StartQueryResponse {
+                success: false,
+                reason,
+            })),
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn start_query(
+        &self,
+        _req: Request<proto::cluster_rpc::StartQueryRequest>,
+    ) -> Result<Response<proto::cluster_rpc::StartQueryResponse>, Status> {
+        Err(Status::unimplemented("Not Supported"))
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn release_query(
+        &self,
+        req: Request<ReleaseQueryRequest>,
+    ) -> Result<Response<ReleaseQueryResponse>, Status> {
+        let trace_id = req.into_inner().trace_id;
+        let ledger = &o2_enterprise::enterprise::search::admission::ledger::NODE_LEDGER;
+        ledger.release(&trace_id);
+        Ok(Response::new(ReleaseQueryResponse { success: true }))
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn release_query(
+        &self,
+        _req: Request<proto::cluster_rpc::ReleaseQueryRequest>,
+    ) -> Result<Response<proto::cluster_rpc::ReleaseQueryResponse>, Status> {
         Err(Status::unimplemented("Not Supported"))
     }
 }

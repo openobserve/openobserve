@@ -18,6 +18,10 @@ service Search {
     rpc GetResult(GetResultRequest) returns (GetResultResponse) {}
     rpc DeleteResult(DeleteResultRequest) returns (DeleteResultResponse) {}
     rpc GetTable(GetTableRequest) returns (GetTableResponse) {}
+    // Slot-based admission RPCs
+    rpc TryAcquire(TryAcquireRequest) returns (TryAcquireResponse) {}
+    rpc StartQuery(StartQueryRequest) returns (StartQueryResponse) {}
+    rpc ReleaseQuery(ReleaseQueryRequest) returns (ReleaseQueryResponse) {}
 }
 
 message QueryStatusRequest {}
@@ -127,14 +131,9 @@ message QueryStatus {
     optional string    stream_type = 7;
     optional Query           query = 8;
     optional ScanStats  scan_stats = 9;
-    optional WorkGroup work_group = 10;
+    optional string    work_group = 10;
     optional string   search_type = 11;
     optional SearchEventContext search_event_context = 12;
-}
-
-enum WorkGroup {
-    SHORT = 0;
-    LONG  = 1;
 }
 
 message Query {
@@ -149,4 +148,34 @@ message GetTableRequest {
 
 message GetTableResponse {
     bytes            data = 1;
+}
+
+// Slot-based admission messages
+message TryAcquireRequest {
+    string trace_id = 1;
+    string    group = 2; // "short" | "long" | "background"
+    uint32    slots = 3;
+    uint64   ttl_ms = 4;
+}
+
+message TryAcquireResponse {
+    bool   success = 1;
+    string  reason = 2;
+}
+
+message StartQueryRequest {
+    string trace_id = 1;
+}
+
+message StartQueryResponse {
+    bool   success = 1;
+    string  reason = 2;
+}
+
+message ReleaseQueryRequest {
+    string trace_id = 1;
+}
+
+message ReleaseQueryResponse {
+    bool success = 1;
 }
