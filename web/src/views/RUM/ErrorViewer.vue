@@ -161,10 +161,13 @@ const getError = () => {
       .then((res) => {
         errorDetails.value = { ...res.data.hits[0] };
         errorDetails.value["category"] = [];
+        // Prioritize error_stack (actual application error) over error_handling_stack (Vue internals)
         const errorStack =
-          errorDetails.value.error_handling_stack ||
-          errorDetails.value.error_stack;
+          errorDetails.value.error_stack ||
+          errorDetails.value.error_handling_stack;
         errorDetails.value.error_stack = errorStack.split("\n");
+        // Keep the original stack for translation
+        errorDetails.value.original_error_stack = errorDetails.value.error_stack;
       })
       .finally(() => {
         isLoading.value.pop();
