@@ -400,8 +400,7 @@ const useRoutes = () => {
     {
       path: "alerts/anomaly/add",
       name: "addAnomalyDetection",
-      component: () =>
-        import("@/views/AddAnomalyDetectionView.vue"),
+      component: () => import("@/views/AddAlertView.vue"),
       meta: {
         title: "Add Anomaly Detection",
       },
@@ -418,8 +417,7 @@ const useRoutes = () => {
     {
       path: "alerts/anomaly/edit/:anomaly_id",
       name: "editAnomalyDetection",
-      component: () =>
-        import("@/views/AddAnomalyDetectionView.vue"),
+      component: () => import("@/views/AddAlertView.vue"),
       meta: {
         title: "Edit Anomaly Detection",
       },

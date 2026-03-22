@@ -351,7 +351,32 @@
     "collapseFields": "Alanları Daralt",
     "openFields": "Açık Alanlar",
     "aiBarSuccessPlaceholder": "Bundan sonra ne yapmak istersin?",
-    "nlpModeDisabledForVisualization": "Birden çok akışla görselleştirme sırasında Doğal Dil modu devre dışı bırakılamaz"
+    "nlpModeDisabledForVisualization": "Birden çok akışla görselleştirme sırasında Doğal Dil modu devre dışı bırakılamaz",
+    "patternDetailsTitle": "Desen Detayları",
+    "patternXofY": "{total} {index} kalıbı",
+    "patternXofYShort": "{total} 'in {index}",
+    "patternStatistics": "İstatistikler",
+    "patternOccurrences": "Olaylar",
+    "patternPercentage": "Yüzde",
+    "patternAnomalyDetected": "Anomali Algılandı",
+    "patternAnomalyScore": "Bu model nadir bir model olarak algılanır (anomali puanı: {score} %)",
+    "patternAnomalyRare": "Bu desen nadir bir model olarak algılanır ({pct} %log, {freq} oluşum)",
+    "patternAnomalyRarePlural": "Bu desen nadir bir desen olarak algılanır ({pct} %log, {freq} oluşum)",
+    "patternAnomalyLowFreq": "Bu model beklenenden daha az sıklıkta görünür ({freq} vs avg {avg}, z-score: {z})",
+    "patternAnomalyLowFreqPlural": "Bu model beklenenden daha az sıklıkta görünür ({freq} vs avg {avg}, z-score: {z})",
+    "patternVariablesHeader": "Değişkenler",
+    "patternVariablesDetected": "{count} değişken (ler) algılandı",
+    "patternNoVariablesDetected": "Değişken tespit edilmedi",
+    "patternTemplate": "Desen şablonu",
+    "patternVariablesWithCount": "Değişkenler ({count})",
+    "patternVariableNameColumn": "Değişken Adı",
+    "patternVariableTypeColumn": "Tür",
+    "patternExampleLogsWithCount": "Örnek Günlükler ({count})",
+    "patternNavPrevious": "Önceki",
+    "patternNavNext": "Sonraki",
+    "patternWildcardSampleValues": "Örnek değerler",
+    "wildcardSampleValues": "Örnek değerler",
+    "patternZScore": "Z puanı: {zScore} (ortalama frekans: {avgFrequency})"
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -1471,7 +1496,18 @@
     "hideQueryResults": "Sorgu sonuçlarını gizle",
     "vrlExtractionTooltip": "Grafikte çıkarılan VRL alanlarını kullanmak için bir VRL işlevi yazın ve Uygula düğmesine tıklayın. Alanlar çıkarılacak ve bunları grafiği oluşturmak için kullanmanıza izin verecektir.",
     "errorFetchingFunctions": "İşlevleri getirirken hata oluştu",
-    "functionAppliedSuccess": "{name} işlevi başarıyla uygulandı."
+    "functionAppliedSuccess": "{name} işlevi başarıyla uygulandı.",
+    "pivotOptions": "Pivot Seçenekleri",
+    "pivotShowRowTotals": "Satır Toplamlarını Göster",
+    "pivotShowColTotals": "Sütun Toplamlarını Göster",
+    "pivotMissingValue": "Eksik Değer",
+    "pivotMissingValueHint": "Veri içermeyen hücreler için gösterilen değer",
+    "pivotShowRowTotalsTooltip": "Pivot tablonun altında her sütunun değerlerini özetleyen bir toplamlar satırı görüntüleyin",
+    "pivotShowColTotalsTooltip": "Pivot tablonun sağ tarafında her satırın değerlerini özetleyen bir toplamlar sütunu görüntüleyin",
+    "pivotStickyRowTotals": "Yapışkan Satır Toplamları",
+    "pivotStickyRowTotalsTooltip": "Toplamlar satırını dikey olarak kaydırırken görünür kalması için alttaki sabitleyin",
+    "pivotStickyColTotals": "Yapışkan Sütun Toplamları",
+    "pivotStickyColTotalsTooltip": "Yatay kaydırırken görünür kalması için sağdaki toplamlar sütununu sabitleyin"
   },
   "panel": {
     "header": "Panel",
@@ -1553,7 +1589,12 @@
     "sqlBuilder": "SQL Oluşturucu",
     "generatedSql": "Oluşturulan SQL",
     "enterCustomSql": "Özel SQL sorgunuzu girin...",
-    "customSql": "Özel SQL"
+    "customSql": "Özel SQL",
+    "pivotField": "Pivot Alanı",
+    "addToPivot": "Pivot Alanına Ekle",
+    "pivotFieldTooltip": "Bir boyut alanını buraya sürükleyin. Farklı değerleri pivot tabloda sütun başlıkları haline gelir. Çok seviyeli döndürme için en fazla 3 alana izin verilir.",
+    "breakdownTooltipHBar": "Daha net bir görünüm için verileri Y ekseninde farklı bölümlere bölmek için bu alanları kullanın.",
+    "breakdownTooltipDefault": "Daha net bir görünüm için verileri X ekseninde farklı bölümlere bölmek için bu alanları kullanın."
   },
   "home": {
     "streams": "Akışlar",
@@ -2103,7 +2144,15 @@
       "active": "Aktif",
       "failed": "Başarısız",
       "disabled": "Engelli"
-    }
+    },
+    "anomalyStepCaptions": {
+      "alertSetup": "Dedektörünüzü adlandırın ve izlenecek bir akış seçin",
+      "detectionConfig": "Sorgu ve algılama parametrelerini yapılandırma",
+      "alerting": "Anormallikler tespit edildiğinde bildirimleri ayarlayın"
+    },
+    "updateAnomalyDetection": "Anomali algılamayı güncelle:",
+    "anomalyCreated": "Anomali algılama yapılandırması oluşturuldu. Eğitim kısa süre içinde başlayacak.",
+    "editJson": "Uyarı JSON'unu Düzenle"
   },
   "alert_templates": {
     "header": "Şablonlar",
@@ -2637,7 +2686,9 @@
     "spanColorPalettePreview": "Span Renk Paleti Önizlemesi",
     "errorsFound": "Hata İzleri",
     "spansTitle": "YAYILIMLAR",
-    "spansFound": "Bulunan Açıklıklar"
+    "spansFound": "Bulunan Açıklıklar",
+    "errorTraces": "Hata İzleri",
+    "errorSpans": "Hata Aralıkları"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",

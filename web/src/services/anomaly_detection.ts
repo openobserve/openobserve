@@ -20,36 +20,44 @@ const anomaly_detection = {
     return http().get(`/api/${org_identifier}/anomaly_detection`);
   },
 
-  get: (org_identifier: string, anomaly_id: string) => {
+  getConfig: (org_identifier: string, anomaly_id: string) => {
     return http().get(`/api/${org_identifier}/anomaly_detection/${anomaly_id}`);
   },
 
-  create: (org_identifier: string, data: object) => {
-    return http().post(`/api/${org_identifier}/anomaly_detection`, data);
+  // GET /api/v2/{org}/alerts/{id} — falls back to anomaly table when ID not in alerts
+  get: (org_identifier: string, anomaly_id: string) => {
+    return http().get(`/api/v2/${org_identifier}/alerts/${anomaly_id}`);
   },
 
+  // POST /api/v2/{org}/alerts — delegates to anomaly config creation when alert_type is "anomaly_detection"
+  create: (org_identifier: string, data: object) => {
+    return http().post(`/api/v2/${org_identifier}/alerts`, data);
+  },
+
+  // PUT /api/v2/{org}/alerts/{id} — delegates to anomaly config update when alert_type is "anomaly_detection"
   update: (org_identifier: string, anomaly_id: string, data: object) => {
     return http().put(
-      `/api/${org_identifier}/anomaly_detection/${anomaly_id}`,
+      `/api/v2/${org_identifier}/alerts/${anomaly_id}`,
       data,
     );
   },
 
+  // DELETE /api/v2/{org}/alerts/{id} — falls back to anomaly config delete when ID not in alerts
   delete: (org_identifier: string, anomaly_id: string) => {
     return http().delete(
-      `/api/${org_identifier}/anomaly_detection/${anomaly_id}`,
+      `/api/v2/${org_identifier}/alerts/${anomaly_id}`,
     );
   },
 
-  // Pause (enabled=false) or Resume (enabled=true) via update endpoint
+  // Pause (enabled=false) or Resume (enabled=true) via unified alerts update endpoint
   toggleEnabled: (
     org_identifier: string,
     anomaly_id: string,
     enabled: boolean,
   ) => {
     return http().put(
-      `/api/${org_identifier}/anomaly_detection/${anomaly_id}`,
-      { enabled },
+      `/api/v2/${org_identifier}/alerts/${anomaly_id}`,
+      { alert_type: "anomaly_detection", anomaly_config: { enabled } },
     );
   },
 

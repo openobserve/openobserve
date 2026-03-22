@@ -351,7 +351,32 @@
     "collapseFields": "Velden samenvouwen",
     "openFields": "Open velden",
     "aiBarSuccessPlaceholder": "Wat zou je hierna willen doen?",
-    "nlpModeDisabledForVisualization": "De modus Natural Language kan niet worden uitgeschakeld tijdens visualisatie met meerdere streams"
+    "nlpModeDisabledForVisualization": "De modus Natural Language kan niet worden uitgeschakeld tijdens visualisatie met meerdere streams",
+    "patternDetailsTitle": "Details van het patroon",
+    "patternXofY": "Patroon {index} van {total}",
+    "patternXofYShort": "{index} van {total}",
+    "patternStatistics": "Statistieken",
+    "patternOccurrences": "Voorvallen",
+    "patternPercentage": "Percentage",
+    "patternAnomalyDetected": "Anomalie gedetecteerd",
+    "patternAnomalyScore": "Dit patroon wordt gedetecteerd als een zeldzaam patroon (anomaliescore: {score}%)",
+    "patternAnomalyRare": "Dit patroon wordt gedetecteerd als een zeldzaam patroon ({pct}% van de logboeken, het voorkomen van {freq})",
+    "patternAnomalyRarePlural": "Dit patroon wordt gedetecteerd als een zeldzaam patroon ({pct}% van de logboeken, {freq} voorvallen)",
+    "patternAnomalyLowFreq": "Dit patroon komt minder vaak voor dan verwacht ({freq} versus avg {avg}, z-score: {z})",
+    "patternAnomalyLowFreqPlural": "Dit patroon komt minder vaak voor dan verwacht ({freq} versus avg {avg}, z-score: {z})",
+    "patternVariablesHeader": "Variabelen",
+    "patternVariablesDetected": "{count} variabele (n) gedetecteerd",
+    "patternNoVariablesDetected": "Geen variabelen gedetecteerd",
+    "patternTemplate": "Patroonsjabloon",
+    "patternVariablesWithCount": "Variabelen ({count})",
+    "patternVariableNameColumn": "Naam van de variabele",
+    "patternVariableTypeColumn": "Typ",
+    "patternExampleLogsWithCount": "Voorbeeldlogboeken ({count})",
+    "patternNavPrevious": "Vorige",
+    "patternNavNext": "Volgende",
+    "patternWildcardSampleValues": "Voorbeeldwaarden",
+    "wildcardSampleValues": "Voorbeeldwaarden",
+    "patternZScore": "Z-score: {zScore} (gemiddelde frequentie: {avgFrequency})"
   },
   "menu": {
     "home": "Home",
@@ -1471,7 +1496,18 @@
     "hideQueryResults": "Resultaten van zoekopdrachten verbergen",
     "vrlExtractionTooltip": "Om geëxtraheerde VRL-velden in het diagram te gebruiken, schrijft u een VRL-functie en klikt u op de knop Toepassen. De velden worden geëxtraheerd, zodat u ze kunt gebruiken om de grafiek samen te stellen.",
     "errorFetchingFunctions": "Fout bij het ophalen van functies",
-    "functionAppliedSuccess": "De functie {name} is succesvol toegepast."
+    "functionAppliedSuccess": "De functie {name} is succesvol toegepast.",
+    "pivotOptions": "Pivot-opties",
+    "pivotShowRowTotals": "Rijtotalen weergeven",
+    "pivotShowColTotals": "Kolomtotalen weergeven",
+    "pivotMissingValue": "Ontbrekende waarde",
+    "pivotMissingValueHint": "Getoonde waarde voor cellen zonder gegevens",
+    "pivotShowRowTotalsTooltip": "Een rij met totalen onder aan de draaitabel weergeven met een samenvatting van de waarden van elke kolom",
+    "pivotShowColTotalsTooltip": "Een kolom met totalen aan de rechterkant van de draaitabel weergeven met een samenvatting van de waarden van elke rij",
+    "pivotStickyRowTotals": "Totalen van Sticky Row",
+    "pivotStickyRowTotalsTooltip": "Zet de rij met totalen onderaan vast, zodat deze zichtbaar blijft wanneer je verticaal scrolt.",
+    "pivotStickyColTotals": "Totalen van plakkerige kolommen",
+    "pivotStickyColTotalsTooltip": "Zet de kolom met totalen aan de rechterkant vast, zodat deze zichtbaar blijft wanneer u horizontaal scrolt"
   },
   "panel": {
     "header": "Paneel",
@@ -1553,7 +1589,12 @@
     "sqlBuilder": "SQL Builder",
     "generatedSql": "Gegenereerde SQL",
     "enterCustomSql": "Voer uw aangepaste SQL-query in...",
-    "customSql": "SQL op maat"
+    "customSql": "SQL op maat",
+    "pivotField": "Draaiveld",
+    "addToPivot": "Aan draadveld toevoegen",
+    "pivotFieldTooltip": "Sleep een dimensieveld hierheen. De verschillende waarden worden kolomkoppen in de draaitabel. Er zijn maximaal 3 velden toegestaan voor draaien op meerdere niveaus.",
+    "breakdownTooltipHBar": "Gebruik deze velden om de gegevens op te splitsen in verschillende secties op de Y-as voor een duidelijker beeld.",
+    "breakdownTooltipDefault": "Gebruik deze velden om de gegevens op te splitsen in verschillende secties op de X-as voor een duidelijker beeld."
   },
   "home": {
     "streams": "Streams",
@@ -2103,7 +2144,15 @@
       "active": "Actief",
       "failed": "Mislukt",
       "disabled": "Uitgeschakeld"
-    }
+    },
+    "anomalyStepCaptions": {
+      "alertSetup": "Geef je detector een naam en selecteer een stream om te monitoren",
+      "detectionConfig": "Configureer de query- en detectieparameters",
+      "alerting": "Meldingen instellen wanneer er afwijkingen worden gedetecteerd"
+    },
+    "updateAnomalyDetection": "Anomaliedetectie bijwerken:",
+    "anomalyCreated": "Configuratie voor anomaliedetectie gemaakt. De training start binnenkort.",
+    "editJson": "Waarschuwings-JSON bewerken"
   },
   "alert_templates": {
     "header": "Sjablonen",
@@ -2637,7 +2686,9 @@
     "spanColorPalettePreview": "Voorbeeld van het kleurenpalet van Span",
     "errorsFound": "Foutsporen",
     "spansTitle": "OVERSPANT",
-    "spansFound": "Overspanningen gevonden"
+    "spansFound": "Overspanningen gevonden",
+    "errorTraces": "Foutsporen",
+    "errorSpans": "Foutspanne"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",

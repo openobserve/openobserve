@@ -98,27 +98,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="importAlert"
             data-test="alert-import"
           />
-          <!-- Add Alert button (hidden on Anomaly Detection tab) -->
+          <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
           <q-btn
-            v-if="activeTab !== 'anomalyDetection'"
             data-test="alert-list-add-alert-btn"
             class="q-ml-sm o2-primary-button tw:h-[36px]"
             no-caps
             flat
-            :disable="!destinations.length"
+            :disable="!destinations.length || !templates.length"
             :title="!destinations.length ? t('alerts.noDestinations') : ''"
             :label="t(`alerts.add`)"
-            @click="showAddUpdateFn({})"
-          />
-          <!-- New Anomaly Detection button (shown only on Anomaly Detection tab) -->
-          <q-btn
-            v-if="activeTab === 'anomalyDetection'"
-            data-test="alert-list-add-anomaly-btn"
-            class="q-ml-sm o2-primary-button tw:h-[36px]"
-            no-caps
-            flat
-            :label="t('alerts.newAnomalyDetection')"
-            @click="router.push({ name: 'addAnomalyDetection', query: { org_identifier: store.state.selectedOrganization.identifier } })"
+            @click="activeTab === 'anomalyDetection'
+              ? router.push({ name: 'addAnomalyDetection', query: { org_identifier: store.state.selectedOrganization.identifier, folder: activeFolderId, tab: activeTab } })
+              : showAddUpdateFn({})"
           />
         </div>
       </div>
@@ -149,14 +140,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #after>
           <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
             <div class="tw:h-full card-container">
-              <!-- Anomaly Detection List (shown when Anomaly Detection tab is active) -->
-              <AnomalyDetectionList
-                v-if="activeTab === 'anomalyDetection'"
-                :org_identifier="store.state.selectedOrganization.identifier"
-              />
-              <!-- Alert List Table -->
+                  <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
               <q-table
-                v-if="activeTab !== 'anomalyDetection'"
                 v-model:selected="selectedAlerts"
                 :selected-rows-label="getSelectedString"
                 selection="multiple"
@@ -193,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="col.classes"
                     :style="col.style"
                   >
-                    {{ col.label }}
+                    <span :style="col.name === 'name' ? 'padding-left: 21px' : ''">{{ col.label }}</span>
                   </q-th>
                 </q-tr>
               </template>
@@ -222,7 +207,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <q-td v-for="col in columns" :key="col.name" :props="props">
                       <template v-if="col.name === 'name'">
-                        <div class="tw:flex tw:items-center tw:gap-1">
+                        <div class="tw:flex tw:items-center tw:gap-1.5">
+                          <q-icon
+                            v-if="props.row.is_real_time === 'anomaly'"
+                            name="query_stats"
+                            size="15px"
+                            class="tw:text-blue-600 tw:shrink-0"
+                          />
+                          <q-icon
+                            v-else-if="props.row.is_real_time"
+                            name="bolt"
+                            size="15px"
+                            class="tw:text-orange-500 tw:shrink-0"
+                          />
+                          <q-icon
+                            v-else
+                            name="schedule"
+                            size="15px"
+                            class="tw:text-grey-7 tw:shrink-0"
+                          />
                           <span>{{ computedName(props.row[col.field]) }}</span>
                         </div>
                         <q-tooltip
@@ -249,8 +252,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ props.row[col.field] }}
                       </template>
+                      <template v-else-if="col.name === 'status'">
+                        <q-badge
+                          :color="
+                            props.row.status === 'failed' ? 'negative' :
+                            props.row.status === 'active' ? 'positive' :
+                            props.row.status === 'training' ? 'warning' :
+                            props.row.status === 'disabled' ? 'grey' :
+                            'info'
+                          "
+                          :label="props.row.status !== '--' ? props.row.status : ''"
+                          style="text-transform: capitalize; cursor: default"
+                        >
+                          <q-tooltip
+                            v-if="props.row.status === 'failed' && props.row.last_error"
+                            max-width="400px"
+                            anchor="top middle"
+                            self="bottom middle"
+                          >
+                            {{ props.row.last_error }}
+                          </q-tooltip>
+                        </q-badge>
+                        <span v-if="props.row.status === '--'">--</span>
+                      </template>
                       <template v-else-if="col.name === 'period'">
-                        {{ props.row[col.field] ?  props.row[col.field] + " Mins" : "--" }}
+                        {{ props.row[col.field] ? (props.row[col.field] >= 60 ? (props.row[col.field] % 60 === 0 ? `${Math.floor(props.row[col.field] / 60)} Hours` : `${Math.floor(props.row[col.field] / 60)} Hours ${props.row[col.field] % 60} Mins`) : `${props.row[col.field]} Mins`) : "--" }}
                       </template>
                       <template v-else-if="col.name === 'frequency'">
                         {{ props.row[col.field] ? props.row[col.field] + (props.row?.frequency_type == "cron" ? "" : " Mins") : "--" }}
@@ -262,27 +288,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                         >
                           {{ props.row[col.field].name }}
-                        </div>
-                      </template>
-                      <template v-else-if="col.name === 'dedup_status'">
-                        <div class="tw:flex tw:items-center tw:justify-center">
-                          <q-icon
-                            v-if="props.row.deduplication?.enabled"
-                            name="check_circle"
-                            size="sm"
-                            color="positive"
-                          >
-                            <q-tooltip class="bg-grey-8">
-                              Deduplication: Enabled
-                              <div v-if="props.row.deduplication.fingerprint_fields?.length">
-                                Fields: {{ props.row.deduplication.fingerprint_fields.join(', ') }}
-                              </div>
-                              <div v-if="props.row.deduplication.grouping?.enabled">
-                                Grouping: {{ props.row.deduplication.grouping.group_wait_seconds }}s wait
-                              </div>
-                            </q-tooltip>
-                          </q-icon>
-                          <span v-else class="text-grey-5">-</span>
                         </div>
                       </template>
                       <template v-else-if="col.name == 'actions'">
@@ -400,7 +405,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   <q-item-section>Export</q-item-section>
                                 </q-item>
                                 <q-separator />
+                                <!-- Anomaly Detection: Trigger Detection + Re-train (always available) -->
+                                <template v-if="props.row.type === 'anomaly'">
+                                  <q-item
+                                    class="flex items-center justify-center"
+                                    clickable
+                                    v-close-popup
+                                    :data-test="`alert-list-${props.row.name}-trigger-detection`"
+                                    @click="triggerAlert(props.row)"
+                                  >
+                                    <q-item-section dense avatar>
+                                      <q-icon size="16px" :name="symOutlinedSoundSampler" />
+                                    </q-item-section>
+                                    <q-item-section>Trigger Detection</q-item-section>
+                                  </q-item>
+                                  <q-item
+                                    class="flex items-center justify-center"
+                                    clickable
+                                    v-close-popup
+                                    :data-test="`alert-list-${props.row.name}-retrain-anomaly`"
+                                    @click="retrainAnomaly(props.row)"
+                                  >
+                                    <q-item-section dense avatar>
+                                      <q-icon size="16px" name="replay" />
+                                    </q-item-section>
+                                    <q-item-section>Re-train</q-item-section>
+                                  </q-item>
+                                </template>
+                                <!-- Regular alerts: existing Trigger Alert item -->
                                 <q-item
+                                  v-else
                                   class="flex items-center justify-center"
                                   clickable
                                   v-close-popup
@@ -595,6 +629,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :destinations="destinations"
         :templates="templates"
         :alerts="store?.state?.organizationData?.allAlertsListByFolderId[activeFolderId]"
+        :folderId="activeFolderId"
         @update:alerts="refreshImportedAlerts"
         @update:destinations="refreshDestination"
         @update:templates="getTemplates"
@@ -719,6 +754,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <MoveAcrossFolders
           :activeFolderId="activeFolderToMove"
           :moduleId="selectedAlertToMove"
+          :anomalyConfigIds="selectedAnomalyConfigsToMove"
           type="alerts"
           @updated="updateAcrossFolders"
         />
@@ -735,6 +771,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <AlertHistoryDrawer
           :alert-details="selectedAlertDetails"
           :alert-id="selectedAlertDetails?.alert_id || ''"
+          :alert-type="selectedAlertDetails?.alert_type"
           @close="showAlertDetailsDrawer = false"
           @edit="editAlertFromDrawer"
         />
@@ -794,8 +831,8 @@ import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
 import { toRaw } from "vue";
 import { nextTick } from "vue";
 import AppTabs from "@/components/common/AppTabs.vue";
-import AnomalyDetectionList from "@/components/anomaly_detection/AnomalyDetectionList.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
+import anomalyDetectionService from "@/services/anomaly_detection";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import { symOutlinedSoundSampler } from "@quasar/extras/material-symbols-outlined";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
@@ -816,7 +853,6 @@ export default defineComponent({
     FolderList,
     MoveAcrossFolders,
     AppTabs,
-    AnomalyDetectionList,
     SelectFolderDropDown,
     AlertHistoryDrawer,
     O2AIContextAddBtn,
@@ -834,6 +870,13 @@ export default defineComponent({
     const { track } = useReo();
     const formData: Ref<Alert | {}> = ref({});
     const toBeClonedAlert: Ref<any> = ref({});
+    // Flag to skip clearing search state on the first folder emission after mount.
+    // When returning from add/edit screens, the FolderList emits the active folder
+    // which would normally clear restored search filters. This flag prevents that.
+    const savedAlertListFilters = store.state.alertListFilters || {};
+    const isRestoringState = ref(!!savedAlertListFilters.searchQuery
+      || !!savedAlertListFilters.filterQuery
+      || !!savedAlertListFilters.searchAcrossFolders);
     const showAddAlertDialog: any = ref(false);
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const selectedDelete: any = ref(null);
@@ -856,6 +899,7 @@ export default defineComponent({
 
     const toBeCloneAlertName = ref("");
     const toBeClonedID = ref("");
+    const toBeClonedIsAnomaly = ref(false);
     const toBeClonestreamType = ref("");
     const toBeClonestreamName = ref("");
     const streamTypes = ref(["logs", "metrics", "traces"]);
@@ -958,21 +1002,13 @@ export default defineComponent({
       document.addEventListener('click', handleClickOutside, true);
     });
 
-    onBeforeUnmount(() => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('click', handleClickOutside, true);
-    });
-
-    const activeFolderToMove = ref("default");
-
     // Show anomaly detection only when the backend is an enterprise or cloud build.
     // The frontend build flag alone is not sufficient — an enterprise UI can be
     // pointed at an OSS backend which does not have the feature.
     const isAnomalyDetectionEnabled = computed(
       () =>
         store.state.zoConfig.build_type !== "opensource" &&
-        config.isEnterprise === "true" && 
-        config.isCloud === "false",
+        config.isEnterprise === "true",
     );
 
     // Initialize activeTab from URL query parameter, default to "all".
@@ -983,6 +1019,59 @@ export default defineComponent({
         ? "all"
         : rawTab,
     );
+
+    const filteredResults: Ref<any[]> = ref([]);
+
+    // ── Anomaly polling ──────────────────────────────────────────────────────
+    // Statuses that mean the anomaly job is done — no need to keep polling
+    const ANOMALY_TERMINAL_STATUSES = ["failed", "active", "completed"];
+
+    const hasNonTerminalAnomalyRows = computed(
+      () =>
+        activeTab.value === "anomalyDetection" &&
+        filteredResults.value.some(
+          (row: any) =>
+            row.type === "anomaly" &&
+            !ANOMALY_TERMINAL_STATUSES.includes(row.status),
+        ),
+    );
+
+    let anomalyPollingTimer: ReturnType<typeof setInterval> | null = null;
+
+    const stopAnomalyPolling = () => {
+      if (anomalyPollingTimer !== null) {
+        clearInterval(anomalyPollingTimer);
+        anomalyPollingTimer = null;
+      }
+    };
+
+    const startAnomalyPolling = () => {
+      if (anomalyPollingTimer !== null) return; // already running
+      anomalyPollingTimer = setInterval(async () => {
+        if (!hasNonTerminalAnomalyRows.value) {
+          stopAnomalyPolling();
+          return;
+        }
+        await getAlertsFn(store, activeFolderId.value);
+      }, 10000);
+    };
+
+    watch(hasNonTerminalAnomalyRows, (hasNonTerminal) => {
+      if (hasNonTerminal) {
+        startAnomalyPolling();
+      } else {
+        stopAnomalyPolling();
+      }
+    });
+    // ── End anomaly polling ──────────────────────────────────────────────────
+
+    onBeforeUnmount(() => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('click', handleClickOutside, true);
+      stopAnomalyPolling();
+    });
+
+    const activeFolderToMove = ref("default");
 
     // Tabs for alerts view
     const alertTabs = computed(() => {
@@ -1037,7 +1126,7 @@ export default defineComponent({
           sortable: true,
           style: "width: 150px",
         },
-        // "period" column — conditional
+        // "period" (Look back window) — all tabs except realTime
         ...(activeTab.value !== 'realTime' ? [{
           name: "period",
           field: "period",
@@ -1046,7 +1135,7 @@ export default defineComponent({
           sortable: true,
           style: "width: 150px",
         }] : []),
-        // "frequency" column — conditional
+        // "frequency" (Check every) — all tabs except realTime
         ...(activeTab.value !== 'realTime' ? [{
           name: "frequency",
           field: "frequency",
@@ -1071,30 +1160,25 @@ export default defineComponent({
           sortable: true,
           style: "width: 150px",
         },
-        {
-          name: "total_evaluations",
-          field: "total_evaluations",
-          label: t("alerts.totalEvaluations"),
-          align: "center",
-          sortable: true,
-          style: "width: 150px",
-        },
-        {
-          name: "firing_count",
-          field: "firing_count",
-          label: t("alerts.firingCount"),
-          align: "center",
-          sortable: true,
-          style: "width: 150px",
-        },
-        {
-          name: "dedup_status",
-          field: "dedup_status",
-          label: "Dedup",
-          align: "center",
-          sortable: false,
-          style: "width: 80px",
-        },
+        // Anomaly Detection tab — extra columns
+        ...(activeTab.value === 'anomalyDetection' ? [
+          {
+            name: "last_trained_at",
+            field: "last_trained_at",
+            label: "Last Trained At",
+            align: "left" as const,
+            sortable: true,
+            style: "width: 150px",
+          },
+          {
+            name: "status",
+            field: "status",
+            label: "Status",
+            align: "left" as const,
+            sortable: true,
+            style: "width: 120px",
+          },
+        ] : []),
         {
           name: "actions",
           field: "actions",
@@ -1127,12 +1211,75 @@ export default defineComponent({
     const allSelectedAlerts = ref(false);
     const allAlerts: Ref<any[]> = ref([]);
 
-    const searchQuery = ref<any>("");
-    const filterQuery = ref<any>("");
-    const searchAcrossFolders = ref<any>(false);
-    const filteredResults: Ref<any[]> = ref([]);
-    const selectedAlertToMove: Ref<any> = ref({});
+    const searchQuery = ref<any>(savedAlertListFilters.searchQuery || "");
+    const filterQuery = ref<any>(savedAlertListFilters.filterQuery || "");
+    const searchAcrossFolders = ref<any>(savedAlertListFilters.searchAcrossFolders || false);
+    const selectedAlertToMove: Ref<any[]> = ref([]);
+    const selectedAnomalyConfigsToMove: Ref<any[]> = ref([]);
     const folderIdToBeCloned = ref<any>(router.currentRoute.value.query.folder ?? "default");
+    // ---------------------------------------------------------------------------
+    // Anomaly detection scaffolding — TEMPORARY until backend returns anomaly
+    // data as part of the alert list API. Remove this block when that happens.
+    // ---------------------------------------------------------------------------
+    // Normalizes an anomaly-detection item returned by the merged alerts list API
+    // (alert_type === "anomaly_detection") into the standard alert row shape.
+    const normalizeAnomalyToAlertRow = (anomaly: any, counter: number): any => ({
+      "#": counter <= 9 ? `0${counter}` : `${counter}`,
+      alert_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
+      anomaly_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
+      name: anomaly.name,
+      alert_type: "anomaly_detection",
+      stream_name: anomaly.stream_name || "--",
+      stream_type: anomaly.stream_type || "--",
+      enabled: anomaly.enabled,
+      conditions: "--",
+      rawCondition: {},
+      detection_function: anomaly.detection_function || "",
+      query_mode: anomaly.query_mode || "filters",
+      custom_sql: anomaly.custom_sql || "",
+      filters: anomaly.filters || [],
+      histogram_interval: anomaly.histogram_interval || "",
+      description: anomaly.description || "",
+      uuid: getUUID(),
+      owner: anomaly.owner || "",
+      period: anomaly.trigger_condition?.period ?? "",
+      frequency: anomaly.trigger_condition?.frequency ?? "",
+      frequency_type: anomaly.trigger_condition?.frequency_type ?? "minutes",
+      last_triggered_at: anomaly.last_triggered_at
+        ? convertUnixToQuasarFormat(anomaly.last_triggered_at)
+        : "",
+      last_satisfied_at: anomaly.last_satisfied_at
+        ? convertUnixToQuasarFormat(anomaly.last_satisfied_at)
+        : "",
+      detection_window: (() => {
+        const mins = anomaly.trigger_condition?.period_minutes;
+        if (!mins) return "--";
+        if (mins >= 60) {
+          const h = Math.floor(mins / 60);
+          const m = mins % 60;
+          return m === 0 ? `${h} Hours` : `${h} Hours ${m} Mins`;
+        }
+        return `${mins} mins`;
+      })(),
+      last_trained_at: anomaly.last_trained_at
+        ? convertUnixToQuasarFormat(anomaly.last_trained_at)
+        : "",
+      total_evaluations: anomaly.total_evaluations ?? "--",
+      firing_count: anomaly.firing_count ?? "--",
+      status: anomaly.status || "--",
+      last_error: anomaly.last_error || null,
+      selected: false,
+      type: "anomaly",
+      folder_name: {
+        name: anomaly.folder_name || "default",
+        id: anomaly.folder_id || "",
+      },
+      // Marker: "anomaly" distinguishes these rows from boolean is_real_time alerts
+      is_real_time: "anomaly",
+    });
+
+    // ---------------------------------------------------------------------------
+
     const getAlertsByFolderId = async (store: any, folderId: any) => {
       try {
         //this is the condition where we are fetching the alerts from the server 
@@ -1184,63 +1331,18 @@ export default defineComponent({
             };
           });
 
-          // Fetch alert history data and aggregate by alert name
-          try {
-            // Get history for last 12 hours
-            const endTime = Date.now() * 1000; // Convert to microseconds
-            const startTime = endTime - (12 * 60 * 60 * 1000000); // 12 hours ago in microseconds
-
-            const historyRes = await alertsService.getHistory(
-              store?.state?.selectedOrganization?.identifier,
-              {
-                size: 10000,
-                start_time: startTime,
-                end_time: endTime
-              }
-            );
-
-            // Aggregate history data by alert name
-            const historyByAlert: any = {};
-            if (historyRes.data && historyRes.data.hits) {
-              historyRes.data.hits.forEach((entry: any) => {
-                const alertName = entry.alert_name;
-                if (!historyByAlert[alertName]) {
-                  historyByAlert[alertName] = {
-                    total: 0,
-                    firing: 0,
-                  };
-                }
-                historyByAlert[alertName].total++;
-                const status = (entry.status || "").toLowerCase();
-                if (status === "completed") {
-                  historyByAlert[alertName].firing++;
-                }
-              });
-            }
-
-            // Merge history data with alerts
-            localAllAlerts = localAllAlerts.map((alert: any) => {
-              const history = historyByAlert[alert.name] || { total: 0, firing: 0 };
-              return {
-                ...alert,
-                total_evaluations: history.total,
-                firing_count: history.firing,
-              };
-            });
-          } catch (historyError) {
-            console.warn("Failed to fetch alert history:", historyError);
-            // If history fetch fails, still show alerts with 0 counts
-            localAllAlerts = localAllAlerts.map((alert: any) => ({
-              ...alert,
-              total_evaluations: 0,
-              firing_count: 0,
-            }));
-          }
           //general alerts that we use to display (formatting the alerts into the table format)
           //localAllAlerts is the alerts that we use to store
           // PERFORMANCE OPTIMIZATION: Store raw condition data without conversion
           // Conversion happens lazily only when user expands an alert (in triggerExpand)
+          // Anomaly detection items (alert_type === "anomaly_detection") are handled by
+          // normalizeAnomalyToAlertRow which reads period/frequency from trigger_condition.
           localAllAlerts = localAllAlerts.map((data: any) => {
+            if (data.alert_type === "anomaly_detection") {
+              const num = counter++;
+              return normalizeAnomalyToAlertRow(data, num);
+            }
+
             let frequency = "";
             if (data.trigger_condition?.frequency_type == "cron") {
               frequency = data.trigger_condition.cron;
@@ -1277,14 +1379,13 @@ export default defineComponent({
                 id: data.folder_id,
               },
               is_real_time: data.is_real_time,
-              total_evaluations: data.total_evaluations || 0,
-              firing_count: data.firing_count || 0,
             };
           });
+
           //this is the condition where we are setting the alertStateLoadingMap
           localAllAlerts.forEach((alert: any) => {
             alertStateLoadingMap.value[alert.uuid as string] = false;
-          });    
+          });
           //this is the condition where we are setting the allAlertsListByFolderId in the store
           store?.dispatch("setAllAlertsListByFolderId", {
             ...store.state.organizationData.allAlertsListByFolderId,
@@ -1368,26 +1469,23 @@ export default defineComponent({
       if (activeTab.value === "incidents") {
         return;
       }
-      // Anomaly Detection tab shows its own component — no alert table filtering needed
-      if (activeTab.value === "anomalyDetection") {
-        return;
-      }
-      //here we are filtering the alerts by the activeTab
-      //why allAlerts.value is used because we are not fetching the alerts again,
-      // we are just assigning the alerts to the filteredResults
       if (activeTab.value === "scheduled") {
+        // Scheduled: is_real_time is falsy (false / undefined / null) — anomaly rows ("anomaly") excluded
         filteredResults.value = allAlerts.value.filter(
           (alert: any) => !alert.is_real_time,
         );
-      }
-      //we filter the alerts by the realTime tab
-      else if (activeTab.value === "realTime") {
+      } else if (activeTab.value === "realTime") {
+        // Real-time: strictly boolean true — anomaly rows excluded
         filteredResults.value = allAlerts.value.filter(
-          (alert: any) => alert.is_real_time,
+          (alert: any) => alert.is_real_time === true,
         );
-      }
-      //else we will return all the alerts
-      else {
+      } else if (activeTab.value === "anomalyDetection") {
+        // Anomaly Detection: rows injected by normalizeAnomalyToAlertRow with is_real_time === "anomaly"
+        filteredResults.value = allAlerts.value.filter(
+          (alert: any) => alert.is_real_time === "anomaly",
+        );
+      } else {
+        // "all" — show everything
         filteredResults.value = allAlerts.value;
       }
     };
@@ -1573,7 +1671,7 @@ export default defineComponent({
       const unixSeconds = unixMicroseconds / 1e6;
       const dateToFormat = new Date(unixSeconds * 1000);
       const formattedDate = dateToFormat.toISOString();
-      return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+      return date.formatDate(formattedDate, "YYYY-MM-DD HH:mm:ss");
     }
 
     const addAlert = () => {
@@ -1583,13 +1681,74 @@ export default defineComponent({
     const duplicateAlert = async (row: any) => {
       toBeClonedID.value = row.alert_id;
       toBeCloneAlertName.value = row.name;
+      toBeClonedIsAnomaly.value = row.type === "anomaly";
       toBeClonestreamName.value = "";
       toBeClonestreamType.value = "";
       showForm.value = true;
-      toBeClonedAlert.value = await getAlertById(row.alert_id);
+      // Anomaly rows use the /clone endpoint — no need to pre-fetch full data
+      if (!toBeClonedIsAnomaly.value) {
+        toBeClonedAlert.value = await getAlertById(row.alert_id);
+      }
     };
     const submitForm = async () => {
 
+
+      // Anomaly rows: use the dedicated /clone endpoint (no fetch+mutate dance needed)
+      if (toBeClonedIsAnomaly.value) {
+        if (!toBeClonestreamType.value) {
+          $q.notify({
+            type: "negative",
+            message: "Please select stream type ",
+            timeout: 2000,
+          });
+          return;
+        }
+        if (!toBeClonestreamName.value) {
+          $q.notify({
+            type: "negative",
+            message: "Please select stream name",
+            timeout: 2000,
+          });
+          return;
+        }
+        isSubmitting.value = true;
+        const dismiss = $q.notify({
+          spinner: true,
+          message: "Please wait...",
+          timeout: 2000,
+        });
+        try {
+          await alertsService.clone_by_id(
+            store.state.selectedOrganization.identifier,
+            toBeClonedID.value,
+            {
+              name: toBeCloneAlertName.value,
+              folder_id: (folderIdToBeCloned.value as string) || "default",
+              stream_type: toBeClonestreamType.value,
+              stream_name: toBeClonestreamName.value,
+            },
+          );
+          dismiss();
+          $q.notify({
+            type: "positive",
+            message: "Anomaly detection cloned successfully",
+            timeout: 2000,
+          });
+          showForm.value = false;
+          await getAlertsFn(store, folderIdToBeCloned.value);
+          activeFolderId.value = folderIdToBeCloned.value;
+        } catch (e: any) {
+          dismiss();
+          $q.notify({
+            type: "negative",
+            message: e?.response?.data?.message || "Failed to clone anomaly detection",
+            timeout: 2000,
+          });
+        } finally {
+          isSubmitting.value = false;
+        }
+        return;
+      }
 
       if (!toBeClonedAlert.value) {
         $q.notify({
@@ -1739,14 +1898,20 @@ export default defineComponent({
       }
 
     };
-    const refreshList = async (folderId: string) => {
+    const refreshList = async (folderId?: string) => {
       //here we are fetching the alerts from the server because after creating the alert we should get the latest alerts
       //and then we are setting the activeFolderId to the folderId
       //this is done to avoid multiple api calls , when we assign the folderId before fetching it will trigger the watch and it will fetch the alerts again
       //and we dont need to fetch the alerts again because we are already fetching the alerts in the getAlertsFn
-      await getAlertsFn(store, folderId);
+      const resolvedFolderId = folderId || activeFolderId.value || "default";
+      // Always fetch the latest alerts for the folder from backend
+      await getAlertsFn(store, resolvedFolderId);
+      // Re-apply active search/filter on the freshly fetched data
+      if (filterQuery.value) {
+        filterAlertsByQuery(filterQuery.value);
+      }
       await hideForm();
-      activeFolderId.value = folderId;
+      activeFolderId.value = resolvedFolderId;
     };
     const hideForm = async () => {
       showAddAlertDialog.value = false;
@@ -1755,6 +1920,7 @@ export default defineComponent({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           folder: activeFolderId.value,
+          tab: activeTab.value,
         },
       });
       track("Button Click", {
@@ -1939,8 +2105,12 @@ export default defineComponent({
     };
 
     const exportAlert = async (row: any) => {
-      // Find the alert based on uuid
-      const alertToBeExported = await getAlertById(row.alert_id);
+      // Use the /export endpoint — strips runtime fields for anomaly configs, works for regular alerts too
+      const res = await alertsService.export_by_id(
+        store.state.selectedOrganization.identifier,
+        row.alert_id,
+      );
+      const alertToBeExported = res.data;
 
       if (alertToBeExported.hasOwnProperty("id")) {
         delete alertToBeExported.id;
@@ -1987,6 +2157,9 @@ export default defineComponent({
           message: t("alerts.alertTriggeredSuccess"),
           timeout: 2000,
         });
+        if (row.type === "anomaly") {
+          await getAlertsFn(store, activeFolderId.value);
+        }
       } catch (error: any) {
         $q.notify({
           type: "negative",
@@ -1996,13 +2169,60 @@ export default defineComponent({
       }
     };
 
+    const retrainAnomaly = async (row: any) => {
+      try {
+        await alertsService.retrain_by_id(
+          store.state.selectedOrganization.identifier,
+          row.alert_id,
+        );
+        row.status = "training";
+        $q.notify({
+          type: "positive",
+          message: "Retraining triggered",
+          timeout: 2000,
+        });
+      } catch (error: any) {
+        $q.notify({
+          type: "negative",
+          message: error?.response?.data?.message || "Failed to trigger retraining",
+          timeout: 2000,
+        });
+      }
+    };
+
     const updateActiveFolderId = async (newVal: any) => {
       //this is the condition we kept because when we we click on the any folder that is there in the the row when we do search across folders
-      //at that time if it is the same folder it wont trigger the watch and it will show the alerts of the filtered only 
+      //at that time if it is the same folder it wont trigger the watch and it will show the alerts of the filtered only
       //so we are fetching the alerts by the folderId and then filtering the alerts by the activeTab this is done explicitly on only if users clicks on same folder
       if(newVal == activeFolderId.value){
-        getAlertsByFolderId(store, newVal);
+        if (isRestoringState.value) {
+          // Force fresh fetch from backend (cache may be stale after add/edit on another route)
+          isRestoringState.value = false;
+          await getAlertsFn(store, newVal);
+          if (searchAcrossFolders.value && searchQuery.value) {
+            await getAlertsFn(store, activeFolderId.value, searchQuery.value);
+            filterAlertsByTab();
+          } else if (filterQuery.value) {
+            filterAlertsByQuery(filterQuery.value);
+          } else {
+            filterAlertsByTab();
+          }
+          return;
+        }
+        await getAlertsByFolderId(store, newVal);
         filterAlertsByTab();
+      }
+      // When restoring state from a prior navigation, skip clearing search filters
+      if (isRestoringState.value) {
+        isRestoringState.value = false;
+        await getAlertsFn(store, newVal);
+        if (filterQuery.value) {
+          filterAlertsByQuery(filterQuery.value);
+        } else {
+          filterAlertsByTab();
+        }
+        activeFolderId.value = newVal;
+        return;
       }
       //here we are resetting the searchQuery, filterQuery, searchAcrossFolders, allSelectedAlerts, selectedAlerts
       //here we only reset if the value is not null
@@ -2021,6 +2241,15 @@ export default defineComponent({
     };
 
     const editAlert = async (row: any) => {
+      // Anomaly detection rows route to the dedicated edit page
+      if (row.type === "anomaly") {
+        await router.push({
+          name: "editAnomalyDetection",
+          params: { anomaly_id: row.alert_id },
+          query: { org_identifier: store.state.selectedOrganization.identifier, folder: activeFolderId.value, tab: activeTab.value },
+        });
+        return;
+      }
       // Don't fetch alert data here - let the watcher handle it to avoid duplicate API calls
       // Just trigger the route change with alert_id, the watcher will fetch and call showAddUpdateFn
       await router.push({
@@ -2042,14 +2271,19 @@ export default defineComponent({
       // Close the drawer first
       showAlertDetailsDrawer.value = false;
 
-      // Get the full alert data and open the edit form
-      const selectedAlert = await getAlertById(selectedAlertDetails.value.alert_id);
-      showAddUpdateFn({ row: selectedAlert });
+      // Reuse the same edit flow as the listing page
+      await editAlert(selectedAlertDetails.value);
     };
 
     const moveAlertToAnotherFolder = (row: any) => {
       showMoveAlertDialog.value = true;
-      selectedAlertToMove.value = [row.alert_id];
+      if (row.type === "anomaly") {
+        selectedAlertToMove.value = [];
+        selectedAnomalyConfigsToMove.value = [row.alert_id];
+      } else {
+        selectedAlertToMove.value = [row.alert_id];
+        selectedAnomalyConfigsToMove.value = [];
+      }
       activeFolderToMove.value = activeFolderId.value;
     };
 
@@ -2062,6 +2296,7 @@ export default defineComponent({
       await getAlertsFn(store, activeFolderId);
       showMoveAlertDialog.value = false;
       selectedAlertToMove.value = [];
+      selectedAnomalyConfigsToMove.value = [];
       activeFolderToMove.value = "";
       selectedAlerts.value = [];
       allSelectedAlerts.value = false;
@@ -2077,10 +2312,12 @@ export default defineComponent({
 
     const moveMultipleAlerts = () => {
       showMoveAlertDialog.value = true;
-      const selectedAlertsToMove = selectedAlerts.value.map((alert: any) => {
-        return alert.alert_id;
-      });
-      selectedAlertToMove.value = selectedAlertsToMove;
+      selectedAlertToMove.value = selectedAlerts.value
+        .filter((alert: any) => alert.type !== "anomaly")
+        .map((alert: any) => alert.alert_id);
+      selectedAnomalyConfigsToMove.value = selectedAlerts.value
+        .filter((alert: any) => alert.type === "anomaly")
+        .map((alert: any) => alert.alert_id);
       activeFolderToMove.value = activeFolderId.value;
     };
 
@@ -2144,6 +2381,17 @@ export default defineComponent({
         searchQuery.value = null;
       }
     });
+    // Persist filter state to Vuex so it survives navigation to add/edit screens
+    watch(
+      [searchQuery, filterQuery, searchAcrossFolders],
+      () => {
+        store.commit("setAlertListFilters", {
+          searchQuery: searchQuery.value || "",
+          filterQuery: filterQuery.value || "",
+          searchAcrossFolders: !!searchAcrossFolders.value,
+        });
+      },
+    );
     watch(activeTab, async (newVal) => {
       //here we are resetting the filterQuery when the activeTab is changed
       //this is done because we need to trigger again the filterQuery watch
@@ -2200,11 +2448,11 @@ export default defineComponent({
 
         const alertsData = await Promise.all(
           selectedAlertsToExport.map(async (alertId: string) => {
-            const alertData = await getAlertById(alertId);
-            if (alertData.hasOwnProperty("id")) {
-              delete alertData.id;
-            }
-            return alertData;
+            const res = await alertsService.export_by_id(
+              store.state.selectedOrganization.identifier,
+              alertId,
+            );
+            return res.data;
           }),
         );
         alertToBeExported.push(...alertsData);
@@ -2307,16 +2555,13 @@ export default defineComponent({
           alert.name.toLowerCase().includes(query.toLowerCase())
         )
         filteredResults.value = tempResults.filter((alert: any) => {
-          //here we are filtering the alerts by the activeTab
-          if(activeTab.value === "scheduled"){
+          if (activeTab.value === "scheduled") {
             return !alert.is_real_time;
-          } 
-          //we filter the alerts by the realTime tab
-          else if(activeTab.value === "realTime"){
-            return alert.is_real_time;
-          } 
-          //else we will return all the alerts
-          else {
+          } else if (activeTab.value === "realTime") {
+            return alert.is_real_time === true;
+          } else if (activeTab.value === "anomalyDetection") {
+            return alert.is_real_time === "anomaly";
+          } else {
             return true;
           }
         })
@@ -2509,6 +2754,7 @@ export default defineComponent({
       showAddAlertDialog,
       showForm,
       toBeCloneAlertName,
+      toBeClonedIsAnomaly,
       toBeClonestreamType,
       toBeClonestreamName,
       streamTypes,
@@ -2554,6 +2800,7 @@ export default defineComponent({
       getTemplates,
       exportAlert,
       triggerAlert,
+      retrainAnomaly,
       updateActiveFolderId,
       activeFolderId,
       editAlert,
@@ -2562,6 +2809,7 @@ export default defineComponent({
       showMoveAlertDialog,
       outlinedDriveFileMove,
       selectedAlertToMove,
+      selectedAnomalyConfigsToMove,
       moveAlertToAnotherFolder,
       activeFolderToMove,
       updateAcrossFolders,

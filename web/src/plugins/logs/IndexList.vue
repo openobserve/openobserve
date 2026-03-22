@@ -127,6 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               (searchObj.data.stream.selectedStream.length + 1)
             : searchObj.data.stream.selectedStreamFields.length
         "
+        :show-fts-field-values="showFtsFieldValues"
         @add-to-filter="addToFilter"
         @toggle-field="clickFieldFn"
         @toggle-interesting="addToInterestingFieldList"
@@ -287,6 +288,10 @@ export default defineComponent({
     const traceIdMapper = ref<{ [key: string]: string[] }>({});
 
     const showOnlyInterestingFields = ref(false);
+
+    const showFtsFieldValues = computed(
+      () => store.state.zoConfig?.show_fts_field_values ?? false,
+    );
 
     const userDefinedSchemaBtnGroupOption = ref([
       {
@@ -743,7 +748,7 @@ export default defineComponent({
       event: any,
       { name, ftsKey, isSchemaField, streams }: any,
     ) => {
-      if (ftsKey) {
+      if (ftsKey && !showFtsFieldValues.value) {
         event.stopPropagation();
         event.preventDefault();
         return;
@@ -1809,6 +1814,7 @@ export default defineComponent({
       activeIncludeFilterValues,
       activeExcludeFilterValues,
       expandedFields,
+      showFtsFieldValues,
     };
   },
 });

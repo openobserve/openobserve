@@ -286,7 +286,8 @@ jobs:
                 "metrics-visualizations.spec.js",
                 "metrics-config.spec.js",
                 "metrics-promql-query-persistence.spec.js",
-                "metrics-table-column-order.spec.js"
+                "metrics-table-column-order.spec.js",
+                "metrics-promql-builder.spec.js",
               ]
           - testfolder: "Dashboards-Variables"
             browser: "chrome"
@@ -306,10 +307,15 @@ jobs:
               ]
           - testfolder: "Dashboard-Table-Pagination"
             browser: "chrome"
-            run_files: 
+            run_files:
               [
                 "dashboard-table-pagination.spec.js",
-                "dashboard-series-color-multiwindow.spec.js",
+              ]
+          - testfolder: "Dashboard-Pivot-Table"
+            browser: "chrome"
+            run_files:
+              [
+                "dashboard-pivot-table.spec.js",
               ]
           - testfolder: "Dashboards-Panel-Level-DateTime-Config"
             browser: "chrome"
@@ -320,6 +326,24 @@ jobs:
                 "dashboard-panel-time-advanced-edge-cases.spec.js",
                 "dashboard-panel-time-apply-behavior.spec.js",
                 "dashboard-panel-time-variables-behavior.spec.js",
+              ]
+          - testfolder: "Dashboard-Config-Settings"
+            browser: "chrome"
+            run_files:
+              [
+                "dashboard-series-color-multiwindow.spec.js",
+                "dashboard-config-advanced.spec.js",
+                "dashboard-config-axis.spec.js",
+                "dashboard-config-gauge-maps.spec.js",
+                "dashboard-config-general.spec.js",
+                "dashboard-config-legends.spec.js",
+                "dashboard-config-line-style.spec.js",
+                "dashboard-config-panel-time.spec.js",
+                "dashboard-config-table.spec.js",
+                "dashboard-config-trellis.spec.js",
+                "dashboard-config-drilldown.spec.js",
+                "dashboard-config-promql.spec.js",
+                "dashboard-config-markline.spec.js",
               ]
     steps:
       - name: Clone the current repo
@@ -480,7 +504,7 @@ jobs:
               "Logs-Core"|"Logs-Queries")
                 ACTUAL_FOLDER="Logs"
                 ;;
-              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables"|"Dashboard-Table-Pagination"|"Dashboards-Panel-Level-DateTime-Config")
+              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables"|"Dashboard-Table-Pagination"|"Dashboard-Pivot-Table"|"Dashboards-Panel-Level-DateTime-Config"|"Dashboard-Config-Settings")
                 ACTUAL_FOLDER="Dashboards"
                 ;;
               *)

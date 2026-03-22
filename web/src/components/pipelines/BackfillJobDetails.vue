@@ -262,6 +262,24 @@ const show = computed({
 const loading = ref(false);
 const job = ref<BackfillJob | null>(null);
 
+const loadJobDetails = async () => {
+  loading.value = true;
+
+  try {
+    const response = await backfillService.getBackfillJob({
+      org_id: store.state.selectedOrganization.identifier,
+      pipeline_id: props.pipelineId,
+      job_id: props.jobId,
+    });
+    job.value = response;
+  } catch (error: any) {
+    console.error("Error loading backfill job details:", error);
+    job.value = null;
+  } finally {
+    loading.value = false;
+  }
+};
+
 watch(
   () => props.jobId,
   (newJobId) => {
@@ -280,24 +298,6 @@ watch(
     }
   }
 );
-
-const loadJobDetails = async () => {
-  loading.value = true;
-
-  try {
-    const response = await backfillService.getBackfillJob({
-      org_id: store.state.selectedOrganization.identifier,
-      pipeline_id: props.pipelineId,
-      job_id: props.jobId,
-    });
-    job.value = response;
-  } catch (error: any) {
-    console.error("Error loading backfill job details:", error);
-    job.value = null;
-  } finally {
-    loading.value = false;
-  }
-};
 
 const canCancelJob = computed(() => {
   return job.value && ["running", "pending"].includes(job.value.status);

@@ -114,6 +114,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         type: Array,
         default: [],
       },
+      anomalyConfigIds: {
+        type: Array,
+        default: [],
+      },
       type: {
         type: String,
         default: "alerts",
@@ -142,9 +146,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           try {
             const moduleIds = props.moduleId
-            const data = {
+            const data: Record<string, any> = {
               [getModuleName()]: moduleIds,
               dst_folder_id: selectedFolder.value.value,
+            }
+            if (props.anomalyConfigIds && (props.anomalyConfigIds as any[]).length > 0) {
+              data.anomaly_config_ids = props.anomalyConfigIds;
             }
             await moveModuleToAnotherFolder(
               store,
