@@ -37,6 +37,7 @@ use datafusion::{
         ExecutionPlan, PhysicalExpr,
         expressions::{BinaryExpr, Column, InListExpr, NotExpr},
         filter::FilterExec,
+        limit::LocalLimitExec,
         projection::ProjectionExec,
     },
 };
@@ -222,7 +223,7 @@ fn construct_filter_exec(
     exprs: Vec<Arc<dyn PhysicalExpr>>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     if exprs.is_empty() {
-        match filter.projection() {
+        let mut plan = match filter.projection() {
             Some(projection_indices) => {
                 let filter_child_schema = filter.input().schema();
                 let proj_exprs = projection_indices
@@ -235,18 +236,22 @@ fn construct_filter_exec(
                         )
                     })
                     .collect::<Vec<_>>();
-                Ok(Arc::new(ProjectionExec::try_new(
-                    proj_exprs,
-                    filter.input().clone(),
-                )?))
+                Arc::new(ProjectionExec::try_new(proj_exprs, filter.input().clone())?)
             }
-            None => Ok(filter.input().clone()),
+            None => filter.input().clone(),
+        };
+        if let Some(fetch) = filter.fetch() {
+            plan = Arc::new(LocalLimitExec::new(plan, fetch));
         }
+        Ok(plan)
     } else {
         // TODO: remove the unused column after extract index condition
         let plan = FilterExec::try_new(conjunction(exprs), filter.input().clone())?
             .with_projection(filter.projection().cloned())?;
-        Ok(Arc::new(plan))
+        let plan = plan
+            .with_fetch(filter.fetch())
+            .unwrap_or_else(|| Arc::new(plan));
+        Ok(plan)
     }
 }
 
