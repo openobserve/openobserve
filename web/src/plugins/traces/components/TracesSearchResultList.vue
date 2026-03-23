@@ -348,7 +348,7 @@ const addSearchTerm = (
     const isOp = action === "include" ? "is" : "is not";
     searchObj.data.stream.addToFilter = `${field} ${isOp} null`;
   } else {
-    searchObj.data.stream.addToFilter = `${field} ${operator} '${String(fieldValue).replace(/'/g, "\\'")}'`;
+    searchObj.data.stream.addToFilter = `${field} ${operator} '${String(fieldValue).replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
   }
 };
 
