@@ -78,7 +78,7 @@ interface SearchObjectData {
   crossLinkQuery: string;
 }
 
-interface SearchObject {
+export interface SearchObject {
   organizationIdentifier: string;
   config: any;
   communicationMethod: string;

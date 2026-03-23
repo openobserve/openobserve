@@ -41,7 +41,8 @@
           class="tw:absolute tw:text-[10px] tw:text-[var(--o2-text-secondary)] tw:leading-none tw:whitespace-nowrap"
           style="top: 50%; padding-left: 3px"
           :style="{ left: tick.left, transform: tick.transform }"
-        >{{ tick.label }}</span>
+          >{{ tick.label }}</span
+        >
 
         <!-- Static tick marks — skip first and last -->
         <template v-for="(tick, index) in timelineTicks" :key="'tic-' + index">
@@ -63,12 +64,21 @@
           <!-- Time label pill -->
           <div
             class="tw:text-[10px] tw:text-white tw:px-[6px] tw:py-[2px] tw:rounded tw:whitespace-nowrap tw:font-medium"
-            style="background: rgba(30,30,30,0.9); line-height: 1.4"
+            style="background: rgba(30, 30, 30, 0.9); line-height: 1.4"
           >
             {{ cursorTimeLabel }}
           </div>
           <!-- Downward caret -->
-          <div style="width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid rgba(30,30,30,0.9); margin-top: 0"></div>
+          <div
+            style="
+              width: 0;
+              height: 0;
+              border-left: 4px solid transparent;
+              border-right: 4px solid transparent;
+              border-top: 5px solid rgba(30, 30, 30, 0.9);
+              margin-top: 0;
+            "
+          ></div>
         </div>
       </div>
 
@@ -86,7 +96,7 @@
         <div
           v-if="cursorVisible"
           class="tw:absolute tw:top-0 tw:bottom-0 tw:pointer-events-none"
-          style="width: 1px; background: rgba(80,80,80,0.6); z-index: 10"
+          style="width: 1px; background: rgba(80, 80, 80, 0.6); z-index: 10"
           :style="{ left: cursorX + 'px' }"
         ></div>
       </div>
@@ -120,7 +130,7 @@ import { formatDuration } from "@/composables/traces/useTraceProcessing";
 import useTraces from "@/composables/useTraces";
 
 // Props
-interface Props {
+export interface Props {
   spans: EnrichedSpan[];
   selectedSpanId?: string | null;
   traceDuration: number;
@@ -173,7 +183,10 @@ const timelineTicks = computed(() => {
   return [0, 0.25, 0.5, 0.75, 1].map((fraction) => ({
     label: formatDuration(duration * fraction),
     left: `calc(${GRID_LEFT}px + ${fraction} * (100% - ${totalPad}px))`,
-    transform: fraction === 1 ? "translateX(-100%) translateY(-50%)" : "translateY(-50%)",
+    transform:
+      fraction === 1
+        ? "translateX(-100%) translateY(-50%)"
+        : "translateY(-50%)",
   }));
 });
 
@@ -185,7 +198,10 @@ const handleChartMouseMove = (event: MouseEvent) => {
   const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
   const offsetX = event.clientX - rect.left;
   const gridWidth = rect.width - GRID_LEFT - GRID_RIGHT;
-  const percentage = Math.max(0, Math.min(1, (offsetX - GRID_LEFT) / gridWidth));
+  const percentage = Math.max(
+    0,
+    Math.min(1, (offsetX - GRID_LEFT) / gridWidth),
+  );
 
   cursorX.value = offsetX;
   cursorTimeLabel.value = formatDuration(percentage * props.traceDuration);

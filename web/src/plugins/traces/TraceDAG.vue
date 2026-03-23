@@ -94,7 +94,7 @@ import "@vue-flow/core/dist/style.css";
 import "@vue-flow/core/dist/theme-default.css";
 import "@vue-flow/controls/dist/style.css";
 
-interface SpanNode {
+export interface SpanNode {
   span_id: string;
   parent_span_id: string | null;
   service_name: string;
@@ -105,12 +105,12 @@ interface SpanNode {
   llm_observation_type: string | null;
 }
 
-interface SpanEdge {
+export interface SpanEdge {
   from: string;
   to: string;
 }
 
-interface DAGResponse {
+export interface DAGResponse {
   trace_id: string;
   nodes: SpanNode[];
   edges: SpanEdge[];

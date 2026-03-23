@@ -1115,12 +1115,13 @@ const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
 );
 
-interface TimeRange {
+export interface TimeRange {
   startTime: number;
   endTime: number;
 }
 
 interface Props {
+export interface Props {
   serviceName: string;
   matchedDimensions: Record<string, string>;
   additionalDimensions?: Record<string, string>; // Unstable dimensions (pod-id, etc.) - shown with _o2_all option
