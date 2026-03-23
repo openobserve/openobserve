@@ -110,16 +110,10 @@ export const fillMissingValues = (
     "yyyy-MM-dd'T'HH:mm:ss",
   );
 
-  // Use resultMetaData's earliest time_offset.start_time as the fill start.
-  // During streaming, chunks arrive latest-first, so this represents
-  // how far back we've received data — fill only from there to user's endTime.
-  const resultMetaStartTime = resultMetaData?.reduce(
-    (earliest: number, it: any) => {
-      const t = it?.time_offset?.start_time;
-      return t && (earliest === 0 || t < earliest) ? t : earliest;
-    },
-    0,
-  );
+  // Use resultMetaData's last entry's time_offset.start_time as the fill start.
+  // Chunks arrive right-to-left (latest first), so the last entry has the earliest start.
+  const resultMetaStartTime =
+    resultMetaData?.[resultMetaData.length - 1]?.time_offset?.start_time ?? 0;
   const fillStartTime = resultMetaStartTime
     ? new Date(resultMetaStartTime / 1000)
     : binnedDate;
