@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { nextTick } from "vue";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -505,7 +506,7 @@ describe("useTraces", () => {
 
       await copyTracesUrl();
       // Give microtasks a chance to run
-      await Promise.resolve();
+      await nextTick();
 
       expect(mockNotify).toHaveBeenCalledWith(
         expect.objectContaining({ type: "positive" }),
@@ -524,7 +525,7 @@ describe("useTraces", () => {
       };
 
       await copyTracesUrl();
-      await Promise.resolve();
+      await nextTick();
 
       expect(mockNotify).toHaveBeenCalledWith(
         expect.objectContaining({ type: "negative" }),
