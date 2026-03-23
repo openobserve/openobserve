@@ -100,119 +100,122 @@ export const fillMissingValues = (
     processedData.map((d: any) => getDataValue(d, uniqueKey)),
   );
 
-  const filledData: any = [];
-
-  // Anchor entry: add null at user's selected start time so ECharts x-axis is stable
-  // Format using same method as processedData
-  const anchorFormattedTime = format(
-    toZonedTime(binnedDate, "UTC"),
-    "yyyy-MM-dd'T'HH:mm:ss",
-  );
-  if (
-    xAxisKeysWithoutTimeStamp.length === 0 &&
-    breakdownAxisKeysWithoutTimeStamp.length === 0
-  ) {
-    const anchorEntry: any = { [timeKey]: anchorFormattedTime };
-    keys.forEach((key) => {
-      if (key !== timeKey) anchorEntry[key] = noValueConfigOption;
-    });
-    filledData.push(anchorEntry);
-  } else {
-    uniqueXAxisValues.forEach((uniqueValue: any) => {
-      const anchorEntry: any = {
-        [timeKey]: anchorFormattedTime,
-        [uniqueKey]: uniqueValue,
-      };
-      keys.forEach((key) => {
-        if (key !== timeKey && key !== uniqueKey) {
-          anchorEntry[key] = noValueConfigOption;
-        }
-      });
-      filledData.push(anchorEntry);
-    });
-  }
-
-  // Add existing processedData after the anchor without using spread,
-  // which can overflow call stack for large datasets.
-  for (const row of processedData) {
-    filledData.push(row);
-  }
-
   const intervalMillis = interval * 1000;
 
-  // Fill gaps only within the received data range
-  // Data arrives from the end during streaming, so avoid filling before firstDataTimestamp.
-  const firstDataTimestamp =
-    processedData.length > 0 ? getDataValue(processedData[0], timeKey) : null;
-  const lastDataTimestamp =
-    processedData.length > 0
-      ? getDataValue(processedData[processedData.length - 1], timeKey)
-      : null;
+  // Use metadata endTime for the fill range end (user's selected end time).
+  const metaDataEndTime = metadata?.queries[0]?.endTime?.toString() ?? 0;
+  const endTime = new Date(parseInt(metaDataEndTime) / 1000);
+  const endTimeForFill = format(
+    toZonedTime(endTime, "UTC"),
+    "yyyy-MM-dd'T'HH:mm:ss",
+  );
 
-  if (firstDataTimestamp && lastDataTimestamp) {
-    const firstDataDate = new Date(firstDataTimestamp + "Z");
-    const lastDataDate = new Date(lastDataTimestamp + "Z");
-    const binnedFillStart = dateBin(interval, firstDataDate, origin);
-    const endTimeForFill = format(
-      toZonedTime(lastDataDate, "UTC"),
+  // Use resultMetaData's earliest time_offset.start_time as the fill start.
+  // During streaming, chunks arrive latest-first, so this represents
+  // how far back we've received data — fill only from there to user's endTime.
+  const resultMetaStartTime = resultMetaData?.reduce(
+    (earliest: number, it: any) => {
+      const t = it?.time_offset?.start_time;
+      return t && (earliest === 0 || t < earliest) ? t : earliest;
+    },
+    0,
+  );
+  const fillStartTime = resultMetaStartTime
+    ? new Date(resultMetaStartTime / 1000)
+    : binnedDate;
+  const binnedFillStart = dateBin(interval, fillStartTime, origin);
+
+  // Build map from processedData for O(1) lookup
+  const hasBreakdown =
+    xAxisKeysWithoutTimeStamp.length > 0 ||
+    breakdownAxisKeysWithoutTimeStamp.length > 0;
+  const searchDataMap = new Map();
+  processedData?.forEach((d: any) => {
+    const key = hasBreakdown
+      ? `${getDataValue(d, timeKey)}-${getDataValue(d, uniqueKey)}`
+      : `${getDataValue(d, timeKey)}`;
+    searchDataMap.set(key, d);
+  });
+
+  const filledData: any = [];
+
+  // Anchor entry: single null at user's selected start time to pin ECharts x-axis.
+  // Skip if fill loop already covers user's start (all data has arrived).
+  if (binnedFillStart > binnedDate) {
+    const anchorFormattedTime = format(
+      toZonedTime(binnedDate, "UTC"),
       "yyyy-MM-dd'T'HH:mm:ss",
     );
+    if (!hasBreakdown) {
+      const anchorEntry: any = { [timeKey]: anchorFormattedTime };
+      keys.forEach((key) => {
+        if (key !== timeKey) anchorEntry[key] = noValueConfigOption;
+      });
+      filledData.push(anchorEntry);
+    } else {
+      uniqueXAxisValues.forEach((uniqueValue: any) => {
+        const anchorEntry: any = {
+          [timeKey]: anchorFormattedTime,
+          [uniqueKey]: uniqueValue,
+        };
+        keys.forEach((key) => {
+          if (key !== timeKey && key !== uniqueKey) {
+            anchorEntry[key] = noValueConfigOption;
+          }
+        });
+        filledData.push(anchorEntry);
+      });
+    }
+  }
 
-    // Build map from processedData for O(1) lookup
-    const searchDataMap = new Map();
-    processedData?.forEach((d: any) => {
-      const key =
-        xAxisKeysWithoutTimeStamp.length > 0 ||
-        breakdownAxisKeysWithoutTimeStamp.length > 0
-          ? `${getDataValue(d, timeKey)}-${getDataValue(d, uniqueKey)}`
-          : `${getDataValue(d, timeKey)}`;
-      searchDataMap.set(key, d);
-    });
+  // Fill slot-by-slot in chronological order from binnedFillStart
+  // (resultMetaData start) to endTimeForFill (user's end).
+  // Only covers the range where streaming data has been received.
+  let currentTime = binnedFillStart;
+  let currentFormattedTime = format(
+    toZonedTime(currentTime, "UTC"),
+    "yyyy-MM-dd'T'HH:mm:ss",
+  );
 
-    let currentTime = binnedFillStart;
-    let currentFormattedTime = format(
-      toZonedTime(currentTime, "UTC"),
-      "yyyy-MM-dd'T'HH:mm:ss",
-    );
-    while (currentFormattedTime <= endTimeForFill) {
-      if (
-        xAxisKeysWithoutTimeStamp.length === 0 &&
-        breakdownAxisKeysWithoutTimeStamp.length === 0
-      ) {
-        const key = `${currentFormattedTime}`;
+  while (currentFormattedTime <= endTimeForFill) {
+    if (!hasBreakdown) {
+      const key = `${currentFormattedTime}`;
+      const currentData = searchDataMap.get(key);
+      if (currentData) {
+        filledData.push(currentData);
+      } else {
+        const nullEntry: any = { [timeKey]: currentFormattedTime };
+        keys.forEach((key) => {
+          if (key !== timeKey) nullEntry[key] = noValueConfigOption;
+        });
+        filledData.push(nullEntry);
+      }
+    } else {
+      uniqueXAxisValues.forEach((uniqueValue: any) => {
+        const key = `${currentFormattedTime}-${uniqueValue}`;
         const currentData = searchDataMap.get(key);
-        if (!currentData) {
-          const nullEntry: any = { [timeKey]: currentFormattedTime };
+        if (currentData) {
+          filledData.push(currentData);
+        } else {
+          const nullEntry: any = {
+            [timeKey]: currentFormattedTime,
+            [uniqueKey]: uniqueValue,
+          };
           keys.forEach((key) => {
-            if (key !== timeKey) nullEntry[key] = noValueConfigOption;
+            if (key !== timeKey && key !== uniqueKey) {
+              nullEntry[key] = noValueConfigOption;
+            }
           });
           filledData.push(nullEntry);
         }
-      } else {
-        uniqueXAxisValues.forEach((uniqueValue: any) => {
-          const key = `${currentFormattedTime}-${uniqueValue}`;
-          const currentData = searchDataMap.get(key);
-          if (!currentData) {
-            const nullEntry: any = {
-              [timeKey]: currentFormattedTime,
-              [uniqueKey]: uniqueValue,
-            };
-            keys.forEach((key) => {
-              if (key !== timeKey && key !== uniqueKey) {
-                nullEntry[key] = noValueConfigOption;
-              }
-            });
-            filledData.push(nullEntry);
-          }
-        });
-      }
-
-      currentTime = new Date(currentTime.getTime() + intervalMillis);
-      currentFormattedTime = format(
-        toZonedTime(currentTime, "UTC"),
-        "yyyy-MM-dd'T'HH:mm:ss",
-      );
+      });
     }
+
+    currentTime = new Date(currentTime.getTime() + intervalMillis);
+    currentFormattedTime = format(
+      toZonedTime(currentTime, "UTC"),
+      "yyyy-MM-dd'T'HH:mm:ss",
+    );
   }
 
   return filledData;
