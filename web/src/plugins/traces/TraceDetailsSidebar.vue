@@ -69,7 +69,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="span.service_name"
             data-test="trace-details-sidebar-header-toolbar-service"
           >
-            <q-icon name="cloud_queue" size="12px" class="q-mr-xs" />
+            <img
+              :src="serviceIconUrl"
+              class="q-mr-xs tw:w-[0.875rem] tw:h-[0.875rem] tw:shrink-0"
+              aria-hidden="true"
+            />
             <span class="chip-label">Service</span>
             <span
               class="chip-value"
@@ -910,6 +914,7 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import config from "@/aws-exports";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
+import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
 import TenstackTable from "@/components/TenstackTable.vue";
 import {
@@ -991,7 +996,7 @@ export default defineComponent({
       rowsPerPage: 0,
     });
     const q = useQuasar();
-    const { buildQueryDetails, navigateToLogs } = useTraces();
+    const { buildQueryDetails, navigateToLogs, searchObj } = useTraces();
     const router = useRouter();
 
     // JSON syntax highlighting colors - using CSS variables for theme-aware colors
@@ -2081,6 +2086,13 @@ export default defineComponent({
       toggleFullscreen,
       isDarkMode,
       DOMPurify,
+      serviceIconUrl: computed(() =>
+        getServiceIconDataUrl(
+          props.span?.service_name ?? "",
+          store.state.theme === "dark",
+          searchObj.meta.serviceColors?.[props.span?.service_name] ?? "#9e9e9e",
+        ),
+      ),
     };
   },
 });

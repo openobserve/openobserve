@@ -16,14 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="row items-center tw:flex-nowrap!" data-test="trace-row-service">
-    <!-- Service colour dot -->
-    <span
-      data-test="trace-row-service-dot"
-      class="q-mr-sm tw:inline-block tw:w-[0.625rem] tw:h-[0.625rem] tw:rounded-full tw:shrink-0"
-      :style="{
-        backgroundColor: rootColor,
-        boxShadow: `0 0 0.5rem ${rootColor}`,
-      }"
+    <!-- Service type icon -->
+    <img
+      data-test="trace-row-service-icon"
+      :src="serviceIconUrl"
+      class="q-mr-sm tw:shrink-0 tw:w-[1.25rem] tw:h-[1.25rem]"
+      aria-hidden="true"
     />
 
     <!-- Service name + badge -->
@@ -43,18 +41,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { QBadge, QTooltip } from "quasar";
+import { QTooltip, useQuasar } from "quasar";
 import useTraces from "@/composables/useTraces";
+import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 
 const props = defineProps<{
   item: Record<string, any>;
 }>();
 
+const $q = useQuasar();
 const { searchObj } = useTraces();
 const serviceColors = computed(() => searchObj.meta.serviceColors ?? {});
 
 const rootColor = computed(
   () => serviceColors.value[props.item.service_name] ?? "#9e9e9e",
+);
+
+const serviceIconUrl = computed(() =>
+  getServiceIconDataUrl(
+    props.item.service_name,
+    $q.dark.isActive,
+    rootColor.value,
+  ),
 );
 
 const extraServices = computed(() => {

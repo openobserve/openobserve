@@ -109,6 +109,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="ellipsis flex items-center span-name-section-content"
                 >
+                  <img
+                    :src="getSpanServiceIconUrl(span)"
+                    class="q-mr-xs tw:shrink-0 tw:w-[1.125rem] tw:h-[1.125rem] tw:inline-block"
+                    aria-hidden="true"
+                    :data-test="`trace-tree-span-service-icon-${span.spanId}`"
+                  />
                   <q-icon
                     v-if="span.spanStatus === 'ERROR'"
                     name="error"
@@ -254,6 +260,7 @@ import SpanBlock from "./SpanBlock.vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { formatTokens, formatCost, isLLMTrace } from "@/utils/llmUtils";
+import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 
 export default defineComponent({
   name: "TraceTree",
@@ -598,6 +605,12 @@ export default defineComponent({
       formatTokens,
       formatCost,
       isLLMTrace,
+      getSpanServiceIconUrl: (span: any) =>
+        getServiceIconDataUrl(
+          span.serviceName,
+          store.state.theme === "dark",
+          span.style?.color ?? "#9e9e9e",
+        ),
     };
   },
   components: { SpanBlock },
