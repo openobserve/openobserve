@@ -1333,6 +1333,74 @@ async fn process_node(
                 "[Pipeline]: LLM evaluation node {node_idx} received {count} records from condition node"
             );
 
+            // Pre-filter: keep only spans relevant to LLM evaluation before passing
+            // to the background eval task. This drops pure infra spans (HTTP, DB, Redis,
+            // cache) that will never be evaluated, reducing channel pressure and buffer
+            // task work without any risk to the real-time ingestion path.
+            //
+            // A span is relevant if it is one of:
+            //   (a) an LLM span  — has llm_input / llm.input / gen_ai.content.prompt
+            //   (b) a tool span  — has gen_ai.tool.name/gen_ai_tool_name or operation_name
+            //                      starting with "execute_tool " or "tool."
+            //   (c) a root span  — has no non-zero reference_parent_span_id or parent_span_id
+            //
+            // The buffer task applies an identical filter internally; this is an intentional
+            // early-exit that avoids serialising irrelevant spans into the mpsc channel at all.
+            let llm_span_identifier = params.llm_span_identifier.as_str();
+            let pre_filter_total = all_records.len();
+            let all_records: Vec<_> = all_records
+                .into_iter()
+                .filter(|r| {
+                    // (a) LLM span
+                    let is_llm = {
+                        let check = |field: &str| {
+                            r.get(field)
+                                .map(|v| {
+                                    !v.is_null()
+                                        && v.as_str().map(|s| !s.is_empty()).unwrap_or(false)
+                                })
+                                .unwrap_or(false)
+                        };
+                        check(llm_span_identifier)
+                            || check("llm_input")
+                            || check("llm.input")
+                            || check("gen_ai.content.prompt")
+                    };
+                    if is_llm {
+                        return true;
+                    }
+
+                    // (b) tool span
+                    let is_tool = r.get("gen_ai.tool.name").is_some()
+                        || r.get("gen_ai_tool_name").is_some()
+                        || r.get("operation_name")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.starts_with("execute_tool ") || s.starts_with("tool."))
+                            .unwrap_or(false);
+                    if is_tool {
+                        return true;
+                    }
+
+                    // (c) root span — no non-zero parent
+                    let has_real_parent = |field: &str| -> bool {
+                        r.get(field)
+                            .and_then(|v| v.as_str())
+                            .map(|s| !s.is_empty() && !s.chars().all(|c| c == '0'))
+                            .unwrap_or(false)
+                    };
+                    !has_real_parent("reference_parent_span_id")
+                        && !has_real_parent("parent_span_id")
+                })
+                .collect();
+
+            let pre_filter_kept = all_records.len();
+            if pre_filter_kept < pre_filter_total {
+                log::info!(
+                    "[Pipeline]: LLM evaluation node {node_idx} pre-filter: {pre_filter_kept}/{pre_filter_total} spans are LLM/tool/root (dropped {} infra spans)",
+                    pre_filter_total - pre_filter_kept,
+                );
+            }
+
             // Drop child_senders immediately — the eval background task will ingest
             // results directly rather than sending through the leaf node. This allows
             // the leaf node's channel to close and its task to return immediately.
@@ -1351,6 +1419,7 @@ async fn process_node(
                         sampling_rate: params.sampling_rate,
                         enable_llm_judge: true,
                         llm_span_identifier: params.llm_span_identifier.clone(),
+                        eval_template: params.eval_template.clone(),
                         ..Default::default()
                     };
                 let params_name = params.name.clone();

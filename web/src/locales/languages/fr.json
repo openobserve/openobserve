@@ -118,7 +118,9 @@
     "copySuccess": "Copié dans le presse-papiers",
     "copyError": "Impossible de copier dans le presse-papiers",
     "goBack": "Retourner",
-    "stopGenerating": "Arrêtez de générer"
+    "stopGenerating": "Arrêtez de générer",
+    "version": "Version",
+    "create": "Créez"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",
@@ -2675,7 +2677,12 @@
     "errorGettingResults": "Erreur lors de l'obtention des résultats",
     "discardChangesTitle": "Ignorer les modifications",
     "deleteNodeTitle": "Supprimer le nœud",
-    "deleteNodeLlmEvalConfirm": "Êtes-vous sûr de vouloir supprimer ce nœud d'évaluation LLM ?"
+    "deleteNodeLlmEvalConfirm": "Êtes-vous sûr de vouloir supprimer ce nœud d'évaluation LLM ?",
+    "evalTemplates": "Modèles d'évaluation",
+    "evaluationTemplate": "Modèle d'évaluation",
+    "evaluationTemplateHelp": "Sélectionnez un modèle d'évaluation qui définit les critères et les dimensions pour le juge LLM.",
+    "noTemplatesFound": "Aucun modèle d'évaluation n'a été trouvé. Créez-en un sur la page Modèles d'évaluation.",
+    "evalTemplatesRefreshed": "Les modèles d'évaluation ont été actualisés avec succès"
   },
   "reports": {
     "header": "Rapports",
@@ -3246,5 +3253,40 @@
     "guideQuery": "Requête SQL en cours",
     "guideQueryEncoded": "Requête SQL codée en Base64",
     "guideExampleHeader": "Exemple"
+  },
+  "evalTemplate": {
+    "header": "Modèles d'évaluation",
+    "newTemplate": "Nouveau modèle",
+    "editTemplate": "Modifier le modèle d'évaluation",
+    "createTemplate": "Créer un nouveau modèle d'évaluation",
+    "noTemplatesFound": "Aucun modèle d'évaluation n'a été trouvé",
+    "templateName": "Nom du modèle",
+    "responseType": "Type de réponse",
+    "dimensions": "Dimensions de l'évaluation",
+    "promptTemplate": "Modèle rapide",
+    "statsTitle": "Statistiques sur les modèles",
+    "avgQualityScore": "Score de qualité moyen",
+    "usageStats": "Statistiques d'utilisation",
+    "totalEvaluations": "Total des évaluations",
+    "lastUsed": "Dernière utilisation",
+    "deleteTemplate": "Supprimer le modèle",
+    "deleteConfirmation": "Êtes-vous sûr de vouloir supprimer « {name} » ?",
+    "loadFailed": "Impossible de charger les modèles",
+    "saveRequiredFields": "Veuillez remplir tous les champs obligatoires",
+    "updateSuccess": "Modèle mis à jour avec succès",
+    "createSuccess": "Modèle créé avec succès",
+    "updateFailed": "Impossible de mettre à jour le modèle",
+    "createFailed": "Impossible de créer le modèle",
+    "deleteSuccess": "Modèle supprimé avec succès",
+    "deleteFailed": "Impossible de supprimer le modèle",
+    "statsLoadFailed": "Impossible de charger les statistiques du modèle",
+    "nameRequired": "Le nom est obligatoire",
+    "responseTypeRequired": "Le type de réponse est obligatoire",
+    "dimensionRequired": "Au moins une dimension est requise",
+    "contentRequired": "Le contenu est obligatoire",
+    "never": "Jamais",
+    "typeScore": "Score numérique (par exemple, 0,0 à 1,0)",
+    "typeBoolean": "Binaire/Pass-Fail (booléen)",
+    "typeCustom": "Texte catégoriel/personnalisé"
   }
 }

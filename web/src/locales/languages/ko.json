@@ -118,7 +118,9 @@
     "retry": "재시도",
     "set": "+ 세트",
     "goBack": "뒤로 이동",
-    "stopGenerating": "생성 중지"
+    "stopGenerating": "생성 중지",
+    "version": "버전",
+    "create": "작성"
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
@@ -2675,7 +2677,12 @@
     "errorGettingResults": "결과를 가져오는 중 오류가 발생했습니다.",
     "discardChangesTitle": "변경 내용 취소",
     "deleteNodeTitle": "노드 삭제",
-    "deleteNodeLlmEvalConfirm": "이 LLM 평가 노드를 정말로 삭제하시겠습니까?"
+    "deleteNodeLlmEvalConfirm": "이 LLM 평가 노드를 정말로 삭제하시겠습니까?",
+    "evalTemplates": "평가 템플릿",
+    "evaluationTemplate": "평가 템플릿",
+    "evaluationTemplateHelp": "LLM 심사위원의 기준과 차원을 정의하는 평가 템플릿을 선택합니다.",
+    "noTemplatesFound": "평가 템플릿을 찾을 수 없습니다.평가 템플릿 페이지에서 새로 생성하십시오.",
+    "evalTemplatesRefreshed": "평가 템플릿이 성공적으로 새로 고쳐졌습니다."
   },
   "reports": {
     "header": "보고서",
@@ -3246,5 +3253,40 @@
     "guideQuery": "현재 SQL 쿼리",
     "guideQueryEncoded": "Base64로 인코딩된 SQL 쿼리",
     "guideExampleHeader": "예시"
+  },
+  "evalTemplate": {
+    "header": "평가 템플릿",
+    "newTemplate": "새 템플릿",
+    "editTemplate": "평가 템플릿 편집",
+    "createTemplate": "새 평가 템플릿 생성",
+    "noTemplatesFound": "평가 템플릿을 찾을 수 없습니다.",
+    "templateName": "템플릿 이름",
+    "responseType": "응답 유형",
+    "dimensions": "평가 치수",
+    "promptTemplate": "프롬프트 템플릿",
+    "statsTitle": "템플릿 통계",
+    "avgQualityScore": "평균 품질 평가 점수",
+    "usageStats": "사용 통계",
+    "totalEvaluations": "전체 평가",
+    "lastUsed": "마지막 사용",
+    "deleteTemplate": "템플릿 삭제",
+    "deleteConfirmation": "정말로 “{name}”을 삭제하시겠습니까?",
+    "loadFailed": "템플릿을 로드하지 못했습니다.",
+    "saveRequiredFields": "모든 필수 필드를 입력하십시오.",
+    "updateSuccess": "템플릿이 성공적으로 업데이트되었습니다.",
+    "createSuccess": "템플릿이 성공적으로 생성되었습니다.",
+    "updateFailed": "템플릿을 업데이트하지 못했습니다.",
+    "createFailed": "템플릿을 만들지 못했습니다.",
+    "deleteSuccess": "템플릿이 성공적으로 삭제되었습니다.",
+    "deleteFailed": "템플릿을 삭제하지 못했습니다.",
+    "statsLoadFailed": "템플릿 통계를 로드하지 못했습니다.",
+    "nameRequired": "이름은 필수",
+    "responseTypeRequired": "응답 유형이 필요합니다.",
+    "dimensionRequired": "차원이 하나 이상 필요합니다.",
+    "contentRequired": "콘텐츠가 필요합니다.",
+    "never": "절대 안 돼",
+    "typeScore": "숫자 점수 (예: 0.0 - 1.0)",
+    "typeBoolean": "바이너리/패스-페일 (부울)",
+    "typeCustom": "범주형/사용자 지정 텍스트"
   }
 }

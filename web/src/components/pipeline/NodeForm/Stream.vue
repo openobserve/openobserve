@@ -26,7 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between">
       {{ t("pipeline.streamTitle") }}
       <div>
-          <q-btn v-close-popup="true" round flat icon="cancel" >
+          <q-btn v-close-popup="true"
+round
+flat
+icon="cancel" >
           </q-btn>
         </div>
     </div>
@@ -114,11 +117,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
           </div>
-          <div v-if="selectedNodeType == 'output'" style="font-size: 14px;" class="note-message" >
-            <span class="tw:flex tw:items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Select an existing stream from the list or enter the name to create a new one</span>
-            <span class="tw:flex tw:items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Enrichment_tables as destination stream is only available for scheduled pipelines</span>
+          <div v-if="selectedNodeType == 'output'"
+style="font-size: 14px;"
+class="note-message" >
+            <span class="tw:flex tw:items-center"> <q-icon name="info" class="q-pr-xs" /> Select an existing stream from the list or enter the name to create a new one</span>
+            <span class="tw:flex tw:items-center"> <q-icon name="info" class="q-pr-xs" /> Enrichment_tables as destination stream is only available for scheduled pipelines</span>
 
-          <span class="tw:flex"> <q-icon name="info" class="q-pr-xs q-pt-xs"</q-icon> Use curly braces '{}' to configure stream name dynamically. e.g. static_text_{fieldname}_postfix. Static text before/after {} is optional</span>
+          <span class="tw:flex"> <q-icon name="info" class="q-pr-xs q-pt-xs" /> Use curly braces '{}' to configure stream name dynamically. e.g. static_text_{fieldname}_postfix. Static text before/after {} is optional</span>
 
             </div>
         </div>

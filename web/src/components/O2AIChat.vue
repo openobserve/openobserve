@@ -4501,10 +4501,8 @@ export default defineComponent({
       previewImage,
       openImagePreview,
       closeImagePreview,
-      // Context references
       contextReferences,
       handleReferencesUpdate,
-      handleNavigationAction,
     }
   }
 });
