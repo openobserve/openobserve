@@ -63,10 +63,10 @@ impl From<Model> for SourceMap {
     }
 }
 
-impl Into<i32> for FileType {
-    fn into(self) -> i32 {
-        match self {
-            Self::SourceMap => 0,
+impl From<FileType> for i32 {
+    fn from(val: FileType) -> Self {
+        match val {
+            FileType::SourceMap => 0,
         }
     }
 }

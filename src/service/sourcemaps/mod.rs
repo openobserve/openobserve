@@ -257,6 +257,7 @@ async fn get_sourcemap_file_info(
 // this function does not return error, as we do not have retry.
 // if something fails in this attempt which is a temporary failure
 // when that sourcemap is fetched again, this will be retried
+#[cfg(feature = "enterprise")]
 async fn store_file_locally(mut smap_info: SourceMap, file_data: bytes::Bytes) {
     let path = get_file_path(&smap_info.org, &smap_info.file_store_id);
     log::info!(
