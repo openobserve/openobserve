@@ -287,7 +287,7 @@ async fn get_sourcemap_file_data(
     org_id: &str,
     smap_file: &SourceMap,
 ) -> Result<bytes::Bytes, anyhow::Error> {
-    let path = get_file_path(&org_id, &smap_file.file_store_id);
+    let path = get_file_path(org_id, &smap_file.file_store_id);
     if smap_file.cluster == config::get_cluster_name() {
         let get_res = storage::get("", &path).await?;
         let bytes = get_res.bytes().await?;
@@ -401,26 +401,23 @@ async fn resolve_stack(
 
     let (src_line, src_col) = tok.get_src();
 
-    let sline: String;
-    let scol: String;
-
     // sourcemap crate uses u32::MAX as an indicator value to say that
     // token was invalid or the location in the original source was not found
     // so we account for that, and set it to unknown here
     // not the best way to do, as typos can switch one to other,
     // but should be ok.
     // also sat-add 1 to re-adjust 1 based index of source files
-    if src_line == u32::MAX {
-        sline = UNKNOWN_STR.to_string();
+    let sline = if src_line == u32::MAX {
+        UNKNOWN_STR.to_string()
     } else {
-        sline = src_line.saturating_add(1).to_string();
-    }
+        src_line.saturating_add(1).to_string()
+    };
 
-    if src_col == u32::MAX {
-        scol = UNKNOWN_STR.to_string();
+    let scol = if src_col == u32::MAX {
+        UNKNOWN_STR.to_string()
     } else {
-        scol = src_col.saturating_add(1).to_string();
-    }
+        src_col.saturating_add(1).to_string()
+    };
 
     let translated = format!(
         "at {} @ {}:{}:{}",

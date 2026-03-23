@@ -18,6 +18,7 @@ use std::collections::HashMap;
 use axum::{
     Json,
     extract::{Multipart, Path, Query},
+    http::HeaderMap,
     response::Response,
 };
 use infra::table::source_maps::FileType;
@@ -153,7 +154,7 @@ pub async fn delete(
 
 /// TranslateStacktrace
 #[utoipa::path(
-    delete,
+    post,
     path = "/{org_id}/sourcemaps/stacktrace",
     context_path = "/api",
     tag = "Sourcemaps",
@@ -221,13 +222,27 @@ pub async fn translate_stacktrace(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn upload_maps(Path(org_id): Path<String>, mut multipart: Multipart) -> Response {
+pub async fn upload_maps(
+    Path(org_id): Path<String>,
+    headers: HeaderMap,
+    mut multipart: Multipart,
+) -> Response {
     let mut file_data = Vec::new();
 
     let mut service = None;
     let mut env = None;
     let mut version = None;
 
+    if let Some(v) = headers.get("content-length") {
+        let Ok(content_length) = String::from_utf8_lossy(v.as_bytes()).parse::<u64>() else {
+            return MetaHttpResponse::bad_request("Invalid Content-Length header");
+        };
+        if content_length > 10 * config::SOURCEMAP_FILE_MAX_SIZE {
+            return MetaHttpResponse::bad_request("file is too large");
+        }
+    } else {
+        return MetaHttpResponse::bad_request("Missing content-length header");
+    }
     while let Ok(Some(field)) = multipart.next_field().await {
         let field_name = field.name().unwrap_or("").to_string();
 

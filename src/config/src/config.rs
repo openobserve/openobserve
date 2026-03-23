@@ -76,7 +76,7 @@ pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
 pub const SOURCEMAP_ZIP_MAX_SIZE: usize = 1024 * 1024 * 100; // 100 MB
 // max file size for individual sourcemap. We temp cache these in mem,
 // so it will affect spikes in mem at resolving stacktrace
-pub const SOURCEMAP_FILE_MAX_SIZE: u64 = 1024 * 1024 * 50; // 50 MB
+pub const SOURCEMAP_FILE_MAX_SIZE: u64 = 1024 * 1024 * 5; // 5 MB
 pub const SOURCEMAP_MEM_CACHE_SIZE: usize = 10000;
 
 #[inline]

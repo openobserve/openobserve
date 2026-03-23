@@ -140,9 +140,10 @@ mod tests {
             "version" varchar(150) NULL,
             "source_file_name" varchar(250) NOT NULL,
             "source_map_file_name" varchar(250) NOT NULL, 
+            "file_store_id" varchar(64) NOT NULL,
             "file_type" integer NOT NULL,
             "created_at" bigint NOT NULL,
-            "is_local" bool NOT NULL 
+            "cluster" varchar(250) NOT NULL
             )"#
         );
     }
@@ -159,9 +160,10 @@ mod tests {
             "version" varchar(150) NULL,
             "source_file_name" varchar(250) NOT NULL,
             "source_map_file_name" varchar(250) NOT NULL, 
+            "file_store_id" varchar(64) NOT NULL,
             "file_type" integer NOT NULL,
             "created_at" bigint NOT NULL,
-            "is_local" boolean NOT NULL 
+            "cluster" varchar(250) NOT NULL
             )"#
         );
     }
