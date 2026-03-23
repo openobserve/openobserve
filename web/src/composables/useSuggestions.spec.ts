@@ -273,7 +273,7 @@ describe("useSuggestions", () => {
 
       // Simulate SQL like: "level = " with cursor at end
       autoCompleteData.value.query = "level = ";
-      autoCompleteData.value.position.cursorIndex = 8;
+      autoCompleteData.value.position.cursorIndex = 7;
       autoCompleteData.value.fieldValues = {
         level: new Set(["error", "warn", "info"]),
       };
@@ -298,7 +298,7 @@ describe("useSuggestions", () => {
       } = useSuggestions();
 
       autoCompleteData.value.query = "level = ";
-      autoCompleteData.value.position.cursorIndex = 8;
+      autoCompleteData.value.position.cursorIndex = 7;
       autoCompleteData.value.fieldValues = {
         level: new Set(["error"]),
       };
@@ -320,7 +320,7 @@ describe("useSuggestions", () => {
 
       const mockOpen = vi.fn();
       autoCompleteData.value.query = "level = ";
-      autoCompleteData.value.position.cursorIndex = 8;
+      autoCompleteData.value.position.cursorIndex = 7;
       autoCompleteData.value.fieldValues = {
         level: new Set(["error"]),
       };
@@ -339,7 +339,7 @@ describe("useSuggestions", () => {
       } = useSuggestions();
 
       autoCompleteData.value.query = "level = ";
-      autoCompleteData.value.position.cursorIndex = 8;
+      autoCompleteData.value.position.cursorIndex = 7;
       autoCompleteData.value.fieldValues = {
         level: new Set(["error"]),
       };
