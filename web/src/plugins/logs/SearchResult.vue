@@ -490,6 +490,8 @@ import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
 import useLogs from "../../composables/useLogs";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import usePatterns from "@/composables/useLogs/usePatterns";
+import { usePatternActions } from "@/plugins/logs/patterns/usePatternActions";
+import { extractConstantsFromPattern } from "@/plugins/logs/patterns/patternUtils";
 import { convertLogData } from "@/utils/logs/convertLogData";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useRouter } from "vue-router";
@@ -771,10 +773,17 @@ export default defineComponent({
     // Use separate patterns state (completely isolated from logs)
     const { patternsState } = usePatterns();
 
+    const {
+      selectedPattern,
+      showPatternDetails,
+      openPatternDetails,
+      navigatePatternDetail,
+      addPatternToSearch,
+      createAlertFromPattern,
+    } = usePatternActions();
+
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
-    const selectedPattern = ref(null);
-    const showPatternDetails = ref(false);
 
     // Volume Analysis state
     const showVolumeAnalysisDashboard = ref(false);
@@ -1123,198 +1132,6 @@ export default defineComponent({
         correlationLoading.value = false;
         correlationFetchInProgress.value = false;
       }
-    };
-
-    const openPatternDetails = (pattern: any, index: number) => {
-      selectedPattern.value = { pattern, index };
-      showPatternDetails.value = true;
-    };
-
-    const navigatePatternDetail = (next: boolean, prev: boolean) => {
-      if (!selectedPattern.value) return;
-
-      const currentIndex = (selectedPattern.value as any).index;
-      const totalPatterns = patternsState.value.patterns?.patterns?.length || 0;
-
-      let newIndex = currentIndex;
-      if (next && currentIndex < totalPatterns - 1) {
-        newIndex = currentIndex + 1;
-      } else if (prev && currentIndex > 0) {
-        newIndex = currentIndex - 1;
-      }
-
-      if (newIndex !== currentIndex && patternsState.value.patterns?.patterns) {
-        const newPattern = patternsState.value.patterns.patterns[newIndex];
-        selectedPattern.value = { pattern: newPattern, index: newIndex };
-      }
-    };
-
-    // const sanitizeForMatchAll = (text: string): string => {
-    //   // Remove special characters that Tantivy's match_all doesn't handle well
-    //   // Keep only alphanumeric characters and spaces
-    //   // Replace multiple spaces with single space
-    //   return text
-    //     .replace(/[^\w\s]/g, ' ') // Replace special chars with space
-    //     .replace(/\s+/g, ' ')      // Replace multiple spaces with single space
-    //     .trim();
-    // };
-
-    const extractConstantsFromPattern = (template: string): string[] => {
-      // Extract longest non-variable strings from pattern template
-      // Pattern template has format like: "INFO action <*> at 14:47.1755283"
-      // Variables can be: <*>, <:IDENTIFIERS>, <:TIMESTAMP>, <:UNIX_TIMESTAMP>, etc.
-      // We want continuous strings between these variables that are longer than 10 chars
-      const constants: string[] = [];
-
-      // Split by all variable markers using regex
-      // Matches: <*>, <:WORD>, etc.
-      const parts = template.split(/<[*:][^>]*>/);
-
-      for (const part of parts) {
-        const trimmed = part.trim();
-        // Only include strings longer than 10 characters
-        if (trimmed.length > 10) {
-          constants.push(trimmed);
-        }
-      }
-
-      return constants;
-    };
-
-    // Shared escaping helper for match_all() SQL clauses
-    const escapeForMatchAll = (str: string): string => {
-      return str
-        .replace(/\\/g, "\\\\")
-        .replace(/'/g, "\\'")
-        .replace(/"/g, '\\"')
-        .replace(/\n/g, "\\n")
-        .replace(/\r/g, "\\r")
-        .replace(/\t/g, "\\t");
-    };
-
-    const addPatternToSearch = (
-      pattern: any,
-      action: "include" | "exclude",
-    ) => {
-      // Extract constants from pattern template
-      const constants = extractConstantsFromPattern(pattern.template);
-
-      if (constants.length === 0) {
-        $q.notify({
-          type: "warning",
-          message: "No strings longer than 10 characters found in pattern",
-          timeout: 2000,
-        });
-        return;
-      }
-
-      // Build multiple match_all() clauses, one for each constant
-      const matchAllClauses = constants.map((constant) => {
-        return `match_all('${escapeForMatchAll(constant)}')`;
-      });
-
-      // Combine with AND
-      let filterExpression = matchAllClauses.join(" AND ");
-
-      // For exclude action, wrap the entire expression in NOT (...)
-      if (action === "exclude") {
-        if (matchAllClauses.length > 1) {
-          filterExpression = `NOT (${filterExpression})`;
-        } else {
-          filterExpression = `NOT ${filterExpression}`;
-        }
-      }
-
-      // Set the filter to be added to the query
-      searchObj.data.stream.addToFilter = filterExpression;
-
-      // Switch to logs view to show the filtered results
-      searchObj.meta.logsVisualizeToggle = "logs";
-    };
-
-    const createAlertFromPattern = (pattern: any) => {
-      const streamName = searchObj.data.stream.selectedStream[0];
-      if (!streamName) {
-        $q.notify({
-          type: "warning",
-          message: "No stream selected. Please select a stream before creating an alert.",
-          timeout: 2000,
-        });
-        return;
-      }
-
-      // Reuse the same extraction logic as the search path for consistency
-      const constants = extractConstantsFromPattern(pattern.template);
-
-      // Build SQL query with properly escaped match_all() clauses
-      let sqlQuery = `SELECT * FROM '${streamName}'`;
-      if (constants.length > 0) {
-        const conditions = constants.map((c: string) => {
-          return `match_all('${escapeForMatchAll(c)}')`;
-        });
-        sqlQuery += ` WHERE ${conditions.join(" AND ")}`;
-      }
-
-      // Warn user if no constants could be extracted at all
-      if (constants.length === 0) {
-        $q.notify({
-          type: "warning",
-          message:
-            "Pattern has very short constant segments. The alert query will match all logs in this stream — consider adding manual filters.",
-          timeout: 5000,
-        });
-      }
-
-      // Derive alert name: prefix based on anomaly, include stream, cap length
-      const alertName = (() => {
-        const prefix = pattern.is_anomaly ? "Anomaly" : "Alert";
-        const words = pattern.template
-          .replace(/<[^>]*>/g, " ")
-          .split(/[\s\W]+/)
-          .filter((w: string) => /[a-zA-Z]{2,}/.test(w))
-          .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-          .slice(0, 5);
-        const suffix = words.length > 0 ? words.join("_") : streamName;
-        const name = `${prefix}_${streamName}_${suffix}`;
-        // Truncate to 60 chars, trim trailing underscore
-        return name.slice(0, 60).replace(/_+$/, "");
-      })();
-
-      // Estimate alert period from the current search time range (clamped 5–60 min)
-      const periodMinutes = (() => {
-        const dt = (searchObj.data as any).datetime;
-        const start = dt?.startTime;
-        const end = dt?.endTime;
-        if (start && end) {
-          const diffMin = Math.round((end - start) / 60_000_000);
-          return Math.max(5, Math.min(60, diffMin));
-        }
-        return 15;
-      })();
-
-      const patternData = {
-        streamName,
-        streamType: "logs",
-        sqlQuery,
-        patternTemplate: pattern.template,
-        alertName,
-        periodMinutes,
-        // Additional metadata for smarter alert defaults
-        patternId: pattern.pattern_id || "",
-        patternFrequency: pattern.frequency || 0,
-        patternPercentage: pattern.percentage || 0,
-        isAnomaly: !!pattern.is_anomaly,
-        totalLogsAnalyzed: searchObj.data.queryResults?.scan_records || 0,
-      };
-
-      sessionStorage.setItem("patternData", JSON.stringify(patternData));
-      router.push({
-        name: "addAlert",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          fromPattern: "true",
-        },
-      });
     };
 
     const getRowIndex = (next: boolean, prev: boolean, oldIndex: number) => {
