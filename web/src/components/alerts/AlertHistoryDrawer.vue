@@ -39,28 +39,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="18px"
             :color="store.state.theme === 'dark' ? 'blue-4' : 'primary'"
           />
-          <span class="tw:font-semibold tw:text-[15px] tw:whitespace-nowrap">{{
-            t("alert_list.alert_history")
-          }}</span>
-          <q-icon
-            name="chevron_right"
-            size="16px"
-            color="grey-5"
-            class="tw:shrink-0"
-          />
-          <!-- Alert Name Badge -->
+          <!-- Alert Name -->
           <span
-            v-if="alertDetails"
             :class="[
-              'tw:font-medium tw:text-[13px] tw:px-2 tw:py-0.5 tw:rounded tw:truncate tw:max-w-[220px] tw:inline-block',
-              store.state.theme === 'dark'
-                ? 'tw:text-blue-300 tw:bg-blue-900/40'
-                : 'tw:text-blue-700 tw:bg-blue-50',
+              'tw:font-semibold tw:text-[15px] tw:truncate tw:max-w-[220px] tw:inline-block',
             ]"
           >
-            {{ alertDetails.name }}
+            {{ alertDetails?.name ?? t("alert_list.alert_history") }}
             <q-tooltip
-              v-if="alertDetails.name && alertDetails.name.length > 28"
+              v-if="alertDetails?.name && alertDetails.name.length > 28"
               class="tw:text-xs"
             >
               {{ alertDetails.name }}
@@ -82,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             size="sm"
             icon="query_stats"
-            label="Anomaly Detection"
+            label="Anomaly"
             color="blue-1"
             text-color="blue-8"
             class="tw:shrink-0"
@@ -292,12 +279,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </template>
                       <template v-else-if="col.name === 'timestamp'">
-                        <span class="tw:text-[13px]">{{
+                        <span class="tw:text-[13px] tw:tabular-nums">{{
                           formatTimestamp(props.row.timestamp)
                         }}</span>
-                        <q-tooltip class="tw:text-xs">
-                          {{ formatTimestampFull(props.row.timestamp) }}
-                        </q-tooltip>
                       </template>
                       <template v-else-if="col.name === 'evaluation_time'">
                         <span class="tw:text-[13px] tw:tabular-nums">
@@ -409,83 +393,125 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Regular alert condition view -->
             <template v-else>
-            <div
-              class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'code-block-dark'
-                  : 'code-block-light'
-              "
-            >
-              <!-- Code block header bar — stays fixed -->
-              <div
-                class="code-block-header tw:shrink-0"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'code-block-header-dark'
-                    : 'code-block-header-light'
-                "
-              >
-                <div class="tw:flex tw:items-center tw:gap-1.5">
-                  <span
-                    class="tw:text-[11px] tw:font-medium"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'tw:text-gray-400'
-                        : 'tw:text-gray-500'
-                    "
-                  >
-                    {{
-                      alertDetails.type === "sql"
-                        ? "SQL"
-                        : alertDetails.type === "promql"
-                          ? "PromQL"
-                          : "Conditions"
-                    }}
-                  </span>
-                </div>
-                <q-btn
-                  v-if="
-                    alertDetails.conditions &&
-                    alertDetails.conditions !== '' &&
-                    alertDetails.conditions !== '--'
-                  "
-                  @click="
-                    copyToClipboard(
-                      alertDetails.conditions,
-                      alertDetails.type === 'sql'
-                        ? t('alerts.alertDetails.sqlQuery')
-                        : alertDetails.type === 'promql'
-                          ? t('alerts.alertDetails.promqlQuery')
-                          : t('alerts.alertDetails.conditions'),
-                    )
-                  "
-                  flat
-                  dense
-                  size="xs"
-                  icon="content_copy"
-                  :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
-                  data-test="alert-details-copy-conditions-btn"
+              <!-- Outer flex column — condition area + VRL area split 50/50 when VRL present -->
+              <div class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:gap-2">
+
+                <!-- ── Condition area (main + optional PromQL) ── -->
+                <div
+                  class="tw:flex tw:flex-col tw:overflow-hidden"
+                  :class="hasVRL ? 'tw:flex-1 tw:min-h-0' : 'tw:flex-1'"
+                  style="gap: 8px; display: flex; flex-direction: column;"
                 >
-                  <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
-                </q-btn>
-              </div>
-              <!-- Code content — scrolls internally -->
-              <pre
-                class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
-                >{{
-                  alertDetails.conditions !== "" &&
-                  alertDetails.conditions !== "--"
-                    ? alertDetails.type === "sql" ||
-                      alertDetails.type === "promql"
-                      ? alertDetails.conditions
-                      : alertDetails.conditions.length !== 2
-                        ? `if ${alertDetails.conditions}`
+                  <!-- Main condition block -->
+                  <div
+                    class="code-block tw:flex tw:flex-col tw:overflow-hidden"
+                    :class="[
+                      store.state.theme === 'dark' ? 'code-block-dark' : 'code-block-light',
+                      showSeparatePromQL ? 'tw:flex-1 tw:min-h-0' : 'tw:flex-1',
+                    ]"
+                  >
+                    <div
+                      class="code-block-header tw:shrink-0"
+                      :class="store.state.theme === 'dark' ? 'code-block-header-dark' : 'code-block-header-light'"
+                    >
+                      <span
+                        class="tw:text-[11px] tw:font-medium"
+                        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                      >
+                        {{
+                          alertDetails.type === "sql"
+                            ? "SQL"
+                            : alertDetails.type === "promql"
+                              ? "PromQL"
+                              : "Conditions"
+                        }}
+                      </span>
+                      <q-btn
+                        v-if="alertDetails.conditions && alertDetails.conditions !== '' && alertDetails.conditions !== '--'"
+                        @click="copyToClipboard(
+                          alertDetails.conditions,
+                          alertDetails.type === 'sql'
+                            ? t('alerts.alertDetails.sqlQuery')
+                            : alertDetails.type === 'promql'
+                              ? t('alerts.alertDetails.promqlQuery')
+                              : t('alerts.alertDetails.conditions'),
+                        )"
+                        flat dense size="xs" icon="content_copy"
+                        :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
+                        data-test="alert-details-copy-conditions-btn"
+                      >
+                        <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
+                      </q-btn>
+                    </div>
+                    <pre
+                      class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
+                    >{{
+                      alertDetails.conditions !== "" && alertDetails.conditions !== "--"
+                        ? alertDetails.type === "sql" || alertDetails.type === "promql"
+                          ? alertDetails.conditions
+                          : alertDetails.conditions.length !== 2
+                            ? `if ${alertDetails.conditions}`
+                            : t("alerts.alertDetails.noCondition")
                         : t("alerts.alertDetails.noCondition")
-                    : t("alerts.alertDetails.noCondition")
-                }}</pre
-              >
-            </div>
+                    }}</pre>
+                  </div>
+
+                  <!-- Separate PromQL block (only when rawCondition has promql and type isn't promql) -->
+                  <div
+                    v-if="showSeparatePromQL"
+                    class="code-block tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden"
+                    :class="store.state.theme === 'dark' ? 'code-block-dark' : 'code-block-light'"
+                  >
+                    <div
+                      class="code-block-header tw:shrink-0"
+                      :class="store.state.theme === 'dark' ? 'code-block-header-dark' : 'code-block-header-light'"
+                    >
+                      <span
+                        class="tw:text-[11px] tw:font-medium"
+                        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                      >PromQL</span>
+                      <q-btn
+                        @click="copyToClipboard(rawPromQL!, t('alerts.alertDetails.promqlQuery'))"
+                        flat dense size="xs" icon="content_copy"
+                        :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
+                      >
+                        <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
+                      </q-btn>
+                    </div>
+                    <pre
+                      class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
+                    >{{ rawPromQL }}</pre>
+                  </div>
+                </div>
+
+                <!-- ── VRL block (only when hasVRL) — takes equal half ── -->
+                <div
+                  v-if="hasVRL"
+                  class="code-block tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden"
+                  :class="store.state.theme === 'dark' ? 'code-block-dark' : 'code-block-light'"
+                >
+                  <div
+                    class="code-block-header tw:shrink-0"
+                    :class="store.state.theme === 'dark' ? 'code-block-header-dark' : 'code-block-header-light'"
+                  >
+                    <span
+                      class="tw:text-[11px] tw:font-medium"
+                      :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                    >VRL Function</span>
+                    <q-btn
+                      @click="copyToClipboard(rawVRL!, 'VRL Function')"
+                      flat dense size="xs" icon="content_copy"
+                      :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
+                    >
+                      <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
+                    </q-btn>
+                  </div>
+                  <pre
+                    class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
+                  >{{ rawVRL }}</pre>
+                </div>
+
+              </div>
             </template>
 
             <!-- Description (only show if exists) -->
@@ -529,6 +555,7 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import { buildAnomalyPreviewSql } from "@/utils/alerts/anomalySqlBuilder";
+import { b64DecodeUnicode } from "@/utils/zincutils";
 import type { Ref } from "vue";
 
 // Composables
@@ -546,6 +573,25 @@ interface Props {
 const props = defineProps<Props>();
 
 const isAnomaly = computed(() => props.alertType === "anomaly_detection");
+
+// PromQL from rawCondition (shown separately only when the alert type isn't already promql)
+const rawPromQL = computed(() => {
+  const rc = props.alertDetails?.rawCondition;
+  if (!rc?.promql) return null;
+  if (props.alertDetails?.type === "promql") return null; // already shown as main condition
+  return rc.promql;
+});
+
+// VRL function (URL-safe base64-decoded, matches b64EncodeUnicode encoding used on save)
+const rawVRL = computed(() => {
+  const encoded = props.alertDetails?.rawCondition?.vrl_function;
+  if (!encoded) return null;
+  return b64DecodeUnicode(encoded) ?? null;
+});
+
+const hasVRL = computed(() => !!rawVRL.value);
+const showSeparatePromQL = computed(() => !!rawPromQL.value);
+
 
 // Full config fetched from the dedicated anomaly detection endpoint.
 // The list API only returns summary fields; we need this for the Condition tab.
@@ -797,27 +843,7 @@ const formatStatus = (status: string) => {
 
 const formatTimestamp = (timestamp: number) => {
   if (!timestamp) return "N/A";
-  const now = Date.now() * 1000; // microseconds
-  const diff = now - timestamp;
-
-  if (diff < 3600000000) {
-    const minutes = Math.floor(diff / 60000000);
-    return `${minutes} min ago`;
-  }
-  if (diff < 86400000000) {
-    const hours = Math.floor(diff / 3600000000);
-    return `${hours}h ago`;
-  }
-  if (diff < 604800000000) {
-    const days = Math.floor(diff / 86400000000);
-    return `${days}d ago`;
-  }
-  return date.formatDate(timestamp / 1000, "MMM DD, HH:mm");
-};
-
-const formatTimestampFull = (timestamp: number) => {
-  if (!timestamp) return "N/A";
-  return date.formatDate(timestamp / 1000, "MMM DD, YYYY HH:mm:ss");
+  return date.formatDate(timestamp / 1000, "YYYY-MM-DD HH:mm:ss");
 };
 
 // Main Functions
@@ -914,6 +940,7 @@ const copyToClipboard = (text: string, type: string) => {
 watch(
   () => props.alertId,
   async (newVal) => {
+
     if (newVal) {
       pagination.value.page = 1;
       currentPage.value = 1;
