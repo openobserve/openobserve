@@ -18,7 +18,7 @@ import { useTracesTableColumns, LLM_COLUMN_IDS } from "./useTracesTableColumns";
 
 // Default ordered field lists (mirror DEFAULT_TRACE_COLUMNS in useTraces.ts)
 const DEFAULT_SPANS_FIELDS = [
-  "timestamp",
+  "_timestamp",
   "service",
   "operation_name",
   "duration",
@@ -27,7 +27,7 @@ const DEFAULT_SPANS_FIELDS = [
   "method",
 ];
 const DEFAULT_TRACES_FIELDS = [
-  "timestamp",
+  "_timestamp",
   "service",
   "operation_name",
   "duration",
@@ -42,9 +42,8 @@ function buildCols(
   searchMode: "traces" | "spans",
   selectedFields: string[],
 ) {
-  const { columns, buildColumns } = useTracesTableColumns();
-  buildColumns(showLlmColumns, searchMode, selectedFields);
-  return columns.value;
+  const { buildColumns } = useTracesTableColumns();
+  return buildColumns(showLlmColumns, searchMode, selectedFields);
 }
 
 describe("useTracesTableColumns", () => {
@@ -94,8 +93,8 @@ describe("useTracesTableColumns", () => {
   });
 
   describe("spans mode — empty selectedFields", () => {
-    it("should return 0 columns", () => {
-      expect(buildCols(false, "spans", [])).toHaveLength(0);
+    it("should return 1 column with timestamp", () => {
+      expect(buildCols(false, "spans", [])).toHaveLength(1);
     });
   });
 
@@ -117,7 +116,7 @@ describe("useTracesTableColumns", () => {
     it("should respect a custom field order", () => {
       const reordered = [
         "service",
-        "timestamp",
+        "_timestamp",
         "status_code",
         "operation_name",
         "duration",
@@ -208,16 +207,16 @@ describe("useTracesTableColumns", () => {
     it("should respect a custom field order", () => {
       const reordered = [
         "service",
-        "timestamp",
+        "_timestamp",
         "spans",
         "operation_name",
         "duration",
         "status",
         "service_latency",
       ];
-      expect(
-        buildCols(false, "traces", reordered).map((c) => c.id),
-      ).toEqual(reordered);
+      expect(buildCols(false, "traces", reordered).map((c) => c.id)).toEqual(
+        reordered,
+      );
     });
   });
 
@@ -283,17 +282,17 @@ describe("useTracesTableColumns", () => {
     it("should reorder columns when selectedFields order changes in subsequent call", () => {
       const { columns, buildColumns } = useTracesTableColumns();
 
-      buildColumns(false, "spans", ["timestamp", "service", "status_code"]);
+      buildColumns(false, "spans", ["_timestamp", "service", "status_code"]);
       expect(columns.value.map((c) => c.id)).toEqual([
-        "timestamp",
+        "_timestamp",
         "service",
         "status_code",
       ]);
 
-      buildColumns(false, "spans", ["status_code", "timestamp", "service"]);
+      buildColumns(false, "spans", ["status_code", "_timestamp", "service"]);
       expect(columns.value.map((c) => c.id)).toEqual([
         "status_code",
-        "timestamp",
+        "_timestamp",
         "service",
       ]);
     });

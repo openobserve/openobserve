@@ -168,12 +168,18 @@ export function useTracesTableColumns() {
       toColumnDef(field),
     );
 
-    cols.unshift({
-      id: store.state.zoConfig.timestamp_column,
-      header: "Timestamp",
-      size: 160,
-      meta: { slot: true, sortable: true },
-    });
+    if (
+      !selectedFields.find(
+        (col) =>
+          col === store?.state?.zoConfig?.timestamp_column || "_timestamp",
+      )
+    )
+      cols.unshift({
+        id: store?.state?.zoConfig?.timestamp_column || "_timestamp",
+        header: "Timestamp",
+        size: 160,
+        meta: { slot: true, sortable: true },
+      });
 
     // Inject LLM columns just before service_latency in traces mode.
     // They are not stored in selectedFields — managed by the showLlmColumns flag.
@@ -198,6 +204,7 @@ export function useTracesTableColumns() {
       }
     }
 
+    columns.value = cols;
     return cols;
   };
 
