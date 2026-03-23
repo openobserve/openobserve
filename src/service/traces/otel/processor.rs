@@ -120,8 +120,12 @@ impl OtelIngestionProcessor {
         let mut cost = self.usage_extractor.extract_cost(span_attributes);
 
         // Extract user and session
-        let user_id = self.metadata_extractor.extract_user_id(span_attributes);
-        let session_id = self.metadata_extractor.extract_session_id(span_attributes);
+        let user_id = self
+            .metadata_extractor
+            .extract_user_id(span_attributes, resource_attributes);
+        let session_id = self
+            .metadata_extractor
+            .extract_session_id(span_attributes, resource_attributes);
 
         // Extract prompt information
         let prompt_name = self.prompt_extractor.extract_name(span_attributes);

@@ -22,7 +22,7 @@ const mockDashboardPanelData = {
   },
 };
 
-vi.mock("@/composables/useDashboardPanel", () => ({
+vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: () => ({
     dashboardPanelData: mockDashboardPanelData,
   }),
@@ -80,12 +80,14 @@ describe("DashboardJoinsOption", () => {
 
   it("removes a join when remove button is clicked", async () => {
     // Manually add a join to the mock data
-    mockDashboardPanelData.data.queries[0].joins = [{
-      stream: "test_stream",
-      streamAlias: "stream_0",
-      joinType: "inner",
-      conditions: []
-    }];
+    mockDashboardPanelData.data.queries[0].joins = [
+      {
+        stream: "test_stream",
+        streamAlias: "stream_0",
+        joinType: "inner",
+        conditions: [],
+      },
+    ];
 
     // Force component to re-render
     await wrapper.vm.$forceUpdate();
@@ -97,12 +99,14 @@ describe("DashboardJoinsOption", () => {
 
   it("generates stream aliases automatically", async () => {
     // Test that the component exists and can handle joins
-    mockDashboardPanelData.data.queries[0].joins = [{
-      stream: "new_stream",
-      streamAlias: "",
-      joinType: "inner",
-      conditions: []
-    }];
+    mockDashboardPanelData.data.queries[0].joins = [
+      {
+        stream: "new_stream",
+        streamAlias: "",
+        joinType: "inner",
+        conditions: [],
+      },
+    ];
 
     await wrapper.vm.$forceUpdate();
     await wrapper.vm.$nextTick();
@@ -117,20 +121,20 @@ describe("DashboardJoinsOption", () => {
         stream: "stream1",
         streamAlias: "stream_0",
         joinType: "inner",
-        conditions: []
+        conditions: [],
       },
       {
         stream: "stream2",
         streamAlias: "stream_1",
         joinType: "left",
-        conditions: []
+        conditions: [],
       },
       {
         stream: "stream3",
         streamAlias: "stream_2",
         joinType: "right",
-        conditions: []
-      }
+        conditions: [],
+      },
     ];
 
     await wrapper.vm.$forceUpdate();
@@ -141,32 +145,36 @@ describe("DashboardJoinsOption", () => {
 
   it("handles joins with different join types", () => {
     const joinTypes = ["inner", "left", "right"];
-    joinTypes.forEach(joinType => {
-      mockDashboardPanelData.data.queries[0].joins = [{
-        stream: "test_stream",
-        streamAlias: "stream_0",
-        joinType: joinType as any,
-        conditions: []
-      }];
+    joinTypes.forEach((joinType) => {
+      mockDashboardPanelData.data.queries[0].joins = [
+        {
+          stream: "test_stream",
+          streamAlias: "stream_0",
+          joinType: joinType as any,
+          conditions: [],
+        },
+      ];
     });
 
     expect(wrapper.exists()).toBe(true);
   });
 
   it("updates join configuration", async () => {
-    mockDashboardPanelData.data.queries[0].joins = [{
-      stream: "test_stream",
-      streamAlias: "stream_0",
-      joinType: "inner",
-      conditions: [
-        {
-          leftField: { streamAlias: "main", field: "id" },
-          rightField: { streamAlias: "stream_0", field: "id" },
-          operation: "=",
-          logicalOperator: "AND"
-        }
-      ]
-    }];
+    mockDashboardPanelData.data.queries[0].joins = [
+      {
+        stream: "test_stream",
+        streamAlias: "stream_0",
+        joinType: "inner",
+        conditions: [
+          {
+            leftField: { streamAlias: "main", field: "id" },
+            rightField: { streamAlias: "stream_0", field: "id" },
+            operation: "=",
+            logicalOperator: "AND",
+          },
+        ],
+      },
+    ];
 
     await wrapper.vm.$forceUpdate();
     await wrapper.vm.$nextTick();
@@ -175,12 +183,14 @@ describe("DashboardJoinsOption", () => {
   });
 
   it("handles empty stream in join", async () => {
-    mockDashboardPanelData.data.queries[0].joins = [{
-      stream: "",
-      streamAlias: "",
-      joinType: "inner",
-      conditions: []
-    }];
+    mockDashboardPanelData.data.queries[0].joins = [
+      {
+        stream: "",
+        streamAlias: "",
+        joinType: "inner",
+        conditions: [],
+      },
+    ];
 
     await wrapper.vm.$forceUpdate();
     await wrapper.vm.$nextTick();
@@ -189,25 +199,27 @@ describe("DashboardJoinsOption", () => {
   });
 
   it("handles complex conditions in join", async () => {
-    mockDashboardPanelData.data.queries[0].joins = [{
-      stream: "complex_stream",
-      streamAlias: "stream_0",
-      joinType: "inner",
-      conditions: [
-        {
-          leftField: { streamAlias: "main", field: "field1" },
-          rightField: { streamAlias: "stream_0", field: "field1" },
-          operation: "=",
-          logicalOperator: "AND"
-        },
-        {
-          leftField: { streamAlias: "main", field: "field2" },
-          rightField: { streamAlias: "stream_0", field: "field2" },
-          operation: "!=",
-          logicalOperator: "OR"
-        }
-      ]
-    }];
+    mockDashboardPanelData.data.queries[0].joins = [
+      {
+        stream: "complex_stream",
+        streamAlias: "stream_0",
+        joinType: "inner",
+        conditions: [
+          {
+            leftField: { streamAlias: "main", field: "field1" },
+            rightField: { streamAlias: "stream_0", field: "field1" },
+            operation: "=",
+            logicalOperator: "AND",
+          },
+          {
+            leftField: { streamAlias: "main", field: "field2" },
+            rightField: { streamAlias: "stream_0", field: "field2" },
+            operation: "!=",
+            logicalOperator: "OR",
+          },
+        ],
+      },
+    ];
 
     await wrapper.vm.$forceUpdate();
     await wrapper.vm.$nextTick();
@@ -280,12 +292,14 @@ describe("DashboardJoinsOption", () => {
   });
 
   it("handles stream with special characters", async () => {
-    mockDashboardPanelData.data.queries[0].joins = [{
-      stream: "stream-with-dashes_and_underscores",
-      streamAlias: "stream_0",
-      joinType: "inner",
-      conditions: []
-    }];
+    mockDashboardPanelData.data.queries[0].joins = [
+      {
+        stream: "stream-with-dashes_and_underscores",
+        streamAlias: "stream_0",
+        joinType: "inner",
+        conditions: [],
+      },
+    ];
 
     await wrapper.vm.$forceUpdate();
     await wrapper.vm.$nextTick();
@@ -294,12 +308,14 @@ describe("DashboardJoinsOption", () => {
   });
 
   it("handles joins with null conditions", async () => {
-    mockDashboardPanelData.data.queries[0].joins = [{
-      stream: "test_stream",
-      streamAlias: "stream_0",
-      joinType: "inner",
-      conditions: null as any
-    }];
+    mockDashboardPanelData.data.queries[0].joins = [
+      {
+        stream: "test_stream",
+        streamAlias: "stream_0",
+        joinType: "inner",
+        conditions: null as any,
+      },
+    ];
 
     await wrapper.vm.$forceUpdate();
     await wrapper.vm.$nextTick();
@@ -308,12 +324,15 @@ describe("DashboardJoinsOption", () => {
   });
 
   it("handles very long stream names", async () => {
-    mockDashboardPanelData.data.queries[0].joins = [{
-      stream: "a_very_long_stream_name_that_exceeds_normal_length_expectations_for_testing_purposes",
-      streamAlias: "stream_0",
-      joinType: "left",
-      conditions: []
-    }];
+    mockDashboardPanelData.data.queries[0].joins = [
+      {
+        stream:
+          "a_very_long_stream_name_that_exceeds_normal_length_expectations_for_testing_purposes",
+        streamAlias: "stream_0",
+        joinType: "left",
+        conditions: [],
+      },
+    ];
 
     await wrapper.vm.$forceUpdate();
     await wrapper.vm.$nextTick();
@@ -332,7 +351,7 @@ describe("DashboardJoinsOption", () => {
       stream: "stream1",
       streamAlias: "stream_0",
       joinType: "inner",
-      conditions: []
+      conditions: [],
     });
     await wrapper.vm.$forceUpdate();
     await wrapper.vm.$nextTick();
@@ -342,7 +361,7 @@ describe("DashboardJoinsOption", () => {
       stream: "stream2",
       streamAlias: "stream_1",
       joinType: "left",
-      conditions: []
+      conditions: [],
     });
     await wrapper.vm.$forceUpdate();
     await wrapper.vm.$nextTick();
@@ -351,19 +370,21 @@ describe("DashboardJoinsOption", () => {
   });
 
   it("handles conditions with null field values", async () => {
-    mockDashboardPanelData.data.queries[0].joins = [{
-      stream: "test_stream",
-      streamAlias: "stream_0",
-      joinType: "inner",
-      conditions: [
-        {
-          leftField: { streamAlias: null as any, field: null as any },
-          rightField: { streamAlias: null as any, field: null as any },
-          operation: "=",
-          logicalOperator: "AND"
-        }
-      ]
-    }];
+    mockDashboardPanelData.data.queries[0].joins = [
+      {
+        stream: "test_stream",
+        streamAlias: "stream_0",
+        joinType: "inner",
+        conditions: [
+          {
+            leftField: { streamAlias: null as any, field: null as any },
+            rightField: { streamAlias: null as any, field: null as any },
+            operation: "=",
+            logicalOperator: "AND",
+          },
+        ],
+      },
+    ];
 
     await wrapper.vm.$forceUpdate();
     await wrapper.vm.$nextTick();

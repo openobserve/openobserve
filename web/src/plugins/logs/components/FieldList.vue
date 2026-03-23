@@ -100,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :timestamp-column="timestampColumn"
             :theme="theme"
             :show-quick-mode="showQuickMode"
+            :show-fts-field-values="showFtsFieldValues"
             @add-to-filter="$emit('add-to-filter', $event)"
             @toggle-field="$emit('toggle-field', $event)"
             @toggle-interesting="
@@ -111,6 +112,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <FieldExpansion
                 :field="field"
                 :field-values="fieldValues[field.name]"
+                :active-include-values="activeIncludeFieldValues?.[field.name] ?? []"
+                :active-exclude-values="activeExcludeFieldValues?.[field.name] ?? []"
+                :expanded="expandedFields?.[field.name] ?? false"
                 :selected-fields="selectedFields"
                 :selected-streams-count="selectedStreamsCount"
                 :theme="theme"
@@ -200,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import FieldRow from "./FieldRow.vue";
 import FieldExpansion from "./FieldExpansion.vue";
@@ -225,6 +229,9 @@ interface Props {
   timestampColumn: string;
   showQuickMode: boolean;
   fieldValues: Record<string, any>;
+  activeIncludeFieldValues?: Record<string, string[]>;
+  activeExcludeFieldValues?: Record<string, string[]>;
+  expandedFields?: Record<string, boolean>;
   selectedStreamsCount: number;
   defaultValuesCount: number;
   showUserDefinedSchemaToggle: boolean;
@@ -232,9 +239,10 @@ interface Props {
   userDefinedSchemaBtnGroupOption: any[];
   selectedFieldsBtnGroupOption: any[];
   totalFieldsCount: number;
+  showFtsFieldValues: boolean;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 defineEmits<{
   "update:pagination": [value: { page: number; rowsPerPage: number }];
@@ -262,15 +270,87 @@ defineEmits<{
 // Refs
 const fieldListRef = ref<HTMLElement | null>(null);
 
-// Methods
-const scrollToTop = () => {
-  if (fieldListRef.value) {
-    const scrollContainer = fieldListRef?.value?.$el?.querySelector(
-      ".q-table__middle.scroll",
-    );
-    if (scrollContainer) {
-      scrollContainer.scrollTop = 0;
+// ---------------------------------------------------------------------------
+// Scroll position preservation
+//
+// Problem: Quasar's q-table resets the scroll position to 0 after every
+// reactive row update (it does this in a requestAnimationFrame callback of
+// its own). A plain onBeforeUpdate / onUpdated pair runs too early and gets
+// overridden.
+//
+// Solution:
+//   1. Watch `streamFieldsRows` with flush:"pre" to capture scrollTop
+//      synchronously before the DOM mutates.
+//   2. Schedule a restore via nextTick + requestAnimationFrame so we run
+//      AFTER Quasar's own reset RAF.
+//   3. When the parent wants an intentional reset (stream change), it calls
+//      prepareScrollReset() which sets _skipScrollRestore = true so the
+//      watcher skips the restore for that one update.
+// ---------------------------------------------------------------------------
+
+/** When true, the next watcher invocation will skip scroll restoration. */
+let _skipScrollRestore = false;
+/** RAF handle for a pending scroll-restore; cancelled on intentional resets. */
+let _restoreRafId: number | null = null;
+
+/** Returns the scrollable q-table container element, or null if not mounted. */
+const getScrollContainer = (): HTMLElement | null =>
+  fieldListRef?.value?.$el?.querySelector(".q-table__middle.scroll") ?? null;
+
+// Watch the rows prop specifically — this is what causes q-table to re-render
+// and reset scroll. Save the position BEFORE the DOM update (flush: "pre"),
+// then restore it after Quasar's own post-render work via nextTick +
+// requestAnimationFrame.
+watch(
+  () => props.streamFieldsRows,
+  () => {
+    if (_skipScrollRestore) {
+      _skipScrollRestore = false;
+      return;
     }
+    const c = getScrollContainer();
+    const saved = c ? c.scrollTop : 0;
+    if (saved === 0) return; // nothing to preserve
+
+    if (_restoreRafId !== null) cancelAnimationFrame(_restoreRafId);
+
+    nextTick(() => {
+      _restoreRafId = requestAnimationFrame(() => {
+        _restoreRafId = null;
+        if (_skipScrollRestore) return;
+        const container = getScrollContainer();
+        if (container) container.scrollTop = saved;
+      });
+    });
+  },
+  { flush: "pre" },
+);
+
+/**
+ * Imperatively scrolls the field list to the top and prevents the next
+ * watcher cycle from overriding that position (e.g. after stream change).
+ */
+const scrollToTop = () => {
+  _skipScrollRestore = true;
+  if (_restoreRafId !== null) {
+    cancelAnimationFrame(_restoreRafId);
+    _restoreRafId = null;
+  }
+  const c = getScrollContainer();
+  if (c) c.scrollTop = 0;
+};
+
+/**
+ * Called synchronously by the parent before an intentional scroll reset
+ * (e.g. stream change) so that any in-flight restore RAF is cancelled before
+ * the rows change fires the watcher. Without this the restore would run after
+ * the parent's scroll-to-top and undo it.
+ */
+const prepareScrollReset = () => {
+  _skipScrollRestore = true;
+  if (_restoreRafId !== null) {
+    cancelAnimationFrame(_restoreRafId);
+    _restoreRafId = null;
   }
 };
 
@@ -278,6 +358,7 @@ const scrollToTop = () => {
 defineExpose({
   fieldListRef,
   scrollToTop,
+  prepareScrollReset,
 });
 </script>
 

@@ -32,7 +32,7 @@ const mockDashboardPanelData = {
   },
 };
 
-vi.mock("@/composables/useDashboardPanel", () => ({
+vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: () => ({
     dashboardPanelData: mockDashboardPanelData,
   }),
@@ -113,7 +113,7 @@ describe("ColorBySeries", () => {
   it("should show 'Edit color by series' button when colors are set", async () => {
     // Modify the mock data to have colors
     mockDashboardPanelData.data.config.color.colorBySeries = [
-      { series: "series1", color: "#FF0000" }
+      { series: "series1", color: "#FF0000" },
     ];
 
     const wrapperWithColors = mount(ColorBySeries, {
@@ -135,10 +135,10 @@ describe("ColorBySeries", () => {
       "[data-test='dashboard-addpanel-config-colorBySeries-add-btn']",
     );
     expect(btn.text()).toContain("Edit color by series");
-    
+
     // Reset mock data for other tests
     mockDashboardPanelData.data.config.color.colorBySeries = [];
-    
+
     wrapperWithColors.unmount();
   });
 
@@ -218,7 +218,7 @@ describe("ColorBySeries", () => {
     // Just verify the component renders correctly in dark theme
     expect(darkWrapper.exists()).toBe(true);
     expect(darkWrapper.text()).toContain("Color by series");
-    
+
     darkWrapper.unmount();
   });
 });

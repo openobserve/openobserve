@@ -1,11 +1,7 @@
-import { test, expect } from "../baseFixtures";
-
-
-import { LogoManagementPage } from "../../pages/generalPages/logoManagementPage.js";
-import { IngestionPage } from "../../pages/generalPages/ingestionPage.js";
-import { LoginPage } from '../../pages/generalPages/loginPage.js';
-
-
+const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const testLogger = require('../utils/test-logger.js');
+const PageManager = require('../../pages/page-manager.js');
+const { LogoManagementPage } = require('../../pages/generalPages/logoManagementPage.js');
 const path = require('path');
 
 // Function to generate a random 5-character alphabetic name
@@ -19,41 +15,28 @@ function generateRandomLogoName() {
 }
 
 
-test('Logo Upload on Management ', { tag: '@enterprise' }, async ({ page }) => {
-    // Create page object instances
-    const filePath = path.resolve(__dirname, '../attachment/imagesAuto.png');
+test('Logo Upload on Management', { tag: '@enterprise' }, async ({ page }) => {
+    testLogger.testStart('Logo Upload on Management', __filename);
+    await navigateToBase(page);
 
-    const loginPage = new LoginPage(page);
-    const ingestionPage = new IngestionPage(page);
+    const pm = new PageManager(page);
     const logoManagementPage = new LogoManagementPage(page);
 
-    // Example usage in Playwright POM
-const logoName = generateRandomLogoName();
-console.log(`Generated logo name: ${logoName}`);
- 
-    // Step 1: Navigate to the application and login
- 
-    await page.goto(process.env["ZO_BASE_URL"]);
- 
-    // console.log ('URL Opened')
- 
-    await loginPage.gotoLoginPage();
+    const filePath = path.resolve(__dirname, '../attachment/imagesAuto.png');
+    const logoName = generateRandomLogoName();
+    testLogger.info(`Generated logo name: ${logoName}`);
 
-    await loginPage.loginAsInternalUser();
- 
-    await loginPage.login();
+    // Ingest test data
+    await pm.ingestionPage.ingestion();
 
-    await ingestionPage.ingestion();
- 
     await page.waitForTimeout(10000);
 
     // Perform a hard refresh
     await page.reload({ ignoreCache: true });
 
     await page.waitForTimeout(10000);
-    
-    // Step 2: Navigate to _meta Organization Page
-     
+
+    // Navigate to _meta Organization Page
     await logoManagementPage.managementOrg('_meta');
 
     await logoManagementPage.navigateToManagement();
@@ -62,16 +45,18 @@ console.log(`Generated logo name: ${logoName}`);
 
     await logoManagementPage.clickSaveSubmit();
 
-    await logoManagementPage.updateCustomLogoText(logoName); // Updated Unauthorized Access 
+    await logoManagementPage.updateCustomLogoText(logoName);
 
-    console.log(`Uploading light mode logo from path: ${filePath}`);
+    testLogger.info(`Uploading light mode logo from path: ${filePath}`);
     await logoManagementPage.uploadLogo(filePath);
 
     await page.waitForTimeout(5000);
 
     // Upload dark mode logo
-    console.log(`Uploading dark mode logo from path: ${filePath}`);
+    testLogger.info(`Uploading dark mode logo from path: ${filePath}`);
     await logoManagementPage.uploadLogoDarkMode(filePath);
 
-    await page.waitForTimeout(5000); // Adjust or remove as needed
+    await page.waitForTimeout(5000);
+
+    testLogger.info('Logo upload test completed successfully');
 });

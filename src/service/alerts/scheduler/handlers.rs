@@ -192,7 +192,7 @@ async fn handle_anomaly_detection_triggers(
         next_run_at: next_run,
         is_realtime: false,
         is_silenced: false,
-        status: trigger_status,
+        status: trigger_status.clone(),
         start_time: run_start_us,
         end_time: run_end_us,
         retries: trigger.retries,
@@ -210,6 +210,27 @@ async fn handle_anomaly_detection_triggers(
         let mut td = ScheduledTriggerData::from_json_string(&trigger.data).unwrap_or_default();
         td.last_satisfied_at = Some(run_end_us);
         trigger.data = td.to_json_string();
+    }
+
+    // If detection succeeded and the config is trained but status is not Active
+    // (e.g. stuck at Waiting after a manual retrain request that hasn't been
+    // processed by the training scheduler yet, or processed but status not yet
+    // flipped), move it to Active so the UI reflects the real state.
+    #[cfg(feature = "enterprise")]
+    if trigger_status == TriggerDataStatus::Completed && config.is_trained {
+        use o2_enterprise::enterprise::anomaly_detection::types::Status as AnomalyStatus;
+        if config.status != AnomalyStatus::Active.to_i32() {
+            use infra::table::entity::anomaly_detection_config;
+            use sea_orm::{ActiveModelTrait, Set};
+            let mut active: anomaly_detection_config::ActiveModel = config.into();
+            active.status = Set(AnomalyStatus::Active.to_i32());
+            active.updated_at = Set(run_end_us);
+            if let Err(e) = active.update(db).await {
+                log::warn!(
+                    "[anomaly_detection] failed to reset status to Active for {anomaly_id}: {e}"
+                );
+            }
+        }
     }
 
     // Reschedule.
@@ -802,7 +823,9 @@ async fn handle_alert_triggers(
     }
 
     // send notification
-    if let Some(data) = trigger_results.data {
+    if let Some(data) = trigger_results.data
+        && !data.is_empty()
+    {
         // Check if grouping is enabled BEFORE deduplication (enterprise-only feature)
         #[cfg(feature = "enterprise")]
         let grouping_enabled = alert
@@ -929,8 +952,8 @@ async fn handle_alert_triggers(
             )
             .await
             {
-                Ok(deduplicated_data) => {
-                    if deduplicated_data.is_empty() {
+                Ok((deduplicated_data, deduplicated)) => {
+                    if deduplicated_data.is_empty() && deduplicated {
                         log::debug!(
                             "[SCHEDULER trace_id {scheduler_trace_id}] All alert results deduplicated for org: {}, module_key: {}",
                             &new_trigger.org,

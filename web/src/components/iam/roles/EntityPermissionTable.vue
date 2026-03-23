@@ -162,7 +162,7 @@ const updateTableData = () => {
   } else {
     rows.value = getResourceEntities().filter((entity: Entity) => {
       const showEntity = Object.values(entity.permission).some(
-        (permission: any) => permission,
+        (permission: any) => permission.value,
       );
 
       return showEntity;

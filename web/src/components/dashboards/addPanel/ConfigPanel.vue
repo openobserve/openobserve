@@ -139,7 +139,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Picker visible (time set or "+Set" was clicked) -->
         <div
-          v-if="showTimePicker || (panelTimeRange !== null && panelTimeRange !== undefined)"
+          v-if="
+            showTimePicker ||
+            (panelTimeRange !== null && panelTimeRange !== undefined)
+          "
           class="flex items-center no-wrap panel-time-picker-container"
         >
           <div class="panel-time-picker-btn">
@@ -388,6 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ? 'o2-toggle-button-lg-dark'
           : 'o2-toggle-button-lg-light'
       "
+      :disable="isPivotMode"
     />
 
     <div class="space"></div>
@@ -404,8 +408,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ? 'o2-toggle-button-lg-dark'
           : 'o2-toggle-button-lg-light'
       "
+      :disable="isPivotMode"
     />
     <div class="space"></div>
+
+   
 
     <q-toggle
       v-if="dashboardPanelData.data.type == 'table'"
@@ -467,6 +474,145 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </q-input>
 
+    <div class="space"></div>
+
+    <!-- Pivot Table Options (shown when pivot mode active) -->
+    <div
+      v-if="
+        dashboardPanelData.data.type == 'table' && !promqlMode && isPivotMode
+      "
+      class="q-mb-sm"
+    >
+      <div class="q-mb-xs" style="font-weight: 600; font-size: 12px">
+        {{ t("dashboard.pivotOptions") }}
+      </div>
+      <div class="row items-center">
+        <q-toggle
+          v-model="dashboardPanelData.data.config.table_pivot_show_row_totals"
+          :label="t('dashboard.pivotShowRowTotals')"
+          data-test="dashboard-config-pivot-row-totals"
+          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
+          size="lg"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
+        />
+        <div>
+          <q-icon
+            class="q-ml-xs"
+            size="20px"
+            name="info"
+            data-test="dashboard-config-pivot-row-totals-info"
+          />
+          <q-tooltip
+            class="bg-grey-8"
+            anchor="top middle"
+            self="bottom middle"
+            max-width="250px"
+          >
+            {{ t("dashboard.pivotShowRowTotalsTooltip") }}
+          </q-tooltip>
+        </div>
+      </div>
+      <div
+        v-if="dashboardPanelData.data.config.table_pivot_show_row_totals"
+        class="row items-center q-ml-md"
+      >
+        <q-toggle
+          v-model="dashboardPanelData.data.config.table_pivot_sticky_col_totals"
+          :label="t('dashboard.pivotStickyColTotals')"
+          data-test="dashboard-config-pivot-sticky-col-totals"
+          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
+          size="lg"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
+        />
+        <div>
+          <q-icon
+            class="q-ml-xs"
+            size="20px"
+            name="info"
+            data-test="dashboard-config-pivot-sticky-col-totals-info"
+          />
+          <q-tooltip
+            class="bg-grey-8"
+            anchor="top middle"
+            self="bottom middle"
+            max-width="250px"
+          >
+            {{ t("dashboard.pivotStickyColTotalsTooltip") }}
+          </q-tooltip>
+        </div>
+      </div>
+      <div class="row items-center">
+        <q-toggle
+          v-model="dashboardPanelData.data.config.table_pivot_show_col_totals"
+          :label="t('dashboard.pivotShowColTotals')"
+          data-test="dashboard-config-pivot-col-totals"
+          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
+          size="lg"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
+        />
+        <div>
+          <q-icon
+            class="q-ml-xs"
+            size="20px"
+            name="info"
+            data-test="dashboard-config-pivot-col-totals-info"
+          />
+          <q-tooltip
+            class="bg-grey-8"
+            anchor="top middle"
+            self="bottom middle"
+            max-width="250px"
+          >
+            {{ t("dashboard.pivotShowColTotalsTooltip") }}
+          </q-tooltip>
+        </div>
+      </div>
+      <div
+        v-if="dashboardPanelData.data.config.table_pivot_show_col_totals"
+        class="row items-center q-ml-md"
+      >
+        <q-toggle
+          v-model="dashboardPanelData.data.config.table_pivot_sticky_row_totals"
+          :label="t('dashboard.pivotStickyRowTotals')"
+          data-test="dashboard-config-pivot-sticky-row-totals"
+          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
+          size="lg"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
+        />
+        <div>
+          <q-icon
+            class="q-ml-xs"
+            size="20px"
+            name="info"
+            data-test="dashboard-config-pivot-sticky-row-totals-info"
+          />
+          <q-tooltip
+            class="bg-grey-8"
+            anchor="top middle"
+            self="bottom middle"
+            max-width="250px"
+          >
+            {{ t("dashboard.pivotStickyRowTotalsTooltip") }}
+          </q-tooltip>
+        </div>
+      </div>
+    </div>
     <div class="space"></div>
 
     <div class="o2-input">
@@ -1846,7 +1992,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { computed, defineComponent, inject, onBeforeMount, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
@@ -1920,9 +2066,8 @@ export default defineComponent({
       "dashboardPanelDataPageKey",
       "dashboard",
     );
-    const { dashboardPanelData, promqlMode } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const { dashboardPanelData, promqlMode, isPivotMode } =
+      useDashboardPanelData(dashboardPanelDataPageKey);
 
     const { t } = useI18n();
     const store = useStore();
@@ -2589,13 +2734,56 @@ export default defineComponent({
     watch(
       pickerValue,
       (newValue) => {
-        if (newValue && useDefaultTime.value && (showTimePicker.value || panelTimeRange.value !== null)) {
+        if (
+          newValue &&
+          useDefaultTime.value &&
+          (showTimePicker.value || panelTimeRange.value !== null)
+        ) {
           const timeRange = buildPanelTimeRange(newValue as any);
           dashboardPanelData.data.config.panel_time_range = timeRange;
           panelTimeRange.value = timeRange;
         }
       },
       { deep: true },
+    );
+
+    // When pivot mode activates: disable conflicting features and
+    // initialize pivot config values (undefined → false/0 defaults).
+    // Without this, q-toggle shows undefined as OFF but conversion
+    // may treat undefined differently — causing a mismatch.
+    watch(
+      () => isPivotMode.value,
+      (active) => {
+        if (active) {
+          dashboardPanelData.data.config.table_transpose = false;
+          dashboardPanelData.data.config.table_dynamic_columns = false;
+          if (
+            dashboardPanelData.data.config.table_pivot_show_row_totals ===
+            undefined
+          ) {
+            dashboardPanelData.data.config.table_pivot_show_row_totals = false;
+          }
+          if (
+            dashboardPanelData.data.config.table_pivot_show_col_totals ===
+            undefined
+          ) {
+            dashboardPanelData.data.config.table_pivot_show_col_totals = false;
+          }
+          if (
+            dashboardPanelData.data.config.table_pivot_sticky_row_totals ===
+            undefined
+          ) {
+            dashboardPanelData.data.config.table_pivot_sticky_row_totals = false;
+          }
+          if (
+            dashboardPanelData.data.config.table_pivot_sticky_col_totals ===
+            undefined
+          ) {
+            dashboardPanelData.data.config.table_pivot_sticky_col_totals = false;
+          }
+        }
+      },
+      { immediate: true },
     );
 
     // Cancel (remove set time via X icon) → back to "+Set" button
@@ -2610,7 +2798,6 @@ export default defineComponent({
         relativeTimePeriod: "15m",
       };
     };
-
 
     // Clear legend width when switching away from plain type or when position is not right
     watchEffect(() => {
@@ -2698,6 +2885,7 @@ export default defineComponent({
       formattedPickerValue,
       onToggleDefaultTime,
       onCancelPanelTime,
+      isPivotMode,
     };
   },
 });
@@ -2769,6 +2957,7 @@ export default defineComponent({
   font-weight: bold;
   color: white;
 }
+
 .unit-container {
   display: flex;
   height: 36px;

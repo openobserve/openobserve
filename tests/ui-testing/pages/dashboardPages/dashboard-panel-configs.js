@@ -73,6 +73,20 @@ export default class DashboardPanelConfigs {
       '[data-test="dashboard-addpanel-config-override-config-add-btn"]'
     );
 
+    // Pivot table locators
+    this.pivotRowTotals = page.locator(
+      '[data-test="dashboard-config-pivot-row-totals"]'
+    );
+    this.pivotColTotals = page.locator(
+      '[data-test="dashboard-config-pivot-col-totals"]'
+    );
+    this.pivotStickyColTotals = page.locator(
+      '[data-test="dashboard-config-pivot-sticky-col-totals"]'
+    );
+    this.pivotStickyRowTotals = page.locator(
+      '[data-test="dashboard-config-pivot-sticky-row-totals"]'
+    );
+
     //Metric Text
     this.bgColor = page.locator('[data-test="dashboard-config-color-mode"]');
 
@@ -99,6 +113,10 @@ export default class DashboardPanelConfigs {
     this.timeShiftAddBtn = page.locator(
       '[data-test="dashboard-addpanel-config-time-shift-add-btn"]'
     );
+
+    // Column Order Popup locators (PromQL Aggregate mode)
+    this.columnOrderBtn = page.locator('[data-test="dashboard-config-column-order-button"]');
+    this.columnOrderDialog = page.locator('[data-test="column-order-dialog"]');
 
     // Color By Series locators
     this.colorBySeriesBtn = page.locator(
@@ -133,7 +151,7 @@ export default class DashboardPanelConfigs {
   async selectUnit(unit) {
     await this.unit.waitFor({ state: "visible" });
     await this.unit.click();
-    await this.page.getByRole("option", { name: unit }).click();
+    await this.page.getByRole("option", { name: unit, exact: true }).click();
   }
 
   //Decimals
@@ -180,7 +198,7 @@ export default class DashboardPanelConfigs {
   async selectValuePosition(position) {
     await this.valuePosition.waitFor({ state: "visible" });
     await this.valuePosition.click();
-    await this.page.getByRole("option", { name: position }).click();
+    await this.page.getByRole("option", { name: position, exact: true }).click();
   }
 
   // Value rotate
@@ -311,6 +329,94 @@ export default class DashboardPanelConfigs {
   async selectOverrideConfig() {
     await this.overrideConfig.waitFor({ state: "visible" });
     await this.overrideConfig.click();
+  }
+
+  /**
+   * Open override config popup, select a column (by name or first available) and a unit,
+   * then save. Popup auto-adds one row on open (onMounted).
+   * @param {Object} options
+   * @param {string|null} [options.columnName] - Column label to select; null = pick first option
+   * @param {string} [options.unitName] - Unit label to select (e.g. "Bytes", "Milliseconds")
+   */
+  async configureOverrideWithUnit({ columnName = null, unitName = "Bytes" } = {}) {
+    await this.scrollSidebarToElement(this.overrideConfig);
+    await this.overrideConfig.click();
+
+    const fieldSelect = this.page.locator('[data-test="dashboard-addpanel-config-unit-config-select-column-0"]');
+    await fieldSelect.waitFor({ state: "visible", timeout: 10000 });
+    await fieldSelect.click();
+
+    if (columnName) {
+      await this.page.getByRole("option", { name: columnName }).first().waitFor({ state: "visible", timeout: 5000 });
+      await this.page.getByRole("option", { name: columnName }).first().click();
+    } else {
+      // Pick first available column when column name is unknown
+      await this.page.locator('.q-menu [role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
+      await this.page.locator('.q-menu [role="option"]').first().click();
+    }
+
+    const unitSelect = this.page.locator('[data-test="dashboard-addpanel-config-unit-config-select-unit-0"]');
+    await unitSelect.waitFor({ state: "visible", timeout: 5000 });
+    await unitSelect.click();
+    await this.page.getByRole("option", { name: unitName, exact: true }).click();
+
+    // Scope to q-card__actions (OverrideConfigPopup footer) to avoid matching the panel Save btn
+    await this.page.locator('.q-card__actions').getByRole("button", { name: "Save" }).click();
+    await fieldSelect.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+  }
+
+  /**
+   * Open value mapping popup, fill one mapping row, then click Apply.
+   * Popup auto-adds one row on open (onMounted).
+   * @param {Object} options
+   * @param {string} [options.value] - Value to match (type=value row)
+   * @param {string} [options.text] - Display text to show
+   * @param {boolean} [options.setColor] - Whether to initialize the color (clicks "Set color")
+   */
+  async configureValueMapping({ value = "test_value", text = "Mapped!", setColor = true } = {}) {
+    // ValueMapping.vue shares data-test with Drilldown.vue — use last()
+    const valueMappingBtn = this.page.locator('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').last();
+    await this.scrollSidebarToElement(valueMappingBtn);
+    await valueMappingBtn.click();
+
+    const popup = this.page.locator('[data-test="dashboard-value-mapping-popup"]');
+    await popup.waitFor({ state: "visible", timeout: 10000 });
+
+    const valueInput = popup.locator('[data-test="dashboard-addpanel-config-value-mapping-value-input-0"]');
+    await valueInput.waitFor({ state: "visible", timeout: 5000 });
+    await valueInput.fill(value);
+
+    const textInput = popup.locator('[data-test="dashboard-addpanel-config-value-mapping-text-input-0"]');
+    await textInput.fill(text);
+
+    if (setColor) {
+      await popup.getByText("Set color").click();
+      await popup.locator('.color-section input').first().waitFor({ state: "visible", timeout: 5000 });
+    }
+
+    await popup.locator('[data-test="dashboard-addpanel-config-value-mapping-apply-btn"]').click();
+    await popup.waitFor({ state: "hidden", timeout: 5000 });
+  }
+
+  /**
+   * Open value mapping popup and return the popup locator (for external assertions).
+   */
+  async openValueMappingPopup() {
+    const valueMappingBtn = this.page.locator('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').last();
+    await this.scrollSidebarToElement(valueMappingBtn);
+    await valueMappingBtn.click();
+    const popup = this.page.locator('[data-test="dashboard-value-mapping-popup"]');
+    await popup.waitFor({ state: "visible", timeout: 10000 });
+    return popup;
+  }
+
+  /**
+   * Close value mapping popup via the X button without saving.
+   */
+  async closeValueMappingPopup() {
+    const popup = this.page.locator('[data-test="dashboard-value-mapping-popup"]');
+    await popup.locator('[data-test="dashboard-tab-settings-tab-name-edit-cancel"]').click();
+    await popup.waitFor({ state: "hidden", timeout: 5000 });
   }
 
   // Add and configure override with dynamic column and type
@@ -643,6 +749,56 @@ export default class DashboardPanelConfigs {
     await this.colorBySeriesPopup.waitFor({ state: "hidden", timeout: 10000 });
   }
 
+  // ========== Column Order Popup (PromQL Aggregate / Expanded Time series mode) ==========
+
+  /** Returns the locator for the column row at the given index in the column order popup. */
+  columnOrderRow(index) {
+    return this.page.locator(`[data-test="column-order-row-${index}"]`);
+  }
+
+  /** Opens the column order dialog via the "Configure Column Order" button in the config sidebar. */
+  async openColumnOrderDialog() {
+    await this.scrollSidebarToElement(this.columnOrderBtn);
+    await this.columnOrderBtn.click();
+    await this.columnOrderDialog.waitFor({ state: 'visible', timeout: 5000 });
+  }
+
+  /**
+   * Returns the column NAME text (not row number or icons) of the row at the given index.
+   * Targets the `.column-name` div inside the row.
+   */
+  async getColumnName(index) {
+    const nameEl = this.columnOrderRow(index).locator('.column-name');
+    await nameEl.waitFor({ state: 'visible', timeout: 5000 });
+    return (await nameEl.textContent() || '').trim();
+  }
+
+  /** Clicks the move-down button for the column at the given index. */
+  async moveColumnDown(index) {
+    const btn = this.page.locator(`[data-test="column-order-move-down-${index}"]`);
+    await btn.waitFor({ state: 'visible', timeout: 5000 });
+    await btn.click();
+  }
+
+  /** Clicks the move-up button for the column at the given index. */
+  async moveColumnUp(index) {
+    const btn = this.page.locator(`[data-test="column-order-move-up-${index}"]`);
+    await btn.waitFor({ state: 'visible', timeout: 5000 });
+    await btn.click();
+  }
+
+  /** Saves the column order and waits for the dialog to close. */
+  async saveColumnOrder() {
+    await this.page.locator('[data-test="dashboard-column-order-save-btn"]').click();
+    await this.columnOrderDialog.waitFor({ state: 'hidden', timeout: 5000 });
+  }
+
+  /** Cancels the column order dialog without saving. */
+  async cancelColumnOrder() {
+    await this.page.locator('[data-test="dashboard-column-order-cancel-btn"]').click();
+    await this.columnOrderDialog.waitFor({ state: 'hidden', timeout: 5000 });
+  }
+
   /**
    * Delete a color-by-series row at the given index
    * @param {number} index - Row index (0-based)
@@ -669,6 +825,53 @@ export default class DashboardPanelConfigs {
     const seriesName = await this.selectColorBySeriesOption(rowIndex, { optionIndex, matchText });
     await this.setColorForSeriesRow(rowIndex, color);
     return seriesName;
+  }
+
+  // ========== Pivot Table Configs ==========
+
+  /**
+   * Toggle show row totals for pivot table
+   */
+  async togglePivotRowTotals() {
+    await this.pivotRowTotals.waitFor({ state: "visible" });
+    await this.pivotRowTotals.click();
+  }
+
+  /**
+   * Toggle show column totals for pivot table
+   */
+  async togglePivotColTotals() {
+    await this.pivotColTotals.waitFor({ state: "visible" });
+    await this.pivotColTotals.click();
+  }
+
+  /**
+   * Toggle sticky column totals for pivot table
+   * (only visible when row totals is enabled)
+   */
+  async togglePivotStickyColTotals() {
+    await this.pivotStickyColTotals.waitFor({ state: "visible" });
+    await this.pivotStickyColTotals.click();
+  }
+
+  /**
+   * Toggle sticky row totals for pivot table
+   * (only visible when column totals is enabled)
+   */
+  async togglePivotStickyRowTotals() {
+    await this.pivotStickyRowTotals.waitFor({ state: "visible" });
+    await this.pivotStickyRowTotals.click();
+  }
+
+  /**
+   * Get the checked state of a toggle by data-test selector
+   * @param {import('@playwright/test').Locator} toggleLocator
+   * @returns {Promise<boolean>}
+   */
+  async getToggleState(toggleLocator) {
+    await toggleLocator.waitFor({ state: "visible", timeout: 10000 });
+    const ariaChecked = await toggleLocator.getAttribute("aria-checked");
+    return ariaChecked === "true";
   }
 
 }

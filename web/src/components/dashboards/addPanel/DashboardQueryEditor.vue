@@ -263,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         self="top right"
                         max-width="250px"
                       >
-                        {{ t('dashboard.vrlExtractionTooltip') }}
+                        {{ t("dashboard.vrlExtractionTooltip") }}
                       </q-tooltip>
                     </q-btn>
                   </div>
@@ -295,7 +295,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import ConfirmDialog from "../../../components/ConfirmDialog.vue";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import { inject } from "vue";
@@ -385,7 +385,9 @@ export default defineComponent({
       selectedFunction.value = "";
 
       // show success message
-      showPositiveNotification(t("dashboard.functionAppliedSuccess", { name: val.name }));
+      showPositiveNotification(
+        t("dashboard.functionAppliedSuccess", { name: val.name }),
+      );
     };
 
     const {
@@ -612,41 +614,60 @@ export default defineComponent({
     };
 
     // Unified Query Editor: Handle language change
-    const handleLanguageChange = (newLanguage: 'sql' | 'promql') => {
-      console.log('[DashboardQueryEditor] Language changed to:', newLanguage);
+    const handleLanguageChange = (newLanguage: "sql" | "promql") => {
+      console.log("[DashboardQueryEditor] Language changed to:", newLanguage);
       dashboardPanelData.data.queryType = newLanguage;
 
       // Explicitly sync the editor with the correct query after language change
       setTimeout(() => {
         if (queryEditorRef.value && queryEditorRef.value.setValue) {
-          const currentQuery = dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].query;
-          console.log('[DashboardQueryEditor] Syncing editor with query for', newLanguage, ':', currentQuery);
+          const currentQuery =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].query;
+          console.log(
+            "[DashboardQueryEditor] Syncing editor with query for",
+            newLanguage,
+            ":",
+            currentQuery,
+          );
           queryEditorRef.value.setValue(currentQuery);
         }
       }, 50);
     };
 
     // Unified Query Editor: Handle Ask AI
-    const handleAskAI = async (naturalLanguage: string, language: 'sql' | 'promql') => {
-      console.log('[DashboardQueryEditor] Ask AI for language:', language, 'input:', naturalLanguage);
+    const handleAskAI = async (
+      naturalLanguage: string,
+      language: "sql" | "promql",
+    ) => {
+      console.log(
+        "[DashboardQueryEditor] Ask AI for language:",
+        language,
+        "input:",
+        naturalLanguage,
+      );
       // The unified component handles AI generation internally
       // This event is just for parent components that may need to react
     };
 
     // Try to inject runQuery from parent (if provided), otherwise use emit
-    const injectedRunQuery = inject<((withoutCache?: boolean) => void) | null>('runQuery', null);
+    const injectedRunQuery = inject<((withoutCache?: boolean) => void) | null>(
+      "runQuery",
+      null,
+    );
 
     // Unified Query Editor: Handle run query from AI bar execution intent
     const handleRunQuery = () => {
-      console.log('[DashboardQueryEditor] Run query triggered from AI bar');
+      console.log("[DashboardQueryEditor] Run query triggered from AI bar");
       if (injectedRunQuery) {
         injectedRunQuery(false);
       } else {
         // Emit event for parent to handle
         // Note: emits need to be handled by parent in template
-        console.warn('[DashboardQueryEditor] No injected runQuery found, parent should listen to @run-query event');
+        console.warn(
+          "[DashboardQueryEditor] No injected runQuery found, parent should listen to @run-query event",
+        );
       }
     };
 
@@ -658,17 +679,23 @@ export default defineComponent({
     };
 
     const handleVrlGenerationStart = () => {
-      console.log('[DashboardQueryEditor] VRL AI generation started');
+      console.log("[DashboardQueryEditor] VRL AI generation started");
       // Can add loading indicators here if needed
     };
 
     const handleVrlGenerationEnd = () => {
-      console.log('[DashboardQueryEditor] VRL AI generation ended');
+      console.log("[DashboardQueryEditor] VRL AI generation ended");
       // Can remove loading indicators here if needed
     };
 
-    const handleVrlGenerationSuccess = (payload: {type: string, message: string}) => {
-      console.log('[DashboardQueryEditor] VRL AI generation success:', payload.type);
+    const handleVrlGenerationSuccess = (payload: {
+      type: string;
+      message: string;
+    }) => {
+      console.log(
+        "[DashboardQueryEditor] VRL AI generation success:",
+        payload.type,
+      );
       // VRL function code is already updated via @update:query handler
     };
 

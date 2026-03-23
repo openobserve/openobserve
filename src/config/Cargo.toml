@@ -40,7 +40,7 @@ dotenvy.workspace = true
 faststr.workspace = true
 futures.workspace = true
 local-ip-address.workspace = true
-gxhash = { version = "~3.4.1", optional = true }
+gxhash = { version = "3.5", optional = true }
 hashbrown.workspace = true
 hex.workspace = true
 itoa = "1.0"

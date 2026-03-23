@@ -77,15 +77,18 @@
     <q-card-actions align="right" class="q-pa-md">
       <q-btn
         flat
+        no-caps
         :label="t('common.cancel')"
         class="q-ml-sm o2-secondary-button tw:h-[36px]"
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         v-close-popup
         data-test="json-editor-cancel"
       />
       <q-btn
-        class="q-ml-sm o2-primary-button tw:h-[36px]"
-        padding="sm lg"
+        flat
         no-caps
+        class="q-ml-sm o2-primary-button no-border tw:h-[36px]"
+        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
         :label="t('common.save')"
         @click="saveChanges"
         data-test="json-editor-save"
@@ -294,6 +297,8 @@ export default defineComponent({
       toggleAIChat,
       isHovered,
       getBtnLogo,
+      protectedFields,
+      storedFields,
     };
   },
 });

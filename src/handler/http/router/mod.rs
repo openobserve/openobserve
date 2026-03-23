@@ -236,23 +236,21 @@ pub async fn proxy_auth_middleware(request: Request, next: Next) -> Response {
 #[cfg(feature = "enterprise")]
 pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let method = request.method().to_string();
-    let prefix = format!("{}/api/", get_config().common.base_uri);
     let path = request
         .uri()
         .path()
-        .strip_prefix(&prefix)
+        .strip_prefix("/")
         .unwrap_or("")
         .to_string();
     let path_columns = path.split('/').collect::<Vec<&str>>();
     let path_len = path_columns.len();
 
     if get_o2_config().common.audit_enabled
-        && !(path_columns.get(1).unwrap_or(&"").to_string().eq("ws")
-            || path_columns
-                .get(1)
-                .unwrap_or(&"")
-                .to_string()
-                .ends_with("_stream")
+        && !(path_columns
+            .get(1)
+            .unwrap_or(&"")
+            .to_string()
+            .ends_with("_stream")
             || path.ends_with("ai/chat_stream")
             || (method.eq("POST") && INGESTION_EP.contains(&path_columns[path_len - 1])))
     {
@@ -645,11 +643,13 @@ pub fn service_routes() -> Router {
         // Alerts (v2)
         .route("/v2/{org_id}/alerts", get(alerts::list_alerts).post(alerts::create_alert))
         .route("/v2/{org_id}/alerts/{alert_id}", get(alerts::get_alert).put(alerts::update_alert).delete(alerts::delete_alert))
-        .route("/v2/{org_id}/alerts/{alert_id}/export", get(alerts::export_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/export", post(alerts::export_alert))
         .route("/v2/{org_id}/alerts/bulk", delete(alerts::delete_alert_bulk))
         .route("/v2/{org_id}/alerts/{alert_id}/enable", patch(alerts::enable_alert))
         .route("/v2/{org_id}/alerts/bulk/enable", post(alerts::enable_alert_bulk))
         .route("/v2/{org_id}/alerts/{alert_id}/trigger", patch(alerts::trigger_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/retrain", patch(alerts::retrain_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/clone", post(alerts::clone_alert))
         .route("/v2/{org_id}/alerts/generate_sql", post(alerts::generate_sql))
         .route("/v2/{org_id}/alerts/move", patch(alerts::move_alerts))
         .route("/v2/{org_id}/alerts/history", get(alerts::history::get_alert_history))
@@ -997,10 +997,11 @@ pub fn create_app_router() -> Router {
             .merge(proxy_routes(true))
     };
 
+    // Ensure redirect takes into account base_uri
+    let web_path = format!("{}/web/", cfg.common.base_uri);
     // Add UI routes at app level (outside basic_routes to avoid any middleware conflicts)
     if cfg.common.ui_enabled {
-        // Ensure redirect takes into account base_uri
-        let web_path = format!("{}/web/", cfg.common.base_uri);
+        let web_path = web_path.clone();
         app = app
             .route(
                 "/",
@@ -1018,7 +1019,18 @@ pub fn create_app_router() -> Router {
     if cfg.common.base_uri.is_empty() || cfg.common.base_uri == "/" {
         app
     } else {
-        Router::new().nest(&cfg.common.base_uri, app)
+        // In axum 0.8, nest("/abc", app) maps the inner "/" route to exactly "/abc",
+        // but NOT "/abc/" (trailing slash). Add an explicit redirect for the trailing
+        // slash case so both /abc and /abc/ work.
+        let mut outer = Router::new().nest(&cfg.common.base_uri, app);
+        if cfg.common.ui_enabled {
+            let base_uri_slash = format!("{}/", cfg.common.base_uri);
+            outer = outer.route(
+                &base_uri_slash,
+                get(move || core::future::ready(axum::response::Redirect::permanent(&web_path))),
+            );
+        }
+        outer
     }
 }
 

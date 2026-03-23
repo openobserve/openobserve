@@ -652,7 +652,7 @@ import type {
 } from "./types/panelEditor";
 import { resolveConfig } from "./types/panelEditor";
 import { usePanelEditor } from "./composables/usePanelEditor";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 
 // ============================================================================
 // Component Imports
@@ -732,8 +732,12 @@ const resolvedConfig = computed<PanelEditorConfig>(() => resolveConfig(props));
 
 // Get dashboard panel data composable
 const pageKey = computed(() => props.pageType);
-const { dashboardPanelData, resetAggregationFunction, makeAutoSQLQuery, validatePanel } =
-  useDashboardPanelData(pageKey.value);
+const {
+  dashboardPanelData,
+  resetAggregationFunction,
+  makeAutoSQLQuery,
+  validatePanel,
+} = useDashboardPanelData(pageKey.value);
 
 // Provide page key for child components
 provide("dashboardPanelDataPageKey", pageKey.value);

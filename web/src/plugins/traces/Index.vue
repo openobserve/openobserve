@@ -44,10 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Service Graph Tab Content -->
       <div
-        v-if="
-          activeTab === 'service-graph' &&
-          store.state.zoConfig.service_graph_enabled
-        "
+        v-if="activeTab === 'service-graph' && config.isEnterprise == 'true'"
         class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-[calc(100vh-90px)] tw:overflow-hidden"
       >
         <service-graph
@@ -76,6 +73,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-show="searchObj.meta.showFields"
                 ref="indexListRef"
                 :field-list="searchObj.data.stream.selectedStreamFields"
+                :active-include-field-values="activeIncludeFilterValues"
+                :active-exclude-field-values="activeExcludeFilterValues"
                 data-test="traces-search-index-list"
                 class="card-container"
                 :key="searchObj.data.stream.streamLists"
@@ -241,6 +240,7 @@ import {
   ref,
   onDeactivated,
   onActivated,
+  onUnmounted,
   onBeforeMount,
   nextTick,
   defineAsyncComponent,
@@ -252,6 +252,10 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 
 import useTraces from "@/composables/useTraces";
+import {
+  contextRegistry,
+  createTracesContextProvider,
+} from "@/composables/contextProviders";
 
 import TransformService from "@/services/jstransform";
 import {
@@ -274,6 +278,7 @@ import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
@@ -295,6 +300,7 @@ const {
   copyTracesUrl,
   formatTracesMetaData,
 } = useTraces();
+const { fnParsedSQL } = logsUtils();
 let refreshIntervalID = 0;
 const searchResultRef = ref(null);
 const searchBarRef = ref(null);
@@ -310,6 +316,18 @@ const { getStreams, getStream } = useStreams();
 const chartRedrawTimeout = ref(null);
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
   useHttpStreaming();
+// AI copilot context provider for traces page
+const setupContextProvider = () => {
+  const provider = createTracesContextProvider(searchObj, store);
+  contextRegistry.register("traces", provider);
+  contextRegistry.setActive("traces");
+};
+
+const cleanupContextProvider = () => {
+  contextRegistry.unregister("traces");
+  contextRegistry.setActive("");
+};
+
 // Track the current search stream so we can cancel it when a new search starts
 let currentSearchTraceId: string | null = null;
 // Track the count query stream so it can be cancelled independently
@@ -1268,17 +1286,12 @@ async function loadPageData() {
 }
 
 onBeforeMount(async () => {
+  setupContextProvider();
   restoreUrlQueryParams();
   // Restore active tab from URL query params
   const queryParams = router.currentRoute.value.query;
-  if (queryParams.tab === "service-graph") {
-    // Only allow service-graph tab if service graph is enabled
-    if (store.state.zoConfig.service_graph_enabled) {
-      activeTab.value = "service-graph";
-    } else {
-      // If service graph is disabled, default to search tab
-      activeTab.value = "search";
-    }
+  if (queryParams.tab === "service-graph" && config.isEnterprise == "true") {
+    activeTab.value = "service-graph";
   }
   await importSqlParser();
   if (!searchObj.loading) {
@@ -1287,10 +1300,16 @@ onBeforeMount(async () => {
 });
 
 onDeactivated(() => {
+  cleanupContextProvider();
   clearInterval(refreshIntervalID);
 });
 
+onUnmounted(() => {
+  cleanupContextProvider();
+});
+
 onActivated(() => {
+  setupContextProvider();
   const params = router.currentRoute.value.query;
   if (params.reload === "true") {
     restoreUrlQueryParams();
@@ -1463,6 +1482,135 @@ const onFiltersReset = () => {
 
 const isStreamSelected = computed(() => {
   return searchObj.data.stream.selectedStream.value.trim().length > 0;
+});
+
+/**
+ * Extracts a plain column name from a DataFusion SQL AST column node.
+ * The parser can represent column names as either a plain string or a nested
+ * object ({ expr: { value: "name" } }), so we handle both shapes.
+ */
+const extractTracesColName = (col: any): string | null => {
+  if (typeof col === "string") return col.replace(/^"|"$/g, "");
+  if (col?.expr?.value != null) return String(col.expr.value);
+  return null;
+};
+
+/**
+ * Wraps the traces WHERE clause (stored in editorValue) into a full SQL
+ * statement so that fnParsedSQL can parse it.
+ *
+ * The traces query editor only stores the WHERE portion of the query,
+ * optionally pipe-separated (e.g. "| status='200' and duration>100").
+ * fnParsedSQL requires a complete SELECT statement, so we synthesise one.
+ *
+ * Returns an empty string when there is no active WHERE clause.
+ */
+const buildTracesWhereSQL = (): string => {
+  const query = searchObj.data.editorValue?.trim();
+  if (!query) return "";
+  const parts = query.split("|");
+  const whereClause = (parts.length > 1 ? parts[1] : parts[0]).trim();
+  if (!whereClause) return "";
+  const streamName = searchObj.data.stream.selectedStream?.value || "stream";
+  return `SELECT * FROM "${streamName}" WHERE ${whereClause}`;
+};
+
+/**
+ * Derives which field values are currently *included* in the active query.
+ * Returns a map of { fieldName: [value, ...] } by walking the SQL WHERE AST
+ * and collecting:
+ *   - equality conditions  (field = 'value')
+ *   - IS NULL conditions   (field IS NULL  → sentinel key "null")
+ *
+ * Used to pre-check the corresponding checkboxes (blue) in the field sidebar.
+ */
+const activeIncludeFilterValues = computed((): Record<string, string[]> => {
+  const result: Record<string, string[]> = {};
+  try {
+    const fullSql = buildTracesWhereSQL();
+    if (!fullSql) return result;
+    const parsed = fnParsedSQL(fullSql);
+    if (!parsed?.where) return result;
+    const walkNode = (node: any) => {
+      if (!node) return;
+      const op = node.operator?.toUpperCase();
+      if (op === "OR" || op === "AND") {
+        walkNode(node.left);
+        walkNode(node.right);
+      } else if (op === "=") {
+        if (node.left?.type === "column_ref") {
+          const colName = extractTracesColName(node.left.column);
+          if (colName && node.right?.value != null) {
+            const val = String(node.right.value);
+            if (!result[colName]) result[colName] = [];
+            if (!result[colName].includes(val)) result[colName].push(val);
+          }
+        }
+      } else if (op === "IS") {
+        // IS NULL — the field values API returns null rows with key "null"
+        if (node.left?.type === "column_ref") {
+          const colName = extractTracesColName(node.left.column);
+          if (colName) {
+            if (!result[colName]) result[colName] = [];
+            if (!result[colName].includes("null")) result[colName].push("null");
+          }
+        }
+      }
+    };
+    walkNode(parsed.where);
+  } catch {
+    // ignore parse errors
+  }
+  return result;
+});
+
+/**
+ * Derives which field values are currently *excluded* from the active query.
+ * Returns a map of { fieldName: [value, ...] } by walking the SQL WHERE AST
+ * and collecting:
+ *   - inequality conditions  (field != 'value' / field <> 'value')
+ *   - IS NOT NULL conditions (field IS NOT NULL → sentinel key "null")
+ *
+ * Used to pre-check the corresponding checkboxes (red) in the field sidebar.
+ */
+const activeExcludeFilterValues = computed((): Record<string, string[]> => {
+  const result: Record<string, string[]> = {};
+  try {
+    const fullSql = buildTracesWhereSQL();
+    if (!fullSql) return result;
+    const parsed = fnParsedSQL(fullSql);
+    if (!parsed?.where) return result;
+    const walkNode = (node: any) => {
+      if (!node) return;
+      const op = node.operator?.toUpperCase();
+      if (op === "OR" || op === "AND") {
+        walkNode(node.left);
+        walkNode(node.right);
+      } else if (op === "!=" || op === "<>") {
+        if (node.left?.type === "column_ref") {
+          const colName = extractTracesColName(node.left.column);
+          if (colName && node.right?.value != null) {
+            const val = String(node.right.value);
+            if (!result[colName]) result[colName] = [];
+            if (!result[colName].includes(val)) result[colName].push(val);
+          }
+        }
+      } else if (op === "IS NOT") {
+        // IS NOT NULL — the field values API returns null rows with key "null"
+        if (node.left?.type === "column_ref") {
+          const colName = extractTracesColName(node.left.column);
+          if (colName) {
+            if (!result[colName]) result[colName] = [];
+            if (!result[colName].includes("null")) result[colName].push("null");
+          }
+        }
+      }
+    };
+    walkNode(parsed.where);
+  } catch {
+    // ignore parse errors
+  }
+  return result;
 });
 
 const searchData = () => {
@@ -1652,14 +1800,7 @@ watch(updateSelectedColumns, () => {
 watch(activeTab, (newTab) => {
   const query = { ...router.currentRoute.value.query };
   if (newTab === "service-graph") {
-    // Only set service-graph tab if service graph is enabled
-    if (store.state.zoConfig.service_graph_enabled) {
-      query.tab = "service-graph";
-    } else {
-      // If service graph is disabled, force back to search tab
-      activeTab.value = "search";
-      delete query.tab;
-    }
+    query.tab = "service-graph";
   } else {
     delete query.tab;
   }

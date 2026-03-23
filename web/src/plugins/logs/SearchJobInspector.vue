@@ -383,7 +383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-separator />
         <q-card-section>
           <div :class="['sql-query-container', store.state.theme === 'dark' ? 'sql-query-container--dark' : '']">
-            <pre class="sql-query">{{ profileData?.sql || 'No SQL query available' }}</pre>
+            <pre class="sql-query" data-test="inspector-sql-query-content">{{ profileData?.sql || 'No SQL query available' }}</pre>
           </div>
         </q-card-section>
       </q-card>

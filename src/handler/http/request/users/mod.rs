@@ -84,7 +84,11 @@ pub mod service_accounts;
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all users", "category": "users"}))
+        ("x-o2-mcp" = json!({
+            "description": "List all users",
+            "category": "users",
+            "summary_fields": ["email", "role", "first_name", "last_name"]
+        }))
     )
 )]
 pub async fn list(
@@ -231,7 +235,7 @@ pub async fn update(
     Headers(user_email): Headers<UserEmail>,
     axum::Json(user): axum::Json<UpdateUser>,
 ) -> Response {
-    let email_id = email_id.trim().to_lowercase();
+    let email_id = email_id.trim().to_string();
     #[cfg(not(feature = "enterprise"))]
     let mut user = user;
     if user.eq(&UpdateUser::default()) {
@@ -525,11 +529,7 @@ pub async fn authentication(
 
     let mut resp = SignInResponse::default();
     let auth = match auth {
-        Some(auth) => {
-            let mut auth = auth.0;
-            auth.name = auth.name.to_lowercase();
-            auth
-        }
+        Some(auth) => auth.0,
         None => {
             // get Authorization header from request
             #[cfg(feature = "enterprise")]

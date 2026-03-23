@@ -52,7 +52,7 @@ const mockDashboardPanelData = {
   },
 };
 
-vi.mock("@/composables/useDashboardPanel", () => ({
+vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(() => ({
     getAllSelectedStreams: vi.fn(() => [
       { stream: "stream1", streamAlias: "s1" },
@@ -116,7 +116,7 @@ describe("SelectFunction", () => {
     it("should render select function dropdown", () => {
       wrapper = createWrapper();
       expect(
-        wrapper.find('[data-test="dashboard-function-dropdown"]').exists()
+        wrapper.find('[data-test="dashboard-function-dropdown"]').exists(),
       ).toBe(true);
     });
 
@@ -200,7 +200,7 @@ describe("SelectFunction", () => {
       if (wrapper.vm.canAddArgument(wrapper.vm.fields.functionName)) {
         wrapper.vm.addArgument();
         expect(wrapper.vm.fields.args.length).toBeGreaterThanOrEqual(
-          initialLength
+          initialLength,
         );
       }
     });
@@ -240,7 +240,7 @@ describe("SelectFunction", () => {
       };
       wrapper = createWrapper({ modelValue });
       const fieldSelector = wrapper.find(
-        '[data-test="dashboard-function-dropdown-arg-field-selector-0"]'
+        '[data-test="dashboard-function-dropdown-arg-field-selector-0"]',
       );
       expect(fieldSelector.exists()).toBe(true);
     });
@@ -341,7 +341,7 @@ describe("SelectFunction", () => {
       wrapper = createWrapper();
       const types = wrapper.vm.getSupportedTypeBasedOnFunctionNameAndIndex(
         "concat",
-        0
+        0,
       );
       expect(Array.isArray(types)).toBe(true);
     });
@@ -419,7 +419,7 @@ describe("SelectFunction", () => {
       wrapper = createWrapper({ modelValue });
       if (wrapper.vm.canAddArgument("concat")) {
         const addBtn = wrapper.find(
-          '[data-test="dashboard-function-dropdown-add-argument-button"]'
+          '[data-test="dashboard-function-dropdown-add-argument-button"]',
         );
         expect(addBtn.exists()).toBe(true);
       }
@@ -434,7 +434,7 @@ describe("SelectFunction", () => {
       if (wrapper.vm.canAddArgument("concat")) {
         const initialLength = wrapper.vm.fields.args.length;
         const addBtn = wrapper.find(
-          '[data-test="dashboard-function-dropdown-add-argument-button"]'
+          '[data-test="dashboard-function-dropdown-add-argument-button"]',
         );
         if (addBtn.exists()) {
           await addBtn.trigger("click");
@@ -456,7 +456,7 @@ describe("SelectFunction", () => {
       wrapper = createWrapper({ modelValue });
       if (wrapper.vm.canRemoveArgument("concat", 0)) {
         const removeBtn = wrapper.find(
-          '[data-test="dashboard-function-dropdown-arg-remove-button-0"]'
+          '[data-test="dashboard-function-dropdown-arg-remove-button-0"]',
         );
         expect(removeBtn.exists()).toBe(true);
       }
@@ -474,7 +474,7 @@ describe("SelectFunction", () => {
       const initialLength = wrapper.vm.fields.args.length;
       if (wrapper.vm.canRemoveArgument("concat", 0)) {
         const removeBtn = wrapper.find(
-          '[data-test="dashboard-function-dropdown-arg-remove-button-0"]'
+          '[data-test="dashboard-function-dropdown-arg-remove-button-0"]',
         );
         if (removeBtn.exists()) {
           await removeBtn.trigger("click");
@@ -491,7 +491,10 @@ describe("SelectFunction", () => {
         args: [
           {
             type: "function",
-            value: { functionName: "sum", args: [{ type: "field", value: {} }] },
+            value: {
+              functionName: "sum",
+              args: [{ type: "field", value: {} }],
+            },
           },
         ],
       };
@@ -566,7 +569,7 @@ describe("SelectFunction", () => {
       // Some functions allow adding before last argument
       const types = wrapper.vm.getSupportedTypeBasedOnFunctionNameAndIndex(
         "concat",
-        0
+        0,
       );
       expect(Array.isArray(types)).toBe(true);
     });
@@ -599,7 +602,7 @@ describe("SelectFunction", () => {
       };
       wrapper = createWrapper({ modelValue });
       const typeSelector = wrapper.find(
-        '[data-test="dashboard-function-dropdown-arg-type-selector-0"]'
+        '[data-test="dashboard-function-dropdown-arg-type-selector-0"]',
       );
       expect(typeSelector.exists()).toBe(true);
     });

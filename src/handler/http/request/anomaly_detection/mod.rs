@@ -47,7 +47,7 @@ use crate::{
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
 pub async fn list_configs(Path(org_id): Path<String>) -> Response {
-    match anomaly_service::list_configs(&org_id).await {
+    match anomaly_service::list_configs(&org_id, None, None).await {
         Ok(configs) => MetaHttpResponse::json(configs),
         Err(e) => {
             tracing::error!("Failed to list anomaly configs: {}", e);
@@ -376,7 +376,12 @@ pub struct CreateAnomalyConfigRequest {
     pub query_mode: String,  // "filters" or "custom_sql"
     pub filters: Option<serde_json::Value>,
     pub custom_sql: Option<String>,
-    pub detection_function: String, // "count(*)", "avg(field)", etc.
+    /// Aggregate function name: "count", "avg", "sum", "min", "max", "p50", "p95", "p99".
+    /// For backwards compatibility, also accepts the combined form "avg(field)".
+    pub detection_function: String,
+    /// Field to aggregate (required for avg/sum/min/max/pXX, ignored for count).
+    /// Combined with `detection_function` into "avg(field)" before saving.
+    pub detection_function_field: Option<String>,
     /// SQL histogram bucket size, e.g. "5m", "1h".
     pub histogram_interval: String,
     /// How often the detection job fires, e.g. "1h", "30m".
@@ -397,15 +402,25 @@ pub struct CreateAnomalyConfigRequest {
     pub rcf_tree_size: Option<i32>,
     pub rcf_shingle_size: Option<i32>,
     pub alert_enabled: Option<bool>,
-    pub alert_destination_id: Option<String>,
+    #[serde(default)]
+    pub alert_destinations: Vec<String>,
     pub enabled: Option<bool>,
+    /// Folder to place this config in. Resolved to the org default folder if absent.
+    pub folder_id: Option<String>,
+    /// Owner username. Defaults to the requesting user if absent.
+    pub owner: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct UpdateAnomalyConfigRequest {
     pub name: Option<String>,
     pub description: Option<String>,
+    pub query_mode: Option<String>,
+    pub filters: Option<serde_json::Value>,
+    pub custom_sql: Option<String>,
     pub detection_function: Option<String>,
+    /// Field to aggregate (required for avg/sum/min/max/pXX).
+    pub detection_function_field: Option<String>,
     /// SQL histogram bucket size. Changing this requires retraining.
     pub histogram_interval: Option<String>,
     /// How often the detection job fires.
@@ -420,8 +435,10 @@ pub struct UpdateAnomalyConfigRequest {
     /// How often to retrain the model (in days). `0` means never retrain automatically.
     pub retrain_interval_days: Option<i32>,
     pub alert_enabled: Option<bool>,
-    pub alert_destination_id: Option<String>,
+    pub alert_destinations: Option<Vec<String>>,
     pub enabled: Option<bool>,
+    pub folder_id: Option<String>,
+    pub owner: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

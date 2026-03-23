@@ -26,7 +26,7 @@ installQuasar({
 });
 
 // Mock useDashboardPanelData composable
-vi.mock("@/composables/useDashboardPanel", () => ({
+vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(() => ({
     fetchPromQLLabels: vi.fn().mockResolvedValue(undefined),
   })),
@@ -132,7 +132,11 @@ describe("LabelFilterEditor", () => {
       const emittedLabels = wrapper.emitted("update:labels");
       expect(emittedLabels).toBeTruthy();
       expect(emittedLabels![0][0]).toHaveLength(2);
-      expect(emittedLabels![0][0][1]).toEqual({ label: "", op: "=", value: "" });
+      expect(emittedLabels![0][0][1]).toEqual({
+        label: "",
+        op: "=",
+        value: "",
+      });
     });
 
     it("should remove label filter when remove button is clicked", async () => {
@@ -162,7 +166,11 @@ describe("LabelFilterEditor", () => {
       const emittedLabels = wrapper.emitted("update:labels");
       expect(emittedLabels).toBeTruthy();
       expect(emittedLabels![0][0]).toHaveLength(1);
-      expect(emittedLabels![0][0][0]).toEqual({ label: "", op: "=", value: "" });
+      expect(emittedLabels![0][0][0]).toEqual({
+        label: "",
+        op: "=",
+        value: "",
+      });
     });
   });
 

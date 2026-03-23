@@ -91,6 +91,18 @@ export class SearchJobInspectorPage {
   }
 
   /**
+   * Wait for inspector data to be loaded (tiles show values or error state)
+   */
+  async waitForInspectorDataLoaded() {
+    // Wait for either the Results tile text or error banner to be visible
+    // This indicates the API call has completed
+    await Promise.race([
+      this.page.locator(this.resultsTileText).waitFor({ state: 'visible', timeout: 15000 }),
+      this.page.locator(this.inspectorErrorBanner).waitFor({ state: 'visible', timeout: 15000 })
+    ]);
+  }
+
+  /**
    * Check if on inspector page
    * @returns {Promise<boolean>}
    */
@@ -311,7 +323,9 @@ export class SearchJobInspectorPage {
     const viewQueryBtn = this.page.locator(this.viewQueryBtnText);
     await expect(viewQueryBtn).toBeVisible({ timeout: 5000 });
     await viewQueryBtn.click();
-    await this.page.waitForLoadState('domcontentloaded');
+    // Wait for SQL content element to be visible (primary selector)
+    const sqlContent = this.page.locator('[data-test="inspector-sql-query-content"]');
+    await sqlContent.waitFor({ state: 'visible', timeout: 10000 });
   }
 
   /**
@@ -333,27 +347,16 @@ export class SearchJobInspectorPage {
    * @returns {Promise<string>}
    */
   async getSqlQueryContent() {
-    // Wait for the SQL dialog to be visible first
-    await this.page.waitForSelector('.q-dialog', { state: 'visible', timeout: 5000 }).catch(() => {});
+    // Wait for the SQL content element using data-test attribute
+    const sqlLocator = this.page.locator('[data-test="inspector-sql-query-content"]');
+    await sqlLocator.waitFor({ state: 'visible', timeout: 10000 });
 
-    // Look for SQL content using specific selector from SearchJobInspector.vue
-    const sqlLocators = [
-      this.page.locator('pre.sql-query'),
-      this.page.locator('.sql-query-container pre'),
-      this.page.locator('.q-dialog pre').first(),
-      this.page.locator('.q-dialog code').first()
-    ];
-
-    for (const locator of sqlLocators) {
-      if (await locator.isVisible({ timeout: 5000 }).catch(() => false)) {
-        const content = await locator.textContent() || '';
-        // Skip if it's the fallback message
-        if (content && content !== 'No SQL query available') {
-          return content;
-        }
-      }
+    const content = await sqlLocator.textContent() || '';
+    // Return empty string if showing fallback message (no SQL data available)
+    if (content === 'No SQL query available') {
+      return '';
     }
-    return '';
+    return content;
   }
 
   /**

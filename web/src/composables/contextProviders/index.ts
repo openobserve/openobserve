@@ -35,3 +35,4 @@ export { createPipelinesContextProvider } from './pipelinesContextProvider';
 export { createAlertsContextProvider } from './alertsContextProvider';
 export { createDashboardsContextProvider } from './dashboardsContextProvider';
 export { createIncidentsContextProvider } from './incidentsContextProvider';
+export { createTracesContextProvider } from './tracesContextProvider';

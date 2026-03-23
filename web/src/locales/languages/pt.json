@@ -352,7 +352,32 @@
     "openFields": "Campos abertos",
     "createAlertFromPattern": "Crie um alerta a partir desse padrão",
     "aiBarSuccessPlaceholder": "O que você gostaria de fazer a seguir?",
-    "nlpModeDisabledForVisualization": "O modo de linguagem natural não pode ser desativado durante a visualização com vários fluxos"
+    "nlpModeDisabledForVisualization": "O modo de linguagem natural não pode ser desativado durante a visualização com vários fluxos",
+    "patternDetailsTitle": "Detalhes do padrão",
+    "patternXofY": "Padrão {índice} de {total}",
+    "patternXofYShort": "{índice} de {total}",
+    "patternStatistics": "Estatísticas",
+    "patternOccurrences": "Ocorrências",
+    "patternPercentage": "Porcentagem",
+    "patternAnomalyDetected": "Anomalia detectada",
+    "patternAnomalyScore": "Esse padrão é detectado como um padrão raro (pontuação de anomalia: {score}%)",
+    "patternAnomalyRare": "Esse padrão é detectado como um padrão raro ({pct}% de registros, {freq} ocorrência)",
+    "patternAnomalyRarePlural": "Esse padrão é detectado como um padrão raro ({pct}% de registros, {freq} ocorrências)",
+    "patternAnomalyLowFreq": "Esse padrão aparece com menos frequência do que o esperado ({freq} vs avg {avg}, z-score: {z})",
+    "patternAnomalyLowFreqPlural": "Esse padrão aparece com menos frequência do que o esperado ({freq} vs avg {avg}, z-score: {z})",
+    "patternVariablesHeader": "Variáveis",
+    "patternVariablesDetected": "{count} variável (s) detectada (s)",
+    "patternNoVariablesDetected": "Nenhuma variável detectada",
+    "patternTemplate": "Modelo de padrão",
+    "patternVariablesWithCount": "Variáveis ({count})",
+    "patternVariableNameColumn": "Nome da variável",
+    "patternVariableTypeColumn": "Tipo",
+    "patternExampleLogsWithCount": "Exemplos de registros ({count})",
+    "patternNavPrevious": "Anterior",
+    "patternNavNext": "Próximo",
+    "patternWildcardSampleValues": "Valores da amostra",
+    "wildcardSampleValues": "Valores da amostra",
+    "patternZScore": "Pontuação Z: {zScore} (frequência média: {avgFrequency})"
   },
   "menu": {
     "home": "Início",
@@ -1472,7 +1497,18 @@
     "hideQueryResults": "Ocultar resultados da consulta",
     "vrlExtractionTooltip": "Para usar campos VRL extraídos no gráfico, escreva uma função VRL e clique no botão Aplicar. Os campos serão extraídos, permitindo que você os use para criar o gráfico.",
     "errorFetchingFunctions": "Erro ao buscar funções",
-    "functionAppliedSuccess": "função {name} aplicada com sucesso."
+    "functionAppliedSuccess": "função {name} aplicada com sucesso.",
+    "pivotOptions": "Opções de pivô",
+    "pivotShowRowTotals": "Mostrar totais de linhas",
+    "pivotShowColTotals": "Mostrar totais de colunas",
+    "pivotMissingValue": "Valor ausente",
+    "pivotMissingValueHint": "Valor mostrado para células sem dados",
+    "pivotShowRowTotalsTooltip": "Exibir uma linha de totais na parte inferior da tabela dinâmica resumindo os valores de cada coluna",
+    "pivotShowColTotalsTooltip": "Exibir uma coluna de totais no lado direito da tabela dinâmica resumindo os valores de cada linha",
+    "pivotStickyRowTotals": "Totais de linhas fixas",
+    "pivotStickyRowTotalsTooltip": "Fixe a linha de totais na parte inferior para que ela permaneça visível ao rolar verticalmente",
+    "pivotStickyColTotals": "Totais de colunas fixas",
+    "pivotStickyColTotalsTooltip": "Fixe a coluna de totais à direita para que ela permaneça visível ao rolar horizontalmente"
   },
   "panel": {
     "header": "Painel",
@@ -1554,7 +1590,12 @@
     "sqlBuilder": "Construtor de SQL",
     "generatedSql": "SQL gerado",
     "enterCustomSql": "Insira sua consulta SQL personalizada...",
-    "customSql": "SQL personalizado"
+    "customSql": "SQL personalizado",
+    "pivotField": "Campo pivô",
+    "addToPivot": "Adicionar ao campo dinâmico",
+    "pivotFieldTooltip": "Arraste um campo de dimensão aqui. Seus valores distintos se tornam cabeçalhos de coluna na tabela dinâmica. Até 3 campos são permitidos para dinamização em vários níveis.",
+    "breakdownTooltipHBar": "Use esses campos para dividir os dados em diferentes seções no eixo Y para uma visão mais clara.",
+    "breakdownTooltipDefault": "Use esses campos para dividir os dados em diferentes seções no eixo X para uma visão mais clara."
   },
   "home": {
     "streams": "Transmissões",
@@ -2106,7 +2147,15 @@
       "active": "Ativo",
       "failed": "Falhou",
       "disabled": "Desativado"
-    }
+    },
+    "anomalyStepCaptions": {
+      "alertSetup": "Nomeie seu detector e selecione um fluxo para monitorar",
+      "detectionConfig": "Configurar os parâmetros de consulta e detecção",
+      "alerting": "Configure notificações quando anomalias forem detectadas"
+    },
+    "updateAnomalyDetection": "Atualize a detecção de anomalias:",
+    "anomalyCreated": "Configuração de detecção de anomalias criada. O treinamento começará em breve.",
+    "editJson": "Editar alerta JSON"
   },
   "alert_templates": {
     "header": "Modelos",
@@ -2415,7 +2464,8 @@
     "maxSeriesPerQueryDescription": "Número máximo de séries que podem ser retornadas de uma única consulta ProMQL. Ajuda a evitar o congelamento da interface com grandes conjuntos de resultados. Deixe em branco para usar o padrão do sistema (40.000).",
     "maxSeriesPerQueryTooltip": "Quando uma consulta ProMQL como 'count (metric) by (label) 'retorna muitas séries, ela pode congelar a interface do usuário. Esse limite evita isso. Defina como null para o padrão do sistema ou especifique um valor entre 1.000 e 1.000.000.",
     "maxSeriesPerQueryValidation": "O valor deve estar entre 1.000 e 1.000.000 ou deixar em branco por padrão",
-    "systemDefault": "padrão do sistema"
+    "systemDefault": "padrão do sistema",
+    "usageStreamEnabledLabel": "Ativar fluxo de uso"
   },
   "iam": {
     "users": "Usuários",
@@ -2640,7 +2690,9 @@
     "spanColorPalettePreview": "Pré-visualização da paleta de cores Span",
     "errorsFound": "Traços de erro",
     "spansTitle": "VÃOS",
-    "spansFound": "Vãos encontrados"
+    "spansFound": "Vãos encontrados",
+    "errorTraces": "Traços de erro",
+    "errorSpans": "Expansões de erro"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",

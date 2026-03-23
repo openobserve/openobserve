@@ -88,11 +88,11 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const searchQuery = ref(props.initialSearch || "");
+    const route = useRoute();
+    const searchQuery = ref((route.query.search as string) || props.initialSearch || "");
     const activeCategory = ref("all");
 
     // Watch for changes in route query parameter
-    const route = useRoute();
     watch(() => route.query.search, (newSearch) => {
       if (newSearch && typeof newSearch === 'string') {
         searchQuery.value = newSearch;
@@ -100,7 +100,7 @@ export default defineComponent({
         // Clear search when query param is removed
         searchQuery.value = "";
       }
-    }, { immediate: true });
+    });
 
     // Watch for changes in initialSearch prop
     watch(() => props.initialSearch, (newSearch) => {

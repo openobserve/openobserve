@@ -17,6 +17,7 @@ import {
   routeGuard,
   useLocalUserInfo,
   useLocalCurrentUser,
+  invalidateLoginData,
 } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import Home from "@/views/HomeView.vue";
@@ -90,6 +91,8 @@ const useRoutes = () => {
     {
       path: "/logout",
       beforeEnter(to: any, from: any, next: any) {
+        // Clear backend auth cookies before redirecting to login (#10900)
+        invalidateLoginData();
         useLocalCurrentUser("", true);
         useLocalUserInfo("", true);
 
@@ -397,8 +400,7 @@ const useRoutes = () => {
     {
       path: "alerts/anomaly/add",
       name: "addAnomalyDetection",
-      component: () =>
-        import("@/views/AddAnomalyDetectionView.vue"),
+      component: () => import("@/views/AddAlertView.vue"),
       meta: {
         title: "Add Anomaly Detection",
       },
@@ -415,8 +417,7 @@ const useRoutes = () => {
     {
       path: "alerts/anomaly/edit/:anomaly_id",
       name: "editAnomalyDetection",
-      component: () =>
-        import("@/views/AddAnomalyDetectionView.vue"),
+      component: () => import("@/views/AddAlertView.vue"),
       meta: {
         title: "Edit Anomaly Detection",
       },

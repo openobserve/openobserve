@@ -124,6 +124,8 @@
           :show-multi-select="true"
           :default-values-count="defaultValuesCount"
           :theme="store.state.theme"
+          :active-include-values="activeIncludeValues"
+          :active-exclude-values="activeExcludeValues"
           @add-search-term="handleAddSearchTerm"
           @add-multiple-search-terms="handleAddMultipleSearchTerms"
           @load-more-values="handleLoadMoreValues"
@@ -164,6 +166,14 @@ const props = defineProps({
   row: {
     type: Object,
     default: () => null,
+  },
+  activeIncludeValues: {
+    type: Array as () => string[],
+    default: () => [],
+  },
+  activeExcludeValues: {
+    type: Array as () => string[],
+    default: () => [],
   },
 });
 
@@ -245,6 +255,10 @@ const defaultValuesCount = computed(
   () => store.state.zoConfig?.query_values_default_num || 10,
 );
 
+const showFtsFieldValues = computed(
+  () => store.state.zoConfig?.show_fts_field_values ?? false,
+);
+
 const addSearchTerm = (term: string) => {
   searchObj.data.stream.addToFilter = term;
 };
@@ -324,7 +338,7 @@ const fetchValues = (from: number = 0, keyword: string = "") => {
 };
 
 const openFilterCreator = (event: any, { ftsKey }: any) => {
-  if (ftsKey) {
+  if (ftsKey && !showFtsFieldValues.value) {
     event.stopPropagation();
     event.preventDefault();
     return;

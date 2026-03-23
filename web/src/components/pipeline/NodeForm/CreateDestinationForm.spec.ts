@@ -1,4 +1,19 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+// Copyright 2023 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
@@ -6,6 +21,7 @@ import CreateDestinationForm from "./CreateDestinationForm.vue";
 import { createStore } from "vuex";
 import destinationService from "@/services/alert_destination";
 import i18n from "@/locales";
+import { nextTick } from "vue";
 
 // Mock the destination service
 vi.mock("@/services/alert_destination", () => ({
@@ -14,7 +30,7 @@ vi.mock("@/services/alert_destination", () => ({
   },
 }));
 
-// Mock the zincutils
+// Mock zincutils with deterministic UUIDs
 let uuidCounter = 0;
 vi.mock("@/utils/zincutils", () => ({
   isValidResourceName: vi.fn((val: string) => {
@@ -25,26 +41,22 @@ vi.mock("@/utils/zincutils", () => ({
   getUUID: vi.fn(() => `test-uuid-${++uuidCounter}`),
 }));
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
+installQuasar({ plugins: [Dialog, Notify] });
 
 describe("CreateDestinationForm", () => {
   let wrapper: any;
   let store: any;
 
-  beforeEach(() => {
-    // Create a mock Vuex store
+  function createWrapper(props: Record<string, any> = {}) {
     store = createStore({
       state: {
         theme: "light",
-        selectedOrganization: {
-          identifier: "test-org",
-        },
+        selectedOrganization: { identifier: "test-org" },
       },
     });
 
-    wrapper = mount(CreateDestinationForm, {
+    return mount(CreateDestinationForm, {
+      props,
       global: {
         plugins: [store, i18n],
         stubs: {
@@ -60,504 +72,651 @@ describe("CreateDestinationForm", () => {
         },
       },
     });
+  }
+
+  beforeEach(() => {
+    uuidCounter = 0;
+    vi.clearAllMocks();
+    wrapper = createWrapper();
   });
 
+  afterEach(() => {
+    if (wrapper) {
+      wrapper.unmount();
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
   describe("Component Initialization", () => {
-    it("should render the component", () => {
+    it("renders the component", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should start at step 1", () => {
+    it("starts at step 1", () => {
       expect(wrapper.vm.step).toBe(1);
     });
 
-    it("should have OpenObserve as default destination type", () => {
+    it("has 'openobserve' as default destination type", () => {
       expect(wrapper.vm.formData.destination_type).toBe("openobserve");
     });
 
-    it("should initialize with default OpenObserve headers", () => {
+    it("initializes with OpenObserve Authorization header", () => {
       expect(wrapper.vm.apiHeaders).toHaveLength(1);
       expect(wrapper.vm.apiHeaders[0].key).toBe("Authorization");
       expect(wrapper.vm.apiHeaders[0].value).toBe("Basic <token>");
     });
 
-    it("should have OpenObserve default url_endpoint", () => {
-      expect(wrapper.vm.formData.url_endpoint).toBe("/api/default/default/_json");
+    it("initializes url_endpoint to OpenObserve default endpoint", () => {
+      expect(wrapper.vm.formData.url_endpoint).toBe(
+        "/api/default/default/_json"
+      );
     });
 
-    it("should have POST as default method", () => {
+    it("has 'post' as default method", () => {
       expect(wrapper.vm.formData.method).toBe("post");
     });
 
-    it("should have json as default output format", () => {
+    it("has 'json' as default output_format", () => {
       expect(wrapper.vm.formData.output_format).toBe("json");
     });
+
+    it("initializes formData.name as empty string", () => {
+      expect(wrapper.vm.formData.name).toBe("");
+    });
+
+    it("initializes formData.url as empty string", () => {
+      expect(wrapper.vm.formData.url).toBe("");
+    });
+
+    it("initializes skip_tls_verify as false", () => {
+      expect(wrapper.vm.formData.skip_tls_verify).toBe(false);
+    });
+
+    it("initializes separator as empty string", () => {
+      expect(wrapper.vm.formData.separator).toBe("");
+    });
+
+    it("initializes esbulk_index as empty string", () => {
+      expect(wrapper.vm.formData.esbulk_index).toBe("");
+    });
   });
 
-  describe("Destination Type Selection", () => {
-    it("should display all destination type cards", () => {
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("Destination Type Cards", () => {
+    it("renders all 7 destination type cards", () => {
       const cards = wrapper.findAll('[class*="destination-type-card"]');
-      expect(cards.length).toBeGreaterThanOrEqual(7); // 7 destination types
+      expect(cards.length).toBeGreaterThanOrEqual(7);
     });
 
-    it("should show images for non-custom destination types", async () => {
-      const openobserveCard = wrapper.find(
+    it("renders destination card for openobserve", () => {
+      expect(
+        wrapper.find('[data-test="destination-type-card-openobserve"]').exists()
+      ).toBe(true);
+    });
+
+    it("renders destination card for splunk", () => {
+      expect(
+        wrapper.find('[data-test="destination-type-card-splunk"]').exists()
+      ).toBe(true);
+    });
+
+    it("renders destination card for elasticsearch", () => {
+      expect(
+        wrapper
+          .find('[data-test="destination-type-card-elasticsearch"]')
+          .exists()
+      ).toBe(true);
+    });
+
+    it("renders destination card for datadog", () => {
+      expect(
+        wrapper.find('[data-test="destination-type-card-datadog"]').exists()
+      ).toBe(true);
+    });
+
+    it("renders destination card for custom", () => {
+      expect(
+        wrapper.find('[data-test="destination-type-card-custom"]').exists()
+      ).toBe(true);
+    });
+
+    it("openobserve card shows an image", () => {
+      const card = wrapper.find(
         '[data-test="destination-type-card-openobserve"]'
       );
-      const img = openobserveCard.find("img");
-      expect(img.exists()).toBe(true);
-      expect(img.attributes("alt")).toBe("OpenObserve");
+      expect(card.find("img").exists()).toBe(true);
     });
 
-    it("should show icon for custom destination type", async () => {
-      await wrapper.vm.$nextTick();
-      const customCard = wrapper.find(
-        '[data-test="destination-type-card-custom"]'
+    it("applies 'selected' class to the active destination card", () => {
+      const card = wrapper.find(
+        '[data-test="destination-type-card-openobserve"]'
       );
-      // Just verify the card exists - icon rendering depends on Quasar setup
-      expect(customCard.exists()).toBe(true);
+      expect(card.classes()).toContain("selected");
     });
 
-    it("should update destination_type when a card is clicked", async () => {
-      const splunkCard = wrapper.find(
-        '[data-test="destination-type-card-splunk"]'
-      );
-      await splunkCard.trigger("click");
+    it("updates destination_type when a card is clicked", async () => {
+      const splunk = wrapper.find('[data-test="destination-type-card-splunk"]');
+      await splunk.trigger("click");
       await flushPromises();
-
       expect(wrapper.vm.formData.destination_type).toBe("splunk");
     });
+  });
 
-    it("should apply selected class to the active destination card", async () => {
-      const openobserveCard = wrapper.find(
-        '[data-test="destination-type-card-openobserve"]'
-      );
-      expect(openobserveCard.classes()).toContain("selected");
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("defaultUrlEndpoint computed property", () => {
+    it.each([
+      ["openobserve", "/api/{org}/{stream}/_json"],
+      ["splunk", "/services/collector"],
+      ["elasticsearch", "/_bulk"],
+      ["datadog", "/v1/input"],
+      ["dynatrace", "/api/v2/logs/ingest"],
+      ["newrelic", "/log/v1"],
+      ["custom", ""],
+    ])("returns correct endpoint for %s", async (type, expected) => {
+      wrapper.vm.formData.destination_type = type;
+      await nextTick();
+      expect(wrapper.vm.defaultUrlEndpoint).toBe(expected);
     });
   });
 
-  describe("URL Endpoint Prefilling", () => {
-    it("should prefill correct endpoint for OpenObserve", async () => {
-      // Set destination type and trigger change
-      wrapper.vm.formData.destination_type = "openobserve";
-      await wrapper.vm.$nextTick();
-      await flushPromises();
-
-      // Check the computed property directly
-      expect(wrapper.vm.defaultUrlEndpoint).toBe("/api/{org}/{stream}/_json");
-    });
-
-    it("should prefill correct endpoint for Splunk", async () => {
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("Auto-prefill on destination type change", () => {
+    it("sets url_endpoint for Splunk on type change", async () => {
       wrapper.vm.formData.destination_type = "splunk";
-      await wrapper.vm.$nextTick();
+      await nextTick();
       await flushPromises();
       expect(wrapper.vm.formData.url_endpoint).toBe("/services/collector");
     });
 
-    it("should prefill correct endpoint for Elasticsearch", async () => {
+    it("sets url_endpoint for Elasticsearch on type change", async () => {
       wrapper.vm.formData.destination_type = "elasticsearch";
-      await wrapper.vm.$nextTick();
+      await nextTick();
       expect(wrapper.vm.formData.url_endpoint).toBe("/_bulk");
     });
 
-    it("should prefill correct endpoint for Datadog", async () => {
+    it("sets url_endpoint for Datadog on type change", async () => {
       wrapper.vm.formData.destination_type = "datadog";
-      await wrapper.vm.$nextTick();
+      await nextTick();
       expect(wrapper.vm.formData.url_endpoint).toBe("/v1/input");
     });
 
-    it("should prefill correct endpoint for Dynatrace", async () => {
+    it("sets url_endpoint for Dynatrace on type change", async () => {
       wrapper.vm.formData.destination_type = "dynatrace";
-      await wrapper.vm.$nextTick();
+      await nextTick();
       expect(wrapper.vm.formData.url_endpoint).toBe("/api/v2/logs/ingest");
     });
 
-    it("should prefill correct endpoint for Newrelic", async () => {
+    it("sets url_endpoint for Newrelic on type change", async () => {
       wrapper.vm.formData.destination_type = "newrelic";
-      await wrapper.vm.$nextTick();
+      await nextTick();
       expect(wrapper.vm.formData.url_endpoint).toBe("/log/v1");
     });
 
-    it("should prefill empty endpoint for Custom", async () => {
+    it("sets url_endpoint to empty for Custom on type change", async () => {
       wrapper.vm.formData.destination_type = "custom";
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.formData.url_endpoint).toBe("");
-    });
-  });
-
-  describe("URL Endpoint Field", () => {
-    it("should show url_endpoint field on step 2", async () => {
-      wrapper.vm.formData.destination_type = "openobserve";
-      wrapper.vm.step = 2; // Move to step 2 where the field is shown
-      await wrapper.vm.$nextTick();
-      await flushPromises();
-
-      const endpointField = wrapper.find('[data-test="add-destination-url-endpoint-input"]');
-      expect(endpointField.exists()).toBe(true);
-    });
-
-    it("should make url_endpoint optional for custom destination type", async () => {
-      wrapper.vm.formData.destination_type = "custom";
-      wrapper.vm.formData.url_endpoint = "";
-      await wrapper.vm.$nextTick();
-      await flushPromises();
-
-      // For custom, empty endpoint should be valid
+      await nextTick();
       expect(wrapper.vm.formData.url_endpoint).toBe("");
     });
 
-    it("should require url_endpoint for non-custom destination types", async () => {
-      wrapper.vm.formData.destination_type = "openobserve";
-      wrapper.vm.formData.name = "test";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.method = "post";
-      wrapper.vm.formData.url_endpoint = "";
-      await wrapper.vm.$nextTick();
-      await flushPromises();
-
-      // For non-custom, endpoint should be required
-      // isValidDestination checks name, url, and method - not url_endpoint
-      // So we just verify the endpoint is empty when it should be filled
-      expect(wrapper.vm.formData.url_endpoint).toBe("");
-    });
-  });
-
-  describe("Method Field Behavior", () => {
-    it("should hide Method field for OpenObserve", async () => {
-      wrapper.vm.formData.destination_type = "openobserve";
-      wrapper.vm.step = 2;
-      await wrapper.vm.$nextTick();
-      await flushPromises();
-
-      const methodField = wrapper.find(
-        '[data-test="add-destination-method-select"]'
-      );
-      expect(methodField.exists()).toBe(false);
-    });
-
-    it("should show Method field for Custom destination", async () => {
-      wrapper.vm.formData.destination_type = "custom";
-      wrapper.vm.step = 2;
-      await wrapper.vm.$nextTick();
-      await flushPromises();
-
-      const methodField = wrapper.find(
-        '[data-test="add-destination-method-select"]'
-      );
-      expect(methodField.exists()).toBe(true);
-    });
-
-    it("should set method to POST when switching to non-custom destination", async () => {
-      wrapper.vm.formData.destination_type = "custom";
-      wrapper.vm.formData.method = "get";
-      await wrapper.vm.$nextTick();
-      await flushPromises();
-
+    it("sets output_format to nestedevent for Splunk", async () => {
       wrapper.vm.formData.destination_type = "splunk";
-      await wrapper.vm.$nextTick();
+      await nextTick();
       await flushPromises();
-
-      expect(wrapper.vm.formData.method).toBe("post");
-    });
-  });
-
-  describe("Output Format Field Behavior", () => {
-    it("should disable Output Format field for OpenObserve", async () => {
-      wrapper.vm.formData.destination_type = "openobserve";
-      wrapper.vm.step = 2; // Move to step 2 where field is visible
-      await wrapper.vm.$nextTick();
-      await flushPromises();
-
-      const outputField = wrapper.find(
-        '[data-test="add-destination-output-format-select"]'
-      );
-      // Just verify field exists on step 2
-      expect(outputField.exists()).toBe(true);
-    });
-
-    it("should enable Output Format field for Custom", async () => {
-      wrapper.vm.formData.destination_type = "custom";
-      wrapper.vm.step = 2; // Move to step 2 where field is visible
-      await wrapper.vm.$nextTick();
-      await flushPromises();
-
-      const outputField = wrapper.find(
-        '[data-test="add-destination-output-format-select"]'
-      );
-      // Just verify field exists on step 2
-      expect(outputField.exists()).toBe(true);
-    });
-
-    it("should set output_format to nestedevent for Splunk", async () => {
-      wrapper.vm.formData.destination_type = "splunk";
-      await wrapper.vm.$nextTick();
-      await flushPromises();
-
       expect(wrapper.vm.formData.output_format).toBe("nestedevent");
     });
 
-    it("should set output_format to esbulk for Elasticsearch", async () => {
+    it("sets output_format to esbulk for Elasticsearch and provides default index", async () => {
       wrapper.vm.formData.destination_type = "elasticsearch";
-      await wrapper.vm.$nextTick();
+      await nextTick();
       await flushPromises();
-
       expect(wrapper.vm.formData.output_format).toBe("esbulk");
       expect(wrapper.vm.formData.esbulk_index).toBe("default");
     });
 
-    it("should set output_format to json for Datadog", async () => {
+    it("sets output_format to json for Datadog", async () => {
       wrapper.vm.formData.destination_type = "datadog";
-      await wrapper.vm.$nextTick();
+      await nextTick();
       await flushPromises();
-
       expect(wrapper.vm.formData.output_format).toBe("json");
     });
-  });
 
-  describe("Default Headers Functionality", () => {
-    it("should set correct headers for OpenObserve", async () => {
-      wrapper.vm.formData.destination_type = "openobserve";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.apiHeaders).toHaveLength(1);
-      expect(wrapper.vm.apiHeaders[0].key).toBe("Authorization");
-      expect(wrapper.vm.apiHeaders[0].value).toBe("Basic <token>");
-    });
-
-    it("should set correct headers for Splunk", async () => {
-      wrapper.vm.formData.destination_type = "splunk";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.apiHeaders).toHaveLength(1);
-      expect(wrapper.vm.apiHeaders[0].key).toBe("Authorization");
-      expect(wrapper.vm.apiHeaders[0].value).toBe("Splunk <splunk_token>");
-    });
-
-    it("should set correct headers for Elasticsearch", async () => {
-      wrapper.vm.formData.destination_type = "elasticsearch";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.apiHeaders).toHaveLength(2);
-      expect(wrapper.vm.apiHeaders[0].key).toBe("Authorization");
-      expect(wrapper.vm.apiHeaders[0].value).toBe("ApiKey <token>");
-      expect(wrapper.vm.apiHeaders[1].key).toBe("Content-Type");
-      expect(wrapper.vm.apiHeaders[1].value).toBe("application/json");
-    });
-
-    it("should set correct headers for Datadog", async () => {
-      wrapper.vm.formData.destination_type = "datadog";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.apiHeaders).toHaveLength(3);
-      expect(wrapper.vm.apiHeaders[0].key).toBe("DD-API-KEY");
-      expect(wrapper.vm.apiHeaders[0].value).toBe("<token>");
-      expect(wrapper.vm.apiHeaders[1].key).toBe("Content-Encoding");
-      expect(wrapper.vm.apiHeaders[1].value).toBe("gzip");
-      expect(wrapper.vm.apiHeaders[2].key).toBe("Content-Type");
-      expect(wrapper.vm.apiHeaders[2].value).toBe("application/json");
-    });
-
-    it("should set correct headers for Dynatrace", async () => {
-      wrapper.vm.formData.destination_type = "dynatrace";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.apiHeaders).toHaveLength(2);
-      expect(wrapper.vm.apiHeaders[0].key).toBe("Authorization");
-      expect(wrapper.vm.apiHeaders[0].value).toBe("Api-Token <token>");
-      expect(wrapper.vm.apiHeaders[1].key).toBe("Content-Type");
-      expect(wrapper.vm.apiHeaders[1].value).toBe(
-        "application/json; charset=utf-8"
-      );
-    });
-
-    it("should set correct headers for Newrelic", async () => {
-      wrapper.vm.formData.destination_type = "newrelic";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.apiHeaders).toHaveLength(2);
-      expect(wrapper.vm.apiHeaders[0].key).toBe("Api-Key");
-      expect(wrapper.vm.apiHeaders[0].value).toBe("<token>");
-      expect(wrapper.vm.apiHeaders[1].key).toBe("Content-Type");
-      expect(wrapper.vm.apiHeaders[1].value).toBe("application/json");
-    });
-
-    it("should set empty header for Custom", async () => {
+    it("sets method to 'post' when switching from custom to a non-custom type", async () => {
       wrapper.vm.formData.destination_type = "custom";
-      await wrapper.vm.$nextTick();
+      wrapper.vm.formData.method = "get";
+      await nextTick();
 
-      expect(wrapper.vm.apiHeaders).toHaveLength(1);
-      expect(wrapper.vm.apiHeaders[0].key).toBe("");
-      expect(wrapper.vm.apiHeaders[0].value).toBe("");
+      wrapper.vm.formData.destination_type = "splunk";
+      await nextTick();
+      await flushPromises();
+      expect(wrapper.vm.formData.method).toBe("post");
     });
   });
 
-  describe("Header Management", () => {
-    it("should add a new header row", () => {
-      const initialLength = wrapper.vm.apiHeaders.length;
-      wrapper.vm.addApiHeader("X-Custom", "value");
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("Default Headers per Destination Type", () => {
+    it.each([
+      [
+        "openobserve",
+        1,
+        [{ key: "Authorization", value: "Basic <token>" }],
+      ],
+      [
+        "splunk",
+        1,
+        [{ key: "Authorization", value: "Splunk <splunk_token>" }],
+      ],
+      [
+        "elasticsearch",
+        2,
+        [
+          { key: "Authorization", value: "ApiKey <token>" },
+          { key: "Content-Type", value: "application/json" },
+        ],
+      ],
+      [
+        "datadog",
+        3,
+        [
+          { key: "DD-API-KEY", value: "<token>" },
+          { key: "Content-Encoding", value: "gzip" },
+          { key: "Content-Type", value: "application/json" },
+        ],
+      ],
+      [
+        "dynatrace",
+        2,
+        [
+          { key: "Authorization", value: "Api-Token <token>" },
+          { key: "Content-Type", value: "application/json; charset=utf-8" },
+        ],
+      ],
+      [
+        "newrelic",
+        2,
+        [
+          { key: "Api-Key", value: "<token>" },
+          { key: "Content-Type", value: "application/json" },
+        ],
+      ],
+      ["custom", 1, [{ key: "", value: "" }]],
+    ])(
+      "sets correct default headers for %s (%i header(s))",
+      async (type, count, expectedHeaders) => {
+        wrapper.vm.formData.destination_type = type;
+        await nextTick();
 
-      expect(wrapper.vm.apiHeaders.length).toBe(initialLength + 1);
-      expect(wrapper.vm.apiHeaders[initialLength].key).toBe("X-Custom");
-      expect(wrapper.vm.apiHeaders[initialLength].value).toBe("value");
+        expect(wrapper.vm.apiHeaders).toHaveLength(count);
+        expectedHeaders.forEach(({ key, value }: { key: string; value: string }, i: number) => {
+          expect(wrapper.vm.apiHeaders[i].key).toBe(key);
+          expect(wrapper.vm.apiHeaders[i].value).toBe(value);
+        });
+      }
+    );
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("Header Management", () => {
+    it("addApiHeader appends a new entry to apiHeaders", () => {
+      const initial = wrapper.vm.apiHeaders.length;
+      wrapper.vm.addApiHeader("X-Custom", "my-value");
+      expect(wrapper.vm.apiHeaders).toHaveLength(initial + 1);
+      expect(wrapper.vm.apiHeaders[initial].key).toBe("X-Custom");
+      expect(wrapper.vm.apiHeaders[initial].value).toBe("my-value");
     });
 
-    it("should delete a header row", () => {
+    it("deleteApiHeader removes the specified header", () => {
       wrapper.vm.addApiHeader("X-Test", "test");
-      const headerToDelete = wrapper.vm.apiHeaders[1];
-      const initialLength = wrapper.vm.apiHeaders.length;
+      const toDelete = wrapper.vm.apiHeaders[1];
+      const before = wrapper.vm.apiHeaders.length;
 
-      wrapper.vm.deleteApiHeader(headerToDelete);
+      wrapper.vm.deleteApiHeader(toDelete);
 
-      expect(wrapper.vm.apiHeaders.length).toBe(initialLength - 1);
+      expect(wrapper.vm.apiHeaders).toHaveLength(before - 1);
       expect(
-        wrapper.vm.apiHeaders.find((h: any) => h.uuid === headerToDelete.uuid)
+        wrapper.vm.apiHeaders.find((h: any) => h.uuid === toDelete.uuid)
       ).toBeUndefined();
     });
 
-    it("should add empty header if all headers are deleted", () => {
-      const headerToDelete = wrapper.vm.apiHeaders[0];
-      wrapper.vm.deleteApiHeader(headerToDelete);
+    it("deleteApiHeader adds an empty header row when all headers are deleted", () => {
+      const toDelete = wrapper.vm.apiHeaders[0];
+      wrapper.vm.deleteApiHeader(toDelete);
 
-      expect(wrapper.vm.apiHeaders.length).toBe(1);
+      expect(wrapper.vm.apiHeaders).toHaveLength(1);
       expect(wrapper.vm.apiHeaders[0].key).toBe("");
       expect(wrapper.vm.apiHeaders[0].value).toBe("");
     });
   });
 
-  describe("Step Navigation", () => {
-    it("should have Continue button disabled on step 1 if no destination type selected", async () => {
-      wrapper.vm.formData.destination_type = "";
-      await wrapper.vm.$nextTick();
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("OpenObserve Org/Stream Dynamic Endpoint", () => {
+    it("updates url_endpoint when openobserveOrg changes", async () => {
+      wrapper.vm.formData.destination_type = "openobserve";
+      wrapper.vm.openobserveOrg = "my-org";
+      await nextTick();
+      expect(wrapper.vm.formData.url_endpoint).toContain("my-org");
+    });
 
+    it("updates url_endpoint when openobserveStream changes", async () => {
+      wrapper.vm.formData.destination_type = "openobserve";
+      wrapper.vm.openobserveStream = "my-stream";
+      await nextTick();
+      expect(wrapper.vm.formData.url_endpoint).toContain("my-stream");
+    });
+
+    it("builds correct endpoint from org and stream", async () => {
+      wrapper.vm.formData.destination_type = "openobserve";
+      wrapper.vm.openobserveOrg = "acme";
+      wrapper.vm.openobserveStream = "events";
+      await nextTick();
+      expect(wrapper.vm.formData.url_endpoint).toBe("/api/acme/events/_json");
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("showMetadataFields computed property", () => {
+    it("returns true for splunk", async () => {
+      wrapper.vm.formData.destination_type = "splunk";
+      await nextTick();
+      expect(wrapper.vm.showMetadataFields).toBe(true);
+    });
+
+    it("returns true for datadog", async () => {
+      wrapper.vm.formData.destination_type = "datadog";
+      await nextTick();
+      expect(wrapper.vm.showMetadataFields).toBe(true);
+    });
+
+    it("returns false for openobserve", async () => {
+      wrapper.vm.formData.destination_type = "openobserve";
+      await nextTick();
+      expect(wrapper.vm.showMetadataFields).toBe(false);
+    });
+
+    it("returns false for custom", async () => {
+      wrapper.vm.formData.destination_type = "custom";
+      await nextTick();
+      expect(wrapper.vm.showMetadataFields).toBe(false);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("Step Navigation", () => {
+    it("canProceedStep1 is falsy when destination_type is empty", async () => {
+      wrapper.vm.formData.destination_type = "";
+      await nextTick();
       expect(wrapper.vm.canProceedStep1).toBeFalsy();
     });
 
-    it("should enable Continue button on step 1 when destination type is selected", async () => {
+    it("canProceedStep1 is true when a destination type is selected", async () => {
       wrapper.vm.formData.destination_type = "openobserve";
-      await wrapper.vm.$nextTick();
-
+      await nextTick();
       expect(wrapper.vm.canProceedStep1).toBe(true);
     });
 
-    it("should move to step 2 when nextStep is called", async () => {
+    it("nextStep advances to step 2", async () => {
       wrapper.vm.formData.destination_type = "openobserve";
       wrapper.vm.step = 1;
       wrapper.vm.nextStep();
-      await wrapper.vm.$nextTick();
-
+      await nextTick();
       expect(wrapper.vm.step).toBe(2);
     });
 
-    it("should move back to step 1 when prevStep is called", async () => {
-      wrapper.vm.step = 2;
-      wrapper.vm.prevStep();
-      await wrapper.vm.$nextTick();
-
+    it("nextStep does not advance if destination_type is not selected", async () => {
+      wrapper.vm.formData.destination_type = "";
+      wrapper.vm.step = 1;
+      wrapper.vm.nextStep();
+      await nextTick();
       expect(wrapper.vm.step).toBe(1);
     });
 
-    it("should validate step 2 form fields", () => {
-      wrapper.vm.formData.destination_type = "openobserve"; // Default type that doesn't require metadata
-      wrapper.vm.formData.name = "test-destination";
+    it("prevStep decrements step", async () => {
+      wrapper.vm.step = 2;
+      wrapper.vm.prevStep();
+      await nextTick();
+      expect(wrapper.vm.step).toBe(1);
+    });
+
+    it("prevStep does not go below 1", async () => {
+      wrapper.vm.step = 1;
+      wrapper.vm.prevStep();
+      await nextTick();
+      expect(wrapper.vm.step).toBe(1);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("canProceedStep2 Validation", () => {
+    it("is true for valid openobserve form data", async () => {
+      wrapper.vm.formData.destination_type = "openobserve";
+      wrapper.vm.formData.name = "valid-dest";
       wrapper.vm.formData.url = "https://example.com";
       wrapper.vm.formData.url_endpoint = "/api/org/stream/_json";
       wrapper.vm.formData.method = "post";
       wrapper.vm.formData.output_format = "json";
-
-      // canProceedStep2 returns truthy value, not boolean
+      await nextTick();
       expect(wrapper.vm.canProceedStep2).toBeTruthy();
     });
 
-    it("should not validate step 2 if required fields are missing", () => {
+    it("is false when name is missing", async () => {
       wrapper.vm.formData.name = "";
       wrapper.vm.formData.url = "https://example.com";
-
+      await nextTick();
       expect(wrapper.vm.canProceedStep2).toBeFalsy();
     });
-  });
 
-  describe("Form Validation", () => {
-    it("should validate destination name", () => {
-      wrapper.vm.formData.name = "valid-name";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.url_endpoint = "/api/test";
-      wrapper.vm.formData.method = "post";
-
-      expect(wrapper.vm.isValidDestination).toBeTruthy();
-    });
-
-    it("should invalidate if name is empty", () => {
-      wrapper.vm.formData.name = "";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.method = "post";
-
-      expect(wrapper.vm.isValidDestination).toBeFalsy();
-    });
-
-    it("should invalidate if URL is empty", () => {
+    it("is false when URL is missing", async () => {
       wrapper.vm.formData.name = "test";
       wrapper.vm.formData.url = "";
-      wrapper.vm.formData.method = "post";
-
-      expect(wrapper.vm.isValidDestination).toBeFalsy();
+      await nextTick();
+      expect(wrapper.vm.canProceedStep2).toBeFalsy();
     });
 
-    it("should invalidate if URL has trailing slash", () => {
-      wrapper.vm.formData.name = "test";
-      wrapper.vm.formData.url = "https://example.com/";
-      wrapper.vm.formData.url_endpoint = "/api/test";
-      wrapper.vm.formData.method = "post";
-
-      // URL with trailing slash should fail validation
-      expect(wrapper.vm.formData.url.endsWith('/')).toBe(true);
-    });
-
-    it("should validate if URL has no trailing slash", () => {
-      wrapper.vm.formData.name = "test";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.url_endpoint = "/api/test";
-      wrapper.vm.formData.method = "post";
-
-      expect(wrapper.vm.formData.url.endsWith('/')).toBe(false);
-    });
-
-    it("should invalidate if endpoint does not start with slash", () => {
-      wrapper.vm.formData.name = "test";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.url_endpoint = "api/test";
-      wrapper.vm.formData.method = "post";
-
-      // Endpoint without leading slash should fail validation
-      expect(wrapper.vm.formData.url_endpoint.startsWith('/')).toBe(false);
-    });
-
-    it("should validate if endpoint starts with slash", () => {
-      wrapper.vm.formData.name = "test";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.url_endpoint = "/api/test";
-      wrapper.vm.formData.method = "post";
-
-      expect(wrapper.vm.formData.url_endpoint.startsWith('/')).toBe(true);
-    });
-
-    it("should allow empty endpoint for custom destination type", () => {
+    it("is false for non-custom when url_endpoint is empty", async () => {
+      wrapper.vm.formData.destination_type = "openobserve";
       wrapper.vm.formData.name = "test";
       wrapper.vm.formData.url = "https://example.com";
       wrapper.vm.formData.url_endpoint = "";
-      wrapper.vm.formData.destination_type = "custom";
       wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "json";
+      await nextTick();
+      expect(wrapper.vm.canProceedStep2).toBe(false);
+    });
 
-      // Empty endpoint should be valid for custom
-      expect(wrapper.vm.formData.url_endpoint).toBe("");
+    it("is false for stringseparated when separator is empty", async () => {
+      wrapper.vm.formData.destination_type = "custom";
+      wrapper.vm.formData.name = "test";
+      wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "stringseparated";
+      wrapper.vm.formData.separator = "";
+      await nextTick();
+      expect(wrapper.vm.canProceedStep2).toBe(false);
+    });
+
+    it("is true for stringseparated when separator is provided", async () => {
+      wrapper.vm.formData.destination_type = "custom";
+      wrapper.vm.formData.name = "test";
+      wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "stringseparated";
+      wrapper.vm.formData.separator = "|";
+      await nextTick();
+      expect(wrapper.vm.canProceedStep2).toBe(true);
+    });
+
+    it("allows single space as a valid separator", async () => {
+      wrapper.vm.formData.destination_type = "custom";
+      wrapper.vm.formData.name = "test";
+      wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "stringseparated";
+      wrapper.vm.formData.separator = " ";
+      await nextTick();
+      expect(wrapper.vm.canProceedStep2).toBe(true);
     });
   });
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("isValidDestination computed property", () => {
+    it("is truthy when name, url, and method are provided", () => {
+      wrapper.vm.formData.name = "valid-name";
+      wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.method = "post";
+      expect(wrapper.vm.isValidDestination).toBeTruthy();
+    });
+
+    it("is falsy when name is empty", () => {
+      wrapper.vm.formData.name = "";
+      wrapper.vm.formData.url = "https://example.com";
+      wrapper.vm.formData.method = "post";
+      expect(wrapper.vm.isValidDestination).toBeFalsy();
+    });
+
+    it("is falsy when url is empty", () => {
+      wrapper.vm.formData.name = "test";
+      wrapper.vm.formData.url = "";
+      wrapper.vm.formData.method = "post";
+      expect(wrapper.vm.isValidDestination).toBeFalsy();
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("Template Rendering at Step 2", () => {
+    beforeEach(async () => {
+      wrapper.vm.formData.destination_type = "openobserve";
+      wrapper.vm.step = 2;
+      await nextTick();
+      await flushPromises();
+    });
+
+    it("renders name input field", () => {
+      expect(
+        wrapper.find('[data-test="add-destination-name-input"]').exists()
+      ).toBe(true);
+    });
+
+    it("renders URL input field", () => {
+      expect(
+        wrapper.find('[data-test="add-destination-url-input"]').exists()
+      ).toBe(true);
+    });
+
+    it("renders url_endpoint input field", () => {
+      expect(
+        wrapper.find('[data-test="add-destination-url-endpoint-input"]').exists()
+      ).toBe(true);
+    });
+
+    it("renders output format select field", () => {
+      expect(
+        wrapper
+          .find('[data-test="add-destination-output-format-select"]')
+          .exists()
+      ).toBe(true);
+    });
+
+    it("renders skip TLS verify toggle", () => {
+      expect(
+        wrapper
+          .find('[data-test="add-destination-skip-tls-verify-toggle"]')
+          .exists()
+      ).toBe(true);
+    });
+
+    it("does NOT render Method field for openobserve type", () => {
+      expect(
+        wrapper.find('[data-test="add-destination-method-select"]').exists()
+      ).toBe(false);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("Custom Type Specific Fields", () => {
+    beforeEach(async () => {
+      wrapper.vm.formData.destination_type = "custom";
+      wrapper.vm.step = 2;
+      await nextTick();
+      await flushPromises();
+    });
+
+    it("renders Method select for custom destination type", () => {
+      expect(
+        wrapper.find('[data-test="add-destination-method-select"]').exists()
+      ).toBe(true);
+    });
+
+    it("url_endpoint field is not disabled for custom type", () => {
+      const endpointField = wrapper.find(
+        '[data-test="add-destination-url-endpoint-input"]'
+      );
+      expect(endpointField.exists()).toBe(true);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("StringSeparated Output Format", () => {
+    it("shows separator field when stringseparated format is selected", async () => {
+      wrapper.vm.formData.destination_type = "custom";
+      wrapper.vm.formData.output_format = "stringseparated";
+      wrapper.vm.step = 2;
+      await nextTick();
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="add-destination-separator-input"]').exists()
+      ).toBe(true);
+    });
+
+    it("hides separator field for other output formats", async () => {
+      wrapper.vm.formData.destination_type = "custom";
+      wrapper.vm.formData.output_format = "json";
+      wrapper.vm.step = 2;
+      await nextTick();
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="add-destination-separator-input"]').exists()
+      ).toBe(false);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("ESBulk Index Field", () => {
+    it("shows esbulk index field when output format is esbulk", async () => {
+      wrapper.vm.formData.destination_type = "custom";
+      wrapper.vm.formData.output_format = "esbulk";
+      wrapper.vm.step = 2;
+      await nextTick();
+      await flushPromises();
+
+      expect(
+        wrapper
+          .find('[data-test="add-destination-esbulk-index-input"]')
+          .exists()
+      ).toBe(true);
+    });
+
+    it("hides esbulk index field for non-esbulk formats", async () => {
+      wrapper.vm.formData.output_format = "json";
+      wrapper.vm.step = 2;
+      await nextTick();
+      await flushPromises();
+
+      expect(
+        wrapper
+          .find('[data-test="add-destination-esbulk-index-input"]')
+          .exists()
+      ).toBe(false);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
   describe("Form Submission", () => {
     beforeEach(() => {
       vi.clearAllMocks();
     });
 
-    it("should merge URL and endpoint before submission", async () => {
+    it("merges URL and endpoint and calls destinationService.create", async () => {
       (destinationService.create as any).mockResolvedValue({ data: {} });
 
       wrapper.vm.formData = {
@@ -572,10 +731,11 @@ describe("CreateDestinationForm", () => {
         headers: {},
         emails: "",
         type: "http",
+        esbulk_index: "",
+        separator: "",
       };
-
       wrapper.vm.apiHeaders = [
-        { key: "Authorization", value: "Basic token123", uuid: "123" },
+        { key: "Authorization", value: "Basic token123", uuid: "h1" },
       ];
 
       await wrapper.vm.createDestination();
@@ -587,37 +747,36 @@ describe("CreateDestinationForm", () => {
         module: "pipeline",
         data: expect.objectContaining({
           name: "Test Destination",
-          url: "https://example.com/api/test", // Merged URL + endpoint
+          url: "https://example.com/api/test",
           method: "post",
           output_format: "json",
           type: "http",
           destination_type_name: "openobserve",
-          headers: {
-            Authorization: "Basic token123",
-          },
+          headers: { Authorization: "Basic token123" },
         }),
       });
     });
 
-    it("should include destination_type_name in payload", async () => {
+    it("includes destination_type_name in payload", async () => {
       (destinationService.create as any).mockResolvedValue({ data: {} });
 
       wrapper.vm.formData = {
-        name: "Test Destination",
-        url: "https://example.com",
-        url_endpoint: "/api/test",
+        name: "Splunk Dest",
+        url: "https://splunk.example.com",
+        url_endpoint: "/services/collector",
         method: "post",
-        output_format: "json",
+        output_format: "nestedevent",
         destination_type: "splunk",
         skip_tls_verify: false,
         template: "",
         headers: {},
         emails: "",
         type: "http",
+        esbulk_index: "",
+        separator: "",
       };
-
       wrapper.vm.apiHeaders = [
-        { key: "Authorization", value: "Splunk token123", uuid: "123" },
+        { key: "Authorization", value: "Splunk token", uuid: "h2" },
       ];
 
       await wrapper.vm.createDestination();
@@ -633,12 +792,12 @@ describe("CreateDestinationForm", () => {
       );
     });
 
-    it("should handle empty endpoint in submission", async () => {
+    it("does not append empty endpoint to base URL for custom type", async () => {
       (destinationService.create as any).mockResolvedValue({ data: {} });
 
       wrapper.vm.formData = {
-        name: "Custom Destination",
-        url: "https://example.com",
+        name: "Custom Dest",
+        url: "https://custom.example.com",
         url_endpoint: "",
         method: "post",
         output_format: "json",
@@ -648,10 +807,11 @@ describe("CreateDestinationForm", () => {
         headers: {},
         emails: "",
         type: "http",
+        esbulk_index: "",
+        separator: "",
       };
-
       wrapper.vm.apiHeaders = [
-        { key: "X-Custom", value: "value", uuid: "123" },
+        { key: "X-Custom", value: "value", uuid: "h3" },
       ];
 
       await wrapper.vm.createDestination();
@@ -659,18 +819,18 @@ describe("CreateDestinationForm", () => {
 
       expect(destinationService.create).toHaveBeenCalledWith({
         org_identifier: "test-org",
-        destination_name: "Custom Destination",
+        destination_name: "Custom Dest",
         module: "pipeline",
         data: expect.objectContaining({
-          url: "https://example.com", // No endpoint appended
+          url: "https://custom.example.com",
         }),
       });
     });
 
-    it("should emit created event with destination name on success", async () => {
+    it("emits 'created' event with destination name on success", async () => {
       (destinationService.create as any).mockResolvedValue({ data: {} });
 
-      wrapper.vm.formData.name = "Test Destination";
+      wrapper.vm.formData.name = "My Dest";
       wrapper.vm.formData.url = "https://example.com";
       wrapper.vm.formData.url_endpoint = "/api/test";
       wrapper.vm.formData.method = "post";
@@ -679,10 +839,10 @@ describe("CreateDestinationForm", () => {
       await flushPromises();
 
       expect(wrapper.emitted("created")).toBeTruthy();
-      expect(wrapper.emitted("created")[0]).toEqual(["Test Destination"]);
+      expect(wrapper.emitted("created")![0]).toEqual(["My Dest"]);
     });
 
-    it("should not submit if validation fails", async () => {
+    it("does not call destinationService.create when name is empty", async () => {
       wrapper.vm.formData.name = "";
       wrapper.vm.formData.url = "";
 
@@ -692,11 +852,12 @@ describe("CreateDestinationForm", () => {
     });
   });
 
+  // ─────────────────────────────────────────────────────────────────────────────
   describe("Form Reset", () => {
-    it("should reset form to default values", () => {
-      wrapper.vm.formData.name = "Changed Name";
+    it("resetForm resets all formData fields to defaults", () => {
+      wrapper.vm.formData.name = "Changed";
       wrapper.vm.formData.url = "https://changed.com";
-      wrapper.vm.formData.url_endpoint = "/changed/endpoint";
+      wrapper.vm.formData.url_endpoint = "/changed";
       wrapper.vm.formData.destination_type = "splunk";
       wrapper.vm.step = 2;
 
@@ -709,8 +870,8 @@ describe("CreateDestinationForm", () => {
       expect(wrapper.vm.step).toBe(1);
     });
 
-    it("should reset headers to OpenObserve defaults", () => {
-      wrapper.vm.apiHeaders = [{ key: "Custom", value: "Header", uuid: "123" }];
+    it("resetForm resets apiHeaders to OpenObserve defaults", () => {
+      wrapper.vm.apiHeaders = [{ key: "X-Custom", value: "Val", uuid: "x1" }];
 
       wrapper.vm.resetForm();
 
@@ -720,768 +881,241 @@ describe("CreateDestinationForm", () => {
     });
   });
 
-  describe("Edit Mode - URL Splitting", () => {
-    it("should split URL into base and endpoint when editing", () => {
-      const destination = {
-        name: "Test Destination",
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("Edit Mode – populateFormForEdit", () => {
+    it("splits URL into base and endpoint for non-custom types", () => {
+      wrapper.vm.populateFormForEdit({
+        name: "Edit Dest",
         url: "https://example.com/api/test",
         method: "post",
         output_format: "json",
         destination_type_name: "openobserve",
         skip_tls_verify: false,
-        headers: {
-          Authorization: "Basic token123",
-        },
-      };
-
-      wrapper.vm.populateFormForEdit(destination);
+      });
 
       expect(wrapper.vm.formData.url).toBe("https://example.com");
       expect(wrapper.vm.formData.url_endpoint).toBe("/api/test");
     });
 
-    it("should handle URL with query parameters when splitting", () => {
-      const destination = {
-        name: "Test Destination",
-        url: "https://example.com/api/test?key=value",
+    it("handles URL with query parameters during split", () => {
+      wrapper.vm.populateFormForEdit({
+        name: "Splunk Dest",
+        url: "https://splunk.host.com/services/collector?key=val",
         method: "post",
-        output_format: "json",
+        output_format: "nestedevent",
         destination_type_name: "splunk",
         skip_tls_verify: false,
-      };
+      });
 
-      wrapper.vm.populateFormForEdit(destination);
-
-      expect(wrapper.vm.formData.url).toBe("https://example.com");
-      expect(wrapper.vm.formData.url_endpoint).toBe("/api/test?key=value");
+      expect(wrapper.vm.formData.url).toBe("https://splunk.host.com");
+      expect(wrapper.vm.formData.url_endpoint).toBe(
+        "/services/collector?key=val"
+      );
     });
 
-    it("should handle URL with hash when splitting", () => {
-      const destination = {
-        name: "Test Destination",
-        url: "https://example.com/api/test#section",
-        method: "post",
-        output_format: "json",
-        destination_type_name: "openobserve",
-        skip_tls_verify: false,
-      };
-
-      wrapper.vm.populateFormForEdit(destination);
-
-      expect(wrapper.vm.formData.url).toBe("https://example.com");
-      expect(wrapper.vm.formData.url_endpoint).toBe("/api/test#section");
-    });
-
-    it("should handle URL without path when splitting", () => {
-      const destination = {
-        name: "Test Destination",
+    it("handles URL without path (sets url_endpoint to empty)", () => {
+      wrapper.vm.populateFormForEdit({
+        name: "No Path",
         url: "https://example.com",
         method: "post",
         output_format: "json",
         destination_type_name: "openobserve",
         skip_tls_verify: false,
-      };
-
-      wrapper.vm.populateFormForEdit(destination);
+      });
 
       expect(wrapper.vm.formData.url).toBe("https://example.com");
-      // URL without path should result in empty endpoint
       expect(wrapper.vm.formData.url_endpoint).toBe("");
     });
 
-    it("should split URL without protocol", () => {
-      const destination = {
-        name: "Test Destination",
-        url: "test.splunktest.com/services/collector",
-        method: "post",
-        output_format: "nestedevent",
-        destination_type_name: "splunk",
-        skip_tls_verify: false,
-      };
-
-      wrapper.vm.populateFormForEdit(destination);
-
-      expect(wrapper.vm.formData.url).toBe("https://test.splunktest.com");
-      expect(wrapper.vm.formData.url_endpoint).toBe("/services/collector");
-    });
-
-    it("should not split URL for custom destination type", () => {
-      const destination = {
-        name: "Test Destination",
+    it("does not split URL for custom type", () => {
+      wrapper.vm.populateFormForEdit({
+        name: "Custom Dest",
         url: "https://example.com/api/custom/endpoint",
         method: "post",
         output_format: "json",
         destination_type_name: "custom",
         skip_tls_verify: false,
-      };
+      });
 
-      wrapper.vm.populateFormForEdit(destination);
-
-      expect(wrapper.vm.formData.url).toBe("https://example.com/api/custom/endpoint");
+      expect(wrapper.vm.formData.url).toBe(
+        "https://example.com/api/custom/endpoint"
+      );
       expect(wrapper.vm.formData.url_endpoint).toBe("");
     });
 
-    it("should handle invalid URL gracefully", () => {
-      const destination = {
-        name: "Test Destination",
-        url: "not-a-valid-url",
+    it("uses destination_type_name to set destination_type", () => {
+      wrapper.vm.populateFormForEdit({
+        name: "Datadog Dest",
+        url: "https://http-intake.logs.datadoghq.com/v1/input",
         method: "post",
         output_format: "json",
-        destination_type_name: "openobserve",
+        destination_type_name: "datadog",
         skip_tls_verify: false,
-      };
+      });
 
-      wrapper.vm.populateFormForEdit(destination);
-
-      expect(wrapper.vm.formData.url).toBe("not-a-valid-url");
-      expect(wrapper.vm.formData.url_endpoint).toBe("");
+      expect(wrapper.vm.formData.destination_type).toBe("datadog");
     });
 
-    it("should set destination_type from destination_type_name in edit mode", () => {
-      const destination = {
-        name: "Test Destination",
-        url: "https://example.com/api/test",
-        method: "post",
-        output_format: "json",
-        destination_type_name: "splunk",
-        skip_tls_verify: false,
-      };
-
-      wrapper.vm.populateFormForEdit(destination);
-
-      expect(wrapper.vm.formData.destination_type).toBe("splunk");
-    });
-
-    it("should fallback to openobserve if destination_type_name is missing", () => {
-      const destination = {
-        name: "Test Destination",
-        url: "https://example.com/api/test",
+    it("falls back to 'openobserve' when destination_type_name is absent", () => {
+      wrapper.vm.populateFormForEdit({
+        name: "Unknown",
+        url: "https://example.com/api",
         method: "post",
         output_format: "json",
         skip_tls_verify: false,
-      };
-
-      wrapper.vm.populateFormForEdit(destination);
+      });
 
       expect(wrapper.vm.formData.destination_type).toBe("openobserve");
     });
 
-    it("should populate headers correctly in edit mode", () => {
-      const destination = {
-        name: "Test Destination",
-        url: "https://example.com/api/test",
+    it("populates headers from existing destination headers", () => {
+      wrapper.vm.populateFormForEdit({
+        name: "Dest with headers",
+        url: "https://example.com/api",
         method: "post",
         output_format: "json",
         destination_type_name: "custom",
         skip_tls_verify: false,
         headers: {
           "X-Custom-Header": "value1",
-          "Authorization": "Bearer token",
+          Authorization: "Bearer token",
         },
-      };
-
-      wrapper.vm.populateFormForEdit(destination);
+      });
 
       expect(wrapper.vm.apiHeaders).toHaveLength(2);
-      expect(wrapper.vm.apiHeaders.some((h: any) => h.key === "X-Custom-Header" && h.value === "value1")).toBe(true);
-      expect(wrapper.vm.apiHeaders.some((h: any) => h.key === "Authorization" && h.value === "Bearer token")).toBe(true);
-    });
-  });
-
-  describe("Cancel Action", () => {
-    it("should emit cancel event", async () => {
-      wrapper.vm.$emit("cancel");
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.emitted("cancel")).toBeTruthy();
-    });
-  });
-
-  describe("Connection Notes", () => {
-    it("should display correct connection notes for OpenObserve", () => {
-      wrapper.vm.formData.destination_type = "openobserve";
-
-      const notes = wrapper.vm.connectionNotes;
-      expect(notes.title).toContain("OpenObserve");
-      expect(notes.example).toContain("openobserve");
+      expect(
+        wrapper.vm.apiHeaders.some(
+          (h: any) => h.key === "X-Custom-Header" && h.value === "value1"
+        )
+      ).toBe(true);
+      expect(
+        wrapper.vm.apiHeaders.some(
+          (h: any) => h.key === "Authorization" && h.value === "Bearer token"
+        )
+      ).toBe(true);
     });
 
-    it("should display correct connection notes for Splunk", () => {
-      wrapper.vm.formData.destination_type = "splunk";
-
-      const notes = wrapper.vm.connectionNotes;
-      expect(notes.title).toContain("Splunk");
-      expect(notes.example).toContain("splunk");
-    });
-
-    it("should display correct connection notes for each destination type", () => {
-      const types = [
-        "openobserve",
-        "splunk",
-        "elasticsearch",
-        "datadog",
-        "dynatrace",
-        "newrelic",
-        "custom",
-      ];
-
-      types.forEach((type) => {
-        wrapper.vm.formData.destination_type = type;
-        const notes = wrapper.vm.connectionNotes;
-
-        expect(notes.title).toBeTruthy();
-        expect(notes.steps).toBeInstanceOf(Array);
-        expect(notes.steps.length).toBeGreaterThan(0);
+    it("parses openobserveOrg and openobserveStream from openobserve endpoint", () => {
+      wrapper.vm.populateFormForEdit({
+        name: "OO Dest",
+        url: "https://cloud.openobserve.ai/api/my-org/my-stream/_json",
+        method: "post",
+        output_format: "json",
+        destination_type_name: "openobserve",
+        skip_tls_verify: false,
       });
-    });
-  });
 
-  describe("StringSeparated Output Format", () => {
-    it("should show separator field when stringseparated format is selected", async () => {
-      wrapper.vm.formData.destination_type = "custom";
-      wrapper.vm.formData.output_format = "stringseparated";
-      wrapper.vm.step = 2;
-      await wrapper.vm.$nextTick();
-      await flushPromises();
-
-      const separatorField = wrapper.find('[data-test="add-destination-separator-input"]');
-      expect(separatorField.exists()).toBe(true);
+      expect(wrapper.vm.openobserveOrg).toBe("my-org");
+      expect(wrapper.vm.openobserveStream).toBe("my-stream");
     });
 
-    it("should hide separator field when other formats are selected", async () => {
-      wrapper.vm.formData.destination_type = "custom";
-      wrapper.vm.formData.output_format = "json";
-      wrapper.vm.step = 2;
-      await wrapper.vm.$nextTick();
-      await flushPromises();
-
-      const separatorField = wrapper.find('[data-test="add-destination-separator-input"]');
-      expect(separatorField.exists()).toBe(false);
-    });
-
-    it("should initialize separator as empty string", () => {
-      expect(wrapper.vm.formData.separator).toBe("");
-    });
-
-    it("should validate that separator is required for stringseparated format", async () => {
-      wrapper.vm.formData.destination_type = "custom";
-      wrapper.vm.formData.name = "test";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.method = "post";
-      wrapper.vm.formData.output_format = "stringseparated";
-      wrapper.vm.formData.separator = "";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.canProceedStep2).toBe(false);
-    });
-
-    it("should pass validation when separator is provided for stringseparated format", async () => {
-      wrapper.vm.formData.destination_type = "custom";
-      wrapper.vm.formData.name = "test";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.method = "post";
-      wrapper.vm.formData.output_format = "stringseparated";
-      wrapper.vm.formData.separator = "|";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.canProceedStep2).toBe(true);
-    });
-
-    it("should allow space as separator", async () => {
-      wrapper.vm.formData.destination_type = "custom";
-      wrapper.vm.formData.name = "test";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.method = "post";
-      wrapper.vm.formData.output_format = "stringseparated";
-      wrapper.vm.formData.separator = " ";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.canProceedStep2).toBe(true);
-    });
-
-    it("should allow special characters as separator", async () => {
-      const specialChars = ["|", "\\n", "\\t", ",", ";", ":", "-"];
-
-      for (const char of specialChars) {
-        wrapper.vm.formData.destination_type = "custom";
-        wrapper.vm.formData.name = "test";
-        wrapper.vm.formData.url = "https://example.com";
-        wrapper.vm.formData.method = "post";
-        wrapper.vm.formData.output_format = "stringseparated";
-        wrapper.vm.formData.separator = char;
-        await wrapper.vm.$nextTick();
-
-        expect(wrapper.vm.canProceedStep2).toBe(true);
-      }
-    });
-
-    it("should format stringseparated as nested object in payload", async () => {
-      (destinationService.create as any).mockResolvedValue({ data: {} });
-
-      wrapper.vm.formData = {
-        name: "Test StringSeparated",
-        url: "https://example.com",
-        url_endpoint: "/api/logs",
-        method: "post",
-        output_format: "stringseparated",
-        separator: "|",
-        destination_type: "custom",
-        skip_tls_verify: false,
-        template: "",
-        headers: {},
-        emails: "",
-        type: "http",
-      };
-
-      wrapper.vm.apiHeaders = [
-        { key: "Authorization", value: "Bearer token123", uuid: "123" },
-      ];
-
-      await wrapper.vm.createDestination();
-      await flushPromises();
-
-      expect(destinationService.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            output_format: {
-              stringseparated: {
-                separator: "|",
-              },
-            },
-          }),
-        }),
-      );
-    });
-
-    it("should format stringseparated with newline separator in payload", async () => {
-      (destinationService.create as any).mockResolvedValue({ data: {} });
-
-      wrapper.vm.formData = {
-        name: "Test StringSeparated Newline",
-        url: "https://example.com",
-        url_endpoint: "/api/logs",
-        method: "post",
-        output_format: "stringseparated",
-        separator: "\\n",
-        destination_type: "custom",
-        skip_tls_verify: false,
-        template: "",
-        headers: {},
-        emails: "",
-        type: "http",
-      };
-
-      wrapper.vm.apiHeaders = [
-        { key: "Authorization", value: "Bearer token123", uuid: "123" },
-      ];
-
-      await wrapper.vm.createDestination();
-      await flushPromises();
-
-      expect(destinationService.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            output_format: {
-              stringseparated: {
-                separator: "\\n",
-              },
-            },
-          }),
-        }),
-      );
-    });
-
-    it("should parse stringseparated format when editing destination", () => {
-      const destination = {
-        name: "Test Destination",
-        url: "https://example.com/api/logs",
-        method: "post",
-        output_format: {
-          stringseparated: {
-            separator: "|",
-          },
-        },
-        destination_type_name: "custom",
-        skip_tls_verify: false,
-      };
-
-      wrapper.vm.populateFormForEdit(destination);
-
-      expect(wrapper.vm.formData.output_format).toBe("stringseparated");
-      expect(wrapper.vm.formData.separator).toBe("|");
-      expect(wrapper.vm.formData.esbulk_index).toBe("");
-    });
-
-    it("should parse stringseparated with newline separator when editing", () => {
-      const destination = {
-        name: "Test Destination",
-        url: "https://example.com/api/logs",
-        method: "post",
-        output_format: {
-          stringseparated: {
-            separator: "\\n",
-          },
-        },
-        destination_type_name: "custom",
-        skip_tls_verify: false,
-      };
-
-      wrapper.vm.populateFormForEdit(destination);
-
-      expect(wrapper.vm.formData.output_format).toBe("stringseparated");
-      expect(wrapper.vm.formData.separator).toBe("\\n");
-    });
-
-    it("should handle missing separator in stringseparated object when editing", () => {
-      const destination = {
-        name: "Test Destination",
-        url: "https://example.com/api/logs",
-        method: "post",
-        output_format: {
-          stringseparated: {},
-        },
-        destination_type_name: "custom",
-        skip_tls_verify: false,
-      };
-
-      wrapper.vm.populateFormForEdit(destination);
-
-      expect(wrapper.vm.formData.output_format).toBe("stringseparated");
-      expect(wrapper.vm.formData.separator).toBe("");
-    });
-
-    it("should reset separator when format changes from stringseparated to json", async () => {
-      wrapper.vm.formData.output_format = "stringseparated";
-      wrapper.vm.formData.separator = "|";
-      await wrapper.vm.$nextTick();
-
-      wrapper.vm.formData.output_format = "json";
-      await wrapper.vm.$nextTick();
-
-      // Separator should still have value but won't be used in payload
-      expect(wrapper.vm.formData.separator).toBe("|");
-    });
-
-    it("should clear separator when switching from stringseparated to esbulk in edit mode", () => {
-      const destination1 = {
-        name: "Test Destination",
-        url: "https://example.com/api/logs",
-        method: "post",
-        output_format: {
-          stringseparated: {
-            separator: "|",
-          },
-        },
-        destination_type_name: "custom",
-        skip_tls_verify: false,
-      };
-
-      wrapper.vm.populateFormForEdit(destination1);
-      expect(wrapper.vm.formData.separator).toBe("|");
-
-      // Now edit with esbulk format
-      const destination2 = {
-        name: "Test Destination",
-        url: "https://example.com/api/logs",
-        method: "post",
-        output_format: {
-          esbulk: {
-            index: "logs",
-          },
-        },
-        destination_type_name: "elasticsearch",
-        skip_tls_verify: false,
-      };
-
-      wrapper.vm.populateFormForEdit(destination2);
-      expect(wrapper.vm.formData.separator).toBe("");
-      expect(wrapper.vm.formData.esbulk_index).toBe("logs");
-    });
-
-    it("should reset separator field when form is reset", () => {
-      wrapper.vm.formData.separator = "|";
-      wrapper.vm.formData.output_format = "stringseparated";
-
-      wrapper.vm.resetForm();
-
-      expect(wrapper.vm.formData.separator).toBe("");
-      expect(wrapper.vm.formData.output_format).toBe("json");
-    });
-
-    // Note: The scenario where separator has a value but format is "json" is already covered by:
-    // 1. Line 1153-1163: Tests that separator is ignored when format changes to json
-    // 2. Line 560-600: Tests that json format works correctly in payload
-    // The payload construction logic is straightforward: if format === "stringseparated" use nested object, else use string
-
-    it("should validate separator field is not null", async () => {
-      wrapper.vm.formData.destination_type = "custom";
-      wrapper.vm.formData.name = "test";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.method = "post";
-      wrapper.vm.formData.output_format = "stringseparated";
-      wrapper.vm.formData.separator = null as any;
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.canProceedStep2).toBe(false);
-    });
-
-    it("should validate separator field is not undefined", async () => {
-      wrapper.vm.formData.destination_type = "custom";
-      wrapper.vm.formData.name = "test";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.method = "post";
-      wrapper.vm.formData.output_format = "stringseparated";
-      wrapper.vm.formData.separator = undefined as any;
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.canProceedStep2).toBe(false);
-    });
-
-    it("should include String Separated in outputFormats options", () => {
-      const outputFormats = [
-        { label: "JSON", value: "json" },
-        { label: "NDJSON", value: "ndjson" },
-        { label: "NestedEvent", value: "nestedevent" },
-        { label: "ESBulk", value: "esbulk" },
-        { label: "String Separated", value: "stringseparated" },
-      ];
-
-      // Check that stringseparated option exists
-      const stringSeparatedOption = outputFormats.find(
-        (opt) => opt.value === "stringseparated"
-      );
-      expect(stringSeparatedOption).toBeDefined();
-      expect(stringSeparatedOption?.label).toBe("String Separated");
-    });
-  });
-
-  describe("Destination Metadata", () => {
-    it("should have metadata field available", () => {
-      // Metadata may be undefined initially until destination type requires it
-      expect(wrapper.vm.formData.metadata === undefined || typeof wrapper.vm.formData.metadata === "object").toBe(true);
-    });
-
-    it("should validate that Splunk requires metadata", async () => {
-      wrapper.vm.formData.destination_type = "splunk";
-      wrapper.vm.formData.name = "test";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.url_endpoint = "/services/collector";
-      wrapper.vm.formData.method = "post";
-      wrapper.vm.formData.output_format = "nestedevent";
-      // Without metadata, validation should fail
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.canProceedStep2).toBe(false);
-    });
-
-    it("should validate that Elasticsearch requires esbulk_index", async () => {
-      wrapper.vm.formData.destination_type = "elasticsearch";
-      wrapper.vm.formData.name = "test";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.url_endpoint = "/_bulk";
-      wrapper.vm.formData.method = "post";
-      wrapper.vm.formData.output_format = "esbulk";
-      wrapper.vm.formData.esbulk_index = "default";
-      // With esbulk_index, validation should pass
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.canProceedStep2).toBe(true);
-    });
-
-    it("should validate that Datadog requires metadata", async () => {
-      wrapper.vm.formData.destination_type = "datadog";
-      wrapper.vm.formData.name = "test";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.url_endpoint = "/v1/input";
-      wrapper.vm.formData.method = "post";
-      wrapper.vm.formData.output_format = "json";
-      // Without metadata, validation should fail
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.canProceedStep2).toBe(false);
-    });
-
-    it("should not require metadata for OpenObserve", async () => {
-      wrapper.vm.formData.destination_type = "openobserve";
-      wrapper.vm.formData.name = "test";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.url_endpoint = "/api/org/stream/_json";
-      wrapper.vm.formData.method = "post";
-      wrapper.vm.formData.output_format = "json";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.canProceedStep2).toBe(true);
-    });
-
-    it("should validate Splunk metadata fields", async () => {
-      wrapper.vm.formData.destination_type = "splunk";
-      wrapper.vm.formData.name = "test";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.url_endpoint = "/services/collector";
-      wrapper.vm.formData.method = "post";
-      wrapper.vm.formData.output_format = "nestedevent";
-      wrapper.vm.formData.metadata = {
-        source: "http:source",
-        sourcetype: "_json",
-        hostname: "server01",
-      };
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.canProceedStep2).toBe(true);
-    });
-
-    it("should fail validation if Splunk metadata is incomplete", async () => {
-      wrapper.vm.formData.destination_type = "splunk";
-      wrapper.vm.formData.name = "test";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.method = "post";
-      wrapper.vm.formData.output_format = "nestedevent";
-      wrapper.vm.formData.metadata = {
-        source: "http:source",
-        // Missing sourcetype and hostname
-      };
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.canProceedStep2).toBe(false);
-    });
-
-    it("should validate Elasticsearch with esbulk_index", async () => {
-      wrapper.vm.formData.destination_type = "elasticsearch";
-      wrapper.vm.formData.name = "test";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.url_endpoint = "/_bulk";
-      wrapper.vm.formData.method = "post";
-      wrapper.vm.formData.output_format = "esbulk";
-      wrapper.vm.formData.esbulk_index = "default";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.canProceedStep2).toBe(true);
-    });
-
-    it("should fail validation if Elasticsearch esbulk_index is missing", async () => {
-      wrapper.vm.formData.destination_type = "elasticsearch";
-      await wrapper.vm.$nextTick(); // Wait for watcher to set default esbulk_index
-      wrapper.vm.formData.name = "test";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.url_endpoint = "/_bulk";
-      wrapper.vm.formData.method = "post";
-      wrapper.vm.formData.output_format = "esbulk";
-      wrapper.vm.formData.esbulk_index = ""; // Override to empty after watcher runs
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.canProceedStep2).toBe(false);
-    });
-
-    it("should validate Datadog metadata fields", async () => {
-      wrapper.vm.formData.destination_type = "datadog";
-      wrapper.vm.formData.name = "test";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.url_endpoint = "/v1/input";
-      wrapper.vm.formData.method = "post";
-      wrapper.vm.formData.output_format = "json";
-      wrapper.vm.formData.metadata = {
-        ddsource: "nginx",
-        ddtags: "env:prod,version:1.0",
-        service: "api-gateway",
-        hostname: "server01",
-      };
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.canProceedStep2).toBe(true);
-    });
-
-    it("should fail validation if Datadog metadata is incomplete", async () => {
-      wrapper.vm.formData.destination_type = "datadog";
-      wrapper.vm.formData.name = "test";
-      wrapper.vm.formData.url = "https://example.com";
-      wrapper.vm.formData.method = "post";
-      wrapper.vm.formData.output_format = "json";
-      wrapper.vm.formData.metadata = {
-        ddsource: "nginx",
-        // Missing ddtags, service, and hostname
-      };
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.canProceedStep2).toBe(false);
-    });
-
-    it("should include metadata in payload when creating destination", async () => {
-      (destinationService.create as any).mockResolvedValue({ data: {} });
-
-      wrapper.vm.formData = {
-        name: "Test Splunk",
-        url: "https://example.com",
-        url_endpoint: "/services/collector",
-        method: "post",
-        output_format: "nestedevent",
-        destination_type: "splunk",
-        skip_tls_verify: false,
-        template: "",
-        headers: {},
-        emails: "",
-        type: "http",
-        metadata: {
-          source: "http:source",
-          sourcetype: "_json",
-          hostname: "server01",
-        },
-      };
-
-      wrapper.vm.apiHeaders = [
-        { key: "Authorization", value: "Splunk token123", uuid: "123" },
-      ];
-
-      await wrapper.vm.createDestination();
-      await flushPromises();
-
-      expect(destinationService.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          module: "pipeline",
-          data: expect.objectContaining({
-            metadata: {
-              source: "http:source",
-              sourcetype: "_json",
-              hostname: "server01",
-            },
-          }),
-        }),
-      );
-    });
-
-    it("should populate metadata when editing destination", () => {
-      const destination = {
-        name: "Test Destination",
-        url: "https://example.com/services/collector",
+    it("handles URL without protocol for non-custom types", () => {
+      wrapper.vm.populateFormForEdit({
+        name: "No Protocol",
+        url: "splunk.test.com/services/collector",
         method: "post",
         output_format: "nestedevent",
         destination_type_name: "splunk",
         skip_tls_verify: false,
-        metadata: {
-          source: "http:source",
-          sourcetype: "_json",
-          hostname: "server01",
-        },
-      };
-
-      wrapper.vm.populateFormForEdit(destination);
-
-      expect(wrapper.vm.formData.metadata).toEqual({
-        source: "http:source",
-        sourcetype: "_json",
-        hostname: "server01",
       });
+
+      expect(wrapper.vm.formData.url).toBe("https://splunk.test.com");
+      expect(wrapper.vm.formData.url_endpoint).toBe("/services/collector");
     });
 
-    it("should reset metadata when resetting form", () => {
-      wrapper.vm.formData.metadata = {
-        source: "test",
-        sourcetype: "test",
-        hostname: "test",
-      };
+    it("advances to step 2 when populating edit form", () => {
+      wrapper.vm.populateFormForEdit({
+        name: "Edit Dest",
+        url: "https://example.com/api",
+        method: "post",
+        output_format: "json",
+        destination_type_name: "openobserve",
+        skip_tls_verify: false,
+      });
 
-      wrapper.vm.resetForm();
+      expect(wrapper.vm.step).toBe(2);
+    });
+  });
 
-      expect(wrapper.vm.formData.metadata).toBeUndefined();
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("connectionNotes computed property", () => {
+    it.each([
+      "openobserve",
+      "splunk",
+      "elasticsearch",
+      "datadog",
+      "dynatrace",
+      "newrelic",
+      "custom",
+    ])("returns notes with a title and steps array for %s", async (type) => {
+      wrapper.vm.formData.destination_type = type;
+      await nextTick();
+
+      const notes = wrapper.vm.connectionNotes;
+      expect(notes.title).toBeTruthy();
+      expect(Array.isArray(notes.steps)).toBe(true);
+      expect(notes.steps.length).toBeGreaterThan(0);
+    });
+
+    it("OpenObserve notes title contains 'OpenObserve'", () => {
+      wrapper.vm.formData.destination_type = "openobserve";
+      expect(wrapper.vm.connectionNotes.title).toContain("OpenObserve");
+    });
+
+    it("Splunk notes title contains 'Splunk'", async () => {
+      wrapper.vm.formData.destination_type = "splunk";
+      await nextTick();
+      expect(wrapper.vm.connectionNotes.title).toContain("Splunk");
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("Cancel Emit", () => {
+    it("emits 'cancel' event when $emit('cancel') is called", async () => {
+      wrapper.vm.$emit("cancel");
+      await nextTick();
+      expect(wrapper.emitted("cancel")).toBeTruthy();
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("Edit Mode via Prop", () => {
+    it("populates form when destination prop is provided", async () => {
+      const editWrapper = createWrapper({
+        destination: {
+          name: "Prop Dest",
+          url: "https://prop.example.com/api/endpoint",
+          method: "post",
+          output_format: "json",
+          destination_type_name: "splunk",
+          skip_tls_verify: true,
+          headers: {},
+        },
+      });
+      await flushPromises();
+
+      expect(editWrapper.vm.formData.name).toBe("Prop Dest");
+      expect(editWrapper.vm.formData.skip_tls_verify).toBe(true);
+      editWrapper.unmount();
+    });
+
+    it("isEditMode is false when no destination prop is provided", () => {
+      expect(wrapper.vm.isEditMode).toBe(false);
+    });
+
+    it("isEditMode is true when destination prop is provided", async () => {
+      const editWrapper = createWrapper({
+        destination: {
+          name: "Edit",
+          url: "https://example.com",
+          method: "post",
+          output_format: "json",
+          skip_tls_verify: false,
+        },
+      });
+      await flushPromises();
+      expect(editWrapper.vm.isEditMode).toBe(true);
+      editWrapper.unmount();
     });
   });
 });

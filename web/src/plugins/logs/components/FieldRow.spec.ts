@@ -21,6 +21,16 @@ vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (key: string) => key }),
 }));
 
+vi.mock("vuex", () => ({
+  useStore: () => ({
+    state: {
+      zoConfig: {
+        show_fts_field_values: false,
+      },
+    },
+  }),
+}));
+
 vi.mock("@quasar/extras/material-icons-outlined", () => ({
   outlinedAdd: "add",
   outlinedVisibility: "visibility",

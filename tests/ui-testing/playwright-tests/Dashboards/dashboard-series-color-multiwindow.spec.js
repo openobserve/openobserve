@@ -15,66 +15,7 @@ import {
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
 import testLogger from "../utils/test-logger.js";
-
-/**
- * Verify a specific color appears on any canvas element via pixel analysis.
- * ECharts renders to canvas and is imported as an ES module (not on window.echarts),
- * so we scan canvas pixels directly instead of using getInstanceByDom().
- * @param {import('@playwright/test').Page} page
- * @param {{ r: number, g: number, b: number }} rgb - Target color as RGB values
- * @param {number} [minPixels=5] - Minimum matching pixels to consider color found
- * @returns {Promise<{ canvasCount: number, matchingPixels: number, colorFound: boolean }>}
- */
-async function verifyColorOnCanvas(page, { r, g, b }, minPixels = 5) {
-  return page.evaluate(
-    ({ r, g, b, minPixels }) => {
-      const canvasElements = document.querySelectorAll("canvas");
-      const result = {
-        canvasCount: canvasElements.length,
-        matchingPixels: 0,
-        colorFound: false,
-        canvasInfo: [],
-      };
-
-      for (const canvas of canvasElements) {
-        try {
-          const ctx = canvas.getContext("2d");
-          if (!ctx) continue;
-
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const data = imageData.data;
-          let matchCount = 0;
-
-          // Check every 4th pixel for performance (still thorough)
-          for (let i = 0; i < data.length; i += 16) {
-            if (
-              Math.abs(data[i] - r) < 10 &&
-              Math.abs(data[i + 1] - g) < 10 &&
-              Math.abs(data[i + 2] - b) < 10 &&
-              data[i + 3] > 200 // alpha > 200 (nearly opaque)
-            ) {
-              matchCount++;
-            }
-          }
-
-          result.canvasInfo.push({
-            width: canvas.width,
-            height: canvas.height,
-            matchingPixels: matchCount,
-          });
-
-          result.matchingPixels += matchCount;
-        } catch (e) {
-          result.canvasInfo.push({ error: e.message });
-        }
-      }
-
-      result.colorFound = result.matchingPixels >= minPixels;
-      return result;
-    },
-    { r, g, b, minPixels }
-  );
-}
+import { verifyColorOnCanvas } from "./utils/canvasHelpers.js";
 
 /**
  * Wait for multi-window API response(s) and chart rendering after applying a query.
