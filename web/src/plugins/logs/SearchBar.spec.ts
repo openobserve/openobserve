@@ -19,6 +19,7 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { qLayoutInjections } from "@/test/unit/helpers/layout-injections";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import { reactive } from "vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import SearchBar from "./SearchBar.vue";
 
@@ -73,7 +74,6 @@ vi.mock("@/services/organizations", () => ({
 // the component module is imported.
 
 vi.mock("@/composables/useLogs/searchState", () => {
-  const { reactive } = require("vue");
   const mockSearchObj = reactive({
     organizationIdentifier: "default",
     communicationMethod: "http",
