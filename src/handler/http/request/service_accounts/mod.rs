@@ -210,7 +210,7 @@ pub async fn update(
         return MetaHttpResponse::forbidden("Service Accounts Not Enabled");
     }
 
-    let email_id = email_id.trim().to_lowercase();
+    let email_id = email_id.trim().to_string();
 
     let rotate_token = match query.get("rotateToken") {
         Some(s) => match s.to_lowercase().as_str() {
