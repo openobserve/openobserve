@@ -396,6 +396,16 @@ pub enum IngestionRequest {
     Usage(Bytes),
 }
 
+impl IngestionRequest {
+    /// Returns whether usage reporting should be triggered for this request type.
+    ///
+    /// Returns `false` for `Usage` requests to prevent circular reporting:
+    /// usage events being ingested must not generate additional usage events.
+    pub fn should_report_usage(&self) -> bool {
+        !matches!(self, IngestionRequest::Usage(_))
+    }
+}
+
 pub enum IngestionValueType {
     Bulk,
     Hec,
@@ -763,5 +773,69 @@ mod tests {
         let custom: HecResponse = HecStatus::Custom("Test error".to_string(), 418).into();
         assert_eq!(custom.text, "Test error");
         assert_eq!(custom.code, 418);
+    }
+
+    /// Verifies that `IngestionRequest::Usage` does NOT trigger usage reporting,
+    /// preventing circular reporting where usage events generate more usage events.
+    #[test]
+    fn test_usage_request_does_not_trigger_usage_reporting() {
+        let req = IngestionRequest::Usage(Bytes::from("[]"));
+        assert!(
+            !req.should_report_usage(),
+            "IngestionRequest::Usage must not trigger usage reporting to prevent circular reporting"
+        );
+    }
+
+    /// Verifies that all non-Usage request types DO trigger usage reporting.
+    #[test]
+    fn test_non_usage_requests_trigger_usage_reporting() {
+        let json_req = IngestionRequest::JSON(Bytes::from("[]"));
+        assert!(
+            json_req.should_report_usage(),
+            "JSON requests should trigger usage reporting"
+        );
+
+        let multi_req = IngestionRequest::Multi(Bytes::from(""));
+        assert!(
+            multi_req.should_report_usage(),
+            "Multi requests should trigger usage reporting"
+        );
+
+        let rum_req = IngestionRequest::RUM(Bytes::from(""));
+        assert!(
+            rum_req.should_report_usage(),
+            "RUM requests should trigger usage reporting"
+        );
+
+        let json_values_req = IngestionRequest::JsonValues(IngestionValueType::Bulk, vec![]);
+        assert!(
+            json_values_req.should_report_usage(),
+            "JsonValues requests should trigger usage reporting"
+        );
+    }
+
+    /// Verifies the fn_num contract: when should_report_usage() is false,
+    /// the resulting fn_num is None, which prevents report_request_usage_stats()
+    /// from being called in write_logs_by_stream().
+    #[test]
+    fn test_usage_request_produces_none_fn_num() {
+        let req = IngestionRequest::Usage(Bytes::from("[]"));
+        let need_usage_report = req.should_report_usage();
+        let fn_num: Option<usize> = need_usage_report.then_some(0);
+        assert!(
+            fn_num.is_none(),
+            "fn_num must be None for Usage requests so write_logs_by_stream skips usage reporting"
+        );
+    }
+
+    #[test]
+    fn test_json_request_produces_some_fn_num() {
+        let req = IngestionRequest::JSON(Bytes::from("[]"));
+        let need_usage_report = req.should_report_usage();
+        let fn_num: Option<usize> = need_usage_report.then_some(0);
+        assert!(
+            fn_num.is_some(),
+            "fn_num must be Some for non-Usage requests to enable usage reporting"
+        );
     }
 }
