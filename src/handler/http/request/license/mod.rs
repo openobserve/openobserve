@@ -130,7 +130,7 @@ pub async fn store_license(
         return MetaHttpResponse::forbidden("Unauthorized Access to license");
     }
 
-    if let Err(e) = check_license(&req.key).await {
+    if let Err(e) = check_license(&req.raw_key, &req.key).await {
         return MetaHttpResponse::bad_request(e.to_string());
     };
 
