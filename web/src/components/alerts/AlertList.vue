@@ -2517,16 +2517,16 @@ export default defineComponent({
         filterQuery.value = null;
       }
       if (!newVal) {
-        //here we are setting the filterQuery to null and then setting the searchQuery to the filterQuery
-        //here we are also setting the filteredResults to the allAlertsListByFolderId as we are not searching across folders
-        //this is done because we want to clear the filterQuery and then set the searchQuery to the filterQuery
-        filteredResults.value =
+        //here we are restoring the current folder's alerts and re-filtering by the active tab
+        //this ensures cross-folder results are cleared and only the current folder's data is shown
+        const currentFolderAlerts =
           store.state.organizationData.allAlertsListByFolderId[
             activeFolderId.value
-          ];
+          ] || [];
+        allAlerts.value = currentFolderAlerts;
         filterQuery.value = null;
-        filterQuery.value = searchQuery.value;
         searchQuery.value = null;
+        filterAlertsByTab();
       }
     });
     // Persist filter state to Vuex so it survives navigation to add/edit screens
