@@ -426,7 +426,7 @@ export const usePanelSQLExecutor = (ctx: {
     const allSearchRequests: any[] = [];
     const allMetadata: any[] = [];
 
-    for (const [, it] of panelSchema.value.queries.entries()) {
+    for (const [panelQueryIndex, it] of panelSchema.value.queries.entries()) {
       if (it.config?.time_shift && it.config?.time_shift?.length > 0) {
         // Expand time-shift query into N+1 entries (original + N shifts)
         const timeShiftInMilliSecondsArray = it.config.time_shift.map(
@@ -497,6 +497,7 @@ export const usePanelSQLExecutor = (ctx: {
             queryType: panelSchema.value.queryType,
             variables: [...(metadata1 || []), ...(metadata2 || [])],
             timeRangeGap: timeRangeGap,
+            panelQueryIndex: panelQueryIndex,
           });
         }
       } else {
@@ -544,6 +545,7 @@ export const usePanelSQLExecutor = (ctx: {
             seconds: 0,
             periodAsStr: "",
           },
+          panelQueryIndex: panelQueryIndex,
         });
       }
     }

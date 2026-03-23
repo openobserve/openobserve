@@ -45,11 +45,14 @@ export const convertMultiSQLData = async (
   // C1: loop on all search query data with per-query schema
   const options: any = [];
   for (let i = 0; i < searchQueryData.length; i++) {
+    // Get the original query index from metadata (handling time-shifts gracefully)
+    const panelQueryIndex = metadata?.queries?.[i]?.panelQueryIndex ?? i;
+
     // Create a per-query schema view: set queries[0] to the current query
     // so contextBuilder.ts reads the correct query's fields
     const querySchema = {
       ...panelSchema,
-      queries: [panelSchema.queries[i]],
+      queries: [panelSchema.queries[panelQueryIndex]],
     };
 
     options.push(
@@ -100,14 +103,15 @@ export const convertMultiSQLData = async (
   ) {
     const mergedData: any[] = [];
 
-    options.forEach((opt: any, queryIndex: number) => {
-      const queryConfig = panelSchema.queries[queryIndex]?.config;
+    options.forEach((opt: any, execIndex: number) => {
+      const panelQueryIndex = metadata?.queries?.[execIndex]?.panelQueryIndex ?? execIndex;
+      const queryConfig = panelSchema.queries[panelQueryIndex]?.config;
 
       opt?.options?.series?.[0]?.data?.forEach((d: any) => {
         const labeledName = buildLabeledName(
           d.name,
           queryConfig,
-          queryIndex,
+          execIndex,
         );
         mergedData.push({ ...d, name: labeledName });
       });
@@ -128,7 +132,10 @@ export const convertMultiSQLData = async (
   // C6: Metric — collect values from all queries for grid display
   if (chartType === "metric" && options.length > 1) {
     const additionalValues = options.slice(1).map((opt: any, idx: number) => {
-      const qConfig = panelSchema.queries[idx + 1]?.config;
+      // slice(1) means execIndex is idx + 1
+      const execIndex = idx + 1;
+      const panelQueryIndex = metadata?.queries?.[execIndex]?.panelQueryIndex ?? execIndex;
+      const qConfig = panelSchema.queries[panelQueryIndex]?.config;
       return {
         options: opt.options,
         queryLabel: qConfig?.query_label || "",
@@ -229,7 +236,8 @@ export const convertMultiSQLData = async (
   if (options && options.length > 1 && options[0]?.options) {
     // Label Q1 series
     if (options[0].options.series) {
-      const q1Config = panelSchema.queries[0]?.config;
+      const pIdx0 = metadata?.queries?.[0]?.panelQueryIndex ?? 0;
+      const q1Config = panelSchema.queries[pIdx0]?.config;
       const q1Period =
         metadata?.queries[0]?.timeRangeGap?.periodAsStr || "";
 
@@ -238,7 +246,7 @@ export const convertMultiSQLData = async (
           if (isAnnotationSeries(it)) return it;
           return {
             ...it,
-            name: buildLabeledName(it.name, q1Config, 0, q1Period),
+            name: buildLabeledName(it.name, q1Config, pIdx0, q1Period),
             _queryIndex: 0,
           };
         },
@@ -248,7 +256,8 @@ export const convertMultiSQLData = async (
     // Label + merge Q2+ series
     for (let i = 1; i < options.length; i++) {
       if (options[i]?.options?.series) {
-        const qConfig = panelSchema.queries[i]?.config;
+        const panelQueryIndex = metadata?.queries?.[i]?.panelQueryIndex ?? i;
+        const qConfig = panelSchema.queries[panelQueryIndex]?.config;
         const periodAsStr =
           metadata?.queries[i]?.timeRangeGap?.periodAsStr || "";
 
@@ -258,7 +267,7 @@ export const convertMultiSQLData = async (
             if (isAnnotationSeries(it)) return it;
             return {
               ...it,
-              name: buildLabeledName(it.name, qConfig, i, periodAsStr),
+              name: buildLabeledName(it.name, qConfig, panelQueryIndex, periodAsStr),
               _queryIndex: i,
               // C4: prefix stack names to prevent cross-query stacking
               stack: it.stack ? `q${i}-${it.stack}` : it.stack,

@@ -1133,7 +1133,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.query_label"
               dense
               outlined
-              placeholder="e.g. {field_name}"
+              placeholder="{field_name}"
+              @focus="() => {
+                if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.query_label) {
+                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.query_label = '{field_name}'
+                }
+              }"
               class="col"
               hide-bottom-space
               :data-test="`dashboard-config-legend-${dashboardPanelData.layout.currentQueryIndex}`"
