@@ -2461,7 +2461,8 @@
     "maxSeriesPerQueryDescription": "Tek bir PromQL sorgusundan döndürülebilecek maksimum seri sayısı. Büyük sonuç kümeleriyle kullanıcı arayüzünün donmasını önlemeye yardımcı olur. Sistem varsayılanını kullanmak için boş bırakın (40.000).",
     "maxSeriesPerQueryTooltip": "'count (metric) by (label) 'gibi bir PromQL sorgusu çok fazla seri döndürdüğünde kullanıcı arayüzünü dondurabilir. Bu sınır bunu engeller. Sistem varsayılanı için null değerine ayarlayın veya 1.000 ile 1.000.000 arasında bir değer belirtin.",
     "maxSeriesPerQueryValidation": "Değer 1.000 ile 1.000.000 arasında olmalı veya varsayılan olarak boş bırakılmalıdır",
-    "systemDefault": "sistem varsayılan"
+    "systemDefault": "sistem varsayılan",
+    "usageStreamEnabledLabel": "Kullanım Akışını Etkinleştir"
   },
   "iam": {
     "users": "Kullanıcılar",
