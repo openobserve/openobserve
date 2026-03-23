@@ -24,7 +24,7 @@ use config::{
 };
 use sea_orm::{
     ColumnTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Schema, Set, entity::prelude::*,
+    QuerySelect, Schema, Set, entity::prelude::*, sea_query::Func,
 };
 use serde::{Deserialize, Serialize};
 
@@ -263,7 +263,7 @@ pub async fn remove(org_id: &str, email: &str) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
-        .filter(Column::Email.eq(email))
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -277,7 +277,7 @@ pub async fn remove_by_user(email: &str) -> Result<(), errors::Error> {
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::delete_many()
-        .filter(Column::Email.eq(email))
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -304,7 +304,7 @@ pub async fn update(
             Expr::value(chrono::Utc::now().timestamp_micros()),
         )
         .filter(Column::OrgId.eq(org_id))
-        .filter(Column::Email.eq(email))
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -327,7 +327,7 @@ pub async fn update_rum_token(
             Expr::value(chrono::Utc::now().timestamp_micros()),
         )
         .filter(Column::OrgId.eq(org_id))
-        .filter(Column::Email.eq(email))
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -346,7 +346,7 @@ pub async fn update_token(org_id: &str, email: &str, token: &str) -> Result<(), 
             Expr::value(chrono::Utc::now().timestamp_micros()),
         )
         .filter(Column::OrgId.eq(org_id))
-        .filter(Column::Email.eq(email))
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -358,7 +358,7 @@ pub async fn get(org_id: &str, email: &str) -> Result<OrgUserRecord, errors::Err
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
-        .filter(Column::Email.eq(email))
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
         .one(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
@@ -387,7 +387,9 @@ pub async fn get_expanded_user_org(
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
-        .filter(Column::Email.eq(email))
+        .filter(
+            Expr::expr(Func::lower(Expr::col((Entity, Column::Email)))).eq(email.to_lowercase()),
+        )
         .inner_join(users::Entity)
         .select_only()
         .column(users::Column::Email)
@@ -468,7 +470,9 @@ pub async fn list_users_by_org(org_id: &str) -> Result<Vec<OrgUserRecord>, error
 pub async fn list_orgs_by_user(email: &str) -> Result<Vec<UserOrgExpandedRecord>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let records = Entity::find()
-        .filter(Column::Email.eq(email))
+        .filter(
+            Expr::expr(Func::lower(Expr::col((Entity, Column::Email)))).eq(email.to_lowercase()),
+        )
         .order_by(Column::CreatedAt, Order::Desc)
         .inner_join(super::entity::organizations::Entity)
         .select_only()
