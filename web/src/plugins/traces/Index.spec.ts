@@ -198,6 +198,10 @@ const mockSearchObj = {
   runQuery: false,
 };
 
+vi.mock("@/aws-exports", () => ({
+  default: { isCloud: "false", isEnterprise: "true" },
+}));
+
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
     searchObj: mockSearchObj,
@@ -412,9 +416,7 @@ describe("Index.vue (Main Traces Page)", () => {
   });
 
   describe("Tab Navigation", () => {
-    it("should switch to service-graph tab when service graph is enabled", async () => {
-      // Enable service graph in store
-      store.state.zoConfig.service_graph_enabled = true;
+    it("should switch to service-graph tab on enterprise", async () => {
 
       routerCurrentRouteSpy.mockReturnValue({
         value: {
@@ -444,41 +446,7 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(wrapper.vm.activeTab).toBe("service-graph");
     });
 
-    it("should default to search tab when service graph is disabled", async () => {
-      // Disable service graph
-      store.state.zoConfig.service_graph_enabled = false;
-
-      routerCurrentRouteSpy.mockReturnValue({
-        value: {
-          query: { tab: "service-graph" },
-          name: "traces",
-          path: "/traces",
-        },
-      } as any);
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      expect(wrapper.vm.activeTab).toBe("search");
-    });
-
     it("should update URL when tab changes", async () => {
-      store.state.zoConfig.service_graph_enabled = true;
-
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -1063,7 +1031,6 @@ describe("Index.vue (Main Traces Page)", () => {
 
   describe("Service Graph Integration", () => {
     it("should switch to search tab when viewing traces from service graph", async () => {
-      store.state.zoConfig.service_graph_enabled = true;
       wrapper = mount(Index, {
         attachTo: node,
         global: {
