@@ -57,6 +57,7 @@ const organizationObj = {
     span_id_field_name: "span_id",
     free_trial_expiry: "",
     cross_links: [],
+    usage_stream_enabled: false,
   },
   isDataIngested: false,
   regexPatterns: [],

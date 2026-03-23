@@ -2461,7 +2461,8 @@
     "maxSeriesPerQueryDescription": "Maximale Anzahl von Serien, die von einer einzelnen PromQL-Abfrage zurückgegeben werden können. Hilft, das Einfrieren der Benutzeroberfläche bei großen Ergebnismengen zu verhindern. Lassen Sie das Feld leer, um den Systemstandard (40.000) zu verwenden.",
     "maxSeriesPerQueryTooltip": "Wenn eine PromQL-Abfrage wie 'count (metric) by (label) 'zu viele Serien zurückgibt, kann sie die Benutzeroberfläche einfrieren. Dieses Limit verhindert das. Legen Sie den Systemstandard auf Null fest, oder geben Sie einen Wert zwischen 1.000 und 1.000.000 an.",
     "maxSeriesPerQueryValidation": "Der Wert muss zwischen 1.000 und 1.000.000 liegen oder als Standardeinstellung leer lassen",
-    "systemDefault": "Systemstandard"
+    "systemDefault": "Systemstandard",
+    "usageStreamEnabledLabel": "Nutzungsstream aktivieren"
   },
   "iam": {
     "users": "Nutzer",
