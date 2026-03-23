@@ -108,7 +108,7 @@ describe("useTracesTableColumns", () => {
 
     it("should use a prettified header for unknown field names", () => {
       const cols = buildCols(false, "spans", ["http_url"]);
-      expect(cols[0]?.header).toBe("Http Url");
+      expect(cols.find((c) => c.id === "http_url")?.header).toBe("Http Url");
     });
   });
 
@@ -133,13 +133,17 @@ describe("useTracesTableColumns", () => {
 
   describe("known column metadata", () => {
     it("should use correct header and size for status_code", () => {
-      const col = buildCols(false, "spans", ["status_code"])[0];
+      const col = buildCols(false, "spans", ["status_code"]).find(
+        (c) => c.id === "status_code",
+      );
       expect(col?.header).toBe("Status Code");
       expect(col?.size).toBe(140);
     });
 
     it("should use correct header and size for method", () => {
-      const col = buildCols(false, "spans", ["method"])[0];
+      const col = buildCols(false, "spans", ["method"]).find(
+        (c) => c.id === "method",
+      );
       expect(col?.header).toBe("Method");
       expect(col?.size).toBe(140);
     });
