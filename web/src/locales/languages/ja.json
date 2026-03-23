@@ -351,7 +351,32 @@
     "collapseFields": "フィールドを折りたたむ",
     "openFields": "オープンフィールド",
     "aiBarSuccessPlaceholder": "次は何をしたいですか？",
-    "nlpModeDisabledForVisualization": "複数のストリームを含むビジュアライゼーションでは、自然言語モードを無効にすることはできません"
+    "nlpModeDisabledForVisualization": "複数のストリームを含むビジュアライゼーションでは、自然言語モードを無効にすることはできません",
+    "patternDetailsTitle": "パターン詳細",
+    "patternXofY": "{total} のパターン {インデックス}",
+    "patternXofYShort": "{合計} の {インデックス}",
+    "patternStatistics": "統計情報",
+    "patternOccurrences": "オカレンス",
+    "patternPercentage": "パーセンテージ",
+    "patternAnomalyDetected": "異常検出",
+    "patternAnomalyScore": "このパターンはまれなパターンとして検出されます (異常スコア:{score}%)",
+    "patternAnomalyRare": "このパターンはまれなパターンとして検出されます (ログの {pct}%、発生回数は {freq})",
+    "patternAnomalyRarePlural": "このパターンはまれなパターンとして検出されます (ログの {pct}%、発生回数は {freq})",
+    "patternAnomalyLowFreq": "このパターンは予想よりも少ない頻度で現れます ({freq} vs avg {avg}、Z スコア:{z})",
+    "patternAnomalyLowFreqPlural": "このパターンは予想よりも少ない頻度で現れます ({freq} vs avg {avg}、Z スコア:{z})",
+    "patternVariablesHeader": "[変数]",
+    "patternVariablesDetected": "{count} 個の変数が検出されました",
+    "patternNoVariablesDetected": "変数が検出されませんでした",
+    "patternTemplate": "パターンテンプレート",
+    "patternVariablesWithCount": "変数 ({カウント})",
+    "patternVariableNameColumn": "変数名",
+    "patternVariableTypeColumn": "タイプ",
+    "patternExampleLogsWithCount": "サンプルログ ({count})",
+    "patternNavPrevious": "前へ",
+    "patternNavNext": "[次へ]",
+    "patternWildcardSampleValues": "サンプル値",
+    "wildcardSampleValues": "サンプル値",
+    "patternZScore": "Z スコア:{スコア} (平均周波数:{平均周波数})"
   },
   "menu": {
     "home": "ホーム",
@@ -1488,7 +1513,18 @@
     "hideQueryResults": "クエリ結果を非表示にする",
     "vrlExtractionTooltip": "抽出された VRL フィールドをチャートで使用するには、VRL 関数を記述して [適用] ボタンをクリックします。フィールドが抽出され、そのフィールドを使用してチャートを作成できます。",
     "errorFetchingFunctions": "関数を取得中にエラーが発生しました",
-    "functionAppliedSuccess": "{name} 関数が正常に適用されました。"
+    "functionAppliedSuccess": "{name} 関数が正常に適用されました。",
+    "pivotOptions": "ピボットオプション",
+    "pivotShowRowTotals": "行合計を表示",
+    "pivotShowColTotals": "列の合計を表示",
+    "pivotMissingValue": "値が見つかりません",
+    "pivotMissingValueHint": "データがないセルに表示される値",
+    "pivotShowRowTotalsTooltip": "ピボットテーブルの下部に、各列の値をまとめた集計行を表示します",
+    "pivotShowColTotalsTooltip": "ピボットテーブルの右側に、各行の値をまとめた合計列を表示します",
+    "pivotStickyRowTotals": "スティッキー行の合計",
+    "pivotStickyRowTotalsTooltip": "合計行を下部に固定して、垂直方向にスクロールしても表示されたままにします",
+    "pivotStickyColTotals": "スティッキーカラムの合計",
+    "pivotStickyColTotalsTooltip": "合計列を右側に固定して、横にスクロールしても表示されたままにします"
   },
   "panel": {
     "header": "パネル",
@@ -1570,7 +1606,12 @@
     "sqlBuilder": "SQL ビルダー",
     "generatedSql": "生成された SQL",
     "enterCustomSql": "カスタム SQL クエリを入力してください...",
-    "customSql": "カスタム SQL"
+    "customSql": "カスタム SQL",
+    "pivotField": "ピボットフィールド",
+    "addToPivot": "ピボットフィールドに追加",
+    "pivotFieldTooltip": "ここにディメンションフィールドをドラッグします。その個別の値はピボットテーブルの列ヘッダーになります。最大 3 つのフィールドでマルチレベルピボットが可能です。",
+    "breakdownTooltipHBar": "これらのフィールドを使用してデータを Y 軸上のさまざまなセクションに分割すると、見やすくなります。",
+    "breakdownTooltipDefault": "これらのフィールドを使用してデータを X 軸上のさまざまなセクションに分割すると、見やすくなります。"
   },
   "home": {
     "streams": "ストリーム",
@@ -2126,7 +2167,9 @@
       "detectionConfig": "クエリと検出パラメータの設定",
       "alerting": "異常が検出されたときの通知を設定する"
     },
-    "updateAnomalyDetection": "異常検出の更新:"
+    "updateAnomalyDetection": "異常検出の更新:",
+    "anomalyCreated": "異常検知設定が作成されました。トレーニングはまもなく開始されます。",
+    "editJson": "アラート JSON の編集"
   },
   "alert_templates": {
     "header": "テンプレート",
@@ -2439,7 +2482,8 @@
     "maxSeriesPerQueryDescription": "1 つの PromQL クエリから返されるシリーズの最大数。結果セットが大きい場合に UI がフリーズするのを防ぐのに役立ちます。システムデフォルト (40,000) を使用するには空のままにします。",
     "maxSeriesPerQueryTooltip": "「count (metric) by (label)」のようなPromQLクエリで返されるシリーズが多すぎると、UIがフリーズすることがあります。この制限によりそれが防止されます。システムデフォルトの場合は null に設定するか、1,000 ～ 1,000,000 の間の値を指定します。",
     "maxSeriesPerQueryValidation": "値は1,000から1,000,000の間でなければなりません。デフォルトでは空白のままにしてください",
-    "systemDefault": "システムデフォルト"
+    "systemDefault": "システムデフォルト",
+    "usageStreamEnabledLabel": "使用ストリームを有効にする"
   },
   "iam": {
     "users": "ユーザー",
@@ -2664,7 +2708,9 @@
     "spanColorPalettePreview": "Span カラーパレットのプレビュー",
     "errorsFound": "エラートレース",
     "spansTitle": "スパン",
-    "spansFound": "スパンが見つかりました"
+    "spansFound": "スパンが見つかりました",
+    "errorTraces": "エラートレース",
+    "errorSpans": "エラースパン"
   },
   "actions": {
     "testAction": "アクションをテスト",

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { Quasar } from "quasar";
 import CustomChartRenderer from "./CustomChartRenderer.vue";
 
@@ -98,6 +98,7 @@ describe("CustomChartRenderer", () => {
 
   const createWrapper = (props = {}) => {
     return mount(CustomChartRenderer, {
+      attachTo: document.body,
       props: {
         data: mockChartData,
         renderType: "canvas",
@@ -113,20 +114,18 @@ describe("CustomChartRenderer", () => {
     });
   };
   
-  const waitForChartInit = async (wrapper: any) => {
-    // Wait for component mount and async chart initialization with echarts-gl import
-    await wrapper.vm.$nextTick();
-    await wrapper.vm.$nextTick();
-    await wrapper.vm.$nextTick();
-    await wrapper.vm.$nextTick();
-    
-    // Additional wait for async echarts-gl import and chart initialization
-    await new Promise(resolve => setTimeout(resolve, 50));
-    
-    // Ensure chartRef is available
-    if (wrapper.vm.chartRef) {
-      await wrapper.vm.$nextTick();
-    }
+  const waitForChartInit = async (_wrapper: any) => {
+    // Capture the current call count so we can wait for exactly one NEW call,
+    // handling the async import("echarts-gl") inside initChart which doesn't
+    // settle in a single flushPromises pass within Vitest's module resolution.
+    const callsBefore = mockChart.setOption.mock.calls.length;
+    await vi.waitFor(
+      () =>
+        expect(mockChart.setOption.mock.calls.length).toBeGreaterThan(
+          callsBefore,
+        ),
+      { timeout: 2000 },
+    );
   };
 
   beforeEach(async () => {

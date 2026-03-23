@@ -119,8 +119,8 @@ pub(crate) fn verify_decode_token(
         .get("email")
         .or_else(|| final_claims.get("user_id"))
         .and_then(Value::as_str)
-        .map(str::to_lowercase)
-        .unwrap_or_default();
+        .unwrap_or_default()
+        .to_string();
 
     let user_name = final_claims
         .get("name")

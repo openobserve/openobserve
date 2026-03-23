@@ -299,6 +299,22 @@ pub fn format_duration(ms: u64) -> String {
     parts.join("")
 }
 
+/// Parse an interval string like "5m", "1h", "30s" into minutes.
+/// Returns 0 for unrecognised formats.
+pub fn parse_interval_to_minutes(s: &str) -> i64 {
+    if let Some(n) = s.strip_suffix('m') {
+        n.parse().unwrap_or(0)
+    } else if let Some(n) = s.strip_suffix('h') {
+        n.parse::<i64>().unwrap_or(0) * 60
+    } else if let Some(n) = s.strip_suffix('s') {
+        n.parse::<i64>().unwrap_or(0) / 60
+    } else if let Some(n) = s.strip_suffix('d') {
+        n.parse::<i64>().unwrap_or(0) * 1440
+    } else {
+        s.parse().unwrap_or(0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

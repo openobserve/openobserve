@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Simple field without expansion (FTS keys or fields without values) -->
   <div
-    v-if="field.ftsKey || !field.isSchemaField || !field.showValues"
+    v-if="(field.ftsKey && !showFtsFieldValues) || !field.isSchemaField || !field.showValues"
     class="field-container flex content-center ellipsis full-width hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
     :title="field.name"
   >
@@ -113,6 +113,7 @@ interface Props {
   timestampColumn: string;
   theme: string;
   showQuickMode: boolean;
+  showFtsFieldValues: boolean;
 }
 
 const props = defineProps<Props>();

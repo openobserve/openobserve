@@ -351,7 +351,32 @@
     "collapseFields": "Felder ausblenden",
     "openFields": "Felder öffnen",
     "aiBarSuccessPlaceholder": "Was möchtest du als Nächstes tun?",
-    "nlpModeDisabledForVisualization": "Der Natural Language-Modus kann bei einer Visualisierung mit mehreren Streams nicht deaktiviert werden"
+    "nlpModeDisabledForVisualization": "Der Natural Language-Modus kann bei einer Visualisierung mit mehreren Streams nicht deaktiviert werden",
+    "patternDetailsTitle": "Einzelheiten zum Muster",
+    "patternXofY": "Muster {index} von {total}",
+    "patternXofYShort": "{index} von {total}",
+    "patternStatistics": "Statistiken",
+    "patternOccurrences": "Vorkommen",
+    "patternPercentage": "Prozentsatz",
+    "patternAnomalyDetected": "Anomalie erkannt",
+    "patternAnomalyScore": "Dieses Muster wird als seltenes Muster erkannt (Anomalie-Score: {score}%)",
+    "patternAnomalyRare": "Dieses Muster wird als seltenes Muster erkannt ({pct}% der Logs, {freq} Vorkommen)",
+    "patternAnomalyRarePlural": "Dieses Muster wird als seltenes Muster erkannt ({pct}% der Logs, {freq} Vorkommen)",
+    "patternAnomalyLowFreq": "Dieses Muster tritt seltener als erwartet auf ({freq} vs avg {avg}, Z-Score: {z})",
+    "patternAnomalyLowFreqPlural": "Dieses Muster tritt seltener als erwartet auf ({freq} vs avg {avg}, Z-Score: {z})",
+    "patternVariablesHeader": "Variablen",
+    "patternVariablesDetected": "{count} Variable (n) wurde (n) erkannt",
+    "patternNoVariablesDetected": "Keine Variablen erkannt",
+    "patternTemplate": "Muster-Vorlage",
+    "patternVariablesWithCount": "Variablen ({count})",
+    "patternVariableNameColumn": "Variablenname",
+    "patternVariableTypeColumn": "Typ",
+    "patternExampleLogsWithCount": "Beispielprotokolle ({count})",
+    "patternNavPrevious": "Bisherige",
+    "patternNavNext": "Weiter",
+    "patternWildcardSampleValues": "Beispielwerte",
+    "wildcardSampleValues": "Beispielwerte",
+    "patternZScore": "Z-Score: {zScore} (durchschnittliche Häufigkeit: {avgFrequency})"
   },
   "menu": {
     "home": "Startseite",
@@ -1471,7 +1496,18 @@
     "hideQueryResults": "Abfrageergebnisse ausblenden",
     "vrlExtractionTooltip": "Um extrahierte VRL-Felder im Diagramm zu verwenden, schreiben Sie eine VRL-Funktion und klicken Sie auf die Schaltfläche Anwenden. Die Felder werden extrahiert, sodass Sie sie zum Erstellen des Diagramms verwenden können.",
     "errorFetchingFunctions": "Fehler beim Abrufen von Funktionen",
-    "functionAppliedSuccess": "Die Funktion {name} wurde erfolgreich angewendet."
+    "functionAppliedSuccess": "Die Funktion {name} wurde erfolgreich angewendet.",
+    "pivotOptions": "Pivot-Optionen",
+    "pivotShowRowTotals": "Zeilensummen anzeigen",
+    "pivotShowColTotals": "Spaltensummen anzeigen",
+    "pivotMissingValue": "Fehlender Wert",
+    "pivotMissingValueHint": "Wert, der für Zellen ohne Daten angezeigt wird",
+    "pivotShowRowTotalsTooltip": "Zeigen Sie am Ende der Pivot-Tabelle eine Summenzeile an, in der die Werte der einzelnen Spalten zusammengefasst sind",
+    "pivotShowColTotalsTooltip": "Zeigen Sie auf der rechten Seite der Pivot-Tabelle eine Summenspalte an, in der die Werte jeder Zeile zusammengefasst sind",
+    "pivotStickyRowTotals": "Gesamtwerte für wichtige Zeilen",
+    "pivotStickyRowTotalsTooltip": "Stecken Sie die Ergebniszeile unten fest, damit sie beim vertikalen Scrollen sichtbar bleibt",
+    "pivotStickyColTotals": "Gesamtwerte für wichtige Spalten",
+    "pivotStickyColTotalsTooltip": "Fixieren Sie die Summenspalte auf der rechten Seite, damit sie beim horizontalen Scrollen sichtbar bleibt"
   },
   "panel": {
     "header": "Panel",
@@ -1553,7 +1589,12 @@
     "sqlBuilder": "SQL-Generator",
     "generatedSql": "Generiertes SQL",
     "enterCustomSql": "Geben Sie Ihre benutzerdefinierte SQL-Abfrage ein...",
-    "customSql": "Benutzerdefiniertes SQL"
+    "customSql": "Benutzerdefiniertes SQL",
+    "pivotField": "Pivot-Feld",
+    "addToPivot": "Zum Pivot-Feld hinzufügen",
+    "pivotFieldTooltip": "Ziehen Sie ein Dimensionsfeld hierher. Die einzelnen Werte werden zu Spaltenüberschriften in der Pivot-Tabelle. Bis zu 3 Felder sind für mehrstufiges Pivotieren zulässig.",
+    "breakdownTooltipHBar": "Verwenden Sie diese Felder, um die Daten für eine klarere Ansicht in verschiedene Abschnitte auf der Y-Achse zu unterteilen.",
+    "breakdownTooltipDefault": "Verwenden Sie diese Felder, um die Daten für eine klarere Ansicht in verschiedene Abschnitte auf der X-Achse zu unterteilen."
   },
   "home": {
     "streams": "Streams",
@@ -2109,7 +2150,9 @@
       "detectionConfig": "Konfiguration der Abfrage- und Erkennungsparameter",
       "alerting": "Richten Sie Benachrichtigungen ein, wenn Anomalien erkannt werden"
     },
-    "updateAnomalyDetection": "Anomalieerkennung aktualisieren:"
+    "updateAnomalyDetection": "Anomalieerkennung aktualisieren:",
+    "anomalyCreated": "Konfiguration zur Erkennung von Anomalien wurde erstellt. Die Schulung beginnt in Kürze.",
+    "editJson": "Alert-JSON bearbeiten"
   },
   "alert_templates": {
     "header": "Vorlagen",
@@ -2418,7 +2461,8 @@
     "maxSeriesPerQueryDescription": "Maximale Anzahl von Serien, die von einer einzelnen PromQL-Abfrage zurückgegeben werden können. Hilft, das Einfrieren der Benutzeroberfläche bei großen Ergebnismengen zu verhindern. Lassen Sie das Feld leer, um den Systemstandard (40.000) zu verwenden.",
     "maxSeriesPerQueryTooltip": "Wenn eine PromQL-Abfrage wie 'count (metric) by (label) 'zu viele Serien zurückgibt, kann sie die Benutzeroberfläche einfrieren. Dieses Limit verhindert das. Legen Sie den Systemstandard auf Null fest, oder geben Sie einen Wert zwischen 1.000 und 1.000.000 an.",
     "maxSeriesPerQueryValidation": "Der Wert muss zwischen 1.000 und 1.000.000 liegen oder als Standardeinstellung leer lassen",
-    "systemDefault": "Systemstandard"
+    "systemDefault": "Systemstandard",
+    "usageStreamEnabledLabel": "Nutzungsstream aktivieren"
   },
   "iam": {
     "users": "Nutzer",
@@ -2643,7 +2687,9 @@
     "spanColorPalettePreview": "Vorschau der Span-Farbpalette",
     "errorsFound": "Fehlerspuren",
     "spansTitle": "SPANNT",
-    "spansFound": "Gefundene Spannweiten"
+    "spansFound": "Gefundene Spannweiten",
+    "errorTraces": "Fehlerspuren",
+    "errorSpans": "Fehlerspannen"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",

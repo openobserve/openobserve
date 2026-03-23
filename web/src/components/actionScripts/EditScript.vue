@@ -982,6 +982,11 @@ const validateActionScriptData = async () => {
 const validateFrequency = (value: string) => {
   cronError.value = "";
 
+  if (!value || !value.trim()) {
+    cronError.value = "Invalid cron expression!";
+    return;
+  }
+
   try {
     const intervalInSecs = getCronIntervalDifferenceInSeconds(value);
 

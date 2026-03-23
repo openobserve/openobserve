@@ -101,7 +101,11 @@ describe("AlertHistoryDrawer.vue", () => {
   });
 
   afterEach(() => {
-    wrapper?.unmount();
+    try {
+      wrapper?.unmount();
+    } catch {
+      // Quasar teleported components can throw during unmount in jsdom
+    }
   });
 
   const mountComponent = async (
@@ -130,9 +134,6 @@ describe("AlertHistoryDrawer.vue", () => {
       await mountComponent();
       expect(
         wrapper.find('[data-test="alert-details-title"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="alert-details-edit-btn"]').exists(),
       ).toBe(true);
       expect(
         wrapper.find('[data-test="alert-details-close-btn"]').exists(),
@@ -397,11 +398,12 @@ describe("AlertHistoryDrawer.vue", () => {
   });
 
   describe("Pagination", () => {
-    it("should have pagination component", async () => {
+    it("should have pagination data initialized", async () => {
       await mountComponent();
-      expect(
-        wrapper.findComponent({ name: "QTablePagination" }).exists(),
-      ).toBe(true);
+      const vm = wrapper.vm as any;
+      expect(vm.pagination).toBeDefined();
+      expect(vm.pagination.rowsPerPage).toBe(50);
+      expect(vm.pagination.page).toBe(1);
     });
 
     it("should call getHistory when table requests data", async () => {
@@ -438,18 +440,6 @@ describe("AlertHistoryDrawer.vue", () => {
   });
 
   describe("Actions", () => {
-    it("should emit edit event when edit button is clicked", async () => {
-      await mountComponent();
-
-      const editBtn = wrapper.find(
-        '[data-test="alert-details-edit-btn"]',
-      );
-      await editBtn.trigger("click");
-
-      expect(wrapper.emitted("edit")).toBeTruthy();
-      expect(wrapper.emitted("edit")![0]).toEqual([mockAlertDetails]);
-    });
-
     it("should not crash when alertDetails is null", async () => {
       await mountComponent({
         alertDetails: null,
@@ -570,42 +560,34 @@ describe("AlertHistoryDrawer.vue", () => {
       expect(vm.formatTimestamp(null)).toBe("N/A");
     });
 
-    it("formatTimestamp should format recent timestamps as relative", async () => {
+    it("formatTimestamp should format recent timestamps as ISO datetime", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
       // 5 minutes ago in microseconds
       const fiveMinAgo = (Date.now() - 5 * 60 * 1000) * 1000;
-      expect(vm.formatTimestamp(fiveMinAgo)).toMatch(/\d+ min ago/);
+      expect(vm.formatTimestamp(fiveMinAgo)).toMatch(
+        /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+      );
     });
 
-    it("formatTimestamp should format hours-old timestamps", async () => {
+    it("formatTimestamp should format hours-old timestamps as ISO datetime", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
       // 3 hours ago in microseconds
       const threeHoursAgo = (Date.now() - 3 * 3600 * 1000) * 1000;
-      expect(vm.formatTimestamp(threeHoursAgo)).toMatch(/\d+h ago/);
+      expect(vm.formatTimestamp(threeHoursAgo)).toMatch(
+        /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+      );
     });
 
-    it("formatTimestamp should format days-old timestamps", async () => {
+    it("formatTimestamp should format days-old timestamps as ISO datetime", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
       // 3 days ago in microseconds
       const threeDaysAgo = (Date.now() - 3 * 86400 * 1000) * 1000;
-      expect(vm.formatTimestamp(threeDaysAgo)).toMatch(/\d+d ago/);
-    });
-
-    it("formatTimestampFull should return N/A for falsy timestamps", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.formatTimestampFull(0)).toBe("N/A");
-      expect(vm.formatTimestampFull(null)).toBe("N/A");
-    });
-
-    it("formatTimestampFull should return full date string", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      const result = vm.formatTimestampFull(1699900000000000);
-      expect(result).toMatch(/\w+ \d{2}, \d{4} \d{2}:\d{2}:\d{2}/);
+      expect(vm.formatTimestamp(threeDaysAgo)).toMatch(
+        /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+      );
     });
   });
 

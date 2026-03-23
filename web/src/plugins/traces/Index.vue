@@ -44,10 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Service Graph Tab Content -->
       <div
-        v-if="
-          activeTab === 'service-graph' &&
-          store.state.zoConfig.service_graph_enabled
-        "
+        v-if="activeTab === 'service-graph' && config.isEnterprise == 'true'"
         class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-[calc(100vh-90px)] tw:overflow-hidden"
       >
         <service-graph
@@ -243,6 +240,7 @@ import {
   ref,
   onDeactivated,
   onActivated,
+  onUnmounted,
   onBeforeMount,
   nextTick,
   defineAsyncComponent,
@@ -254,6 +252,10 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 
 import useTraces from "@/composables/useTraces";
+import {
+  contextRegistry,
+  createTracesContextProvider,
+} from "@/composables/contextProviders";
 
 import TransformService from "@/services/jstransform";
 import {
@@ -314,6 +316,18 @@ const { getStreams, getStream } = useStreams();
 const chartRedrawTimeout = ref(null);
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
   useHttpStreaming();
+// AI copilot context provider for traces page
+const setupContextProvider = () => {
+  const provider = createTracesContextProvider(searchObj, store);
+  contextRegistry.register("traces", provider);
+  contextRegistry.setActive("traces");
+};
+
+const cleanupContextProvider = () => {
+  contextRegistry.unregister("traces");
+  contextRegistry.setActive("");
+};
+
 // Track the current search stream so we can cancel it when a new search starts
 let currentSearchTraceId: string | null = null;
 // Track the count query stream so it can be cancelled independently
@@ -1272,17 +1286,12 @@ async function loadPageData() {
 }
 
 onBeforeMount(async () => {
+  setupContextProvider();
   restoreUrlQueryParams();
   // Restore active tab from URL query params
   const queryParams = router.currentRoute.value.query;
-  if (queryParams.tab === "service-graph") {
-    // Only allow service-graph tab if service graph is enabled
-    if (store.state.zoConfig.service_graph_enabled) {
-      activeTab.value = "service-graph";
-    } else {
-      // If service graph is disabled, default to search tab
-      activeTab.value = "search";
-    }
+  if (queryParams.tab === "service-graph" && config.isEnterprise == "true") {
+    activeTab.value = "service-graph";
   }
   await importSqlParser();
   if (!searchObj.loading) {
@@ -1291,10 +1300,16 @@ onBeforeMount(async () => {
 });
 
 onDeactivated(() => {
+  cleanupContextProvider();
   clearInterval(refreshIntervalID);
 });
 
+onUnmounted(() => {
+  cleanupContextProvider();
+});
+
 onActivated(() => {
+  setupContextProvider();
   const params = router.currentRoute.value.query;
   if (params.reload === "true") {
     restoreUrlQueryParams();
@@ -1785,14 +1800,7 @@ watch(updateSelectedColumns, () => {
 watch(activeTab, (newTab) => {
   const query = { ...router.currentRoute.value.query };
   if (newTab === "service-graph") {
-    // Only set service-graph tab if service graph is enabled
-    if (store.state.zoConfig.service_graph_enabled) {
-      query.tab = "service-graph";
-    } else {
-      // If service graph is disabled, force back to search tab
-      activeTab.value = "search";
-      delete query.tab;
-    }
+    query.tab = "service-graph";
   } else {
     delete query.tab;
   }

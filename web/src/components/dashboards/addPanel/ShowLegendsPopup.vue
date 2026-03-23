@@ -150,7 +150,7 @@ export default defineComponent({
 
       // Collect all values to determine min/max
       series.forEach((s: any) => {
-        if (s.data && Array.isArray(s.data)) {
+        if (s && s.data && Array.isArray(s.data)) {
           s.data.forEach((d: any) => {
             if (Array.isArray(d)) {
               // Usually [time, value] or [value, name]
@@ -211,12 +211,13 @@ export default defineComponent({
       };
 
       // For pie/donut charts, extract from series[0].data
+      const firstSeries = series.find((s: any) => s != null);
       if (
-        series.length > 0 &&
-        series[0].data &&
-        Array.isArray(series[0].data)
+        firstSeries &&
+        firstSeries.data &&
+        Array.isArray(firstSeries.data)
       ) {
-        const firstSeriesData = series[0].data;
+        const firstSeriesData = firstSeries.data;
         // Check if it's pie/donut format (data has name property)
         if (
           firstSeriesData.length > 0 &&

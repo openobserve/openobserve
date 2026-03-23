@@ -27,10 +27,15 @@ pub struct MetadataExtractor;
 
 impl MetadataExtractor {
     /// Extract user ID
-    pub fn extract_user_id(&self, attributes: &HashMap<String, json::Value>) -> Option<String> {
+    pub fn extract_user_id(
+        &self,
+        attributes: &HashMap<String, json::Value>,
+        resource_attributes: &HashMap<String, json::Value>,
+    ) -> Option<String> {
         let user_id_keys = [
             OtelAttributes::USER_ID,
             VercelAiSdkAttributes::TELEMETRY_METADATA_USER_ID,
+            "service_user.id",
         ];
 
         for key in &user_id_keys {
@@ -40,17 +45,31 @@ impl MetadataExtractor {
                 return Some(s.to_string());
             }
         }
+
+        for key in &user_id_keys {
+            if let Some(value) = resource_attributes.get(*key)
+                && let Some(s) = value.as_str()
+            {
+                return Some(s.to_string());
+            }
+        }
+
         None
     }
 
     /// Extract session ID
-    pub fn extract_session_id(&self, attributes: &HashMap<String, json::Value>) -> Option<String> {
+    pub fn extract_session_id(
+        &self,
+        attributes: &HashMap<String, json::Value>,
+        resource_attributes: &HashMap<String, json::Value>,
+    ) -> Option<String> {
         let session_id_keys = [
             OtelAttributes::SESSION_ID,
             GenAiAttributes::CONVERSATION_ID,
             VercelAiSdkAttributes::TELEMETRY_METADATA_SESSION_ID,
             LangfuseAttributes::METADATA_LANGFUSE_SESSION_ID,
             LangfuseAttributes::METADATA_SESSION_ID,
+            "service_session.id",
         ];
 
         for key in &session_id_keys {
@@ -60,6 +79,15 @@ impl MetadataExtractor {
                 return Some(s.to_string());
             }
         }
+
+        for key in &session_id_keys {
+            if let Some(value) = resource_attributes.get(*key)
+                && let Some(s) = value.as_str()
+            {
+                return Some(s.to_string());
+            }
+        }
+
         None
     }
 }

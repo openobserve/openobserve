@@ -13,10 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import FieldRow from "@/plugins/logs/components/FieldRow.vue";
 import { Quasar } from "quasar";
+
+vi.mock("vuex", () => ({
+  useStore: () => ({
+    state: {
+      zoConfig: {
+        show_fts_field_values: false,
+      },
+    },
+  }),
+}));
 
 describe("FieldRow.vue", () => {
   const defaultProps = {

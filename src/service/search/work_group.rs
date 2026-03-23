@@ -44,7 +44,7 @@ pub struct DeferredLock {
 #[tracing::instrument(
     name = "service:search:work_group:check",
     skip_all,
-    fields(caller = caller, trace_id = trace_id)
+    fields(caller = caller)
 )]
 pub async fn check_work_group(
     trace_id: &str,
@@ -96,7 +96,7 @@ pub async fn check_work_group(
 #[tracing::instrument(
     name = "service:search:work_group:check",
     skip_all,
-    fields(caller = caller, trace_id = trace_id, work_group = ?work_group)
+    fields(caller = caller, work_group = ?work_group)
 )]
 pub async fn check_work_group(
     trace_id: &str,

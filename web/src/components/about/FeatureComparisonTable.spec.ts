@@ -251,4 +251,218 @@ describe("FeatureComparisonTable", () => {
     const wrapper_div = wrapper.find(".feature-comparison-wrapper");
     expect(wrapper_div.exists()).toBe(true);
   });
+
+  it("should compute currentPlanName for opensource build", () => {
+    const wrapper = mount(FeatureComparisonTable, {
+      global: {
+        plugins: [i18n, store],
+      },
+    });
+
+    expect((wrapper.vm as any).currentPlanName).toBeTruthy();
+  });
+
+  it("should compute currentPlanName for enterprise build", () => {
+    const enterpriseStore = createStore({
+      state: {
+        theme: "light",
+        zoConfig: {
+          build_type: "enterprise",
+        },
+      },
+    });
+
+    const wrapper = mount(FeatureComparisonTable, {
+      global: {
+        plugins: [i18n, enterpriseStore],
+      },
+    });
+
+    expect((wrapper.vm as any).currentPlanName).toBeTruthy();
+  });
+
+  it("should compute currentPlanName for cloud build", () => {
+    const cloudStore = createStore({
+      state: {
+        theme: "light",
+        zoConfig: {
+          build_type: "cloud",
+        },
+      },
+    });
+
+    const wrapper = mount(FeatureComparisonTable, {
+      global: {
+        plugins: [i18n, cloudStore],
+      },
+    });
+
+    expect((wrapper.vm as any).currentPlanName).toBeTruthy();
+  });
+
+  it("should return empty string for currentPlanName when build_type is unknown", () => {
+    const unknownStore = createStore({
+      state: {
+        theme: "light",
+        zoConfig: {
+          build_type: "unknown",
+        },
+      },
+    });
+
+    const wrapper = mount(FeatureComparisonTable, {
+      global: {
+        plugins: [i18n, unknownStore],
+      },
+    });
+
+    expect((wrapper.vm as any).currentPlanName).toBe("");
+  });
+
+  it("should display cloud subtitle (not edition-specific message) for cloud build", () => {
+    const cloudStore = createStore({
+      state: {
+        theme: "light",
+        zoConfig: {
+          build_type: "cloud",
+        },
+      },
+    });
+
+    const wrapper = mount(FeatureComparisonTable, {
+      global: {
+        plugins: [i18n, cloudStore],
+      },
+    });
+
+    // Cloud should show the generic subtitle, not the edition-specific messages
+    const editionInfo = wrapper.find(".edition-info");
+    expect(editionInfo.exists()).toBe(false);
+  });
+
+  it("should not show enterprise promotion for cloud build", () => {
+    const cloudStore = createStore({
+      state: {
+        theme: "light",
+        zoConfig: {
+          build_type: "cloud",
+        },
+      },
+    });
+
+    const wrapper = mount(FeatureComparisonTable, {
+      global: {
+        plugins: [i18n, cloudStore],
+      },
+    });
+
+    const promotion = wrapper.find(".enterprise-promotion");
+    expect(promotion.exists()).toBe(false);
+  });
+
+  it("should show enterprise promotion message for enterprise build", () => {
+    const enterpriseStore = createStore({
+      state: {
+        theme: "light",
+        zoConfig: {
+          build_type: "enterprise",
+        },
+      },
+    });
+
+    const wrapper = mount(FeatureComparisonTable, {
+      global: {
+        plugins: [i18n, enterpriseStore],
+      },
+    });
+
+    const promotion = wrapper.find(".enterprise-promotion");
+    expect(promotion.exists()).toBe(true);
+  });
+
+  it("should load features from registry and each feature has name and values", () => {
+    const wrapper = mount(FeatureComparisonTable, {
+      global: {
+        plugins: [i18n, store],
+      },
+    });
+
+    const vm = wrapper.vm as any;
+    const features = vm.featureData.features;
+    expect(Array.isArray(features)).toBe(true);
+    features.forEach((feature: any) => {
+      expect(feature).toHaveProperty("name");
+      expect(feature).toHaveProperty("values");
+      expect(feature.values).toHaveProperty("opensource");
+      expect(feature.values).toHaveProperty("enterprise");
+      expect(feature.values).toHaveProperty("cloud");
+    });
+  });
+
+  it("should have correct column alignment settings", () => {
+    const wrapper = mount(FeatureComparisonTable, {
+      global: {
+        plugins: [i18n, store],
+      },
+    });
+
+    const vm = wrapper.vm as any;
+    expect(vm.columns[0].align).toBe("left");   // name column
+    expect(vm.columns[1].align).toBe("center"); // opensource
+    expect(vm.columns[2].align).toBe("center"); // enterprise
+    expect(vm.columns[3].align).toBe("center"); // cloud
+  });
+
+  it("should have correct column sortable settings", () => {
+    const wrapper = mount(FeatureComparisonTable, {
+      global: {
+        plugins: [i18n, store],
+      },
+    });
+
+    (wrapper.vm as any).columns.forEach((col: any) => {
+      expect(col.sortable).toBe(false);
+    });
+  });
+
+  it("should have editions array with correct ids", () => {
+    const wrapper = mount(FeatureComparisonTable, {
+      global: {
+        plugins: [i18n, store],
+      },
+    });
+
+    const editionIds = (wrapper.vm as any).featureData.editions.map((e: any) => e.id);
+    expect(editionIds).toContain("opensource");
+    expect(editionIds).toContain("enterprise");
+    expect(editionIds).toContain("cloud");
+  });
+
+  it("should only highlight the current build type column", () => {
+    // When build_type is opensource, only opensource column is highlighted
+    expect(store.state.zoConfig.build_type).toBe("opensource");
+
+    const wrapper = mount(FeatureComparisonTable, {
+      global: {
+        plugins: [i18n, store],
+      },
+    });
+
+    const highlighted = wrapper.findAll(".highlighted-column");
+    // Should have at least one highlighted cell (one per row for opensource column)
+    expect(highlighted.length).toBeGreaterThan(0);
+  });
+
+  it("should render table with hidden pagination", () => {
+    const wrapper = mount(FeatureComparisonTable, {
+      global: {
+        plugins: [i18n, store],
+      },
+    });
+
+    const table = wrapper.findComponent({ name: "QTable" });
+    expect(table.exists()).toBe(true);
+    // rowsPerPage: 0 means show all
+    expect((wrapper.vm as any).pagination.rowsPerPage).toBe(0);
+  });
 });

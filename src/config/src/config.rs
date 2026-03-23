@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 34;
+pub const DB_SCHEMA_VERSION: u64 = 35;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -864,6 +864,12 @@ pub struct Common {
     pub timestamp_compression_disabled: bool,
     #[env_config(name = "ZO_FEATURE_INGESTER_NONE_COMPRESSION", default = false)]
     pub feature_ingester_none_compression: bool,
+    #[env_config(
+        name = "ZO_FEATURE_SHOW_FTS_FIELD_VALUES",
+        default = false,
+        help = "Show field values dropdown for full text search fields in the logs page field list"
+    )]
+    pub show_fts_field_values: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
     pub feature_fulltext_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_INDEX_EXTRA_FIELDS", default = "")]
@@ -2441,7 +2447,7 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // HACK for thread_num equal to CPU core * 4
     if cfg.limit.query_thread_num == 0 {
         if cfg.common.local_mode {
-            cfg.limit.query_thread_num = cpu_num * 2;
+            cfg.limit.query_thread_num = cpu_num;
         } else {
             cfg.limit.query_thread_num = cpu_num * 4;
         }
