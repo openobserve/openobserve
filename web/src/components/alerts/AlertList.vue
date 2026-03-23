@@ -1795,9 +1795,9 @@ export default defineComponent({
       return filteredResults.value?.length;
     });
     const maxRecordToReturn = ref<number>(100);
-    const selectedPerPage = ref<number>(20);
+    const selectedPerPage = ref<number>(savedAlertListFilters.perPage || 20);
     const pagination: any = ref({
-      rowsPerPage: 20,
+      rowsPerPage: savedAlertListFilters.perPage || 20,
     });
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
@@ -2530,11 +2530,12 @@ export default defineComponent({
       }
     });
     // Persist filter state to Vuex so it survives navigation to add/edit screens
-    watch([searchQuery, filterQuery, searchAcrossFolders], () => {
+    watch([searchQuery, filterQuery, searchAcrossFolders, selectedPerPage], () => {
       store.commit("setAlertListFilters", {
         searchQuery: searchQuery.value || "",
         filterQuery: filterQuery.value || "",
         searchAcrossFolders: !!searchAcrossFolders.value,
+        perPage: selectedPerPage.value,
       });
     });
     watch(activeTab, async (newVal) => {
