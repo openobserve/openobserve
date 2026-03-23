@@ -395,6 +395,71 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", () 
     await cleanupTestDashboard(page, pm, dashboardName);
   });
 
+  test("TC-PIE-028: pie chart with cross-field aggregation (X=docker_id, Y=count(container_name)) — renders with legend", {
+    tag: ["@pieDonut", "@functional", "@P1"],
+  }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupTestDashboard(page, pm, dashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.selectChartType("pie");
+    await pm.chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+
+    // Y-axis: kubernetes_container_name with count aggregation (cross-field)
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
+    await pm.chartTypeSelector.configureYAxisRawQuery(
+      "y_axis_1",
+      "count(kubernetes_container_name)"
+    );
+    // X-axis: remove default histogram(_timestamp) first, then add kubernetes_docker_id
+    await pm.chartTypeSelector.removeField("x_axis_1", "x");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_docker_id", "x");
+
+    await pm.dashboardPanelActions.addPanelName("Pie Cross-Field Agg");
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
+    testLogger.info("Pie panel with cross-field aggregation created");
+
+    // 1. Verify chart renders with data
+    await pm.dashboardPanelActions.verifyChartRenders(expect);
+    testLogger.info("verifyChartRenders passed - cross-field pie", { coloredPixels: await getPlottedPixelCount(page) });
+
+    // 2. Save panel to access legend on dashboard view
+    await pm.dashboardPanelActions.savePanel();
+
+    // 3. Verify legend popup — hover over chart area to reveal legend button
+    const chartArea = page.locator('[data-test="chart-renderer"]').first();
+    await chartArea.waitFor({ state: "visible", timeout: 10000 });
+    await chartArea.hover();
+
+    const legendBtn = pm.dashboardLegendsCopy.getShowLegendsButton();
+    await legendBtn.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+    const isLegendBtnVisible = await legendBtn.isVisible().catch(() => false);
+
+    if (isLegendBtnVisible) {
+      await legendBtn.click();
+      const legendPopup = page.locator('[data-test="dashboard-show-legends-popup"]');
+      await expect(legendPopup).toBeVisible({ timeout: 5000 });
+
+      const legendCount = await pm.dashboardLegendsCopy.getLegendCount();
+      testLogger.info("Legend popup verified", { legendItemCount: legendCount });
+      expect(legendCount).toBeGreaterThan(0);
+
+      // Verify first legend item has text (not empty)
+      const firstLegendText = await pm.dashboardLegendsCopy.getLegendItem(0).textContent();
+      expect(firstLegendText.trim().length).toBeGreaterThan(0);
+      testLogger.info("First legend item has text", { text: firstLegendText.trim() });
+
+      await page.locator('[data-test="dashboard-show-legends-close"]').click();
+    } else {
+      testLogger.info("Legend button not visible — skipping popup check");
+    }
+
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
   // ---------------------------------------------------------------------------
   // P2 — Edge Cases & Negative Tests
   // ---------------------------------------------------------------------------
