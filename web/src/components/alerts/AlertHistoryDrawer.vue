@@ -398,9 +398,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- ── Condition area (main + optional PromQL) ── -->
                 <div
-                  class="tw:flex tw:flex-col tw:overflow-hidden"
+                  class="tw:flex tw:flex-col tw:overflow-hidden tw:gap-2"
                   :class="hasVRL ? 'tw:flex-1 tw:min-h-0' : 'tw:flex-1'"
-                  style="gap: 8px; display: flex; flex-direction: column;"
                 >
                   <!-- Main condition block -->
                   <div
