@@ -1421,7 +1421,7 @@ const onSplitterUpdate = () => {
 };
 
 const refreshTimezone = () => {
-  updateGridColumns();
+  // updateGridColumns();
   generateHistogramData();
 
   // searchResultRef.value?.reDrawChart();

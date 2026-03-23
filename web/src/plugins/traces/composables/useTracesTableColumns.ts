@@ -36,6 +36,7 @@
 
 import { ref } from "vue";
 import { type ColumnDef } from "@tanstack/vue-table";
+import { useStore } from "vuex";
 
 /** IDs of LLM columns injected at runtime — never stored in selectedFields. */
 export const LLM_COLUMN_IDS = new Set([
@@ -156,15 +157,23 @@ export function useTracesTableColumns() {
    * Call this whenever selectedFields, searchMode, or showLlmColumns changes.
    */
   const columns = ref<ColumnDef<Record<string, any>>[]>([]);
+  const store = useStore();
 
   const buildColumns = (
     showLlmColumns: boolean,
     searchMode: "traces" | "spans",
     selectedFields: string[],
-  ): void => {
+  ): ColumnDef<Record<string, any>>[] => {
     const cols: ColumnDef<Record<string, any>>[] = selectedFields.map((field) =>
       toColumnDef(field),
     );
+
+    cols.unshift({
+      id: store.state.zoConfig.timestamp_column,
+      header: "Timestamp",
+      size: 160,
+      meta: { slot: true, sortable: true },
+    });
 
     // Inject LLM columns just before service_latency in traces mode.
     // They are not stored in selectedFields — managed by the showLlmColumns flag.
@@ -189,7 +198,7 @@ export function useTracesTableColumns() {
       }
     }
 
-    columns.value = cols;
+    return cols;
   };
 
   return { columns, buildColumns };
