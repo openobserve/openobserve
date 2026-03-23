@@ -209,6 +209,7 @@ jobs:
                 "visualize-vrl.spec.js",
                 "dashboard-create-alert.spec.js",
                 "dashboard-sankey.spec.js",
+                "dashboard-pie-donut.spec.js",
               ]
           - testfolder: "Dashboards-Streaming"
             browser: "chrome"
