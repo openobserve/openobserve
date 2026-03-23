@@ -230,7 +230,7 @@ export async function setupMetricPanelWithConfig(page, pm, dashboardName, panelN
  * @param {string} [options.panelName]
  * @param {string} [options.query]    - PromQL query string
  */
-export async function buildPromQLPanel(page, pm, dashboardName, {
+async function buildPromQLPanel(page, pm, dashboardName, {
   chartType,
   panelName = "Test Panel",
   query = "zo_node_memory_usage",
