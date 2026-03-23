@@ -171,7 +171,7 @@ export function useTracesTableColumns() {
     if (
       !selectedFields.find(
         (col) =>
-          col === store?.state?.zoConfig?.timestamp_column || "_timestamp",
+          col === (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
       )
     )
       cols.unshift({
