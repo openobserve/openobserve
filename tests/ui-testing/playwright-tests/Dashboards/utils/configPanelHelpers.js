@@ -141,6 +141,24 @@ export async function setupTablePanelWithConfig(page, pm, dashboardName, panelNa
 }
 
 /**
+ * Pie chart panel (SQL builder) — config sidebar opened and ready.
+ */
+export async function setupPiePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPanel(page, pm, dashboardName, { chartType: "pie", panelName });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Pie panel with config ready", { dashboardName, panelName });
+}
+
+/**
+ * Donut chart panel (SQL builder) — config sidebar opened and ready.
+ */
+export async function setupDonutPanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPanel(page, pm, dashboardName, { chartType: "donut", panelName });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Donut panel with config ready", { dashboardName, panelName });
+}
+
+/**
  * Gauge chart panel — config sidebar opened and ready.
  */
 export async function setupGaugePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
@@ -212,7 +230,7 @@ export async function setupMetricPanelWithConfig(page, pm, dashboardName, panelN
  * @param {string} [options.panelName]
  * @param {string} [options.query]    - PromQL query string
  */
-async function buildPromQLPanel(page, pm, dashboardName, {
+export async function buildPromQLPanel(page, pm, dashboardName, {
   chartType,
   panelName = "Test Panel",
   query = "zo_node_memory_usage",
