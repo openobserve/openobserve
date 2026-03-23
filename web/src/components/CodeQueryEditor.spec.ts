@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import CodeQueryEditor from "./CodeQueryEditor.vue";
@@ -21,37 +21,40 @@ import { createStore } from "vuex";
 
 installQuasar();
 
+// Stable mock editor instance so tests can reference it directly
+const mockEditorObj = {
+  onDidChangeModelContent: vi.fn(),
+  createContextKey: vi.fn(),
+  addCommand: vi.fn(),
+  onDidFocusEditorWidget: vi.fn(),
+  onDidBlurEditorWidget: vi.fn(),
+  dispose: vi.fn(),
+  getValue: vi.fn(() => ""),
+  setValue: vi.fn(),
+  layout: vi.fn(),
+  getModel: vi.fn(() => ({
+    getValue: vi.fn(() => ""),
+    setValue: vi.fn(),
+    getLineCount: vi.fn(() => 1),
+    getLineLength: vi.fn(() => 0),
+    pushEditOperations: vi.fn(),
+    getOffsetAt: vi.fn(() => 0),
+  })),
+  updateOptions: vi.fn(),
+  hasWidgetFocus: vi.fn(() => false),
+  getRawOptions: vi.fn(() => ({ readOnly: false })),
+  deltaDecorations: vi.fn(() => []),
+  getPosition: vi.fn(() => ({ lineNumber: 1, column: 1 })),
+  trigger: vi.fn(),
+  getAction: vi.fn(() => ({ run: vi.fn(() => Promise.resolve()) })),
+};
+
 // Simple mock for monaco editor
 vi.mock("monaco-editor/esm/vs/editor/editor.all.js", () => ({}));
 vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
   default: {},
   editor: {
-    create: vi.fn(() => ({
-      onDidChangeModelContent: vi.fn(),
-      createContextKey: vi.fn(),
-      addCommand: vi.fn(),
-      onDidFocusEditorWidget: vi.fn(),
-      onDidBlurEditorWidget: vi.fn(),
-      dispose: vi.fn(),
-      getValue: vi.fn(() => ""),
-      setValue: vi.fn(),
-      layout: vi.fn(),
-      getModel: vi.fn(() => ({
-        getValue: vi.fn(() => ""),
-        setValue: vi.fn(),
-        getLineCount: vi.fn(() => 1),
-        getLineLength: vi.fn(() => 0),
-        pushEditOperations: vi.fn(),
-        getOffsetAt: vi.fn(() => 0),
-      })),
-      updateOptions: vi.fn(),
-      hasWidgetFocus: vi.fn(() => false),
-      getRawOptions: vi.fn(() => ({ readOnly: false })),
-      deltaDecorations: vi.fn(() => []),
-      getPosition: vi.fn(() => ({ lineNumber: 1, column: 1 })),
-      trigger: vi.fn(),
-      getAction: vi.fn(() => ({ run: vi.fn(() => Promise.resolve()) })),
-    })),
+    create: vi.fn(() => mockEditorObj),
     defineTheme: vi.fn(),
     setTheme: vi.fn(),
     setModelMarkers: vi.fn(),
@@ -68,12 +71,30 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
 }));
 
 // Mock dynamic imports
-vi.mock("monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js", () => ({}));
-vi.mock("monaco-editor/esm/vs/language/json/monaco.contribution.js", () => ({}));
-vi.mock("monaco-editor/esm/vs/language/html/monaco.contribution.js", () => ({}));
-vi.mock("monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js", () => ({}));
-vi.mock("monaco-editor/esm/vs/basic-languages/python/python.contribution.js", () => ({}));
-vi.mock("monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js", () => ({}));
+vi.mock(
+  "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js",
+  () => ({}),
+);
+vi.mock(
+  "monaco-editor/esm/vs/language/json/monaco.contribution.js",
+  () => ({}),
+);
+vi.mock(
+  "monaco-editor/esm/vs/language/html/monaco.contribution.js",
+  () => ({}),
+);
+vi.mock(
+  "monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js",
+  () => ({}),
+);
+vi.mock(
+  "monaco-editor/esm/vs/basic-languages/python/python.contribution.js",
+  () => ({}),
+);
+vi.mock(
+  "monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js",
+  () => ({}),
+);
 
 // Fix: component imports default from "@/composables/useLogs/searchState"
 vi.mock("@/composables/useLogs/searchState", () => ({
@@ -124,6 +145,12 @@ describe("CodeQueryEditor", () => {
       state: {
         theme: "light",
       },
+    });
+    // Reset call histories on the stable editor instance so each test starts clean
+    Object.values(mockEditorObj).forEach((fn) => {
+      if (typeof fn === "function" && "mockClear" in fn) {
+        (fn as ReturnType<typeof vi.fn>).mockClear();
+      }
     });
     vi.clearAllMocks();
   });
@@ -201,7 +228,9 @@ describe("CodeQueryEditor", () => {
     });
 
     it("should accept keywords array prop", () => {
-      const keywords = [{ label: "SELECT", kind: "Keyword", insertText: "SELECT" }];
+      const keywords = [
+        { label: "SELECT", kind: "Keyword", insertText: "SELECT" },
+      ];
       const wrapper = createWrapper({ keywords });
       expect(wrapper.props("keywords")).toEqual(keywords);
     });
@@ -434,7 +463,8 @@ describe("CodeQueryEditor", () => {
     });
 
     it("should handle complex SQL query", () => {
-      const query = "SELECT u.name, COUNT(*) as count FROM users u JOIN orders o ON u.id = o.user_id GROUP BY u.name";
+      const query =
+        "SELECT u.name, COUNT(*) as count FROM users u JOIN orders o ON u.id = o.user_id GROUP BY u.name";
       const wrapper = createWrapper({ query });
       expect(wrapper.props("query")).toBe(query);
     });
@@ -463,6 +493,69 @@ describe("CodeQueryEditor", () => {
 
       await wrapper.setProps({ language: "json" });
       expect(wrapper.props("language")).toBe("json");
+    });
+  });
+
+  describe("Ctrl+Enter / Cmd+Enter keyboard shortcut", () => {
+    let shortcutWrapper: ReturnType<typeof mount> | null = null;
+    let getElementByIdSpy: ReturnType<typeof vi.spyOn>;
+
+    // Spy on document.getElementById so setupEditor finds the editor element
+    // without needing the component attached to document. This bypasses the
+    // 100ms retry-loop setTimeout. Then use vi.waitFor to poll until the
+    // async setupEditor chain (dynamic imports + loadMonaco) fully completes.
+    const mountAndSetup = async (props: any = {}) => {
+      const fakeEditorEl = document.createElement("div");
+      getElementByIdSpy = vi
+        .spyOn(document, "getElementById")
+        .mockReturnValue(fakeEditorEl);
+
+      shortcutWrapper = mount(CodeQueryEditor, {
+        props: {
+          editorId: "test-editor",
+          query: "SELECT * FROM logs",
+          ...props,
+        },
+        global: { plugins: [store] },
+      });
+      // Wait until the async setupEditor completes and addCommand is recorded
+      await vi.waitFor(
+        () => {
+          expect(mockEditorObj.addCommand).toHaveBeenCalled();
+        },
+        { timeout: 3000 },
+      );
+      return shortcutWrapper;
+    };
+
+    afterEach(() => {
+      getElementByIdSpy?.mockRestore();
+      shortcutWrapper?.unmount();
+      shortcutWrapper = null;
+    });
+
+    it("should call addCommand with CtrlCmd+Enter keybinding", async () => {
+      await mountAndSetup();
+      expect(mockEditorObj.addCommand).toHaveBeenCalled();
+      const firstCall = mockEditorObj.addCommand.mock.calls[0];
+      // KeyMod.CtrlCmd | KeyCode.Enter = 1 | 13 (bitwise OR of the mock values)
+      expect(firstCall[0]).toBe(1 | 13);
+    });
+
+    it("should emit run-query when CtrlCmd+Enter handler is invoked", async () => {
+      const wrapper = await mountAndSetup();
+      expect(mockEditorObj.addCommand).toHaveBeenCalled();
+      const handler = mockEditorObj.addCommand.mock.calls[0][1];
+      expect(typeof handler).toBe("function");
+      handler();
+      expect(wrapper.emitted("run-query")).toBeTruthy();
+    });
+
+    it("should register addCommand with ctrlenter context", async () => {
+      await mountAndSetup();
+      expect(mockEditorObj.addCommand).toHaveBeenCalled();
+      const firstCall = mockEditorObj.addCommand.mock.calls[0];
+      expect(firstCall[2]).toBe("ctrlenter");
     });
   });
 });

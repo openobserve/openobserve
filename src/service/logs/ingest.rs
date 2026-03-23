@@ -75,7 +75,7 @@ pub async fn ingest(
     let start = std::time::Instant::now();
     let started_at: i64 = Utc::now().timestamp_micros();
     let cfg = config::get_config();
-    let mut need_usage_report = true;
+    let need_usage_report = in_req.should_report_usage();
     let log_ingestion_errors = ingestion_log_enabled().await;
     #[cfg(feature = "vectorscan")]
     let pattern_manager = get_pattern_manager().await?;
@@ -186,8 +186,6 @@ pub async fn ingest(
             IngestionData::Multi(req),
         ),
         IngestionRequest::Usage(req) => {
-            // no need to report usage for usage data
-            need_usage_report = false;
             json_req = json::from_slice(&req).unwrap_or({
                 let val: json::Value = json::from_slice(&req)?;
                 vec![val]

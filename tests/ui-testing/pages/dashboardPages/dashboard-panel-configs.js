@@ -67,7 +67,7 @@ export default class DashboardPanelConfigs {
       '[data-test="dashboard-config-table_dynamic_columns"]'
     );
     this.valueMapping = page.locator(
-      '[data-test="dashboard-addpanel-config-drilldown-add-btn"]'
+      '[data-test="dashboard-addpanel-config-value-mapping-add-btn"]'
     );
     this.overrideConfig = page.locator(
       '[data-test="dashboard-addpanel-config-override-config-add-btn"]'
@@ -374,8 +374,7 @@ export default class DashboardPanelConfigs {
    * @param {boolean} [options.setColor] - Whether to initialize the color (clicks "Set color")
    */
   async configureValueMapping({ value = "test_value", text = "Mapped!", setColor = true } = {}) {
-    // ValueMapping.vue shares data-test with Drilldown.vue — use last()
-    const valueMappingBtn = this.page.locator('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').last();
+    const valueMappingBtn = this.page.locator('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
     await this.scrollSidebarToElement(valueMappingBtn);
     await valueMappingBtn.click();
 
@@ -402,7 +401,7 @@ export default class DashboardPanelConfigs {
    * Open value mapping popup and return the popup locator (for external assertions).
    */
   async openValueMappingPopup() {
-    const valueMappingBtn = this.page.locator('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').last();
+    const valueMappingBtn = this.page.locator('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
     await this.scrollSidebarToElement(valueMappingBtn);
     await valueMappingBtn.click();
     const popup = this.page.locator('[data-test="dashboard-value-mapping-popup"]');
