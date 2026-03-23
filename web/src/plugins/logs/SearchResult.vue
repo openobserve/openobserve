@@ -1243,16 +1243,8 @@ export default defineComponent({
         return;
       }
 
-      // For alerts, use a lower min-length threshold (3 chars) so we still
-      // get useful WHERE clauses even for short-fragment patterns.
-      const parts = pattern.template.split(/<[*:][^>]*>/);
-      const constants: string[] = [];
-      for (const part of parts) {
-        const trimmed = part.trim();
-        if (trimmed.length >= 3) {
-          constants.push(trimmed);
-        }
-      }
+      // Reuse the same extraction logic as the search path for consistency
+      const constants = extractConstantsFromPattern(pattern.template);
 
       // Build SQL query with properly escaped match_all() clauses
       let sqlQuery = `SELECT * FROM '${streamName}'`;
@@ -1315,12 +1307,12 @@ export default defineComponent({
         totalLogsAnalyzed: searchObj.data.queryResults?.scan_records || 0,
       };
 
+      sessionStorage.setItem("patternData", JSON.stringify(patternData));
       router.push({
         name: "addAlert",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           fromPattern: "true",
-          patternData: encodeURIComponent(JSON.stringify(patternData)),
         },
       });
     };
