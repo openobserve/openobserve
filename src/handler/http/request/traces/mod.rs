@@ -1070,8 +1070,9 @@ async fn process_latest_traces_stream(
     }
 
     let total_partitions = partitions.len();
-    // Process partitions newest-first (partitions from search_partition are ordered oldest-first)
-    let partitions_desc: Vec<[i64; 2]> = partitions.into_iter().rev().collect();
+    // Partitions from search_partition are already in DESC order (newest-first) by default,
+    // since the partition SQL has no ORDER BY and the default is OrderBy::Desc.
+    let partitions_desc = partitions;
 
     // `from` is a global offset: skip the first `from` hits across all partitions,
     // then deliver `size` hits. We track how many we've seen and delivered so far.

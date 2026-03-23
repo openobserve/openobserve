@@ -2459,7 +2459,8 @@
     "maxSeriesPerQueryDescription": "Número máximo de series que se pueden devolver desde una sola consulta de PromQL. Ayuda a evitar que la interfaz de usuario se bloquee con conjuntos de resultados grandes. Déjelo vacío para usar los valores predeterminados del sistema (40 000).",
     "maxSeriesPerQueryTooltip": "Cuando una consulta de PromQL como 'count (metric) by (label) 'devuelve demasiadas series, puede congelar la interfaz de usuario. Este límite lo impide. Establézcalo en nulo como valor predeterminado del sistema o especifique un valor entre 1000 y 1 000 000.",
     "maxSeriesPerQueryValidation": "El valor debe estar entre 1000 y 1 000 000, o dejarlo vacío de forma predeterminada",
-    "systemDefault": "predeterminado del sistema"
+    "systemDefault": "predeterminado del sistema",
+    "usageStreamEnabledLabel": "Habilitar flujo de uso"
   },
   "iam": {
     "users": "Usuarios",
