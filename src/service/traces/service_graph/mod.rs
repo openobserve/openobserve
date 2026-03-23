@@ -18,6 +18,10 @@
 //! Daemon-based service graph that queries traces periodically.
 //! No inline processing during trace ingestion.
 
+/// Default window (in minutes) used when no explicit time range is provided.
+/// The UI has its own time range picker, so this only applies as the server-side fallback.
+pub const DEFAULT_QUERY_WINDOW_MINUTES: i64 = 60;
+
 // OSS modules
 pub mod aggregator;
 pub mod api;

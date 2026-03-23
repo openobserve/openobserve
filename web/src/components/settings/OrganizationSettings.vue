@@ -74,6 +74,18 @@
       </q-toggle>
     </div>
 
+    <div data-test="add-toggle-usage-stream" class="o2-input">
+      <q-toggle
+        data-test="add-toggle-usage-stream-btn"
+        v-model="usageStreamEnabled"
+        :label="t('settings.usageStreamEnabledLabel')"
+        stack-label
+        class="q-mt-sm o2-toggle-button-lg tw:mr-3 -tw:ml-4"
+        size="lg"
+      >
+      </q-toggle>
+    </div>
+
     <!-- Cross-Linking Configuration -->
     <template v-if="store.state.zoConfig?.enable_cross_linking">
       <q-separator class="q-mt-lg q-mb-md" />
@@ -137,6 +149,10 @@ const toggleIngestionLogs = ref(
   store.state?.organizationData?.organizationSettings?.toggle_ingestion_logs ||
     false,
 );
+const usageStreamEnabled = ref(
+  store.state?.organizationData?.organizationSettings?.usage_stream_enabled ||
+    false,
+);
 const crossLinks = ref(
   store.state?.organizationData?.organizationSettings?.cross_links || [],
 );
@@ -169,6 +185,7 @@ const saveOrgSettings = async () => {
       span_id_field_name: spanIdFieldName.value,
       toggle_ingestion_logs: toggleIngestionLogs.value,
       cross_links: crossLinks.value,
+      usage_stream_enabled: usageStreamEnabled.value,
     };
 
     await organizations.post_organization_settings(
@@ -182,6 +199,7 @@ const saveOrgSettings = async () => {
       span_id_field_name: spanIdFieldName.value,
       toggle_ingestion_logs: toggleIngestionLogs.value,
       cross_links: crossLinks.value,
+      usage_stream_enabled: usageStreamEnabled.value,
     };
 
     store.dispatch("setOrganizationSettings", updatedSettings);

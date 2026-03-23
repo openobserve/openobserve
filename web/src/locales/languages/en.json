@@ -2555,6 +2555,7 @@
     "traceIdFieldName": "Trace ID Field Name",
     "spanIdFieldName": "Span ID Field Name",
     "toggleIngestionLogsLabel": "Toggle Ingestion Logs",
+    "usageStreamEnabledLabel": "Enable Usage Stream",
     "claimParserFunction": "SSO Claim Parser",
     "claimParserFunctionDescription": "Select a function (VRL or JavaScript) to parse and transform SSO/LDAP claims into organization and role assignments",
     "claimParserFunctionLabel": "Select Function",
