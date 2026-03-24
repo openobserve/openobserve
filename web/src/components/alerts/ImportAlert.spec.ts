@@ -667,6 +667,35 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         expect(wrapper.vm.isAlertImporting).toBe(false);
       });
 
+      it("should reset BaseImport isImporting flag when JSON string is empty", async () => {
+        const baseImportRef = wrapper.vm.$refs.baseImportRef;
+        // Simulate BaseImport setting isImporting to true (as handleImport does)
+        baseImportRef.isImporting = true;
+
+        const mockPayload = {
+          jsonStr: "",
+          jsonArray: [],
+        };
+
+        await wrapper.vm.importJson(mockPayload);
+
+        expect(baseImportRef.isImporting).toBe(false);
+      });
+
+      it("should reset BaseImport isImporting flag when JSON is invalid", async () => {
+        const baseImportRef = wrapper.vm.$refs.baseImportRef;
+        baseImportRef.isImporting = true;
+
+        const mockPayload = {
+          jsonStr: "{ invalid json }",
+          jsonArray: [],
+        };
+
+        await wrapper.vm.importJson(mockPayload);
+
+        expect(baseImportRef.isImporting).toBe(false);
+      });
+
       it("should process valid JSON array", async () => {
         const mockPayload = {
           jsonStr: '[{"name": "alert1"}]',
