@@ -66,10 +66,8 @@ impl MigrationTrait for Migration {
 
         // Backfill: set source = 'meta_org' for existing _meta org entries
         let db = manager.get_connection();
-        db.execute_unprepared(
-            "UPDATE model_pricing SET source = 'meta_org' WHERE org = '_meta'",
-        )
-        .await?;
+        db.execute_unprepared("UPDATE model_pricing SET source = 'meta_org' WHERE org = '_meta'")
+            .await?;
 
         Ok(())
     }

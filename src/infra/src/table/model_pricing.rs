@@ -78,13 +78,13 @@ pub async fn put(item: ModelPricingDefinition) -> Result<ModelPricingDefinition,
         Some(existing) => {
             // If the name changed, check that the new name doesn't conflict with another
             // entry in the same org (the DB has a unique index on (org, name)).
-            if existing.name != item.name {
-                if let Some(_) = get_by_org_and_name(client, &item.org_id, &item.name).await? {
-                    return Err(Error::Message(format!(
-                        "A model pricing definition with name '{}' already exists in this organization",
-                        item.name
-                    )));
-                }
+            if existing.name != item.name
+                && (get_by_org_and_name(client, &item.org_id, &item.name).await?).is_some()
+            {
+                return Err(Error::Message(format!(
+                    "A model pricing definition with name '{}' already exists in this organization",
+                    item.name
+                )));
             }
             let mut active: ActiveModel = existing.into();
             active.name = Set(item.name);
@@ -189,7 +189,10 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), Error> {
     Ok(())
 }
 
-pub async fn delete_by_id(org_id: &str, id: &str) -> Result<(), Error> {
+/// Delete a model pricing definition by ID, scoped to org.
+/// Returns `Ok(true)` if a row was deleted, `Ok(false)` if not found.
+/// Built-in entries (`source = 'built_in'`) are never deleted — returns an error.
+pub async fn delete_by_id(org_id: &str, id: &str) -> Result<bool, Error> {
     let _lock = get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     if let Some(model) = Entity::find_by_id(id)
@@ -197,9 +200,16 @@ pub async fn delete_by_id(org_id: &str, id: &str) -> Result<(), Error> {
         .one(client)
         .await?
     {
+        if model.source == config::meta::model_pricing::PricingSource::BuiltIn.as_str() {
+            return Err(Error::Message(
+                "Built-in model pricing definitions cannot be deleted".to_string(),
+            ));
+        }
         model.delete(client).await?;
+        Ok(true)
+    } else {
+        Ok(false)
     }
-    Ok(())
 }
 
 /// Return all model names belonging to the built-in org.

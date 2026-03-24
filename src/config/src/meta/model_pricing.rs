@@ -135,6 +135,12 @@ pub struct PricingTierDefinition {
     /// Keys must exactly match usage keys produced by the span extractor:
     ///   "input", "output", "cache_read_input_tokens", "cache_creation_input_tokens", etc.
     /// Values are price per single token (e.g., 0.000003 = $3/1M tokens).
+    ///
+    /// **Precision note:** `f64` provides ~15 significant decimal digits, which is more
+    /// than sufficient for cost *estimation* on observability data. These values are not
+    /// used for billing or financial accounting — they produce approximate cost figures
+    /// for dashboards and alerts. The multiplication `token_count as f64 * price` is
+    /// exact for token counts < 2^53 (~9 quadrillion), well beyond practical span sizes.
     #[serde(default)]
     pub prices: HashMap<String, f64>,
 }

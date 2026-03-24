@@ -71,7 +71,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 stack-label
                 dense
                 borderless
-                :rules="[(val: string) => !!val?.trim() || 'Match pattern is required']"
+                :rules="[
+                  (val: string) => !!val?.trim() || 'Match pattern is required',
+                  (val: string) => {
+                    try { new RegExp(val); return true; }
+                    catch { return 'Invalid regex pattern'; }
+                  },
+                ]"
                 reactive-rules
                 lazy-rules
                 data-test="model-pricing-pattern-input"
@@ -519,8 +525,8 @@ onBeforeMount(async () => {
   const isDuplicate = route.query.duplicate === "true";
   if (id) {
     try {
-      const res = await modelPricingService.list(orgIdentifier.value);
-      const found = (res.data || []).find((m: any) => m.id === id);
+      const res = await modelPricingService.get(orgIdentifier.value, id);
+      const found = res.data;
       if (found) {
         model.value = JSON.parse(JSON.stringify(found));
         if (isDuplicate) {

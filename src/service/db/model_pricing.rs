@@ -67,21 +67,23 @@ fn build_entries(definitions: Vec<ModelPricingDefinition>) -> Vec<CachedModelPri
     let mut entries: Vec<CachedModelPricing> = definitions
         .into_iter()
         .filter(|d| d.enabled)
-        .filter_map(|def| match RegexBuilder::new(&def.match_pattern)
-            .size_limit(REGEX_SIZE_LIMIT)
-            .build()
-        {
-            Ok(re) => Some(CachedModelPricing {
-                definition: def,
-                compiled_regex: re,
-            }),
-            Err(e) => {
-                log::warn!(
-                    "[model_pricing] invalid regex '{}' for model '{}': {e}",
-                    def.match_pattern,
-                    def.name,
-                );
-                None
+        .filter_map(|def| {
+            match RegexBuilder::new(&def.match_pattern)
+                .size_limit(REGEX_SIZE_LIMIT)
+                .build()
+            {
+                Ok(re) => Some(CachedModelPricing {
+                    definition: def,
+                    compiled_regex: re,
+                }),
+                Err(e) => {
+                    log::warn!(
+                        "[model_pricing] invalid regex '{}' for model '{}': {e}",
+                        def.match_pattern,
+                        def.name,
+                    );
+                    None
+                }
             }
         })
         .collect();
@@ -203,8 +205,7 @@ fn merge_entries(
             .cmp(&y.definition.sort_order)
             .then_with(|| {
                 // Priority order: Org (0) < MetaOrg (1) < BuiltIn (2)
-                source_priority(&x.definition.source)
-                    .cmp(&source_priority(&y.definition.source))
+                source_priority(&x.definition.source).cmp(&source_priority(&y.definition.source))
             })
             .then_with(|| x.definition.name.cmp(&y.definition.name))
     });
@@ -225,8 +226,9 @@ fn source_priority(source: &PricingSource) -> u8 {
 /// considered. Selection priority:
 ///   1. Source priority: Org > MetaOrg > BuiltIn  (higher-priority source always wins)
 ///   2. Within the same source, the greatest `valid_from` (most recent) wins.
-///   3. Within the same source and `valid_from`, the merge-order position (sort_order
-///      then name) is used as the final tiebreaker — earlier in the list wins.
+///   3. Within the same source and `valid_from`, the merge-order position (sort_order then name) is
+///      used as the final tiebreaker — earlier in the list wins.
+///
 /// When `span_ts_micros` is None, the first matching entry is returned.
 pub fn find_pricing_sync_at(
     entries: &[CachedModelPricing],
@@ -251,7 +253,8 @@ pub fn find_pricing_sync_at(
                 let new_prio = source_priority(&entry.definition.source);
                 let best_prio = source_priority(&b.definition.source);
                 if new_prio != best_prio {
-                    // Lower priority number = higher precedence (Org=0 beats MetaOrg=1 beats BuiltIn=2)
+                    // Lower priority number = higher precedence (Org=0 beats MetaOrg=1 beats
+                    // BuiltIn=2)
                     new_prio < best_prio
                 } else {
                     // Same source level: prefer the most recent valid_from.
@@ -285,11 +288,22 @@ pub fn calculate_cost_from_definition(
     definition: &ModelPricingDefinition,
     usage: &HashMap<String, i64>,
 ) -> CostResult {
-    let mut cost = HashMap::new();
-
-    let tier = select_tier(definition, usage);
+    let tier = match select_tier(definition, usage) {
+        Some(t) => t,
+        None => {
+            log::warn!(
+                "[model_pricing] no tiers in definition '{}' — returning empty cost",
+                definition.name,
+            );
+            return CostResult {
+                cost: HashMap::new(),
+                tier_name: String::new(),
+            };
+        }
+    };
     let tier_name = tier.name.clone();
 
+    let mut cost = HashMap::new();
     let mut total = 0.0;
     for (usage_key, &token_count) in usage {
         if usage_key == "total" {
@@ -324,13 +338,13 @@ pub fn calculate_cost_from_definition(
 fn select_tier<'a>(
     definition: &'a ModelPricingDefinition,
     usage: &HashMap<String, i64>,
-) -> &'a config::meta::model_pricing::PricingTierDefinition {
+) -> Option<&'a config::meta::model_pricing::PricingTierDefinition> {
     // Evaluate conditional tiers in order; first match wins.
     for tier in &definition.tiers {
         if let Some(ref cond) = tier.condition {
             let actual = usage.get(&cond.usage_key).copied().unwrap_or(0) as f64;
             if cond.operator.evaluate(actual, cond.value) {
-                return tier;
+                return Some(tier);
             }
         }
     }
@@ -340,7 +354,7 @@ fn select_tier<'a>(
         .tiers
         .iter()
         .find(|t| t.condition.is_none())
-        .unwrap_or_else(|| definition.tiers.first().expect("at least one tier"))
+        .or_else(|| definition.tiers.first())
 }
 
 // ── Startup: cache + watch ────────────────────────────────────────────────────
@@ -423,14 +437,17 @@ pub async fn set(item: ModelPricingDefinition) -> Result<ModelPricingDefinition,
 
 /// Delete a model pricing definition by ID.
 /// `org_id` is used both for the DB query (defence-in-depth org scoping) and the coordinator
-/// event key (cache invalidation).
-pub async fn delete_by_id(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
-    table::model_pricing::delete_by_id(org_id, id).await?;
-    let event_key = format!("{WATCHER_PREFIX}{org_id}/{id}");
-    if let Err(e) = infra::coordinator::model_pricing::emit_delete_event(&event_key).await {
-        log::error!("[model_pricing] failed to emit delete event: {e}");
+/// event key (cache invalidation). Returns `Ok(true)` if deleted, `Ok(false)` if not found.
+/// Returns an error if the entry is built-in.
+pub async fn delete_by_id(org_id: &str, id: &str) -> Result<bool, anyhow::Error> {
+    let deleted = table::model_pricing::delete_by_id(org_id, id).await?;
+    if deleted {
+        let event_key = format!("{WATCHER_PREFIX}{org_id}/{id}");
+        if let Err(e) = infra::coordinator::model_pricing::emit_delete_event(&event_key).await {
+            log::error!("[model_pricing] failed to emit delete event: {e}");
+        }
     }
-    Ok(())
+    Ok(deleted)
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

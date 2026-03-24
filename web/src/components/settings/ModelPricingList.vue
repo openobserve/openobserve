@@ -82,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="model-pricing-list-table"
       :rows="filteredModels"
       :columns="columns"
+      :loading="loading"
       row-key="id"
       v-model:pagination="pagination"
       class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
@@ -365,6 +366,7 @@ const q = useQuasar();
 
 const qTableRef = ref<any>(null);
 const models = ref<any[]>([]);
+const loading = ref(true);
 const refreshing = ref(false);
 
 const confirmDialogMeta = ref({
@@ -507,8 +509,9 @@ function getDefaultTier(model: any) {
   return model.tiers?.[0];
 }
 
-function formatPerMillion(pricePerToken: number | undefined): string {
-  if (!pricePerToken) return "$0";
+function formatPerMillion(pricePerToken: number | undefined | null): string {
+  if (pricePerToken == null) return "N/A";
+  if (pricePerToken === 0) return "$0.00";
   const perMillion = pricePerToken * 1_000_000;
   return `$${perMillion.toFixed(2)}`;
 }
@@ -518,11 +521,14 @@ const orgIdentifier = computed(
 );
 
 async function fetchModels() {
+  loading.value = true;
   try {
     const res = await modelPricingService.list(orgIdentifier.value);
     models.value = res.data || [];
   } catch (e: any) {
     q.notify({ type: "negative", message: "Failed to load models: " + e.message });
+  } finally {
+    loading.value = false;
   }
 }
 
@@ -679,6 +685,7 @@ onBeforeMount(() => {
 });
 
 onActivated(() => {
+  fetchModels();
   if (router.currentRoute.value.query.action === "import") {
     showImportModelPricingPage.value = true;
   }

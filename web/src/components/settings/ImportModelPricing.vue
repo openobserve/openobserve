@@ -159,243 +159,128 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </base-import>
 </template>
 
-<script lang="ts">
-import {
-  defineComponent,
-  ref,
-  computed,
-} from "vue";
+<script lang="ts" setup>
+import { ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 
-import AppTabs from "../common/AppTabs.vue";
 import BaseImport from "../common/BaseImport.vue";
 
 import modelPricingService from "@/services/model_pricing";
 
-export default defineComponent({
-  name: "ImportModelPricing",
-  props: {
-    existingModels: {
-      type: Array as () => string[],
-      default: () => [],
-    },
-  },
-  emits: ["cancel:hideform", "update:list"],
-  setup(props, { emit }) {
-    const store = useStore();
-    const router = useRouter();
-    const q = useQuasar();
-    const baseImportRef = ref<any>(null);
-    const modelPricingErrorsToDisplay = ref<any[]>([]);
-    const userSelectedModelPricingName = ref<string[]>([]);
-    const userSelectedModelPricingPattern = ref<string[]>([]);
-    const modelPricingCreators = ref<any[]>([]);
-    const activeTab = ref("import_json_file");
-    const isImporting = ref(false);
+defineProps<{
+  existingModels?: string[];
+}>();
 
-    const jsonArrayOfObj = computed({
-      get: () => {
-        return baseImportRef.value?.jsonArrayOfObj || [];
-      },
-      set: (val) => {
-        if (baseImportRef.value) {
-          baseImportRef.value.jsonArrayOfObj = val;
-        }
-      },
+const emit = defineEmits<{
+  "cancel:hideform": [];
+  "update:list": [];
+}>();
+
+const store = useStore();
+const router = useRouter();
+const q = useQuasar();
+const baseImportRef = ref<any>(null);
+const modelPricingErrorsToDisplay = ref<any[]>([]);
+const userSelectedModelPricingName = ref<string[]>([]);
+const userSelectedModelPricingPattern = ref<string[]>([]);
+const modelPricingCreators = ref<any[]>([]);
+const activeTab = ref("import_json_file");
+const isImporting = ref(false);
+
+const jsonArrayOfObj = computed({
+  get: () => {
+    return baseImportRef.value?.jsonArrayOfObj || [];
+  },
+  set: (val) => {
+    if (baseImportRef.value) {
+      baseImportRef.value.jsonArrayOfObj = val;
+    }
+  },
+});
+
+const allTabs = ref([
+  {
+    label: "File Upload / JSON",
+    value: "import_json_file",
+  },
+  {
+    label: "URL Import",
+    value: "import_json_url",
+  },
+]);
+
+function updateModelPricingName(name: string, index: number) {
+  if (baseImportRef.value?.jsonArrayOfObj[index]) {
+    baseImportRef.value.jsonArrayOfObj[index].name = name;
+    baseImportRef.value.jsonStr = JSON.stringify(
+      baseImportRef.value.jsonArrayOfObj,
+      null,
+      2
+    );
+  }
+}
+
+function updateModelPricingPattern(pattern: string, index: number) {
+  if (baseImportRef.value?.jsonArrayOfObj[index]) {
+    baseImportRef.value.jsonArrayOfObj[index].match_pattern = pattern;
+    baseImportRef.value.jsonStr = JSON.stringify(
+      baseImportRef.value.jsonArrayOfObj,
+      null,
+      2
+    );
+  }
+}
+
+function handleTabChange(newTab: string) {
+  activeTab.value = newTab;
+}
+
+async function importJson({ jsonStr: jsonString }: any) {
+  modelPricingErrorsToDisplay.value = [];
+  modelPricingCreators.value = [];
+
+  try {
+    if (!jsonString || jsonString.trim() === "") {
+      throw new Error("JSON string is empty");
+    }
+
+    const parsedJson = JSON.parse(jsonString);
+    jsonArrayOfObj.value = Array.isArray(parsedJson)
+      ? parsedJson
+      : [parsedJson];
+  } catch (e: any) {
+    q.notify({
+      message: e.message || "Invalid JSON format",
+      color: "negative",
+      position: "bottom",
+      timeout: 2000,
+    });
+    return;
+  }
+
+  let successCount = 0;
+  const totalCount = jsonArrayOfObj.value.length;
+  isImporting.value = true;
+
+  for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
+    const success = await processJsonObject(jsonObj, index + 1);
+    if (success) {
+      successCount++;
+    }
+  }
+
+  if (successCount === totalCount) {
+    q.notify({
+      message: `Successfully imported ${successCount} model pricing definition${successCount !== 1 ? "s" : ""}`,
+      color: "positive",
+      position: "bottom",
+      timeout: 2000,
     });
 
-    const allTabs = ref([
-      {
-        label: "File Upload / JSON",
-        value: "import_json_file",
-      },
-      {
-        label: "URL Import",
-        value: "import_json_url",
-      },
-    ]);
-
-    const updateModelPricingName = (name: string, index: number) => {
-      if (baseImportRef.value?.jsonArrayOfObj[index]) {
-        baseImportRef.value.jsonArrayOfObj[index].name = name;
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
-      }
-    };
-
-    const updateModelPricingPattern = (pattern: string, index: number) => {
-      if (baseImportRef.value?.jsonArrayOfObj[index]) {
-        baseImportRef.value.jsonArrayOfObj[index].match_pattern = pattern;
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
-      }
-    };
-
-    const handleTabChange = (newTab: string) => {
-      activeTab.value = newTab;
-    };
-
-    const importJson = async ({ jsonStr: jsonString }: any) => {
-      modelPricingErrorsToDisplay.value = [];
-      modelPricingCreators.value = [];
-
-      try {
-        if (!jsonString || jsonString.trim() === "") {
-          throw new Error("JSON string is empty");
-        }
-
-        const parsedJson = JSON.parse(jsonString);
-        jsonArrayOfObj.value = Array.isArray(parsedJson)
-          ? parsedJson
-          : [parsedJson];
-      } catch (e: any) {
-        q.notify({
-          message: e.message || "Invalid JSON format",
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
-        });
-        return;
-      }
-
-      let successCount = 0;
-      const totalCount = jsonArrayOfObj.value.length;
-      isImporting.value = true;
-
-      for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
-        const success = await processJsonObject(jsonObj, index + 1);
-        if (success) {
-          successCount++;
-        }
-      }
-
-      if (successCount === totalCount) {
-        q.notify({
-          message: `Successfully imported ${successCount} model pricing definition${successCount !== 1 ? "s" : ""}`,
-          color: "positive",
-          position: "bottom",
-          timeout: 2000,
-        });
-
-        setTimeout(() => {
-          emit("update:list");
-          router.push({
-            name: "modelPricing",
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          });
-          emit("cancel:hideform");
-        }, 400);
-      }
-
-      isImporting.value = false;
-
-      if (baseImportRef.value) {
-        baseImportRef.value.isImporting = false;
-      }
-    };
-
-    const processJsonObject = async (jsonObj: any, index: number) => {
-      try {
-        const validationResult = await validateModelPricingInputs(jsonObj, index);
-        if (!validationResult) {
-          return false;
-        }
-
-        if (modelPricingErrorsToDisplay.value.length === 0) {
-          const created = await createModelPricing(jsonObj, index);
-          return created;
-        }
-        return false;
-      } catch (e: any) {
-        q.notify({
-          message: "Error importing model pricing — please check the JSON",
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
-        });
-        return false;
-      }
-    };
-
-    const validateModelPricingInputs = async (jsonObj: any, index: number) => {
-      if (!jsonObj.name || !jsonObj.name.trim() || typeof jsonObj.name !== "string") {
-        modelPricingErrorsToDisplay.value.push([
-          {
-            field: "model_pricing_name",
-            message: `Model pricing - ${index}: name is required`,
-          },
-        ]);
-        return false;
-      }
-
-      if (
-        !jsonObj.match_pattern ||
-        !jsonObj.match_pattern.trim() ||
-        typeof jsonObj.match_pattern !== "string"
-      ) {
-        modelPricingErrorsToDisplay.value.push([
-          {
-            field: "model_pricing_pattern",
-            message: `Model pricing - ${index}: match_pattern is required`,
-          },
-        ]);
-        return false;
-      }
-
-      if (!Array.isArray(jsonObj.tiers) || jsonObj.tiers.length === 0) {
-        modelPricingErrorsToDisplay.value.push([
-          `Model pricing - ${index}: tiers must be a non-empty array`,
-        ]);
-        return false;
-      }
-
-      return true;
-    };
-
-    const createModelPricing = async (jsonObj: any, index: number) => {
-      try {
-        await modelPricingService.create(store.state.selectedOrganization.identifier, {
-          name: jsonObj.name,
-          match_pattern: jsonObj.match_pattern,
-          enabled: jsonObj.enabled ?? true,
-          tiers: jsonObj.tiers,
-          sort_order: jsonObj.sort_order ?? 0,
-        });
-        modelPricingCreators.value.push({
-          success: true,
-          message: `Model pricing - ${index}: "${jsonObj.name}" created successfully`,
-        });
-        return true;
-      } catch (error: any) {
-        const errorMessage =
-          error?.response?.data?.message || "Unknown Error";
-
-        q.notify({
-          message: `Failed to import model pricing "${jsonObj.name}": ${errorMessage}`,
-          color: "negative",
-          position: "bottom",
-          timeout: 4000,
-        });
-
-        modelPricingCreators.value.push({
-          success: false,
-          message: `Model pricing - ${index}: "${jsonObj.name}" creation failed --> \n Reason: ${errorMessage}`,
-        });
-        return false;
-      }
-    };
-
-    const arrowBackFn = () => {
+    setTimeout(() => {
+      emit("update:list");
       router.push({
         name: "modelPricing",
         query: {
@@ -403,46 +288,113 @@ export default defineComponent({
         },
       });
       emit("cancel:hideform");
-    };
+    }, 400);
+  }
 
-    const updateActiveTab = () => {
-      if (baseImportRef.value) {
-        baseImportRef.value.jsonStr = "";
-        baseImportRef.value.jsonFiles = null;
-        baseImportRef.value.url = "";
-        baseImportRef.value.jsonArrayOfObj = [{}];
-      }
-    };
+  isImporting.value = false;
 
-    return {
-      store,
-      importJson,
-      router,
-      q,
-      baseImportRef,
-      modelPricingErrorsToDisplay,
-      activeTab,
-      allTabs,
-      jsonArrayOfObj,
-      updateActiveTab,
-      arrowBackFn,
-      userSelectedModelPricingName,
-      userSelectedModelPricingPattern,
-      modelPricingCreators,
-      updateModelPricingName,
-      updateModelPricingPattern,
-      isImporting,
-      handleTabChange,
-      processJsonObject,
-      validateModelPricingInputs,
-      createModelPricing,
-    };
-  },
-  components: {
-    BaseImport,
-    AppTabs,
-  },
-});
+  if (baseImportRef.value) {
+    baseImportRef.value.isImporting = false;
+  }
+}
+
+async function processJsonObject(jsonObj: any, index: number) {
+  try {
+    const validationResult = await validateModelPricingInputs(jsonObj, index);
+    if (!validationResult) {
+      return false;
+    }
+
+    const created = await createModelPricing(jsonObj, index);
+    return created;
+  } catch (e: any) {
+    q.notify({
+      message: "Error importing model pricing — please check the JSON",
+      color: "negative",
+      position: "bottom",
+      timeout: 2000,
+    });
+    return false;
+  }
+}
+
+async function validateModelPricingInputs(jsonObj: any, index: number) {
+  if (!jsonObj.name || !jsonObj.name.trim() || typeof jsonObj.name !== "string") {
+    modelPricingErrorsToDisplay.value.push([
+      {
+        field: "model_pricing_name",
+        message: `Model pricing - ${index}: name is required`,
+      },
+    ]);
+    return false;
+  }
+
+  if (
+    !jsonObj.match_pattern ||
+    !jsonObj.match_pattern.trim() ||
+    typeof jsonObj.match_pattern !== "string"
+  ) {
+    modelPricingErrorsToDisplay.value.push([
+      {
+        field: "model_pricing_pattern",
+        message: `Model pricing - ${index}: match_pattern is required`,
+      },
+    ]);
+    return false;
+  }
+
+  if (!Array.isArray(jsonObj.tiers) || jsonObj.tiers.length === 0) {
+    modelPricingErrorsToDisplay.value.push([
+      `Model pricing - ${index}: tiers must be a non-empty array`,
+    ]);
+    return false;
+  }
+
+  return true;
+}
+
+async function createModelPricing(jsonObj: any, index: number) {
+  try {
+    await modelPricingService.create(store.state.selectedOrganization.identifier, {
+      name: jsonObj.name,
+      match_pattern: jsonObj.match_pattern,
+      enabled: jsonObj.enabled ?? true,
+      tiers: jsonObj.tiers,
+      sort_order: jsonObj.sort_order ?? 0,
+    });
+    modelPricingCreators.value.push({
+      success: true,
+      message: `Model pricing - ${index}: "${jsonObj.name}" created successfully`,
+    });
+    return true;
+  } catch (error: any) {
+    const errorMessage =
+      error?.response?.data?.message || "Unknown Error";
+
+    q.notify({
+      message: `Failed to import model pricing "${jsonObj.name}": ${errorMessage}`,
+      color: "negative",
+      position: "bottom",
+      timeout: 4000,
+    });
+
+    modelPricingCreators.value.push({
+      success: false,
+      message: `Model pricing - ${index}: "${jsonObj.name}" creation failed --> \n Reason: ${errorMessage}`,
+    });
+    return false;
+  }
+}
+
+function arrowBackFn() {
+  router.push({
+    name: "modelPricing",
+    query: {
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
+  });
+  emit("cancel:hideform");
+}
 </script>
 
 <style scoped lang="scss">

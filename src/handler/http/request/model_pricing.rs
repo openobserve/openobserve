@@ -16,7 +16,8 @@
 use axum::{
     Json,
     extract::{Path, Query},
-    response::Response,
+    http::StatusCode,
+    response::{IntoResponse, Response},
 };
 use config::meta::model_pricing::{BUILT_IN_ORG, META_ORG, ModelPricingDefinition, PricingSource};
 use serde::Deserialize;
@@ -128,7 +129,11 @@ pub async fn get(
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
     match model_pricing::get_by_id(&model_id).await {
-        Ok(Some(item)) if item.org_id == org_id => MetaHttpResponse::json(item),
+        Ok(Some(item))
+            if item.org_id == org_id || item.org_id == META_ORG || item.org_id == BUILT_IN_ORG =>
+        {
+            MetaHttpResponse::json(item)
+        }
         Ok(Some(_)) | Ok(None) => MetaHttpResponse::not_found("Model pricing definition not found"),
         Err(e) => MetaHttpResponse::internal_error(e),
     }
@@ -151,7 +156,7 @@ pub async fn get(
     ),
     request_body(content = ModelPricingDefinition, description = "Model pricing definition"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = ModelPricingDefinition),
+        (status = 201, description = "Created", content_type = "application/json", body = ModelPricingDefinition),
         (status = 400, description = "Bad request"),
     ),
 )]
@@ -193,7 +198,7 @@ pub async fn create(
     }
 
     match model_pricing::set(item).await {
-        Ok(saved) => MetaHttpResponse::json(saved),
+        Ok(saved) => (StatusCode::CREATED, Json(saved)).into_response(),
         Err(e) => map_set_error(e),
     }
 }
@@ -306,23 +311,17 @@ pub async fn delete(
     {
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
-    match model_pricing::get_by_id(&model_id).await {
-        Ok(Some(item)) if item.org_id == org_id => {
-            if item.source == PricingSource::BuiltIn {
-                return MetaHttpResponse::forbidden(
-                    "Built-in model pricing definitions cannot be deleted.",
-                );
+    match model_pricing::delete_by_id(&org_id, &model_id).await {
+        Ok(true) => MetaHttpResponse::ok("Model pricing definition deleted"),
+        Ok(false) => MetaHttpResponse::not_found("Model pricing definition not found"),
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("Built-in") {
+                MetaHttpResponse::forbidden(msg)
+            } else {
+                MetaHttpResponse::internal_error(e)
             }
         }
-        Ok(Some(_)) | Ok(None) => {
-            return MetaHttpResponse::not_found("Model pricing definition not found");
-        }
-        Err(e) => return MetaHttpResponse::internal_error(e),
-    }
-
-    match model_pricing::delete_by_id(&org_id, &model_id).await {
-        Ok(_) => MetaHttpResponse::ok("Model pricing definition deleted"),
-        Err(e) => MetaHttpResponse::internal_error(e),
     }
 }
 
@@ -392,38 +391,34 @@ pub async fn get_built_in(
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
 
-    use crate::service::db::model_pricing_sync::GITHUB_SERVICE;
-
     let source_url = config::get_config().common.model_pricing_source_url.clone();
 
-    let github_service = &*GITHUB_SERVICE;
-
-    let models: Vec<BuiltInModelPricingEntry> = match github_service
-        .fetch_json::<Vec<BuiltInModelPricingEntry>>(&source_url)
-        .await
-    {
-        Ok(m) => m,
+    // Read from DB (synced by background job) instead of making a live HTTP call.
+    let all_built_in = match model_pricing::list(BUILT_IN_ORG).await {
+        Ok(items) => items,
         Err(e) => {
-            log::error!("[model_pricing] failed to fetch built-in models from {source_url}: {e}");
-            return MetaHttpResponse::internal_error(
-                "Failed to fetch built-in model pricing. The source may be temporarily unavailable.",
-            );
+            log::error!("[model_pricing] failed to list built-in models from DB: {e}");
+            return MetaHttpResponse::internal_error("Failed to load built-in model pricing.");
         }
     };
 
     let search = query.search.to_lowercase();
-    let models = if search.is_empty() {
-        models
-    } else {
-        models
-            .into_iter()
-            .filter(|m| {
-                m.name.to_lowercase().contains(&search)
-                    || m.provider.to_lowercase().contains(&search)
-                    || m.description.to_lowercase().contains(&search)
-            })
-            .collect()
-    };
+    let models: Vec<BuiltInModelPricingEntry> = all_built_in
+        .into_iter()
+        .filter(|m| {
+            search.is_empty()
+                || m.name.to_lowercase().contains(&search)
+                || m.provider.to_lowercase().contains(&search)
+                || m.description.to_lowercase().contains(&search)
+        })
+        .map(|m| BuiltInModelPricingEntry {
+            name: m.name,
+            match_pattern: m.match_pattern,
+            tiers: m.tiers,
+            description: m.description,
+            provider: m.provider,
+        })
+        .collect();
 
     MetaHttpResponse::json(BuiltInModelPricingResponse {
         models,
@@ -491,6 +486,9 @@ fn validate_definition(item: &ModelPricingDefinition) -> Result<(), String> {
     if item.name.trim().is_empty() {
         return Err("Model name is required".to_string());
     }
+    if item.name.len() > 256 {
+        return Err("Model name must be 256 characters or fewer".to_string());
+    }
     if item.match_pattern.trim().is_empty() {
         return Err("Match pattern is required".to_string());
     }
@@ -507,6 +505,20 @@ fn validate_definition(item: &ModelPricingDefinition) -> Result<(), String> {
         return Err("At least one pricing tier is required".to_string());
     }
     for tier in &item.tiers {
+        if let Some(ref cond) = tier.condition {
+            if cond.usage_key.trim().is_empty() {
+                return Err(format!(
+                    "Tier '{}' has a condition with an empty usage_key",
+                    tier.name
+                ));
+            }
+            if cond.value.is_nan() || cond.value.is_infinite() {
+                return Err(format!(
+                    "Tier '{}' condition value must be a finite number, got {}",
+                    tier.name, cond.value
+                ));
+            }
+        }
         for (key, &price) in &tier.prices {
             if price.is_nan() || price.is_infinite() {
                 return Err(format!(
