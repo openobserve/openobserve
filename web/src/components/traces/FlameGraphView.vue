@@ -145,6 +145,7 @@ let chartInstance: echarts.ECharts | null = null;
 // State
 const viewMode = ref<"time" | "percentage">("time");
 const cursorVisible = ref(false);
+const maxVisualDepth = ref(0);
 const cursorX = ref(0);
 const cursorTimeLabel = ref("");
 
@@ -192,10 +193,52 @@ const handleChartMouseMove = (event: MouseEvent) => {
   cursorVisible.value = true;
 };
 
+// Assigns a collision-free visual row to each span.
+// Starts each span at its tree depth, then bumps it down if it overlaps
+// an already-placed span on that row.
+const computeVisualRows = (
+  spans: EnrichedSpan[],
+): { rowMap: Map<string, number>; maxRow: number } => {
+  const sorted = [...spans].sort((a, b) =>
+    a.depth !== b.depth ? a.depth - b.depth : a.startOffsetMs - b.startOffsetMs,
+  );
+
+  const rowOccupancy: Array<Array<{ start: number; end: number }>> = [];
+  const rowMap = new Map<string, number>();
+  let maxRow = 0;
+
+  for (const span of sorted) {
+    const spanStart = span.startOffsetMs;
+    const spanEnd = span.startOffsetMs + span.durationMs;
+
+    let candidate = span.depth;
+
+    while (true) {
+      const occupants = rowOccupancy[candidate];
+      if (!occupants) break;
+      const hasOverlap = occupants.some(
+        (o) => spanStart < o.end && o.start < spanEnd,
+      );
+      if (!hasOverlap) break;
+      candidate++;
+    }
+
+    rowMap.set(span.span_id, candidate);
+    if (!rowOccupancy[candidate]) rowOccupancy[candidate] = [];
+    rowOccupancy[candidate].push({ start: spanStart, end: spanEnd });
+    if (candidate > maxRow) maxRow = candidate;
+  }
+
+  return { rowMap, maxRow };
+};
+
 // Build flame graph data for ECharts
 const buildFlameGraphData = () => {
   const data: any[] = [];
   const traceDuration = props.traceDuration || 1;
+
+  const { rowMap, maxRow } = computeVisualRows(props.spans);
+  maxVisualDepth.value = maxRow;
 
   props.spans.forEach((span) => {
     const startPercent = (span.startOffsetMs / traceDuration) * 100;
@@ -203,10 +246,11 @@ const buildFlameGraphData = () => {
 
     // Only include if width is above minimum threshold
     if (durationPercent > 0.1) {
+      const visualRow = rowMap.get(span.span_id) ?? span.depth;
       data.push({
         value: [
           startPercent, // x position (percentage)
-          span.depth, // y position (depth level)
+          visualRow, // y position (collision-free visual row)
           durationPercent, // width (percentage of trace)
           span.durationMs, // actual duration in ms
         ],
@@ -289,8 +333,8 @@ const initChart = () => {
       bottom: 10,
       containLabel: false,
       height:
-        maxDepth.value > 0
-          ? maxDepth.value * (BLOCK_HEIGHT + BLOCK_PADDING) + BLOCK_HEIGHT
+        maxVisualDepth.value > 0
+          ? maxVisualDepth.value * (BLOCK_HEIGHT + BLOCK_PADDING) + BLOCK_HEIGHT
           : BLOCK_HEIGHT,
     },
     xAxis: {
@@ -391,7 +435,7 @@ const updateChart = () => {
   chartInstance.setOption(
     {
       yAxis: {
-        max: maxDepth.value + 0.5,
+        max: maxVisualDepth.value + 0.5,
       },
       series: [
         {
