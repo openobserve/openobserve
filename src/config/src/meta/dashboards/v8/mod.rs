@@ -428,6 +428,14 @@ pub struct PanelConfig {
     hidden_columns: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     sticky_columns: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sticky_first_column: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    column_order: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_pagination: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_pagination_rows_per_page: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]

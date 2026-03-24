@@ -265,6 +265,12 @@ jobs:
                 "ui-regression.spec.js",
                 "pipeline-regression.spec.js",
               ]
+          - testfolder: "Dashboard-Table-Pagination"
+            browser: "chrome"
+            run_files: 
+              [
+                "dashboard-table-pagination.spec.js"
+              ]
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
@@ -424,7 +430,7 @@ jobs:
               "Logs-Core"|"Logs-Queries")
                 ACTUAL_FOLDER="Logs"
                 ;;
-              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming")
+              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboard-Table-Pagination")
                 ACTUAL_FOLDER="dashboards"
                 ;;
               *)

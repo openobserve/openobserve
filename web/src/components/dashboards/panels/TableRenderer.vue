@@ -15,46 +15,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-table
-    :class="[
-      'my-sticky-virtscroll-table',
-      { 'no-position-absolute': store.state.printMode },
-      { 'wrap-enabled': wrapCells },
-    ]"
-    virtual-scroll
-    v-model:pagination="pagination"
-    :rows-per-page-options="[0]"
-    :virtual-scroll-sticky-size-start="48"
-    dense
-    :wrap-cells="wrapCells"
-    :rows="data.rows || []"
-    :columns="data.columns"
-    row-key="id"
-    ref="tableRef"
-    data-test="dashboard-panel-table"
-    @row-click="(...args: any) => $emit('row-click', ...args)"
-    hide-no-data
-  >
-    <template v-slot:body-cell="props">
-      <q-td :props="props" :style="getStyle(props)" class="copy-cell-td">
-        <!-- Copy button on left for numeric/right-aligned columns -->
-        <q-btn
-          v-if="props.col.align === 'right' && shouldShowCopyButton(props.value)"
-          :icon="
-            isCellCopied(props.rowIndex, props.col.name)
-              ? 'check'
-              : 'content_copy'
-          "
-          dense
-          size="xs"
-          no-caps
-          flat
-          class="copy-btn q-mr-xs"
-          @click.stop="
-            copyCellContent(props.value, props.rowIndex, props.col.name)
-          "
+  <div class="table-wrapper">
+    <q-table
+      :class="[
+        'my-sticky-virtscroll-table',
+        { 'no-position-absolute': store.state.printMode },
+        { 'wrap-enabled': wrapCells },
+      ]"
+      :virtual-scroll="!showPagination"
+      v-model:pagination="pagination"
+      :rows-per-page-options="paginationOptions"
+      :virtual-scroll-sticky-size-start="48"
+      dense
+      :wrap-cells="wrapCells"
+      :rows="data.rows || []"
+      :columns="data.columns"
+      row-key="id"
+      ref="tableRef"
+      data-test="dashboard-panel-table"
+      @row-click="(...args: any) => $emit('row-click', ...args)"
+      hide-no-data
+    >
+      <template v-slot:body-cell="props">
+        <q-td
+          :props="props"
+          :style="[getStyle(props), getStickyColumnStyle(props.col)]"
+          :class="{ 'sticky-column': props.col.sticky }"
+          :data-col-index="props.col.__colIndex"
+          class="copy-cell-td"
         >
-        </q-btn>
+          <!-- Copy button on left for numeric/right-aligned columns -->
+          <q-btn
+            v-if="
+              props.col.align === 'right' && shouldShowCopyButton(props.value)
+            "
+            :icon="
+              isCellCopied(props.rowIndex, props.col.name)
+                ? 'check'
+                : 'content_copy'
+            "
+            dense
+            size="xs"
+            no-caps
+            flat
+            class="copy-btn q-mr-xs"
+            @click.stop="
+              copyCellContent(props.value, props.rowIndex, props.col.name)
+            "
+          >
+          </q-btn>
           <!-- Use JsonFieldRenderer if column is marked as JSON -->
           <JsonFieldRenderer
             v-if="props.col.showFieldAsJson"
@@ -91,26 +100,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-td>
     </template>
 
-    <!-- Expose a bottom slot so callers (e.g., PromQL table) can provide footer content -->
-    <template v-slot:bottom>
-      <slot name="bottom" />
-    </template>
-  </q-table>
+      <!-- Expose a bottom slot so callers (e.g., PromQL table) can provide footer content -->
+      <!-- If no custom slot is provided, use default pagination layout -->
+      <template v-slot:bottom="scope">
+        <!-- Custom slot provided by parent (e.g., PromQLTableChart with legend filter) -->
+        <slot
+          v-if="$slots.bottom"
+          name="bottom"
+          v-bind="{
+            ...scope,
+            setRowsPerPage: (val: number) => (pagination.rowsPerPage = val),
+            paginationOptions,
+            totalRows: (data.rows || []).length,
+          }"
+        />
+        <!-- Default pagination layout when no custom slot -->
+        <!-- This matches the design in PromQLTableChart for consistency across all pages -->
+        <div v-else class="row items-center full-width">
+          <q-space />
+          <TablePaginationControls
+            :show-pagination="showPagination"
+            :pagination="scope.pagination"
+            :pagination-options="paginationOptions"
+            :total-rows="(data.rows || []).length"
+            :pages-number="scope.pagesNumber"
+            :is-first-page="scope.isFirstPage"
+            :is-last-page="scope.isLastPage"
+            @update:rows-per-page="
+              (val: number) => (pagination.rowsPerPage = val)
+            "
+            @first-page="scope.firstPage"
+            @prev-page="scope.prevPage"
+            @next-page="scope.nextPage"
+            @last-page="scope.lastPage"
+          />
+        </div>
+      </template>
+    </q-table>
+  </div>
 </template>
 
 <script lang="ts">
 import useNotifications from "@/composables/useNotifications";
 import { exportFile, copyToClipboard, useQuasar } from "quasar";
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, watch, computed, onUnmounted } from "vue";
 import { findFirstValidMappedValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useStore } from "vuex";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
 import JsonFieldRenderer from "./JsonFieldRenderer.vue";
+import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
+import TablePaginationControls from "../addPanel/TablePaginationControls.vue";
 
 export default defineComponent({
   name: "TableRenderer",
   components: {
     JsonFieldRenderer,
+    TablePaginationControls,
   },
   props: {
     data: {
@@ -127,6 +172,16 @@ export default defineComponent({
       required: false,
       type: Object,
       default: () => [],
+    },
+    showPagination: {
+      required: false,
+      type: Boolean,
+      default: false,
+    },
+    rowsPerPage: {
+      required: false,
+      type: Number,
+      default: TABLE_ROWS_PER_PAGE_DEFAULT_VALUE,
     },
   },
   emits: ["row-click"],
@@ -311,23 +366,113 @@ export default defineComponent({
             timeout: 1000,
           });
         })
-        .catch(() => {
-          $q.notify({
-            type: "negative",
-            message: "Failed to copy",
-            timeout: 1000,
-          });
-        });
+        .catch(() => {});
     };
 
+    // Sticky column offsets (calculated from column widths)
+    const stickyColumnOffsets = ref<Record<string, number>>({});
+
+    const updateStickyColumnOffsets = () => {
+      const columns = props.data?.columns || [];
+      let offset = 0;
+      const offsets: Record<string, number> = {};
+      for (const col of columns) {
+        if (col.sticky) {
+          offsets[col.name] = offset;
+          offset += parseInt(String(col.width || 100), 10);
+        }
+        col.__colIndex = columns.indexOf(col);
+      }
+      stickyColumnOffsets.value = offsets;
+
+      // Update/create style element for sticky columns
+      let styleEl = document.querySelector('style[data-sticky-styles="true"]') as HTMLStyleElement | null;
+      if (!styleEl) {
+        styleEl = document.createElement("style");
+        styleEl.setAttribute("data-sticky-styles", "true");
+        document.head.appendChild(styleEl);
+      }
+      const bgColor = store.state.theme === "dark" ? "#1a1a1a" : "#fff";
+      let css = "";
+      for (const col of columns) {
+        if (col.sticky) {
+          css += `.sticky-column[data-col-index="${col.__colIndex}"] { position: sticky; left: ${offsets[col.name]}px; z-index: 2; background-color: ${bgColor}; box-shadow: 2px 0 4px rgba(0,0,0,0.1); }\n`;
+        }
+      }
+      styleEl.textContent = css;
+    };
+
+    watch(
+      () => [props.data?.columns, store.state.theme],
+      () => {
+        updateStickyColumnOffsets();
+      },
+      { deep: true, immediate: true },
+    );
+
+    const getStickyColumnStyle = (col: any) => {
+      if (!col?.sticky) return {};
+      const bgColor = store.state.theme === "dark" ? "#1a1a1a" : "#fff";
+      return {
+        position: "sticky",
+        left: `${stickyColumnOffsets.value[col.name] ?? 0}px`,
+        "z-index": 2,
+        "background-color": bgColor,
+        "box-shadow": "2px 0 4px rgba(0,0,0,0.1)",
+      };
+    };
+
+    // Cleanup style element on unmount
+    onUnmounted(() => {
+      const styleEl = document.querySelector('style[data-sticky-styles="true"]');
+      if (styleEl) styleEl.remove();
+    });
+
+    // Pagination logic
+    // Dynamic available rows options
+    const paginationOptions = computed(() => {
+      if (!props.showPagination) {
+        return [0];
+      }
+
+      const defaultOptions = [10, 20, 50, 100, 250, 500, 1000];
+      const configuredRows = props.rowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE;
+
+      const options = new Set(defaultOptions);
+      if (configuredRows > 0) {
+        options.add(configuredRows);
+      }
+
+      const sorted = Array.from(options).sort((a, b) => a - b);
+      sorted.push(0);
+      return sorted;
+    });
+
+    const pagination = ref({
+      rowsPerPage: props.showPagination ? props.rowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE : 0,
+      page: 1,
+    });
+
+    watch(
+      () => [props.showPagination, props.rowsPerPage],
+      ([newShowPagination, newRowsPerPage]) => {
+        // Force reset pagination when toggle or config changes
+        pagination.value = {
+          ...pagination.value,
+          rowsPerPage: newShowPagination ? newRowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE : 0,
+          page: 1, // Reset to first page
+        };
+      },
+    );
+
     return {
-      pagination: ref({
-        rowsPerPage: 0,
-      }),
+      pagination,
+      paginationOptions,
       downloadTableAsCSV,
       downloadTableAsJSON,
       tableRef,
       getStyle,
+      getStickyColumnStyle,
       store,
       copyCellContent,
       isCellCopied,
@@ -396,7 +541,6 @@ export default defineComponent({
     overflow-wrap: break-word;
     white-space: normal !important;
   }
-
 }
 
 .copy-cell-td {

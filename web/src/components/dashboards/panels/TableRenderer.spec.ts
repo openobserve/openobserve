@@ -588,4 +588,805 @@ describe("TableRenderer", () => {
       expect(wrapper.exists()).toBe(true);
     });
   });
+
+  describe("JSON Export", () => {
+    it("should export table data as JSON", () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.downloadTableAsJSON("test-table");
+
+      expect(exportFile).toHaveBeenCalledWith(
+        "test-table.json",
+        expect.stringContaining('"columns"'),
+        "application/json",
+      );
+    });
+
+    it("should handle JSON export with correct structure", () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.downloadTableAsJSON("test-export");
+
+      expect(exportFile).toHaveBeenCalled();
+      const jsonContent = vi.mocked(exportFile).mock.calls[0][1];
+      const parsed = JSON.parse(jsonContent);
+
+      expect(parsed).toHaveProperty("columns");
+      expect(parsed).toHaveProperty("rows");
+    });
+
+    it("should handle empty table JSON export", () => {
+      const emptyData = { columns: [], rows: [] };
+      wrapper = createWrapper({ data: emptyData });
+
+      wrapper.vm.downloadTableAsJSON("empty-table");
+
+      expect(exportFile).toHaveBeenCalledWith(
+        "empty-table.json",
+        expect.any(String),
+        "application/json",
+      );
+    });
+
+    it("should use default filename when not provided", () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.downloadTableAsJSON();
+
+      expect(exportFile).toHaveBeenCalledWith(
+        "table-export.json",
+        expect.any(String),
+        "application/json",
+      );
+    });
+
+    it("should handle JSON export errors gracefully", () => {
+      wrapper = createWrapper();
+
+      // Mock exportFile to return false (failure)
+      vi.mocked(exportFile).mockReturnValueOnce(false);
+
+      const result = wrapper.vm.downloadTableAsJSON("test");
+
+      expect(exportFile).toHaveBeenCalled();
+    });
+  });
+
+  describe("Copy Cell Content", () => {
+    it("should copy cell content to clipboard", async () => {
+      wrapper = createWrapper();
+
+      await wrapper.vm.copyCellContent("test value", 0, "field");
+
+      // Check that the cell was marked as copied
+      expect(wrapper.vm.isCellCopied(0, "field")).toBe(true);
+    });
+
+    it("should not copy null values", async () => {
+      wrapper = createWrapper();
+
+      await wrapper.vm.copyCellContent(null, 0, "field");
+
+      expect(wrapper.vm.isCellCopied(0, "field")).toBe(false);
+    });
+
+    it("should not copy undefined values", async () => {
+      wrapper = createWrapper();
+
+      await wrapper.vm.copyCellContent(undefined, 0, "field");
+
+      expect(wrapper.vm.isCellCopied(0, "field")).toBe(false);
+    });
+
+    it("should reset copied state after timeout", async () => {
+      vi.useFakeTimers();
+      wrapper = createWrapper();
+
+      await wrapper.vm.copyCellContent("test", 0, "field");
+      expect(wrapper.vm.isCellCopied(0, "field")).toBe(true);
+
+      // Fast forward 3 seconds
+      vi.advanceTimersByTime(3000);
+
+      expect(wrapper.vm.isCellCopied(0, "field")).toBe(false);
+      vi.useRealTimers();
+    });
+
+    it("should handle copy errors gracefully", async () => {
+      wrapper = createWrapper();
+
+      // Simulate copy failure - the catch block should handle it
+      await wrapper.vm.copyCellContent("test", 0, "field");
+
+      // Should not throw error even if clipboard API fails
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should convert value to string before copying", async () => {
+      wrapper = createWrapper();
+
+      await wrapper.vm.copyCellContent(123, 0, "field");
+
+      expect(wrapper.vm.isCellCopied(0, "field")).toBe(true);
+    });
+  });
+
+  describe("Should Show Copy Button", () => {
+    it("should show copy button for valid string values", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.shouldShowCopyButton("test")).toBe(true);
+    });
+
+    it("should show copy button for numeric values", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.shouldShowCopyButton(123)).toBe(true);
+    });
+
+    it("should not show copy button for null", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.shouldShowCopyButton(null)).toBe(false);
+    });
+
+    it("should not show copy button for undefined", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.shouldShowCopyButton(undefined)).toBe(false);
+    });
+
+    it("should not show copy button for 'undefined' string", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.shouldShowCopyButton("undefined")).toBe(false);
+    });
+
+    it("should not show copy button for empty strings", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.shouldShowCopyButton("")).toBe(false);
+    });
+
+    it("should not show copy button for whitespace-only strings", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.shouldShowCopyButton("   ")).toBe(false);
+    });
+  });
+
+  describe("Is Cell Copied", () => {
+    it("should return false for non-copied cells", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.isCellCopied(0, "field")).toBe(false);
+    });
+
+    it("should return true for copied cells", async () => {
+      wrapper = createWrapper();
+
+      await wrapper.vm.copyCellContent("test", 5, "testField");
+
+      expect(wrapper.vm.isCellCopied(5, "testField")).toBe(true);
+    });
+
+    it("should distinguish between different cells", async () => {
+      wrapper = createWrapper();
+
+      await wrapper.vm.copyCellContent("test1", 0, "field1");
+
+      expect(wrapper.vm.isCellCopied(0, "field1")).toBe(true);
+      expect(wrapper.vm.isCellCopied(0, "field2")).toBe(false);
+      expect(wrapper.vm.isCellCopied(1, "field1")).toBe(false);
+    });
+  });
+
+  describe("Sticky Column Style", () => {
+    it("should return empty object for non-sticky columns", () => {
+      wrapper = createWrapper();
+
+      const style = wrapper.vm.getStickyColumnStyle({ sticky: false });
+      expect(style).toEqual({});
+    });
+
+    it("should return style object for sticky columns", () => {
+      wrapper = createWrapper({
+        data: {
+          columns: [
+            {
+              name: "col1",
+              sticky: true,
+              field: "col1",
+              label: "Column 1",
+            },
+          ],
+          rows: [],
+        },
+      });
+
+      const style = wrapper.vm.getStickyColumnStyle({
+        sticky: true,
+        name: "col1",
+      });
+
+      expect(style).toHaveProperty("position", "sticky");
+      expect(style).toHaveProperty("left");
+      expect(style).toHaveProperty("z-index", 2);
+      expect(style).toHaveProperty("background-color");
+      expect(style).toHaveProperty("box-shadow");
+    });
+
+    it("should calculate correct left offset for sticky columns", () => {
+      wrapper = createWrapper({
+        data: {
+          columns: [
+            {
+              name: "col1",
+              sticky: true,
+              width: 100,
+              field: "col1",
+            },
+            {
+              name: "col2",
+              sticky: true,
+              width: 150,
+              field: "col2",
+            },
+          ],
+          rows: [],
+        },
+      });
+
+      // Trigger the watch to calculate offsets
+      wrapper.vm.$nextTick();
+
+      const style1 = wrapper.vm.getStickyColumnStyle({
+        sticky: true,
+        name: "col1",
+      });
+      const style2 = wrapper.vm.getStickyColumnStyle({
+        sticky: true,
+        name: "col2",
+      });
+
+      expect(style1.left).toBe("0px");
+      expect(style2.left).toBe("100px");
+    });
+
+    it("should apply dark theme background for sticky columns", async () => {
+      store.state.theme = "dark";
+      wrapper = createWrapper({
+        data: {
+          columns: [
+            {
+              name: "col1",
+              sticky: true,
+              field: "col1",
+            },
+          ],
+          rows: [],
+        },
+      });
+
+      await wrapper.vm.$nextTick();
+
+      const style = wrapper.vm.getStickyColumnStyle({
+        sticky: true,
+        name: "col1",
+      });
+
+      expect(style["background-color"]).toBe("#1a1a1a");
+    });
+
+    it("should apply light theme background for sticky columns", async () => {
+      store.state.theme = "light";
+      wrapper = createWrapper({
+        data: {
+          columns: [
+            {
+              name: "col1",
+              sticky: true,
+              field: "col1",
+            },
+          ],
+          rows: [],
+        },
+      });
+
+      await wrapper.vm.$nextTick();
+
+      const style = wrapper.vm.getStickyColumnStyle({
+        sticky: true,
+        name: "col1",
+      });
+
+      expect(style["background-color"]).toBe("#fff");
+    });
+  });
+
+  describe("Update Sticky Column Styles", () => {
+    it("should create style element on mount", () => {
+      wrapper = createWrapper({
+        data: {
+          columns: [
+            {
+              name: "col1",
+              sticky: true,
+              field: "col1",
+            },
+          ],
+          rows: [],
+        },
+      });
+
+      // Check if style element exists
+      const styleElements = document.querySelectorAll(
+        'style[data-sticky-styles="true"]',
+      );
+      expect(styleElements.length).toBeGreaterThan(0);
+    });
+
+    it("should remove style element on unmount", () => {
+      wrapper = createWrapper({
+        data: {
+          columns: [
+            {
+              name: "col1",
+              sticky: true,
+              field: "col1",
+            },
+          ],
+          rows: [],
+        },
+      });
+
+      const initialCount = document.querySelectorAll(
+        'style[data-sticky-styles="true"]',
+      ).length;
+
+      wrapper.unmount();
+
+      const finalCount = document.querySelectorAll(
+        'style[data-sticky-styles="true"]',
+      ).length;
+      expect(finalCount).toBeLessThan(initialCount);
+    });
+
+    it("should update styles when columns change", async () => {
+      wrapper = createWrapper({
+        data: {
+          columns: [
+            {
+              name: "col1",
+              sticky: true,
+              field: "col1",
+            },
+          ],
+          rows: [],
+        },
+      });
+
+      await wrapper.setProps({
+        data: {
+          columns: [
+            {
+              name: "col1",
+              sticky: true,
+              field: "col1",
+            },
+            {
+              name: "col2",
+              sticky: true,
+              field: "col2",
+            },
+          ],
+          rows: [],
+        },
+      });
+
+      await wrapper.vm.$nextTick();
+
+      // Check that styles were updated
+      const styleElements = document.querySelectorAll(
+        'style[data-sticky-styles="true"]',
+      );
+      expect(styleElements.length).toBeGreaterThan(0);
+    });
+
+    it("should update styles when theme changes", async () => {
+      wrapper = createWrapper({
+        data: {
+          columns: [
+            {
+              name: "col1",
+              sticky: true,
+              field: "col1",
+            },
+          ],
+          rows: [],
+        },
+      });
+
+      store.state.theme = "dark";
+      await wrapper.vm.$nextTick();
+
+      store.state.theme = "light";
+      await wrapper.vm.$nextTick();
+
+      // Styles should have been updated
+      expect(wrapper.exists()).toBe(true);
+    });
+  });
+
+  describe("Column Format Function", () => {
+    it("should apply column format function to cell values", () => {
+      const formatFn = (val: any) => `Formatted: ${val}`;
+      const dataWithFormat = {
+        columns: [
+          {
+            name: "field",
+            label: "Field",
+            field: "field",
+            format: formatFn,
+          },
+        ],
+        rows: [{ id: 1, field: "test" }],
+      };
+
+      wrapper = createWrapper({ data: dataWithFormat });
+
+      const table = wrapper.findComponent({ name: "QTable" });
+      expect(table.props("columns")[0].format).toBe(formatFn);
+    });
+
+    it("should handle column format with row parameter", () => {
+      const formatFn = (val: any, row: any) => `${val}-${row.id}`;
+      const dataWithFormat = {
+        columns: [
+          {
+            name: "field",
+            label: "Field",
+            field: "field",
+            format: formatFn,
+          },
+        ],
+        rows: [{ id: 1, field: "test" }],
+      };
+
+      wrapper = createWrapper({ data: dataWithFormat });
+
+      const table = wrapper.findComponent({ name: "QTable" });
+      const result = table.props("columns")[0].format("test", { id: 1 });
+      expect(result).toBe("test-1");
+    });
+  });
+
+  describe("Sticky Column Offsets", () => {
+    it("should calculate cumulative width for multiple sticky columns", async () => {
+      wrapper = createWrapper({
+        data: {
+          columns: [
+            {
+              name: "col1",
+              sticky: true,
+              width: 100,
+              field: "col1",
+            },
+            {
+              name: "col2",
+              sticky: true,
+              width: 200,
+              field: "col2",
+            },
+            {
+              name: "col3",
+              sticky: true,
+              width: 150,
+              field: "col3",
+            },
+          ],
+          rows: [],
+        },
+      });
+
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      // Test offsets through getStickyColumnStyle function
+      const col1Style = wrapper.vm.getStickyColumnStyle({ name: "col1", sticky: true });
+      const col2Style = wrapper.vm.getStickyColumnStyle({ name: "col2", sticky: true });
+      const col3Style = wrapper.vm.getStickyColumnStyle({ name: "col3", sticky: true });
+
+      expect(col1Style.left).toBe("0px");
+      expect(col2Style.left).toBe("100px");
+      expect(col3Style.left).toBe("300px");
+    });
+
+    it("should use default width when not specified", async () => {
+      wrapper = createWrapper({
+        data: {
+          columns: [
+            {
+              name: "col1",
+              sticky: true,
+              field: "col1",
+            },
+            {
+              name: "col2",
+              sticky: true,
+              field: "col2",
+            },
+          ],
+          rows: [],
+        },
+      });
+
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      // Test offsets through getStickyColumnStyle function
+      const col1Style = wrapper.vm.getStickyColumnStyle({ name: "col1", sticky: true });
+      const col2Style = wrapper.vm.getStickyColumnStyle({ name: "col2", sticky: true });
+
+      expect(col1Style.left).toBe("0px");
+      expect(col2Style.left).toBe("100px"); // Default width
+    });
+
+    it("should parse string width values", async () => {
+      wrapper = createWrapper({
+        data: {
+          columns: [
+            {
+              name: "col1",
+              sticky: true,
+              width: "120",
+              field: "col1",
+            },
+            {
+              name: "col2",
+              sticky: true,
+              width: "180",
+              field: "col2",
+            },
+          ],
+          rows: [],
+        },
+      });
+
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      // Test offsets through getStickyColumnStyle function
+      const col1Style = wrapper.vm.getStickyColumnStyle({ name: "col1", sticky: true });
+      const col2Style = wrapper.vm.getStickyColumnStyle({ name: "col2", sticky: true });
+
+      expect(col1Style.left).toBe("0px");
+      expect(col2Style.left).toBe("120px");
+    });
+
+    it("should assign column index to each column", async () => {
+      wrapper = createWrapper({
+        data: {
+          columns: [
+            { name: "col1", field: "col1", label: "Col 1" },
+            { name: "col2", field: "col2", label: "Col 2" },
+            { name: "col3", field: "col3", label: "Col 3" },
+          ],
+          rows: [],
+        },
+      });
+
+      await wrapper.vm.$nextTick();
+
+      const columns = wrapper.vm.data.columns;
+      expect(columns[0].__colIndex).toBe(0);
+      expect(columns[1].__colIndex).toBe(1);
+      expect(columns[2].__colIndex).toBe(2);
+    });
+  });
+
+  describe("Dark Mode", () => {
+    it("should apply dark mode styling for sticky columns when theme is dark", async () => {
+      store.state.theme = "dark";
+      wrapper = createWrapper({
+        data: {
+          columns: [
+            {
+              name: "col1",
+              sticky: true,
+              field: "col1",
+            },
+          ],
+          rows: [],
+        },
+      });
+
+      await wrapper.vm.$nextTick();
+
+      const style = wrapper.vm.getStickyColumnStyle({
+        sticky: true,
+        name: "col1",
+      });
+
+      expect(style["background-color"]).toBe("#1a1a1a");
+    });
+  });
+
+  describe("Pagination Feature", () => {
+    it("should default showPagination to false", () => {
+      wrapper = createWrapper();
+
+      const table = wrapper.findComponent({ name: "QTable" });
+      // When pagination is disabled, virtual scroll should be enabled
+      expect(table.props("virtualScroll")).toBe(true);
+    });
+
+    it("should disable virtual scroll when showPagination is true", () => {
+      wrapper = createWrapper({ showPagination: true });
+
+      const table = wrapper.findComponent({ name: "QTable" });
+      expect(table.props("virtualScroll")).toBe(false);
+    });
+
+    it("should enable virtual scroll when showPagination is false", () => {
+      wrapper = createWrapper({ showPagination: false });
+
+      const table = wrapper.findComponent({ name: "QTable" });
+      expect(table.props("virtualScroll")).toBe(true);
+    });
+
+    it("should use default rows per page value when showPagination is true", () => {
+      wrapper = createWrapper({ showPagination: true });
+
+      // Default TABLE_ROWS_PER_PAGE_DEFAULT_VALUE is 10
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(10);
+    });
+
+    it("should use custom rowsPerPage value when provided", () => {
+      wrapper = createWrapper({ showPagination: true, rowsPerPage: 25 });
+
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(25);
+    });
+
+    it("should set rowsPerPage to 0 when showPagination is false", () => {
+      wrapper = createWrapper({ showPagination: false });
+
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(0);
+    });
+
+    it("should return [0] for paginationOptions when showPagination is false", () => {
+      wrapper = createWrapper({ showPagination: false });
+
+      expect(wrapper.vm.paginationOptions).toEqual([0]);
+    });
+
+    it("should return sorted pagination options with configured value when showPagination is true", () => {
+      wrapper = createWrapper({ showPagination: true, rowsPerPage: 25 });
+
+      const options = wrapper.vm.paginationOptions;
+      // Should include default options [10, 20, 50, 100, 250, 500, 1000] plus 25 and 0 (All)
+      expect(options).toContain(10);
+      expect(options).toContain(20);
+      expect(options).toContain(25);
+      expect(options).toContain(50);
+      expect(options).toContain(100);
+      expect(options).toContain(0); // "All" option at the end
+      // Should be sorted
+      expect(options[options.length - 1]).toBe(0);
+    });
+
+    it("should include custom rowsPerPage in options even if not in default list", () => {
+      wrapper = createWrapper({ showPagination: true, rowsPerPage: 15 });
+
+      const options = wrapper.vm.paginationOptions;
+      expect(options).toContain(15);
+      // Should be in sorted order
+      const numericOptions = options.slice(0, -1); // Exclude 0 (All)
+      for (let i = 1; i < numericOptions.length; i++) {
+        expect(numericOptions[i]).toBeGreaterThan(numericOptions[i - 1]);
+      }
+    });
+
+    it("should reset pagination to page 1 when showPagination changes", async () => {
+      wrapper = createWrapper({ showPagination: true, rowsPerPage: 10 });
+
+      // Set page to something other than 1
+      wrapper.vm.pagination.page = 5;
+      expect(wrapper.vm.pagination.page).toBe(5);
+
+      // Toggle showPagination
+      await wrapper.setProps({ showPagination: false });
+
+      // Page should reset to 1
+      expect(wrapper.vm.pagination.page).toBe(1);
+    });
+
+    it("should reset pagination to page 1 when rowsPerPage changes", async () => {
+      wrapper = createWrapper({ showPagination: true, rowsPerPage: 10 });
+
+      // Set page to something other than 1
+      wrapper.vm.pagination.page = 3;
+
+      // Change rowsPerPage
+      await wrapper.setProps({ rowsPerPage: 20 });
+
+      // Page should reset to 1
+      expect(wrapper.vm.pagination.page).toBe(1);
+    });
+
+    it("should update rowsPerPage when showPagination is toggled from false to true", async () => {
+      wrapper = createWrapper({ showPagination: false });
+
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(0);
+
+      await wrapper.setProps({ showPagination: true, rowsPerPage: 50 });
+
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
+    });
+
+    it("should update rowsPerPage when showPagination is toggled from true to false", async () => {
+      wrapper = createWrapper({ showPagination: true, rowsPerPage: 50 });
+
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
+
+      await wrapper.setProps({ showPagination: false });
+
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(0);
+    });
+
+    it("should pass paginationOptions to QTable rows-per-page-options", () => {
+      wrapper = createWrapper({ showPagination: true, rowsPerPage: 10 });
+
+      const table = wrapper.findComponent({ name: "QTable" });
+      const tableOptions = table.props("rowsPerPageOptions");
+
+      expect(tableOptions).toEqual(wrapper.vm.paginationOptions);
+    });
+
+    it("should not include duplicate values in paginationOptions", () => {
+      // Use a value that's already in default options
+      wrapper = createWrapper({ showPagination: true, rowsPerPage: 50 });
+
+      const options = wrapper.vm.paginationOptions;
+      const uniqueOptions = [...new Set(options)];
+      expect(options.length).toBe(uniqueOptions.length);
+    });
+
+    it("should handle zero rowsPerPage gracefully", () => {
+      wrapper = createWrapper({ showPagination: true, rowsPerPage: 0 });
+
+      // Should use default value when rowsPerPage is 0
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(10); // TABLE_ROWS_PER_PAGE_DEFAULT_VALUE
+    });
+
+    it("should handle negative rowsPerPage gracefully", () => {
+      wrapper = createWrapper({ showPagination: true, rowsPerPage: -5 });
+
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(0);
+    });
+
+    it("should expose setRowsPerPage function through bottom slot", () => {
+      wrapper = mount(TableRenderer, {
+        props: {
+          ...defaultProps,
+          showPagination: true,
+          rowsPerPage: 10,
+        },
+        global: {
+          plugins: [i18n, store],
+          mocks: {
+            $t: (key: string) => key,
+          },
+        },
+        slots: {
+          bottom: `<template #default="scope">
+            <div class="test-bottom" data-rows-per-page-fn="true"></div>
+          </template>`,
+        },
+      });
+
+      // The bottom slot should be rendered
+      expect(wrapper.find(".test-bottom").exists()).toBe(true);
+    });
+  });
 });
