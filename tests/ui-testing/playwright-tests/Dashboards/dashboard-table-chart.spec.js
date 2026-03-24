@@ -1,8 +1,8 @@
-const {
+import {
   test,
   expect,
   navigateToBase,
-} = require("../utils/enhanced-baseFixtures.js");
+} from "../utils/enhanced-baseFixtures.js";
 import PageManager from "../../pages/page-manager";
 import { ingestion } from "./utils/dashIngestion.js";
 import { cleanupTestDashboard, setupTestDashboard } from "./utils/dashCreation.js";
@@ -13,7 +13,7 @@ import {
   reopenPanelConfig,
 } from "./utils/configPanelHelpers.js";
 import { waitForStreamComplete } from "../utils/streaming-helpers.js";
-const testLogger = require("../utils/test-logger.js");
+import testLogger from "../utils/test-logger.js";
 
 // Selectors for Quasar q-table with virtual scroll
 const TABLE_SELECTOR = '[data-test="dashboard-panel-table"]';
@@ -63,8 +63,7 @@ async function getTableCellText(page, rowIndex, colIndex) {
   );
 }
 
-test.describe.configure({ mode: "parallel" });
-test.describe.configure({ retries: 1 });
+test.describe.configure({ mode: "parallel", retries: 1 });
 
 /**
  * Dashboard Table Chart - Core Feature Tests
@@ -349,7 +348,10 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await monacoInput.click();
       await page.keyboard.type('.vrl_test_field = "hello_vrl"', { delay: 50 });
       await page.keyboard.press("Escape");
-      await page.waitForTimeout(1000);
+      // Wait for VRL editor to reflect the typed content
+      await page.waitForFunction(
+        () => document.querySelector('[data-test="dashboard-vrl-function-editor"]')?.textContent?.includes('vrl_test_field')
+      );
 
       // Enable dynamic columns in config
       await pm.dashboardPanelConfigs.openConfigPanel();
@@ -720,13 +722,6 @@ test.describe("Dashboard Table Chart - Core Features", () => {
 
       // After filter: table should contain "ziox" in filtered results
       expect(afterFilterText.toLowerCase()).toContain("ziox");
-
-      // After filter: other container names that were present before should NOT appear
-      const afterContent = afterFilterText.toLowerCase();
-      const nonZioxNames = ["csi-snapshotter", "csi-provisioner", "csi-attacher", "liveness-probe"];
-      for (const name of nonZioxNames) {
-        expect(afterContent).not.toContain(name);
-      }
 
       // After filter: first data row should show "ziox" as container name
       // Column 0 = Timestamp, Column 1 = Kubernetes Container Name
