@@ -123,13 +123,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #cell-actions="{ row, column, active }">
             <CellActions
-              v-if="active"
+              v-if="active && !column.columnDef.meta.disableCellAction"
               :column="column"
               :row="row"
               :selected-stream-fields="
                 searchObj.data.stream.selectedStreamFields
               "
               :hide-search-term-actions="false"
+              :hide-ai="true"
               @copy="copyToClipboard"
               @add-search-term="addSearchTerm"
               @send-to-ai-chat="sendToAiChat"

@@ -92,7 +92,7 @@ const KNOWN_COLUMN_META: Record<
   status: {
     header: "Status",
     size: 120,
-    meta: { align: "center", slot: true },
+    meta: { align: "center", slot: true, disableCellAction: true },
   },
   status_code: {
     header: "Status Code",
@@ -107,7 +107,7 @@ const KNOWN_COLUMN_META: Record<
   service_latency: {
     header: "Service Latency",
     size: 160,
-    meta: { slot: true },
+    meta: { slot: true, disableCellAction: true },
   },
   input_tokens: {
     header: "Input Tokens",

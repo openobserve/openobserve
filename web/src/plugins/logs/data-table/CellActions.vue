@@ -42,6 +42,7 @@
     <!-- o2 ai context add button in the cell actions when user adds a interesting field to the table 
      then we show some options there we need this  -->
     <O2AIContextAddBtn
+      v-if="!hideAi"
       @send-to-ai-chat="sendToAiChat(JSON.stringify(row[column.id]))"
       :style="'border: 1px solid #fff;'"
       :size="'6px'"
@@ -74,6 +75,10 @@ const props = defineProps({
     default: () => [],
   },
   hideSearchTermActions: {
+    type: Boolean,
+    default: false,
+  },
+  hideAi: {
     type: Boolean,
     default: false,
   },
