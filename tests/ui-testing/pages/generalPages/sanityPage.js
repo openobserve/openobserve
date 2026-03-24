@@ -190,8 +190,6 @@ export class SanityPage {
     // Histogram Methods
     async clickHistogramToggle() {
         // Histogram toggle is now inside the utilities hamburger menu
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
         await this.page.locator(this.histogramToggleButton).click();
     }
 
