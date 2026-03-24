@@ -1024,7 +1024,7 @@ export default defineComponent({
     const aiIcon = computed(() => {
       return store.state.theme === "dark"
         ? getImageURL("images/common/ai_icon_dark.svg")
-        : getImageURL("images/common/ai_icon.svg");
+        : getImageURL("images/common/ai_icon_gradient.svg");
     });
 
     // Toggle NLP mode
