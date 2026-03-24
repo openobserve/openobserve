@@ -2219,7 +2219,7 @@
     "anomalyStatus": {
       "waiting": "待っています",
       "training": "トレーニング",
-      "active": "アクティブ",
+      "ready": "準備完了",
       "failed": "失敗",
       "disabled": "無効"
     },
