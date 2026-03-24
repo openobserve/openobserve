@@ -44,6 +44,16 @@ vi.mock('axios', () => ({
   }
 }));
 
+vi.mock('quasar', async () => {
+  const actual = await vi.importActual('quasar');
+  return {
+    ...actual,
+    useQuasar: vi.fn(() => ({
+      notify: vi.fn(),
+    })),
+  };
+});
+
 vi.mock('@/utils/zincutils', () => ({
   getImageURL: vi.fn((path) => `mocked-url/${path}`),
   useLocalOrganization: vi.fn(() => null),
@@ -689,6 +699,29 @@ describe('ImportPipeline.vue', () => {
 
     it('should expose importJson function', () => {
       expect(typeof wrapper.vm.importJson).toBe('function');
+    });
+  });
+
+  describe('importJson - BaseImport loading reset on error', () => {
+    beforeEach(() => {
+      wrapper = createWrapper();
+      wrapper.vm.baseImportRef = {
+        jsonArrayOfObj: [],
+        updateJsonArray: vi.fn(),
+        isImporting: true,
+      };
+    });
+
+    it('should reset BaseImport isImporting flag when JSON string is empty', async () => {
+      await wrapper.vm.importJson({ jsonStr: '', jsonArray: [] });
+
+      expect(wrapper.vm.baseImportRef.isImporting).toBe(false);
+    });
+
+    it('should reset BaseImport isImporting flag when JSON is invalid', async () => {
+      await wrapper.vm.importJson({ jsonStr: '{ invalid json }', jsonArray: [] });
+
+      expect(wrapper.vm.baseImportRef.isImporting).toBe(false);
     });
   });
 
