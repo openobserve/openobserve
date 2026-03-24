@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="props.errorCount != null && props.errorCount > 0"
           data-test="traces-error-count-badge"
           rounded
-          :label="`${formatLargeNumber(props.errorCount)} ${props.searchMode === 'spans' ? t('traces.errorTraces') : t('traces.errorSpans')}`"
+          :label="`${formatLargeNumber(props.errorCount)} ${props.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}`"
           class="text-caption tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-field-type-boolean-bg)]! tw:mr-[0.85rem]"
         />
         <q-space />
