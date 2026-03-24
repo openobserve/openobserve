@@ -53,7 +53,7 @@ jobs:
   build_binary:
     name: build_binary
     runs-on:
-      labels: ubicloud-standard-16
+      labels: ubicloud-standard-30
 
     steps:
       - name: Remove unused tools
