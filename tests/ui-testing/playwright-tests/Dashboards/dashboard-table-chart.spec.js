@@ -63,8 +63,6 @@ async function getTableCellText(page, rowIndex, colIndex) {
   );
 }
 
-test.describe.configure({ mode: "parallel", retries: 1 });
-
 /**
  * Dashboard Table Chart - Core Feature Tests
  *
@@ -98,6 +96,7 @@ test.describe.configure({ mode: "parallel", retries: 1 });
  * - Table with Y-axis aggregation function (sum, avg, min, max)
  */
 test.describe("Dashboard Table Chart - Core Features", () => {
+  test.describe.configure({ mode: "parallel", retries: 1 });
   test.beforeEach(async ({ page }) => {
     await navigateToBase(page);
     await ingestion(page);
