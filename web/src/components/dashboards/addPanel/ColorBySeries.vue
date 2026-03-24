@@ -16,7 +16,7 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div>
-    <div class="q-mb-sm" style="font-weight: 600">
+    <div class="q-mb-sm" style="font-weight: 600; display: flex; align-items: center">
       <span>{{ t("dashboard.colorBySeriesTitle") }}</span>
       <q-btn
         no-caps

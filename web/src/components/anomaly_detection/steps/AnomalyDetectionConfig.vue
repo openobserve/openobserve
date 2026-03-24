@@ -225,6 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               hide-bottom-space
               :rules="[(v) => !!v || 'Detection function is required']"
               data-test="anomaly-detection-function"
+              class="detection-fn-select"
               style="width: 110px; background: none"
               @update:model-value="onDetectionFunctionChange"
             />
@@ -244,6 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :rules="[(v) => !!v || 'Field is required']"
               hide-bottom-space
               data-test="anomaly-detection-function-field"
+              class="detection-fn-select"
               style="width: 180px; background: none"
               @filter="filterDetectionFieldOptions"
             >
@@ -1241,6 +1243,26 @@ export default defineComponent({
 .alert-settings-row {
   margin-bottom: 24px !important;
   padding-bottom: 0 !important;
+}
+
+// Detection function dropdowns — prevent text wrapping and cursor overflow
+.detection-fn-select {
+  :deep(.q-field__control) {
+    height: 36px;
+    min-height: 36px;
+  }
+  :deep(.q-field__native),
+  :deep(.q-field__input) {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 36px;
+  }
+  :deep(.q-field__marginal) {
+    height: 36px;
+  }
 }
 
 // Monaco SQL editor wrapper
