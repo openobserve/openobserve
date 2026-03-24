@@ -30,10 +30,13 @@ use crate::{
         models::dashboards::{
             DashboardRequestBody,
             DashboardResponseBody,
+            DeletePanelResponseBody,
             ListDashboardsQuery,
             ListDashboardsResponseBody,
             MoveDashboardRequestBody,
-            MoveDashboardsRequestBody, // UpdateDashboardRequestBody, UpdateDashboardResponseBody,
+            MoveDashboardsRequestBody,
+            PanelRequestBody,
+            PanelResponseBody,
         },
         request::{BulkDeleteRequest, BulkDeleteResponse},
     },
@@ -78,6 +81,20 @@ impl From<DashboardError> for Response {
             DashboardError::ListPermittedDashboardsError(err) => MetaHttpResponse::forbidden(err),
             DashboardError::UserNotFound => MetaHttpResponse::unauthorized("User not found"),
             DashboardError::PermissionDenied => MetaHttpResponse::forbidden("Permission denied"),
+            DashboardError::PanelUnsupportedVersion => {
+                MetaHttpResponse::bad_request("Panel operations are only supported for v8 dashboards")
+            }
+            DashboardError::TabNotFound(tab_id) => {
+                MetaHttpResponse::not_found(format!("Tab not found: {tab_id}"))
+            }
+            DashboardError::PanelNotFound(panel_id) => {
+                MetaHttpResponse::not_found(format!("Panel not found: {panel_id}"))
+            }
+            DashboardError::PanelAlreadyExists(panel_id, tab_id) => {
+                MetaHttpResponse::conflict(format!(
+                    "Panel with id {panel_id} already exists in tab {tab_id}"
+                ))
+            }
         }
     }
 }
@@ -490,6 +507,196 @@ pub async fn move_dashboards(
             MetaHttpResponse::ok(message)
         }
         Err(e) => e.into(),
+    }
+}
+
+/// AddPanel
+#[utoipa::path(
+    patch,
+    path = "/{org_id}/dashboards/{dashboard_id}/panels",
+    context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "AddPanel",
+    summary = "Add a panel to a dashboard",
+    description = "Add a panel to an existing dashboard. Layout auto-computed if not specified. Returns new hash for chaining.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard ID"),
+        ("folder" = Option<String>, Query, description = "Folder ID where the dashboard is located"),
+        ("hash" = String, Query, description = "Hash value for conflict detection"),
+    ),
+    request_body(content = inline(PanelRequestBody), description = "Panel to add"),
+    responses(
+        (status = StatusCode::OK, description = "Panel added", body = inline(PanelResponseBody)),
+        (status = StatusCode::BAD_REQUEST, description = "Unsupported dashboard version", body = ()),
+        (status = StatusCode::NOT_FOUND, description = "Dashboard or tab not found", body = ()),
+        (status = StatusCode::CONFLICT, description = "Panel ID already exists or hash conflict", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Add a panel to an existing dashboard. Layout auto-computed. Returns new hash for chaining.", "category": "dashboards"}))
+    )
+)]
+pub async fn add_panel(
+    Path((org_id, dashboard_id)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+    axum::Json(req_body): axum::Json<PanelRequestBody>,
+) -> Response {
+    let folder = crate::common::utils::http::get_folder(&query);
+    let hash = match query.get("hash") {
+        Some(h) => h.as_str(),
+        None => {
+            return MetaHttpResponse::bad_request("hash query parameter is required");
+        }
+    };
+
+    match dashboards::add_panel_to_dashboard(
+        &org_id,
+        &dashboard_id,
+        &folder,
+        hash,
+        req_body.tab_id.as_deref(),
+        req_body.panel,
+    )
+    .await
+    {
+        Ok((panel, new_hash, tab_id)) => MetaHttpResponse::json(PanelResponseBody {
+            panel,
+            hash: new_hash,
+            tab_id,
+        }),
+        Err(err) => err.into(),
+    }
+}
+
+/// UpdatePanel
+#[utoipa::path(
+    put,
+    path = "/{org_id}/dashboards/{dashboard_id}/panels/{panel_id}",
+    context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "UpdatePanel",
+    summary = "Update a single panel in a dashboard",
+    description = "Update a single panel in a dashboard by panel ID. Preserves layout if not explicitly set.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard ID"),
+        ("panel_id" = String, Path, description = "Panel ID"),
+        ("folder" = Option<String>, Query, description = "Folder ID where the dashboard is located"),
+        ("hash" = String, Query, description = "Hash value for conflict detection"),
+    ),
+    request_body(content = inline(PanelRequestBody), description = "Panel data to update"),
+    responses(
+        (status = StatusCode::OK, description = "Panel updated", body = inline(PanelResponseBody)),
+        (status = StatusCode::BAD_REQUEST, description = "Unsupported dashboard version", body = ()),
+        (status = StatusCode::NOT_FOUND, description = "Dashboard, tab, or panel not found", body = ()),
+        (status = StatusCode::CONFLICT, description = "Hash conflict", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update a single panel in a dashboard by panel ID. Preserves layout if not explicitly set.", "category": "dashboards"}))
+    )
+)]
+pub async fn update_panel(
+    Path((org_id, dashboard_id, panel_id)): Path<(String, String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+    axum::Json(req_body): axum::Json<PanelRequestBody>,
+) -> Response {
+    let folder = crate::common::utils::http::get_folder(&query);
+    let hash = match query.get("hash") {
+        Some(h) => h.as_str(),
+        None => {
+            return MetaHttpResponse::bad_request("hash query parameter is required");
+        }
+    };
+
+    match dashboards::update_panel_in_dashboard(
+        &org_id,
+        &dashboard_id,
+        &folder,
+        &panel_id,
+        hash,
+        req_body.tab_id.as_deref(),
+        req_body.panel,
+    )
+    .await
+    {
+        Ok((panel, new_hash, tab_id)) => MetaHttpResponse::json(PanelResponseBody {
+            panel,
+            hash: new_hash,
+            tab_id,
+        }),
+        Err(err) => err.into(),
+    }
+}
+
+/// DeletePanel
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/dashboards/{dashboard_id}/panels/{panel_id}",
+    context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "DeletePanel",
+    summary = "Delete a single panel from a dashboard",
+    description = "Delete a single panel from a dashboard by panel ID.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard ID"),
+        ("panel_id" = String, Path, description = "Panel ID"),
+        ("folder" = Option<String>, Query, description = "Folder ID where the dashboard is located"),
+        ("hash" = String, Query, description = "Hash value for conflict detection"),
+        ("tabId" = Option<String>, Query, description = "Tab ID to search for the panel"),
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Panel deleted", body = inline(DeletePanelResponseBody)),
+        (status = StatusCode::BAD_REQUEST, description = "Unsupported dashboard version", body = ()),
+        (status = StatusCode::NOT_FOUND, description = "Dashboard, tab, or panel not found", body = ()),
+        (status = StatusCode::CONFLICT, description = "Hash conflict", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Delete a single panel from a dashboard by panel ID.", "category": "dashboards", "requires_confirmation": true}))
+    )
+)]
+pub async fn delete_panel(
+    Path((org_id, dashboard_id, panel_id)): Path<(String, String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let folder = crate::common::utils::http::get_folder(&query);
+    let hash = match query.get("hash") {
+        Some(h) => h.as_str(),
+        None => {
+            return MetaHttpResponse::bad_request("hash query parameter is required");
+        }
+    };
+    let tab_id = query.get("tabId").map(|s| s.as_str());
+
+    match dashboards::delete_panel_from_dashboard(
+        &org_id,
+        &dashboard_id,
+        &folder,
+        &panel_id,
+        hash,
+        tab_id,
+    )
+    .await
+    {
+        Ok((new_hash, deleted_panel_id)) => {
+            MetaHttpResponse::json(DeletePanelResponseBody {
+                hash: new_hash,
+                panel_id: deleted_panel_id,
+            })
+        }
+        Err(err) => err.into(),
     }
 }
 

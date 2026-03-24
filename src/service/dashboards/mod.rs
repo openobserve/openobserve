@@ -16,7 +16,7 @@
 use config::{
     TIMESTAMP_COL_NAME, ider,
     meta::{
-        dashboards::{Dashboard, ListDashboardsParams},
+        dashboards::{Dashboard, ListDashboardsParams, v8},
         folder::{DEFAULT_FOLDER, Folder, FolderType},
         stream::{DistinctField, StreamType},
     },
@@ -121,6 +121,18 @@ pub enum DashboardError {
 
     #[error("Permission denied")]
     PermissionDenied,
+
+    #[error("panel operations are only supported for v8 dashboards")]
+    PanelUnsupportedVersion,
+
+    #[error("tab not found: {0}")]
+    TabNotFound(String),
+
+    #[error("panel not found: {0}")]
+    PanelNotFound(String),
+
+    #[error("panel with id {0} already exists in tab {1}")]
+    PanelAlreadyExists(String, String),
 }
 
 async fn add_distinct_field_entry(
@@ -613,6 +625,287 @@ pub(crate) async fn get_folder_and_dashboard(
     table::dashboards::get_by_id(org_id, dashboard_id)
         .await?
         .ok_or(DashboardError::DashboardNotFound)
+}
+
+/// Computes an auto-layout position for a new panel based on existing panels.
+///
+/// Grid is 192 columns wide. Default panel size: w=96, h=18.
+/// Places the new panel to the right of the last panel if there is room,
+/// otherwise below all existing panels.
+fn compute_panel_layout(
+    panels: &[v8::Panel],
+    override_w: Option<i64>,
+    override_h: Option<i64>,
+) -> v8::Layout {
+    let w = override_w.unwrap_or(96);
+    let h = override_h.unwrap_or(18);
+
+    if panels.is_empty() {
+        return v8::Layout {
+            x: 0,
+            y: 0,
+            w,
+            h,
+            i: 1,
+        };
+    }
+
+    let mut max_i: i64 = 0;
+    let mut max_y: i64 = 0;
+    let mut last_panel: Option<&v8::Panel> = None;
+
+    for panel in panels {
+        if panel.layout.i > max_i {
+            max_i = panel.layout.i;
+        }
+        if panel.layout.y > max_y || (panel.layout.y == max_y && last_panel.is_none()) {
+            max_y = panel.layout.y;
+            last_panel = Some(panel);
+        } else if panel.layout.y == max_y
+            && last_panel.is_some_and(|lp| {
+                panel.layout.x + panel.layout.w > lp.layout.x + lp.layout.w
+            })
+        {
+            last_panel = Some(panel);
+        }
+    }
+
+    let new_i = max_i + 1;
+
+    // Try to place to the right of the last panel
+    if let Some(lp) = last_panel {
+        let remaining = 192 - (lp.layout.x + lp.layout.w);
+        if remaining >= w {
+            return v8::Layout {
+                x: lp.layout.x + lp.layout.w,
+                y: lp.layout.y,
+                w,
+                h,
+                i: new_i,
+            };
+        }
+    }
+
+    // Place below all existing panels
+    let max_bottom = panels
+        .iter()
+        .map(|p| p.layout.y + p.layout.h)
+        .max()
+        .unwrap_or(0);
+
+    v8::Layout {
+        x: 0,
+        y: max_bottom,
+        w,
+        h,
+        i: new_i,
+    }
+}
+
+/// Adds a panel to an existing dashboard.
+///
+/// Auto-computes layout if the caller does not set explicit x/y values.
+/// Returns the panel as stored, the new dashboard hash, and the resolved tab ID.
+#[tracing::instrument(skip(panel))]
+pub async fn add_panel_to_dashboard(
+    org_id: &str,
+    dashboard_id: &str,
+    folder_id: &str,
+    hash: &str,
+    tab_id: Option<&str>,
+    mut panel: v8::Panel,
+) -> Result<(v8::Panel, String, String), DashboardError> {
+    let (_folder, mut dashboard) = get_folder_and_dashboard(org_id, dashboard_id).await?;
+    let v8_dash = dashboard.v8.as_mut().ok_or(DashboardError::PanelUnsupportedVersion)?;
+
+    // Resolve tab
+    let tab = if let Some(tid) = tab_id {
+        v8_dash
+            .tabs
+            .iter_mut()
+            .find(|t| t.tab_id == tid)
+            .ok_or_else(|| DashboardError::TabNotFound(tid.to_string()))?
+    } else {
+        v8_dash
+            .tabs
+            .first_mut()
+            .ok_or_else(|| DashboardError::TabNotFound("(no tabs)".to_string()))?
+    };
+    let resolved_tab_id = tab.tab_id.clone();
+
+    // Generate panel ID if empty
+    if panel.id.is_empty() {
+        panel.id = ider::generate();
+    }
+
+    // Check for duplicate panel ID
+    if tab.panels.iter().any(|p| p.id == panel.id) {
+        return Err(DashboardError::PanelAlreadyExists(
+            panel.id.clone(),
+            resolved_tab_id,
+        ));
+    }
+
+    // Auto-compute layout if caller didn't set explicit position
+    if panel.layout.x == 0 && panel.layout.y == 0 {
+        let override_w = if panel.layout.w > 0 {
+            Some(panel.layout.w)
+        } else {
+            None
+        };
+        let override_h = if panel.layout.h > 0 {
+            Some(panel.layout.h)
+        } else {
+            None
+        };
+        panel.layout = compute_panel_layout(&tab.panels, override_w, override_h);
+    } else if panel.layout.i == 0 {
+        // Even with explicit position, ensure i is set
+        let max_i = tab.panels.iter().map(|p| p.layout.i).max().unwrap_or(0);
+        panel.layout.i = max_i + 1;
+    }
+
+    tab.panels.push(panel.clone());
+
+    let saved = put(org_id, dashboard_id, folder_id, None, dashboard, Some(hash)).await?;
+    let new_hash = saved.hash.clone();
+
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        let _ = o2_enterprise::enterprise::super_cluster::queue::dashboards_put(
+            org_id, folder_id, saved,
+        )
+        .await;
+    }
+
+    Ok((panel, new_hash, resolved_tab_id))
+}
+
+/// Updates a single panel in an existing dashboard by panel ID.
+///
+/// Preserves the existing layout if the incoming panel's layout is all zeros.
+/// Returns the updated panel, the new dashboard hash, and the resolved tab ID.
+#[tracing::instrument(skip(panel))]
+pub async fn update_panel_in_dashboard(
+    org_id: &str,
+    dashboard_id: &str,
+    folder_id: &str,
+    panel_id: &str,
+    hash: &str,
+    tab_id: Option<&str>,
+    mut panel: v8::Panel,
+) -> Result<(v8::Panel, String, String), DashboardError> {
+    let (_folder, mut dashboard) = get_folder_and_dashboard(org_id, dashboard_id).await?;
+    let v8_dash = dashboard.v8.as_mut().ok_or(DashboardError::PanelUnsupportedVersion)?;
+
+    // Resolve tab
+    let tab = if let Some(tid) = tab_id {
+        v8_dash
+            .tabs
+            .iter_mut()
+            .find(|t| t.tab_id == tid)
+            .ok_or_else(|| DashboardError::TabNotFound(tid.to_string()))?
+    } else {
+        v8_dash
+            .tabs
+            .first_mut()
+            .ok_or_else(|| DashboardError::TabNotFound("(no tabs)".to_string()))?
+    };
+    let resolved_tab_id = tab.tab_id.clone();
+
+    // Find existing panel
+    let idx = tab
+        .panels
+        .iter()
+        .position(|p| p.id == panel_id)
+        .ok_or_else(|| DashboardError::PanelNotFound(panel_id.to_string()))?;
+
+    // Preserve existing layout if incoming layout is all zeros
+    let existing_layout = &tab.panels[idx].layout;
+    if panel.layout.x == 0
+        && panel.layout.y == 0
+        && panel.layout.w == 0
+        && panel.layout.h == 0
+        && panel.layout.i == 0
+    {
+        panel.layout = existing_layout.clone();
+    }
+
+    // URL param is authoritative for panel ID
+    panel.id = panel_id.to_string();
+
+    tab.panels[idx] = panel.clone();
+
+    let saved = put(org_id, dashboard_id, folder_id, None, dashboard, Some(hash)).await?;
+    let new_hash = saved.hash.clone();
+
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        let _ = o2_enterprise::enterprise::super_cluster::queue::dashboards_put(
+            org_id, folder_id, saved,
+        )
+        .await;
+    }
+
+    Ok((panel, new_hash, resolved_tab_id))
+}
+
+/// Deletes a single panel from an existing dashboard by panel ID.
+///
+/// If `tab_id` is provided, searches only that tab. Otherwise searches all tabs.
+/// Returns the new dashboard hash and the deleted panel ID.
+#[tracing::instrument]
+pub async fn delete_panel_from_dashboard(
+    org_id: &str,
+    dashboard_id: &str,
+    folder_id: &str,
+    panel_id: &str,
+    hash: &str,
+    tab_id: Option<&str>,
+) -> Result<(String, String), DashboardError> {
+    let (_folder, mut dashboard) = get_folder_and_dashboard(org_id, dashboard_id).await?;
+    let v8_dash = dashboard.v8.as_mut().ok_or(DashboardError::PanelUnsupportedVersion)?;
+
+    let mut found = false;
+
+    if let Some(tid) = tab_id {
+        let tab = v8_dash
+            .tabs
+            .iter_mut()
+            .find(|t| t.tab_id == tid)
+            .ok_or_else(|| DashboardError::TabNotFound(tid.to_string()))?;
+
+        let before_len = tab.panels.len();
+        tab.panels.retain(|p| p.id != panel_id);
+        found = tab.panels.len() < before_len;
+    } else {
+        // Search all tabs
+        for tab in &mut v8_dash.tabs {
+            let before_len = tab.panels.len();
+            tab.panels.retain(|p| p.id != panel_id);
+            if tab.panels.len() < before_len {
+                found = true;
+                break;
+            }
+        }
+    }
+
+    if !found {
+        return Err(DashboardError::PanelNotFound(panel_id.to_string()));
+    }
+
+    let saved = put(org_id, dashboard_id, folder_id, None, dashboard, Some(hash)).await?;
+    let new_hash = saved.hash.clone();
+
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        let _ = o2_enterprise::enterprise::super_cluster::queue::dashboards_put(
+            org_id, folder_id, saved,
+        )
+        .await;
+    }
+
+    Ok((new_hash, panel_id.to_string()))
 }
 
 /// Filters dashboards, returning only those that the user has permission to get.
