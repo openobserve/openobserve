@@ -832,11 +832,11 @@ mod tests {
 
         processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
 
-        // Cost should not be calculated for unknown model, but the structure should exist
-        // Cost details should have zero values
-        assert!(span_attrs.contains_key(O2Attributes::COST_DETAILS));
-        let cost = span_attrs.get(O2Attributes::COST_DETAILS).unwrap();
-        assert_eq!(cost.get("total").and_then(|v| v.as_f64()), Some(0.0));
+        // No pricing definition matched for unknown model — cost details should be absent.
+        // Emitting zeros would imply the cost is known to be zero (e.g. a free model),
+        // which is different from "cost unknown". The DB-backed pricing catalog is the
+        // only source of truth; the old hardcoded fallback has been removed.
+        assert!(!span_attrs.contains_key(O2Attributes::COST_DETAILS));
     }
 
     #[test]
