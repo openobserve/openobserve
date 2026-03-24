@@ -1068,7 +1068,10 @@
     "promqlTableMode": "ProMQL-tabelmodus",
     "overrideMessageExample": "{endpoint} wordt bijvoorbeeld vervangen door de labelwaarde voor eindpunt.",
     "stepValueTooltipInfo": "Indien niet gespecificeerd, wordt de stapwaarde van Paneelconfiguratie gebruikt.",
-    "optional": "Optioneel"
+    "optional": "Optioneel",
+    "pagination": "Paginering",
+    "rowsPerPage": "Records per pagina",
+    "rowsPerPageTooltip": "Stel het standaardaantal records in dat per pagina moet worden weergegeven"
   },
   "panel": {
     "header": "Paneel",

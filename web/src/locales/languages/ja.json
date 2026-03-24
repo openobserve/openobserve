@@ -1084,7 +1084,10 @@
     "promqlTableMode": "プロムQL テーブルモード",
     "overrideMessageExample": "たとえば、{endpoint} はエンドポイントのラベル値に置き換えられます。",
     "stepValueTooltipInfo": "指定しない場合は、パネル設定のステップ値が使用されます。",
-    "optional": "[オプション]"
+    "optional": "[オプション]",
+    "pagination": "ページネーション",
+    "rowsPerPage": "1 ページあたりのレコード数",
+    "rowsPerPageTooltip": "1 ページに表示するデフォルトのレコード数を設定します"
   },
   "panel": {
     "header": "パネル",
