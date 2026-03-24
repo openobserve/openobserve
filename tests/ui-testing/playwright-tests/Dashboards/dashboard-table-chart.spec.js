@@ -648,6 +648,103 @@ test.describe("Dashboard Table Chart - Core Features", () => {
     }
   );
 
+  // ===== P1 — Dynamic Filter (Adhoc) on Table =====
+
+  test(
+    "should apply dynamic filter on table panel and verify filtered data",
+    { tag: ["@tableChart", "@functional", "@P1"] },
+    async ({ page }) => {
+      const pm = new PageManager(page);
+      const dashboardName = generateDashboardName();
+
+      // Build table panel in the panel editor
+      await setupTestDashboard(page, pm, dashboardName);
+      await pm.dashboardCreate.addPanel();
+      await pm.dashboardPanelActions.addPanelName("Dynamic Filter Table");
+
+      await pm.chartTypeSelector.selectChartType("table");
+      await pm.chartTypeSelector.selectStreamType("logs");
+      await pm.chartTypeSelector.selectStream("e2e_automate");
+
+      await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
+      await pm.chartTypeSelector.searchAndAddField("kubernetes_container_hash", "y");
+
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await pm.chartTypeSelector.waitForTableDataLoad();
+
+      // --- BEFORE filter: capture row count and table content ---
+      const table = page.locator(TABLE_SELECTOR);
+      await table.waitFor({ state: "visible", timeout: 15000 });
+      const beforeRowCount = await pm.dashboardPanelActions.getTableRowCount();
+      const beforeHeaders = await getTableHeaders(page);
+      const beforeFilterText = await table.textContent();
+      testLogger.info("Before dynamic filter", {
+        rowCount: beforeRowCount,
+        headers: beforeHeaders,
+        preview: beforeFilterText.substring(0, 200),
+      });
+
+      // Before filter: table should have multiple rows (multiple container names)
+      expect(beforeRowCount).toBeGreaterThan(1);
+
+      // --- Apply dynamic filter: kubernetes_container_name = ziox ---
+      const adhocAddBtn = page.locator('[data-test="dashboard-variable-adhoc-add-selector"]');
+      await adhocAddBtn.waitFor({ state: "visible", timeout: 15000 });
+      await adhocAddBtn.click();
+
+      const nameSelector = page.locator('[data-test="dashboard-variable-adhoc-name-selector"]');
+      await nameSelector.click();
+      await nameSelector.fill("kubernetes_container_name");
+
+      const valueSelector = page.locator('[data-test="dashboard-variable-adhoc-value-selector"]');
+      await valueSelector.click();
+      await valueSelector.fill("ziox");
+
+      // Apply to re-query with the dynamic filter
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await pm.chartTypeSelector.waitForTableDataLoad();
+
+      // --- AFTER filter: capture row count and table content ---
+      const afterRowCount = await pm.dashboardPanelActions.getTableRowCount();
+      const afterFilterText = await table.textContent();
+      testLogger.info("After dynamic filter", {
+        rowCount: afterRowCount,
+        preview: afterFilterText.substring(0, 200),
+      });
+
+      // After filter: row count should be less than before (filtered down)
+      expect(afterRowCount).toBeLessThan(beforeRowCount);
+
+      // After filter: table data should have changed
+      expect(afterFilterText).not.toEqual(beforeFilterText);
+
+      // After filter: table should contain "ziox" in filtered results
+      expect(afterFilterText.toLowerCase()).toContain("ziox");
+
+      // After filter: other container names that were present before should NOT appear
+      const afterContent = afterFilterText.toLowerCase();
+      const nonZioxNames = ["csi-snapshotter", "csi-provisioner", "csi-attacher", "liveness-probe"];
+      for (const name of nonZioxNames) {
+        expect(afterContent).not.toContain(name);
+      }
+
+      // After filter: first data row should show "ziox" as container name
+      // Column 0 = Timestamp, Column 1 = Kubernetes Container Name
+      const firstRowContainerName = await getTableCellText(page, 0, 1);
+      expect(firstRowContainerName.toLowerCase()).toBe("ziox");
+
+      testLogger.info("Dynamic filter verified", {
+        beforeRows: beforeRowCount,
+        afterRows: afterRowCount,
+        firstRowValue: firstRowContainerName,
+      });
+
+      // Save and cleanup
+      await pm.dashboardPanelActions.savePanel();
+      await cleanupTestDashboard(page, pm, dashboardName);
+    }
+  );
+
   // ===== P1 — Builder to Custom Query Mode Switch =====
 
   test(
