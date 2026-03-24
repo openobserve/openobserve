@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </q-tabs>
     <q-separator style="width: 100%" />
-    <q-tab-panels v-model="activeTab" class="span_details_tab-panels">
+    <q-tab-panels v-model="activeTab" class="span_details_tab-panels tw:grow-1">
       <!-- LLM Preview Tab Panel -->
       <q-tab-panel
         v-if="isLLMSpan"
@@ -519,10 +519,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="trace-details-sidebar-attributes-table"
         ></pre>
       </q-tab-panel>
-      <q-tab-panel
-        name="events"
-        class="tw:p-0 tw:flex tw:flex-col tw:h-[30.6rem]!"
-      >
+      <q-tab-panel name="events" class="tw:p-0 tw:flex tw:flex-col tw:h-full">
         <template v-if="spanDetails.events.length">
           <!-- Wrap toggle toolbar -->
           <div class="tw:flex tw:items-center tw:gap-2 tw:pb-[0.325rem]">
@@ -558,9 +555,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :enable-status-bar="false"
               :default-columns="false"
               :row-height="28"
+              :hide-view-related-button="true"
+              :hide-expand-actions="true"
               :enable-ai-context-button="false"
               @update:columnOrder="handleEventsColumnOrder"
               @update:columnSizes="handleEventsColumnSizes"
+              @copy="copyEventToClipboard"
             />
           </div>
         </template>
@@ -1612,6 +1612,17 @@ export default defineComponent({
       });
     };
 
+    const copyEventToClipboard = (value: any, copyAsJson: boolean = true) => {
+      const text = copyAsJson ? JSON.stringify(value, null, 2) : String(value);
+      copyToClipboard(text).then(() => {
+        q?.notify?.({
+          type: "positive",
+          message: "Content Copied Successfully!",
+          timeout: 2000,
+        });
+      });
+    };
+
     const openReferenceTrace = (type: string, link: any) => {
       if (link && link.context) {
         const query = {
@@ -2054,6 +2065,7 @@ export default defineComponent({
       getStartTime,
       copySpanId,
       copyAttributesToClipboard,
+      copyEventToClipboard,
       openReferenceTrace,
       spanLinks,
       linkColumns,

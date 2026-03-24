@@ -461,6 +461,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
+                  class="tw:flex tw:flex-col tw:h-full"
                 />
               </div>
             </div>
