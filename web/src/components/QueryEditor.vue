@@ -581,6 +581,10 @@ defineExpose({
   box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35) !important;
 }
 
+.ai-floating-button:hover .ai-icon {
+  filter: brightness(0) invert(1);
+}
+
 /* AI icon rotation on hover - matches MainLayout ai-icon */
 .ai-floating-button .ai-icon {
   transition: transform 0.6s ease;
