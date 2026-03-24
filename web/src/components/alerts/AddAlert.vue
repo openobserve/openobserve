@@ -2715,7 +2715,6 @@ export default defineComponent({
           const raw = sessionStorage.getItem("patternData");
           if (!raw) return;
           const patternData = JSON.parse(raw);
-          sessionStorage.removeItem("patternData");
 
           const isAnomaly = !!patternData.isAnomaly;
 
@@ -2819,6 +2818,7 @@ export default defineComponent({
           });
 
           await nextTick();
+          sessionStorage.removeItem("patternData");
           if (previewAlertRef.value?.refreshData) {
             previewAlertRef.value.refreshData();
           }
@@ -3366,15 +3366,22 @@ export default defineComponent({
     }
 
     // Set default frequency to min_auto_refresh_interval
-    if (this.store.state?.zoConfig?.min_auto_refresh_interval)
-      this.formData.trigger_condition.frequency = Math.ceil(
-        this.store.state?.zoConfig?.min_auto_refresh_interval / 60 || 10,
-      );
+    // Skip when coming from a pattern or panel — those loaders set their own frequency
+    if (!isFromPattern && !isFromPanel) {
+      if (this.store.state?.zoConfig?.min_auto_refresh_interval)
+        this.formData.trigger_condition.frequency = Math.ceil(
+          this.store.state?.zoConfig?.min_auto_refresh_interval / 60 || 10,
+        );
+    }
 
     this.beingUpdated = this.isUpdated;
-    this.updateStreams(false)?.then(() => {
-      this.updateEditorContent(this.formData.stream_name);
-    });
+    // Skip when coming from a pattern — loadPatternDataIfPresent already called updateStreams
+    // and a second call would overwrite the pattern-derived SQL query
+    if (!isFromPattern) {
+      this.updateStreams(false)?.then(() => {
+        this.updateEditorContent(this.formData.stream_name);
+      });
+    }
     if (
       this.modelValue &&
       this.modelValue.name != undefined &&

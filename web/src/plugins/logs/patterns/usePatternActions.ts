@@ -111,6 +111,7 @@ export const usePatternActions = () => {
           "Pattern has very short constant segments. The alert query will match all logs in this stream — consider adding manual filters.",
         timeout: 5000,
       });
+      return;
     }
 
     const dt = (searchObj.data as any).datetime;
