@@ -446,20 +446,167 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:body-cell="props">
             <q-td
               class="text-left tw:text-[0.85rem]! cell-with-max-height"
-              :class="
-                props.col.name === 'field' ? 'tw:text-[var(--o2-json-key)]' : ''
-              "
+              :class="[
+                props.col.name === 'field'
+                  ? 'tw:text-[var(--o2-json-key)]'
+                  : '',
+                props.col.name === 'value' ? 'filter-cell' : '',
+              ]"
             >
-              <div class="cell-content">
+              <div v-if="props.col.name === 'value'" class="cell-content">
+                <div class="tw:w-fit! tw:inline-block">
+                  <q-btn-dropdown
+                    data-test="log-details-include-exclude-field-btn"
+                    size="0.5rem"
+                    flat
+                    outlined
+                    filled
+                    dense
+                    class="pointer tw:pl-0! tw:text-[var(--o2-text-4)]!"
+                    :name="'img:' + getImageURL('images/common/add_icon.svg')"
+                    aria-label="Add icon"
+                  >
+                    <q-list class="logs-table-list tw:p-[0.25rem]!">
+                      <q-item
+                        clickable
+                        v-close-popup
+                        @click.stop="
+                          $emit('apply-filter-immediately', {
+                            field: props.row.field,
+                            value: props.row.value,
+                            operator: '=',
+                          })
+                        "
+                        class="tw:rounded"
+                      >
+                        <q-item-section>
+                          <q-item-label
+                            ><q-btn
+                              title="Apply & Search (=)"
+                              size="6px"
+                              round
+                              class="tw:mr-[0.25rem]! pointer"
+                            >
+                              <q-icon
+                                color="currentColor"
+                                class="tw:w-[0.65rem]! tw:h-[0.65rem]!"
+                              >
+                                <EqualIcon></EqualIcon>
+                              </q-icon> </q-btn
+                            ><span class="tw:text-[0.85rem]!"
+                              >Apply & Search</span
+                            ></q-item-label
+                          >
+                        </q-item-section>
+                      </q-item>
+                      <q-item
+                        clickable
+                        v-close-popup
+                        @click.stop="
+                          $emit('apply-filter-immediately', {
+                            field: props.row.field,
+                            value: props.row.value,
+                            operator: '!=',
+                          })
+                        "
+                        class="tw:rounded"
+                      >
+                        <q-item-section>
+                          <q-item-label
+                            ><q-btn
+                              title="Apply & Search (≠)"
+                              size="6px"
+                              round
+                              class="pointer"
+                            >
+                              <q-icon color="currentColor">
+                                <NotEqualIcon
+                                  class="tw:w-[0.65rem]! tw:h-[0.65rem]!"
+                                ></NotEqualIcon>
+                              </q-icon> </q-btn
+                            ><span class="tw:text-[0.85rem]!">
+                              Apply & Search</span
+                            ></q-item-label
+                          >
+                        </q-item-section>
+                      </q-item>
+                      <q-separator />
+                      <q-item
+                        v-if="showPendingFilter"
+                        clickable
+                        v-close-popup
+                        @click.stop="
+                          $emit('add-filter', {
+                            field: props.row.field,
+                            value: props.row.value,
+                            operator: '=',
+                          })
+                        "
+                        class="tw:rounded"
+                      >
+                        <q-item-section>
+                          <q-item-label
+                            ><q-btn
+                              title="Add to pending"
+                              size="6px"
+                              round
+                              class="tw:mr-[0.25rem]! pointer"
+                            >
+                              <q-icon color="currentColor">
+                                <EqualIcon
+                                  class="tw:w-[0.65rem]! tw:h-[0.65rem]!"
+                                ></EqualIcon>
+                              </q-icon> </q-btn
+                            ><span class="tw:text-[0.85rem]!"
+                              >Add to pending</span
+                            ></q-item-label
+                          >
+                        </q-item-section>
+                      </q-item>
+                      <q-item
+                        v-if="showPendingFilter"
+                        clickable
+                        v-close-popup
+                        @click.stop="
+                          $emit('add-filter', {
+                            field: props.row.field,
+                            value: props.row.value,
+                            operator: '!=',
+                          })
+                        "
+                        class="tw:rounded"
+                      >
+                        <q-item-section>
+                          <q-item-label
+                            ><q-btn
+                              title="Add to pending"
+                              size="6px"
+                              round
+                              class="tw:mr-[0.25rem]! pointer"
+                            >
+                              <q-icon color="currentColor">
+                                <NotEqualIcon
+                                  class="tw:w-[0.65rem]! tw:h-[0.65rem]!"
+                                ></NotEqualIcon>
+                              </q-icon> </q-btn
+                            ><span class="tw:text-[0.85rem]!"
+                              >Add to pending</span
+                            ></q-item-label
+                          >
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
+                  </q-btn-dropdown>
+                </div>
                 <span
-                  v-if="props.col.name === 'value'"
+                  class="tw:min-w-0 tw:inline! tw:w-auto!"
                   v-html="
                     highlightTextMatch(props.row[props.col.name], searchQuery)
                   "
                 />
-                <span v-else>
-                  {{ props.row[props.col.name] }}
-                </span>
+              </div>
+              <div v-else class="cell-content">
+                <span>{{ props.row[props.col.name] }}</span>
               </div>
             </q-td>
           </template>
@@ -905,7 +1052,11 @@ import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { computed } from "vue";
-import { formatTimeWithSuffix, convertTimeFromNsToUs } from "@/utils/zincutils";
+import {
+  formatTimeWithSuffix,
+  convertTimeFromNsToUs,
+  getImageURL,
+} from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
 import { onMounted, onUnmounted, defineAsyncComponent, nextTick } from "vue";
@@ -927,6 +1078,8 @@ import {
 } from "@/utils/llmUtils";
 import DOMPurify from "dompurify";
 import { escapeHtml } from "@/utils/html";
+import EqualIcon from "@/components/icons/EqualIcon.vue";
+import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -964,6 +1117,8 @@ export default defineComponent({
     TelemetryCorrelationDashboard: defineAsyncComponent(
       () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
     ),
+    EqualIcon,
+    NotEqualIcon,
   },
   emits: [
     "close",
@@ -971,6 +1126,7 @@ export default defineComponent({
     "select-span",
     "open-trace",
     "show-correlation",
+    "add-filter",
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
@@ -985,6 +1141,8 @@ export default defineComponent({
 
     // Track fullscreen state
     const isFullscreen = ref(false);
+
+    const showPendingFilter = false;
 
     const closeSidebar = () => {
       emit("close");
@@ -2033,6 +2191,14 @@ export default defineComponent({
       return formatModelParameters(params);
     };
 
+    const serviceIconUrl = computed(() =>
+      getServiceIconDataUrl(
+        props.span?.service_name ?? "",
+        store.state.theme === "dark",
+        searchObj.meta.serviceColors?.[props.span?.service_name] ?? "#9e9e9e",
+      ),
+    );
+
     return {
       t,
       activeTab,
@@ -2087,13 +2253,8 @@ export default defineComponent({
       toggleFullscreen,
       isDarkMode,
       DOMPurify,
-      serviceIconUrl: computed(() =>
-        getServiceIconDataUrl(
-          props.span?.service_name ?? "",
-          store.state.theme === "dark",
-          searchObj.meta.serviceColors?.[props.span?.service_name] ?? "#9e9e9e",
-        ),
-      ),
+      serviceIconUrl,
+      getImageURL,
     };
   },
 });
@@ -2272,6 +2433,17 @@ export default defineComponent({
     word-break: break-word;
     word-wrap: break-word;
     white-space: pre-wrap;
+  }
+}
+
+// Hide filter action buttons until the row is hovered
+.filter-cell {
+  .filter-actions {
+    visibility: hidden;
+  }
+
+  &:hover .filter-actions {
+    visibility: visible;
   }
 }
 

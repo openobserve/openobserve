@@ -369,9 +369,7 @@ const applyFilterTerm = (filterTerm: string, baseValue: string): string => {
     return parts.join("| ");
   } else {
     const fieldName = getFieldFromExpression(filter);
-    const replaced = fieldName
-      ? replaceExistingFieldCondition(parts[0] as string, fieldName, filter)
-      : null;
+    const replaced = fieldName ? (parts[0] as string, fieldName, filter) : null;
     if (replaced !== null) return replaced;
     return (parts[0] as string) !== ""
       ? (parts[0] as string) + " and " + filter

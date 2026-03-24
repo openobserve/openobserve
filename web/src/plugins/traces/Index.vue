@@ -403,7 +403,7 @@ function getQueryTransform() {
 
 async function getStreamList() {
   try {
-    getStreams("traces", false)
+    return getStreams("traces", false)
       .then(async (res) => {
         searchObj.data.streamResults = res;
 
@@ -1323,6 +1323,19 @@ async function loadPageData() {
   await getStreamList();
 }
 
+function runQueryIfRequested() {
+  const queryParams = router.currentRoute.value.query;
+  const hasStream = !!queryParams.stream;
+  const hasOrg = !!queryParams.org_identifier;
+  const hasPeriod =
+    !!queryParams.period || (!!queryParams.from && !!queryParams.to);
+  const shouldRunQuery = queryParams["run-query"] === "true";
+
+  if (hasStream && hasOrg && hasPeriod && shouldRunQuery) {
+    searchData();
+  }
+}
+
 onBeforeMount(async () => {
   setupContextProvider();
   restoreUrlQueryParams();
@@ -1334,6 +1347,7 @@ onBeforeMount(async () => {
   await importSqlParser();
   if (!searchObj.loading) {
     await loadPageData();
+    runQueryIfRequested();
   }
 });
 
@@ -1346,12 +1360,13 @@ onUnmounted(() => {
   cleanupContextProvider();
 });
 
-onActivated(() => {
+onActivated(async () => {
   setupContextProvider();
   const params = router.currentRoute.value.query;
   if (params.reload === "true") {
     restoreUrlQueryParams();
-    loadPageData();
+    await loadPageData();
+    runQueryIfRequested();
   }
   if (
     searchObj.organizationIdentifier !=

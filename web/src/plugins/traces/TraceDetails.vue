@@ -40,10 +40,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-details-back-btn"
               class="tw:px-1! tw:mr-[0.325rem]! hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]"
               size="xs"
-              icon="arrow_back"
+              flat
+              dense
               @click="handleBackOrClose"
             >
-              <q-tooltip>{{ t("traces.tracesList") }}</q-tooltip>
+              <q-icon class="tw:text-[1.1rem]!" name="arrow_back" />
+              <q-tooltip>{{
+                areFiltersAdded
+                  ? t("traces.applyPendingFilters")
+                  : t("traces.backToTraces")
+              }}</q-tooltip>
             </q-btn>
 
             <div class="tw:flex">
@@ -53,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:text-base tw:font-semibold tw:leading-tight tw:text-[var(--o2-text-primary)]"
                 :title="traceTree[0]?.operationName"
               >
-                {{ traceTree[0]?.operationName || "Loading..." }}
+                {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
               </div>
 
               <!-- Service, Timestamp, and Trace ID -->
@@ -65,12 +71,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}</span>
                 <span>•</span>
                 <span>
-                  Trace ID:
+                  {{ t("traces.traceId") }}:
                   <span
                     v-if="mode === 'embedded'"
                     data-test="trace-details-trace-id"
                     class="tw:text-[var(--o2-text-primary)] tw:font-mono tw:cursor-pointer hover:tw:text-[var(--o2-theme-color)] tw:transition-colors"
-                    :title="`Open ${effectiveTraceId} in Traces`"
+                    :title="t('traces.openInTraces')"
                     @click="handleExpandToFullView"
                   >
                     {{ effectiveTraceId }}
@@ -91,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="content_copy"
                   size="12px"
                   class="tw:cursor-pointer hover:tw:text-[var(--o2-text-primary)]"
-                  title="Copy Trace ID"
+                  :title="t('traces.copyTraceId')"
                   @click="copyTraceId"
                 />
 
@@ -102,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:cursor-pointer hover:tw:text-[var(--o2-theme-color)]"
                   size="14px"
                   name="open_in_new"
-                  title="Open in Traces"
+                  :title="t('traces.openInTraces')"
                   @click="handleExpandToFullView"
                 />
               </div>
@@ -110,6 +116,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="tw:flex tw:items-center tw:space-x-3">
+            <!-- Apply filters button (standalone mode, right side) -->
+            <q-btn
+              v-if="mode === 'standalone' && areFiltersAdded"
+              data-test="trace-details-apply-filters-btn-right"
+              class="tw:px-2! tw:mr-[0.625rem]! tw:ml-[0.325rem]! hover:tw:bg-slate-200 tw:rounded tw:border-1! tw:border-solid! tw:border-[var(--o2-theme-color)]! tw:text-[var(--o2-theme-color)]! tw:tracking-[0.03rem]"
+              size="xs"
+              icon="filter_alt"
+              no-caps
+              @click="openFilterPopover"
+            >
+              <span class="tw:text-[0.75rem] tw:pl-[0.25rem]"
+                >{{ t("traces.viewFilters") }}
+              </span>
+              <q-tooltip>{{ t("traces.reviewAndApplyFilters") }}</q-tooltip>
+            </q-btn>
+
             <!-- Span Count Badge -->
             <div
               data-test="trace-details-spans-count"
@@ -117,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <q-icon name="hub" size="14px" />
               <span data-test="span-count-text"
-                >{{ effectiveSpanList.length }} spans</span
+                >{{ effectiveSpanList.length }} {{ t("traces.spansLabel") }}</span
               >
             </div>
 
@@ -130,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="14px"
                 :color="errorSpansCount > 0 ? 'negative' : undefined"
               />
-              <span>{{ errorSpansCount }} errors</span>
+              <span>{{ errorSpansCount }} {{ t("traces.errorsLabel") }}</span>
             </div>
 
             <!-- Expand button (embedded mode) -->
@@ -197,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="trace-details-search-input"
                   outlined
                   dense
-                  placeholder="Search in spans"
+                  :placeholder="t('traces.searchInSpans')"
                   clearable
                   class="tw:text-[12px]!"
                   @update:model-value="handleSearchQueryChange"
@@ -230,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="nav-btn"
                     @click="prevMatch"
                   >
-                    <q-tooltip>Previous match</q-tooltip>
+                    <q-tooltip>{{ t("traces.previousMatch") }}</q-tooltip>
                   </q-btn>
                   <div class="button-separator"></div>
                   <q-btn
@@ -245,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="nav-btn"
                     @click="nextMatch"
                   >
-                    <q-tooltip>Next match</q-tooltip>
+                    <q-tooltip>{{ t("traces.nextMatch") }}</q-tooltip>
                   </q-btn>
                 </div>
               </div>
@@ -383,7 +405,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :baseTracePosition="baseTracePosition"
                   :splitterWidth="leftWidth"
                   :isSidebarOpen="
-                    isSidebarOpen && (selectedSpanId || showTraceDetails)
+                    Boolean(
+                      isSidebarOpen && (selectedSpanId || showTraceDetails),
+                    )
                   "
                   @resize-start="startResize"
                 />
@@ -461,6 +485,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
+                  @add-filter="addFilterFromSidebar"
+                  @apply-filter-immediately="applyFilterImmediately"
                 />
               </div>
             </div>
@@ -487,7 +513,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :startTime="effectiveTimeRange.from || 0"
                   :endTime="effectiveTimeRange.to || 0"
                   :sidebarOpen="
-                    isSidebarOpen && (!!selectedSpanId || showTraceDetails)
+                    Boolean(
+                      isSidebarOpen && (!!selectedSpanId || showTraceDetails),
+                    )
                   "
                   @node-click="handleDAGNodeClick"
                 />
@@ -519,6 +547,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
+                  @add-filter="addFilterFromSidebar"
+                  @apply-filter-immediately="applyFilterImmediately"
                 />
               </div>
             </div>
@@ -563,9 +593,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   style="font-size: 16px; font-weight: 600; margin-bottom: 8px"
                 >
-                  Spans Table View
+                  {{ t("traces.spansTableView") }}
                 </div>
-                <div style="font-size: 14px">Coming soon...</div>
+                <div style="font-size: 14px">{{ t("traces.comingSoon") }}</div>
               </div>
             </div>
 
@@ -611,9 +641,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :thickness="2"
       />
       <div data-test="trace-details-loading-text" class="q-pt-sm">
-        Fetching your trace.
+        {{ t("traces.fetchingTrace") }}
       </div>
     </div>
+
+    <!-- Filters Sidebar -->
+    <q-dialog
+      v-model="showFilterPopover"
+      position="right"
+      maximized
+      transition-show="slide-left"
+      transition-hide="slide-right"
+    >
+      <q-card
+        class="tw:w-[30vw]! tw:h-full tw:flex tw:flex-col tw:bg-[var(--o2-surface)]"
+      >
+        <q-card-section
+          class="tw:flex tw:items-center tw:justify-between tw:border-b tw:border-[var(--o2-border)] tw:pb-2 tw:pt-3 tw:px-4"
+        >
+          <div
+            class="tw:text-lg tw:font-semibold tw:text-[var(--o2-text-primary)]"
+          >
+            {{ t("traces.traceFilters") }}
+          </div>
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+
+        <q-card-section class="tw:flex-1 tw:p-4 tw:flex tw:flex-col">
+          <div
+            class="tw:flex-1 tw:border tw:border-[var(--o2-border)] tw:rounded"
+          >
+            <CodeQueryEditor
+              v-model:query="localEditorValue"
+              language="sql"
+              class="tw:h-full tw:w-full"
+            />
+          </div>
+        </q-card-section>
+
+        <q-card-actions
+          align="right"
+          class="tw:border-t tw:border-[var(--o2-border)] tw:p-4 tw:bg-[var(--o2-card-bg)]"
+        >
+          <q-btn
+            flat
+            :label="t('common.cancel')"
+            color="primary"
+            v-close-popup
+            class="tw:normal-case"
+          />
+          <q-btn
+            unelevated
+            color="primary"
+            :label="t('traces.showTraces')"
+            @click="applyAndViewTraces"
+            class="tw:normal-case"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </div>
 </template>
 
@@ -630,7 +716,6 @@ import {
   nextTick,
 } from "vue";
 import { cloneDeep } from "lodash-es";
-import SpanRenderer from "./SpanRenderer.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useTraces from "@/composables/useTraces";
 import { computed } from "vue";
@@ -652,6 +737,7 @@ import {
   convertTraceServiceMapData,
 } from "@/utils/traces/convertTraceData";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
+import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
 import {
   SPAN_KIND_MAP,
   SPAN_KIND_UNSPECIFIED,
@@ -767,6 +853,9 @@ export default defineComponent({
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
+    CodeQueryEditor: defineAsyncComponent(
+      () => import("@/components/CodeQueryEditor.vue"),
+    ),
   },
 
   emits: ["searchQueryUpdated", "close", "spanSelected"],
@@ -828,6 +917,53 @@ export default defineComponent({
     const router = useRouter();
 
     const traceDetails = ref({});
+
+    // ── Filter-from-trace-details state ──────────────────────────────────────
+    const areFiltersAdded = ref(false);
+    const showFilterPopover = ref(false);
+    const filterDialogReady = ref(false);
+    const localEditorValue = ref("");
+
+    const addFilterFromSidebar = ({
+      field,
+      value,
+      operator,
+    }: {
+      field: string;
+      value: string;
+      operator: "=" | "!=";
+    }) => {
+      const term = buildFilterTerm(field, value, operator);
+      localEditorValue.value = applyFilterTerm(term, localEditorValue.value);
+      areFiltersAdded.value = true;
+
+      $q.notify({
+        type: "positive",
+        message: `Filter added: ${field} ${operator} '${value}'`,
+        timeout: 2000,
+      });
+    };
+
+    const openFilterPopover = () => {
+      showFilterPopover.value = true;
+    };
+
+    const applyAndViewTraces = () => {
+      searchObj.data.editorValue = localEditorValue.value;
+      showFilterPopover.value = false;
+      const query: any = cloneDeep(router.currentRoute.value.query);
+      delete query.trace_id;
+      if (searchObj.data.datetime.type === "relative") {
+        query.period = searchObj.data.datetime.relativeTimePeriod;
+      } else {
+        query.from = searchObj.data.datetime.startTime.toString();
+        query.to = searchObj.data.datetime.endTime.toString();
+      }
+      query.query = b64EncodeUnicode(localEditorValue.value);
+      query["run-query"] = "true";
+      router.push({ name: "traces", query });
+    };
+    // ─────────────────────────────────────────────────────────────────────────
 
     const traceVisuals = [
       { label: "Timeline", value: "timeline", icon: TraceTimelineIcon },
@@ -1455,13 +1591,13 @@ export default defineComponent({
 
         // Add service to selectedTrace if not already present
         const serviceName = event.service || "Frontend";
-        const existingService =
-          searchObj.data.traceDetails.selectedTrace.service_name.find(
-            (s: any) => s.service_name === serviceName,
-          );
+        const traceObj = searchObj.data.traceDetails.selectedTrace as any;
+        const existingService = traceObj.service_name.find(
+          (s: any) => s.service_name === serviceName,
+        );
 
         if (!existingService) {
-          searchObj.data.traceDetails.selectedTrace.service_name.push({
+          traceObj.service_name.push({
             service_name: serviceName,
             count: 1,
           });
@@ -1584,7 +1720,7 @@ export default defineComponent({
 
             serviceColorIndex.value++;
           }
-          searchObj.data.traceDetails.selectedTrace.services[
+          (searchObj.data.traceDetails.selectedTrace as any).services[
             service.service_name
           ] = service.count;
         },
@@ -2188,8 +2324,27 @@ export default defineComponent({
       if (props.mode === "embedded") {
         emit("close");
       } else {
-        routeToTracesList();
+        if (areFiltersAdded.value) {
+          applyAndViewTraces();
+        } else {
+          routeToTracesList();
+        }
       }
+    };
+
+    const applyFilterImmediately = ({
+      field,
+      value,
+      operator,
+    }: {
+      field: string;
+      value: string;
+      operator: "=" | "!=";
+    }) => {
+      const term = buildFilterTerm(field, value, operator);
+      localEditorValue.value = applyFilterTerm(term, localEditorValue.value);
+      areFiltersAdded.value = true;
+      applyAndViewTraces();
     };
 
     const handleExpandToFullView = () => {
@@ -2337,6 +2492,15 @@ export default defineComponent({
       // New event handlers
       handleBackOrClose,
       handleDAGNodeClick,
+      // Filter-from-trace-details
+      areFiltersAdded,
+      showFilterPopover,
+      filterDialogReady,
+      localEditorValue,
+      addFilterFromSidebar,
+      applyFilterImmediately,
+      openFilterPopover,
+      applyAndViewTraces,
       // DAG resize
       dagLeftWidth,
       startDagResize,
@@ -2589,7 +2753,6 @@ html:has(.trace-details) {
     // background: rgba(240, 240, 245, 0.8);
     // border: 0.125rem solid rgba(100, 100, 120, 0.3);
   }
-
   .chart-container-inner {
     min-height: 12.5rem;
     overflow: hidden;
