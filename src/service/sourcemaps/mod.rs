@@ -726,8 +726,11 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(res.error, "TypeError: can't access property \"nonExistent\", e is undefined");
-        assert_eq!(res.stack.len(),7);
+        assert_eq!(
+            res.error,
+            "TypeError: can't access property \"nonExistent\", e is undefined"
+        );
+        assert_eq!(res.stack.len(), 7);
 
         assert_eq!(
             res.stack[0].line,
