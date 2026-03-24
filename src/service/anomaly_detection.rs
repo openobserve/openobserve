@@ -783,6 +783,7 @@ pub async fn train_model(org_id: &str, anomaly_id: &str) -> Result<serde_json::V
             "status": "in_progress"
         }))
     }
+
     #[cfg(not(feature = "enterprise"))]
     anyhow::bail!("Anomaly detection is an enterprise feature")
 }
@@ -1096,11 +1097,11 @@ fn combine_detection_fn(function: &str, field: Option<&str>) -> String {
 
 /// Parse interval string like "1h", "30m" into seconds
 fn parse_interval(interval: &str) -> Result<i64> {
-    if let Some(interval) = interval.strip_suffix('h') {
-        let hours: i64 = interval.parse()?;
+    if interval.ends_with('h') {
+        let hours: i64 = interval[..interval.len() - 1].parse()?;
         Ok(hours * 3600)
-    } else if let Some(interval) = interval.strip_suffix('m') {
-        let minutes: i64 = interval.parse()?;
+    } else if interval.ends_with('m') {
+        let minutes: i64 = interval[..interval.len() - 1].parse()?;
         Ok(minutes * 60)
     } else {
         anyhow::bail!("Invalid interval format. Use '1h' or '30m'");
@@ -1458,7 +1459,6 @@ pub async fn write_anomalies_to_stream(
 /// Called by the enterprise scheduler when anomalies are detected and alert_enabled=true.
 /// Looks up the destination by name and POSTs a JSON payload to its webhook URL.
 #[cfg(feature = "enterprise")]
-#[allow(clippy::too_many_arguments)]
 pub async fn send_anomaly_alert(
     org_id: String,
     destination_id: String,

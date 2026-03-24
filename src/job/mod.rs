@@ -286,6 +286,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::compact::retention::watch());
     tokio::task::spawn(db::metrics::watch_prom_cluster_leader());
     tokio::task::spawn(db::system_settings::watch());
+    tokio::task::spawn(db::model_pricing::watch());
     tokio::task::spawn(db::alerts::templates::watch());
     tokio::task::spawn(db::alerts::destinations::watch());
     tokio::task::spawn(db::alerts::realtime_triggers::watch());
@@ -332,6 +333,30 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::system_settings::cache()
         .await
         .expect("system settings cache failed");
+
+    db::model_pricing::cache()
+        .await
+        .expect("model pricing cache failed");
+
+    // Sync built-in model pricing from GitHub (initial + periodic)
+    if LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
+        tokio::task::spawn(async {
+            if let Err(e) = db::model_pricing_sync::sync_built_in_from_github(false).await {
+                log::error!("[model_pricing] initial built-in sync failed: {e}");
+            }
+        });
+        tokio::task::spawn(async {
+            let interval = std::time::Duration::from_secs(
+                config::get_config().common.model_pricing_sync_interval_secs,
+            );
+            loop {
+                tokio::time::sleep(interval).await;
+                if let Err(e) = db::model_pricing_sync::sync_built_in_from_github(false).await {
+                    log::error!("[model_pricing] periodic built-in sync failed: {e}");
+                }
+            }
+        });
+    }
 
     // ensure system templates exist in database BEFORE caching
     alerts::templates::ensure_system_templates()
