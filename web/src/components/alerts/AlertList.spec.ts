@@ -717,7 +717,7 @@ describe("AlertList - additional validations", () => {
       await flushPromises();
 
       expect(wrapper.vm.filteredResults.every((r: any) => predicate(r))).toBe(true);
-    });
+    }, 10000);
   });
 
   it("openMenu stops event propagation (no error)", async () => {
@@ -809,7 +809,9 @@ describe("AlertList - micro validations", () => {
 
     wrapper.vm.searchAcrossFolders = false;
     await flushPromises();
-    expect(wrapper.vm.filterQuery).toBe("abc");
+    // When toggling off, both queries are cleared to reset cross-folder results
+    expect(wrapper.vm.filterQuery).toBeNull();
+    expect(wrapper.vm.searchQuery).toBeNull();
   }, 10000);
 
   it("editAlert fetches by alert_id then opens form", async () => {

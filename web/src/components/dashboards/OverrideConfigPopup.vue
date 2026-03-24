@@ -5,7 +5,7 @@
       style="border-bottom: 2px solid gray; margin-bottom: 5px"
     >
       <div class="flex items-center q-table__title q-mr-md">
-        <span>Override Config</span>
+        <span>{{ t("dashboard.overrideConfigTitle") }}</span>
       </div>
       <q-btn
         icon="close"
@@ -27,7 +27,7 @@
     >
       <q-select
         v-model="overrideConfig.field.value"
-        :label="'Field'"
+        :label="t('dashboard.overrideConfigFieldLabel')"
         :options="columnsOptions"
         :display-value="getFieldDisplayValue(overrideConfig.field.value)"
         style="width: 40%"
@@ -42,7 +42,7 @@
       <div class="tw:flex items-center" style="width: 60%; gap: 10px">
         <q-select
           v-model="overrideConfig.config[0].type"
-          :label="'Type'"
+          :label="t('dashboard.overrideConfigTypeLabel')"
           :options="configTypeOptions"
           :disable="!overrideConfig.field.value"
           style="width: 40%"
@@ -63,7 +63,7 @@
         >
           <q-select
             v-model="overrideConfig.config[0].value.unit"
-            :label="'Unit'"
+            :label="t('dashboard.overrideConfigUnitLabel')"
             :options="unitOptions"
             :disable="!overrideConfig.field.value"
             style="flex-grow: 1; width: 50%"
@@ -96,7 +96,7 @@
         >
           <q-checkbox
             v-model="overrideConfig.config[0].autoColor"
-            :label="'Unique Value Color'"
+            :label="t('dashboard.overrideConfigUniqueValueColor')"
             :disable="!overrideConfig.field.value"
             dense
           />
@@ -115,13 +115,13 @@
     </div>
     <q-btn
       @click="addOverrideConfig"
-      label="+ Add field override"
+      :label="t('dashboard.overrideConfigAddNew')"
       no-caps
       class="q-mt-md el-border"
     />
 
     <q-card-actions align="right">
-      <q-btn label="Save" color="primary" @click="saveOverrides" />
+      <q-btn :label="t('dashboard.overrideConfigSave')" color="primary" @click="saveOverrides" />
     </q-card-actions>
   </div>
 </template>
@@ -159,16 +159,16 @@ export default defineComponent({
   setup(props: any, { emit }) {
     const { t } = useI18n();
 
-    const configTypeOptions = [
+    const configTypeOptions = computed(() => [
       {
-        label: "Unit",
+        label: t("dashboard.overrideConfigTypeUnit"),
         value: "unit",
       },
       {
-        label: "Unique Value Color",
+        label: t("dashboard.overrideConfigTypeUniqueValueColor"),
         value: "unique_value_color",
       },
-    ];
+    ]);
 
     const unitOptions = [
       {
