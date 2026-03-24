@@ -310,10 +310,15 @@ test.describe("Dashboard Table Chart - Core Features", () => {
         () => document.querySelector('[data-test="dashboard-vrl-function-editor"]')?.textContent?.includes('vrl_test_field')
       );
 
-      // Enable dynamic columns in config
+      // First apply: execute the query with VRL so the new field is generated
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await pm.chartTypeSelector.waitForTableDataLoad();
+
+      // Now enable dynamic columns so the VRL-created field appears as a column
       await pm.dashboardPanelConfigs.openConfigPanel();
       await pm.dashboardPanelConfigs.selectDynamicColumns();
 
+      // Second apply: re-render table with dynamic columns enabled
       await pm.dashboardPanelActions.applyDashboardBtn();
       await pm.chartTypeSelector.waitForTableDataLoad();
 
