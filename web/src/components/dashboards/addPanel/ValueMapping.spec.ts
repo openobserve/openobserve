@@ -89,29 +89,33 @@ describe("ValueMapping", () => {
     it("should render value mappings section", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.text()).toContain("Value Mappings");
+      // Title block was removed in config redesign (PR #10917);
+      // the section header is now rendered by the parent ConfigPanel expansion item.
+      expect(wrapper.exists()).toBe(true);
     });
 
     it("should render info tooltip button", () => {
       wrapper = createWrapper();
 
+      // Info tooltip button was removed from this component in config redesign (PR #10917).
       expect(
         wrapper
           .find('[data-test="dashboard-addpanel-config-drilldown-info"]')
           .exists(),
-      ).toBe(true);
+      ).toBe(false);
     });
 
     it("should render tooltip component", () => {
       wrapper = createWrapper();
 
-      // Test that the component renders successfully
+      // Info tooltip was removed from this component in config redesign (PR #10917);
+      // verify the component still mounts without errors.
       expect(wrapper.exists()).toBe(true);
       expect(
         wrapper
           .find('[data-test="dashboard-addpanel-config-drilldown-info"]')
           .exists(),
-      ).toBe(true);
+      ).toBe(false);
     });
 
     it("should render add/edit button", () => {
@@ -119,7 +123,7 @@ describe("ValueMapping", () => {
 
       expect(
         wrapper
-          .find('[data-test="dashboard-addpanel-config-drilldown-add-btn"]')
+          .find('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]')
           .exists(),
       ).toBe(true);
     });
@@ -131,7 +135,7 @@ describe("ValueMapping", () => {
       wrapper = createWrapper();
 
       const button = wrapper.find(
-        '[data-test="dashboard-addpanel-config-drilldown-add-btn"]',
+        '[data-test="dashboard-addpanel-config-value-mapping-add-btn"]',
       );
       expect(button.text().trim()).toBe("Add Value Mapping");
     });
@@ -143,7 +147,7 @@ describe("ValueMapping", () => {
       wrapper = createWrapper();
 
       const button = wrapper.find(
-        '[data-test="dashboard-addpanel-config-drilldown-add-btn"]',
+        '[data-test="dashboard-addpanel-config-value-mapping-add-btn"]',
       );
       expect(button.text().trim()).toBe("Edit Value Mapping");
     });
@@ -154,7 +158,7 @@ describe("ValueMapping", () => {
       wrapper = createWrapper();
 
       let button = wrapper.find(
-        '[data-test="dashboard-addpanel-config-drilldown-add-btn"]',
+        '[data-test="dashboard-addpanel-config-value-mapping-add-btn"]',
       );
       expect(button.text().trim()).toBe("Add Value Mapping");
 
@@ -166,7 +170,7 @@ describe("ValueMapping", () => {
       wrapper = createWrapper();
 
       button = wrapper.find(
-        '[data-test="dashboard-addpanel-config-drilldown-add-btn"]',
+        '[data-test="dashboard-addpanel-config-value-mapping-add-btn"]',
       );
       expect(button.text().trim()).toBe("Edit Value Mapping");
     });
@@ -183,7 +187,7 @@ describe("ValueMapping", () => {
       wrapper = createWrapper();
 
       const button = wrapper.find(
-        '[data-test="dashboard-addpanel-config-drilldown-add-btn"]',
+        '[data-test="dashboard-addpanel-config-value-mapping-add-btn"]',
       );
       await button.trigger("click");
 
@@ -428,7 +432,7 @@ describe("ValueMapping", () => {
       wrapper = createWrapper();
 
       let button = wrapper.find(
-        '[data-test="dashboard-addpanel-config-drilldown-add-btn"]',
+        '[data-test="dashboard-addpanel-config-value-mapping-add-btn"]',
       );
       expect(button.text().trim()).toBe("Add Value Mapping");
 
@@ -448,7 +452,7 @@ describe("ValueMapping", () => {
       wrapper = createWrapper();
 
       let button = wrapper.find(
-        '[data-test="dashboard-addpanel-config-drilldown-add-btn"]',
+        '[data-test="dashboard-addpanel-config-value-mapping-add-btn"]',
       );
       expect(button.text().trim()).toBe("Edit Value Mapping");
 

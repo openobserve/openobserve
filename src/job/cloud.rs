@@ -204,8 +204,17 @@ async fn check_all_orgs_ai_quota() {
         let used = trial_quota::get_used(&org_id);
         let limit = trial_quota::get_limit(&org_id);
 
-        let (subject, body) =
-            trial_quota::build_quota_email_message(&org_id, checkpoint, is_paid, used, limit);
+        let org_name = match infra::table::organizations::get(&org_id).await {
+            Ok(record) => record.org_name,
+            Err(e) => {
+                log::warn!("[AI_QUOTA] Failed to get org name for org={org_id}: {e}");
+                String::new()
+            }
+        };
+
+        let (subject, body) = trial_quota::build_quota_email_message(
+            &org_id, &org_name, checkpoint, is_paid, used, limit,
+        );
 
         let email = Email {
             recipients: vec![admin.email.clone()],

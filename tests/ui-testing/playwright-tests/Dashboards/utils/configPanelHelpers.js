@@ -141,6 +141,24 @@ export async function setupTablePanelWithConfig(page, pm, dashboardName, panelNa
 }
 
 /**
+ * Pie chart panel (SQL builder) — config sidebar opened and ready.
+ */
+export async function setupPiePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPanel(page, pm, dashboardName, { chartType: "pie", panelName });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Pie panel with config ready", { dashboardName, panelName });
+}
+
+/**
+ * Donut chart panel (SQL builder) — config sidebar opened and ready.
+ */
+export async function setupDonutPanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPanel(page, pm, dashboardName, { chartType: "donut", panelName });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Donut panel with config ready", { dashboardName, panelName });
+}
+
+/**
  * Gauge chart panel — config sidebar opened and ready.
  */
 export async function setupGaugePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
