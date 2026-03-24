@@ -964,9 +964,9 @@ async function getQueryData(
                 ? formatTracesMetaData(rawHits)
                 : rawHits;
 
-            isLLMSpanPresent.value = formattedHits.some((hit: any) =>
-              isLLMTrace(hit),
-            );
+            isLLMSpanPresent.value =
+              (!appendResult ? false : isLLMSpanPresent.value) ||
+              formattedHits.some((hit: any) => isLLMTrace(hit));
 
             // Replace hits on the first partition of a pagination fetch (clears the
             // previous page) or on the very first data chunk of a fresh search
