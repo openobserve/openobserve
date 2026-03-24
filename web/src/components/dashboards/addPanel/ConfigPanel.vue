@@ -506,88 +506,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         </q-select>
 
-        <div
-          v-if="
-            promqlMode &&
-            dashboardPanelData.data.type != 'geomap' &&
-            dashboardPanelData.data.type != 'maps'
-          "
-          v-show="isConfigOptionVisible('legend', 'promql-legend')"
-          class="showLabelOnTop"
-          style="font-weight: 600"
-        >
-          {{ t("dashboard.query") }}
-          <q-tabs
-            v-model="dashboardPanelData.layout.currentQueryIndex"
-            narrow-indicator
-            dense
-            inline-label
-            outside-arrows
-            mobile-arrows
-            data-test="dashboard-config-query-tab"
-          >
-            <q-tab
-              no-caps
-              v-for="(tab, index) in dashboardPanelData.data.queries"
-              :key="index"
-              :name="index"
-              :label="`${t('dashboard.queryLabel')} ${Number(index) + 1}`"
-              :data-test="`dashboard-config-query-tab-${index}`"
-            >
-            </q-tab>
-          </q-tabs>
-        </div>
-
-        <CommonAutoComplete
-          v-if="
-            promqlMode &&
-            dashboardPanelData.data.type != 'geomap' &&
-            dashboardPanelData.data.type != 'maps'
-          "
-          v-show="isConfigOptionVisible('legend', 'promql-legend-label')"
-          :label="t('common.legend')"
-          v-model="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].config.promql_legend
-          "
-          :items="dashboardSelectfieldPromQlList"
-          searchRegex="(?:{([^}]*)(?:{.*})*$|([a-zA-Z-_]+)$)"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop q-mt-sm"
-          stack-label
-          borderless
-          label-slot
-          style="
-            top: none !important;
-            margin-top: none !important;
-            padding-top: 3px !important;
-            width: auto !important;
-          "
-          :value-replace-fn="selectPromQlNameOption"
-        >
-          <template v-slot:label>
-            <div class="row items-center all-pointer-events">
-              {{ t("dashboard.legendLabel") }}
-              <div>
-                <q-icon
-                  class="q-ml-xs"
-                  size="20px"
-                  name="info"
-                  data-test="dashboard-config-promql-legend-info"
-                />
-                <q-tooltip
-                  class="bg-grey-8"
-                  anchor="top middle"
-                  self="bottom middle"
-                >
-                  {{ t("dashboard.overrideMessage") }}
-                </q-tooltip>
-              </div>
-            </div>
-          </template>
-        </CommonAutoComplete>
       </div>
     </q-expansion-item>
 
@@ -673,44 +591,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-decimals"
         />
 
-      <!-- <q-input v-if="promqlMode" v-model="dashboardPanelData.data.config.promql_legend" label="Legend" color="input-border"
-      bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label dense label-slot borderless hide-bottom-space> -->
-      <div
-        v-if="
-          promqlMode &&
-          dashboardPanelData.data.type != 'geomap' &&
-          dashboardPanelData.data.type != 'maps'
-        "
-        class="q-py-md showLabelOnTop"
-        style="font-weight: 600"
-      >
-        {{ t("dashboard.query") }}
-        <q-tabs
-          v-model="dashboardPanelData.layout.currentQueryIndex"
-          narrow-indicator
-          dense
-          inline-label
-          outside-arrows
-          mobile-arrows
-          data-test="dashboard-config-query-tab"
-        >
-          <q-tab
-            no-caps
-            v-for="(tab, index) in dashboardPanelData.data.queries"
-            :key="index"
-            :name="index"
-            :label="t('dashboard.queryLabel') + ' ' + (index + 1)"
-            :data-test="`dashboard-config-query-tab-${index}`"
-          >
-          </q-tab>
-        </q-tabs>
-      </div>
-      <!-- </q-input> -->
-      <div class="space"></div>
-
-
-      <!-- <q-input v-if="promqlMode" v-model="dashboardPanelData.data.config.promql_legend" label="Legend" color="input-border"
-      bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label dense label-slot borderless hide-bottom-space> -->
+      <!-- Query tabs: shown for promql (any queries) or sql (2+ queries), not for geomap/maps -->
       <div
         v-if="
           ((promqlMode && dashboardPanelData.data.queries.length > 0) ||
@@ -736,19 +617,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(tab, index) in dashboardPanelData.data.queries"
             :key="index"
             :name="index"
-            :label="t('dashboard.queryLabel') + ' ' + (index + 1)"
+            :label="tab.tabName || (t('dashboard.queryLabel') + ' ' + (index + 1))"
             :data-test="`dashboard-config-query-tab-${index}`"
           >
           </q-tab>
         </q-tabs>
       </div>
-      <!-- </q-input> -->
-      <div class="space"></div>
 
-      <!-- Multi-Query Series Labels — visible when 2+ queries exist for SQL -->
+      <!-- Legend (series name override) — visible only for promql, not geomap/maps -->
+      <CommonAutoComplete
+        v-if="
+          promqlMode &&
+          dashboardPanelData.data.type != 'geomap' &&
+          dashboardPanelData.data.type != 'maps'
+        "
+        v-show="isConfigOptionVisible('data', 'promql-legend-label')"
+        :label="t('common.legend')"
+        v-model="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.promql_legend
+        "
+        :items="dashboardSelectfieldPromQlList"
+        searchRegex="(?:{([^}]*)(?:{.*})*$|([a-zA-Z-_]+)$)"
+        color="input-border"
+        bg-color="input-bg"
+        class="showLabelOnTop q-mt-sm"
+        stack-label
+        borderless
+        label-slot
+        style="
+          top: none !important;
+          margin-top: none !important;
+          padding-top: 3px !important;
+          width: auto !important;
+        "
+        :value-replace-fn="selectPromQlNameOption"
+      >
+        <template v-slot:label>
+          <div class="row items-center all-pointer-events">
+            {{ t("dashboard.legendLabel") }}
+            <div>
+              <q-icon
+                class="q-ml-xs"
+                size="20px"
+                name="info"
+                data-test="dashboard-config-promql-legend-info"
+              />
+              <q-tooltip
+                class="bg-grey-8"
+                anchor="top middle"
+                self="bottom middle"
+              >
+                {{ t("dashboard.overrideMessage") }}
+              </q-tooltip>
+            </div>
+          </div>
+        </template>
+      </CommonAutoComplete>
+
+      <!-- Query Label — visible only for SQL with 2+ queries -->
       <div
-        v-if="!promqlMode && dashboardPanelData.data.queries.length > 1"
-        class=""
+        v-if="!promqlMode && dashboardPanelData.data.queries.length > 1 &&
+          dashboardPanelData.data.type != 'geomap' &&
+          dashboardPanelData.data.type != 'maps'"
+        v-show="isConfigOptionVisible('data', 'query-label')"
       >
         <div class="q-mb-md row items-center" style="font-weight: 600">
           {{ t("dashboard.multiSqlQueryLabel") }}
@@ -791,10 +724,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <div
-        v-if="dashboardPanelData.data.queries.length > 1"
-        class="space"
-      ></div>
 
       <!-- for auto sql query limit -->
       <!-- it should not be promql and custom query -->

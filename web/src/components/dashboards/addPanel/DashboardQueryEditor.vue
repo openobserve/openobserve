@@ -42,10 +42,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(tab, index) in dashboardPanelData.data.queries"
               :key="index"
               :name="index"
-              :label="'Query ' + (index + 1)"
               @click.stop
               :data-test="`dashboard-panel-query-tab-${index}`"
             >
+              <!-- Inline editable query name -->
+              <input
+                v-if="editingQueryIndex === index"
+                v-model="editingQueryName"
+                @click.stop
+                @keydown.enter.stop="saveQueryName(index)"
+                @keydown.escape.stop="cancelQueryNameEdit"
+                @blur="saveQueryName(index)"
+                class="query-tab-name-input"
+                :data-test="`dashboard-panel-query-tab-name-input-${index}`"
+              />
+              <span
+                v-else
+                @dblclick.stop="startEditQueryName(index, tab)"
+                class="query-tab-name-text"
+                style="font-size: 12px"
+                :title="'Double-click to rename'"
+                :data-test="`dashboard-panel-query-tab-name-${index}`"
+              >{{ tab.tabName || ('Query ' + (index + 1)) }}</span>
               <q-icon
                 v-if="dashboardPanelData.data.queries.length > 1"
                 :name="
@@ -724,6 +742,35 @@ export default defineComponent({
       // VRL function code is already updated via @update:query handler
     };
 
+    // Inline query tab renaming
+    const editingQueryIndex = ref(-1);
+    const editingQueryName = ref("");
+
+    const startEditQueryName = (index: number, tab: any) => {
+      editingQueryIndex.value = index;
+      editingQueryName.value = tab.tabName || "Query " + (index + 1);
+      nextTick(() => {
+        const el = document.querySelector<HTMLInputElement>(
+          `.query-tab-name-input`,
+        );
+        el?.focus();
+      });
+    };
+
+    const saveQueryName = (index: number) => {
+      if (editingQueryIndex.value !== index) return;
+      const trimmed = editingQueryName.value.trim();
+      dashboardPanelData.data.queries[index].tabName =
+        trimmed || undefined;
+      editingQueryIndex.value = -1;
+      editingQueryName.value = "";
+    };
+
+    const cancelQueryNameEdit = () => {
+      editingQueryIndex.value = -1;
+      editingQueryName.value = "";
+    };
+
     return {
       t,
       router,
@@ -761,6 +808,11 @@ export default defineComponent({
       handleVrlGenerationStart,
       handleVrlGenerationEnd,
       handleVrlGenerationSuccess,
+      editingQueryIndex,
+      editingQueryName,
+      startEditQueryName,
+      saveQueryName,
+      cancelQueryNameEdit,
     };
   },
 });
@@ -807,6 +859,27 @@ export default defineComponent({
   border-radius: 4px;
   white-space: nowrap;
   margin-right: 8px;
+}
+
+.query-tab-name-text {
+  cursor: default;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.query-tab-name-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid currentColor;
+  outline: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  width: 90px;
+  min-width: 50px;
+  max-width: 160px;
+  padding: 0 2px;
+  line-height: 1.2;
 }
 
 .empty-function .monaco-editor-background {
