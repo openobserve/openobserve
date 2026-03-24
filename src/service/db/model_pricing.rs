@@ -28,9 +28,13 @@ use config::meta::model_pricing::{BUILT_IN_ORG, META_ORG, ModelPricingDefinition
 use dashmap::DashMap;
 use infra::table;
 use once_cell::sync::Lazy;
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 
 const WATCHER_PREFIX: &str = "/model_pricing/";
+
+/// Maximum compiled regex size (bytes). Limits NFA state-set size to prevent
+/// pathological patterns from consuming excessive CPU on the hot path.
+pub const REGEX_SIZE_LIMIT: usize = 10 * 1024; // 10 KB
 
 /// Cached model pricing entry with pre-compiled regex.
 #[derive(Clone)]
@@ -63,7 +67,10 @@ fn build_entries(definitions: Vec<ModelPricingDefinition>) -> Vec<CachedModelPri
     let mut entries: Vec<CachedModelPricing> = definitions
         .into_iter()
         .filter(|d| d.enabled)
-        .filter_map(|def| match Regex::new(&def.match_pattern) {
+        .filter_map(|def| match RegexBuilder::new(&def.match_pattern)
+            .size_limit(REGEX_SIZE_LIMIT)
+            .build()
+        {
             Ok(re) => Some(CachedModelPricing {
                 definition: def,
                 compiled_regex: re,
@@ -215,8 +222,11 @@ fn source_priority(source: &PricingSource) -> u8 {
 /// Sync lookup: find the best matching pricing definition from pre-loaded entries.
 ///
 /// When `span_ts_micros` is Some, only definitions where `valid_from <= span_ts` are
-/// considered. Among all matching definitions the one with the greatest `valid_from`
-/// (most recent) is selected, giving accurate historical cost calculation.
+/// considered. Selection priority:
+///   1. Source priority: Org > MetaOrg > BuiltIn  (higher-priority source always wins)
+///   2. Within the same source, the greatest `valid_from` (most recent) wins.
+///   3. Within the same source and `valid_from`, the merge-order position (sort_order
+///      then name) is used as the final tiebreaker — earlier in the list wins.
 /// When `span_ts_micros` is None, the first matching entry is returned.
 pub fn find_pricing_sync_at(
     entries: &[CachedModelPricing],
@@ -235,13 +245,22 @@ pub fn find_pricing_sync_at(
         {
             continue;
         }
-        // Pick the entry with the greatest valid_from (most recent applicable price)
         let is_better = match &best {
             None => true,
             Some(b) => {
-                let new_vf = entry.definition.valid_from.unwrap_or(i64::MIN);
-                let best_vf = b.definition.valid_from.unwrap_or(i64::MIN);
-                new_vf > best_vf
+                let new_prio = source_priority(&entry.definition.source);
+                let best_prio = source_priority(&b.definition.source);
+                if new_prio != best_prio {
+                    // Lower priority number = higher precedence (Org=0 beats MetaOrg=1 beats BuiltIn=2)
+                    new_prio < best_prio
+                } else {
+                    // Same source level: prefer the most recent valid_from.
+                    // None means "valid for all time" — treated as i64::MIN so that
+                    // an entry with an explicit valid_from is preferred when available.
+                    let new_vf = entry.definition.valid_from.unwrap_or(i64::MIN);
+                    let best_vf = b.definition.valid_from.unwrap_or(i64::MIN);
+                    new_vf > best_vf
+                }
             }
         };
         if is_better {
@@ -890,5 +909,165 @@ mod tests {
         MERGED.remove("test_merge_org_acme");
         CACHE.remove(META_ORG);
         CACHE.remove("test_merge_org_acme");
+    }
+
+    #[test]
+    fn test_find_pricing_source_priority_org_beats_builtin() {
+        // An Org entry with valid_from=None should beat a BuiltIn entry with a specific
+        // valid_from, because source priority (Org > BuiltIn) takes precedence.
+        let entries = vec![
+            CachedModelPricing {
+                definition: ModelPricingDefinition {
+                    name: "gpt-4o-org".to_string(),
+                    valid_from: None, // "valid for all time"
+                    source: PricingSource::Org,
+                    tiers: vec![PricingTierDefinition {
+                        name: "Org".to_string(),
+                        condition: None,
+                        prices: HashMap::from([("input".to_string(), 0.000010)]),
+                    }],
+                    ..Default::default()
+                },
+                compiled_regex: Regex::new("(?i)^gpt-4o").unwrap(),
+            },
+            CachedModelPricing {
+                definition: ModelPricingDefinition {
+                    name: "gpt-4o-builtin".to_string(),
+                    valid_from: Some(5_000_000),
+                    source: PricingSource::BuiltIn,
+                    tiers: vec![PricingTierDefinition {
+                        name: "BuiltIn".to_string(),
+                        condition: None,
+                        prices: HashMap::from([("input".to_string(), 0.000003)]),
+                    }],
+                    ..Default::default()
+                },
+                compiled_regex: Regex::new("(?i)^gpt-4o").unwrap(),
+            },
+        ];
+
+        // Org entry must win even though BuiltIn has a higher valid_from
+        let result = find_pricing_sync_at(&entries, "gpt-4o", Some(6_000_000));
+        assert_eq!(result.unwrap().name, "gpt-4o-org");
+    }
+
+    #[test]
+    fn test_find_pricing_source_priority_org_beats_meta() {
+        let entries = vec![
+            CachedModelPricing {
+                definition: ModelPricingDefinition {
+                    name: "gpt-4o-meta".to_string(),
+                    valid_from: Some(5_000_000),
+                    source: PricingSource::MetaOrg,
+                    ..Default::default()
+                },
+                compiled_regex: Regex::new("(?i)^gpt-4o").unwrap(),
+            },
+            CachedModelPricing {
+                definition: ModelPricingDefinition {
+                    name: "gpt-4o-org".to_string(),
+                    valid_from: None,
+                    source: PricingSource::Org,
+                    ..Default::default()
+                },
+                compiled_regex: Regex::new("(?i)^gpt-4o").unwrap(),
+            },
+        ];
+
+        let result = find_pricing_sync_at(&entries, "gpt-4o", Some(6_000_000));
+        assert_eq!(result.unwrap().name, "gpt-4o-org");
+    }
+
+    #[test]
+    fn test_find_pricing_same_source_uses_valid_from() {
+        // Two Org entries: valid_from tiebreaker applies within same source
+        let entries = vec![
+            CachedModelPricing {
+                definition: ModelPricingDefinition {
+                    name: "gpt-4o-old-price".to_string(),
+                    valid_from: Some(1_000_000),
+                    source: PricingSource::Org,
+                    ..Default::default()
+                },
+                compiled_regex: Regex::new("(?i)^gpt-4o").unwrap(),
+            },
+            CachedModelPricing {
+                definition: ModelPricingDefinition {
+                    name: "gpt-4o-new-price".to_string(),
+                    valid_from: Some(5_000_000),
+                    source: PricingSource::Org,
+                    ..Default::default()
+                },
+                compiled_regex: Regex::new("(?i)^gpt-4o").unwrap(),
+            },
+        ];
+
+        // At ts=6M both valid, picks newer
+        let result = find_pricing_sync_at(&entries, "gpt-4o", Some(6_000_000));
+        assert_eq!(result.unwrap().name, "gpt-4o-new-price");
+
+        // At ts=3M only old is valid
+        let result = find_pricing_sync_at(&entries, "gpt-4o", Some(3_000_000));
+        assert_eq!(result.unwrap().name, "gpt-4o-old-price");
+    }
+
+    #[test]
+    fn test_find_pricing_meta_beats_builtin() {
+        let entries = vec![
+            CachedModelPricing {
+                definition: ModelPricingDefinition {
+                    name: "gpt-4o-builtin".to_string(),
+                    valid_from: Some(5_000_000),
+                    source: PricingSource::BuiltIn,
+                    ..Default::default()
+                },
+                compiled_regex: Regex::new("(?i)^gpt-4o").unwrap(),
+            },
+            CachedModelPricing {
+                definition: ModelPricingDefinition {
+                    name: "gpt-4o-meta".to_string(),
+                    valid_from: None,
+                    source: PricingSource::MetaOrg,
+                    ..Default::default()
+                },
+                compiled_regex: Regex::new("(?i)^gpt-4o").unwrap(),
+            },
+        ];
+
+        let result = find_pricing_sync_at(&entries, "gpt-4o", Some(6_000_000));
+        assert_eq!(result.unwrap().name, "gpt-4o-meta");
+    }
+
+    #[test]
+    fn test_find_pricing_falls_back_to_lower_priority_when_org_not_applicable() {
+        // Org entry has valid_from in the future, so for an older span only BuiltIn applies
+        let entries = vec![
+            CachedModelPricing {
+                definition: ModelPricingDefinition {
+                    name: "gpt-4o-org".to_string(),
+                    valid_from: Some(10_000_000), // future
+                    source: PricingSource::Org,
+                    ..Default::default()
+                },
+                compiled_regex: Regex::new("(?i)^gpt-4o").unwrap(),
+            },
+            CachedModelPricing {
+                definition: ModelPricingDefinition {
+                    name: "gpt-4o-builtin".to_string(),
+                    valid_from: Some(1_000_000),
+                    source: PricingSource::BuiltIn,
+                    ..Default::default()
+                },
+                compiled_regex: Regex::new("(?i)^gpt-4o").unwrap(),
+            },
+        ];
+
+        // At ts=5M, org entry's valid_from (10M) > span_ts → filtered out, builtin wins
+        let result = find_pricing_sync_at(&entries, "gpt-4o", Some(5_000_000));
+        assert_eq!(result.unwrap().name, "gpt-4o-builtin");
+
+        // At ts=15M, org entry is now applicable and wins by source priority
+        let result = find_pricing_sync_at(&entries, "gpt-4o", Some(15_000_000));
+        assert_eq!(result.unwrap().name, "gpt-4o-org");
     }
 }

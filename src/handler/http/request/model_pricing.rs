@@ -173,6 +173,13 @@ pub async fn create(
     {
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
+    // The built-in org is managed exclusively by the background GitHub sync job.
+    if org_id == BUILT_IN_ORG {
+        return MetaHttpResponse::forbidden(
+            "Cannot create entries in the built-in org. Use the refresh endpoint to sync from upstream.",
+        );
+    }
+
     item.org_id = org_id.clone();
     item.id = None; // Force new ID generation
     item.source = if org_id == META_ORG {
@@ -490,7 +497,10 @@ fn validate_definition(item: &ModelPricingDefinition) -> Result<(), String> {
     if item.match_pattern.len() > 512 {
         return Err("Match pattern must be 512 characters or fewer".to_string());
     }
-    if let Err(e) = regex::Regex::new(&item.match_pattern) {
+    if let Err(e) = regex::RegexBuilder::new(&item.match_pattern)
+        .size_limit(crate::service::db::model_pricing::REGEX_SIZE_LIMIT)
+        .build()
+    {
         return Err(format!("Invalid regex pattern: {e}"));
     }
     if item.tiers.is_empty() {
