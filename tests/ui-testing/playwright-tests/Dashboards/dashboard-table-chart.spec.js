@@ -87,13 +87,13 @@ test.describe.configure({ retries: 1 });
  * - Table with X + Y fields (grouped data)
  * - Table row count verification
  * - Combined config: wrap cells + transpose together
- * - Combined config: dynamic columns + wrap cells together
+ * - VRL-created field displayed as column with dynamic columns enabled
  * - histogram(_timestamp) X axis with count() Y in builder mode
  * - Timestamp formatting in table cells
  * - Numeric values display with configured decimals
  * - Row count info display ("X-Y of Z") without pagination
  * - Pivot field placeholder visible when no pivot field added
- * - Adding filter field to table panel and verifying filtered data
+ * - Filtering table data using a dashboard variable with query inspector verification
  * - Switching query modes (Builder → Custom) preserves table data
  * - First Column (X) + Other Columns (Y) layout labels
  * - Table with Y-axis aggregation function (sum, avg, min, max)
@@ -323,33 +323,48 @@ test.describe("Dashboard Table Chart - Core Features", () => {
   );
 
   test(
-    "should handle dynamic columns + wrap cells enabled simultaneously",
-    { tag: ["@tableChart", "@edge-case", "@P2"] },
+    "should display VRL-created field as column when dynamic columns enabled",
+    { tag: ["@tableChart", "@functional", "@P1"] },
     async ({ page }) => {
       const pm = new PageManager(page);
       const dashboardName = generateDashboardName();
 
-      await setupTablePanelWithConfig(page, pm, dashboardName);
+      await setupTestDashboard(page, pm, dashboardName);
+      await pm.dashboardCreate.addPanel();
+      await pm.dashboardPanelActions.addPanelName("VRL Dynamic Cols");
 
+      await pm.chartTypeSelector.selectChartType("table");
+      await pm.chartTypeSelector.selectStreamType("logs");
+      await pm.chartTypeSelector.selectStream("e2e_automate");
+      await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
+      await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+
+      // Enable VRL function toggle and add a VRL function that creates a new field
+      const vrlToggle = page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
+      await vrlToggle.click();
+
+      const vrlEditor = page.locator('[data-test="dashboard-vrl-function-editor"]');
+      await vrlEditor.waitFor({ state: "visible", timeout: 10000 });
+      const monacoInput = vrlEditor.getByRole("code");
+      await monacoInput.click();
+      await page.keyboard.type('.vrl_test_field = "hello_vrl"', { delay: 50 });
+      await page.keyboard.press("Escape");
+      await page.waitForTimeout(1000);
+
+      // Enable dynamic columns in config
+      await pm.dashboardPanelConfigs.openConfigPanel();
       await pm.dashboardPanelConfigs.selectDynamicColumns();
-      await pm.dashboardPanelConfigs.selectWrapCell();
+
       await pm.dashboardPanelActions.applyDashboardBtn();
+      await pm.chartTypeSelector.waitForTableDataLoad();
 
-      const table = page.locator(TABLE_SELECTOR);
-      await expect(table).toBeVisible();
+      // Verify the VRL-created field appears as a column in the table
+      const headers = await getTableHeaders(page);
+      const headerTexts = headers.map((h) => h.toLowerCase());
+      const hasVrlField = headerTexts.some((h) => h.includes("vrl_test_field"));
+      expect(hasVrlField).toBe(true);
 
-      testLogger.info("Table with dynamic columns + wrap cells rendered");
-
-      // Verify both persist after save
-      await pm.dashboardPanelActions.savePanel();
-      await reopenPanelConfig(page, pm);
-
-      await expect(
-        page.locator('[data-test="dashboard-config-table_dynamic_columns"]')
-      ).toHaveAttribute("aria-checked", "true");
-      await expect(
-        page.locator('[data-test="dashboard-config-wrap-table-cells"]')
-      ).toHaveAttribute("aria-checked", "true");
+      testLogger.info("VRL field visible as dynamic column", { headers: headerTexts });
 
       await pm.dashboardPanelActions.savePanel();
       await cleanupTestDashboard(page, pm, dashboardName);
@@ -550,33 +565,83 @@ test.describe("Dashboard Table Chart - Core Features", () => {
     }
   );
 
-  // ===== P1 — Filter Field on Table =====
+  // ===== P1 — Variable-based Filter on Table =====
 
   test(
-    "should add filter field to table panel and render filtered data",
+    "should filter table data using a dashboard variable",
     { tag: ["@tableChart", "@functional", "@P1"] },
     async ({ page }) => {
       const pm = new PageManager(page);
       const dashboardName = generateDashboardName();
 
       await setupTestDashboard(page, pm, dashboardName);
+
+      // Create a dashboard variable via settings
+      await pm.dashboardSetting.openSetting();
+      await pm.dashboardVariables.addDashboardVariable(
+        "containername",
+        "logs",
+        "e2e_automate",
+        "kubernetes_container_name"
+      );
+
+      // Add table panel with filter field
       await pm.dashboardCreate.addPanel();
-      await pm.dashboardPanelActions.addPanelName("Filtered Table");
+      await pm.dashboardPanelActions.addPanelName("Variable Filter Table");
 
       await pm.chartTypeSelector.selectChartType("table");
       await pm.chartTypeSelector.selectStreamType("logs");
       await pm.chartTypeSelector.selectStream("e2e_automate");
 
+      await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_container_hash", "y");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "filter");
 
       await pm.dashboardPanelActions.applyDashboardBtn();
       await pm.chartTypeSelector.waitForTableDataLoad();
 
-      const rowCount = await pm.dashboardPanelActions.getTableRowCount();
-      expect(rowCount).toBeGreaterThan(0);
+      // Get unfiltered row count
+      const unfilteredRowCount = await pm.dashboardPanelActions.getTableRowCount();
+      expect(unfilteredRowCount).toBeGreaterThan(0);
+      testLogger.info("Unfiltered table rows", { unfilteredRowCount });
 
-      testLogger.info("Table with filter field rendered", { rowCount });
+      // Select a specific value from the variable dropdown
+      await pm.dashboardVariables.selectValueFromVariableDropDown(
+        "containername",
+        "ziox"
+      );
+
+      // Set filter condition to use the variable: $containername
+      await pm.dashboardFilter.addFilterCondition(
+        0,
+        "kubernetes_container_name",
+        "",
+        "=",
+        "$containername"
+      );
+
+      const streamPromise = waitForStreamComplete(page);
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await streamPromise;
+      await pm.chartTypeSelector.waitForTableDataLoad();
+
+      const filteredRowCount = await pm.dashboardPanelActions.getTableRowCount();
+      expect(filteredRowCount).toBeGreaterThan(0);
+      // Filtered count should be less than or equal to unfiltered
+      expect(filteredRowCount).toBeLessThanOrEqual(unfilteredRowCount);
+
+      // Verify the filter is reflected in the query via query inspector
+      await page
+        .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
+        .click();
+      await expect(
+        page.locator(".inspector-query-editor").filter({
+          hasText: "kubernetes_container_name = 'ziox'",
+        }).last()
+      ).toBeVisible();
+      await page.locator('[data-test="query-inspector-close-btn"]').click();
+
+      testLogger.info("Table filtered by variable", { unfilteredRowCount, filteredRowCount });
 
       await pm.dashboardPanelActions.savePanel();
       await cleanupTestDashboard(page, pm, dashboardName);
