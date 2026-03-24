@@ -72,18 +72,34 @@ pub async fn list(
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
 
+    // Collect the set of names already present from the org-specific items.
+    let mut seen_names: std::collections::HashSet<String> =
+        items.iter().map(|m| m.name.clone()).collect();
+
     // For non-meta orgs, also include inherited entries from the meta org.
     if org_id != META_ORG && org_id != BUILT_IN_ORG {
         match model_pricing::list(META_ORG).await {
-            Ok(meta_items) => items.extend(meta_items),
+            Ok(meta_items) => {
+                for item in meta_items {
+                    if seen_names.insert(item.name.clone()) {
+                        items.push(item);
+                    }
+                }
+            }
             Err(e) => return MetaHttpResponse::internal_error(e),
         }
     }
 
-    // Include built-in entries (synced from GitHub).
+    // Include built-in entries (synced from GitHub), shadowed by org/meta entries.
     if org_id != BUILT_IN_ORG {
         match model_pricing::list(BUILT_IN_ORG).await {
-            Ok(built_in_items) => items.extend(built_in_items),
+            Ok(built_in_items) => {
+                for item in built_in_items {
+                    if seen_names.insert(item.name.clone()) {
+                        items.push(item);
+                    }
+                }
+            }
             Err(e) => return MetaHttpResponse::internal_error(e),
         }
     }
@@ -117,7 +133,7 @@ pub async fn get(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     if !check_permissions(
-        &model_id,
+        &org_id,
         &org_id,
         &user_email.user_id,
         "settings",
@@ -232,7 +248,7 @@ pub async fn update(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     if !check_permissions(
-        &model_id,
+        &org_id,
         &org_id,
         &user_email.user_id,
         "settings",
@@ -300,7 +316,7 @@ pub async fn delete(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     if !check_permissions(
-        &model_id,
+        &org_id,
         &org_id,
         &user_email.user_id,
         "settings",
