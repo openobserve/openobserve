@@ -138,7 +138,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :props="props"
                 :style="col.style"
               >
-                {{ col.label }}
+                <template v-if="col.field === 'permission'">
+                  <div class="tw:flex tw:items-center tw:justify-center tw:gap-0.5">
+                    <q-checkbox
+                      :data-test="`edit-role-permissions-table-header-column-${col.name}-select-all`"
+                      size="xs"
+                      :model-value="getHeaderCheckboxState(col.name)"
+                      :indeterminate-value="'indeterminate'"
+                      class="filter-check-box cursor-pointer"
+                      @update:model-value="toggleColumnAll(col.name)"
+                    />
+                    <span>{{ col.label }}</span>
+                  </div>
+                </template>
+                <template v-else>
+                  {{ col.label }}
+                </template>
               </th>
             </tr>
             <tr v-if="!visibleResourceCount">
@@ -363,6 +378,41 @@ const columns: any = [
     style: { width: "80px" },
   }
 ];
+
+const getTopLevelTypeRows = computed(() => {
+  return props.rows.filter(
+    (row: any) => row?.show && row.type === "Type"
+  );
+});
+
+const getHeaderCheckboxState = (colName: string) => {
+  const visibleRows = getTopLevelTypeRows.value.filter(
+    (row: any) => row.permission?.[colName]?.show
+  );
+  if (!visibleRows.length) return false;
+  const checkedCount = visibleRows.filter(
+    (row: any) => row.permission[colName].value
+  ).length;
+  if (checkedCount === 0) return false;
+  if (checkedCount === visibleRows.length) return true;
+  return "indeterminate";
+};
+
+const toggleColumnAll = (colName: string) => {
+  const visibleRows = getTopLevelTypeRows.value.filter(
+    (row: any) => row.permission?.[colName]?.show
+  );
+  const allChecked = visibleRows.every(
+    (row: any) => row.permission[colName].value
+  );
+  const newValue = !allChecked;
+  visibleRows.forEach((row: any) => {
+    if (row.permission[colName].value !== newValue) {
+      row.permission[colName].value = newValue;
+      handlePermissionChange(row, colName);
+    }
+  });
+};
 
 const expandPermission = async (resource: any) => {
   emits("expand:row", resource);
