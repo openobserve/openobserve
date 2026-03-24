@@ -179,7 +179,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ></q-select>
           <!-- Wrap Content Button -->
           <q-btn
-            v-if="searchObj.meta.logsVisualizeToggle === 'logs' || searchObj.meta.logsVisualizeToggle === 'patterns'"
+            v-if="
+              searchObj.meta.logsVisualizeToggle === 'logs' ||
+              searchObj.meta.logsVisualizeToggle === 'patterns'
+            "
             data-test="logs-search-result-wrap-table-content-btn"
             icon="wrap_text"
             flat
@@ -322,6 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selected-stream-fts-keys="selectedStreamFullTextSearchKeys"
           :highlight-query="searchObj.data.highlightQuery"
           :default-columns="!searchObj.data.stream.selectedFields.length"
+          :rowHeight="22"
           class="col-12 tw:mt-[0.375rem]"
           :class="[
             !searchObj.meta.showHistogram ||
@@ -512,7 +516,9 @@ export default defineComponent({
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
     SanitizedHtmlRenderer,
-    TenstackTable: defineAsyncComponent(() => import("./TenstackTable.vue")),
+    TenstackTable: defineAsyncComponent(
+      () => import("@/components/TenstackTable.vue"),
+    ),
     EqualIcon,
     NotEqualIcon,
     TelemetryCorrelationDashboard,
@@ -1419,7 +1425,7 @@ export default defineComponent({
         name: "searchJobInspector",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          trace_id: traceId
+          trace_id: traceId,
         },
       });
     };
