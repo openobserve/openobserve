@@ -22,11 +22,17 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = []
-enterprise = []
-vectorscan = []
-cloud = []
-vortex = ["config/vortex"]
+default = ["enterprise", "vectorscan", "vortex"]
+enterprise = [
+    "dep:o2_enterprise",
+    "dep:o2_openfga",
+    "dep:o2_dex",
+    "dep:o2_ratelimit",
+    "config/enterprise",
+]
+vectorscan = ["o2_enterprise/vectorscan"]
+cloud = ["infra/cloud", "enterprise", "o2_enterprise/cloud"]
+vortex = ["dep:vortex", "dep:vortex-datafusion", "config/vortex", "o2_enterprise?/vortex"]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = [
@@ -82,6 +88,8 @@ argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
 aws-sdk-sns.workspace = true
+aws-sdk-marketplacemetering.workspace = true
+aws-sdk-sqs.workspace = true
 base64.workspace = true
 bitflags = "2.11"
 bitvec.workspace = true
@@ -109,6 +117,8 @@ arrow-json.workspace = true
 arrow-schema.workspace = true
 parquet.workspace = true
 object_store.workspace = true
+vortex = { workspace = true, optional = true }
+vortex-datafusion = { workspace = true, optional = true }
 env_logger.workspace = true
 faststr.workspace = true
 flate2.workspace = true
@@ -124,6 +134,10 @@ maxminddb = "0.27"
 md5.workspace = true
 memchr.workspace = true
 mimalloc = { version = "0.1.48", features = ["v3"], optional = true }
+o2_dex = { version = "0.1.0", path = "../o2-enterprise/o2_dex", optional = true }
+o2_enterprise = { version = "0.1.0", path = "../o2-enterprise/o2_enterprise", optional = true, default-features = false }
+o2_openfga = { version = "0.1.0", path = "../o2-enterprise/o2_openfga", optional = true }
+o2_ratelimit = { version = "0.1.0", path = "../o2-enterprise/o2_ratelimit", optional = true }
 once_cell.workspace = true
 opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true
@@ -305,6 +319,8 @@ async-trait = "0.1"
 async-recursion = "1.0"
 aws-config = "1.5.17"
 aws-sdk-sns = "1.61.0"
+aws-sdk-marketplacemetering = "1.61.0"
+aws-sdk-sqs = "1.61.0"
 base64 = "0.22"
 bitvec = "1.0"
 bytes = "1.11"
@@ -330,6 +346,10 @@ arrow-json = "57"
 arrow-schema = { version = "57", features = ["serde"] }
 parquet = { version = "57", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.12", features = ["aws", "azure", "gcp"] }
+vortex = { git = "https://github.com/openobserve/vortex", rev = "1ca97ea3fadd049ff09561430de9480f74c6c46e", features = [
+    "tokio",
+] }
+vortex-datafusion = { git = "https://github.com/openobserve/vortex", rev = "1ca97ea3fadd049ff09561430de9480f74c6c46e" }
 sqlparser = { version = "0.59", features = ["serde", "visitor"] }
 dotenv_config = "0.2"
 dotenvy = "0.15"
