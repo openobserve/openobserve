@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="ellipsis flex items-center span-name-section-content"
                 >
                   <img
-                    :src="getSpanServiceIconUrl(span)"
+                    :src="spanServiceIconUrlMap.get(`${span.serviceName}/${span.style?.color ?? ''}`)"
                     class="q-mr-xs tw:shrink-0 tw:w-[1.125rem] tw:h-[1.125rem] tw:inline-block"
                     aria-hidden="true"
                     :data-test="`trace-tree-span-service-icon-${span.spanId}`"
@@ -578,6 +578,25 @@ export default defineComponent({
       });
     });
 
+    const spanServiceIconUrlMap = computed(() => {
+      const isDark = store.state.theme === "dark";
+      const cache = new Map<string, string>();
+      for (const span of props.spans as any[]) {
+        const key = `${span.serviceName}/${span.style?.color ?? ""}`;
+        if (!cache.has(key)) {
+          cache.set(
+            key,
+            getServiceIconDataUrl(
+              span.serviceName,
+              isDark,
+              span.style?.color ?? "#9e9e9e",
+            ),
+          );
+        }
+      }
+      return cache;
+    });
+
     return {
       toggleSpanCollapse,
       getImageURL,
@@ -605,12 +624,7 @@ export default defineComponent({
       formatTokens,
       formatCost,
       isLLMTrace,
-      getSpanServiceIconUrl: (span: any) =>
-        getServiceIconDataUrl(
-          span.serviceName,
-          store.state.theme === "dark",
-          span.style?.color ?? "#9e9e9e",
-        ),
+      spanServiceIconUrlMap,
     };
   },
   components: { SpanBlock },

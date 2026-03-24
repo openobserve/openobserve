@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :src="serviceIconUrl"
       class="q-mr-sm tw:shrink-0 tw:w-[1.25rem] tw:h-[1.25rem]"
       aria-hidden="true"
+      alt=""
     />
 
     <!-- Service name + badge -->
