@@ -528,9 +528,19 @@ mod tests {
 
     use std::collections::HashSet;
 
-    use super::{super::db::sourcemaps::*, *};
+    use super::{
+        super::{super::migration, db::sourcemaps::*},
+        *,
+    };
 
     async fn upload_zip(svc: &str, env: &str, version: &str) {
+        migration::init_db().await.unwrap();
+        // ensure database tables are created
+        infra::db::create_table().await.unwrap();
+        // db migration steps, since it's separated out
+        infra::table::migrate().await.unwrap();
+        infra::init().await.unwrap();
+
         delete_group(
             "default",
             Some(svc.into()),
