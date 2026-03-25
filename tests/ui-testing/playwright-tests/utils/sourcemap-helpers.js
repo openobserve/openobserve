@@ -393,9 +393,10 @@ async function getRumToken(request, config) {
   }
 
   const data = await response.json();
-  testLogger.info(`RUM token retrieved: ${data.token}`);
+  const token = data.data?.rum_token || data.rum_token;
+  testLogger.info(`RUM token retrieved`);
 
-  return data.token;
+  return token;
 }
 
 /**
