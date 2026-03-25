@@ -247,6 +247,8 @@ pub async fn do_partitioned_search(
             stream_name,
             stream_type,
             &mut search_res,
+            &trace_id,
+            "partitioned_search",
         )
         .await?;
 
@@ -576,6 +578,8 @@ pub async fn process_delta(
             stream_name,
             stream_type,
             &mut search_res,
+            trace_id,
+            "process_delta",
         )
         .await?;
 
@@ -736,6 +740,8 @@ async fn send_partial_search_resp(
         stream_name,
         stream_type,
         &mut s_resp,
+        trace_id,
+        "partial_search_resp",
     )
     .await?;
     if is_result_array_skip_vrl {
