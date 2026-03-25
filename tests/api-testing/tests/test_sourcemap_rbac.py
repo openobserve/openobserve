@@ -4,9 +4,14 @@ Sourcemap RBAC E2E Tests
 Tests for Role-Based Access Control on sourcemap APIs.
 
 Test Coverage:
-- Viewer role permissions (cannot upload/delete, can list)
-- Editor role permissions (can upload, cannot delete)
-- Admin role permissions (can delete)
+- Viewer role permissions (read-only: can list, cannot upload/delete)
+- Editor role permissions (write access: can upload, cannot delete)
+- Admin role permissions (full access: can upload, list, delete)
+
+Expected RBAC Behavior (based on OpenFGA ownership model):
+- Viewer: Read-only access (list, translate stacktrace)
+- Editor: Write access (upload, list) but cannot delete
+- Admin/Root: Full access (upload, list, delete)
 
 Prerequisites:
 - OpenObserve ENTERPRISE build running on ZO_BASE_URL
@@ -16,13 +21,6 @@ Prerequisites:
 Note:
 - Tests marked with @pytest.mark.skip for OSS CI (enterprise-only feature)
 - Tests must run serially due to shared module-scoped fixture
-
-IMPORTANT - Discovery Test Pattern:
-These tests use if/elif to accept both authorized and unauthorized responses.
-This is INTENTIONAL to discover actual RBAC behavior empirically, as the
-spec is not fully defined. Tests log the discovered behavior and document it.
-Once RBAC behavior is confirmed, update tests to assert specific expected codes.
-TODO: Update to strict assertions once RBAC enforcement is confirmed.
 """
 
 import pytest
@@ -147,14 +145,12 @@ def test_sourcemaps_zip():
 # P1 - VIEWER PERMISSIONS
 # ==============================================================================
 
-def test_p1_viewer_upload_sourcemaps_rbac_discovery(base_url, org_id, test_sourcemaps_zip):
+def test_p1_viewer_cannot_upload_sourcemaps(base_url, org_id, test_sourcemaps_zip):
     """
-    P1 - FUNCTIONAL TEST (Discovery Pattern)
-    Viewer role permission check for uploading sourcemaps.
+    P1 - FUNCTIONAL TEST
+    Viewer role CANNOT upload sourcemaps (read-only access).
 
-    This test accepts BOTH outcomes to discover actual RBAC behavior:
-    - 200/201 = Viewers CAN upload (RBAC not enforced yet)
-    - 401/403 = Viewers CANNOT upload (RBAC enforced)
+    Expected: 401 or 403 (Unauthorized/Forbidden)
     """
     assert 'viewer' in test_users, "Viewer user was not created - RBAC setup failed"
 
@@ -174,39 +170,19 @@ def test_p1_viewer_upload_sourcemaps_rbac_discovery(base_url, org_id, test_sourc
             data=data
         )
 
-    # Document actual behavior
-    if response.status_code in [200, 201]:
-        logger.info("📝 Discovery: Viewers CAN upload sourcemaps (RBAC not enforced)")
-        assert response.status_code in [200, 201]
-        # Cleanup
-        viewer_session.delete(
-            f"{base_url}api/{org_id}/sourcemaps",
-            params={'service': data['service'], 'env': data['env'], 'version': data['version']}
-        )
-    elif response.status_code in [401, 403]:
-        logger.info("📝 Discovery: Viewers CANNOT upload sourcemaps (RBAC enforced)")
-        assert response.status_code in [401, 403]
-    elif response.status_code == 400:
-        logger.warning(f"Bad Request (400): {response.text}")
-        logger.error("Sourcemap ZIP invalid or missing. Setup failed.")
-        pytest.fail("Sourcemap upload failed with 400 - invalid ZIP or missing file")
-    else:
-        pytest.fail(f"Unexpected status code: {response.status_code} - {response.text}")
+    assert response.status_code in [401, 403], \
+        f"Viewer should NOT be able to upload sourcemaps. Got {response.status_code}: {response.text}"
+    logger.info("✅ Viewer correctly denied upload access")
 
 
-def test_p1_viewer_list_sourcemaps_rbac_discovery(create_session, base_url, org_id):
+def test_p1_viewer_can_list_sourcemaps(create_session, base_url, org_id):
     """
-    P1 - FUNCTIONAL TEST (Discovery Pattern)
-    Viewer role permission check for listing sourcemaps.
+    P1 - FUNCTIONAL TEST
+    Viewer role CAN list sourcemaps (read-only access).
 
-    This test accepts BOTH outcomes to discover actual RBAC behavior:
-    - 200 = Viewers CAN list (RBAC allows)
-    - 401/403 = Viewers CANNOT list (RBAC denies)
+    Expected: 200 OK with list of sourcemaps
     """
     assert 'viewer' in test_users, "Viewer user was not created - RBAC setup failed"
-
-    # First, upload sourcemaps as root
-    root_session = create_session
 
     # Try to list as viewer
     viewer_session = test_users['viewer']['session']
@@ -215,36 +191,26 @@ def test_p1_viewer_list_sourcemaps_rbac_discovery(create_session, base_url, org_
         f"{base_url}api/{org_id}/sourcemaps"
     )
 
-    # Document actual behavior
-    if response.status_code == 200:
-        logger.info("📝 Discovery: Viewers CAN list sourcemaps")
-        assert response.status_code == 200
-        maps = response.json()
-        assert isinstance(maps, list)
-    elif response.status_code in [401, 403]:
-        logger.info("📝 Discovery: Viewers CANNOT list sourcemaps")
-        assert response.status_code in [401, 403]
-    else:
-        pytest.fail(f"Unexpected status code: {response.status_code} - {response.text}")
+    assert response.status_code == 200, \
+        f"Viewer should be able to list sourcemaps. Got {response.status_code}: {response.text}"
+
+    maps = response.json()
+    assert isinstance(maps, list), "Response should be a list"
+    logger.info(f"✅ Viewer correctly allowed list access ({len(maps)} sourcemaps)")
 
 
-def test_p1_viewer_delete_sourcemaps_rbac_discovery(base_url, org_id):
+def test_p1_viewer_cannot_delete_sourcemaps(base_url, org_id):
     """
-    P1 - FUNCTIONAL TEST (Discovery Pattern)
-    Viewer role permission check for deleting sourcemaps.
+    P1 - FUNCTIONAL TEST
+    Viewer role CANNOT delete sourcemaps (read-only access).
 
-    This test accepts BOTH outcomes to discover actual RBAC behavior:
-    - 200 = Viewers CAN delete (RBAC not enforced yet)
-    - 401/403 = Viewers CANNOT delete (RBAC enforced)
-
-    Uses isolated test data to avoid corrupting shared state if deletion succeeds.
+    Expected: 401 or 403 (Unauthorized/Forbidden)
     """
     assert 'viewer' in test_users, "Viewer user was not created - RBAC setup failed"
 
     viewer_session = test_users['viewer']['session']
 
-    # Use isolated service/version to avoid corrupting shared test state
-    # if RBAC is unenforced and deletion succeeds
+    # Use isolated service/version to avoid affecting shared test data
     params = {
         'service': 'o2-sourcemap-rbac-viewer-delete-test',
         'env': 'testing',
@@ -256,29 +222,21 @@ def test_p1_viewer_delete_sourcemaps_rbac_discovery(base_url, org_id):
         params=params
     )
 
-    # Document actual behavior
-    if response.status_code == 200:
-        logger.info("📝 Discovery: Viewers CAN delete sourcemaps (RBAC not enforced)")
-        assert response.status_code == 200
-    elif response.status_code in [401, 403]:
-        logger.info("📝 Discovery: Viewers CANNOT delete sourcemaps (RBAC enforced)")
-        assert response.status_code in [401, 403]
-    else:
-        pytest.fail(f"Unexpected status code: {response.status_code}")
+    assert response.status_code in [401, 403], \
+        f"Viewer should NOT be able to delete sourcemaps. Got {response.status_code}: {response.text}"
+    logger.info("✅ Viewer correctly denied delete access")
 
 
 # ==============================================================================
 # P1 - EDITOR PERMISSIONS
 # ==============================================================================
 
-def test_p1_editor_upload_sourcemaps_rbac_discovery(base_url, org_id, test_sourcemaps_zip):
+def test_p1_editor_can_upload_sourcemaps(base_url, org_id, test_sourcemaps_zip):
     """
-    P1 - FUNCTIONAL TEST (Discovery Pattern)
-    Editor role permission check for uploading sourcemaps.
+    P1 - FUNCTIONAL TEST
+    Editor role CAN upload sourcemaps (write access).
 
-    This test accepts BOTH outcomes to discover actual RBAC behavior:
-    - 200/201 = Editors CAN upload (RBAC allows)
-    - 401/403 = Editors CANNOT upload (admin only)
+    Expected: 200 or 201 (Success/Created)
     """
     assert 'editor' in test_users, "Editor user was not created - RBAC setup failed"
 
@@ -298,22 +256,17 @@ def test_p1_editor_upload_sourcemaps_rbac_discovery(base_url, org_id, test_sourc
             data=data
         )
 
-    # Document actual behavior
-    if response.status_code in [200, 201]:
-        logger.info("📝 Discovery: Editors CAN upload sourcemaps")
-        assert response.status_code in [200, 201]
+    assert response.status_code in [200, 201], \
+        f"Editor should be able to upload sourcemaps. Got {response.status_code}: {response.text}"
+    logger.info("✅ Editor correctly allowed upload access")
 
-        # Cleanup: Delete what we just uploaded
-        editor_session.delete(
-            f"{base_url}api/{org_id}/sourcemaps",
-            params={'service': data['service'], 'env': data['env'], 'version': data['version']}
-        )
-
-    elif response.status_code in [401, 403]:
-        logger.info("📝 Discovery: Editors CANNOT upload sourcemaps (admin only)")
-        assert response.status_code in [401, 403]
-    else:
-        pytest.fail(f"Unexpected status code: {response.status_code} - {response.text}")
+    # Cleanup: Delete what we just uploaded
+    delete_response = editor_session.delete(
+        f"{base_url}api/{org_id}/sourcemaps",
+        params={'service': data['service'], 'env': data['env'], 'version': data['version']}
+    )
+    # Note: Delete may fail (403) if editors can't delete - that's tested separately
+    logger.info(f"Cleanup delete response: {delete_response.status_code}")
 
 
 # ==============================================================================
