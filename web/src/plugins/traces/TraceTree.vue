@@ -113,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :src="spanServiceIconUrlMap.get(`${span.serviceName}/${span.style?.color ?? ''}`)"
                     class="q-mr-xs tw:shrink-0 tw:w-[1.125rem] tw:h-[1.125rem] tw:inline-block"
                     aria-hidden="true"
+                    alt=""
                     :data-test="`trace-tree-span-service-icon-${span.spanId}`"
                   />
                   <q-icon

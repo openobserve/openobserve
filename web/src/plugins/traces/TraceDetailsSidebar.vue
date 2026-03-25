@@ -73,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :src="serviceIconUrl"
               class="q-mr-xs tw:w-[0.875rem] tw:h-[0.875rem] tw:shrink-0"
               aria-hidden="true"
+              alt=""
             />
             <span class="chip-label">Service</span>
             <span
