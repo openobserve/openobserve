@@ -195,6 +195,7 @@ import { useSearchBar } from "@/composables/useLogs/useSearchBar";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useStreamFields } from "@/composables/useLogs/useStreamFields";
+import { captureFromValuesApi } from "@/composables/useFieldValueStore";
 
 interface Filter {
   fieldName: string;
@@ -1545,6 +1546,19 @@ export default defineComponent({
               });
             });
           });
+
+          // [NEW] Background capture into IndexedDB — does not block return
+          if (streamValues.length > 0 && fieldName) {
+            captureFromValuesApi(
+              {
+                org: store.state.selectedOrganization.identifier,
+                streamType: searchObj.data.stream.streamType ?? "logs",
+                streamName: streamName ?? "",
+              },
+              fieldName,
+              streamValues,
+            );
+          }
 
           // Append to existing stream values in paginated mode; replace on fresh load.
           if (isAppend) {
