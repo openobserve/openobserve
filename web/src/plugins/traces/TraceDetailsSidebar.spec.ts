@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,6 +26,20 @@ import {
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
+
+vi.mock("@/utils/traces/convertTraceData", () => ({
+  getServiceIconDataUrl: vi.fn().mockReturnValue("data:image/svg+xml;base64,ICON"),
+}));
+
+vi.mock("@/composables/useTraces", () => ({
+  default: () => ({
+    searchObj: { meta: { serviceColors: { alertmanager: "#1ab8be" } } },
+    buildQueryDetails: vi.fn(),
+    navigateToLogs: vi.fn(),
+  }),
+}));
+
+import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import TraceDetailsSidebar from "@/plugins/traces/TraceDetailsSidebar.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -192,6 +206,7 @@ describe("TraceDetailsSidebar", async () => {
 
   afterEach(() => {
     wrapper.unmount();
+    vi.clearAllMocks();
   });
 
   it("should mount TraceDetailsSidebar component", () => {
@@ -212,6 +227,35 @@ describe("TraceDetailsSidebar", async () => {
     );
     expect(serviceName.exists()).toBe(true);
     expect(serviceName.text()).toContain(mockSpan.service_name);
+  });
+
+  describe("service icon", () => {
+    it("should render service icon img inside the service chip", () => {
+      const serviceChip = wrapper.find(
+        '[data-test="trace-details-sidebar-header-toolbar-service"]',
+      );
+      expect(serviceChip.exists()).toBe(true);
+      const img = serviceChip.find("img");
+      expect(img.exists()).toBe(true);
+    });
+
+    it("should set icon src from getServiceIconDataUrl", () => {
+      const serviceChip = wrapper.find(
+        '[data-test="trace-details-sidebar-header-toolbar-service"]',
+      );
+      expect(serviceChip.exists()).toBe(true);
+      const img = serviceChip.find("img");
+      expect(img.exists()).toBe(true);
+      expect(img.attributes("src")).toBe("data:image/svg+xml;base64,ICON");
+    });
+
+    it("should call getServiceIconDataUrl with the span service name", () => {
+      expect(
+        vi.mocked(getServiceIconDataUrl).mock.calls.some(
+          (call) => call[0] === mockSpan.service_name,
+        ),
+      ).toBe(true);
+    });
   });
 
   it("should display duration", () => {
