@@ -389,6 +389,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-toggle
           v-model="stickyFirstColumn"
           data-test="dashboard-config-sticky-first-column"
+          class="tw-h-[36px] -tw-ml-2 tw-mb-2 o2-toggle-button-lg"
+          size="lg"
         >
           <template v-slot:default>
             <div class="row items-center all-pointer-events tw-mb-[-5px]">

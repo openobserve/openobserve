@@ -1068,7 +1068,10 @@
     "promqlTableMode": "Mode Tableau ProMQL",
     "overrideMessageExample": "Par exemple, {endpoint} sera remplacé par la valeur d'étiquette du point de terminaison.",
     "stepValueTooltipInfo": "Si elle n'est pas spécifiée, la valeur de l'étape de Configuration du panneau sera utilisée.",
-    "optional": "Facultatif"
+    "optional": "Facultatif",
+    "pagination": "Pagination",
+    "rowsPerPage": "Enregistrements par page",
+    "rowsPerPageTooltip": "Définissez le nombre par défaut d'enregistrements à afficher par page"
   },
   "panel": {
     "header": "Panneau",

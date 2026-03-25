@@ -1068,7 +1068,10 @@
     "promqlTableMode": "PromQL-Tabellenmodus",
     "overrideMessageExample": "Beispielsweise wird {endpoint} durch den Labelwert für Endpunkt ersetzt.",
     "stepValueTooltipInfo": "Wenn nicht angegeben, wird der Schrittwert aus der Panel-Konfiguration verwendet.",
-    "optional": "Fakultativ"
+    "optional": "Fakultativ",
+    "pagination": "Seitennummerierung",
+    "rowsPerPage": "Datensätze pro Seite",
+    "rowsPerPageTooltip": "Legen Sie die Standardanzahl der Datensätze fest, die pro Seite angezeigt werden sollen"
   },
   "panel": {
     "header": "Panel",

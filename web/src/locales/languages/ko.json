@@ -1068,7 +1068,10 @@
     "promqlTableMode": "ProMQL 테이블 모드",
     "overrideMessageExample": "예를 들어, {endpoint} 는 엔드포인트의 레이블 값으로 대체됩니다.",
     "stepValueTooltipInfo": "지정하지 않으면 패널 구성의 단계 값이 사용됩니다.",
-    "optional": "선택 사항"
+    "optional": "선택 사항",
+    "pagination": "쪽수 매기기",
+    "rowsPerPage": "페이지당 레코드 수",
+    "rowsPerPageTooltip": "페이지당 표시할 기본 레코드 수 설정"
   },
   "panel": {
     "header": "패널",

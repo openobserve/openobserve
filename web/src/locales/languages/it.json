@@ -1068,7 +1068,10 @@
     "promqlTableMode": "Modalità tabella ProMQL",
     "overrideMessageExample": "Ad esempio, {endpoint} verrà sostituito con il valore dell'etichetta per endpoint.",
     "stepValueTooltipInfo": "Se non specificato, verrà utilizzato il valore del passo di Panel Configuration.",
-    "optional": "Facoltativo"
+    "optional": "Facoltativo",
+    "pagination": "Impaginazione",
+    "rowsPerPage": "Record per pagina",
+    "rowsPerPageTooltip": "Imposta il numero predefinito di record da visualizzare per pagina"
   },
   "panel": {
     "header": "Pannello",
