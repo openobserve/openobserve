@@ -392,7 +392,12 @@ def get_rum_token(session, base_url, org_id):
         raise Exception(f"Failed to get RUM token: {response.status_code}")
 
     data = response.json()
-    token = data.get('token')
+    # Use same pattern as ingest_rum_errors.py to handle nested response structure
+    token = data.get('data', {}).get('rum_token') or data.get('rum_token')
+
+    if not token:
+        logger.error(f"RUM token is empty in response: {data}")
+        raise Exception("RUM token not found in response")
 
     logger.info(f"RUM token retrieved: {token}")
 
