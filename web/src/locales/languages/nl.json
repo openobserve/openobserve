@@ -2205,7 +2205,7 @@
     "anomalyStatus": {
       "waiting": "Wachtend",
       "training": "Opleiding",
-      "active": "Actief",
+      "ready": "Klaar",
       "failed": "Mislukt",
       "disabled": "Uitgeschakeld"
     },

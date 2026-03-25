@@ -888,7 +888,14 @@ export default defineComponent({
     };
 
     const triggerAutoComplete = async (value: string) => {
-      disableSuggestionPopup();
+      // Close any currently-open suggestion popup before retriggering.
+      // Monaco's model.trigger() calls cancel() internally, but if a natural
+      // popup is already in "Showing" state (e.g. opened by typing quote after
+      // an operator, or from word-based suggest while typing NOT LIKE), the
+      // widget may not refresh its item list. hideSuggestWidget transitions
+      // state to Idle cleanly (no "user dismissed" flag) so the following
+      // triggerSuggest always opens a fresh popup with the latest keywords.
+      editorObj.trigger(value, "hideSuggestWidget", {});
       await nextTick();
       editorObj.trigger(value, "editor.action.triggerSuggest", {});
     };

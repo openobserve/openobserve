@@ -2205,7 +2205,7 @@
     "anomalyStatus": {
       "waiting": "Wartend",
       "training": "Schulung",
-      "active": "Aktiv",
+      "ready": "Bereit",
       "failed": "Fehlgeschlagen",
       "disabled": "Deaktiviert"
     },

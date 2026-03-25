@@ -2205,7 +2205,7 @@
     "anomalyStatus": {
       "waiting": "等待",
       "training": "训练",
-      "active": "活跃",
+      "ready": "就绪",
       "failed": "失败",
       "disabled": "已禁用"
     },
