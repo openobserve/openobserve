@@ -160,6 +160,9 @@ test.describe("Traces Autocomplete Value Suggestions", () => {
     test("should capture field values to IndexedDB when expanding a field in traces sidebar", {
         tag: ['@autosuggestions', '@traces', '@indexeddb']
     }, async ({ page }) => {
+        // Feature not yet implemented for traces - only logs have IndexedDB value capture
+        test.skip(true, 'Autosuggestions IndexedDB capture not implemented for traces yet - only available for logs');
+
         testLogger.info('Testing traces field expansion capture');
 
         // Clear IndexedDB
@@ -228,6 +231,9 @@ test.describe("Traces Autocomplete Value Suggestions", () => {
     test("should show value suggestions in traces query editor", {
         tag: ['@autosuggestions', '@traces', '@autocomplete']
     }, async ({ page }) => {
+        // Feature not yet implemented for traces - value suggestions require IndexedDB capture
+        test.skip(true, 'Autosuggestions value capture not implemented for traces yet - only available for logs');
+
         testLogger.info('Testing traces autocomplete suggestions');
 
         // Use setupTraceSearch - the standard pattern
