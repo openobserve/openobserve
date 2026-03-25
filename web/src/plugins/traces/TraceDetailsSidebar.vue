@@ -483,13 +483,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-item-label
                             ><q-btn
                               title="Apply & Search (=)"
-                              size="6px"
+                              size="0.375rem"
                               round
                               class="tw:mr-[0.25rem]! pointer"
                             >
                               <q-icon
                                 color="currentColor"
-                                class="tw:w-[0.65rem]! tw:h-[0.65rem]!"
+                                class="tw:w-[0.75rem]! tw:h-[0.75rem]!"
                               >
                                 <EqualIcon></EqualIcon>
                               </q-icon> </q-btn
@@ -515,13 +515,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-item-label
                             ><q-btn
                               title="Apply & Search (≠)"
-                              size="6px"
+                              size="0.375rem"
                               round
                               class="pointer"
                             >
                               <q-icon color="currentColor">
                                 <NotEqualIcon
-                                  class="tw:w-[0.65rem]! tw:h-[0.65rem]!"
+                                  class="tw:w-[0.75rem]! tw:h-[0.75rem]!"
                                 ></NotEqualIcon>
                               </q-icon> </q-btn
                             ><span class="tw:text-[0.85rem]!">
@@ -530,7 +530,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                         </q-item-section>
                       </q-item>
-                      <q-separator />
+                      <q-separator v-if="showPendingFilter" />
                       <q-item
                         v-if="showPendingFilter"
                         clickable
