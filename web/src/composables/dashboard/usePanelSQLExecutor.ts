@@ -54,6 +54,7 @@ export const usePanelSQLExecutor = (ctx: {
   shouldFetchAnnotations: () => boolean;
   refreshAnnotations: (start: any, end: any) => Promise<any>;
   log: (...args: any[]) => void;
+  getRegionClusterParams: () => Record<string, any>;
 }) => {
   const {
     state,
@@ -83,6 +84,7 @@ export const usePanelSQLExecutor = (ctx: {
     removeTraceId,
     shouldFetchAnnotations,
     refreshAnnotations,
+    getRegionClusterParams,
     log,
   } = ctx;
 
@@ -148,6 +150,7 @@ export const usePanelSQLExecutor = (ctx: {
               endISOTimestamp,
               null,
             )),
+            ...getRegionClusterParams(),
           },
         },
         type: "histogram",
@@ -358,6 +361,7 @@ export const usePanelSQLExecutor = (ctx: {
                   end_time: endISOTimestamp,
                   per_query_response: true,
                   size: -1,
+                  ...getRegionClusterParams(),
                 },
               },
               type: "histogram" as const,
