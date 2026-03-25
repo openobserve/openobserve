@@ -115,6 +115,9 @@ function createWrapper(props: Record<string, any> = {}) {
           name: "BaseImport",
           template: '<div data-test="base-import"><slot name="output-content" /></div>',
           props: ["title", "testPrefix", "isImporting", "editorHeights"],
+          data() {
+            return { isImporting: false };
+          },
           methods: {
             updateJsonArray: vi.fn(),
           },
