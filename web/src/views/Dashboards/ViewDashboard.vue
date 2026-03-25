@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <RenderDashboardCharts
-        :key="currentDashboardData.data?.dashboardId"
+        :key="currentDashboardData.data?.dashboardId + '-' + dashboardRemountKey"
         v-if="selectedDate"
         ref="renderDashboardChartsRef"
         @variablesData="variablesDataUpdated"
@@ -390,6 +390,8 @@ import {
   contextRegistry,
 } from "@/composables/contextProviders";
 import { hasPanelTime } from "@/utils/dashboard/panelTimeUtils";
+import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
+import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -1585,8 +1587,34 @@ export default defineComponent({
       document.addEventListener("fullscreenchange", onFullscreenChange);
     });
 
+    // Force remount key — bumped on AI dashboard events to force RenderDashboardCharts to remount
+    const dashboardRemountKey = ref(0);
+
+    // Listen for AI assistant dashboard mutations to auto-refresh
+    const { on: onDashboardEvent, off: offDashboardEvent } = useAiDashboardEvents();
+    const handleAiDashboardEvent = async (event: AiDashboardEvent) => {
+      const currentDashboardId = route.query.dashboard as string;
+      const shouldReload = event.dashboardId
+        ? event.dashboardId === currentDashboardId
+        : true; // No ID in event — reload defensively
+
+      if (shouldReload && currentDashboardId) {
+        // Clear cached dashboard data so getDashboard() fetches fresh from API
+        delete store.state.organizationData.allDashboardData[currentDashboardId];
+        await loadDashboard();
+        // Bump key to force RenderDashboardCharts to fully remount with new data
+        dashboardRemountKey.value++;
+      }
+    };
+    onMounted(() => {
+      onDashboardEvent(handleAiDashboardEvent);
+    });
+
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
+
+      // Clean up AI dashboard event listener
+      offDashboardEvent(handleAiDashboardEvent);
 
       // Clean up dashboard context provider
       contextRegistry.unregister("dashboards");
@@ -1660,6 +1688,7 @@ export default defineComponent({
 
     return {
       currentDashboardData,
+      dashboardRemountKey,
       toggleFullscreen,
       fullscreenDiv,
       isFullscreen,

@@ -997,8 +997,10 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import RichTextInput, { ReferenceChip } from '@/components/RichTextInput.vue';
 import O2AIConfirmDialog from '@/components/O2AIConfirmDialog.vue';
 import { useChatHistory } from '@/composables/useChatHistory';
+import { useAiDashboardEvents, getDashboardEventType } from '@/composables/useAiDashboardEvents';
 
 const { fetchAiChat, submitFeedback } = useAiChat();
+const { emit: emitDashboardEvent } = useAiDashboardEvents();
 
 // Register VRL as a JavaScript alias (type assertion)
 hljs.registerLanguage('vrl', () => hljs.getLanguage('javascript') as any);
@@ -1107,18 +1109,24 @@ export default defineComponent({
     // Tool confirmation state (from AI agent — confirmation-required actions, inline in chat)
     const pendingConfirmation = ref<{ tool: string; args: Record<string, any>; message: string; navAction?: NavigationAction } | null>(null);
 
+    // Maps call_id → tool name from tool_call events. Needed because confirmation_required
+    // clears activeToolCall before tool_result arrives, losing the tool name association.
+    const toolCallIdMap = new Map<string, string>();
+
+
+
     // Auto navigation state - per chat ID
     // Stores chat ID -> boolean mapping for auto navigation preference
     const autoNavigationPreferences = ref<Map<number, boolean>>(new Map());
 
     // Pending auto navigation preference for new chats (before chat ID is created)
-    const pendingAutoNavigation = ref(false);
+    const pendingAutoNavigation = ref(true);
 
-    // Current chat's auto navigation state
+    // Current chat's auto navigation state (defaults to true)
     const isAutoNavigationEnabled = computed({
       get: () => {
         if (!currentChatId.value) return pendingAutoNavigation.value;
-        return autoNavigationPreferences.value.get(currentChatId.value) ?? false;
+        return autoNavigationPreferences.value.get(currentChatId.value) ?? true;
       },
       set: (value: boolean) => {
         if (currentChatId.value) {
@@ -1756,6 +1764,11 @@ export default defineComponent({
                       }
                     }
 
+                    // Track call_id → tool name for dashboard event resolution
+                    if (data.call_id && data.tool) {
+                      toolCallIdMap.set(data.call_id, data.tool);
+                    }
+
                     // Show active indicator (blue spinner box) - don't add to chat yet
                     activeToolCall.value = {
                       tool: data.tool,
@@ -1881,6 +1894,26 @@ export default defineComponent({
                         data.call_args,
                         data
                       );
+                    }
+
+                    // Emit dashboard event for successful dashboard-mutating tools
+                    if (data.success !== false) {
+                      // Resolve actual tool name: prefer data.tool, fall back to toolCallIdMap
+                      const resolvedToolName = data.tool && data.tool !== 'tools_call'
+                        ? data.tool
+                        : (data.call_id && toolCallIdMap.get(data.call_id)) || '';
+                      const callArgs = data.call_args || {};
+                      const dashboardEventType = getDashboardEventType(resolvedToolName);
+                      if (dashboardEventType) {
+                        const dashboardId = callArgs.dashboard_id || callArgs.args?.dashboard_id || callArgs.request_body?.dashboard_id;
+                        const folderId = callArgs.folder || callArgs.args?.folder || callArgs.request_body?.folder;
+                        emitDashboardEvent({
+                          type: dashboardEventType,
+                          dashboardId,
+                          folderId,
+                        });
+                      }
+                      if (data.call_id) toolCallIdMap.delete(data.call_id);
                     }
 
                     // Match by call_id if available, fall back to tool name
@@ -2181,6 +2214,11 @@ export default defineComponent({
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
                     }
+                  }
+
+                  // Track call_id → tool name for dashboard event resolution
+                  if (data.call_id && data.tool) {
+                    toolCallIdMap.set(data.call_id, data.tool);
                   }
 
                   // Set new active tool call (shows spinner indicator)
