@@ -2762,16 +2762,16 @@ export default defineComponent({
     };
 
     // Responsive breakpoints: progressively move items into menus
-    // <= 1500px: saved views + reset → left hamburger menu
-    // <= 1300px: also histogram + SQL toggles → left hamburger menu
-    // <= 1100px: also share + transform selector → right overflow menu
+    // <= 1440px: saved views + reset → left hamburger menu
+    // <= 1280px: also histogram + SQL toggles → left hamburger menu
+    // <= 1024px: also share + transform selector → right overflow menu
     const shouldMoveSavedViewToMenu = computed(
-      () => windowWidth.value <= 1500,
+      () => windowWidth.value <= 1440,
     );
     const shouldMoveTogglesToMenu = computed(
-      () => windowWidth.value <= 1300,
+      () => windowWidth.value <= 1280,
     );
-    const shouldMoveShareToMenu = computed(() => windowWidth.value <= 1100);
+    const shouldMoveShareToMenu = computed(() => windowWidth.value <= 1024);
     const vrlEditorNlpMode = ref(false); // Track VRL editor's AI mode
 
     const confirmUpdate = ref(false);

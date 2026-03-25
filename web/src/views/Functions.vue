@@ -165,7 +165,7 @@ export default defineComponent({
     const onWindowResize = () => {
       windowWidth.value = window.innerWidth;
     };
-    const isCompactSidebar = computed(() => windowWidth.value <= 1500);
+    const isCompactSidebar = computed(() => windowWidth.value <= 1440);
 
     const splitterModel = ref(220);
 
@@ -188,7 +188,7 @@ export default defineComponent({
     // Adjust splitter width when switching between compact/full mode
     watch(isCompactSidebar, (compact) => {
       if (showSidebar.value) {
-        splitterModel.value = compact ? 56 : 220;
+        splitterModel.value = compact ? 65 : 220;
         lastSplitterPosition.value = splitterModel.value;
       }
     });
@@ -197,8 +197,8 @@ export default defineComponent({
       window.addEventListener("resize", onWindowResize);
       // Apply initial compact width if needed
       if (isCompactSidebar.value && showSidebar.value) {
-        splitterModel.value = 56;
-        lastSplitterPosition.value = 56;
+        splitterModel.value = 65;
+        lastSplitterPosition.value = 65;
       }
     });
 

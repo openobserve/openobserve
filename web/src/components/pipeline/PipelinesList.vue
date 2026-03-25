@@ -626,7 +626,7 @@ const windowWidth = ref(window.innerWidth);
 const onWindowResize = () => {
   windowWidth.value = window.innerWidth;
 };
-const shouldCollapseToolbar = computed(() => windowWidth.value <= 1500);
+const shouldCollapseToolbar = computed(() => windowWidth.value <= 1440);
 
 onMounted(() => {
   window.addEventListener("resize", onWindowResize);
