@@ -115,18 +115,18 @@ export class RumPage {
 
         // Workaround: Playwright clicks don't trigger Vue @click handlers (known Vue 3 + Playwright limitation)
         // Navigate to error detail by constructing URL from available data
-        if (!this.firstErrorTimestamp) {
-            throw new Error('No error timestamp available - make sure clickRunQuery was called first');
+        if (!this.firstErrorId) {
+            throw new Error('No error ID available - make sure clickRunQuery was called first');
         }
 
         const currentUrl = this.page.url();
         const url = new URL(currentUrl);
         const org = url.searchParams.get('org_identifier') || process.env.ORGNAME || 'default';
 
-        // Use timestamp as the error ID (simplified approach for test purposes)
+        // Use the actual error ID captured from the API response
         // This navigates to error detail view to validate the UI works
         await this.page.goto(
-            `${process.env.ZO_BASE_URL}/web/rum/errors/view/${this.firstErrorTimestamp}?org_identifier=${org}`
+            `${process.env.ZO_BASE_URL}/web/rum/errors/view/${this.firstErrorId}?org_identifier=${org}`
         );
 
         // Wait for page to load
