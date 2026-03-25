@@ -4747,7 +4747,7 @@ export default defineComponent({
 
       &:focus-within {
         border: 1px solid transparent;
-        box-shadow: 0 0 0 2px #667eea;
+        box-shadow: 0 0 0 2px #8B5CF6;
       }
     }
 
@@ -5102,7 +5102,7 @@ export default defineComponent({
 
 // Avatar styling for user messages
 .light-user-avatar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
   color: white;
 }
 
@@ -5113,19 +5113,19 @@ export default defineComponent({
 
 // Send button gradient styling
 .send-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
   transition: all 0.3s ease !important;
-  box-shadow: 0 4px 15px 0 rgba(102, 126, 234, 0.3) !important;
-  
+  box-shadow: 0 4px 15px 0 rgba(139, 92, 246, 0.3) !important;
+
   &:hover:not(.disabled):not([disabled]):not(:disabled) {
-    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%) !important;
-    box-shadow: 0 6px 20px 0 rgba(102, 126, 234, 0.4) !important;
+    background: linear-gradient(135deg, #7C3AED 0%, #DB2777 100%) !important;
+    box-shadow: 0 6px 20px 0 rgba(139, 92, 246, 0.4) !important;
     transform: translateY(-1px) !important;
   }
-  
+
   &:active:not(.disabled):not([disabled]):not(:disabled) {
     transform: translateY(0) !important;
-    box-shadow: 0 2px 10px 0 rgba(102, 126, 234, 0.3) !important;
+    box-shadow: 0 2px 10px 0 rgba(139, 92, 246, 0.3) !important;
   }
 
 }
@@ -5353,8 +5353,8 @@ export default defineComponent({
   }
   
   body.body--dark & {
-    border: 2px solid #667eea !important;
-    color: #667eea !important;
+    border: 2px solid #8B5CF6 !important;
+    color: #8B5CF6 !important;
     background: rgba(30, 30, 30, 0.9) !important;
   }
   
@@ -5518,12 +5518,12 @@ export default defineComponent({
     font-weight: 500;
 
     .light-mode & {
-      background: rgba(102, 126, 234, 0.1);
-      color: #667eea;
+      background: rgba(139, 92, 246, 0.1);
+      color: #8B5CF6;
     }
 
     .dark-mode & {
-      background: rgba(102, 126, 234, 0.2);
+      background: rgba(139, 92, 246, 0.2);
       color: #a0aec0;
     }
   }

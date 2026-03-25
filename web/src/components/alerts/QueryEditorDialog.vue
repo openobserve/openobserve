@@ -1028,7 +1028,7 @@ const getBtnLogo = computed(() => {
 
   return store.state.theme === 'dark'
     ? getImageURL('images/common/ai_icon_dark.svg')
-    : getImageURL('images/common/ai_icon.svg')
+    : getImageURL('images/common/ai_icon_gradient.svg')
 })
 </script>
 
@@ -1063,15 +1063,17 @@ const getBtnLogo = computed(() => {
 
 .ai-hover-btn {
   opacity: 1;
-  transition: background-color 0.2s ease;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
 
   &:hover {
-    background-color: rgba(121, 128, 204, 0.1);
+    background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
+    box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
   }
 }
 
 .ai-btn-active {
-  background-color: rgba(121, 128, 204, 0.2);
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
 }
 
 // Force no transitions on collapsible output sections
@@ -1081,18 +1083,18 @@ const getBtnLogo = computed(() => {
 
 // AI Generate Button Styling (matches O2 AI Assistant - purple gradient)
 .o2-ai-generate-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
   color: white !important;
   border: none !important;
   font-size: 0.6875rem !important; // 11px
   font-weight: 600 !important;
   line-height: 1rem !important; // 16px
   transition: all 0.3s ease !important;
-  box-shadow: 0 0.25rem 0.9375rem 0 rgba(102, 126, 234, 0.3) !important; // 0 4px 15px
+  box-shadow: 0 0.25rem 0.9375rem 0 rgba(139, 92, 246, 0.3) !important; // 0 4px 15px
   padding: 0 0.75rem !important; // 0 12px
 
   &:hover {
-    box-shadow: 0 0.375rem 1.25rem 0 rgba(102, 126, 234, 0.5) !important; // 0 6px 20px
+    box-shadow: 0 0.375rem 1.25rem 0 rgba(139, 92, 246, 0.5) !important; // 0 6px 20px
     transform: translateY(-1px);
   }
 
