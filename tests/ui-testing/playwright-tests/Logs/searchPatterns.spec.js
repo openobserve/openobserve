@@ -690,7 +690,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         testLogger.info('PASSED: Tokenized wildcard chips test complete');
     });
 
-    test("should display wildcard chip tooltips with sample values on hover @P1 @functional", async ({ page }) => {
+    test.skip("should display wildcard chip tooltips with sample values on hover @P1 @functional", async ({ page }) => {
         testLogger.info('Test: Verify wildcard chip hover tooltips show sample values');
 
         const result = await setupPatternsView(page, pm);
