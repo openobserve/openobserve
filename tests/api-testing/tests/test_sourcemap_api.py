@@ -95,7 +95,9 @@ def setup_test_app(create_session, base_url, org_id):
 
         logger.info("========== SETUP COMPLETE ==========")
 
-        yield test_app_build
+        # Yield to pause - cleanup runs after all module tests complete
+        # Note: Tests access data via module globals, not this yielded value
+        yield
 
     finally:
         logger.info("========== TEARDOWN: Cleaning up ==========")

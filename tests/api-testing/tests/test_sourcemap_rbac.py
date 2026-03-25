@@ -143,8 +143,7 @@ def test_p1_viewer_cannot_upload_sourcemaps(base_url, org_id, test_sourcemaps_zi
     Viewer role permission check for uploading sourcemaps.
     📝 DISCOVERY: Viewers CAN upload sourcemaps (RBAC not enforced yet).
     """
-    if 'viewer' not in test_users:
-        pytest.skip("Viewer user not created")
+    assert 'viewer' in test_users, "Viewer user was not created - RBAC setup failed"
 
     viewer_session = test_users['viewer']['session']
 
@@ -176,8 +175,8 @@ def test_p1_viewer_cannot_upload_sourcemaps(base_url, org_id, test_sourcemaps_zi
         assert response.status_code in [401, 403]
     elif response.status_code == 400:
         logger.warning(f"Bad Request (400): {response.text}")
-        logger.warning("Sourcemap ZIP may be invalid or missing. Run test_sourcemap_api.py first.")
-        pytest.skip("Sourcemap upload failed with 400 - invalid ZIP or missing file")
+        logger.error("Sourcemap ZIP invalid or missing. Setup failed.")
+        pytest.fail("Sourcemap upload failed with 400 - invalid ZIP or missing file")
     else:
         pytest.fail(f"Unexpected status code: {response.status_code} - {response.text}")
 
@@ -187,8 +186,7 @@ def test_p1_viewer_can_list_sourcemaps(create_session, base_url, org_id):
     P1 - FUNCTIONAL TEST
     Viewer role CAN or CANNOT list sourcemaps (TBD - discover empirically).
     """
-    if 'viewer' not in test_users:
-        pytest.skip("Viewer user not created")
+    assert 'viewer' in test_users, "Viewer user was not created - RBAC setup failed"
 
     # First, upload sourcemaps as root
     root_session = create_session
@@ -219,8 +217,7 @@ def test_p1_viewer_cannot_delete_sourcemaps(base_url, org_id):
     Viewer role permission check for deleting sourcemaps.
     📝 DISCOVERY: Viewers CAN delete sourcemaps (RBAC not enforced yet).
     """
-    if 'viewer' not in test_users:
-        pytest.skip("Viewer user not created")
+    assert 'viewer' in test_users, "Viewer user was not created - RBAC setup failed"
 
     viewer_session = test_users['viewer']['session']
 
@@ -255,8 +252,7 @@ def test_p1_editor_can_upload_sourcemaps(base_url, org_id, test_sourcemaps_zip):
     P1 - FUNCTIONAL TEST
     Editor role CAN or CANNOT upload sourcemaps (TBD - discover empirically).
     """
-    if 'editor' not in test_users:
-        pytest.skip("Editor user not created")
+    assert 'editor' in test_users, "Editor user was not created - RBAC setup failed"
 
     editor_session = test_users['editor']['session']
 
@@ -301,8 +297,7 @@ def test_p1_admin_can_delete_sourcemaps(create_session, base_url, org_id, test_s
     P1 - FUNCTIONAL TEST
     Admin role can delete sourcemaps.
     """
-    if 'admin' not in test_users:
-        pytest.skip("Admin user not created")
+    assert 'admin' in test_users, "Admin user was not created - RBAC setup failed"
 
     # First, upload sourcemaps as root
     root_session = create_session
