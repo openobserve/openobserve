@@ -87,6 +87,14 @@ async function buildTestApp(rumToken, options = {}) {
 
     // Extract content hashes from dist/
     const distPath = path.join(appDir, 'dist');
+
+    // Validate distPath to prevent path traversal
+    const resolvedDistPath = path.resolve(distPath);
+    const resolvedAppDir = path.resolve(appDir);
+    if (!resolvedDistPath.startsWith(resolvedAppDir)) {
+      throw new Error(`Invalid distPath: ${distPath} is outside appDir`);
+    }
+
     const distFiles = await fs.readdir(distPath);
 
     const hashes = {
@@ -155,11 +163,17 @@ function extractHash(files, prefix, ext) {
  * @returns {Promise<Object>} Server process info
  */
 async function serveTestApp(distPath, port = 8089) {
-  testLogger.info(`Starting HTTP server on port ${port}...`);
+  // Validate port before use
+  const portNum = parseInt(port, 10);
+  if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) {
+    throw new Error(`Invalid port number: ${port}`);
+  }
+
+  testLogger.info(`Starting HTTP server on port ${portNum}...`);
 
   const { spawn } = require('child_process');
 
-  const serverProcess = spawn('python3', ['-m', 'http.server', port.toString()], {
+  const serverProcess = spawn('python3', ['-m', 'http.server', portNum.toString()], {
     cwd: distPath,
     detached: true,
     stdio: 'ignore'
@@ -175,8 +189,8 @@ async function serveTestApp(distPath, port = 8089) {
   return {
     process: serverProcess,
     pid: serverProcess.pid,
-    port,
-    url: `http://localhost:${port}`
+    port: portNum,
+    url: `http://localhost:${portNum}`
   };
 }
 
