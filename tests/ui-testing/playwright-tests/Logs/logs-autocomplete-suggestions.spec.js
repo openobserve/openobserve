@@ -469,30 +469,24 @@ test.describe("Autocomplete Value Suggestions", () => {
         await page.waitForTimeout(500);
         await page.keyboard.press('Control+Space');
 
-        try {
-            await waitForSuggestionsWidget(page, 10000);
+        // Wait for suggestions - no silent catch
+        await waitForSuggestionsWidget(page, 10000);
 
-            // Select the string value
-            if (await suggestionContainsValue(page, stringValue)) {
-                await selectSuggestion(page, stringValue);
-                await page.waitForTimeout(500);
+        // Assert string value is in suggestions
+        const hasStringValue = await suggestionContainsValue(page, stringValue);
+        expect(hasStringValue, `Expected string value ${stringValue} to be in suggestions`).toBe(true);
 
-                // Get the editor content
-                const editorContent = await page.locator('[data-test="logs-search-bar-query-editor"] .monaco-editor .view-lines').textContent();
+        await selectSuggestion(page, stringValue);
+        await page.waitForTimeout(500);
 
-                // String values should be wrapped in single quotes
-                const expectedPattern = `'${stringValue}'`;
-                if (editorContent.includes(expectedPattern)) {
-                    testLogger.info(`String value correctly quoted: ${expectedPattern}`);
-                } else {
-                    testLogger.info(`Editor content: ${editorContent}`);
-                }
-            } else {
-                testLogger.info('String value not in current suggestions');
-            }
-        } catch (error) {
-            testLogger.warn(`Quoting test could not complete: ${error.message}`);
-        }
+        // Get the editor content
+        const editorContent = await page.locator('[data-test="logs-search-bar-query-editor"] .monaco-editor .view-lines').textContent();
+        testLogger.info(`Editor content: ${editorContent}`);
+
+        // String values should be wrapped in single quotes
+        const expectedPattern = `'${stringValue}'`;
+        expect(editorContent.includes(expectedPattern), `Expected string to be quoted as ${expectedPattern}`).toBe(true);
+        testLogger.info(`String value correctly quoted: ${expectedPattern}`);
 
         testLogger.info('String quoting test completed');
     });
@@ -597,8 +591,9 @@ test.describe("Autocomplete Value Suggestions", () => {
 
             testLogger.info('Stream isolation test PASSED');
         } catch (error) {
+            // If second stream test fails, single stream isolation is still verified
             testLogger.info(`Could not test with second stream: ${error.message}`);
-            testLogger.info('Stream isolation test PASSED (single stream verified)');
+            // The first stream test passed if we got here, so verification is partial
         }
     });
 
@@ -620,21 +615,16 @@ test.describe("Autocomplete Value Suggestions", () => {
         await page.waitForTimeout(500);
         await page.keyboard.press('Control+Space');
 
-        try {
-            await waitForSuggestionsWidget(page, 10000);
+        // Wait for suggestions - this is a regression test, failures indicate a problem
+        await waitForSuggestionsWidget(page, 10000);
 
-            const suggestions = await getSuggestionLabels(page);
-            testLogger.info(`Keyword suggestions: ${suggestions.slice(0, 10).join(', ')}`);
+        const suggestions = await getSuggestionLabels(page);
+        testLogger.info(`Keyword suggestions: ${suggestions.slice(0, 10).join(', ')}`);
 
-            // Should show SQL keywords or field names
-            expect(suggestions.length).toBeGreaterThan(0);
+        // Should show SQL keywords or field names
+        expect(suggestions.length).toBeGreaterThan(0);
 
-            testLogger.info('Keyword suggestions regression test PASSED');
-        } catch (error) {
-            testLogger.warn(`Suggestions test: ${error.message}`);
-            // This is a regression test - if suggestions don't appear at all, it's a problem
-            await page.screenshot({ path: 'keyword-suggestions-debug.png' });
-        }
+        testLogger.info('Keyword suggestions regression test PASSED');
     });
 
     // =========================================================================
@@ -761,14 +751,11 @@ test.describe("Autocomplete Value Suggestions - Edge Cases", () => {
         await page.waitForTimeout(500);
         await page.keyboard.press('Control+Space');
 
-        try {
-            await waitForSuggestionsWidget(page, 5000);
-            const suggestions = await getSuggestionLabels(page);
-            testLogger.info(`IN operator suggestions: ${suggestions.slice(0, 5).join(', ')}`);
-            expect(suggestions.length).toBeGreaterThan(0);
-        } catch (error) {
-            testLogger.info(`IN operator: ${error.message}`);
-        }
+        // Wait for suggestions and assert - no silent catch
+        await waitForSuggestionsWidget(page, 5000);
+        const suggestions = await getSuggestionLabels(page);
+        testLogger.info(`IN operator suggestions: ${suggestions.slice(0, 5).join(', ')}`);
+        expect(suggestions.length).toBeGreaterThan(0);
 
         testLogger.info('IN operator test completed');
     });
@@ -794,13 +781,11 @@ test.describe("Autocomplete Value Suggestions - Edge Cases", () => {
         await page.waitForTimeout(500);
         await page.keyboard.press('Control+Space');
 
-        try {
-            await waitForSuggestionsWidget(page, 5000);
-            const suggestions = await getSuggestionLabels(page);
-            testLogger.info(`LIKE operator suggestions: ${suggestions.slice(0, 5).join(', ')}`);
-        } catch (error) {
-            testLogger.info(`LIKE operator: ${error.message}`);
-        }
+        // Wait for suggestions and assert - no silent catch
+        await waitForSuggestionsWidget(page, 5000);
+        const suggestions = await getSuggestionLabels(page);
+        testLogger.info(`LIKE operator suggestions: ${suggestions.slice(0, 5).join(', ')}`);
+        expect(suggestions.length).toBeGreaterThan(0);
 
         testLogger.info('LIKE operator test completed');
     });
@@ -955,13 +940,11 @@ test.describe("Autocomplete Value Suggestions - Edge Cases", () => {
         await page.waitForTimeout(500);
         await page.keyboard.press('Control+Space');
 
-        try {
-            await waitForSuggestionsWidget(page, 5000);
-            const suggestions = await getSuggestionLabels(page);
-            testLogger.info(`str_match suggestions: ${suggestions.slice(0, 5).join(', ')}`);
-        } catch (error) {
-            testLogger.info(`str_match: ${error.message}`);
-        }
+        // Wait for suggestions and assert - no silent catch
+        await waitForSuggestionsWidget(page, 5000);
+        const suggestions = await getSuggestionLabels(page);
+        testLogger.info(`str_match suggestions: ${suggestions.slice(0, 5).join(', ')}`);
+        expect(suggestions.length).toBeGreaterThan(0);
 
         testLogger.info('str_match function test completed');
     });
@@ -1021,34 +1004,24 @@ test.describe("Autocomplete Value Suggestions - Quoting Behavior", () => {
         await page.waitForTimeout(500);
         await page.keyboard.press('Control+Space');
 
-        try {
-            await waitForSuggestionsWidget(page, 10000);
+        // Wait for suggestions - no silent catch
+        await waitForSuggestionsWidget(page, 10000);
 
-            // Check if our numeric value is in suggestions
-            if (await suggestionContainsValue(page, numericValue)) {
-                await selectSuggestion(page, numericValue);
-                await page.waitForTimeout(500);
+        // Check if our numeric value is in suggestions
+        const hasNumericValue = await suggestionContainsValue(page, numericValue);
+        expect(hasNumericValue, `Expected numeric value ${numericValue} to be in suggestions`).toBe(true);
 
-                // Get the editor content
-                const editorContent = await page.locator('[data-test="logs-search-bar-query-editor"] .monaco-editor .view-lines').textContent();
+        await selectSuggestion(page, numericValue);
+        await page.waitForTimeout(500);
 
-                // Numeric values should NOT be wrapped in quotes
-                const hasQuotes = editorContent.includes(`'${numericValue}'`);
-                const hasNoQuotes = editorContent.includes(` ${numericValue}`) || editorContent.endsWith(numericValue);
+        // Get the editor content
+        const editorContent = await page.locator('[data-test="logs-search-bar-query-editor"] .monaco-editor .view-lines').textContent();
+        testLogger.info(`Editor content: ${editorContent}`);
 
-                if (!hasQuotes && hasNoQuotes) {
-                    testLogger.info(`✅ Numeric value inserted without quotes: ${numericValue}`);
-                } else if (hasQuotes) {
-                    testLogger.warn(`❌ Numeric value incorrectly has quotes: '${numericValue}'`);
-                }
-
-                testLogger.info(`Editor content: ${editorContent}`);
-            } else {
-                testLogger.info('Numeric value not in suggestions (may be filtered)');
-            }
-        } catch (error) {
-            testLogger.warn(`Numeric quoting test: ${error.message}`);
-        }
+        // Numeric values should NOT be wrapped in quotes - assert this
+        const hasQuotes = editorContent.includes(`'${numericValue}'`);
+        expect(hasQuotes, `Numeric value ${numericValue} should NOT have quotes`).toBe(false);
+        testLogger.info(`✅ Numeric value inserted without quotes: ${numericValue}`);
 
         testLogger.info('Numeric quoting test completed');
     });
@@ -1085,29 +1058,26 @@ test.describe("Autocomplete Value Suggestions - Quoting Behavior", () => {
         await page.waitForTimeout(500);
         await page.keyboard.press('Control+Space');
 
-        try {
-            await waitForSuggestionsWidget(page, 10000);
+        // Wait for suggestions - no silent catch
+        await waitForSuggestionsWidget(page, 10000);
 
-            if (await suggestionContainsValue(page, stringValue)) {
-                await selectSuggestion(page, stringValue);
-                await page.waitForTimeout(500);
+        const hasStringValue = await suggestionContainsValue(page, stringValue);
+        expect(hasStringValue, `Expected string value ${stringValue} to be in suggestions`).toBe(true);
 
-                const editorContent = await page.locator('[data-test="logs-search-bar-query-editor"] .monaco-editor .view-lines').textContent();
+        await selectSuggestion(page, stringValue);
+        await page.waitForTimeout(500);
 
-                // When open quote exists, selecting should only add value + closing quote
-                // Result should be: field = 'value'  (NOT field = ''value'')
-                const doubleQuotePattern = `''${stringValue}'`;
-                const correctPattern = `'${stringValue}'`;
+        const editorContent = await page.locator('[data-test="logs-search-bar-query-editor"] .monaco-editor .view-lines').textContent();
+        testLogger.info(`Editor content: ${editorContent}`);
 
-                if (editorContent.includes(correctPattern) && !editorContent.includes(doubleQuotePattern)) {
-                    testLogger.info(`✅ Quote closing works correctly: ${correctPattern}`);
-                } else {
-                    testLogger.warn(`❌ Quote closing issue. Editor: ${editorContent}`);
-                }
-            }
-        } catch (error) {
-            testLogger.warn(`Quote closing test: ${error.message}`);
-        }
+        // When open quote exists, selecting should only add value + closing quote
+        // Result should be: field = 'value'  (NOT field = ''value'')
+        const doubleQuotePattern = `''${stringValue}'`;
+        const correctPattern = `'${stringValue}'`;
+
+        expect(editorContent.includes(correctPattern), `Expected correct quote pattern '${stringValue}'`).toBe(true);
+        expect(editorContent.includes(doubleQuotePattern), 'Should not have double quotes').toBe(false);
+        testLogger.info(`✅ Quote closing works correctly: ${correctPattern}`);
 
         testLogger.info('Quote closing test completed');
     });
