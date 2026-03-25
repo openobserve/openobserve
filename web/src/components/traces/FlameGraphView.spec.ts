@@ -657,7 +657,7 @@ describe("FlameGraphView", () => {
           depth: i,
           durationMs: 10,
           startOffsetMs: i * 10,
-        })
+        }),
       );
 
       wrapper = mount(FlameGraphView, {
@@ -774,8 +774,7 @@ describe("FlameGraphView", () => {
   });
 
   describe("Tooltip Formatter", () => {
-    const getFormatter = (w: any) =>
-      w.vm.chartOptions.tooltip.formatter;
+    const getFormatter = (w: any) => w.vm.chartOptions.tooltip.formatter;
 
     it("should format tooltip with span information", async () => {
       wrapper = mount(FlameGraphView, {
@@ -967,7 +966,7 @@ describe("FlameGraphView", () => {
       expect(result).toContain("0.01%");
     });
 
-    it("should render raw span data in tooltip (no HTML escaping)", async () => {
+    it("should escape HTML special characters in tooltip to prevent XSS", async () => {
       wrapper = mount(FlameGraphView, {
         props: {
           spans: mockSpans,
@@ -989,9 +988,12 @@ describe("FlameGraphView", () => {
         },
       });
 
-      // The formatter renders raw strings via template literal interpolation
-      expect(result).toContain("<script>alert('xss')</script>");
-      expect(result).toContain("<img src=x onerror=alert('xss')>");
+      // Raw tags must not appear in the output
+      expect(result).not.toContain("<script>");
+      expect(result).not.toContain("<img");
+      // Escaped entities must be present instead (single quotes are not escaped)
+      expect(result).toContain("&lt;script&gt;alert('xss')&lt;/script&gt;");
+      expect(result).toContain("&lt;img src=x onerror=alert('xss')&gt;");
     });
   });
 
@@ -1056,9 +1058,7 @@ describe("FlameGraphView", () => {
       // Manually set cursorVisible to true first
       wrapper.vm.cursorVisible = true;
       // Trigger mouseleave on the chart wrapper div
-      const chartWrapper = wrapper.find(
-        ".tw\\:flex.tw\\:flex-col.tw\\:flex-1",
-      );
+      const chartWrapper = wrapper.find(".tw\\:flex.tw\\:flex-col.tw\\:flex-1");
       if (chartWrapper.exists()) {
         await chartWrapper.trigger("mouseleave");
         expect(wrapper.vm.cursorVisible).toBe(false);

@@ -128,6 +128,7 @@ import { ref, computed, defineAsyncComponent } from "vue";
 import { type EnrichedSpan } from "@/types/traces/span.types";
 import { formatDuration } from "@/composables/traces/useTraceProcessing";
 import useTraces from "@/composables/useTraces";
+import { escapeHtml } from "@/utils/html";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -257,12 +258,15 @@ const computeVisualRows = (
   return { rowMap, maxRow };
 };
 
+// O(n log n) layout — only re-runs when spans change, not on selection changes
+const visualLayout = computed(() => computeVisualRows(props.spans));
+
 // Build flame graph series data, incorporating selected span highlighting
 const flameGraphDataAndDepth = computed(() => {
   const data: any[] = [];
   const traceDuration = props.traceDuration || 1;
 
-  const { rowMap, maxRow } = computeVisualRows(props.spans);
+  const { rowMap, maxRow } = visualLayout.value;
 
   props.spans.forEach((span) => {
     const startPercent = (span.startOffsetMs / traceDuration) * 100;
@@ -324,11 +328,11 @@ const chartOptions = computed(() => {
 
         return `
           <div style="padding: 4px 0;">
-            <div style="font-weight: bold; margin-bottom: 6px;">${span.operationName}</div>
+            <div style="font-weight: bold; margin-bottom: 6px;">${escapeHtml(span.operationName)}</div>
             <div style="font-size: 11px; line-height: 1.6;">
               <div style="display: flex; justify-content: space-between; gap: 16px;">
                 <span style="color: #cbd5e1;">Service:</span>
-                <span>${span.serviceName}</span>
+                <span>${escapeHtml(span.serviceName)}</span>
               </div>
               <div style="display: flex; justify-content: space-between; gap: 16px;">
                 <span style="color: #cbd5e1;">Duration:</span>
