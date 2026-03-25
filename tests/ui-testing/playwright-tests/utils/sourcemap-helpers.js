@@ -208,9 +208,14 @@ async function stopTestAppServer(serverInfo) {
 
   // Also try to kill any python processes on the port
   try {
-    await execAsync(`lsof -ti:${serverInfo.port} | xargs kill -9 2>/dev/null || true`);
+    // Validate port is a safe integer before interpolating into shell command
+    const port = parseInt(serverInfo.port, 10);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      throw new Error(`Invalid port number: ${serverInfo.port}`);
+    }
+    await execAsync(`lsof -ti:${port} | xargs kill -9 2>/dev/null || true`);
   } catch (err) {
-    // Ignore errors
+    // Ignore errors (port validation errors will be logged, kill errors are expected)
   }
 }
 
