@@ -1231,14 +1231,6 @@ export const convertServiceGraphToNetwork = (
     });
   }
 
-  if (hasPositions) {
-    console.log(
-      "[convertServiceGraphToNetwork] Using cached positions for",
-      cachedPositions.size,
-      "nodes",
-    );
-  }
-
   // Set per-node label position based on x/y to avoid canvas edge clipping.
   // Must include all styling props since per-node label does not fully inherit series-level label.
   const bottomThreshold = canvasHeight * 0.7;
