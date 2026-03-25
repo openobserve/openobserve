@@ -72,8 +72,11 @@ async function getSuggestionLabels(page) {
 /**
  * Try to expand a field using multiple strategies
  * Follows the pattern from traceQueryEditor.spec.js
+ * Waits for field values API response after expanding
  */
 async function tryExpandField(page, pm) {
+    const orgName = process.env["ORGNAME"] || 'default';
+
     // Strategy 1: Try common trace field names via tracesPage method
     // These match the patterns used in traceQueryEditor.spec.js
     const traceFieldNames = [
@@ -88,9 +91,27 @@ async function tryExpandField(page, pm) {
     ];
 
     for (const fieldName of traceFieldNames) {
+        // Start listening for values API response before clicking
+        const valuesResponsePromise = page.waitForResponse(
+            response => response.url().includes(`/api/${orgName}/`) && response.url().includes('_values'),
+            { timeout: 10000 }
+        ).catch(() => null);
+
         const expanded = await pm.tracesPage.expandTraceField(fieldName);
         if (expanded) {
             testLogger.info(`Expanded trace field: ${fieldName}`);
+
+            // Wait for values API response
+            const response = await valuesResponsePromise;
+            if (response) {
+                testLogger.info(`Values API responded for field: ${fieldName}`);
+                // Give IndexedDB time to write
+                await page.waitForTimeout(2000);
+            } else {
+                testLogger.info(`No values API response captured for field: ${fieldName}`);
+                await page.waitForTimeout(3000);
+            }
+
             return { fieldName, success: true };
         }
     }
@@ -106,9 +127,23 @@ async function tryExpandField(page, pm) {
             if (await button.isVisible({ timeout: 2000 }).catch(() => false)) {
                 const dataTest = await button.getAttribute('data-test');
                 const fieldName = dataTest.replace('log-search-expand-', '').replace('-field-btn', '');
+
+                const valuesResponsePromise = page.waitForResponse(
+                    response => response.url().includes(`/api/${orgName}/`) && response.url().includes('_values'),
+                    { timeout: 10000 }
+                ).catch(() => null);
+
                 await button.click();
                 testLogger.info(`Expanded field via data-test selector: ${fieldName}`);
-                await page.waitForTimeout(2000);
+
+                const response = await valuesResponsePromise;
+                if (response) {
+                    testLogger.info(`Values API responded for field: ${fieldName}`);
+                    await page.waitForTimeout(2000);
+                } else {
+                    await page.waitForTimeout(3000);
+                }
+
                 return { fieldName, success: true };
             }
         }
@@ -119,9 +154,22 @@ async function tryExpandField(page, pm) {
     if (await indexList.isVisible({ timeout: 2000 }).catch(() => false)) {
         const expandButtons = indexList.getByRole('button', { name: /expand/i });
         if (await expandButtons.first().isVisible({ timeout: 2000 }).catch(() => false)) {
+            const valuesResponsePromise = page.waitForResponse(
+                response => response.url().includes(`/api/${orgName}/`) && response.url().includes('_values'),
+                { timeout: 10000 }
+            ).catch(() => null);
+
             await expandButtons.first().click();
             testLogger.info('Expanded field via generic expand button in index list');
-            await page.waitForTimeout(2000);
+
+            const response = await valuesResponsePromise;
+            if (response) {
+                testLogger.info('Values API responded');
+                await page.waitForTimeout(2000);
+            } else {
+                await page.waitForTimeout(3000);
+            }
+
             return { fieldName: 'unknown', success: true };
         }
     }
@@ -160,9 +208,6 @@ test.describe("Traces Autocomplete Value Suggestions", () => {
     test("should capture field values to IndexedDB when expanding a field in traces sidebar", {
         tag: ['@autosuggestions', '@traces', '@indexeddb']
     }, async ({ page }) => {
-        // Feature not yet implemented for traces - only logs have IndexedDB value capture
-        test.skip(true, 'Autosuggestions IndexedDB capture not implemented for traces yet - only available for logs');
-
         testLogger.info('Testing traces field expansion capture');
 
         // Clear IndexedDB
@@ -231,9 +276,6 @@ test.describe("Traces Autocomplete Value Suggestions", () => {
     test("should show value suggestions in traces query editor", {
         tag: ['@autosuggestions', '@traces', '@autocomplete']
     }, async ({ page }) => {
-        // Feature not yet implemented for traces - value suggestions require IndexedDB capture
-        test.skip(true, 'Autosuggestions value capture not implemented for traces yet - only available for logs');
-
         testLogger.info('Testing traces autocomplete suggestions');
 
         // Use setupTraceSearch - the standard pattern
