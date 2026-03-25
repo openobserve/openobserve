@@ -25,13 +25,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-slot:before>
           <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
-            <div v-if="showSidebar" class="card-container tw:h-[calc(100vh-50px)]">
+            <div
+              v-if="showSidebar"
+              class="card-container tw:h-[calc(100vh-50px)]"
+              :class="{ 'compact-sidebar': isCompactSidebar }"
+            >
               <q-tabs
                 v-model="activeTab"
                 indicator-color="transparent"
-                inline-label
+                :inline-label="!isCompactSidebar"
                 vertical
                 class="card-container"
+                :class="{ 'compact-tabs': isCompactSidebar }"
               >
                 <q-route-tab
                   v-if="
@@ -47,9 +52,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization.identifier,
                     },
                   }"
-                  :label="t('function.streamPipeline')"
+                  :label="isCompactSidebar ? undefined : t('function.streamPipeline')"
+                  :icon="isCompactSidebar ? 'lan' : undefined"
                   content-class="tab_content"
-                />
+                >
+                  <q-tooltip
+                    v-if="isCompactSidebar"
+                    anchor="center right"
+                    self="center left"
+                    :offset="[8, 0]"
+                  >
+                    {{ t('function.streamPipeline') }}
+                  </q-tooltip>
+                </q-route-tab>
                 <q-route-tab
                   data-test="function-stream-tab"
                   default
@@ -60,9 +75,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization.identifier,
                     },
                   }"
-                  :label="t('function.header')"
+                  :label="isCompactSidebar ? undefined : t('function.header')"
+                  :icon="isCompactSidebar ? functionIcon : undefined"
                   content-class="tab_content"
-                />
+                >
+                  <q-tooltip
+                    v-if="isCompactSidebar"
+                    anchor="center right"
+                    self="center left"
+                    :offset="[8, 0]"
+                  >
+                    {{ t('function.header') }}
+                  </q-tooltip>
+                </q-route-tab>
                 <q-route-tab
                   data-test="function-enrichment-table-tab"
                   name="enrichmentTables"
@@ -72,9 +97,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization.identifier,
                     },
                   }"
-                  :label="t('function.enrichmentTables')"
+                  :label="isCompactSidebar ? undefined : t('function.enrichmentTables')"
+                  :icon="isCompactSidebar ? 'dataset' : undefined"
                   content-class="tab_content"
-                />
+                >
+                  <q-tooltip
+                    v-if="isCompactSidebar"
+                    anchor="center right"
+                    self="center left"
+                    :offset="[8, 0]"
+                  >
+                    {{ t('function.enrichmentTables') }}
+                  </q-tooltip>
+                </q-route-tab>
               </q-tabs>
             </div>
           </div>
@@ -109,10 +144,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount, watch } from "vue";
+import { defineComponent, ref, computed, onBeforeMount, onMounted, onUnmounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
+import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "AppFunctions",
@@ -124,11 +160,51 @@ export default defineComponent({
     const activeTab: any = ref("streamPipelines");
     const templates = ref([]);
     const functionAssociatedStreams = ref([]);
+    // Responsive sidebar: icon-only at narrow widths
+    const windowWidth = ref(window.innerWidth);
+    const onWindowResize = () => {
+      windowWidth.value = window.innerWidth;
+    };
+    const isCompactSidebar = computed(() => windowWidth.value <= 1500);
+
     const splitterModel = ref(220);
 
     const lastSplitterPosition = ref(splitterModel.value);
 
     const showSidebar = ref(true);
+
+    // Function icon from SVG — same as logs page function toggle
+    const functionIcon = computed(() => {
+      return (
+        "img:" +
+        getImageURL(
+          store.state.theme === "dark"
+            ? "images/common/function_dark.svg"
+            : "images/common/function.svg",
+        )
+      );
+    });
+
+    // Adjust splitter width when switching between compact/full mode
+    watch(isCompactSidebar, (compact) => {
+      if (showSidebar.value) {
+        splitterModel.value = compact ? 56 : 220;
+        lastSplitterPosition.value = splitterModel.value;
+      }
+    });
+
+    onMounted(() => {
+      window.addEventListener("resize", onWindowResize);
+      // Apply initial compact width if needed
+      if (isCompactSidebar.value && showSidebar.value) {
+        splitterModel.value = 56;
+        lastSplitterPosition.value = 56;
+      }
+    });
+
+    onUnmounted(() => {
+      window.removeEventListener("resize", onWindowResize);
+    });
 
     watch(
       () => router.currentRoute.value,
@@ -187,7 +263,9 @@ export default defineComponent({
       templates,
       collapseSidebar,
       showSidebar,
-      sendToAiChat
+      sendToAiChat,
+      isCompactSidebar,
+      functionIcon,
     };
   },
 });
@@ -204,30 +282,58 @@ export default defineComponent({
     justify-content: flex-end;
   }
 }
-.functions-tabs {
-  // .q-tabs_bkcss {
-  //   &--vertical {
-  //     margin: 20px 16px 0 16px;
-  //     .q-tab {
-  //       justify-content: flex-start;
-  //       padding: 0 1rem 0 1.25rem;
-  //       border-radius: 0.5rem;
-  //       margin-bottom: 0.5rem;
-  //       text-transform: capitalize;
-  //       &__content.tab_content {
-  //         .q-tab {
-  //           &__icon + &__label {
-  //             padding-left: 0.875rem;
-  //             font-weight: 600;
-  //           }
-  //         }
-  //       }
-  //       &--active {
-  //         background-color: $accent;
-  //         color: black;
-  //       }
-  //     }
-  //   }
-  // }
+
+// Compact sidebar styles for narrow viewports
+.compact-sidebar {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 0;
+}
+
+.compact-tabs {
+  width: 100%;
+
+  :deep(.q-tabs__content) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.5rem 0;
+  }
+
+  :deep(.q-tab) {
+    min-height: 2.5rem;
+    min-width: 2.5rem;
+    width: 2.5rem;
+    padding: 0;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s ease, color 0.2s ease;
+
+    .q-tab__icon {
+      font-size: 1.25rem;
+
+      img {
+        width: 1.25rem;
+        height: 1.25rem;
+      }
+    }
+
+    &:hover {
+      background-color: var(--o2-hover-accent);
+    }
+
+    &.q-tab--active {
+      background: color-mix(
+        in srgb,
+        var(--o2-primary-btn-bg) 20%,
+        white 10%
+      );
+      color: var(--o2-text-primary);
+
+      .q-tab__icon {
+        color: var(--o2-text-primary);
+      }
+    }
+  }
 }
 </style>

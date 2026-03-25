@@ -46,41 +46,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-icon class="o2-search-input-icon" name="search" />
                   </template>
                 </q-input>
-                <q-btn
-                    data-test="pipeline-list-history-btn"
+                <!-- Full buttons visible at wide widths -->
+                <template v-if="!shouldCollapseToolbar">
+                  <q-btn
+                      data-test="pipeline-list-history-btn"
+                      class="q-ml-sm o2-secondary-button tw:h-[36px]"
+                      :class="
+                          store.state.theme === 'dark'
+                          ? 'o2-secondary-button-dark'
+                          : 'o2-secondary-button-light'
+                      "
+                      no-caps
+                      flat
+                      :label="t(`pipeline.history`)"
+                      @click="goToPipelineHistory"
+                  />
+                  <q-btn
+                      v-if="config.isEnterprise == 'true'"
+                      data-test="pipeline-list-backfill-btn"
+                      class="q-ml-sm o2-secondary-button tw:h-[36px]"
+                      :class="
+                          store.state.theme === 'dark'
+                          ? 'o2-secondary-button-dark'
+                          : 'o2-secondary-button-light'
+                      "
+                      no-caps
+                      flat
+                      :label="t('pipeline.backfill')"
+                      @click="goToBackfillJobs"
+                  />
+                  <q-btn
+                    data-test="pipeline-list-import-pipeline-btn"
                     class="q-ml-sm o2-secondary-button tw:h-[36px]"
-                    :class="
-                        store.state.theme === 'dark'
-                        ? 'o2-secondary-button-dark'
-                        : 'o2-secondary-button-light'
-                    "
                     no-caps
                     flat
-                    :label="t(`pipeline.history`)"
-                    @click="goToPipelineHistory"
-                />
-                <q-btn
-                    v-if="config.isEnterprise == 'true'"
-                    data-test="pipeline-list-backfill-btn"
-                    class="q-ml-sm o2-secondary-button tw-h-[36px]"
-                    :class="
-                        store.state.theme === 'dark'
-                        ? 'o2-secondary-button-dark'
-                        : 'o2-secondary-button-light'
-                    "
-                    no-caps
-                    flat
-                    :label="t('pipeline.backfill')"
-                    @click="goToBackfillJobs"
-                />
-                <q-btn
-                  data-test="pipeline-list-import-pipeline-btn"
-                  class="q-ml-sm o2-secondary-button tw:h-[36px]"
-                  no-caps
-                  flat
-                  :label="t(`pipeline.import`)"
-                  @click="routeToImportPipeline"
-                />
+                    :label="t(`pipeline.import`)"
+                    @click="routeToImportPipeline"
+                  />
+                </template>
+
                 <q-btn
                   data-test="pipeline-list-add-pipeline-btn"
                   class="q-ml-sm o2-primary-button tw:h-[36px]"
@@ -89,6 +93,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t(`pipeline.addPipeline`)"
                   @click="routeToAddPipeline"
                 />
+
+                <!-- Overflow menu at narrow widths — after New Pipeline -->
+                <q-btn
+                  v-if="shouldCollapseToolbar"
+                  class="q-ml-sm tw:h-[36px] el-border el-border-radius"
+                  style="padding: 0 0.5rem"
+                  icon="menu"
+                  flat
+                  no-caps
+                  data-test="pipeline-list-overflow-menu-btn"
+                >
+                  <q-menu>
+                    <q-list>
+                      <q-item
+                        clickable
+                        v-close-popup
+                        @click="goToPipelineHistory"
+                        data-test="pipeline-list-menu-history-btn"
+                      >
+                        <q-item-section>
+                          <q-item-label>{{ t("pipeline.history") }}</q-item-label>
+                        </q-item-section>
+                      </q-item>
+                      <q-item
+                        v-if="config.isEnterprise == 'true'"
+                        clickable
+                        v-close-popup
+                        @click="goToBackfillJobs"
+                        data-test="pipeline-list-menu-backfill-btn"
+                      >
+                        <q-item-section>
+                          <q-item-label>{{ t("pipeline.backfill") }}</q-item-label>
+                        </q-item-section>
+                      </q-item>
+                      <q-item
+                        clickable
+                        v-close-popup
+                        @click="routeToImportPipeline"
+                        data-test="pipeline-list-menu-import-btn"
+                      >
+                        <q-item-section>
+                          <q-item-label>{{ t("pipeline.import") }}</q-item-label>
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
+                  </q-menu>
+                </q-btn>
               </div>
         </div>
       </div>
@@ -523,6 +574,7 @@ import {
   reactive,
   onActivated,
   onMounted,
+  onUnmounted,
 } from "vue";
 import { MarkerType } from "@vue-flow/core";
 import { useI18n } from "vue-i18n";
@@ -568,6 +620,20 @@ const qTableRef: any = ref({});
 const q = useQuasar();
 
 const filterQuery = ref("");
+
+// Responsive toolbar: move secondary actions into overflow menu at narrow widths
+const windowWidth = ref(window.innerWidth);
+const onWindowResize = () => {
+  windowWidth.value = window.innerWidth;
+};
+const shouldCollapseToolbar = computed(() => windowWidth.value <= 1500);
+
+onMounted(() => {
+  window.addEventListener("resize", onWindowResize);
+});
+onUnmounted(() => {
+  window.removeEventListener("resize", onWindowResize);
+});
 
 const showCreatePipeline = ref(false);
 
@@ -1554,6 +1620,16 @@ const onBackfillSuccess = (jobId: string) => {
       border-left-color: #fca5a5;
       color: #fecaca;
     }
+  }
+}
+
+// Compact tabs: reduce padding so tabs are auto-width and
+// accommodate additional tabs (e.g. Anomalies) at narrow widths
+.app-tabs-container {
+  :deep(.o2-tab) {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    min-width: auto;
   }
 }
 </style>
