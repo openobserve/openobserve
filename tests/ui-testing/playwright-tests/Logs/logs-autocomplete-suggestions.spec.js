@@ -234,7 +234,7 @@ test.describe("Autocomplete Value Suggestions", () => {
 
     let pm;
     const streamName = 'e2e_automate';
-    const orgName = process.env["ORGNAME"];
+    const orgName = process.env["ORGNAME"] || 'default';
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
@@ -416,12 +416,9 @@ test.describe("Autocomplete Value Suggestions", () => {
                 storedValues.some(v => s.includes(v))
             );
 
-            // Note: This might not always pass if suggestions prioritize other items
-            if (hasStoredValue) {
-                testLogger.info('Found stored field values in suggestions');
-            } else {
-                testLogger.info('Suggestions present but may not include our specific values');
-            }
+            // Assert that stored values appear in suggestions
+            expect(hasStoredValue).toBe(true);
+            testLogger.info('Found stored field values in suggestions');
 
             testLogger.info('Autocomplete suggestions test PASSED');
         } catch (error) {
@@ -454,25 +451,16 @@ test.describe("Autocomplete Value Suggestions", () => {
         const dataTest = await firstButton.getAttribute('data-test');
         const fieldName = dataTest.replace('log-search-expand-', '').replace('-field-btn', '');
 
-        // Wait for values in IndexedDB
+        // Wait for values in IndexedDB - assert values were captured
         const record = await waitForFieldInIndexedDB(page, orgName, 'logs', streamName, fieldName, 15000);
-
-        if (!record || record.values.length === 0) {
-            testLogger.warn('No values captured for quoting test, skipping');
-            test.skip();
-            return;
-        }
+        expect(record, 'Expected IndexedDB record to be created after field expansion').not.toBeNull();
+        expect(record.values.length, 'Expected captured values to be non-empty').toBeGreaterThan(0);
 
         // Find a string value (not numeric, not boolean)
         const stringValue = record.values.find(v =>
             isNaN(Number(v)) && v !== 'true' && v !== 'false'
         );
-
-        if (!stringValue) {
-            testLogger.warn('No string values found for quoting test, skipping');
-            test.skip();
-            return;
-        }
+        expect(stringValue, 'Expected at least one string value in captured field values').toBeDefined();
 
         testLogger.info(`Testing quoting with string value: ${stringValue}`);
 
@@ -739,7 +727,7 @@ test.describe("Autocomplete Value Suggestions - Edge Cases", () => {
 
     let pm;
     const streamName = 'e2e_automate';
-    const orgName = process.env["ORGNAME"];
+    const orgName = process.env["ORGNAME"] || 'default';
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
@@ -838,14 +826,11 @@ test.describe("Autocomplete Value Suggestions - Edge Cases", () => {
         await page.waitForTimeout(500);
         await page.keyboard.press('Control+Space');
 
-        try {
-            await waitForSuggestionsWidget(page, 5000);
-            const suggestions = await getSuggestionLabels(page);
-            testLogger.info(`Open quote suggestions: ${suggestions.slice(0, 5).join(', ')}`);
-            // Suggestions should still appear even with partial input
-        } catch (error) {
-            testLogger.info(`Open quote test: ${error.message}`);
-        }
+        // Suggestions should still appear even with partial input - no silent catch
+        await waitForSuggestionsWidget(page, 5000);
+        const suggestions = await getSuggestionLabels(page);
+        testLogger.info(`Open quote suggestions: ${suggestions.slice(0, 5).join(', ')}`);
+        expect(suggestions.length).toBeGreaterThan(0);
 
         testLogger.info('Partial value test completed');
     });
@@ -871,14 +856,11 @@ test.describe("Autocomplete Value Suggestions - Edge Cases", () => {
         await page.waitForTimeout(500);
         await page.keyboard.press('Control+Space');
 
-        try {
-            await waitForSuggestionsWidget(page, 5000);
-            const suggestions = await getSuggestionLabels(page);
-            testLogger.info(`NOT IN operator suggestions: ${suggestions.slice(0, 5).join(', ')}`);
-            expect(suggestions.length).toBeGreaterThan(0);
-        } catch (error) {
-            testLogger.info(`NOT IN operator: ${error.message}`);
-        }
+        // Wait for suggestions and assert - no silent catch
+        await waitForSuggestionsWidget(page, 5000);
+        const suggestions = await getSuggestionLabels(page);
+        testLogger.info(`NOT IN operator suggestions: ${suggestions.slice(0, 5).join(', ')}`);
+        expect(suggestions.length).toBeGreaterThan(0);
 
         testLogger.info('NOT IN operator test completed');
     });
@@ -904,14 +886,11 @@ test.describe("Autocomplete Value Suggestions - Edge Cases", () => {
         await page.waitForTimeout(500);
         await page.keyboard.press('Control+Space');
 
-        try {
-            await waitForSuggestionsWidget(page, 5000);
-            const suggestions = await getSuggestionLabels(page);
-            testLogger.info(`!= operator suggestions: ${suggestions.slice(0, 5).join(', ')}`);
-            expect(suggestions.length).toBeGreaterThan(0);
-        } catch (error) {
-            testLogger.info(`!= operator: ${error.message}`);
-        }
+        // Wait for suggestions and assert - no silent catch
+        await waitForSuggestionsWidget(page, 5000);
+        const suggestions = await getSuggestionLabels(page);
+        testLogger.info(`!= operator suggestions: ${suggestions.slice(0, 5).join(', ')}`);
+        expect(suggestions.length).toBeGreaterThan(0);
 
         testLogger.info('!= operator test completed');
     });
@@ -932,31 +911,25 @@ test.describe("Autocomplete Value Suggestions - Edge Cases", () => {
         await firstButton.click();
         await page.waitForTimeout(3000);
 
-        // Test >= operator
+        // Test >= operator - no silent catch
         await setQueryEditorContent(page, `SELECT * FROM "${streamName}" WHERE ${fieldName} >= `);
         await page.waitForTimeout(500);
         await page.keyboard.press('Control+Space');
 
-        try {
-            await waitForSuggestionsWidget(page, 5000);
-            const suggestionsGte = await getSuggestionLabels(page);
-            testLogger.info(`>= operator suggestions: ${suggestionsGte.slice(0, 5).join(', ')}`);
-        } catch (error) {
-            testLogger.info(`>= operator: ${error.message}`);
-        }
+        await waitForSuggestionsWidget(page, 5000);
+        const suggestionsGte = await getSuggestionLabels(page);
+        testLogger.info(`>= operator suggestions: ${suggestionsGte.slice(0, 5).join(', ')}`);
+        expect(suggestionsGte.length).toBeGreaterThan(0);
 
-        // Test <= operator
+        // Test <= operator - no silent catch
         await setQueryEditorContent(page, `SELECT * FROM "${streamName}" WHERE ${fieldName} <= `);
         await page.waitForTimeout(500);
         await page.keyboard.press('Control+Space');
 
-        try {
-            await waitForSuggestionsWidget(page, 5000);
-            const suggestionsLte = await getSuggestionLabels(page);
-            testLogger.info(`<= operator suggestions: ${suggestionsLte.slice(0, 5).join(', ')}`);
-        } catch (error) {
-            testLogger.info(`<= operator: ${error.message}`);
-        }
+        await waitForSuggestionsWidget(page, 5000);
+        const suggestionsLte = await getSuggestionLabels(page);
+        testLogger.info(`<= operator suggestions: ${suggestionsLte.slice(0, 5).join(', ')}`);
+        expect(suggestionsLte.length).toBeGreaterThan(0);
 
         testLogger.info('>= and <= operators test completed');
     });
@@ -1003,7 +976,7 @@ test.describe("Autocomplete Value Suggestions - Quoting Behavior", () => {
 
     let pm;
     const streamName = 'e2e_automate';
-    const orgName = process.env["ORGNAME"];
+    const orgName = process.env["ORGNAME"] || 'default';
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
@@ -1027,33 +1000,19 @@ test.describe("Autocomplete Value Suggestions - Quoting Behavior", () => {
         // Find a numeric field (like 'code' which has HTTP status codes)
         const codeFieldBtn = page.locator('[data-test="log-search-expand-code-field-btn"]');
         const codeFieldExists = await codeFieldBtn.count() > 0;
-
-        if (!codeFieldExists) {
-            testLogger.info('No "code" field found, skipping numeric quoting test');
-            test.skip();
-            return;
-        }
+        expect(codeFieldExists, 'Expected "code" field to exist for numeric quoting test').toBe(true);
 
         await codeFieldBtn.click();
         await page.waitForTimeout(3000);
 
-        // Wait for values in IndexedDB
+        // Wait for values in IndexedDB - assert values were captured
         const record = await waitForFieldInIndexedDB(page, orgName, 'logs', streamName, 'code', 15000);
-
-        if (!record || record.values.length === 0) {
-            testLogger.warn('No values captured for code field, skipping');
-            test.skip();
-            return;
-        }
+        expect(record, 'Expected IndexedDB record for code field').not.toBeNull();
+        expect(record.values.length, 'Expected captured values for code field').toBeGreaterThan(0);
 
         // Find a numeric value (like 200, 404, 500)
         const numericValue = record.values.find(v => !isNaN(Number(v)));
-
-        if (!numericValue) {
-            testLogger.warn('No numeric values found in code field, skipping');
-            test.skip();
-            return;
-        }
+        expect(numericValue, 'Expected at least one numeric value in code field').toBeDefined();
 
         testLogger.info(`Testing with numeric value: ${numericValue}`);
 
@@ -1114,19 +1073,12 @@ test.describe("Autocomplete Value Suggestions - Quoting Behavior", () => {
         await page.waitForTimeout(3000);
 
         const record = await waitForFieldInIndexedDB(page, orgName, 'logs', streamName, fieldName, 15000);
-
-        if (!record || record.values.length === 0) {
-            test.skip();
-            return;
-        }
+        expect(record, 'Expected IndexedDB record after field expansion').not.toBeNull();
+        expect(record.values.length, 'Expected captured values').toBeGreaterThan(0);
 
         // Find a string value
         const stringValue = record.values.find(v => isNaN(Number(v)) && v !== 'true' && v !== 'false');
-
-        if (!stringValue) {
-            test.skip();
-            return;
-        }
+        expect(stringValue, 'Expected at least one string value for quote closing test').toBeDefined();
 
         // Type with opening quote already present
         await setQueryEditorContent(page, `SELECT * FROM "${streamName}" WHERE ${fieldName} = '`);
@@ -1170,7 +1122,7 @@ test.describe("Autocomplete Value Suggestions - Cold Start & TTL", () => {
 
     let pm;
     const streamName = 'e2e_automate';
-    const orgName = process.env["ORGNAME"];
+    const orgName = process.env["ORGNAME"] || 'default';
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
@@ -1240,14 +1192,9 @@ test.describe("Autocomplete Value Suggestions - Cold Start & TTL", () => {
         await firstButton.click();
         await page.waitForTimeout(3000);
 
-        // Verify record exists
+        // Verify record exists - assert it was created
         let record = await waitForFieldInIndexedDB(page, orgName, 'logs', streamName, fieldName, 15000);
-
-        if (!record) {
-            testLogger.warn('No record captured, skipping TTL test');
-            test.skip();
-            return;
-        }
+        expect(record, 'Expected IndexedDB record to be created for TTL test').not.toBeNull();
 
         testLogger.info(`Record before TTL modification: ${record.values.length} values`);
 
