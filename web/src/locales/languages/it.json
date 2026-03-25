@@ -2202,7 +2202,7 @@
     "anomalyStatus": {
       "waiting": "Aspettando",
       "training": "Allenamento",
-      "active": "Attivo",
+      "ready": "Pronto",
       "failed": "Fallito",
       "disabled": "Disabili"
     },

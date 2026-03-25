@@ -313,7 +313,7 @@ export default defineComponent({
     const aiIcon = computed(() =>
       store.state.theme === "dark"
         ? getImageURL("images/common/ai_icon_dark.svg")
-        : getImageURL("images/common/ai_icon.svg")
+        : getImageURL("images/common/ai_icon_gradient.svg")
     );
     const aiUsageRatio = computed(() => {
       if (!aiUsage.value || !aiUsage.value.credits_limit) return 0;

@@ -23,7 +23,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    handler::http::extractors::Headers,
     service::anomaly_detection as anomaly_service,
 };
 
@@ -118,11 +119,22 @@ pub async fn get_config(Path((org_id, anomaly_id)): Path<(String, String)>) -> R
         content_type = "application/json",
     ),
 )]
+/// Falls back to `fallback` when `owner` is absent or empty.
+fn resolve_owner(owner: Option<String>, fallback: &str) -> Option<String> {
+    if owner.as_deref().unwrap_or("").is_empty() {
+        Some(fallback.to_string())
+    } else {
+        owner
+    }
+}
+
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
 pub async fn create_config(
     Path(org_id): Path<String>,
-    Json(req): Json<CreateAnomalyConfigRequest>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(mut req): Json<CreateAnomalyConfigRequest>,
 ) -> Response {
+    req.owner = resolve_owner(req.owner, &user_email.user_id);
     match anomaly_service::create_config(&org_id, req).await {
         Ok(config) => MetaHttpResponse::json(config),
         Err(e) => {
@@ -166,8 +178,17 @@ pub async fn create_config(
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
 pub async fn update_config(
     Path((org_id, anomaly_id)): Path<(String, String)>,
-    Json(req): Json<UpdateAnomalyConfigRequest>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(mut req): Json<UpdateAnomalyConfigRequest>,
 ) -> Response {
+    // Sanitize empty owner string: treat "" same as omitted on create — fall back to requester.
+    req.owner = req.owner.map(|o| {
+        if o.is_empty() {
+            user_email.user_id.clone()
+        } else {
+            o
+        }
+    });
     match anomaly_service::update_config(&org_id, &anomaly_id, req).await {
         Ok(config) => MetaHttpResponse::json(config),
         Err(e) if e.to_string().contains("not found") => {
@@ -494,4 +515,30 @@ pub struct DetectionHistoryItem {
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct DeleteResponse {
     pub message: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_owner;
+
+    #[test]
+    fn test_owner_fallback_when_absent() {
+        let result = resolve_owner(None, "fallback@example.com");
+        assert_eq!(result, Some("fallback@example.com".to_string()));
+    }
+
+    #[test]
+    fn test_owner_fallback_when_empty_string() {
+        let result = resolve_owner(Some("".to_string()), "fallback@example.com");
+        assert_eq!(result, Some("fallback@example.com".to_string()));
+    }
+
+    #[test]
+    fn test_owner_preserved_when_set() {
+        let result = resolve_owner(
+            Some("custom@example.com".to_string()),
+            "fallback@example.com",
+        );
+        assert_eq!(result, Some("custom@example.com".to_string()));
+    }
 }

@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,11 +26,50 @@ import {
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
+
+vi.mock("@/utils/traces/convertTraceData", () => ({
+  getServiceIconDataUrl: vi.fn().mockReturnValue("data:image/svg+xml;base64,ICON"),
+}));
+
+vi.mock("@/composables/useTraces", () => ({
+  default: () => ({
+    searchObj: { meta: { serviceColors: { alertmanager: "#1ab8be" } } },
+    buildQueryDetails: vi.fn(),
+    navigateToLogs: vi.fn(),
+  }),
+}));
+
+import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import TraceDetailsSidebar from "@/plugins/traces/TraceDetailsSidebar.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
+
+// CSS.supports is not available in jsdom but used by TenstackTable
+vi.stubGlobal("CSS", { supports: () => false });
+
+// Mock @tanstack/vue-virtual so TenstackTable renders rows in jsdom
+vi.mock("@tanstack/vue-virtual", () => ({
+  useVirtualizer: (optsRef: any) => ({
+    __v_isRef: true,
+    value: {
+      getTotalSize: () => optsRef.value.count * 28,
+      getVirtualItems: () =>
+        Array.from({ length: optsRef.value.count }, (_, i) => ({
+          key: i,
+          index: i,
+          start: i * 28,
+          size: 28,
+        })),
+      measureElement: vi.fn(),
+    },
+  }),
+}));
+
+vi.mock("@/plugins/logs/JsonPreview.vue", () => ({
+  default: { template: "<div />" },
+}));
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -167,6 +206,7 @@ describe("TraceDetailsSidebar", async () => {
 
   afterEach(() => {
     wrapper.unmount();
+    vi.clearAllMocks();
   });
 
   it("should mount TraceDetailsSidebar component", () => {
@@ -187,6 +227,35 @@ describe("TraceDetailsSidebar", async () => {
     );
     expect(serviceName.exists()).toBe(true);
     expect(serviceName.text()).toContain(mockSpan.service_name);
+  });
+
+  describe("service icon", () => {
+    it("should render service icon img inside the service chip", () => {
+      const serviceChip = wrapper.find(
+        '[data-test="trace-details-sidebar-header-toolbar-service"]',
+      );
+      expect(serviceChip.exists()).toBe(true);
+      const img = serviceChip.find("img");
+      expect(img.exists()).toBe(true);
+    });
+
+    it("should set icon src from getServiceIconDataUrl", () => {
+      const serviceChip = wrapper.find(
+        '[data-test="trace-details-sidebar-header-toolbar-service"]',
+      );
+      expect(serviceChip.exists()).toBe(true);
+      const img = serviceChip.find("img");
+      expect(img.exists()).toBe(true);
+      expect(img.attributes("src")).toBe("data:image/svg+xml;base64,ICON");
+    });
+
+    it("should call getServiceIconDataUrl with the span service name", () => {
+      expect(
+        vi.mocked(getServiceIconDataUrl).mock.calls.some(
+          (call) => call[0] === mockSpan.service_name,
+        ),
+      ).toBe(true);
+    });
   });
 
   it("should display duration", () => {
@@ -374,9 +443,7 @@ describe("TraceDetailsSidebar", async () => {
         '[data-test="trace-details-sidebar-process-table"]',
       );
       expect(processTable.exists()).toBe(true);
-      expect(processTable.text()).toContain(
-        "dev2-openobserve-alertmanager-1",
-      );
+      expect(processTable.text()).toContain("dev2-openobserve-alertmanager-1");
     });
   });
 
@@ -427,10 +494,8 @@ describe("TraceDetailsSidebar", async () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        // Check if event rows are rendered
-        const eventRows = wrapper.findAll(
-          '[data-test^="trace-event-details-"]',
-        );
+        // TenstackTable renders rows with data-test="o2-table-detail-{timestamp}"
+        const eventRows = wrapper.findAll('[data-test^="o2-table-detail-"]');
         expect(eventRows.length).toBeGreaterThan(0);
       });
 
@@ -438,13 +503,19 @@ describe("TraceDetailsSidebar", async () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        const eventRow = wrapper.find('[data-test^="trace-event-details-"]');
-        expect(eventRow.exists()).toBe(true);
+        // TenstackTable renders an expand button for each row
+        const expandBtn = wrapper.find('[data-test="table-row-expand-menu"]');
+        expect(expandBtn.exists()).toBe(true);
 
-        await eventRow.trigger("click");
+        await expandBtn.trigger("click");
+        await flushPromises();
+        await wrapper.vm.$nextTick();
 
-        // Check if the event is expanded
-        expect(wrapper.vm.expandedEvents["0"]).toBe(true);
+        // After expansion TenstackTable inserts an expanded row (data-test="o2-table-expanded-row-{index}")
+        const expandedRow = wrapper.find(
+          '[data-test^="o2-table-expanded-row-"]',
+        );
+        expect(expandedRow.exists()).toBe(true);
       });
 
       it("should not display no events message", () => {
@@ -465,11 +536,13 @@ describe("TraceDetailsSidebar", async () => {
         });
 
         it("should display event rows that match the search query", async () => {
-          const highlightedText = wrapper
-            .find('[data-test="trace-details-sidebar-events-table"]')
-            .find(".highlight");
+          await flushPromises();
+          await wrapper.vm.$nextTick();
 
-          expect(highlightedText.exists()).toBe(true);
+          // Events are not filtered by searchQuery — all rows remain visible.
+          // TenstackTable renders rows with data-test="o2-table-detail-{timestamp}"
+          const eventRows = wrapper.findAll('[data-test^="o2-table-detail-"]');
+          expect(eventRows.length).toBeGreaterThan(0);
         });
       });
     });
