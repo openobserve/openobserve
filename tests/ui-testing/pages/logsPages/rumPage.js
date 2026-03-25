@@ -170,4 +170,9 @@ export class RumPage {
         return (await rows.count()) > 0;
     }
 
+    async getFirstErrorRowText() {
+        const firstRow = this.page.locator(this.appTableContainer).locator('tbody tr').first();
+        return await firstRow.textContent();
+    }
+
 }

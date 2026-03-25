@@ -113,8 +113,7 @@ test.describe("Sourcemap UI Tests", () => {
 
     if (rowCount > 0) {
       // Verify first row has expected content
-      const firstRow = page.locator('.app-table-container tbody tr').first();
-      const rowText = await firstRow.textContent();
+      const rowText = await pm.rumPage.getFirstErrorRowText();
       testLogger.info(`First row text: ${rowText}`);
 
       // Should contain error-related text
@@ -177,9 +176,7 @@ test.describe("Sourcemap UI Tests", () => {
     await pm.rumPage.waitForQueryExecution();
 
     const hasErrors = await pm.rumPage.hasErrorRows();
-    if (!hasErrors) {
-      test.skip();
-    }
+    expect(hasErrors).toBe(true); // Fail if no errors found
 
     await pm.rumPage.clickFirstErrorRow();
     await pm.rumPage.expectErrorDetailViewLoaded();
@@ -221,9 +218,7 @@ test.describe("Sourcemap UI Tests", () => {
     await pm.rumPage.waitForQueryExecution();
 
     const hasErrors = await pm.rumPage.hasErrorRows();
-    if (!hasErrors) {
-      test.skip();
-    }
+    expect(hasErrors).toBe(true); // Fail if no errors found
 
     await pm.rumPage.clickFirstErrorRow();
     await pm.rumPage.expectErrorDetailViewLoaded();
