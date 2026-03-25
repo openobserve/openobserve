@@ -92,7 +92,7 @@ async fn pk_to_name(pk: Option<&str>) -> String {
 
 /// Convert an integer status code to its human-readable string label.
 /// This is applied when serializing configs to API responses so the UI
-/// continues to receive "waiting"/"active"/"training"/"failed"/"disabled".
+/// continues to receive "waiting"/"ready"/"training"/"failed"/"disabled".
 fn status_label(status: i32) -> &'static str {
     o2_enterprise::enterprise::anomaly_detection::types::Status::label(status)
 }

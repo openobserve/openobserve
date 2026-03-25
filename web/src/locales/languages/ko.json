@@ -2202,7 +2202,7 @@
     "anomalyStatus": {
       "waiting": "대기 중",
       "training": "트레이닝",
-      "active": "활성",
+      "ready": "준비됨",
       "failed": "실패",
       "disabled": "비활성"
     },

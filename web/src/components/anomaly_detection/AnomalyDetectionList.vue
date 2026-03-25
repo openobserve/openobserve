@@ -323,7 +323,7 @@ export default defineComponent({
     const statusColor = (row: any) => {
       if (!row.enabled) return "grey";
       switch (row.status) {
-        case "active":    return "positive";
+        case "ready":     return "positive";
         case "training":  return "info";
         case "failed":    return "negative";
         case "waiting":   return "grey";

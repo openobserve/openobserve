@@ -2079,7 +2079,7 @@
     "anomalyStatus": {
       "waiting": "Waiting",
       "training": "Training",
-      "active": "Active",
+      "ready": "Ready",
       "failed": "Failed",
       "disabled": "Disabled"
     },
