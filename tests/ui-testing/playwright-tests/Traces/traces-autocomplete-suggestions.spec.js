@@ -30,9 +30,9 @@ async function clearIndexedDB(page) {
 
 async function getIndexedDBRecords(page) {
     return await page.evaluate(async () => {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             const req = indexedDB.open('o2FieldValues', 1);
-            req.onerror = () => resolve([]);
+            req.onerror = () => reject(req.error);
             req.onsuccess = (event) => {
                 const db = event.target.result;
                 if (!db.objectStoreNames.contains('fieldValues')) {
@@ -49,7 +49,7 @@ async function getIndexedDBRecords(page) {
                 };
                 getAllReq.onerror = () => {
                     db.close();
-                    resolve([]);
+                    reject(getAllReq.error);
                 };
             };
         });
@@ -263,21 +263,14 @@ test.describe("Traces Autocomplete Value Suggestions", () => {
         await page.waitForTimeout(500);
         await page.keyboard.press('Control+Space');
 
-        try {
-            await waitForSuggestionsWidget(page, 10000);
-            const suggestions = await getSuggestionLabels(page);
-            testLogger.info(`Traces suggestions: ${suggestions.slice(0, 5).join(', ')}`);
+        // Wait for suggestions widget and assert suggestions appear
+        await waitForSuggestionsWidget(page, 10000);
+        const suggestions = await getSuggestionLabels(page);
+        testLogger.info(`Traces suggestions: ${suggestions.slice(0, 5).join(', ')}`);
 
-            // Soft assertion - suggestions depend on captured values
-            if (suggestions.length > 0) {
-                testLogger.info('✅ Autocomplete suggestions appeared');
-            } else {
-                testLogger.info('No value suggestions - may need field expansion first');
-            }
-        } catch (error) {
-            testLogger.info(`Traces autocomplete widget not visible: ${error.message}`);
-            // Not a hard failure - feature may not be fully enabled
-        }
+        // Assert suggestions appeared - no silent passing
+        expect(suggestions.length, 'Expected autocomplete suggestions to appear').toBeGreaterThan(0);
+        testLogger.info('✅ Autocomplete suggestions appeared');
 
         testLogger.info('Traces autocomplete test completed');
     });

@@ -72,7 +72,7 @@ async function getIndexedDBRecords(page) {
                 };
                 getAllReq.onerror = () => {
                     db.close();
-                    resolve([]);
+                    reject(getAllReq.error);
                 };
             };
         });
@@ -104,7 +104,7 @@ async function getFieldRecord(page, org, streamType, streamName, fieldName) {
                 };
                 getReq.onerror = () => {
                     db.close();
-                    resolve(null);
+                    reject(getReq.error);
                 };
             };
         });
