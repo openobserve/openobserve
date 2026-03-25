@@ -78,6 +78,7 @@ export const usePanelDataLoader = (
   dashboardName?: any,
   folderName?: any,
   shouldRefreshWithoutCache?: any,
+  regionClusterParams?: any,
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
@@ -87,6 +88,19 @@ export const usePanelDataLoader = (
   let runCount = 0;
 
   const store = useStore();
+
+  const getRegionClusterParams = () => {
+    if (
+      regionClusterParams?.value?.regions ||
+      regionClusterParams?.value?.clusters
+    ) {
+      return {
+        regions: regionClusterParams.value.regions,
+        clusters: regionClusterParams.value.clusters,
+      };
+    }
+    return {};
+  };
 
   const {
     fetchQueryDataWithHttpStream,
@@ -690,6 +704,7 @@ export const usePanelDataLoader = (
               null,
             )),
           },
+          ...getRegionClusterParams(),
         },
         type: "histogram",
         isPagination: false,
@@ -1276,6 +1291,7 @@ export const usePanelDataLoader = (
                       per_query_response: true,
                       size: -1,
                     },
+                    ...getRegionClusterParams(),
                   },
                   type: "histogram" as const,
                   isPagination: false,
