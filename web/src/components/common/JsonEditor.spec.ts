@@ -471,7 +471,7 @@ describe("JsonEditor", () => {
       wrapper = createWrapper();
       (wrapper.vm as any).isHovered = false;
       await nextTick();
-      expect((wrapper.vm as any).getBtnLogo).toContain("ai_icon.svg");
+      expect((wrapper.vm as any).getBtnLogo).toContain("ai_icon_gradient.svg");
     });
   });
 

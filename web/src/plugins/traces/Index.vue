@@ -79,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="card-container"
                 :key="searchObj.data.stream.streamLists"
                 @update:changeStream="onChangeStream"
+                @update:selectedFields="updateFieldVisibility"
               />
             </div>
           </template>
@@ -279,6 +280,8 @@ import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { useTracesTableColumns } from "./composables/useTracesTableColumns";
+import { isLLMTrace } from "@/utils/llmUtils";
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
@@ -299,6 +302,8 @@ const {
   getUrlQueryParams,
   copyTracesUrl,
   formatTracesMetaData,
+  loadLocalLogFilterField,
+  updatedLocalLogFilterField,
 } = useTraces();
 const { fnParsedSQL } = logsUtils();
 let refreshIntervalID = 0;
@@ -327,6 +332,7 @@ const cleanupContextProvider = () => {
   contextRegistry.unregister("traces");
   contextRegistry.setActive("");
 };
+const { buildColumns } = useTracesTableColumns();
 
 // Track the current search stream so we can cancel it when a new search starts
 let currentSearchTraceId: string | null = null;
@@ -350,6 +356,8 @@ searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
 const selectedStreamName = computed(
   () => searchObj.data.stream.selectedStream.value,
 );
+
+const isLLMSpanPresent = ref(false);
 
 const importSqlParser = async () => {
   const useSqlParser: any = await import("@/composables/useParser");
@@ -923,25 +931,25 @@ async function getQueryData(
             const rawHits: any[] = response.content?.results?.hits || [];
             if (rawHits.length === 0) return;
 
-            // Handle single-trace-id filter: auto-adjust time range on first hit batch
-            if (
-              filter &&
-              filter.includes("trace_id") &&
-              rawHits.length === 1 &&
-              rawHits[0].start_time &&
-              rawHits[0].end_time
-            ) {
-              const startTime = Math.floor(rawHits[0].start_time / 1000);
-              const endTime = Math.ceil(rawHits[0].end_time / 1000);
-              if (
-                !(
-                  startTime >= queryReq.query.start_time &&
-                  endTime <= queryReq.query.end_time
-                )
-              ) {
-                updateNewDateTime(startTime, endTime);
-              }
-            }
+            // // Handle single-trace-id filter: auto-adjust time range on first hit batch
+            // if (
+            //   filter &&
+            //   filter.includes("trace_id") &&
+            //   rawHits.length === 1 &&
+            //   rawHits[0].start_time &&
+            //   rawHits[0].end_time
+            // ) {
+            //   const startTime = Math.floor(rawHits[0].start_time / 1000);
+            //   const endTime = Math.ceil(rawHits[0].end_time / 1000);
+            //   if (
+            //     !(
+            //       startTime >= queryReq.query.start_time &&
+            //       endTime <= queryReq.query.end_time
+            //     )
+            //   ) {
+            //     updateNewDateTime(startTime, endTime);
+            //   }
+            // }
 
             const partition = tracesPartitionMap[searchTraceId]?.partition ?? 1;
             const chunkCount =
@@ -955,6 +963,11 @@ async function getQueryData(
               searchObj.meta.searchMode === "traces"
                 ? formatTracesMetaData(rawHits)
                 : rawHits;
+
+            isLLMSpanPresent.value =
+              (!appendResult ? false : isLLMSpanPresent.value) ||
+              formattedHits.some((hit: any) => isLLMTrace(hit));
+
             // Replace hits on the first partition of a pagination fetch (clears the
             // previous page) or on the very first data chunk of a fresh search
             if ((isPagination && partition === 1) || !appendResult) {
@@ -965,7 +978,10 @@ async function getQueryData(
             searchObj.data.queryResults.from = queryReq.query.from;
 
             updateFieldValues(rawHits);
-            updateGridColumns();
+
+            // load the field stored in localstorage and rebuild the columns
+            loadLocalLogFilterField(searchObj.meta.searchMode);
+            rebuildColumns();
           }
         },
         error: (_payload: any, err: any) => {
@@ -1009,6 +1025,28 @@ async function getQueryData(
     searchObj.data.errorDetail = "";
   }
 }
+
+const updateFieldVisibility = async (field: any) => {
+  const idx = searchObj.data.stream.selectedFields.indexOf(field.name);
+  if (idx === -1) {
+    searchObj.data.stream.selectedFields.push(field.name);
+  } else {
+    searchObj.data.stream.selectedFields.splice(idx, 1);
+  }
+
+  updatedLocalLogFilterField(searchObj.meta.searchMode);
+
+  await nextTick();
+  rebuildColumns();
+};
+
+const rebuildColumns = () => {
+  searchObj.data.resultGrid.columns = buildColumns(
+    isLLMSpanPresent.value,
+    searchObj.meta.searchMode ?? "traces",
+    searchObj.data.stream.selectedFields,
+  );
+};
 
 const cancelSearch = () => {
   // Cancel dashboard panel queries (RenderDashboardCharts via usePanelDataLoader)
@@ -1115,6 +1153,7 @@ async function extractFields() {
             showValues: !idFields[rowName],
             label: rowName === "duration" ? "duration (µs)" : rowName,
             dataType: schemaTypeMap.get(rowName),
+            isSchemaField: true,
           });
         }
       });
@@ -1130,6 +1169,7 @@ async function extractFields() {
               ftsKey: ftsKeys.has(row.name),
               showValues: !idFields[row.name],
               dataType: row.type,
+              isSchemaField: true,
             });
           }
         }
@@ -1144,8 +1184,6 @@ async function extractFields() {
 function updateGridColumns() {
   try {
     searchObj.data.resultGrid.columns = [];
-
-    searchObj.data.stream.selectedFields = [];
 
     searchObj.meta.resultGrid.manualRemoveFields = false;
 
@@ -1383,7 +1421,7 @@ const onSplitterUpdate = () => {
 };
 
 const refreshTimezone = () => {
-  updateGridColumns();
+  // updateGridColumns();
   generateHistogramData();
 
   // searchResultRef.value?.reDrawChart();
@@ -1691,9 +1729,9 @@ const changeRelativeDate = computed(() => {
     searchObj.data.datetime.relative.period.value
   );
 });
-const updateSelectedColumns = computed(() => {
-  return searchObj.data.stream.selectedFields.length;
-});
+// const updateSelectedColumns = computed(() => {
+//   return searchObj.data.stream.selectedFields.length;
+// });
 const runQuery = computed(() => {
   return searchObj.runQuery;
 });
@@ -1789,12 +1827,12 @@ const handleServiceGraphViewTraces = (data: any) => {
   });
 };
 
-watch(updateSelectedColumns, () => {
-  searchObj.meta.resultGrid.manualRemoveFields = true;
-  setTimeout(() => {
-    updateGridColumns();
-  }, 300);
-});
+// watch(updateSelectedColumns, () => {
+//   searchObj.meta.resultGrid.manualRemoveFields = true;
+//   setTimeout(() => {
+//     // updateGridColumns();
+//   }, 300);
+// });
 
 // Watch for active tab changes and update URL
 watch(activeTab, (newTab) => {
