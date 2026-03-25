@@ -412,6 +412,7 @@ impl Search for Searcher {
     ) -> Result<Response<GetLicenseUsageResponse>, Status> {
         #[cfg(not(feature = "enterprise"))]
         let res = GetLicenseUsageResponse {
+            search_allowed: true,
             ingestion_used: 0,
             ingestion_limit_exceeded: false,
             last_reporting_successful: true,
@@ -433,6 +434,7 @@ impl Search for Searcher {
                 })
                 .collect();
             GetLicenseUsageResponse {
+                search_allowed: o2_enterprise::enterprise::license::search_allowed(),
                 ingestion_used: o2_enterprise::enterprise::license::ingestion_used(),
                 ingestion_limit_exceeded_count:
                     o2_enterprise::enterprise::license::ingestion_limit_exceeded_count() as u32,
@@ -442,7 +444,8 @@ impl Search for Searcher {
                     o2_enterprise::enterprise::license::last_reported_timestamp().await,
                 days_since_last_report: o2_enterprise::enterprise::license::days_since_last_report()
                     .await as u32,
-                last_usage_response: "".into(),
+                last_usage_response: o2_enterprise::enterprise::license::get_usage_resp_string()
+                    .await,
                 ingestion_history,
             }
         };

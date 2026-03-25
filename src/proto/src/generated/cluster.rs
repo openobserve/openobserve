@@ -1176,19 +1176,21 @@ pub struct UsageResult {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetLicenseUsageResponse {
-    #[prost(double, tag = "1")]
+    #[prost(bool, tag = "1")]
+    pub search_allowed: bool,
+    #[prost(double, tag = "2")]
     pub ingestion_used: f64,
-    #[prost(uint32, tag = "2")]
+    #[prost(uint32, tag = "3")]
     pub ingestion_limit_exceeded_count: u32,
-    #[prost(bool, tag = "3")]
+    #[prost(bool, tag = "4")]
     pub last_reporting_successful: bool,
-    #[prost(int64, tag = "4")]
+    #[prost(int64, tag = "5")]
     pub last_reporting_timestamp: i64,
-    #[prost(uint32, tag = "5")]
+    #[prost(uint32, tag = "6")]
     pub days_since_last_report: u32,
-    #[prost(string, tag = "6")]
+    #[prost(string, tag = "7")]
     pub last_usage_response: ::prost::alloc::string::String,
-    #[prost(message, repeated, tag = "7")]
+    #[prost(message, repeated, tag = "8")]
     pub ingestion_history: ::prost::alloc::vec::Vec<UsageResult>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]

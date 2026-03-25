@@ -172,12 +172,13 @@ message UsageResult{
 }
 
 message GetLicenseUsageResponse {
-    double                   ingestion_used = 1;
-    uint32                  ingestion_limit_exceeded_count = 2;
-    bool                    last_reporting_successful = 3;
-    int64                   last_reporting_timestamp = 4;
-    uint32                  days_since_last_report = 5;
-    string                  last_usage_response = 6;
-    repeated UsageResult    ingestion_history = 7;
+    bool                    search_allowed = 1;
+    double                  ingestion_used = 2;
+    uint32                  ingestion_limit_exceeded_count = 3;
+    bool                    last_reporting_successful = 4;
+    int64                   last_reporting_timestamp = 5;
+    uint32                  days_since_last_report = 6;
+    string                  last_usage_response = 7;
+    repeated UsageResult    ingestion_history = 8;
 
 }
