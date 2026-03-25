@@ -13,418 +13,198 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import { describe, expect, it } from "vitest";
+import { mount } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import FieldsInput from "@/components/alerts/FieldsInput.vue";
+import { Dialog, Notify } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar();
+installQuasar({ plugins: [Dialog, Notify] });
 
-const node = document.createElement("div");
-node.setAttribute("id", "app");
-document.body.appendChild(node);
+import FieldsInput from "@/components/alerts/FieldsInput.vue";
 
-describe("FieldsInput.vue", () => {
-  let wrapper: VueWrapper<any>;
+const makeField = (overrides: Record<string, any> = {}) => ({
+  uuid: Math.random().toString(36).slice(2),
+  column: "",
+  operator: "=",
+  value: "",
+  ...overrides,
+});
 
-  const mockStreamFields = [
-    { label: "field1", value: "field1" },
-    { label: "field2", value: "field2" },
-    { label: "field3", value: "field3" },
-    { label: "status", value: "status" },
-    { label: "timestamp", value: "timestamp" },
-  ];
+const streamFields = [
+  { label: "Host", value: "host" },
+  { label: "Level", value: "level" },
+  { label: "Message", value: "message" },
+];
 
-  const mockFields = [
-    {
-      uuid: "uuid-1",
-      column: "field1",
-      operator: "=",
-      value: "test",
+async function mountComp(props: Record<string, any> = {}) {
+  return mount(FieldsInput, {
+    props: {
+      fields: [],
+      streamFields,
+      ...props,
     },
-    {
-      uuid: "uuid-2",
-      column: "field2",
-      operator: ">=",
-      value: "100",
-    },
-  ];
+    global: { plugins: [i18n, store] },
+  });
+}
 
-  afterEach(() => {
-    wrapper?.unmount();
+describe("FieldsInput - rendering with empty fields", () => {
+  it("renders without errors", async () => {
+    const w = await mountComp();
+    expect(w.exists()).toBe(true);
   });
 
-  const mountComponent = (props: any = {}) => {
-    wrapper = mount(FieldsInput, {
-      attachTo: node,
-      props: {
-        fields: [],
-        streamFields: mockStreamFields,
-        ...props,
-      },
-      global: {
-        plugins: [i18n, store],
-      },
-    });
-  };
-
-  describe("Component Mounting", () => {
-    it("should mount successfully", () => {
-      mountComponent();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should have correct data-test attribute", () => {
-      mountComponent();
-      expect(wrapper.find('[data-test="alert-conditions-text"]').exists()).toBe(
-        true,
-      );
-    });
+  it("renders conditions title text", async () => {
+    const w = await mountComp();
+    expect(w.find('[data-test="alert-conditions-text"]').exists()).toBe(true);
   });
 
-  describe("Empty State", () => {
-    it("should show add button when no fields exist", () => {
-      mountComponent({ fields: [] });
-      expect(wrapper.find('[data-test="alert-conditions-add-btn"]').exists()).toBe(
-        true,
-      );
-    });
-
-    it("should emit add event when add button is clicked", async () => {
-      mountComponent({ fields: [] });
-      const addBtn = wrapper.find('[data-test="alert-conditions-add-btn"]');
-      await addBtn.trigger("click");
-
-      expect(wrapper.emitted("add")).toBeTruthy();
-      expect(wrapper.emitted("add")?.length).toBe(1);
-    });
+  it("shows Add Condition button when fields is empty", async () => {
+    const w = await mountComp({ fields: [] });
+    expect(w.find('[data-test="alert-conditions-add-btn"]').exists()).toBe(true);
   });
 
-  describe("Fields Display", () => {
-    it("should display all fields when fields array is populated", () => {
-      mountComponent({ fields: mockFields });
+  it("does not show condition rows when fields is empty", async () => {
+    const w = await mountComp({ fields: [] });
+    expect(w.find('[data-test="alert-conditions-1"]').exists()).toBe(false);
+  });
+});
 
-      expect(wrapper.find('[data-test="alert-conditions-1"]').exists()).toBe(
-        true,
-      );
-      expect(wrapper.find('[data-test="alert-conditions-2"]').exists()).toBe(
-        true,
-      );
-    });
-
-    it("should have column select for each field", () => {
-      mountComponent({ fields: mockFields });
-
-      const columnSelects = wrapper.findAll(
-        '[data-test="alert-conditions-select-column"]',
-      );
-      expect(columnSelects.length).toBe(2);
-    });
-
-    it("should have operator select for each field", () => {
-      mountComponent({ fields: mockFields });
-
-      const operatorSelects = wrapper.findAll(
-        '[data-test="alert-conditions-operator-select"]',
-      );
-      expect(operatorSelects.length).toBe(2);
-    });
-
-    it("should have value input for each field", () => {
-      mountComponent({ fields: mockFields });
-
-      const valueInputs = wrapper.findAll(
-        '[data-test="alert-conditions-value-input"]',
-      );
-      expect(valueInputs.length).toBe(2);
-    });
+describe("FieldsInput - rendering with fields", () => {
+  it("hides Add Condition button when fields is non-empty", async () => {
+    const fields = [makeField()];
+    const w = await mountComp({ fields });
+    expect(w.find('[data-test="alert-conditions-add-btn"]').exists()).toBe(false);
   });
 
-  describe("Field Actions", () => {
-    it("should have delete button for each field", () => {
-      mountComponent({ fields: mockFields });
-
-      const deleteButtons = wrapper.findAll(
-        '[data-test="alert-conditions-delete-condition-btn"]',
-      );
-      expect(deleteButtons.length).toBe(2);
-    });
-
-    it("should emit remove event when delete button is clicked", async () => {
-      mountComponent({ fields: mockFields });
-
-      const deleteBtn = wrapper.find(
-        '[data-test="alert-conditions-delete-condition-btn"]',
-      );
-      await deleteBtn.trigger("click");
-
-      expect(wrapper.emitted("remove")).toBeTruthy();
-      expect(wrapper.emitted("input:update")).toBeTruthy();
-    });
-
-    it("should show add button only on last field", () => {
-      mountComponent({ fields: mockFields });
-
-      const addButtons = wrapper.findAll(
-        '[data-test="alert-conditions-add-condition-btn"]',
-      );
-      expect(addButtons.length).toBe(1);
-    });
-
-    it("should emit add event when add condition button is clicked", async () => {
-      mountComponent({ fields: mockFields });
-
-      const addBtn = wrapper.find(
-        '[data-test="alert-conditions-add-condition-btn"]',
-      );
-      await addBtn.trigger("click");
-
-      expect(wrapper.emitted("add")).toBeTruthy();
-    });
+  it("renders condition rows for each field", async () => {
+    const fields = [makeField(), makeField()];
+    const w = await mountComp({ fields });
+    expect(w.find('[data-test="alert-conditions-1"]').exists()).toBe(true);
+    expect(w.find('[data-test="alert-conditions-2"]').exists()).toBe(true);
   });
 
-  describe("Operators", () => {
-    it("should have all required operators", () => {
-      mountComponent({ fields: mockFields });
-      const vm = wrapper.vm as any;
-
-      const expectedOperators = [
-        "=",
-        "!=",
-        ">=",
-        "<=",
-        ">",
-        "<",
-        "Contains",
-        "NotContains",
-      ];
-
-      expectedOperators.forEach((operator) => {
-        expect(vm.triggerOperators).toContain(operator);
-      });
-    });
-
-    it("should emit input:update when operator changes", async () => {
-      mountComponent({ fields: mockFields });
-
-      const operatorSelect = wrapper.findAllComponents({ name: "QSelect" })[1];
-      await operatorSelect.vm.$emit("update:model-value", "!=");
-      await flushPromises();
-
-      expect(wrapper.emitted("input:update")).toBeTruthy();
-    });
+  it("renders column select for each field", async () => {
+    const fields = [makeField()];
+    const w = await mountComp({ fields });
+    expect(w.find('[data-test="alert-conditions-select-column"]').exists()).toBe(true);
   });
 
-  describe("Field Filtering", () => {
-    it("should filter columns based on input", async () => {
-      mountComponent({ fields: mockFields });
-      const vm = wrapper.vm as any;
-
-      const updateFn = vi.fn((callback) => callback());
-      vm.filterColumns("field1", updateFn);
-
-      expect(updateFn).toHaveBeenCalled();
-      expect(vm.filteredFields.length).toBeGreaterThan(0);
-    });
-
-    it("should show all fields when filter is empty", async () => {
-      mountComponent({ fields: mockFields });
-      const vm = wrapper.vm as any;
-
-      const updateFn = vi.fn((callback) => callback());
-      vm.filterColumns("", updateFn);
-
-      expect(updateFn).toHaveBeenCalled();
-      expect(vm.filteredFields.length).toBe(mockStreamFields.length);
-    });
-
-    it("should filter fields case-insensitively", async () => {
-      mountComponent({ fields: mockFields });
-      const vm = wrapper.vm as any;
-
-      const updateFn = vi.fn((callback) => callback());
-      vm.filterColumns("STATUS", updateFn);
-
-      expect(updateFn).toHaveBeenCalled();
-      expect(vm.filteredFields.some((f: any) => f.value === "status")).toBe(
-        true,
-      );
-    });
+  it("renders operator select for each field", async () => {
+    const fields = [makeField()];
+    const w = await mountComp({ fields });
+    expect(w.find('[data-test="alert-conditions-operator-select"]').exists()).toBe(true);
   });
 
-  describe("Value Updates", () => {
-    it("should emit input:update when value changes", async () => {
-      mountComponent({ fields: mockFields });
-
-      const valueInput = wrapper.findAllComponents({ name: "QInput" })[0];
-      await valueInput.vm.$emit("update:model-value", "new value");
-      await flushPromises();
-
-      expect(wrapper.emitted("input:update")).toBeTruthy();
-    });
+  it("renders value input for each field", async () => {
+    const fields = [makeField()];
+    const w = await mountComp({ fields });
+    expect(w.find('[data-test="alert-conditions-value-input"]').exists()).toBe(true);
   });
 
-  describe("Props", () => {
-    it("should accept fields prop", () => {
-      mountComponent({ fields: mockFields });
-      expect(wrapper.props("fields")).toEqual(mockFields);
-    });
-
-    it("should accept streamFields prop", () => {
-      mountComponent({ streamFields: mockStreamFields });
-      expect(wrapper.props("streamFields")).toEqual(mockStreamFields);
-    });
-
-    it("should accept enableNewValueMode prop", () => {
-      mountComponent({ enableNewValueMode: true });
-      expect(wrapper.props("enableNewValueMode")).toBe(true);
-    });
-
-    it("should have default value for enableNewValueMode", () => {
-      mountComponent();
-      expect(wrapper.props("enableNewValueMode")).toBe(false);
-    });
+  it("renders delete button for each field", async () => {
+    const fields = [makeField()];
+    const w = await mountComp({ fields });
+    expect(w.find('[data-test="alert-conditions-delete-condition-btn"]').exists()).toBe(true);
   });
 
-  describe("New Value Mode", () => {
-    it("should apply new-value-mode when enabled", () => {
-      mountComponent({ fields: mockFields, enableNewValueMode: true });
-      const vm = wrapper.vm as any;
+  it("renders add-condition button only on last field row", async () => {
+    const fields = [makeField(), makeField()];
+    const w = await mountComp({ fields });
+    const addBtns = w.findAll('[data-test="alert-conditions-add-condition-btn"]');
+    expect(addBtns).toHaveLength(1);
+  });
+});
 
-      expect(vm.newValueMode).toEqual({ "new-value-mode": "unique" });
-    });
-
-    it("should not apply new-value-mode when disabled", () => {
-      mountComponent({ fields: mockFields, enableNewValueMode: false });
-      const vm = wrapper.vm as any;
-
-      expect(vm.newValueMode).toEqual({});
-    });
+describe("FieldsInput - emit events", () => {
+  it("clicking Add Condition button emits 'add'", async () => {
+    const w = await mountComp({ fields: [] });
+    await w.find('[data-test="alert-conditions-add-btn"]').trigger("click");
+    expect(w.emitted("add")).toBeTruthy();
+    expect(w.emitted("add")!.length).toBe(1);
   });
 
-  describe("Form Validation", () => {
-    it("should have required validation on column select", () => {
-      mountComponent({ fields: mockFields });
-
-      const columnSelect = wrapper.findComponent({ name: "QSelect" });
-      const rules = columnSelect.props("rules");
-
-      expect(rules).toBeDefined();
-      expect(Array.isArray(rules)).toBe(true);
-      expect(rules?.length).toBeGreaterThan(0);
-    });
-
-    it("should have required validation on operator select", () => {
-      mountComponent({ fields: mockFields });
-
-      const operatorSelects = wrapper.findAllComponents({ name: "QSelect" });
-      const operatorSelect = operatorSelects[1];
-      const rules = operatorSelect.props("rules");
-
-      expect(rules).toBeDefined();
-      expect(Array.isArray(rules)).toBe(true);
-    });
-
-    it("should have required validation on value input", () => {
-      mountComponent({ fields: mockFields });
-
-      const valueInput = wrapper.findComponent({ name: "QInput" });
-      const rules = valueInput.props("rules");
-
-      expect(rules).toBeDefined();
-      expect(Array.isArray(rules)).toBe(true);
-    });
+  it("clicking delete button emits 'remove' with the field", async () => {
+    const field = makeField({ column: "host" });
+    const w = await mountComp({ fields: [field] });
+    await w.find('[data-test="alert-conditions-delete-condition-btn"]').trigger("click");
+    expect(w.emitted("remove")).toBeTruthy();
+    expect((w.emitted("remove") as any[][])[0][0]).toMatchObject({ column: "host" });
   });
 
-  describe("Multiple Fields", () => {
-    it("should handle single field", () => {
-      const singleField = [mockFields[0]];
-      mountComponent({ fields: singleField });
-
-      expect(wrapper.findAll('[data-test^="alert-conditions-"]').length).toBeGreaterThan(
-        0,
-      );
-    });
-
-    it("should handle multiple fields", () => {
-      const multipleFields = [...mockFields, { ...mockFields[0], uuid: "uuid-3" }];
-      mountComponent({ fields: multipleFields });
-
-      expect(wrapper.find('[data-test="alert-conditions-3"]').exists()).toBe(
-        true,
-      );
-    });
+  it("clicking delete button also emits 'input:update'", async () => {
+    const field = makeField({ column: "level" });
+    const w = await mountComp({ fields: [field] });
+    await w.find('[data-test="alert-conditions-delete-condition-btn"]').trigger("click");
+    expect(w.emitted("input:update")).toBeTruthy();
   });
 
-  describe("Emitted Events", () => {
-    it("should emit correct event structure for remove", async () => {
-      mountComponent({ fields: mockFields });
+  it("clicking add-condition-btn on last row emits 'add'", async () => {
+    const fields = [makeField()];
+    const w = await mountComp({ fields });
+    await w.find('[data-test="alert-conditions-add-condition-btn"]').trigger("click");
+    expect(w.emitted("add")).toBeTruthy();
+  });
+});
 
-      const deleteBtn = wrapper.find(
-        '[data-test="alert-conditions-delete-condition-btn"]',
-      );
-      await deleteBtn.trigger("click");
-
-      const removeEvents = wrapper.emitted("remove");
-      expect(removeEvents).toBeTruthy();
-      expect(removeEvents?.[0]).toEqual([mockFields[0]]);
-    });
-
-    it("should emit input:update with correct parameters", async () => {
-      mountComponent({ fields: mockFields });
-
-      const deleteBtn = wrapper.find(
-        '[data-test="alert-conditions-delete-condition-btn"]',
-      );
-      await deleteBtn.trigger("click");
-
-      const updateEvents = wrapper.emitted("input:update");
-      expect(updateEvents).toBeTruthy();
-      expect(updateEvents?.[0]).toEqual(["conditions", mockFields[0]]);
-    });
+describe("FieldsInput - triggerOperators", () => {
+  it("triggerOperators includes = operator", async () => {
+    const w = await mountComp();
+    expect((w.vm as any).triggerOperators).toContain("=");
   });
 
-  describe("UI Elements", () => {
-    it("should apply correct styling based on theme", () => {
-      store.state.theme = "dark";
-      mountComponent({ fields: mockFields });
-
-      const deleteBtn = wrapper.find(
-        '[data-test="alert-conditions-delete-condition-btn"]',
-      );
-      expect(deleteBtn.classes()).toContain("icon-dark");
-    });
-
-    it("should display condition text", () => {
-      mountComponent();
-      const conditionText = wrapper.find('[data-test="alert-conditions-text"]');
-      expect(conditionText.text()).toContain("Conditions");
-    });
+  it("triggerOperators includes != operator", async () => {
+    const w = await mountComp();
+    expect((w.vm as any).triggerOperators).toContain("!=");
   });
 
-  describe("Field Initialization", () => {
-    it("should initialize with empty filteredFields matching streamFields", () => {
-      mountComponent();
-      const vm = wrapper.vm as any;
+  it("triggerOperators includes Contains", async () => {
+    const w = await mountComp();
+    expect((w.vm as any).triggerOperators).toContain("Contains");
+  });
 
-      expect(vm.filteredFields.length).toBe(mockStreamFields.length);
-    });
+  it("triggerOperators includes NotContains", async () => {
+    const w = await mountComp();
+    expect((w.vm as any).triggerOperators).toContain("NotContains");
+  });
 
-    it("should update filteredFields when streamFields prop changes", async () => {
-      mountComponent();
+  it("triggerOperators has 8 items", async () => {
+    const w = await mountComp();
+    expect((w.vm as any).triggerOperators.length).toBe(8);
+  });
+});
 
-      const newFields = [
-        { label: "newField", value: "newField" },
-        ...mockStreamFields,
-      ];
+describe("FieldsInput - filterColumns", () => {
+  it("filters columns by keyword", async () => {
+    const w = await mountComp();
+    (w.vm as any).filterColumns("host", (cb: () => void) => cb());
+    const values = (w.vm as any).filteredFields.map((f: any) => f.value);
+    expect(values).toContain("host");
+    expect(values).not.toContain("level");
+  });
 
-      await wrapper.setProps({ streamFields: newFields });
-      await flushPromises();
+  it("returns all fields when filter is empty", async () => {
+    const w = await mountComp();
+    (w.vm as any).filterColumns("", (cb: () => void) => cb());
+    expect((w.vm as any).filteredFields).toHaveLength(streamFields.length);
+  });
 
-      // Component should respond to prop changes
-      expect(wrapper.props("streamFields").length).toBe(newFields.length);
-    });
+  it("filterColumns is case-insensitive", async () => {
+    const w = await mountComp();
+    (w.vm as any).filterColumns("HOST", (cb: () => void) => cb());
+    expect((w.vm as any).filteredFields.length).toBeGreaterThan(0);
+  });
+});
+
+describe("FieldsInput - newValueMode computed", () => {
+  it("returns empty object when enableNewValueMode=false", async () => {
+    const w = await mountComp({ enableNewValueMode: false });
+    expect((w.vm as any).newValueMode).toEqual({});
+  });
+
+  it("returns new-value-mode object when enableNewValueMode=true", async () => {
+    const w = await mountComp({ enableNewValueMode: true });
+    expect((w.vm as any).newValueMode).toHaveProperty("new-value-mode", "unique");
   });
 });

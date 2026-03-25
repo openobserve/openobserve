@@ -53,7 +53,7 @@ jobs:
   build_binary:
     name: build_binary
     runs-on:
-      labels: ubicloud-standard-16
+      labels: ubicloud-standard-30
 
     steps:
       - name: Remove unused tools
@@ -209,6 +209,7 @@ jobs:
                 "visualize-vrl.spec.js",
                 "dashboard-create-alert.spec.js",
                 "dashboard-sankey.spec.js",
+                "dashboard-pie-donut.spec.js",
               ]
           - testfolder: "Dashboards-Streaming"
             browser: "chrome"
@@ -286,7 +287,8 @@ jobs:
                 "metrics-visualizations.spec.js",
                 "metrics-config.spec.js",
                 "metrics-promql-query-persistence.spec.js",
-                "metrics-table-column-order.spec.js"
+                "metrics-table-column-order.spec.js",
+                "metrics-promql-builder.spec.js",
               ]
           - testfolder: "Dashboards-Variables"
             browser: "chrome"

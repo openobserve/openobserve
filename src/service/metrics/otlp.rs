@@ -152,7 +152,6 @@ pub async fn handle_otlp_request(
 
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
-    let mut schema_evolved: HashMap<String, bool> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, Vec<StreamPartition>> = HashMap::new();
 
     // Start get user defined schema
@@ -473,6 +472,20 @@ pub async fn handle_otlp_request(
             .unwrap_or_default();
         let partition_time_level = get_partition_time_level(StreamType::Metrics);
 
+        // check for schema evolution
+        let min_timestamp = batch_min_timestamp(&json_data, Utc::now().timestamp_micros());
+
+        let _ = check_for_schema(
+            org_id,
+            &local_metric_name,
+            StreamType::Metrics,
+            &mut metric_schema_map,
+            json_data.iter().collect(),
+            min_timestamp,
+            false, // is_derived is false for metrics
+        )
+        .await?;
+
         for val_map in json_data {
             let timestamp = val_map
                 .get(TIMESTAMP_COL_NAME)
@@ -480,40 +493,6 @@ pub async fn handle_otlp_request(
                 .unwrap_or(Utc::now().timestamp_micros());
 
             let value_str = json::to_string(&val_map).unwrap();
-
-            // check for schema evolution
-            let schema_fields = match metric_schema_map.get(&local_metric_name) {
-                Some(schema) => schema
-                    .schema()
-                    .fields()
-                    .iter()
-                    .map(|f| f.name())
-                    .collect::<HashSet<_>>(),
-                None => HashSet::default(),
-            };
-            let mut need_schema_check = !schema_evolved.contains_key(&local_metric_name);
-            for key in val_map.keys() {
-                if !schema_fields.contains(&key) {
-                    need_schema_check = true;
-                    break;
-                }
-            }
-            drop(schema_fields);
-            if need_schema_check {
-                let (schema_evolution, _infer_schema) = check_for_schema(
-                    org_id,
-                    &local_metric_name,
-                    StreamType::Metrics,
-                    &mut metric_schema_map,
-                    vec![&val_map],
-                    timestamp,
-                    false, // is_derived is false for metrics
-                )
-                .await?;
-                if schema_evolution.is_schema_changed {
-                    schema_evolved.insert(local_metric_name.to_owned(), true);
-                }
-            }
 
             let buf = metric_data_map
                 .entry(local_metric_name.to_owned())
@@ -648,6 +627,23 @@ pub async fn handle_otlp_request(
     }
 
     format_response(partial_success, req_type)
+}
+
+fn batch_min_timestamp(
+    json_data: &[serde_json::Map<String, serde_json::Value>],
+    default: i64,
+) -> i64 {
+    let first = json_data
+        .first()
+        .and_then(|v| v.get(TIMESTAMP_COL_NAME)?.as_i64());
+    let last = json_data
+        .last()
+        .and_then(|v| v.get(TIMESTAMP_COL_NAME)?.as_i64());
+
+    match (first, last) {
+        (Some(f), Some(l)) => f.min(l),
+        (f, l) => f.or(l).unwrap_or(default),
+    }
 }
 
 fn process_gauge(
@@ -1640,6 +1636,31 @@ mod tests {
         // This should handle empty data gracefully
         // The actual behavior depends on the implementation
         assert!(empty_metric.data.is_none());
+    }
+
+    #[test]
+    fn test_batch_min_timestamp() {
+        // min of multiple values
+        let json_data = vec![
+            serde_json::Map::from_iter([(TIMESTAMP_COL_NAME.to_string(), json!(1i64))]),
+            serde_json::Map::from_iter([(TIMESTAMP_COL_NAME.to_string(), json!(2i64))]),
+            serde_json::Map::from_iter([(TIMESTAMP_COL_NAME.to_string(), json!(3i64))]),
+        ];
+        assert_eq!(batch_min_timestamp(&json_data, 42), 1i64);
+
+        // first element doesn't have a timestamp, returns the last
+        let json_data_with_one_timestamp = vec![
+            serde_json::Map::from_iter([("value".to_string(), json!(1))]),
+            serde_json::Map::from_iter([(TIMESTAMP_COL_NAME.to_string(), json!(2i64))]),
+        ];
+        assert_eq!(batch_min_timestamp(&json_data_with_one_timestamp, 42), 2i64);
+
+        // no records have a timestamp, returns default
+        let json_data_with_no_timestamp = vec![
+            serde_json::Map::from_iter([("value".to_string(), json!(1))]),
+            serde_json::Map::from_iter([("value".to_string(), json!(2))]),
+        ];
+        assert_eq!(batch_min_timestamp(&json_data_with_no_timestamp, 42), 42i64);
     }
 
     mod protobuf_json_tests {

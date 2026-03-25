@@ -113,6 +113,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="toolbar-toggle-container element-box-shadow">
           <q-toggle
+            data-test="logs-search-bar-show-histogram-toggle-btn"
+            v-model="searchObj.meta.showHistogram"
+            class="o2-toggle-button-xs"
+            size="xs"
+            flat
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-xs-dark'
+                : 'o2-toggle-button-xs-light'
+            "
+          >
+            <q-icon name="bar_chart" size="14px" />
+            <q-tooltip>{{ t("search.showHistogramLabel") }}</q-tooltip>
+          </q-toggle>
+        </div>
+        <div class="toolbar-toggle-container element-box-shadow">
+          <q-toggle
             data-test="logs-search-bar-sql-mode-toggle-btn"
             v-model="searchObj.meta.sqlMode"
             :disable="isSqlModeDisabled"
@@ -429,45 +446,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-menu>
             <q-list>
-              <!-- Histogram Toggle -->
-              <q-item
-                clickable
-                @click="
-                  searchObj.meta.showHistogram = !searchObj.meta.showHistogram
-                "
-                data-test="logs-search-bar-show-histogram-toggle-btn"
-                class="q-pa-sm saved-view-item"
-              >
-                <q-item-section>
-                  <q-item-label class="tw:flex tw:items-center">
-                    <div
-                      style="
-                        width: 28px;
-                        display: flex;
-                        align-items: center;
-                        margin-right: 12px;
-                      "
-                    >
-                      <q-toggle
-                        v-model="searchObj.meta.showHistogram"
-                        size="xs"
-                        flat
-                        class="o2-toggle-button-xs"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'o2-toggle-button-xs-dark'
-                            : 'o2-toggle-button-xs-light'
-                        "
-                        @click.stop
-                      />
-                    </div>
-                    {{ t("search.showHistogramLabel") }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-
-              <q-separator />
-
               <!-- Quick Mode Toggle -->
               <q-item
                 clickable

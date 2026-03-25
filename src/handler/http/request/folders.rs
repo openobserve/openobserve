@@ -171,7 +171,11 @@ pub async fn update_folder(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all folders", "category": "folders"}))
+        ("x-o2-mcp" = json!({
+            "description": "List all folders",
+            "category": "folders",
+            "summary_fields": ["folderId", "name", "description"]
+        }))
     ),
 )]
 #[allow(unused_variables)]

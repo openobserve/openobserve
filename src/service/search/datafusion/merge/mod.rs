@@ -68,6 +68,9 @@ pub async fn merge_parquet_files(
     if stream_type == StreamType::Metrics && !is_ingester {
         let rule = get_largest_downsampling_rule(stream_name, metadata.max_ts);
         if let Some(rule) = rule {
+            log::info!(
+                "merge_parquet_files: stream_type={stream_type}, stream_name={stream_name}, downsampling rule={rule:?}"
+            );
             return merge_parquet_files_with_downsampling(
                 schema,
                 tables,

@@ -186,7 +186,7 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
         if wal::lock_files_exists(&file_key) {
             continue;
         }
-        log::warn!("[INGESTER:JOB] the file was released, delete it: {file_key}");
+        log::debug!("[INGESTER:JOB] the file was released, delete it: {file_key}");
         let file = wal_dir.join(&file_key);
         let Ok(file_size) = get_file_size(&file).await else {
             continue;

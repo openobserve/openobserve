@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { Quasar } from 'quasar';
+import { Quasar, Notify } from 'quasar';
 import TestFunction from './TestFunction.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
@@ -99,7 +99,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
           provide: {
             store: darkStore,
           },
@@ -121,7 +121,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
           provide: {
             store: mockStore,
           },
@@ -158,7 +158,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
           provide: {
             store: mockStore,
           },
@@ -201,7 +201,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
           provide: {
             store: mockStore,
           },
@@ -236,7 +236,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
           provide: {
             store: mockStore,
           },
@@ -264,7 +264,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
           provide: {
             store: mockStore,
           },
@@ -309,7 +309,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
           provide: {
             store: mockStore,
             $q: { notify: vi.fn() },
@@ -361,7 +361,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
           provide: {
             store: mockStore,
           },
@@ -404,7 +404,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
           provide: {
             store: mockStore,
             $q: { notify: vi.fn() },
@@ -450,7 +450,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
           provide: {
             store: mockStore,
           },
@@ -497,7 +497,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
           provide: {
             store: mockStore,
           },
@@ -549,7 +549,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [Quasar, mockI18n],
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
           provide: {
             store: mockStore,
           },
@@ -590,9 +590,330 @@ describe('TestFunction.vue Branch Coverage', () => {
       
       const result1 = eventWithEvent.event || (eventWithEvent as any).events;
       const result2 = (eventWithEvents as any).event || eventWithEvents.events;
-      
+
       expect(result1).toEqual({ data: 'test' });
       expect(result2).toEqual({ data: 'test' });
+    });
+  });
+
+  // ---- Tests for changes introduced in Mar 7 source ----
+
+  describe('handleTestError - JS vs VRL function error branches', () => {
+    it('should set JS-specific error message when transType is "1"', async () => {
+      const jsProps = {
+        vrlFunction: { function: 'return event;', name: 'jsFunc', transType: '1' },
+        heightOffset: 0,
+      };
+
+      const wrapper = mount(TestFunction, {
+        props: jsProps,
+        global: {
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          provide: { store: mockStore },
+          stubs: {
+            'query-editor': true,
+            'DateTime': true,
+            'FullViewContainer': true,
+            'O2AIContextAddBtn': true,
+          },
+        },
+      });
+
+      const vm = wrapper.vm as any;
+      vm.handleTestError({ response: { data: { message: 'JS runtime error' } } });
+      // Branch: isJSFunction = true
+      expect(vm.outputEventsErrorMsg).toBe('JavaScript error - see details below');
+    });
+
+    it('should set VRL-specific error message when transType is "0"', async () => {
+      const wrapper = mount(TestFunction, {
+        props: defaultProps,
+        global: {
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          provide: { store: mockStore },
+          stubs: {
+            'query-editor': true,
+            'DateTime': true,
+            'FullViewContainer': true,
+            'O2AIContextAddBtn': true,
+          },
+        },
+      });
+
+      const vm = wrapper.vm as any;
+      vm.handleTestError({ response: { data: { message: 'VRL error' } } });
+      // Branch: isJSFunction = false
+      expect(vm.outputEventsErrorMsg).toBe('Error while transforming results');
+    });
+
+    it('should use fallback message when error has no message', async () => {
+      const wrapper = mount(TestFunction, {
+        props: defaultProps,
+        global: {
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          provide: { store: mockStore },
+          stubs: {
+            'query-editor': true,
+            'DateTime': true,
+            'FullViewContainer': true,
+            'O2AIContextAddBtn': true,
+          },
+        },
+      });
+
+      const vm = wrapper.vm as any;
+      vm.handleTestError({ response: { data: {} } });
+      expect(vm.outputEvents).toBe('Error in testing function');
+    });
+
+    it('should set outputEvents to raw error message', async () => {
+      const wrapper = mount(TestFunction, {
+        props: defaultProps,
+        global: {
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          provide: { store: mockStore },
+          stubs: {
+            'query-editor': true,
+            'DateTime': true,
+            'FullViewContainer': true,
+            'O2AIContextAddBtn': true,
+          },
+        },
+      });
+
+      const vm = wrapper.vm as any;
+      vm.handleTestError({ response: { data: { message: 'Detailed VRL error' } } });
+      expect(vm.outputEvents).toBe('Detailed VRL error');
+    });
+
+    it('should emit function-error event with raw error message', async () => {
+      const wrapper = mount(TestFunction, {
+        props: defaultProps,
+        global: {
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          provide: { store: mockStore },
+          stubs: {
+            'query-editor': true,
+            'DateTime': true,
+            'FullViewContainer': true,
+            'O2AIContextAddBtn': true,
+          },
+        },
+      });
+
+      const vm = wrapper.vm as any;
+      vm.handleTestError({ response: { data: { message: 'Test error' } } });
+      expect(wrapper.emitted('function-error')).toBeTruthy();
+      expect(wrapper.emitted('function-error')?.[0]).toEqual(['Test error']);
+    });
+  });
+
+  describe('areInputValid branches (query validation)', () => {
+    it('should return false and set sqlQueryErrorMsg when inputQuery is empty', async () => {
+      const wrapper = mount(TestFunction, {
+        props: defaultProps,
+        global: {
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          provide: { store: mockStore },
+          stubs: {
+            'query-editor': true,
+            'DateTime': true,
+            'FullViewContainer': true,
+            'O2AIContextAddBtn': true,
+          },
+        },
+      });
+
+      const vm = wrapper.vm as any;
+      vm.inputQuery = '';
+      const result = vm.areInputValid();
+      expect(result).toBe(false);
+      expect(vm.sqlQueryErrorMsg).toBe('Please enter a query');
+    });
+
+    it('should return true when inputQuery is non-empty', async () => {
+      const wrapper = mount(TestFunction, {
+        props: defaultProps,
+        global: {
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          provide: { store: mockStore },
+          stubs: {
+            'query-editor': true,
+            'DateTime': true,
+            'FullViewContainer': true,
+            'O2AIContextAddBtn': true,
+          },
+        },
+      });
+
+      const vm = wrapper.vm as any;
+      vm.inputQuery = 'SELECT * FROM "my_stream"';
+      const result = vm.areInputValid();
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('isInputValid branches (events JSON validation)', () => {
+    it('should return true for valid JSON events', async () => {
+      const wrapper = mount(TestFunction, {
+        props: defaultProps,
+        global: {
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          provide: { store: mockStore },
+          stubs: {
+            'query-editor': true,
+            'DateTime': true,
+            'FullViewContainer': true,
+            'O2AIContextAddBtn': true,
+          },
+        },
+      });
+
+      const vm = wrapper.vm as any;
+      vm.inputEvents = JSON.stringify([{ log: 'test', level: 'info' }]);
+      expect(vm.isInputValid()).toBe(true);
+    });
+
+    it('should return false and set eventsErrorMsg for invalid JSON', async () => {
+      const wrapper = mount(TestFunction, {
+        props: defaultProps,
+        global: {
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          provide: { store: mockStore },
+          stubs: {
+            'query-editor': true,
+            'DateTime': true,
+            'FullViewContainer': true,
+            'O2AIContextAddBtn': true,
+          },
+        },
+      });
+
+      const vm = wrapper.vm as any;
+      vm.inputEvents = 'invalid json {{{';
+      const result = vm.isInputValid();
+      expect(result).toBe(false);
+      expect(vm.eventsErrorMsg).toContain('Invalid events');
+    });
+  });
+
+  describe('outputMessage computed', () => {
+    it('should return placeholder text when outputEvents is empty', async () => {
+      const wrapper = mount(TestFunction, {
+        props: defaultProps,
+        global: {
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          provide: { store: mockStore },
+          stubs: {
+            'query-editor': true,
+            'DateTime': true,
+            'FullViewContainer': true,
+            'O2AIContextAddBtn': true,
+          },
+        },
+      });
+
+      const vm = wrapper.vm as any;
+      vm.outputEvents = '';
+      expect(vm.outputMessage).toBe('Please click Test Function to see the events');
+    });
+
+    it('should return empty string when outputEvents has content', async () => {
+      const wrapper = mount(TestFunction, {
+        props: defaultProps,
+        global: {
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          provide: { store: mockStore },
+          stubs: {
+            'query-editor': true,
+            'DateTime': true,
+            'FullViewContainer': true,
+            'O2AIContextAddBtn': true,
+          },
+        },
+      });
+
+      const vm = wrapper.vm as any;
+      vm.outputEvents = '[{"log": "data"}]';
+      expect(vm.outputMessage).toBe('');
+    });
+  });
+
+  describe('setEventsEditor initial value', () => {
+    it('should set inputEvents to valid JSON array after timeout', async () => {
+      vi.useFakeTimers();
+
+      const wrapper = mount(TestFunction, {
+        props: defaultProps,
+        global: {
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          provide: { store: mockStore },
+          stubs: {
+            'query-editor': true,
+            'DateTime': true,
+            'FullViewContainer': true,
+            'O2AIContextAddBtn': true,
+          },
+        },
+      });
+
+      vi.advanceTimersByTime(400);
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      expect(() => JSON.parse(vm.inputEvents)).not.toThrow();
+      const parsed = JSON.parse(vm.inputEvents);
+      expect(Array.isArray(parsed)).toBe(true);
+      expect(parsed.length).toBeGreaterThan(0);
+
+      vi.useRealTimers();
+    });
+  });
+
+  describe('updateStreams branches', () => {
+    it('should return early (Promise.resolve) when selectedStream.type is empty', async () => {
+      const wrapper = mount(TestFunction, {
+        props: defaultProps,
+        global: {
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          provide: { store: mockStore },
+          stubs: {
+            'query-editor': true,
+            'DateTime': true,
+            'FullViewContainer': true,
+            'O2AIContextAddBtn': true,
+          },
+        },
+      });
+
+      const vm = wrapper.vm as any;
+      vm.selectedStream.type = '' as any;
+
+      // Should resolve without throwing (guard: if (!selectedStream.value.type))
+      await expect(vm.updateStreams(false)).resolves.toBeUndefined();
+    });
+
+    it('should reset selectedStream.name when resetStream is true', async () => {
+      const wrapper = mount(TestFunction, {
+        props: defaultProps,
+        global: {
+          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          provide: { store: mockStore },
+          stubs: {
+            'query-editor': true,
+            'DateTime': true,
+            'FullViewContainer': true,
+            'O2AIContextAddBtn': true,
+          },
+        },
+      });
+
+      const vm = wrapper.vm as any;
+      vm.selectedStream.name = 'existing_stream';
+
+      // updateStreams resets name when resetStream=true before checking type
+      await vm.updateStreams(true);
+      expect(vm.selectedStream.name).toBe('');
     });
   });
 });

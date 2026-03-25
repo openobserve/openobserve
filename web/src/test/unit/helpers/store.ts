@@ -89,7 +89,7 @@ const store = createStore({
       timestamp_column: "_timestamp",
       all_fields_name: "_all",
       default_secondary_index_fields: ["level"],
-      service_graph_enabled: true,
+      default_quick_mode_fields: [],
     },
     organizationData: {
       organizationPasscode: "",

@@ -198,18 +198,17 @@ pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
 #[cfg(not(feature = "enterprise"))]
 pub async fn remove_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
 
-/// A deserializer impl for when a value must be lowercased during deserialization
-fn deserialize_lowercase<'de, D>(deserializer: D) -> Result<String, D::Error>
+fn deserialize_trimmed<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     let s: String = serde::Deserialize::deserialize(deserializer)?;
-    Ok(s.to_lowercase())
+    Ok(s.trim().to_string())
 }
 
 #[derive(Debug, serde::Deserialize)]
 pub struct UserEmail {
-    #[serde(deserialize_with = "deserialize_lowercase")]
+    #[serde(deserialize_with = "deserialize_trimmed")]
     pub user_id: String,
 }
 
@@ -328,7 +327,10 @@ where
             } else {
                 path_columns[0].to_string()
             }
-        } else if url_len == 2 || (url_len > 2 && path_columns[1].eq("settings")) {
+        } else if url_len == 2
+            || (url_len > 2 && path_columns[1].eq("settings"))
+            || (url_len > 2 && path_columns[1] == "sourcemaps")
+        {
             // for settings (including settings/v2), the post/delete require PUT permissions,
             // GET needs LIST permissions. This handles:
             // - /org/settings (v1 settings API)

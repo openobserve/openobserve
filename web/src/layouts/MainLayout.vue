@@ -1058,7 +1058,7 @@ export default defineComponent({
 
       return store.state.theme === "dark"
         ? getImageURL("images/common/ai_icon_dark.svg")
-        : getImageURL("images/common/ai_icon.svg");
+        : getImageURL("images/common/ai_icon_gradient.svg");
     });
     //this will be the function used to cancel the get started dialog and remove the isFirstTimeLogin from local storage
     //this will be called from the get started component whenever users clicks on the submit button
@@ -1610,14 +1610,16 @@ body.ai-chat-open {
 }
 
 .ai-btn-active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
 }
 .ai-hover-btn {
-  transition: background 0.3s ease;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.25) 0%, rgba(236, 72, 153, 0.25) 100%) !important;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
 }
 
 .ai-hover-btn:hover {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
+  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
 }
 
 .ai-icon {

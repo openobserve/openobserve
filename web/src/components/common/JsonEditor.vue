@@ -280,7 +280,7 @@ export default defineComponent({
 
       return store.state.theme === 'dark'
         ? getImageURL('images/common/ai_icon_dark.svg')
-        : getImageURL('images/common/ai_icon.svg')
+        : getImageURL('images/common/ai_icon_gradient.svg')
     })
 
     return {
@@ -297,6 +297,8 @@ export default defineComponent({
       toggleAIChat,
       isHovered,
       getBtnLogo,
+      protectedFields,
+      storedFields,
     };
   },
 });
