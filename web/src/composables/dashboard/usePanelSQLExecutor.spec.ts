@@ -91,6 +91,7 @@ const makeCtx = (overrides: Partial<any> = {}) => {
   const shouldFetchAnnotations = vi.fn(() => false);
   const refreshAnnotations = vi.fn(async () => []);
   const log = vi.fn();
+  const getRegionClusterParams = vi.fn(() => ({}));
 
   const ctx: any = {
     state,
@@ -120,6 +121,7 @@ const makeCtx = (overrides: Partial<any> = {}) => {
     removeTraceId,
     shouldFetchAnnotations,
     refreshAnnotations,
+    getRegionClusterParams,
     log,
     ...overrides,
   };
