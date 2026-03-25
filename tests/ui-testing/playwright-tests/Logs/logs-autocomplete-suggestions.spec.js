@@ -225,6 +225,64 @@ async function runQueryAndWaitForResults(page, pm) {
     await page.waitForTimeout(3000);
 }
 
+/**
+ * Find a field that has string values (not purely numeric or boolean)
+ * Iterates through available fields until finding one with string values
+ * Returns { fieldName, stringValue, record } or null if none found
+ */
+async function findFieldWithStringValues(page, orgName, streamName, maxAttempts = 5) {
+    const fieldButtons = page.locator('[data-test*="log-search-expand-"][data-test$="-field-btn"]');
+    const buttonCount = await fieldButtons.count();
+
+    // Try known string fields first - these are more likely to have string values
+    const preferredStringFields = ['kubernetes_container_name', 'level', 'log', 'kubernetes_pod_name', 'kubernetes_namespace_name'];
+
+    for (const preferredField of preferredStringFields) {
+        const preferredButton = page.locator(`[data-test="log-search-expand-${preferredField}-field-btn"]`);
+        if (await preferredButton.count() > 0) {
+            await preferredButton.click();
+            await page.waitForTimeout(3000);
+
+            const record = await waitForFieldInIndexedDB(page, orgName, 'logs', streamName, preferredField, 10000);
+            if (record && record.values && record.values.length > 0) {
+                const stringValue = record.values.find(v =>
+                    isNaN(Number(v)) && v !== 'true' && v !== 'false'
+                );
+                if (stringValue) {
+                    testLogger.info(`Found string field: ${preferredField} with value: ${stringValue}`);
+                    return { fieldName: preferredField, stringValue, record };
+                }
+            }
+        }
+    }
+
+    // Fallback: iterate through all fields
+    for (let i = 0; i < Math.min(buttonCount, maxAttempts); i++) {
+        const button = fieldButtons.nth(i);
+        const dataTest = await button.getAttribute('data-test');
+        const fieldName = dataTest.replace('log-search-expand-', '').replace('-field-btn', '');
+
+        // Skip if already expanded (part of preferred fields)
+        if (preferredStringFields.includes(fieldName)) continue;
+
+        await button.click();
+        await page.waitForTimeout(3000);
+
+        const record = await waitForFieldInIndexedDB(page, orgName, 'logs', streamName, fieldName, 10000);
+        if (record && record.values && record.values.length > 0) {
+            const stringValue = record.values.find(v =>
+                isNaN(Number(v)) && v !== 'true' && v !== 'false'
+            );
+            if (stringValue) {
+                testLogger.info(`Found string field: ${fieldName} with value: ${stringValue}`);
+                return { fieldName, stringValue, record };
+            }
+        }
+    }
+
+    return null;
+}
+
 // ============================================================================
 // TEST SUITE
 // ============================================================================
@@ -442,27 +500,12 @@ test.describe("Autocomplete Value Suggestions", () => {
         await pm.logsPage.selectStream(streamName);
         await runQueryAndWaitForResults(page, pm);
 
-        // Find a string field and expand it
-        const fieldButtons = page.locator('[data-test*="log-search-expand-"][data-test$="-field-btn"]');
-        const firstButton = fieldButtons.first();
-        await firstButton.click();
-        await page.waitForTimeout(3000);
+        // Find a field with string values (not just numeric like 'code')
+        const result = await findFieldWithStringValues(page, orgName, streamName);
+        expect(result, 'Expected to find at least one field with string values').not.toBeNull();
 
-        const dataTest = await firstButton.getAttribute('data-test');
-        const fieldName = dataTest.replace('log-search-expand-', '').replace('-field-btn', '');
-
-        // Wait for values in IndexedDB - assert values were captured
-        const record = await waitForFieldInIndexedDB(page, orgName, 'logs', streamName, fieldName, 15000);
-        expect(record, 'Expected IndexedDB record to be created after field expansion').not.toBeNull();
-        expect(record.values.length, 'Expected captured values to be non-empty').toBeGreaterThan(0);
-
-        // Find a string value (not numeric, not boolean)
-        const stringValue = record.values.find(v =>
-            isNaN(Number(v)) && v !== 'true' && v !== 'false'
-        );
-        expect(stringValue, 'Expected at least one string value in captured field values').toBeDefined();
-
-        testLogger.info(`Testing quoting with string value: ${stringValue}`);
+        const { fieldName, stringValue, record } = result;
+        testLogger.info(`Testing quoting with field: ${fieldName}, value: ${stringValue}`);
 
         // Type query to trigger suggestions
         await setQueryEditorContent(page, `SELECT * FROM "${streamName}" WHERE ${fieldName} = `);
@@ -650,7 +693,9 @@ test.describe("Autocomplete Value Suggestions", () => {
         const records = await getIndexedDBRecords(page);
 
         // Check that excluded fields are not present
+        // These fields should NEVER be stored (they're explicitly excluded in the feature)
         const excludedFields = ['_timestamp', 'body', 'log', 'message', 'msg', '_id'];
+        const storedExcludedFields = [];
 
         for (const excludedField of excludedFields) {
             const hasExcluded = records.some(r =>
@@ -658,11 +703,17 @@ test.describe("Autocomplete Value Suggestions", () => {
             );
 
             if (hasExcluded) {
-                testLogger.warn(`Excluded field ${excludedField} was stored (may be expected in some cases)`);
+                storedExcludedFields.push(excludedField);
+                testLogger.warn(`Excluded field ${excludedField} was incorrectly stored`);
             } else {
-                testLogger.info(`Excluded field ${excludedField} correctly not stored`);
+                testLogger.info(`✅ Excluded field ${excludedField} correctly not stored`);
             }
         }
+
+        // Assert: none of the excluded fields should be stored
+        expect(storedExcludedFields.length,
+            `Excluded fields should not be stored: [${storedExcludedFields.join(', ')}]`
+        ).toBe(0);
 
         testLogger.info('Excluded fields test completed');
     });
@@ -1037,21 +1088,12 @@ test.describe("Autocomplete Value Suggestions - Quoting Behavior", () => {
         await pm.logsPage.selectStream(streamName);
         await runQueryAndWaitForResults(page, pm);
 
-        const fieldButtons = page.locator('[data-test*="log-search-expand-"][data-test$="-field-btn"]');
-        const firstButton = fieldButtons.first();
-        const dataTest = await firstButton.getAttribute('data-test');
-        const fieldName = dataTest.replace('log-search-expand-', '').replace('-field-btn', '');
+        // Find a field with string values (not just numeric like 'code')
+        const result = await findFieldWithStringValues(page, orgName, streamName);
+        expect(result, 'Expected to find at least one field with string values').not.toBeNull();
 
-        await firstButton.click();
-        await page.waitForTimeout(3000);
-
-        const record = await waitForFieldInIndexedDB(page, orgName, 'logs', streamName, fieldName, 15000);
-        expect(record, 'Expected IndexedDB record after field expansion').not.toBeNull();
-        expect(record.values.length, 'Expected captured values').toBeGreaterThan(0);
-
-        // Find a string value
-        const stringValue = record.values.find(v => isNaN(Number(v)) && v !== 'true' && v !== 'false');
-        expect(stringValue, 'Expected at least one string value for quote closing test').toBeDefined();
+        const { fieldName, stringValue } = result;
+        testLogger.info(`Testing quote closing with field: ${fieldName}, value: ${stringValue}`);
 
         // Type with opening quote already present
         await setQueryEditorContent(page, `SELECT * FROM "${streamName}" WHERE ${fieldName} = '`);
@@ -1205,26 +1247,25 @@ test.describe("Autocomplete Value Suggestions - Cold Start & TTL", () => {
         await page.waitForTimeout(500);
         await page.keyboard.press('Control+Space');
 
+        // Check if suggestions appear - if they do, verify expired values are NOT shown
+        let hasExpiredValue = false;
         try {
             await waitForSuggestionsWidget(page, 5000);
             const suggestions = await getSuggestionLabels(page);
 
             // Check if our stored values appear (they shouldn't since record is expired)
             const storedValues = record.values;
-            const hasExpiredValue = suggestions.some(s =>
+            hasExpiredValue = suggestions.some(s =>
                 storedValues.some(v => s.includes(v))
             );
-
-            if (!hasExpiredValue) {
-                testLogger.info('✅ Expired record values not shown in suggestions');
-            } else {
-                testLogger.warn('⚠️ Expired record values still appearing (cache may not be cleared)');
-            }
         } catch (error) {
             // No suggestions is acceptable for expired record
-            testLogger.info(`TTL expiry: No suggestions (expected): ${error.message}`);
+            testLogger.info(`TTL expiry: No suggestions appeared (expected for expired record)`);
         }
 
+        // Assert: expired values should NOT appear in suggestions
+        expect(hasExpiredValue, 'Expired record values should NOT appear in suggestions').toBe(false);
+        testLogger.info('✅ Expired record values not shown in suggestions');
         testLogger.info('TTL expiry test completed');
     });
 });
