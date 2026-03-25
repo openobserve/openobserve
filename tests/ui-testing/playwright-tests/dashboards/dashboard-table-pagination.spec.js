@@ -1070,7 +1070,7 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     testLogger.info('Verified pagination works for PromQL table chart');
 
     // Clean up - save panel first before navigating back
-    await pm.dashboardPanelActions.savePanel();
+    await pm.dashboardPanelActions.savePanelAndWaitForNavigation();
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
@@ -1163,7 +1163,7 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     if (!hasRows) {
       testLogger.warn('No table rows found - PromQL query may not have returned data, skipping pagination assertions');
       // Clean up and skip - pagination controls won't render without data
-      await pm.dashboardPanelActions.savePanel();
+      await pm.dashboardPanelActions.savePanelAndWaitForNavigation();
       await pm.dashboardCreate.backToDashboardList();
       await deleteDashboard(page, dashboardName);
       test.skip(true, 'PromQL query returned no data - cannot verify pagination controls');
@@ -1193,7 +1193,7 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     testLogger.info(`Verified PromQL table pagination: ${paginationText.trim()}`);
 
     // Clean up - save panel first before navigating back
-    await pm.dashboardPanelActions.savePanel();
+    await pm.dashboardPanelActions.savePanelAndWaitForNavigation();
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
