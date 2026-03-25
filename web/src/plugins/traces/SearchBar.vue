@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="search-bar-component" id="searchBarComponent">
+  <div class="search-bar-component tw:h-full" id="searchBarComponent">
     <div class="row tw:m-0! tw:p-[0.375rem]">
       <div class="float-right col flex items-center">
         <!-- Tab Toggle Buttons -->
@@ -230,9 +230,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-    <div v-if="activeTab === 'search' && searchObj.meta.showQuery" class="row">
+    <div
+      v-if="activeTab === 'search' && searchObj.meta.showQuery"
+      class="row tw:h-[calc(100%-3.2rem)]!"
+    >
       <div
-        class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mx-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden"
+        class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mx-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full!"
       >
         <code-query-editor
           ref="queryEditorRef"
@@ -881,10 +884,6 @@ export default defineComponent({
   }
   .fields_autocomplete {
     max-height: 250px;
-  }
-  .monaco-editor {
-    width: 100% !important;
-    height: 40px !important;
   }
 
   .search-button {

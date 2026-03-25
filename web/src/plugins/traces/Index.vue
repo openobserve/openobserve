@@ -16,220 +16,234 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="tracePage" id="tracePage" style="min-height: auto">
-    <div id="tracesSecondLevel">
-      <div
-        class="tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
-        :class="
-          activeTab === 'service-graph' ? 'tw:min-h-[45px]' : 'tw:min-h-[82px]'
-        "
+  <q-page
+    class="tracePage tw:h-[calc(100vh-2.25rem)] tw:min-h-[calc(100vh-2.25rem)]! tw:max-h-[calc(100vh-2.25rem)]! tw:overflow-hidden!"
+    id="tracePage"
+    style="min-height: auto"
+  >
+    <div id="tracesSecondLevel" class="full-height">
+      <q-splitter
+        class="traces-horizontal-splitter full-height"
+        v-model="splitterModel"
+        horizontal
+        @update:model-value="onSplitterUpdate"
       >
-        <!-- Search Bar with Tab Toggle - Always visible to show tabs -->
-        <search-bar
-          data-test="logs-search-bar"
-          ref="searchBarRef"
-          :fieldValues="fieldValues"
-          :isLoading="searchObj.loading"
-          :activeTab="activeTab"
-          class="card-container"
-          @searchdata="searchData"
-          @onChangeTimezone="refreshTimezone"
-          @update:activeTab="activeTab = $event"
-          @error-only-toggled="onErrorOnlyToggled"
-          @filters-reset="onFiltersReset"
-          @cancel-query="cancelSearch"
-          @update:searchMode="onSearchModeChange"
-        />
-      </div>
-
-      <!-- Service Graph Tab Content -->
-      <div
-        v-if="activeTab === 'service-graph' && config.isEnterprise == 'true'"
-        class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-[calc(100vh-90px)] tw:overflow-hidden"
-      >
-        <service-graph
-          class="tw:h-full"
-          @view-traces="handleServiceGraphViewTraces"
-        />
-      </div>
-
-      <!-- Search Tab Content -->
-      <div
-        v-if="activeTab === 'search'"
-        id="tracesThirdLevel"
-        class="traces-search-result-container relative-position"
-      >
-        <!-- Note: Splitter max-height to be dynamically calculated with JS -->
-        <q-splitter
-          v-model="searchObj.config.splitterModel"
-          :limits="searchObj.config.splitterLimit"
-          style="width: 100%"
-          @update:model-value="onSplitterUpdate"
-          class="tw:h-full"
-        >
-          <template #before>
-            <div class="tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
-              <index-list
-                v-show="searchObj.meta.showFields"
-                ref="indexListRef"
-                :field-list="searchObj.data.stream.selectedStreamFields"
-                :active-include-field-values="activeIncludeFilterValues"
-                :active-exclude-field-values="activeExcludeFilterValues"
-                data-test="traces-search-index-list"
-                class="card-container"
-                :key="searchObj.data.stream.streamLists"
-                @update:changeStream="onChangeStream"
-                @update:selectedFields="updateFieldVisibility"
-              />
-            </div>
-          </template>
-          <template #separator>
-            <q-btn
-              data-test="logs-search-field-list-collapse-btn"
-              :icon="
-                searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'
-              "
-              :title="
-                searchObj.meta.showFields
-                  ? t('traces.collapseFields')
-                  : t('traces.openFields')
-              "
-              :class="
-                searchObj.meta.showFields
-                  ? 'splitter-icon-collapse'
-                  : 'splitter-icon-expand'
-              "
-              color="primary"
-              size="sm"
-              dense
-              round
-              @click="collapseFieldList"
+        <template v-slot:before>
+          <div
+            class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
+          >
+            <!-- Search Bar with Tab Toggle - Always visible to show tabs -->
+            <search-bar
+              data-test="logs-search-bar"
+              ref="searchBarRef"
+              :fieldValues="fieldValues"
+              :isLoading="searchObj.loading"
+              :activeTab="activeTab"
+              class="card-container"
+              @searchdata="searchData"
+              @onChangeTimezone="refreshTimezone"
+              @update:activeTab="activeTab = $event"
+              @error-only-toggled="onErrorOnlyToggled"
+              @filters-reset="onFiltersReset"
+              @cancel-query="cancelSearch"
+              @update:searchMode="onSearchModeChange"
             />
-          </template>
-          <template #after>
-            <div class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-              <div
-                v-if="
-                  searchObj.data.errorMsg !== '' &&
-                  parseInt(searchObj.data.errorCode) !== 0 &&
-                  searchObj.loading == false
-                "
-                class="card-container tw:h-full"
-              >
-                <div class="text-center tw:pt-[2rem]">
-                  <!-- Actual error case -->
+          </div>
+        </template>
+        <template v-slot:after>
+          <!-- Service Graph Tab Content -->
+          <div
+            v-if="
+              activeTab === 'service-graph' && config.isEnterprise == 'true'
+            "
+            class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
+          >
+            <service-graph
+              class="tw:h-full"
+              @view-traces="handleServiceGraphViewTraces"
+            />
+          </div>
+
+          <!-- Search Tab Content -->
+          <div
+            v-if="activeTab === 'search'"
+            id="tracesThirdLevel"
+            class="traces-search-result-container relative-position tw:h-full"
+          >
+            <!-- Note: Splitter max-height to be dynamically calculated with JS -->
+            <q-splitter
+              v-model="searchObj.config.splitterModel"
+              :limits="searchObj.config.splitterLimit"
+              style="width: 100%"
+              @update:model-value="onSplitterUpdate"
+              class="tw:h-full"
+            >
+              <template #before>
+                <div class="tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
+                  <index-list
+                    v-show="searchObj.meta.showFields"
+                    ref="indexListRef"
+                    :field-list="searchObj.data.stream.selectedStreamFields"
+                    :active-include-field-values="activeIncludeFilterValues"
+                    :active-exclude-field-values="activeExcludeFilterValues"
+                    data-test="traces-search-index-list"
+                    class="card-container tw:h-full"
+                    :key="searchObj.data.stream.streamLists"
+                    @update:changeStream="onChangeStream"
+                    @update:selectedFields="updateFieldVisibility"
+                  />
+                </div>
+              </template>
+              <template #separator>
+                <q-btn
+                  data-test="logs-search-field-list-collapse-btn"
+                  :icon="
+                    searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'
+                  "
+                  :title="
+                    searchObj.meta.showFields
+                      ? t('traces.collapseFields')
+                      : t('traces.openFields')
+                  "
+                  :class="
+                    searchObj.meta.showFields
+                      ? 'splitter-icon-collapse'
+                      : 'splitter-icon-expand'
+                  "
+                  color="primary"
+                  size="sm"
+                  dense
+                  round
+                  @click="collapseFieldList"
+                />
+              </template>
+              <template #after>
+                <div class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
                   <div
-                    data-test="traces-search-error-message"
-                    class="tw:text-[1.3rem] q-pt-lg"
+                    v-if="
+                      searchObj.data.errorMsg !== '' &&
+                      parseInt(searchObj.data.errorCode) !== 0 &&
+                      searchObj.loading == false
+                    "
+                    class="card-container tw:h-full"
                   >
-                    {{ t("traces.errorRetrievingTraces") }}
-                    <q-btn
-                      v-if="
-                        searchObj.data.errorDetail || searchObj?.data?.errorMsg
-                      "
-                      @click="toggleErrorDetails"
-                      size="sm"
-                      class="o2-secondary-button q-ml-sm"
-                      data-test="traces-search-error-details-btn"
-                      >{{ t("search.histogramErrorBtnLabel") }}</q-btn
-                    >
-                  </div>
-                  <!-- Collapsible error detail — shown below results when toggled -->
-                  <div class="text-center">
-                    <div class="tw:my-none tw:text-[1rem]! tw:px-[2rem]!">
-                      <span v-if="disableMoreErrorDetails">
-                        <SanitizedHtmlRenderer
-                          data-test="traces-search-detail-error-message"
-                          :htmlContent="searchObj?.data?.errorMsg"
-                          class="tw:pt-[1rem]"
-                        />
-                        <div
-                          v-if="searchObj?.data?.errorDetail"
-                          class="error-display__message tw:pt-[1rem]! tw:text-[var(--o2-text-2)]!"
+                    <div class="text-center tw:pt-[2rem]">
+                      <!-- Actual error case -->
+                      <div
+                        data-test="traces-search-error-message"
+                        class="tw:text-[1.3rem] q-pt-lg"
+                      >
+                        {{ t("traces.errorRetrievingTraces") }}
+                        <q-btn
+                          v-if="
+                            searchObj.data.errorDetail ||
+                            searchObj?.data?.errorMsg
+                          "
+                          @click="toggleErrorDetails"
+                          size="sm"
+                          class="o2-secondary-button q-ml-sm"
+                          data-test="traces-search-error-details-btn"
+                          >{{ t("search.histogramErrorBtnLabel") }}</q-btn
                         >
-                          {{ searchObj.data.errorDetail }}
+                      </div>
+                      <!-- Collapsible error detail — shown below results when toggled -->
+                      <div class="text-center">
+                        <div class="tw:my-none tw:text-[1rem]! tw:px-[2rem]!">
+                          <span v-if="disableMoreErrorDetails">
+                            <SanitizedHtmlRenderer
+                              data-test="traces-search-detail-error-message"
+                              :htmlContent="searchObj?.data?.errorMsg"
+                              class="tw:pt-[1rem]"
+                            />
+                            <div
+                              v-if="searchObj?.data?.errorDetail"
+                              class="error-display__message tw:pt-[1rem]! tw:text-[var(--o2-text-2)]!"
+                            >
+                              {{ searchObj.data.errorDetail }}
+                            </div>
+                          </span>
                         </div>
-                      </span>
+                      </div>
+                      <!-- FTS not configured -->
+                      <div
+                        data-test="traces-search-error-20003"
+                        v-if="parseInt(searchObj.data.errorCode) == 20003"
+                      >
+                        <q-btn
+                          no-caps
+                          unelevated
+                          size="sm"
+                          bg-secondary
+                          class="no-border bg-secondary text-white"
+                          :to="
+                            '/streams?dialog=' +
+                            searchObj.data.stream.selectedStream.label
+                          "
+                          >Click here</q-btn
+                        >
+                        {{ t("traces.configureFullTextSearch") }}
+                      </div>
+                      <q-item-label>{{
+                        searchObj.data.additionalErrorMsg
+                      }}</q-item-label>
                     </div>
                   </div>
-                  <!-- FTS not configured -->
                   <div
-                    data-test="traces-search-error-20003"
-                    v-if="parseInt(searchObj.data.errorCode) == 20003"
+                    v-else-if="
+                      searchObj.data.errorMsg !== '' &&
+                      parseInt(searchObj.data.errorCode) == 0 &&
+                      !searchObj.loading
+                    "
+                    data-test="traces-search-result-not-found-text"
+                    class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
                   >
-                    <q-btn
-                      no-caps
-                      unelevated
-                      size="sm"
-                      bg-secondary
-                      class="no-border bg-secondary text-white"
-                      :to="
-                        '/streams?dialog=' +
-                        searchObj.data.stream.selectedStream.label
-                      "
-                      >Click here</q-btn
-                    >
-                    {{ t("traces.configureFullTextSearch") }}
+                    <q-icon name="info" color="primary" size="md" />
+                    {{ searchObj.data.errorMsg }}
                   </div>
-                  <q-item-label>{{
-                    searchObj.data.additionalErrorMsg
-                  }}</q-item-label>
+                  <div
+                    v-else-if="!isStreamSelected"
+                    class="card-container tw:h-full"
+                  >
+                    <div
+                      data-test="logs-search-no-stream-selected-text"
+                      class="text-center tw:mx-[10%] tw:py-[40px] tw:mt-0 tw:text-[20px]"
+                    >
+                      <q-icon name="info" color="primary" size="md" />
+                      {{ t("search.noStreamSelectedMessage") }}
+                    </div>
+                  </div>
+                  <div
+                    data-test="traces-search-result-not-found-text"
+                    v-else-if="
+                      isStreamSelected &&
+                      !searchObj.searchApplied &&
+                      !searchObj.data.queryResults?.hits?.length
+                    "
+                    class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
+                  >
+                    <q-icon name="info" color="primary" size="md" />
+                    {{ t("search.applySearch") }}
+                  </div>
+                  <div
+                    v-else
+                    data-test="logs-search-search-result"
+                    class="tw:h-full!"
+                  >
+                    <search-result
+                      ref="searchResultRef"
+                      @update:datetime="setHistogramDate"
+                      @update:scroll="getMoreData"
+                      @update:sort="runQueryOnSort"
+                      @shareLink="copyTracesUrl"
+                      @metrics:filters-updated="onMetricsFiltersUpdated"
+                    />
+                  </div>
                 </div>
-              </div>
-              <div
-                v-else-if="
-                  searchObj.data.errorMsg !== '' &&
-                  parseInt(searchObj.data.errorCode) == 0 &&
-                  !searchObj.loading
-                "
-                data-test="traces-search-result-not-found-text"
-                class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
-              >
-                <q-icon name="info" color="primary" size="md" />
-                {{ searchObj.data.errorMsg }}
-              </div>
-              <div
-                v-else-if="!isStreamSelected"
-                class="card-container tw:h-full"
-              >
-                <div
-                  data-test="logs-search-no-stream-selected-text"
-                  class="text-center tw:mx-[10%] tw:py-[40px] tw:mt-0 tw:text-[20px]"
-                >
-                  <q-icon name="info" color="primary" size="md" />
-                  {{ t("search.noStreamSelectedMessage") }}
-                </div>
-              </div>
-              <div
-                data-test="traces-search-result-not-found-text"
-                v-else-if="
-                  isStreamSelected &&
-                  !searchObj.searchApplied &&
-                  !searchObj.data.queryResults?.hits?.length
-                "
-                class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
-              >
-                <q-icon name="info" color="primary" size="md" />
-                {{ t("search.applySearch") }}
-              </div>
-              <div
-                v-else
-                data-test="logs-search-search-result"
-                class="tw:h-full!"
-              >
-                <search-result
-                  ref="searchResultRef"
-                  @update:datetime="setHistogramDate"
-                  @update:scroll="getMoreData"
-                  @update:sort="runQueryOnSort"
-                  @shareLink="copyTracesUrl"
-                  @metrics:filters-updated="onMetricsFiltersUpdated"
-                />
-              </div>
-            </div>
-          </template>
-        </q-splitter>
-      </div>
+              </template>
+            </q-splitter>
+          </div>
+        </template>
+      </q-splitter>
     </div>
   </q-page>
 </template>
@@ -309,6 +323,7 @@ const { fnParsedSQL } = logsUtils();
 let refreshIntervalID = 0;
 const searchResultRef = ref(null);
 const searchBarRef = ref(null);
+const splitterModel = ref(15);
 let parser: any;
 const fieldValues = ref({});
 const { showErrorNotification } = useNotifications();
@@ -1861,11 +1876,7 @@ watch(activeTab, (newTab) => {
 });
 </script>
 
-<style lang="scss" scoped>
-.traces-search-result-container {
-  height: calc(100vh - 144px) !important;
-}
-</style>
+<style lang="scss" scoped></style>
 <style lang="scss">
 .tracePage {
   .index-menu .field_list .field_overlay .field_label,
