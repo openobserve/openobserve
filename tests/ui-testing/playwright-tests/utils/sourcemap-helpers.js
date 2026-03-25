@@ -11,7 +11,7 @@ const { promisify } = require('util');
 const path = require('path');
 const execAsync = promisify(exec);
 
-const testLogger = require('../../utils/test-logger');
+const testLogger = require('./test-logger');
 
 /**
  * Build test app with updated RUM SDK configuration
