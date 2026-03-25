@@ -53,9 +53,9 @@ async function clearIndexedDB(page) {
  */
 async function getIndexedDBRecords(page) {
     return await page.evaluate(async () => {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             const req = indexedDB.open('o2FieldValues', 1);
-            req.onerror = () => resolve([]); // DB doesn't exist yet - graceful fallback
+            req.onerror = () => reject(req.error);
             req.onsuccess = (event) => {
                 const db = event.target.result;
                 if (!db.objectStoreNames.contains('fieldValues')) {
@@ -85,9 +85,9 @@ async function getIndexedDBRecords(page) {
 async function getFieldRecord(page, org, streamType, streamName, fieldName) {
     const key = `${org}|${streamType}|${streamName}|${fieldName}`;
     return await page.evaluate(async (searchKey) => {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             const req = indexedDB.open('o2FieldValues', 1);
-            req.onerror = () => resolve(null); // Graceful fallback for non-existent DB
+            req.onerror = () => reject(req.error);
             req.onsuccess = (event) => {
                 const db = event.target.result;
                 if (!db.objectStoreNames.contains('fieldValues')) {
