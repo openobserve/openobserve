@@ -27,6 +27,7 @@ import { rest } from "msw";
 import searchService from "@/services/search";
 import router from "@/test/unit/helpers/router";
 import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
+import { searchState } from "@/composables/useLogs/searchState";
 
 // Mock CSS.supports for test environment
 Object.defineProperty(global, 'CSS', {
@@ -211,6 +212,14 @@ vi.mock('@/composables/useLogs', async () => {
     clearSearchObj: vi.fn()
   }
 })
+
+vi.mock('@/composables/useLogs/usePatterns', () => ({
+  default: () => ({
+    extractPatterns: vi.fn().mockResolvedValue(undefined),
+    patternsState: { value: { patterns: null, loading: false, error: null, lastQuery: null } },
+  }),
+  patternsState: { value: { patterns: null, loading: false, error: null, lastQuery: null } },
+}))
 
 import config from "@/aws-exports";
 import segment from "@/services/segment_analytics";
@@ -1188,6 +1197,51 @@ describe("Logs Index", async () => {
       it("should have buildQueryPageRef defined", () => {
         expect(wrapper.vm.buildQueryPageRef).toBeDefined();
       });
+    });
+  });
+
+  describe("extractPatternsForCurrentQuery — resetSearchError on entry", () => {
+    it("should clear errorMsg before the patterns fetch proceeds", async () => {
+      searchState().searchObj.data.errorMsg = "Previous search error";
+      await wrapper.vm.extractPatternsForCurrentQuery();
+      await flushPromises();
+      expect(searchState().searchObj.data.errorMsg).toBe("");
+    });
+
+    it("should clear errorDetail before the patterns fetch proceeds", async () => {
+      searchState().searchObj.data.errorDetail = "Detailed error info";
+      await wrapper.vm.extractPatternsForCurrentQuery();
+      await flushPromises();
+      expect(searchState().searchObj.data.errorDetail).toBe("");
+    });
+
+    it("should clear countErrorMsg before the patterns fetch proceeds", async () => {
+      searchState().searchObj.data.countErrorMsg = "Count query failed";
+      await wrapper.vm.extractPatternsForCurrentQuery();
+      await flushPromises();
+      expect(searchState().searchObj.data.countErrorMsg).toBe("");
+    });
+
+    it("should clear errorCode before the patterns fetch proceeds", async () => {
+      searchState().searchObj.data.errorCode = 500;
+      await wrapper.vm.extractPatternsForCurrentQuery();
+      await flushPromises();
+      expect(searchState().searchObj.data.errorCode).toBe(0);
+    });
+
+    it("should clear all stale error fields in a single call", async () => {
+      searchState().searchObj.data.errorMsg = "Stale logs error";
+      searchState().searchObj.data.errorDetail = "Stale detail";
+      searchState().searchObj.data.countErrorMsg = "Stale count error";
+      searchState().searchObj.data.errorCode = 429;
+
+      await wrapper.vm.extractPatternsForCurrentQuery();
+      await flushPromises();
+
+      expect(searchState().searchObj.data.errorMsg).toBe("");
+      expect(searchState().searchObj.data.errorDetail).toBe("");
+      expect(searchState().searchObj.data.countErrorMsg).toBe("");
+      expect(searchState().searchObj.data.errorCode).toBe(0);
     });
   });
 });
