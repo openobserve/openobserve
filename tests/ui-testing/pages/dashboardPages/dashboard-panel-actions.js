@@ -32,8 +32,8 @@ export default class DashboardactionPage {
     await this.panelSaveBtn.waitFor({ state: "visible" });
     await this.panelSaveBtn.click();
 
-    // Wait for save to complete
-    // await this.page.waitForLoadState("networkidle");
+    // Wait for save to complete and navigation to dashboard view
+    await this.panelSaveBtn.waitFor({ state: "hidden", timeout: 30000 });
   }
 
   //Apply dashboard button
