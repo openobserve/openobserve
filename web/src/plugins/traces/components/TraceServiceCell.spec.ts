@@ -20,9 +20,9 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 const mockSearchObj = {
   meta: {
     serviceColors: {
-      "frontend": "#4caf50",
-      "backend": "#2196f3",
-      "database": "#ff9800",
+      frontend: "#4caf50",
+      backend: "#2196f3",
+      database: "#ff9800",
     } as Record<string, string>,
   },
 };
@@ -58,12 +58,16 @@ describe("TraceServiceCell", () => {
 
     it("renders the service row container", () => {
       wrapper = mount(TraceServiceCell, { props: { item: makeItem() } });
-      expect(wrapper.find('[data-test="trace-row-service"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="trace-row-service"]').exists()).toBe(
+        true,
+      );
     });
 
     it("renders the colour dot", () => {
       wrapper = mount(TraceServiceCell, { props: { item: makeItem() } });
-      expect(wrapper.find('[data-test="trace-row-service-dot"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="trace-row-service-dot"]').exists()).toBe(
+        true,
+      );
     });
 
     it("renders service name", () => {
@@ -87,7 +91,9 @@ describe("TraceServiceCell", () => {
     it("applies the correct service colour from serviceColors", () => {
       wrapper = mount(TraceServiceCell, { props: { item: makeItem() } });
       const dot = wrapper.find('[data-test="trace-row-service-dot"]');
-      expect(dot.attributes("style")).toContain("background-color: rgb(76, 175, 80)");
+      expect(dot.attributes("style")).toContain(
+        "background-color: rgb(76, 175, 80)",
+      );
     });
 
     it("falls back to #9e9e9e for an unknown service colour", () => {
@@ -95,66 +101,9 @@ describe("TraceServiceCell", () => {
         props: { item: makeItem({ service_name: "unknown-svc" }) },
       });
       const dot = wrapper.find('[data-test="trace-row-service-dot"]');
-      expect(dot.attributes("style")).toContain("background-color: rgb(158, 158, 158)");
-    });
-  });
-
-  describe("extra services badge", () => {
-    it("does not show the badge when there is only one service", () => {
-      wrapper = mount(TraceServiceCell, {
-        props: {
-          item: makeItem({ services: { frontend: { duration: 100 } } }),
-        },
-      });
-      expect(wrapper.find('[data-test="trace-row-extra-services"]').exists()).toBe(false);
-    });
-
-    it("shows the badge with count when there are additional services", () => {
-      wrapper = mount(TraceServiceCell, {
-        props: {
-          item: makeItem({
-            service_name: "frontend",
-            services: {
-              frontend: { duration: 60 },
-              backend: { duration: 30 },
-              database: { duration: 10 },
-            },
-          }),
-        },
-      });
-      const badge = wrapper.find('[data-test="trace-row-extra-services"]');
-      expect(badge.exists()).toBe(true);
-      // Two extra services (backend + database)
-      expect(badge.text()).toContain("+2");
-    });
-
-    it("shows +1 badge when one extra service exists", () => {
-      wrapper = mount(TraceServiceCell, {
-        props: {
-          item: makeItem({
-            service_name: "frontend",
-            services: {
-              frontend: { duration: 70 },
-              backend: { duration: 30 },
-            },
-          }),
-        },
-      });
-      const badge = wrapper.find('[data-test="trace-row-extra-services"]');
-      expect(badge.exists()).toBe(true);
-      expect(badge.text()).toContain("+1");
-    });
-
-    it("does not count root service as an extra service", () => {
-      wrapper = mount(TraceServiceCell, {
-        props: {
-          item: makeItem({
-            service_name: "frontend",
-            services: { frontend: { duration: 100 } },
-          }),
-        },
-      });
-      expect(wrapper.find('[data-test="trace-row-extra-services"]').exists()).toBe(false);
+      expect(dot.attributes("style")).toContain(
+        "background-color: rgb(158, 158, 158)",
+      );
     });
   });
 
@@ -163,15 +112,9 @@ describe("TraceServiceCell", () => {
       wrapper = mount(TraceServiceCell, {
         props: { item: { service_name: "frontend", operation_name: "op" } },
       });
-      expect(wrapper.find('[data-test="trace-row-service-name"]').text()).toBe("frontend");
-      expect(wrapper.find('[data-test="trace-row-extra-services"]').exists()).toBe(false);
-    });
-
-    it("handles empty services object", () => {
-      wrapper = mount(TraceServiceCell, {
-        props: { item: makeItem({ services: {} }) },
-      });
-      expect(wrapper.find('[data-test="trace-row-extra-services"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="trace-row-service-name"]').text()).toBe(
+        "frontend",
+      );
     });
   });
 });

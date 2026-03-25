@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="traces-search-result-list tw:h-full tw:flex tw:flex-col">
+  <div
+    class="traces-search-result-list tw:h-full tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)]"
+  >
     <!-- ════════════════════ Empty State ════════════════════ -->
     <div
       v-if="noResults"
@@ -36,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="showHeader"
         data-test="traces-section-header"
-        class="row items-center q-px-sm q-py-xs tw:shrink-0 tw:min-h-[2.5rem] tw:border-t tw:border-[rgba(0,0,0,0.07)] tw:bg-[var(--o2-section-header-bg)]!"
+        class="row items-center q-px-sm q-py-xs tw:shrink-0 tw:min-h-[2.5rem] tw:border-t tw:border-[rgba(0,0,0,0.07)]"
       >
         <span
           data-test="traces-section-title"
@@ -52,27 +54,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-count-badge"
           rounded
           :label="`${formatLargeNumber(props.total != null ? props.total : hits.length)} ${props.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}`"
-          class="text-caption tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-2)]! tw:mr-[0.85rem]"
+          class="text-caption tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-2)]! tw:mr-[0.85rem]"
         />
-        <div
+        <q-badge
           v-if="props.errorCount != null && props.errorCount > 0"
           data-test="traces-error-count-badge"
-          class="tw:rounded-xl tw:py-[0.25rem] tw:px-[0.625rem] tw:inline-flex tw:items-center tw:w-fit tw:mr-[0.85rem]"
-          style="
-            background: rgba(244, 67, 54, 0.12);
-            color: var(--q-negative, #c62828);
-          "
-        >
-          <span class="tw:text-[0.75rem] tw:tracking-[0.03em] tw:font-bold">
-            {{ formatLargeNumber(props.errorCount!) }}
-            {{
-              props.searchMode === "spans"
-                ? t("traces.errorSpans")
-                : t("traces.errorTraces")
-            }}
-          </span>
-        </div>
-
+          rounded
+          :label="`${formatLargeNumber(props.errorCount)} ${props.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}`"
+          class="text-caption tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-field-type-boolean-bg)]! tw:mr-[0.85rem]"
+        />
         <q-space />
 
         <!-- Pagination -->
@@ -80,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-select
             :model-value="rowsPerPage"
             :options="rowsPerPageOptions"
-            class="select-pagination tw:mr-[0.25rem]"
+            class="select-pagination tw:mr-[0.25rem] tw:mt-0!"
             size="sm"
             dense
             borderless
@@ -100,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon-last="skip_next"
             icon-prev="fast_rewind"
             icon-next="fast_forward"
-            class="float-right paginator-section"
+            class="float-right paginator-section tw:mt-0!"
             data-test="traces-search-result-pagination"
             @update:model-value="emit('page-change', $event)"
           />
@@ -112,16 +102,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="traces-search-result-list"
         class="tw:w-full tw:flex-1 tw:overflow-y-auto tw:overflow-x-auto tw:relative"
       >
-        <TracesTable
-          :columns="tracesColumns"
+        <TenstackTable
+          :columns="searchObj.data.resultGrid.columns"
           :rows="hits"
           :loading="loading"
           :row-class="traceRowClass"
           :sort-by="props.sortBy"
           :sort-order="props.sortOrder"
-          @row-click="(row: any) => emit('row-click', row)"
+          :sort-field-map="{ timestamp: 'start_time', duration: 'duration' }"
+          :row-height="28"
+          :enable-column-reorder="true"
+          :enable-row-expand="false"
+          :enable-text-highlight="false"
+          :enable-status-bar="false"
+          :default-columns="false"
+          @click:data-row="(row: any) => emit('row-click', row)"
           @sort-change="(by, order) => emit('sort-change', by, order)"
+          @update:columnOrder="onColumnReorder"
+          @closeColumn="onCloseColumn"
         >
+          <template #cell-actions="{ row, column, active }">
+            <CellActions
+              v-if="active && !column.columnDef.meta.disableCellAction"
+              :column="column"
+              :row="row"
+              :selected-stream-fields="
+                searchObj.data.stream.selectedStreamFields
+              "
+              :hide-search-term-actions="false"
+              :hide-ai="true"
+              @copy="copyToClipboard"
+              @add-search-term="addSearchTerm"
+              @send-to-ai-chat="sendToAiChat"
+            />
+          </template>
+
           <!-- Loading banner: shown above rows while a new page is fetching -->
           <template #loading-banner>
             <div
@@ -158,11 +173,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
-          <template #cell-timestamp="{ item }">
+          <template
+            #[`cell-${store.state.zoConfig.timestamp_column}`]="{ item }"
+          >
             <TraceTimestampCell :item="item" :search-mode="props.searchMode" />
           </template>
 
-          <template #cell-service="{ item }">
+          <template #cell-service_name="{ item }">
             <TraceServiceCell :item="item" />
           </template>
 
@@ -185,11 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-spans="{ item }">
-            <q-badge
-              data-test="trace-row-spans-badge"
-              :label="item.spans"
-              class="tw:bg-[var(--o2-tag-grey-2)]! tw:text-[var(--o2-text-1)]! tw:px-[0.5rem]! tw:py-[0.325rem]!"
-            />
+            {{ item.spans }}
           </template>
 
           <template #cell-method="{ item }">
@@ -243,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #empty />
-        </TracesTable>
+        </TenstackTable>
       </div>
     </div>
   </div>
@@ -252,8 +265,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import TracesTable from "@/components/traces/TracesTable.vue";
-import { useTracesTableColumns } from "../composables/useTracesTableColumns";
+import { copyToClipboard as qCopyToClipboard } from "quasar";
+import TenstackTable from "@/components/TenstackTable.vue";
+import CellActions from "@/plugins/logs/data-table/CellActions.vue";
+import useTraces from "@/composables/useTraces";
 import TraceTimestampCell from "./TraceTimestampCell.vue";
 import TraceServiceCell from "./TraceServiceCell.vue";
 import TraceLatencyCell from "./TraceLatencyCell.vue";
@@ -270,6 +285,7 @@ import {
   formatTimeWithSuffix,
   formatLargeNumber,
 } from "../../../utils/zincutils";
+import { useStore } from "vuex";
 
 interface Props {
   hits: any[];
@@ -297,6 +313,7 @@ interface Props {
 }
 
 const { t } = useI18n();
+const store = useStore();
 
 const props = withDefaults(defineProps<Props>(), {
   searchPerformed: true,
@@ -316,17 +333,78 @@ const emit = defineEmits<{
   "page-change": [page: number];
   "rows-per-page-change": [rowsPerPage: number];
   "sort-change": [sortBy: string, sortOrder: "asc" | "desc"];
+  copy: [value: any];
+  "send-to-ai-chat": [value: string];
 }>();
+
+const copyToClipboard = (value: any) => qCopyToClipboard(String(value));
+
+const addSearchTerm = (
+  field: string,
+  fieldValue: string | number | boolean,
+  action: string,
+) => {
+  const operator = action === "include" ? "=" : "!=";
+  if (fieldValue === null || fieldValue === "" || fieldValue === "null") {
+    const isOp = action === "include" ? "is" : "is not";
+    searchObj.data.stream.addToFilter = `${field} ${isOp} null`;
+  } else {
+    searchObj.data.stream.addToFilter = `${field} ${operator} '${String(fieldValue).replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+  }
+};
+
+const sendToAiChat = (value: string) => emit("send-to-ai-chat", value);
 
 const rowsPerPageOptions = [10, 25, 50, 100];
 
-const hasLlmTraces = computed(() =>
-  props.hits.some((hit: any) => isLLMTrace(hit)),
-);
+const { searchObj, updatedLocalLogFilterField } = useTraces();
 
-const searchModeRef = computed(() => props.searchMode ?? "traces");
+// const rebuildColumns = () => {
+//   buildColumns(
+//     hasLlmTraces.value,
+//     props.searchMode ?? "traces",
+//     searchObj.data.stream.selectedFields,
+//   );
+// };
 
-const tracesColumns = useTracesTableColumns(hasLlmTraces, searchModeRef);
+// // Rebuild columns whenever any of the inputs change.
+// watch(
+//   [
+//     hasLlmTraces,
+//     () => props.searchMode,
+//     () => searchObj.data.stream.selectedFields,
+//   ],
+//   rebuildColumns,
+//   { immediate: true, deep: false },
+// );
+
+/**
+ * Fired by TenstackTable when the user drags columns to a new order.
+ * LLM columns are injected dynamically by the composable and are not stored
+ * in selectedFields, so we strip them before persisting.
+ */
+const onColumnReorder = (newOrder: string[]) => {
+  const mode = props.searchMode ?? "traces";
+  searchObj.data.stream.selectedFields = newOrder.filter(
+    (id) => id !== store.state.zoConfig.timestamp_column,
+  );
+  updatedLocalLogFilterField(mode);
+};
+
+const onCloseColumn = (columnDef: any) => {
+  const mode = props.searchMode ?? "traces";
+  const fieldIdx = searchObj.data.stream.selectedFields.indexOf(columnDef.id);
+  if (fieldIdx !== -1) {
+    searchObj.data.stream.selectedFields.splice(fieldIdx, 1);
+    updatedLocalLogFilterField(mode);
+  }
+  const colIdx = searchObj.data.resultGrid.columns.findIndex(
+    (c: any) => c.id === columnDef.id,
+  );
+  searchObj.data.resultGrid.columns = searchObj.data.resultGrid.columns.filter(
+    (c) => c.id !== columnDef.id,
+  );
+};
 
 const traceRowClass = (row: any) => {
   if (props.searchMode === "spans") {

@@ -535,7 +535,7 @@ body {
     // background: var(--o2-table-header-bg);
     // opacity: 0.9;
     tr {
-      background: var(--o2-table-header-bg) !important;
+      background: var(--o2-section-header-bg) !important;
     }
 }
 
@@ -2152,4 +2152,8 @@ body {
 
 .q-toggle__inner {
   padding: 0.325em 0em 0.325em 0;
+}
+
+.height-stretch{
+  height: stretch;
 }
