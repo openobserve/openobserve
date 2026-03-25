@@ -116,64 +116,58 @@ async function tryExpandField(page, pm) {
         }
     }
 
-    // Strategy 2: Try generic field buttons with log-search pattern (shared UI)
-    const fieldButtons = page.locator('[data-test*="log-search-expand-"][data-test$="-field-btn"]');
-    const buttonCount = await fieldButtons.count();
-    testLogger.info(`Found ${buttonCount} field buttons with log-search pattern`);
+    // Strategy 2: Click on field rows in the traces field list
+    // Traces uses q-expansion-item - clicking the row expands it and triggers openFilterCreator → fetchFieldValues
+    // The field rows contain an expand_more icon and field name
+    const indexList = page.locator('[data-test="traces-search-index-list"]');
+    if (await indexList.isVisible({ timeout: 3000 }).catch(() => false)) {
+        // Look for field expansion items - they have the expand_more icon
+        const fieldRows = indexList.locator('.field-expansion-item, .q-expansion-item');
+        const rowCount = await fieldRows.count();
+        testLogger.info(`Found ${rowCount} field expansion items in traces index list`);
 
-    if (buttonCount > 0) {
-        for (let i = 0; i < Math.min(buttonCount, 5); i++) {
-            const button = fieldButtons.nth(i);
-            if (await button.isVisible({ timeout: 2000 }).catch(() => false)) {
-                const dataTest = await button.getAttribute('data-test');
-                const fieldName = dataTest.replace('log-search-expand-', '').replace('-field-btn', '');
+        if (rowCount > 0) {
+            // Try first few fields (skip internal fields like _timestamp)
+            for (let i = 0; i < Math.min(rowCount, 10); i++) {
+                const row = fieldRows.nth(i);
+                const rowText = await row.textContent().catch(() => '');
 
+                // Skip system fields
+                if (rowText.includes('_timestamp') || rowText.includes('_id')) {
+                    continue;
+                }
+
+                // Extract field name from the row
+                const fieldName = rowText.trim().split(/\s+/)[0] || `field_${i}`;
+                testLogger.info(`Attempting to expand field: ${fieldName}`);
+
+                // Start listening for values API before clicking
                 const valuesResponsePromise = page.waitForResponse(
                     response => response.url().includes(`/api/${orgName}/`) && response.url().includes('_values'),
-                    { timeout: 10000 }
+                    { timeout: 15000 }
                 ).catch(() => null);
 
-                await button.click();
-                testLogger.info(`Expanded field via data-test selector: ${fieldName}`);
+                // Click on the row to expand it
+                await row.click();
+                testLogger.info(`Clicked on field row: ${fieldName}`);
 
                 const response = await valuesResponsePromise;
                 if (response) {
                     testLogger.info(`Values API responded for field: ${fieldName}`);
                     await page.waitForTimeout(2000);
+                    return { fieldName, success: true };
                 } else {
-                    await page.waitForTimeout(3000);
+                    testLogger.info(`No values API response for field: ${fieldName}, trying next field`);
+                    // Click again to collapse and try another field
+                    await row.click().catch(() => {});
+                    await page.waitForTimeout(500);
                 }
-
-                return { fieldName, success: true };
             }
         }
     }
 
-    // Strategy 3: Try any button with "Expand" in aria-label in the index list
-    const indexList = page.locator('[data-test="traces-search-index-list"]');
-    if (await indexList.isVisible({ timeout: 2000 }).catch(() => false)) {
-        const expandButtons = indexList.getByRole('button', { name: /expand/i });
-        if (await expandButtons.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-            const valuesResponsePromise = page.waitForResponse(
-                response => response.url().includes(`/api/${orgName}/`) && response.url().includes('_values'),
-                { timeout: 10000 }
-            ).catch(() => null);
-
-            await expandButtons.first().click();
-            testLogger.info('Expanded field via generic expand button in index list');
-
-            const response = await valuesResponsePromise;
-            if (response) {
-                testLogger.info('Values API responded');
-                await page.waitForTimeout(2000);
-            } else {
-                await page.waitForTimeout(3000);
-            }
-
-            return { fieldName: 'unknown', success: true };
-        }
-    }
-
+    // Strategy 3: Fallback - try clicking directly on field names
+    testLogger.info('Strategies 1-2 failed, no field could be expanded with values API response');
     return { fieldName: null, success: false };
 }
 
