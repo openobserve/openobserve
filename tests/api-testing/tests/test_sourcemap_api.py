@@ -490,19 +490,6 @@ def test_p2_deleted_sourcemaps_return_graceful_null(create_session, base_url, or
     logger.info("✅ Deleted sourcemaps: Graceful null returned, re-uploaded for other tests")
 
 
-def test_p2_partial_sourcemaps_mixed_resolution(create_session, base_url, org_id):
-    """
-    P2 - EDGE CASE TEST
-    Upload only main.map, verify mixed resolution (main resolved, lazy-module null).
-    """
-    session = create_session
-    url = base_url
-
-    # This test would require creating a partial ZIP
-    # For now, we'll skip implementation and document expected behavior
-    pytest.skip("Partial sourcemaps test requires custom ZIP creation - deferred")
-
-
 def test_p2_source_context_validation(create_session, base_url, org_id):
     """
     P2 - FUNCTIONAL TEST
