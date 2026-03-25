@@ -21,16 +21,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test="`pattern-card-${index}`"
   >
     <!-- Pattern Column -->
-    <div class="tw-flex-1 tw-min-w-0 tw-px-2">
+    <div class="tw:flex-1 tw:min-w-0 tw:px-2">
       <!-- Template rendered as tokenized chips so wildcards are visually distinct -->
       <div
-        class="pattern-template-text tw-flex tw-flex-wrap tw-items-baseline tw-gap-x-[2px] tw-gap-y-[1px]"
+        class="pattern-template-text tw:flex tw:flex-wrap tw:items-baseline tw:gap-x-[2px] tw:gap-y-[1px]"
         :class="[store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8', wrap ? 'tw:break-all' : 'tw:truncate']"
         :data-test="`pattern-card-${index}-template`"
         :title="pattern.template"
       >
         <template v-for="(tok, i) in templateTokens" :key="i">
-          <span v-if="tok.kind === 'text'" class="tw-whitespace-pre">{{ tok.value }}</span>
+          <span v-if="tok.kind === 'text'" class="tw:whitespace-pre">{{ tok.value }}</span>
           <q-chip
             v-else
             dense
@@ -46,12 +46,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :delay="300"
               class="wildcard-tooltip"
             >
-              <div class="tw-font-mono tw-text-xs">
-                <div class="tw-font-semibold tw-mb-1">{{ t("search.wildcardSampleValues") }}</div>
+              <div class="tw:font-mono tw:text-xs">
+                <div class="tw:font-semibold tw:mb-1">{{ t("search.wildcardSampleValues") }}</div>
                 <div
                   v-for="(val, vi) in tok.sampleValues.slice(0, 10)"
                   :key="vi"
-                  class="tw-truncate tw-max-w-[20rem]"
+                  class="tw:truncate tw:max-w-[20rem]"
                 >
                   {{ val }}
                 </div>
@@ -64,12 +64,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Anomaly badge with explanation tooltip -->
       <span
         v-if="pattern.is_anomaly"
-        class="text-negative text-weight-bold tw-text-[0.625rem] tw-cursor-help"
+        class="text-negative text-weight-bold tw:text-[0.625rem] tw:cursor-help"
         :data-test="`pattern-card-${index}-anomaly-badge`"
       >
         ⚠️ {{ t("search.anomalyLabel") }}
         <q-tooltip anchor="bottom middle" self="top middle" class="anomaly-tooltip">
-          <div class="tw-text-xs tw-max-w-[22rem]">{{ anomalyExplanationText }}</div>
+          <div class="tw:text-xs tw:max-w-[22rem]">{{ anomalyExplanationText }}</div>
         </q-tooltip>
       </span>
     </div>
