@@ -622,7 +622,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/dashboards/bulk", delete(dashboards::delete_dashboard_bulk))
         .route("/{org_id}/folders/dashboards/{dashboard_id}", put(dashboards::move_dashboard))
         .route("/{org_id}/dashboards/move", patch(dashboards::move_dashboards))
-        .route("/{org_id}/dashboards/{dashboard_id}/panels", patch(dashboards::add_panel))
+        .route("/{org_id}/dashboards/{dashboard_id}/panels", post(dashboards::add_panel))
         .route("/{org_id}/dashboards/{dashboard_id}/panels/{panel_id}", put(dashboards::update_panel).delete(dashboards::delete_panel))
 
         // Reports

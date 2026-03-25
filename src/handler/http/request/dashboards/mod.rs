@@ -28,15 +28,9 @@ use crate::{
     handler::http::{
         extractors::Headers,
         models::dashboards::{
-            DashboardRequestBody,
-            DashboardResponseBody,
-            DeletePanelResponseBody,
-            ListDashboardsQuery,
-            ListDashboardsResponseBody,
-            MoveDashboardRequestBody,
-            MoveDashboardsRequestBody,
-            PanelRequestBody,
-            PanelResponseBody,
+            DashboardRequestBody, DashboardResponseBody, DeletePanelResponseBody,
+            ListDashboardsQuery, ListDashboardsResponseBody, MoveDashboardRequestBody,
+            MoveDashboardsRequestBody, PanelRequestBody, PanelResponseBody,
         },
         request::{BulkDeleteRequest, BulkDeleteResponse},
     },
@@ -81,20 +75,18 @@ impl From<DashboardError> for Response {
             DashboardError::ListPermittedDashboardsError(err) => MetaHttpResponse::forbidden(err),
             DashboardError::UserNotFound => MetaHttpResponse::unauthorized("User not found"),
             DashboardError::PermissionDenied => MetaHttpResponse::forbidden("Permission denied"),
-            DashboardError::PanelUnsupportedVersion => {
-                MetaHttpResponse::bad_request("Panel operations are only supported for v8 dashboards")
-            }
+            DashboardError::PanelUnsupportedVersion => MetaHttpResponse::bad_request(
+                "Panel operations are only supported for v8 dashboards",
+            ),
             DashboardError::TabNotFound(tab_id) => {
                 MetaHttpResponse::not_found(format!("Tab not found: {tab_id}"))
             }
             DashboardError::PanelNotFound(panel_id) => {
                 MetaHttpResponse::not_found(format!("Panel not found: {panel_id}"))
             }
-            DashboardError::PanelAlreadyExists(panel_id, tab_id) => {
-                MetaHttpResponse::conflict(format!(
-                    "Panel with id {panel_id} already exists in tab {tab_id}"
-                ))
-            }
+            DashboardError::PanelAlreadyExists(panel_id, tab_id) => MetaHttpResponse::conflict(
+                format!("Panel with id {panel_id} already exists in tab {tab_id}"),
+            ),
         }
     }
 }
@@ -512,7 +504,7 @@ pub async fn move_dashboards(
 
 /// AddPanel
 #[utoipa::path(
-    patch,
+    post,
     path = "/{org_id}/dashboards/{dashboard_id}/panels",
     context_path = "/api",
     tag = "Dashboards",
@@ -690,12 +682,10 @@ pub async fn delete_panel(
     )
     .await
     {
-        Ok((new_hash, deleted_panel_id)) => {
-            MetaHttpResponse::json(DeletePanelResponseBody {
-                hash: new_hash,
-                panel_id: deleted_panel_id,
-            })
-        }
+        Ok((new_hash, deleted_panel_id)) => MetaHttpResponse::json(DeletePanelResponseBody {
+            hash: new_hash,
+            panel_id: deleted_panel_id,
+        }),
         Err(err) => err.into(),
     }
 }

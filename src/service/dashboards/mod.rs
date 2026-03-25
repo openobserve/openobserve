@@ -662,9 +662,8 @@ fn compute_panel_layout(
             max_y = panel.layout.y;
             last_panel = Some(panel);
         } else if panel.layout.y == max_y
-            && last_panel.is_some_and(|lp| {
-                panel.layout.x + panel.layout.w > lp.layout.x + lp.layout.w
-            })
+            && last_panel
+                .is_some_and(|lp| panel.layout.x + panel.layout.w > lp.layout.x + lp.layout.w)
         {
             last_panel = Some(panel);
         }
@@ -716,7 +715,10 @@ pub async fn add_panel_to_dashboard(
     mut panel: v8::Panel,
 ) -> Result<(v8::Panel, String, String), DashboardError> {
     let (_folder, mut dashboard) = get_folder_and_dashboard(org_id, dashboard_id).await?;
-    let v8_dash = dashboard.v8.as_mut().ok_or(DashboardError::PanelUnsupportedVersion)?;
+    let v8_dash = dashboard
+        .v8
+        .as_mut()
+        .ok_or(DashboardError::PanelUnsupportedVersion)?;
 
     // Resolve tab
     let tab = if let Some(tid) = tab_id {
@@ -796,7 +798,10 @@ pub async fn update_panel_in_dashboard(
     mut panel: v8::Panel,
 ) -> Result<(v8::Panel, String, String), DashboardError> {
     let (_folder, mut dashboard) = get_folder_and_dashboard(org_id, dashboard_id).await?;
-    let v8_dash = dashboard.v8.as_mut().ok_or(DashboardError::PanelUnsupportedVersion)?;
+    let v8_dash = dashboard
+        .v8
+        .as_mut()
+        .ok_or(DashboardError::PanelUnsupportedVersion)?;
 
     // Resolve tab
     let tab = if let Some(tid) = tab_id {
@@ -864,7 +869,10 @@ pub async fn delete_panel_from_dashboard(
     tab_id: Option<&str>,
 ) -> Result<(String, String), DashboardError> {
     let (_folder, mut dashboard) = get_folder_and_dashboard(org_id, dashboard_id).await?;
-    let v8_dash = dashboard.v8.as_mut().ok_or(DashboardError::PanelUnsupportedVersion)?;
+    let v8_dash = dashboard
+        .v8
+        .as_mut()
+        .ok_or(DashboardError::PanelUnsupportedVersion)?;
 
     let mut found = false;
 

@@ -1594,9 +1594,7 @@ export default defineComponent({
     const { on: onDashboardEvent, off: offDashboardEvent } = useAiDashboardEvents();
     const handleAiDashboardEvent = async (event: AiDashboardEvent) => {
       const currentDashboardId = route.query.dashboard as string;
-      const shouldReload = event.dashboardId
-        ? event.dashboardId === currentDashboardId
-        : true; // No ID in event — reload defensively
+      const shouldReload = event.dashboardId === currentDashboardId;
 
       if (shouldReload && currentDashboardId) {
         // Clear cached dashboard data so getDashboard() fetches fresh from API
