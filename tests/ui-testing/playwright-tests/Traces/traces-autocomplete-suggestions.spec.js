@@ -212,16 +212,14 @@ test.describe("Traces Autocomplete Value Suggestions", () => {
 
         testLogger.info(`Found ${traceRecords.length} traces records in IndexedDB`);
 
+        // Assert we captured trace records - no silent passing
+        expect.soft(traceRecords.length, 'Expected traces records to be captured in IndexedDB after field expansion').toBeGreaterThan(0);
+
         if (traceRecords.length > 0) {
             testLogger.info('Sample traces records:');
             traceRecords.slice(0, 3).forEach(r => {
                 testLogger.info(`  - ${r.key}: ${r.values?.length || 0} values`);
             });
-            // Assert we have captured values
-            expect(traceRecords.length).toBeGreaterThan(0);
-        } else {
-            // Feature may not be enabled for traces yet
-            testLogger.info('No traces records captured - feature may not be enabled for traces');
         }
 
         testLogger.info('Traces field expansion capture test completed');

@@ -613,31 +613,25 @@ test.describe("Autocomplete Value Suggestions", () => {
 
         // Now select a different stream (if available)
         const secondStream = 'default';
-        try {
-            await pm.logsPage.selectStream(secondStream, 3, 5000); // Shorter timeout
-            await runQueryAndWaitForResults(page, pm);
+        await pm.logsPage.selectStream(secondStream, 3, 5000); // Shorter timeout
+        await runQueryAndWaitForResults(page, pm);
 
-            // Check that the first stream's record is still separate
-            const record1After = await getFieldRecord(page, orgName, 'logs', streamName, fieldName);
-            expect(record1After).not.toBeNull();
+        // Check that the first stream's record is still separate
+        const record1After = await getFieldRecord(page, orgName, 'logs', streamName, fieldName);
+        expect(record1After, 'First stream record should persist after switching streams').not.toBeNull();
 
-            // Check for second stream's record (may or may not exist)
-            const record2 = await getFieldRecord(page, orgName, 'logs', secondStream, fieldName);
+        // Check for second stream's record (may or may not exist)
+        const record2 = await getFieldRecord(page, orgName, 'logs', secondStream, fieldName);
 
-            // If both exist, they should have different keys
-            if (record2) {
-                expect(record1After.key).not.toBe(record2.key);
-                testLogger.info(`Stream isolation verified: ${record1After.key} !== ${record2.key}`);
-            } else {
-                testLogger.info('Second stream has no values for this field (expected if field not present)');
-            }
-
-            testLogger.info('Stream isolation test PASSED');
-        } catch (error) {
-            // If second stream test fails, single stream isolation is still verified
-            testLogger.info(`Could not test with second stream: ${error.message}`);
-            // The first stream test passed if we got here, so verification is partial
+        // If both exist, they should have different keys
+        if (record2) {
+            expect(record1After.key, 'Stream records should have different keys').not.toBe(record2.key);
+            testLogger.info(`Stream isolation verified: ${record1After.key} !== ${record2.key}`);
+        } else {
+            testLogger.info('Second stream has no values for this field (expected if field not present)');
         }
+
+        testLogger.info('Stream isolation test PASSED');
     });
 
     // =========================================================================
@@ -1162,27 +1156,24 @@ test.describe("Autocomplete Value Suggestions - Cold Start & TTL", () => {
         await page.waitForTimeout(500);
         await page.keyboard.press('Control+Space');
 
-        try {
-            await waitForSuggestionsWidget(page, 10000);
-            const suggestions = await getSuggestionLabels(page);
+        // Wait for suggestions widget - cold start should still show SQL keywords/field names
+        await waitForSuggestionsWidget(page, 10000);
+        const suggestions = await getSuggestionLabels(page);
 
-            testLogger.info(`Cold start suggestions: ${suggestions.slice(0, 10).join(', ')}`);
+        testLogger.info(`Cold start suggestions: ${suggestions.slice(0, 10).join(', ')}`);
 
-            // Should show field names and/or SQL keywords (AND, OR, NOT, etc.)
-            // NOT value suggestions since we haven't captured any
-            const hasKeywords = suggestions.some(s =>
-                ['AND', 'OR', 'NOT', 'IN', 'LIKE', 'BETWEEN', 'IS'].some(kw =>
-                    s.toUpperCase().includes(kw)
-                )
-            );
+        // Assert suggestions appeared - cold start should show field names and/or SQL keywords
+        expect(suggestions.length, 'Cold start should show keyword/field suggestions').toBeGreaterThan(0);
 
-            if (hasKeywords || suggestions.length > 0) {
-                testLogger.info('✅ Cold start shows keywords/field suggestions');
-            }
-        } catch (error) {
-            // No suggestions on cold start is also acceptable
-            testLogger.info(`Cold start: No suggestions appeared (acceptable): ${error.message}`);
-        }
+        // Verify these are keywords/fields, NOT value suggestions (since we cleared IndexedDB)
+        const hasKeywords = suggestions.some(s =>
+            ['AND', 'OR', 'NOT', 'IN', 'LIKE', 'BETWEEN', 'IS'].some(kw =>
+                s.toUpperCase().includes(kw)
+            )
+        );
+
+        testLogger.info(`Cold start has SQL keywords: ${hasKeywords}`);
+        testLogger.info('Cold start test completed with suggestions');
 
         testLogger.info('Cold start test completed');
     });
