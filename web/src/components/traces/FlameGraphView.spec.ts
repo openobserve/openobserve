@@ -14,29 +14,19 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount, flushPromises, config } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import FlameGraphView from "@/components/traces/FlameGraphView.vue";
-import * as echarts from "echarts";
 
 installQuasar();
 
-// Mock ECharts
-vi.mock("echarts", () => {
-  const mockChartInstance = {
-    setOption: vi.fn(),
-    resize: vi.fn(),
-    dispose: vi.fn(),
-    on: vi.fn(),
-  };
-
-  return {
-    init: vi.fn(() => mockChartInstance),
-    default: {
-      init: vi.fn(() => mockChartInstance),
-    },
-  };
-});
+// Stub ChartRenderer globally so defineAsyncComponent resolves synchronously
+const ChartRendererStub = {
+  name: "ChartRenderer",
+  props: ["data"],
+  emits: ["click"],
+  template: '<div class="chart-renderer-stub"></div>',
+};
 
 // Mock useTraces composable
 const mockSearchObj = {
@@ -110,9 +100,11 @@ describe("FlameGraphView", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    config.global.stubs = { ChartRenderer: ChartRendererStub };
   });
 
   afterEach(() => {
+    config.global.stubs = {};
     if (wrapper) {
       wrapper.unmount();
     }
@@ -132,7 +124,7 @@ describe("FlameGraphView", () => {
       expect(wrapper.find(".flame-graph-view").exists()).toBe(true);
     });
 
-    it("should initialize ECharts on mount with data", async () => {
+    it("should render ChartRenderer when data exists", async () => {
       wrapper = mount(FlameGraphView, {
         props: {
           spans: mockSpans,
@@ -144,10 +136,10 @@ describe("FlameGraphView", () => {
       await flushPromises();
       await wrapper.vm.$nextTick();
 
-      expect(echarts.init).toHaveBeenCalled();
+      expect(wrapper.find(".chart-renderer-stub").exists()).toBe(true);
     });
 
-    it("should not initialize chart when no data", () => {
+    it("should not render ChartRenderer when no data", async () => {
       wrapper = mount(FlameGraphView, {
         props: {
           spans: [],
@@ -156,7 +148,10 @@ describe("FlameGraphView", () => {
         },
       });
 
-      expect(echarts.init).not.toHaveBeenCalled();
+      await flushPromises();
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find(".chart-renderer-stub").exists()).toBe(false);
     });
   });
 
@@ -311,7 +306,7 @@ describe("FlameGraphView", () => {
       await flushPromises();
       await wrapper.vm.$nextTick();
 
-      const data = wrapper.vm.buildFlameGraphData();
+      const { data } = wrapper.vm.flameGraphDataAndDepth;
       expect(data).toBeDefined();
       expect(Array.isArray(data)).toBe(true);
     });
@@ -327,7 +322,7 @@ describe("FlameGraphView", () => {
 
       await wrapper.vm.$nextTick();
 
-      const data = wrapper.vm.buildFlameGraphData();
+      const { data } = wrapper.vm.flameGraphDataAndDepth;
 
       // First span: starts at 0, duration 100ms out of 100ms total = 100%
       expect(data[0].value[0]).toBe(0); // start at 0%
@@ -345,7 +340,7 @@ describe("FlameGraphView", () => {
 
       await wrapper.vm.$nextTick();
 
-      const data = wrapper.vm.buildFlameGraphData();
+      const { data } = wrapper.vm.flameGraphDataAndDepth;
 
       expect(data[0].spanData).toBeDefined();
       expect(data[0].spanData.operationName).toBe("GET /api/users");
@@ -362,7 +357,7 @@ describe("FlameGraphView", () => {
 
       await wrapper.vm.$nextTick();
 
-      const data = wrapper.vm.buildFlameGraphData();
+      const { data } = wrapper.vm.flameGraphDataAndDepth;
 
       expect(data[0].itemStyle.color).toBe("#4caf50"); // service-1 color
     });
@@ -384,7 +379,7 @@ describe("FlameGraphView", () => {
 
       await wrapper.vm.$nextTick();
 
-      const data = wrapper.vm.buildFlameGraphData();
+      const { data } = wrapper.vm.flameGraphDataAndDepth;
 
       expect(data[0].itemStyle.color).toBe("#9CA3AF"); // default color
     });
@@ -400,7 +395,7 @@ describe("FlameGraphView", () => {
 
       await wrapper.vm.$nextTick();
 
-      const data = wrapper.vm.buildFlameGraphData();
+      const { data } = wrapper.vm.flameGraphDataAndDepth;
       const errorSpan = data.find((d: any) => d.spanData.span_id === "span-3");
 
       expect(errorSpan.itemStyle.borderColor).toBe("#EF4444"); // red for errors
@@ -418,7 +413,7 @@ describe("FlameGraphView", () => {
 
       await wrapper.vm.$nextTick();
 
-      const data = wrapper.vm.buildFlameGraphData();
+      const { data } = wrapper.vm.flameGraphDataAndDepth;
       const normalSpan = data.find((d: any) => d.spanData.span_id === "span-1");
 
       expect(normalSpan.itemStyle.borderColor).toBe("#ffffff");
@@ -444,7 +439,7 @@ describe("FlameGraphView", () => {
 
       await wrapper.vm.$nextTick();
 
-      const data = wrapper.vm.buildFlameGraphData();
+      const { data } = wrapper.vm.flameGraphDataAndDepth;
 
       // Should be filtered out due to < 0.1% threshold
       expect(data.length).toBe(0);
@@ -464,18 +459,8 @@ describe("FlameGraphView", () => {
       await flushPromises();
       await wrapper.vm.$nextTick();
 
-      // Get the mock chart instance
-      const mockChart = (echarts.init as any).mock.results[0].value;
-
-      // Simulate click event handler
-      const clickHandler = mockChart.on.mock.calls.find(
-        (call: any) => call[0] === "click"
-      )?.[1];
-
-      expect(clickHandler).toBeDefined();
-
-      // Simulate click with span data
-      clickHandler({
+      // Call handleChartClick directly (ChartRenderer emits 'click' which calls this)
+      wrapper.vm.handleChartClick({
         data: {
           spanData: {
             span_id: "span-1",
@@ -499,20 +484,15 @@ describe("FlameGraphView", () => {
       await flushPromises();
       await wrapper.vm.$nextTick();
 
-      const mockChart = (echarts.init as any).mock.results[0].value;
-      const clickHandler = mockChart.on.mock.calls.find(
-        (call: any) => call[0] === "click"
-      )?.[1];
-
       // Click without span data
-      clickHandler({ data: null });
+      wrapper.vm.handleChartClick({ data: null });
 
       expect(wrapper.emitted("span-selected")).toBeFalsy();
     });
   });
 
   describe("Chart Updates", () => {
-    it("should update chart when spans change", async () => {
+    it("should update flame graph data when spans change", async () => {
       wrapper = mount(FlameGraphView, {
         props: {
           spans: mockSpans,
@@ -524,26 +504,21 @@ describe("FlameGraphView", () => {
       await flushPromises();
       await wrapper.vm.$nextTick();
 
-      const mockChart = (echarts.init as any).mock.results[0].value;
-      mockChart.setOption.mockClear();
+      const newSpans = [
+        createMockSpan({
+          span_id: "new-span",
+          operationName: "New Operation",
+        }),
+      ];
 
-      // Update spans
-      await wrapper.setProps({
-        spans: [
-          createMockSpan({
-            span_id: "new-span",
-            operationName: "New Operation",
-          }),
-        ],
-      });
-
-      await flushPromises();
+      await wrapper.setProps({ spans: newSpans });
       await wrapper.vm.$nextTick();
 
-      expect(mockChart.setOption).toHaveBeenCalled();
+      const { data } = wrapper.vm.flameGraphDataAndDepth;
+      expect(data[0].spanData.operationName).toBe("New Operation");
     });
 
-    it("should update chart when traceDuration changes", async () => {
+    it("should update flame graph data when traceDuration changes", async () => {
       wrapper = mount(FlameGraphView, {
         props: {
           spans: mockSpans,
@@ -555,21 +530,20 @@ describe("FlameGraphView", () => {
       await flushPromises();
       await wrapper.vm.$nextTick();
 
-      const mockChart = (echarts.init as any).mock.results[0].value;
-      mockChart.setOption.mockClear();
+      const { data: dataBefore } = wrapper.vm.flameGraphDataAndDepth;
+      const widthBefore = dataBefore[0].value[2]; // width percentage
 
-      // Update duration
-      await wrapper.setProps({
-        traceDuration: 200,
-      });
-
-      await flushPromises();
+      await wrapper.setProps({ traceDuration: 200 });
       await wrapper.vm.$nextTick();
 
-      expect(mockChart.setOption).toHaveBeenCalled();
+      const { data: dataAfter } = wrapper.vm.flameGraphDataAndDepth;
+      const widthAfter = dataAfter[0].value[2];
+
+      // Same 100ms span over 200ms trace = 50% (was 100% over 100ms)
+      expect(widthAfter).toBeLessThan(widthBefore);
     });
 
-    it("should highlight selected span when selectedSpanId changes", async () => {
+    it("should apply selection highlight when selectedSpanId changes", async () => {
       wrapper = mount(FlameGraphView, {
         props: {
           spans: mockSpans,
@@ -581,22 +555,20 @@ describe("FlameGraphView", () => {
       await flushPromises();
       await wrapper.vm.$nextTick();
 
-      const mockChart = (echarts.init as any).mock.results[0].value;
-      mockChart.setOption.mockClear();
+      await wrapper.setProps({ selectedSpanId: "span-1" });
+      await wrapper.vm.$nextTick();
 
-      // Select a span
-      await wrapper.setProps({
-        selectedSpanId: "span-1",
-      });
-
-      await flushPromises();
-
-      expect(mockChart.setOption).toHaveBeenCalled();
+      const { data } = wrapper.vm.flameGraphDataAndDepth;
+      const selectedItem = data.find(
+        (d: any) => d.spanData.span_id === "span-1",
+      );
+      expect(selectedItem.itemStyle.borderColor).toBe("#2563EB");
+      expect(selectedItem.itemStyle.borderWidth).toBe(3);
     });
   });
 
   describe("Resize Handling", () => {
-    it("should call resize on chart when handleResize is called", async () => {
+    it("should compute correct chartContentHeight for given spans", async () => {
       wrapper = mount(FlameGraphView, {
         props: {
           spans: mockSpans,
@@ -605,17 +577,13 @@ describe("FlameGraphView", () => {
         },
       });
 
-      await flushPromises();
       await wrapper.vm.$nextTick();
 
-      const mockChart = (echarts.init as any).mock.results[0].value;
-
-      wrapper.vm.handleResize();
-
-      expect(mockChart.resize).toHaveBeenCalled();
+      // chartContentHeight must be a positive number
+      expect(wrapper.vm.chartContentHeight).toBeGreaterThan(0);
     });
 
-    it("should not error when handleResize is called without chart", () => {
+    it("should not error when mouse cursor moves over an empty chart", () => {
       wrapper = mount(FlameGraphView, {
         props: {
           spans: [],
@@ -624,13 +592,20 @@ describe("FlameGraphView", () => {
         },
       });
 
-      // Should not throw error
-      expect(() => wrapper.vm.handleResize()).not.toThrow();
+      const mockEvent = {
+        clientX: 50,
+        currentTarget: {
+          getBoundingClientRect: () => ({ left: 0, width: 500 }),
+        },
+      } as unknown as MouseEvent;
+
+      // handleChartMouseMove returns early when !hasData — should not throw
+      expect(() => wrapper.vm.handleChartMouseMove(mockEvent)).not.toThrow();
     });
   });
 
   describe("Cleanup", () => {
-    it("should dispose chart on component unmount", async () => {
+    it("should unmount cleanly when chart is rendered", async () => {
       wrapper = mount(FlameGraphView, {
         props: {
           spans: mockSpans,
@@ -642,14 +617,10 @@ describe("FlameGraphView", () => {
       await flushPromises();
       await wrapper.vm.$nextTick();
 
-      const mockChart = (echarts.init as any).mock.results[0].value;
-
-      wrapper.unmount();
-
-      expect(mockChart.dispose).toHaveBeenCalled();
+      expect(() => wrapper.unmount()).not.toThrow();
     });
 
-    it("should not error on unmount when chart was never initialized", () => {
+    it("should not error on unmount when chart was never rendered", () => {
       wrapper = mount(FlameGraphView, {
         props: {
           spans: [],
@@ -717,7 +688,7 @@ describe("FlameGraphView", () => {
 
       await wrapper.vm.$nextTick();
 
-      const data = wrapper.vm.buildFlameGraphData();
+      const { data } = wrapper.vm.flameGraphDataAndDepth;
 
       // Should be filtered out due to 0% width
       expect(data.length).toBe(0);
@@ -741,8 +712,8 @@ describe("FlameGraphView", () => {
 
       await wrapper.vm.$nextTick();
 
-      // Should not throw error
-      expect(() => wrapper.vm.buildFlameGraphData()).not.toThrow();
+      // Should not throw error when accessing computed
+      expect(() => wrapper.vm.flameGraphDataAndDepth).not.toThrow();
     });
 
     it("should handle very large trace duration", async () => {
@@ -756,7 +727,7 @@ describe("FlameGraphView", () => {
 
       await wrapper.vm.$nextTick();
 
-      const data = wrapper.vm.buildFlameGraphData();
+      const { data } = wrapper.vm.flameGraphDataAndDepth;
 
       // All spans should be filtered due to tiny percentage
       expect(data.length).toBe(0);
@@ -802,7 +773,10 @@ describe("FlameGraphView", () => {
     });
   });
 
-  describe("Tooltip Formatter (Line 162)", () => {
+  describe("Tooltip Formatter", () => {
+    const getFormatter = (w: any) =>
+      w.vm.chartOptions.tooltip.formatter;
+
     it("should format tooltip with span information", async () => {
       wrapper = mount(FlameGraphView, {
         props: {
@@ -812,19 +786,10 @@ describe("FlameGraphView", () => {
         },
       });
 
-      await flushPromises();
       await wrapper.vm.$nextTick();
 
-      // Get the chart options passed to setOption
-      const mockChart = (echarts.init as any).mock.results[0].value;
-      const setOptionCalls = mockChart.setOption.mock.calls;
-      const chartOptions = setOptionCalls[0][0];
-
-      // Access the formatter function
-      const formatter = chartOptions.tooltip.formatter;
-
-      // Create mock params that ECharts would pass to formatter
-      const mockParams = {
+      const formatter = getFormatter(wrapper);
+      const result = formatter({
         data: {
           spanData: {
             operationName: "GET /api/users",
@@ -833,18 +798,14 @@ describe("FlameGraphView", () => {
             hasError: false,
           },
         },
-      };
+      });
 
-      // Call the formatter
-      const result = formatter(mockParams);
-
-      // Verify the HTML output contains expected information
-      expect(result).toContain("GET /api/users"); // Operation name
-      expect(result).toContain("service-1"); // Service name
-      expect(result).toContain("100.00%"); // Percentage
-      expect(result).toContain("Service:"); // Label
-      expect(result).toContain("Duration:"); // Label
-      expect(result).toContain("% of trace:"); // Label
+      expect(result).toContain("GET /api/users");
+      expect(result).toContain("service-1");
+      expect(result).toContain("100.00%");
+      expect(result).toContain("Service:");
+      expect(result).toContain("Duration:");
+      expect(result).toContain("% of trace:");
     });
 
     it("should show error indicator in tooltip for error spans", async () => {
@@ -856,14 +817,9 @@ describe("FlameGraphView", () => {
         },
       });
 
-      await flushPromises();
       await wrapper.vm.$nextTick();
 
-      const mockChart = (echarts.init as any).mock.results[0].value;
-      const chartOptions = mockChart.setOption.mock.calls[0][0];
-      const formatter = chartOptions.tooltip.formatter;
-
-      const mockParamsWithError = {
+      const result = getFormatter(wrapper)({
         data: {
           spanData: {
             operationName: "Failed Operation",
@@ -872,13 +828,10 @@ describe("FlameGraphView", () => {
             hasError: true,
           },
         },
-      };
+      });
 
-      const result = formatter(mockParamsWithError);
-
-      // Should contain error indicator
       expect(result).toContain("⚠ Has errors");
-      expect(result).toContain("#f87171"); // Error color
+      expect(result).toContain("#f87171");
     });
 
     it("should not show error indicator for normal spans", async () => {
@@ -890,14 +843,9 @@ describe("FlameGraphView", () => {
         },
       });
 
-      await flushPromises();
       await wrapper.vm.$nextTick();
 
-      const mockChart = (echarts.init as any).mock.results[0].value;
-      const chartOptions = mockChart.setOption.mock.calls[0][0];
-      const formatter = chartOptions.tooltip.formatter;
-
-      const mockParamsNormal = {
+      const result = getFormatter(wrapper)({
         data: {
           spanData: {
             operationName: "Normal Operation",
@@ -906,11 +854,8 @@ describe("FlameGraphView", () => {
             hasError: false,
           },
         },
-      };
+      });
 
-      const result = formatter(mockParamsNormal);
-
-      // Should NOT contain error indicator
       expect(result).not.toContain("⚠ Has errors");
     });
 
@@ -918,19 +863,14 @@ describe("FlameGraphView", () => {
       wrapper = mount(FlameGraphView, {
         props: {
           spans: mockSpans,
-          traceDuration: 200, // Total duration
+          traceDuration: 200,
           selectedSpanId: null,
         },
       });
 
-      await flushPromises();
       await wrapper.vm.$nextTick();
 
-      const mockChart = (echarts.init as any).mock.results[0].value;
-      const chartOptions = mockChart.setOption.mock.calls[0][0];
-      const formatter = chartOptions.tooltip.formatter;
-
-      const mockParams = {
+      const result = getFormatter(wrapper)({
         data: {
           spanData: {
             operationName: "Test Operation",
@@ -939,11 +879,8 @@ describe("FlameGraphView", () => {
             hasError: false,
           },
         },
-      };
+      });
 
-      const result = formatter(mockParams);
-
-      // Should show 25.00%
       expect(result).toContain("25.00%");
     });
 
@@ -956,18 +893,12 @@ describe("FlameGraphView", () => {
         },
       });
 
-      await flushPromises();
       await wrapper.vm.$nextTick();
 
-      const mockChart = (echarts.init as any).mock.results[0].value;
-      const chartOptions = mockChart.setOption.mock.calls[0][0];
-      const formatter = chartOptions.tooltip.formatter;
-
-      // Import the mocked formatDuration to verify it was called
       const { formatDuration } =
         await import("@/composables/traces/useTraceProcessing");
 
-      const mockParams = {
+      getFormatter(wrapper)({
         data: {
           spanData: {
             operationName: "Test",
@@ -976,11 +907,8 @@ describe("FlameGraphView", () => {
             hasError: false,
           },
         },
-      };
+      });
 
-      formatter(mockParams);
-
-      // Verify formatDuration was called with the correct duration
       expect(formatDuration).toHaveBeenCalledWith(1500);
     });
 
@@ -993,14 +921,9 @@ describe("FlameGraphView", () => {
         },
       });
 
-      await flushPromises();
       await wrapper.vm.$nextTick();
 
-      const mockChart = (echarts.init as any).mock.results[0].value;
-      const chartOptions = mockChart.setOption.mock.calls[0][0];
-      const formatter = chartOptions.tooltip.formatter;
-
-      const mockParams = {
+      const result = getFormatter(wrapper)({
         data: {
           spanData: {
             operationName: "Test",
@@ -1009,36 +932,28 @@ describe("FlameGraphView", () => {
             hasError: false,
           },
         },
-      };
+      });
 
-      const result = formatter(mockParams);
-
-      // Check HTML structure
-      expect(result).toContain("<div"); // Has div elements
-      expect(result).toContain("font-weight: bold"); // Bold title
-      expect(result).toContain("font-size: 11px"); // Font size styling
-      expect(result).toContain("display: flex"); // Flexbox layout
-      expect(result).toContain("justify-content: space-between"); // Space between
-      expect(result).toContain("color: #cbd5e1"); // Label color
+      expect(result).toContain("<div");
+      expect(result).toContain("font-weight: bold");
+      expect(result).toContain("font-size: 11px");
+      expect(result).toContain("display: flex");
+      expect(result).toContain("justify-content: space-between");
+      expect(result).toContain("color: #cbd5e1");
     });
 
     it("should handle very small percentages correctly", async () => {
       wrapper = mount(FlameGraphView, {
         props: {
           spans: mockSpans,
-          traceDuration: 10000, // Very large total
+          traceDuration: 10000,
           selectedSpanId: null,
         },
       });
 
-      await flushPromises();
       await wrapper.vm.$nextTick();
 
-      const mockChart = (echarts.init as any).mock.results[0].value;
-      const chartOptions = mockChart.setOption.mock.calls[0][0];
-      const formatter = chartOptions.tooltip.formatter;
-
-      const mockParams = {
+      const result = getFormatter(wrapper)({
         data: {
           spanData: {
             operationName: "Tiny Span",
@@ -1047,15 +962,12 @@ describe("FlameGraphView", () => {
             hasError: false,
           },
         },
-      };
+      });
 
-      const result = formatter(mockParams);
-
-      // Should show 0.01%
       expect(result).toContain("0.01%");
     });
 
-    it("should escape HTML in span data to prevent XSS", async () => {
+    it("should render raw span data in tooltip (no HTML escaping)", async () => {
       wrapper = mount(FlameGraphView, {
         props: {
           spans: mockSpans,
@@ -1064,15 +976,9 @@ describe("FlameGraphView", () => {
         },
       });
 
-      await flushPromises();
       await wrapper.vm.$nextTick();
 
-      const mockChart = (echarts.init as any).mock.results[0].value;
-      const chartOptions = mockChart.setOption.mock.calls[0][0];
-      const formatter = chartOptions.tooltip.formatter;
-
-      // Test with potentially malicious data
-      const mockParamsWithScript = {
+      const result = getFormatter(wrapper)({
         data: {
           spanData: {
             operationName: "<script>alert('xss')</script>",
@@ -1081,11 +987,9 @@ describe("FlameGraphView", () => {
             hasError: false,
           },
         },
-      };
+      });
 
-      const result = formatter(mockParamsWithScript);
-
-      // The HTML should contain the literal strings (not executed)
+      // The formatter renders raw strings via template literal interpolation
       expect(result).toContain("<script>alert('xss')</script>");
       expect(result).toContain("<img src=x onerror=alert('xss')>");
     });
