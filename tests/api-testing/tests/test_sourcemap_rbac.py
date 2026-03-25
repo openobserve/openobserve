@@ -125,15 +125,14 @@ def create_user_session(email, password, base_url):
 @pytest.fixture(scope="module")
 def test_sourcemaps_zip():
     """
-    Path to test sourcemaps ZIP.
-    Assumes test_sourcemap_api.py has run and created the ZIP.
+    Path to static sourcemaps ZIP fixture.
+    Uses pre-built sourcemaps from fixtures directory.
     """
     from pathlib import Path
-    test_app_dir = Path(__file__).parent.parent.parent / "ui-testing" / "MD_Files" / "Sourcemaps" / "o2-sourcemap-test-app"
-    zip_path = test_app_dir / "dist" / "sourcemaps.zip"
+    zip_path = Path(__file__).parent.parent / "fixtures" / "sourcemaps" / "sourcemaps.zip"
 
     if not zip_path.exists():
-        pytest.skip(f"Sourcemaps ZIP not found at {zip_path}. Run test_sourcemap_api.py first.")
+        pytest.skip(f"Sourcemaps ZIP not found at {zip_path}. Static fixture missing.")
 
     return str(zip_path)
 
