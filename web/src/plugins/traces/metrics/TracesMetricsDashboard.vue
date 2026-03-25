@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Collapsible Header -->
     <div
       v-if="show"
-      class="dashboard-header tw:bg-[var(--o2-section-header-bg)]! tw:flex! tw:items-center! tw:w-full q-px-sm q-py-xs tw:cursor-pointer tw:hover:bg-[var(--o2-hover-accent)] tw:h-[2.5rem]!"
+      class="dashboard-header tw:flex! tw:items-center! tw:w-full q-px-sm q-py-xs tw:cursor-pointer tw:hover:bg-[var(--o2-hover-accent)] tw:h-[2.5rem]!"
       @click="toggleCollapse"
     >
       <div class="tw:w-full flex items-center justify-between">
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <transition name="slide-fade">
       <div
         v-show="searchObj.meta.showHistogram"
-        class="charts-wrapper tw:min-h-[13.5rem]"
+        class="charts-wrapper tw:py-0! tw:min-h-[13.5rem]"
       >
         <div class="charts-container">
           <RenderDashboardCharts

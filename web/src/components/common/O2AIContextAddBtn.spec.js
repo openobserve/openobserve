@@ -105,7 +105,7 @@ describe('O2AIContextAddBtn', () => {
 
   it('uses correct icon based on theme', async () => {
     // Test light theme
-    expect(getImageURL).toHaveBeenCalledWith('images/common/ai_icon.svg');
+    expect(getImageURL).toHaveBeenCalledWith('images/common/ai_icon_gradient.svg');
 
     // Test dark theme
     store.state.theme = 'dark';

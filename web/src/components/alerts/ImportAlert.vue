@@ -607,6 +607,10 @@ export default defineComponent({
           position: "bottom",
           timeout: 2000,
         });
+        // Reset BaseImport's importing flag on validation error
+        if (baseImportRef.value) {
+          baseImportRef.value.isImporting = false;
+        }
         return;
       }
 

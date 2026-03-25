@@ -17,10 +17,26 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
-import TraceTree from "@/plugins/traces/TraceTree.vue";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
+
+vi.mock("@/utils/traces/convertTraceData", () => ({
+  getServiceIconDataUrl: vi
+    .fn()
+    .mockReturnValue("data:image/svg+xml;base64,ICON"),
+}));
+
+vi.mock("@/composables/useTraces", () => ({
+  default: () => ({
+    searchObj: { meta: { serviceColors: {} } },
+    buildQueryDetails: vi.fn(),
+    navigateToLogs: vi.fn(),
+  }),
+}));
+
+import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
+import TraceTree from "@/plugins/traces/TraceTree.vue";
 
 installQuasar({
   plugins: [quasar.Dialog, quasar.Notify],
@@ -1260,6 +1276,39 @@ describe("TraceTree", () => {
         '[data-test="trace-tree-span-badge-collapse-btn-d9603ec7f76eb499"]',
       );
       expect(badge.attributes("title")).toContain("collapse");
+    });
+  });
+
+  describe("service icon rendering", () => {
+    it("should render service icon img for each span", () => {
+      const icons = wrapper.findAll(
+        '[data-test^="trace-tree-span-service-icon-"]',
+      );
+      expect(icons.length).toBe(mockSpans.length);
+    });
+
+    it("should render service icon with correct data-test for each span", () => {
+      for (const span of mockSpans) {
+        const icon = wrapper.find(
+          `[data-test="trace-tree-span-service-icon-${span.spanId}"]`,
+        );
+        expect(icon.exists()).toBe(true);
+      }
+    });
+
+    it("should call getServiceIconDataUrl for each unique service/color combination", () => {
+      expect(
+        vi.mocked(getServiceIconDataUrl).mock.calls.length,
+      ).toBeGreaterThan(0);
+    });
+
+    it("should use span style color when building icon url", () => {
+      // mockSpans[0] has serviceName "alertmanager" and style.color "#1ab8be"
+      expect(getServiceIconDataUrl).toHaveBeenCalledWith(
+        "alertmanager",
+        expect.any(Boolean),
+        "#1ab8be",
+      );
     });
   });
 });
