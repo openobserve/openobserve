@@ -116,29 +116,30 @@ async function tryExpandField(page, pm) {
         }
     }
 
-    // Strategy 2: Click on field rows in the traces field list
-    // Traces uses q-expansion-item - clicking the row expands it and triggers openFilterCreator → fetchFieldValues
-    // The field rows contain an expand_more icon and field name
-    const indexList = page.locator('[data-test="traces-search-index-list"]');
-    if (await indexList.isVisible({ timeout: 3000 }).catch(() => false)) {
-        // Look for field expansion items - they have the expand_more icon
-        const fieldRows = indexList.locator('.field-expansion-item, .q-expansion-item');
-        const rowCount = await fieldRows.count();
-        testLogger.info(`Found ${rowCount} field expansion items in traces index list`);
+    // Strategy 2: Click on field expansion headers in the traces field list
+    // Traces uses q-expansion-item with class 'field-expansion-item'
+    // The clickable header has class 'field-expansion-header'
+    // Using the correct selector: log-search-index-list-fields-table (same as logs)
+    const fieldsTable = page.locator('[data-test="log-search-index-list-fields-table"]');
+    if (await fieldsTable.isVisible({ timeout: 5000 }).catch(() => false)) {
+        // Look for field expansion items directly on the page (they're inside the table)
+        const fieldHeaders = page.locator('.field-expansion-item .field-expansion-header');
+        const headerCount = await fieldHeaders.count();
+        testLogger.info(`Found ${headerCount} field expansion headers in traces field list`);
 
-        if (rowCount > 0) {
+        if (headerCount > 0) {
             // Try first few fields (skip internal fields like _timestamp)
-            for (let i = 0; i < Math.min(rowCount, 10); i++) {
-                const row = fieldRows.nth(i);
-                const rowText = await row.textContent().catch(() => '');
+            for (let i = 0; i < Math.min(headerCount, 10); i++) {
+                const header = fieldHeaders.nth(i);
+                const headerText = await header.textContent().catch(() => '');
 
                 // Skip system fields
-                if (rowText.includes('_timestamp') || rowText.includes('_id')) {
+                if (headerText.includes('_timestamp') || headerText.includes('_id') || headerText.includes('duration')) {
                     continue;
                 }
 
-                // Extract field name from the row
-                const fieldName = rowText.trim().split(/\s+/)[0] || `field_${i}`;
+                // Extract field name from the header
+                const fieldName = headerText.trim().split(/\s+/)[0] || `field_${i}`;
                 testLogger.info(`Attempting to expand field: ${fieldName}`);
 
                 // Start listening for values API before clicking
@@ -147,9 +148,9 @@ async function tryExpandField(page, pm) {
                     { timeout: 15000 }
                 ).catch(() => null);
 
-                // Click on the row to expand it
-                await row.click();
-                testLogger.info(`Clicked on field row: ${fieldName}`);
+                // Click on the header to expand it
+                await header.click();
+                testLogger.info(`Clicked on field header: ${fieldName}`);
 
                 const response = await valuesResponsePromise;
                 if (response) {
@@ -159,11 +160,17 @@ async function tryExpandField(page, pm) {
                 } else {
                     testLogger.info(`No values API response for field: ${fieldName}, trying next field`);
                     // Click again to collapse and try another field
-                    await row.click().catch(() => {});
+                    await header.click().catch(() => {});
                     await page.waitForTimeout(500);
                 }
             }
         }
+    } else {
+        testLogger.info('Fields table not visible, trying fallback selectors');
+        // Fallback: try finding expansion items anywhere on the page
+        const anyExpansionItems = page.locator('.field-expansion-item');
+        const count = await anyExpansionItems.count();
+        testLogger.info(`Fallback: found ${count} field-expansion-item elements on page`);
     }
 
     // Strategy 3: Fallback - try clicking directly on field names
@@ -319,6 +326,20 @@ test.describe("Traces Autocomplete Value Suggestions", () => {
         tag: ['@autosuggestions', '@traces', '@isolation']
     }, async ({ page }) => {
         testLogger.info('Testing traces vs logs isolation');
+
+        // First, capture some traces values by expanding a field
+        await pm.tracesPage.setupTraceSearch('default');
+
+        // Verify we have trace results
+        const hasResults = await pm.tracesPage.hasTraceResults();
+        if (hasResults) {
+            // Try to expand a field to capture values
+            const expandResult = await tryExpandField(page, pm);
+            if (expandResult.success) {
+                testLogger.info(`Expanded field for isolation test: ${expandResult.fieldName}`);
+                await page.waitForTimeout(3000);
+            }
+        }
 
         // Get current IndexedDB state
         const records = await getIndexedDBRecords(page);
