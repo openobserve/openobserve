@@ -25,7 +25,7 @@ import {
   getConsumableRelativeTime,
 } from "@/utils/date";
 import config from "@/aws-exports";
-import { b64EncodeUnicode, addSpacesToOperators } from "@/utils/zincutils";
+import { b64EncodeUnicode, addSpacesToOperators, needsSqlQuoting } from "@/utils/zincutils";
 
 export const useSearchQuery = () => {
   const store = useStore();
@@ -291,7 +291,7 @@ export const useSearchQuery = () => {
           req.query.sql = req.query.sql.replace(
             "[FIELD_LIST]",
             interestingFields
-              .map((field: string) => `"${field}"`)
+              .map((field: string) => needsSqlQuoting(field) ? `"${field}"` : field)
               .join(","),
           );
         }
@@ -480,7 +480,7 @@ export const useSearchQuery = () => {
 
       for (const [index, token] of parsedSQL.entries()) {
         const normalizedToken = token.replaceAll('"', "");
-        if (streamFieldNames.has(normalizedToken)) {
+        if (streamFieldNames.has(normalizedToken) && needsSqlQuoting(normalizedToken)) {
           parsedSQL[index] = `"${normalizedToken}"`;
         }
       }

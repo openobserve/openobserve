@@ -22,7 +22,7 @@ import useStreams from "@/composables/useStreams";
 import savedviewsService from "@/services/saved_views";
 import searchService from "@/services/search";
 
-import { arraysMatch } from "@/utils/zincutils";
+import { arraysMatch, needsSqlQuoting } from "@/utils/zincutils";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 
@@ -350,7 +350,7 @@ export const useSearchBar = () => {
         searchObj.meta.quickMode &&
           searchObj.data.stream.interestingFieldList.length > 0
           ? searchObj.data.stream.interestingFieldList
-            .map((field: string) => `"${field}"`)
+            .map((field: string) => needsSqlQuoting(field) ? `"${field}"` : field)
             .join(",")
           : "*";
 

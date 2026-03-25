@@ -1525,3 +1525,20 @@ export const buildDateTimeObject = (
 
   return baseObj;
 };
+
+const SQL_RESERVED_WORDS = new Set([
+  "select", "from", "where", "and", "or", "not", "in", "is", "null", "true",
+  "false", "order", "by", "group", "having", "limit", "offset", "join", "on",
+  "as", "distinct", "union", "all", "except", "intersect", "with", "case",
+  "when", "then", "else", "end", "between", "like", "exists", "asc", "desc",
+  "insert", "update", "delete", "create", "drop", "alter", "table", "index",
+  "view", "into", "values", "set", "inner", "outer", "left", "right", "full",
+  "cross", "natural", "using", "count", "sum", "avg", "min", "max",
+]);
+
+export const needsSqlQuoting = (field: string): boolean => {
+  if (/[^a-zA-Z0-9_]/.test(field)) return true;
+  if (/^\d/.test(field)) return true;
+  if (SQL_RESERVED_WORDS.has(field.toLowerCase())) return true;
+  return false;
+};

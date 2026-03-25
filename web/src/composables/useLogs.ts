@@ -20,7 +20,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
 
-import { b64DecodeUnicode, useLocalTimezone } from "@/utils/zincutils";
+import { b64DecodeUnicode, useLocalTimezone, needsSqlQuoting } from "@/utils/zincutils";
 
 import useNotifications from "@/composables/useNotifications";
 import useStreams from "@/composables/useStreams";
@@ -567,7 +567,7 @@ const useLogs = () => {
         field_value = "null";
       }
       const quotedField =
-        searchObj.meta.sqlMode === true ? `"${field}"` : field;
+        searchObj.meta.sqlMode === true && needsSqlQuoting(field) ? `"${field}"` : field;
       let expression =
         field_value == "null"
           ? `${quotedField} ${operator} ${field_value}`
@@ -588,7 +588,7 @@ const useLogs = () => {
     } catch (e: any) {
       console.log("Error while getting filter expression by field type", e);
       const quotedField =
-        searchObj.meta.sqlMode === true ? `"${field}"` : field;
+        searchObj.meta.sqlMode === true && needsSqlQuoting(field) ? `"${field}"` : field;
       return `${quotedField} ${operator} '${field_value}'`;
     }
   };
