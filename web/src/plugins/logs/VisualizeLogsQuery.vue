@@ -175,6 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :is_ui_histogram="is_ui_histogram"
                         :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
                         :allowAlertCreation="true"
+                        :regionClusterParams="regionClusterParams"
                         @series-data-update="seriesDataUpdate"
                         @show-legends="showLegendsDialog = true"
                         ref="panelSchemaRendererRef"
@@ -415,6 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :is_ui_histogram="is_ui_histogram"
                         :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
                         :allowAlertCreation="true"
+                        :regionClusterParams="regionClusterParams"
                         @series-data-update="seriesDataUpdate"
                         @show-legends="showLegendsDialog = true"
                       />
@@ -588,6 +590,16 @@ export default defineComponent({
 
     const { searchObj } = searchState();
     const { buildSearch } = useSearchStream();
+
+    const regionClusterParams = computed(() => {
+      if (store.state.zoConfig?.super_cluster_enabled) {
+        return {
+          regions: searchObj.meta.regions,
+          clusters: searchObj.meta.clusters,
+        };
+      }
+      return undefined;
+    });
 
     const { visualizeChartData, is_ui_histogram, shouldRefreshWithoutCache }: any = toRefs(props);
     const chartData = ref(visualizeChartData.value);
@@ -1003,6 +1015,7 @@ export default defineComponent({
       showLegendsDialog,
       currentPanelData,
       panelSchemaRendererRef,
+      regionClusterParams,
     };
   },
 });
