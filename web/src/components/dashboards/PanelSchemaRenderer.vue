@@ -503,6 +503,11 @@ export default defineComponent({
       required: false,
       default: false,
     },
+    regionClusterParams: {
+      type: Object,
+      required: false,
+      default: undefined,
+    },
   },
   emits: [
     "updated:data-zoom",
@@ -611,6 +616,7 @@ export default defineComponent({
       is_ui_histogram,
       shouldRefreshWithoutCache,
       showLegendsButton,
+      regionClusterParams,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let {
@@ -643,6 +649,7 @@ export default defineComponent({
       dashboardName,
       folderName,
       shouldRefreshWithoutCache,
+      regionClusterParams,
     );
 
     const {
