@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
@@ -31,7 +31,14 @@ vi.mock("@/composables/useTraces", () => ({
   default: () => ({ searchObj: mockSearchObj }),
 }));
 
+vi.mock("@/utils/traces/convertTraceData", () => ({
+  getServiceIconDataUrl: vi
+    .fn()
+    .mockReturnValue("data:image/svg+xml;base64,TEST"),
+}));
+
 import TraceServiceCell from "./TraceServiceCell.vue";
+import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 
 installQuasar();
 
@@ -63,13 +70,6 @@ describe("TraceServiceCell", () => {
       );
     });
 
-    it("renders the colour dot", () => {
-      wrapper = mount(TraceServiceCell, { props: { item: makeItem() } });
-      expect(wrapper.find('[data-test="trace-row-service-dot"]').exists()).toBe(
-        true,
-      );
-    });
-
     it("renders service name", () => {
       wrapper = mount(TraceServiceCell, { props: { item: makeItem() } });
       const name = wrapper.find('[data-test="trace-row-service-name"]');
@@ -77,7 +77,7 @@ describe("TraceServiceCell", () => {
       expect(name.text()).toBe("frontend");
     });
 
-    // TraceServiceCell only renders service name and colour dot.
+    // TraceServiceCell only renders service name and icon.
     // Operation name is rendered by a separate column cell — not this component.
     it.skip("renders operation name", () => {
       wrapper = mount(TraceServiceCell, { props: { item: makeItem() } });
@@ -87,23 +87,65 @@ describe("TraceServiceCell", () => {
     });
   });
 
-  describe("colour dot", () => {
-    it("applies the correct service colour from serviceColors", () => {
+  describe("service icon", () => {
+    it("should render the service icon img", () => {
       wrapper = mount(TraceServiceCell, { props: { item: makeItem() } });
-      const dot = wrapper.find('[data-test="trace-row-service-dot"]');
-      expect(dot.attributes("style")).toContain(
-        "background-color: rgb(76, 175, 80)",
+      expect(
+        wrapper.find('[data-test="trace-row-service-icon"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should set the icon src from getServiceIconDataUrl", () => {
+      wrapper = mount(TraceServiceCell, { props: { item: makeItem() } });
+      const img = wrapper.find('[data-test="trace-row-service-icon"]');
+      expect(img.attributes("src")).toBe("data:image/svg+xml;base64,TEST");
+    });
+
+    it("should call getServiceIconDataUrl with service name and color", () => {
+      wrapper = mount(TraceServiceCell, { props: { item: makeItem() } });
+      expect(vi.mocked(getServiceIconDataUrl)).toHaveBeenCalledWith(
+        "frontend",
+        expect.any(Boolean),
+        "#4caf50",
       );
     });
 
-    it("falls back to #9e9e9e for an unknown service colour", () => {
+    it("should use fallback color #9e9e9e for unknown service", () => {
       wrapper = mount(TraceServiceCell, {
         props: { item: makeItem({ service_name: "unknown-svc" }) },
       });
-      const dot = wrapper.find('[data-test="trace-row-service-dot"]');
-      expect(dot.attributes("style")).toContain(
-        "background-color: rgb(158, 158, 158)",
+      expect(vi.mocked(getServiceIconDataUrl)).toHaveBeenCalledWith(
+        "unknown-svc",
+        expect.any(Boolean),
+        "#9e9e9e",
       );
+    });
+  });
+
+  describe("extra services badge", () => {
+    it("does not show the badge when there is only one service", () => {
+      wrapper = mount(TraceServiceCell, {
+        props: {
+          item: makeItem({ services: { frontend: { duration: 100 } } }),
+        },
+      });
+      expect(
+        wrapper.find('[data-test="trace-row-extra-services"]').exists(),
+      ).toBe(false);
+    });
+
+    it("does not count root service as an extra service", () => {
+      wrapper = mount(TraceServiceCell, {
+        props: {
+          item: makeItem({
+            service_name: "frontend",
+            services: { frontend: { duration: 100 } },
+          }),
+        },
+      });
+      expect(
+        wrapper.find('[data-test="trace-row-extra-services"]').exists(),
+      ).toBe(false);
     });
   });
 
@@ -115,6 +157,18 @@ describe("TraceServiceCell", () => {
       expect(wrapper.find('[data-test="trace-row-service-name"]').text()).toBe(
         "frontend",
       );
+      expect(
+        wrapper.find('[data-test="trace-row-extra-services"]').exists(),
+      ).toBe(false);
+    });
+
+    it("handles empty services object", () => {
+      wrapper = mount(TraceServiceCell, {
+        props: { item: makeItem({ services: {} }) },
+      });
+      expect(
+        wrapper.find('[data-test="trace-row-extra-services"]').exists(),
+      ).toBe(false);
     });
   });
 });
