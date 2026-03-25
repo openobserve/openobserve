@@ -2782,6 +2782,13 @@ export default defineComponent({
       autoCompleteData.value.fieldValues = props.fieldValues;
       autoCompleteData.value.popup.open =
         queryEditorRef?.value?.triggerAutoComplete;
+      // [NEW] Pass stream context for IndexedDB value lookups
+      autoCompleteData.value.org =
+        store.state.selectedOrganization.identifier;
+      autoCompleteData.value.streamType =
+        searchObj.data.stream.streamType ?? "logs";
+      autoCompleteData.value.streamName =
+        searchObj.data.stream.selectedStream?.[0] ?? "";
       getSuggestions();
     };
 
