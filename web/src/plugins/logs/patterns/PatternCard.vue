@@ -143,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-btn
         size="6px"
         class="cursor-pointer pattern-details-btn"
+        color="warning"
         round
         :data-test="`pattern-card-${index}-create-alert-btn`"
         @click.stop="$emit('create-alert', pattern)"
