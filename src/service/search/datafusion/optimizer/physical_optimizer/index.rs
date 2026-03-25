@@ -37,6 +37,7 @@ use datafusion::{
         ExecutionPlan, PhysicalExpr,
         expressions::{BinaryExpr, Column, InListExpr, NotExpr},
         filter::FilterExec,
+        limit::LocalLimitExec,
         projection::ProjectionExec,
     },
 };
@@ -96,6 +97,12 @@ impl PhysicalOptimizerRule for IndexRule {
             IndexOptimizer::new(self.index_fields.clone(), self.index_condition.clone());
         let plan = plan.rewrite(&mut rewriter).data()?;
 
+        // If no filter was found at all (e.g., SELECT count(*) FROM table),
+        // and optimizer is enabled, we can still optimize
+        if !rewriter.has_filter && rewriter.optimizer_enabled {
+            rewriter.can_optimize = true;
+        }
+
         // if all filter can be used in index, we can
         // use index optimizer rule to optimize the query
         if self.index_condition.lock().is_none() && rewriter.can_optimize {
@@ -125,6 +132,8 @@ struct IndexOptimizer {
     index_condition: Arc<Mutex<Option<IndexCondition>>>,
     // set to true when the filter only have _timestamp filter
     can_optimize: bool,
+    // set to true when the plan contains a FilterExec
+    has_filter: bool,
     is_remove_filter: bool,
     optimizer_enabled: bool,
 }
@@ -138,6 +147,7 @@ impl IndexOptimizer {
             index_fields,
             index_condition,
             can_optimize: false,
+            has_filter: false,
             is_remove_filter: config::get_config()
                 .common
                 .feature_query_remove_filter_with_index,
@@ -158,6 +168,7 @@ impl IndexOptimizer {
             index_fields,
             index_condition,
             can_optimize: false,
+            has_filter: false,
             is_remove_filter,
             optimizer_enabled,
         }
@@ -169,6 +180,7 @@ impl TreeNodeRewriter for IndexOptimizer {
 
     fn f_up(&mut self, node: Self::Node) -> Result<Transformed<Self::Node>> {
         if let Some(filter) = node.as_any().downcast_ref::<FilterExec>() {
+            self.has_filter = true;
             let mut index_conditions = IndexCondition::new();
             let mut other_conditions = Vec::new();
             for expr in split_conjunction(filter.predicate()) {
@@ -211,7 +223,7 @@ fn construct_filter_exec(
     exprs: Vec<Arc<dyn PhysicalExpr>>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     if exprs.is_empty() {
-        match filter.projection() {
+        let mut plan = match filter.projection() {
             Some(projection_indices) => {
                 let filter_child_schema = filter.input().schema();
                 let proj_exprs = projection_indices
@@ -224,18 +236,22 @@ fn construct_filter_exec(
                         )
                     })
                     .collect::<Vec<_>>();
-                Ok(Arc::new(ProjectionExec::try_new(
-                    proj_exprs,
-                    filter.input().clone(),
-                )?))
+                Arc::new(ProjectionExec::try_new(proj_exprs, filter.input().clone())?)
             }
-            None => Ok(filter.input().clone()),
+            None => filter.input().clone(),
+        };
+        if let Some(fetch) = filter.fetch() {
+            plan = Arc::new(LocalLimitExec::new(plan, fetch));
         }
+        Ok(plan)
     } else {
         // TODO: remove the unused column after extract index condition
         let plan = FilterExec::try_new(conjunction(exprs), filter.input().clone())?
             .with_projection(filter.projection().cloned())?;
-        Ok(Arc::new(plan))
+        let plan = plan
+            .with_fetch(filter.fetch())
+            .unwrap_or_else(|| Arc::new(plan));
+        Ok(plan)
     }
 }
 
@@ -680,6 +696,82 @@ mod tests {
 
             assert_eq!(index_condition.lock().clone(), except_condition);
             assert_eq!(rewriter.can_optimize, can_optimizer);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_index_optimizer_no_filter_count_star() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+            Field::new("id", DataType::Utf8, false),
+            Field::new("status", DataType::Utf8, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1])),
+                Arc::new(StringArray::from(vec!["openobserve"])),
+                Arc::new(StringArray::from(vec!["1"])),
+                Arc::new(StringArray::from(vec!["success"])),
+            ],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        // sql, optimizer_enabled, can_optimize, expected_condition
+        let cases = vec![
+            // SELECT count(*) with no filter should be optimizable
+            (
+                "SELECT count(*) from t",
+                true,
+                true,
+                Some(IndexCondition {
+                    conditions: vec![Condition::All()],
+                }),
+            ),
+            // SELECT count(*) with no filter but optimizer disabled
+            ("SELECT count(*) from t", false, false, None),
+        ];
+
+        for (sql, optimizer_enabled, expected_can_optimize, expected_condition) in cases {
+            let plan = ctx.state().create_logical_plan(sql).await.unwrap();
+            let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+            let index_fields = HashSet::from(["name".to_string(), "id".to_string()]);
+            let index_condition = Arc::new(Mutex::new(None));
+            let mut rewriter = IndexOptimizer::new_with_config(
+                index_fields,
+                index_condition.clone(),
+                false,
+                optimizer_enabled,
+            );
+            let _physical_plan = physical_plan.rewrite(&mut rewriter).unwrap().data;
+
+            // Apply the same post-rewrite logic as IndexRule::optimize
+            if !rewriter.has_filter && rewriter.optimizer_enabled {
+                rewriter.can_optimize = true;
+            }
+            if index_condition.lock().is_none() && rewriter.can_optimize {
+                *index_condition.lock() = Some(IndexCondition {
+                    conditions: vec![Condition::All()],
+                });
+            }
+
+            assert_eq!(
+                index_condition.lock().clone(),
+                expected_condition,
+                "Failed for sql: {}",
+                sql
+            );
+            assert_eq!(
+                rewriter.can_optimize, expected_can_optimize,
+                "Failed for sql: {}",
+                sql
+            );
         }
     }
 }

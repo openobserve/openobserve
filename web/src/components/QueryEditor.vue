@@ -224,14 +224,17 @@ const currentSessionId = ref<string | null>(null);
 const currentAbortController = ref<AbortController | null>(null);
 
 // Chat history tracking (shared IndexedDB with O2AIChat)
-const { saveToHistory } = useChatHistory();
+const { saveToHistory } = useChatHistory(
+  () => store.state.userInfo.email ?? '',
+  () => store.state.selectedOrganization.identifier ?? '',
+);
 const currentChatId = ref<number | null>(null);
 const chatMessages = ref<ChatMessage[]>([]);
 
 const nlpIcon = computed(() => {
   return store.state.theme === 'dark'
     ? getImageURL('images/common/ai_icon_dark.svg')
-    : getImageURL('images/common/ai_icon.svg');
+    : getImageURL('images/common/ai_icon_gradient.svg');
 });
 
 // Computed: AI input field class based on theme
@@ -563,18 +566,23 @@ defineExpose({
   top: 3px;
   right: 8px;
   z-index: 100;
-  background: transparent !important;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
   color: white !important;
-  transition: background 0.3s ease !important;
+  transition: background 0.3s ease, box-shadow 0.3s ease !important;
   width: 30px !important;
   height: 30px !important;
   min-width: 30px !important;
   min-height: 30px !important;
+  border-radius: 6px;
 }
 
 .ai-floating-button:hover {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  box-shadow: 0 2px 5px 0 rgba(102, 126, 234, 0.4) !important;
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
+  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35) !important;
+}
+
+.ai-floating-button:hover .ai-icon {
+  filter: brightness(0) invert(1);
 }
 
 /* AI icon rotation on hover - matches MainLayout ai-icon */
@@ -588,7 +596,7 @@ defineExpose({
 
 /* AI Send Button (arrow icon inside input bar) */
 .ai-send-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
   color: white !important;
   transition: all 0.2s ease !important;
   min-width: 28px !important;
@@ -599,7 +607,7 @@ defineExpose({
 
 .ai-send-button:hover:not([disabled]) {
   transform: translateY(-1px);
-  box-shadow: 0 0.25rem 0.75rem 0 rgba(102, 126, 234, 0.4) !important;
+  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.4) !important;
 }
 
 .ai-send-button:active:not([disabled]) {
@@ -637,7 +645,7 @@ defineExpose({
 
 /* AI Input Bar Styling */
 .ai-input-bar {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(236, 72, 153, 0.05) 100%);
   border-bottom: 1px solid var(--o2-border-color);
 }
 

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="float-right col flex items-center">
         <!-- Tab Toggle Buttons -->
         <div
-          v-if="store.state.zoConfig.service_graph_enabled"
+          v-if="config.isEnterprise == 'true'"
           class="button-group logs-visualize-toggle element-box-shadow tw:mr-[0.375rem]"
         >
           <div class="row">
@@ -299,14 +299,14 @@ const getFieldFromExpression = (expression: string): string | null => {
 
 /**
  * Tries to replace an existing condition for `fieldName` in `queryStr` with
- * `newExpression`. Returns the modified string, or the original if not found.
+ * `newExpression`. Returns the modified string if found, or null if not found.
  * Handles both parenthesized multi-value groups and single conditions.
  */
 const replaceExistingFieldCondition = (
   queryStr: string,
   fieldName: string,
   newExpression: string,
-): string => {
+): string | null => {
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
   const opPat = `(?:=|!=|>=|<=|>|<|is(?:\\s+not)?)`;
@@ -321,13 +321,62 @@ const replaceExistingFieldCondition = (
     return queryStr.replace(multiRegex, newExpression);
   }
 
+  // Try range condition: field >= val AND field <= val (e.g. duration filters)
+  const rangeRegex = new RegExp(
+    `${condPat}\\s+(?:and|AND)\\s+${condPat}`,
+    "gi",
+  );
+  if (rangeRegex.test(queryStr)) {
+    return queryStr.replace(rangeRegex, newExpression);
+  }
+
   // Try single condition
   const singleRegex = new RegExp(condPat, "gi");
   if (singleRegex.test(queryStr)) {
     return queryStr.replace(singleRegex, newExpression);
   }
 
-  return queryStr;
+  return null;
+};
+
+/**
+ * Applies a single filter term to a base editor value using replace-or-append logic.
+ * Returns the new editor value.
+ */
+const applyFilterTerm = (filterTerm: string, baseValue: string): string => {
+  let filter = filterTerm;
+
+  const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
+  if (isFilterValueNull) {
+    filter = filter
+      .replace(/=|!=/, (match) => {
+        return match === "=" ? " is " : " is not ";
+      })
+      .replace(/'null'/, "null");
+  }
+
+  const parts = baseValue.split("|");
+  if (parts.length > 1) {
+    if (parts[1].trim() !== "") {
+      const fieldName = getFieldFromExpression(filter);
+      const replaced = fieldName
+        ? replaceExistingFieldCondition(parts[1], fieldName, filter)
+        : null;
+      parts[1] = replaced !== null ? replaced : parts[1] + " and " + filter;
+    } else {
+      parts[1] = filter;
+    }
+    return parts.join("| ");
+  } else {
+    const fieldName = getFieldFromExpression(filter);
+    const replaced = fieldName
+      ? replaceExistingFieldCondition(parts[0] as string, fieldName, filter)
+      : null;
+    if (replaced !== null) return replaced;
+    return (parts[0] as string) !== ""
+      ? (parts[0] as string) + " and " + filter
+      : filter;
+  }
 };
 
 export default defineComponent({
@@ -573,6 +622,40 @@ export default defineComponent({
       if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(value);
     };
 
+    // Apply multiple filter terms independently (replace-or-append per field).
+    // Used by parent (Index.vue) for metrics brush selections and error toggle.
+    const applyFilters = (terms: string[]) => {
+      let current = searchObj.data.editorValue;
+      for (const term of terms) {
+        current = applyFilterTerm(term, current);
+      }
+      searchObj.data.editorValue = current;
+      if (queryEditorRef.value?.setValue)
+        queryEditorRef.value.setValue(current);
+    };
+
+    // Remove all conditions for a given field from the editor value.
+    // Used by parent (Index.vue) to clear the error-only filter on toggle-off.
+    const removeFilterByField = (fieldName: string) => {
+      const value = searchObj.data.editorValue;
+      const parts = value.split("|");
+      const target = parts.length > 1 ? 1 : 0;
+      const replaced = replaceExistingFieldCondition(
+        parts[target] as string,
+        fieldName,
+        "",
+      );
+      parts[target] = replaced
+        .replace(/\s*\band\b\s*$/i, "")
+        .replace(/^\s*\band\b\s*/i, "")
+        .replace(/\s+and\s+and\s+/gi, " and ")
+        .trim();
+      const newValue = parts.length > 1 ? parts.join("| ") : parts[0];
+      searchObj.data.editorValue = newValue as string;
+      if (queryEditorRef.value?.setValue)
+        queryEditorRef.value.setValue(newValue);
+    };
+
     const jsonToCsv = (jsonData) => {
       const replacer = (key, value) => (value === null ? "" : value);
       const header = Object.keys(jsonData[0]);
@@ -669,6 +752,8 @@ export default defineComponent({
       metricsIcon,
       tracesShareURL,
       config,
+      applyFilters,
+      removeFilterByField,
     };
   },
   computed: {
@@ -678,62 +763,15 @@ export default defineComponent({
   },
   watch: {
     addSearchTerm() {
-      if (this.searchObj.data.stream.addToFilter != "") {
-        let currentQuery = this.searchObj.data.editorValue.split("|");
-        let filter = this.searchObj.data.stream.addToFilter;
-
-        const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
-
-        if (isFilterValueNull) {
-          filter = filter
-            .replace(/=|!=/, (match) => {
-              return match === "=" ? " is " : " is not ";
-            })
-            .replace(/'null'/, "null");
-        }
-
-        if (currentQuery.length > 1) {
-          if (currentQuery[1].trim() != "") {
-            const fieldName = getFieldFromExpression(filter);
-            const replaced = fieldName
-              ? replaceExistingFieldCondition(
-                  currentQuery[1],
-                  fieldName,
-                  filter,
-                )
-              : currentQuery[1];
-            if (replaced !== currentQuery[1]) {
-              currentQuery[1] = replaced;
-            } else {
-              currentQuery[1] += " and " + filter;
-            }
-          } else {
-            currentQuery[1] = filter;
-          }
-          this.searchObj.data.query = currentQuery.join("| ");
-        } else {
-          const fieldName = getFieldFromExpression(filter);
-          const replaced = fieldName
-            ? replaceExistingFieldCondition(
-                currentQuery[0] as string,
-                fieldName,
-                filter,
-              )
-            : (currentQuery[0] as string);
-          if (replaced !== currentQuery[0]) {
-            currentQuery[0] = replaced;
-          } else {
-            if (currentQuery[0] != "") {
-              currentQuery[0] += " and " + filter;
-            } else {
-              currentQuery[0] = filter;
-            }
-          }
-          this.searchObj.data.query = currentQuery[0];
-        }
+      if (this.searchObj.data.stream.addToFilter !== "") {
+        const newValue = applyFilterTerm(
+          this.searchObj.data.stream.addToFilter,
+          this.searchObj.data.editorValue,
+        );
+        this.searchObj.data.editorValue = newValue;
         this.searchObj.data.stream.addToFilter = "";
         if (this.queryEditorRef?.setValue)
-          this.queryEditorRef.setValue(this.searchObj.data.query);
+          this.queryEditorRef.setValue(newValue);
       }
     },
     filters() {},

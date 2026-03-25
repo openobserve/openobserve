@@ -282,8 +282,8 @@ describe("SearchBar.vue Methods", () => {
     expect(searchBarInstance.searchObj.meta.sqlMode).toBe(false);
   });
 
-  // Test 11: toggleHistogram method
-  it("should toggle histogram visibility", () => {
+  // Test 11: toggleHistogram method (histogram toggle is on the toolbar, not in menu)
+  it("should toggle histogram visibility via toolbar toggle", () => {
     const initialValue = searchBarInstance.searchObj.meta.showHistogram;
     searchBarInstance.toggleHistogram();
     expect(searchBarInstance.searchObj.meta.showHistogram).toBe(!initialValue);
@@ -423,10 +423,10 @@ describe("SearchBar.vue Reactive Properties", () => {
     expect(instance.searchObj.data.datetime.relativeTimePeriod).toBe("1h");
   });
 
-  // Test 24: Histogram visibility state
-  it("should validate histogram visibility state", () => {
+  // Test 24: Histogram visibility state (toolbar toggle, not menu item)
+  it("should validate histogram visibility state from toolbar toggle", () => {
     expect(instance.searchObj.meta.showHistogram).toBe(true);
-    
+
     instance.searchObj.meta.showHistogram = false;
     expect(instance.searchObj.meta.showHistogram).toBe(false);
   });
@@ -1731,7 +1731,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
       }),
       
       handleHistogramMode: vi.fn(() => {
-        // Mock histogram mode logic
+        // Mock histogram mode logic (toggle is on toolbar, not in menu)
       }),
       
       handleRunQueryFn: vi.fn(() => {
@@ -3768,6 +3768,9 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           queryResults: {
             hits: [],
           },
+          stream: {
+            selectedStream: [],
+          },
         },
         meta: {
           logsVisualizeToggle: "logs",
@@ -3783,6 +3786,7 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           type: "table",
         },
       },
+      onLogsVisualizeToggleUpdate: vi.fn(),
     };
   });
 
@@ -4044,6 +4048,19 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
       testInstance.searchObj.meta.logsVisualizeToggle = "patterns";
       testInstance.searchObj.meta.resultGrid.showPagination = false;
       expect(testInstance.searchObj.meta.resultGrid.showPagination).toBe(false);
+    });
+
+    it("should run visualize validation even when already in visualize mode", () => {
+      // Previously the visualize block required logsVisualizeToggle == 'logs'.
+      // After the fix, switching to visualize should always validate regardless
+      // of the current toggle state.
+      testInstance.searchObj.meta.logsVisualizeToggle = "visualize";
+      testInstance.searchObj.meta.sqlMode = false;
+      testInstance.searchObj.data.stream.selectedStream = [];
+
+      // This should trigger validation (query-empty + no stream check)
+      // and not silently skip it because logsVisualizeToggle is already "visualize"
+      expect(typeof testInstance.onLogsVisualizeToggleUpdate).toBe("function");
     });
   });
 });

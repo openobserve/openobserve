@@ -246,6 +246,7 @@ export default defineComponent({
       panelTitle,
       updateActiveTabId,
       activeFolderId,
+      activeTabId,
       updateSelectedDashboard,
     };
   },

@@ -153,7 +153,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 </div>
             </div>
-            <div class="tw:grid tw:grid-cols-3 tw:gap-4 tw:w-full">
+            <div class="tw:grid tw:grid-cols-4 tw:gap-4 tw:w-full">
+                <div class="feature-card">
+              <div class="tile-content text-center column justify-between ">
+                <div class="column justify-between">
+                    <div class="row justify-between">
+                    <div class="usage-tile-title">{{ t("billing.aiCredits") }}</div>
+                    <div style="opacity: 0.8;">
+                        <img :src="aiIcon" />
+                    </div>
+                    </div>
+                </div>
+                <div class="usage-data-to-display row items-end ">
+                {{ usageData.ai_credits }} Credits
+                </div>
+                </div>
+                </div>
                 <div class="feature-card">
               <div class="tile-content text-center column justify-between ">
                 <!-- Top Section (60%) -->
@@ -263,7 +278,8 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         functions: "0.00",
         pipeline: "0.00",
         remotepipeline: "0.00",
-        dataretention: "0.00"
+        dataretention: "0.00",
+        ai_credits: "0.00"
       });
       let chartData: any = ref({});
       onMounted(async () => {
@@ -292,9 +308,22 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         )
           .then((res) => {
             dataLoading.value = false;
-            res.data.data.forEach((item: any) => {  
+            res.data.data.forEach((item: any) => {
               const numericValue = parseFloat(item.value);
-              usageData.value[item.event.toLowerCase()] =  numericValue.toFixed(2);
+              // Map API event names to usageData keys
+              const eventKeyMap: Record<string, string> = {
+                "ingestion": "ingestion",
+                "search": "search",
+                "functions": "functions",
+                "pipeline": "pipeline",
+                "remotepipeline": "remotepipeline",
+                "dataretention": "dataretention",
+                "aicredits": "ai_credits",
+              };
+              const key = eventKeyMap[item.event.toLowerCase()];
+              if (key) {
+                usageData.value[key] = numericValue.toFixed(2);
+              }
             });
 
             dismiss();
@@ -323,6 +352,11 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
       const pipelineIcon = getImageURL("images/usage/pipeline.svg");
       const remotePipelineIcon = getImageURL("images/usage/remote_pipeline.svg");
       const dataRetentionIcon = getImageURL("images/usage/data_retention.svg");
+      const aiIcon = computed(() =>
+        store.state.theme === "dark"
+          ? getImageURL("images/common/ai_icon_dark.svg")
+          : getImageURL("images/common/ai_icon_gradient.svg")
+      );
       //this is the example data that needs to be used to get the chart in usage page 
       //we just need to have the data in the format of the dataModel
       //eg: date and value and in the array format
@@ -910,6 +944,7 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         pipelineIcon,
         remotePipelineIcon,
         dataRetentionIcon,
+        aiIcon,
       };
     },
   });

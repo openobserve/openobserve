@@ -33,7 +33,12 @@ use config::{
         stream::StreamType,
     },
     metrics,
-    utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt, time::now_micros},
+    utils::{
+        json,
+        schema::{infer_json_schema_from_map, schema_eq},
+        schema_ext::SchemaExt,
+        time::now_micros,
+    },
 };
 use datafusion::arrow::datatypes::{Field, Schema};
 use hashbrown::HashSet;
@@ -94,7 +99,7 @@ pub async fn check_for_schema(
     let inferred_schema = infer_json_schema_from_map(stream_name, stream_type, value_iter)?;
 
     // fast path
-    if schema.schema().fields.eq(&inferred_schema.fields) {
+    if schema_eq(schema.schema(), &inferred_schema) {
         return Ok((
             SchemaEvolution {
                 is_schema_changed: false,
@@ -552,10 +557,10 @@ pub fn check_schema_for_defined_schema_fields(
             // Automatically include all OTEL Gen-AI and LLM evaluation fields from the schema
             for field in schema.fields() {
                 let name = field.name();
-                if name.starts_with("gen_ai.")
-                    || name.starts_with("llm.")
-                    || name == "user.id"
-                    || name == "session.id"
+                if name.starts_with("gen_ai_")
+                    || name.starts_with("llm_")
+                    || name == "user_id"
+                    || name == "session_id"
                 {
                     fields.insert(name.to_string());
                 }

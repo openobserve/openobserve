@@ -510,7 +510,10 @@ export default defineComponent({
           filteredFields.value = [...props.columns];
         } else {
           const needle = val.toLowerCase();
-          filteredFields.value = props.columns.filter((v: any) => v.toLowerCase().indexOf(needle) > -1);
+          filteredFields.value = props.columns.filter((v: any) => {
+            const label = typeof v === "string" ? v : v.label || v.value || "";
+            return label.toLowerCase().indexOf(needle) > -1;
+          });
         }
       });
     };
@@ -523,7 +526,10 @@ export default defineComponent({
           filteredNumericColumns.value = [...props.columns];
         } else {
           const needle = val.toLowerCase();
-          filteredNumericColumns.value = props.columns.filter((v: any) => v.toLowerCase().indexOf(needle) > -1);
+          filteredNumericColumns.value = props.columns.filter((v: any) => {
+            const label = typeof v === "string" ? v : v.label || v.value || "";
+            return label.toLowerCase().indexOf(needle) > -1;
+          });
         }
       });
     };
@@ -745,6 +751,15 @@ export default defineComponent({
         emit("editor-closed");
       }
     });
+
+    // Sync filtered lists when columns prop changes (async stream load)
+    watch(
+      () => props.columns,
+      (newCols) => {
+        filteredFields.value = [...newCols];
+        filteredNumericColumns.value = [...newCols];
+      }
+    );
 
     // Watch for isAggregationEnabled prop changes
     watch(
@@ -987,12 +1002,16 @@ export default defineComponent({
 }
 
 .ai-hover-btn {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+
   &:hover {
-    background-color: rgba(121, 128, 204, 0.1);
+    background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
+    box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
   }
 
   &.ai-btn-active {
-    background-color: rgba(121, 128, 204, 0.2);
+    background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
   }
 }
 

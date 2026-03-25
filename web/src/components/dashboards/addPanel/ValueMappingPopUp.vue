@@ -25,7 +25,7 @@
       style="border-bottom: 2px solid gray; margin-bottom: 5px"
     >
       <div class="flex items-center q-table__title q-mr-md">
-        <span>Value Mappings</span>
+        <span>{{ t("dashboard.valueMappingsTitle") }}</span>
       </div>
       <q-btn
         icon="close"
@@ -62,7 +62,7 @@
           <div class="draggable-content tw:flex tw:gap-x-6">
             <q-select
               v-model="mapping.type"
-              label="Type"
+              :label="t('dashboard.valueMappingType')"
               :options="mappingTypes"
               :data-test="`dashboard-addpanel-config-value-mapping-type-select-${index}`"
               emit-value
@@ -79,7 +79,7 @@
             >
               <q-input
                 v-model="mapping.value"
-                label="Value"
+                :label="t('dashboard.valueMappingValue')"
                 class="input-spacing"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-value-input-${index}`"
@@ -91,7 +91,7 @@
             >
               <q-input
                 v-model="mapping.pattern"
-                label="Regex"
+                :label="t('dashboard.valueMappingRegex')"
                 class="input-spacing"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-pattern-input-${index}`"
@@ -103,14 +103,14 @@
             >
               <q-input
                 v-model="mapping.from"
-                label="From"
+                :label="t('dashboard.valueMappingFrom')"
                 class="input-spacing"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-from-input-${index}`"
                borderless hide-bottom-space/>
               <q-input
                 v-model="mapping.to"
-                label="To"
+                :label="t('dashboard.valueMappingTo')"
                 class="input-spacing tw:flex-1"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-to-input-${index}`"
@@ -118,7 +118,7 @@
             </div>
             <q-input
               v-model="mapping.text"
-              label="Display Value"
+              :label="t('dashboard.valueMappingDisplayValue')"
               class="input-spacing tw:flex-1"
               dense
               :data-test="`dashboard-addpanel-config-value-mapping-text-input-${index}`"
@@ -147,13 +147,13 @@
                   style="width: 10%"
                   class="cursor-pointer tw:align-middle"
                   size="xs"
-                  title="Remove color"
+                  :title="t('dashboard.valueMappingRemoveColor')"
                   @click="removeColorByIndex(index)"
                 />
               </div>
               <div v-else class="tw:w-full">
                 <q-btn
-                  label="Set color"
+                  :label="t('dashboard.valueMappingSetColor')"
                   no-caps
                   flat
                   dense
@@ -177,7 +177,7 @@
       <div class="flex justify-between">
         <q-btn
           @click="addValueMapping"
-          label="+ Add a new mapping"
+          :label="t('dashboard.valueMappingAddNew')"
           no-caps
           outline
           dense
@@ -187,7 +187,7 @@
         <q-btn
           @click="applyValueMapping"
           color="primary"
-          label="Apply"
+          :label="t('dashboard.valueMappingApply')"
           style="margin-right: 10px"
           padding="5px 14px"
           no-caps
@@ -199,7 +199,7 @@
   </div>
 </template>
 <script lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { onMounted } from "vue";
@@ -225,20 +225,20 @@ export default defineComponent({
       animation: 200,
     });
 
-    const mappingTypes = [
+    const mappingTypes = computed(() => [
       {
-        label: "Value",
+        label: t("dashboard.valueMappingTypeValue"),
         value: "value",
       },
       {
-        label: "Range",
+        label: t("dashboard.valueMappingTypeRange"),
         value: "range",
       },
       {
-        label: "Regex",
+        label: t("dashboard.valueMappingTypeRegex"),
         value: "regex",
       },
-    ];
+    ]);
 
     const addValueMapping = () => {
       editedValueMapping.value.push({

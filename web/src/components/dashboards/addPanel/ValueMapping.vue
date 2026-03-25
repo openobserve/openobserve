@@ -16,38 +16,16 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div>
-    <div class="q-mb-sm" style="font-weight: 600">
-      <span>Value Mappings</span>
-      <q-btn
-        no-caps
-        padding="xs"
-        class=""
-        size="sm"
-        flat
-        icon="info_outline"
-        data-test="dashboard-addpanel-config-drilldown-info"
-      >
-        <q-tooltip
-          class="bg-grey-8"
-          anchor="bottom middle"
-          self="top middle"
-          max-width="250px"
-        >
-          Enhance table readability by mapping values to custom text and
-          backgorund colors for clearer data visualization.
-        </q-tooltip>
-      </q-btn>
-    </div>
     <q-btn
       @click="openValueMappingPopUp"
       style="cursor: pointer; padding: 0px 5px"
       :label="
         dashboardPanelData.data.config.mappings.length
-          ? ' Edit Value Mapping'
-          : ' Add Value Mapping'
+          ? t('dashboard.editValueMapping')
+          : t('dashboard.addValueMapping')
       "
       no-caps
-      data-test="dashboard-addpanel-config-drilldown-add-btn"
+      data-test="dashboard-addpanel-config-value-mapping-add-btn"
       class="el-border"
     />
     <q-dialog v-model="showValueMappingPopUp">
@@ -65,8 +43,9 @@
 
 <script lang="ts">
 import { defineComponent, inject, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ValueMappingPopUp from "./ValueMappingPopUp.vue";
 import { onBeforeMount } from "vue";
 
@@ -75,13 +54,14 @@ export default defineComponent({
   components: { ValueMappingPopUp },
   props: [],
   setup() {
+    const { t } = useI18n();
     const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
     const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey
+      dashboardPanelDataPageKey,
     );
 
     const showValueMappingPopUp = ref(false);
@@ -103,6 +83,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       store,
       dashboardPanelData,
       showValueMappingPopUp,

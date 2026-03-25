@@ -15,73 +15,128 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="width: 50vw;" :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
-    <!-- Header -->
+  <div
+    style="width: 55vw"
+    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+  >
+    <!-- Header — matches Stream Detail (schema.vue) layout -->
     <q-card-section class="q-ma-none">
       <div class="row items-center no-wrap">
         <div class="col">
-          <div class="tw:text-[18px] tw:flex tw:items-center" data-test="alert-details-title">
-            {{ t('alert_list.alert_history') }}
+          <div
+            class="tw:text-[18px] tw:flex tw:items-center"
+            data-test="alert-details-title"
+          >
+            {{ t("alert_list.alert_history") }}
             <!-- Alert Name Badge -->
             <span
               v-if="alertDetails"
               :class="[
-                'tw:font-bold tw:mr-4 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:max-w-xs tw:truncate tw:inline-block',
+                'tw:font-bold tw:mr-2 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:max-w-xs tw:truncate tw:inline-block',
                 store.state.theme === 'dark'
                   ? 'tw:text-blue-400 tw:bg-blue-900/50'
-                  : 'tw:text-blue-600 tw:bg-blue-50'
+                  : 'tw:text-blue-600 tw:bg-blue-50',
               ]"
+              data-test="alert-history-name-badge"
             >
               {{ alertDetails.name }}
-              <q-tooltip v-if="alertDetails.name && alertDetails.name.length > 35" class="tw:text-xs">
+              <q-tooltip
+                v-if="alertDetails.name && alertDetails.name.length > 35"
+                class="tw:text-xs"
+              >
                 {{ alertDetails.name }}
               </q-tooltip>
             </span>
-            <!-- Alert Type Icon -->
-            <div class="tw:flex tw:items-center tw:gap-2">
+            <!-- Alert Type Badge -->
+            <div
+              v-if="alertDetails"
+              :class="[
+                'tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:border',
+                store.state.theme === 'dark'
+                  ? 'tw:bg-gray-800/50 tw:border-gray-600'
+                  : 'tw:bg-gray-50 tw:border-gray-200',
+              ]"
+            >
               <q-icon
-                :name="alertDetails?.is_real_time ? 'bolt' : 'schedule'"
-                size="20px"
-                color="grey"
+                :name="
+                  isAnomaly
+                    ? 'query_stats'
+                    : alertDetails.is_real_time
+                      ? 'bolt'
+                      : 'schedule'
+                "
+                size="14px"
+                class="tw:opacity-70"
+              />
+              <span
+                :class="[
+                  'tw:text-xs tw:font-semibold',
+                  store.state.theme === 'dark'
+                    ? 'tw:text-gray-200'
+                    : 'tw:text-gray-800',
+                ]"
               >
-                <q-tooltip>{{ alertDetails?.is_real_time ? 'Real-time' : 'Scheduled' }}</q-tooltip>
-              </q-icon>
+                {{
+                  isAnomaly
+                    ? "Anomaly Detection"
+                    : alertDetails.is_real_time
+                      ? "Real-time"
+                      : "Scheduled"
+                }}
+              </span>
+            </div>
+            <!-- Tab toggle -->
+            <div
+              class="tab-toggle tw:shrink-0 tw:ml-4"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tab-toggle-dark'
+                  : 'tab-toggle-light'
+              "
+            >
+              <button
+                class="tab-toggle-btn"
+                :class="activeTab === 'history' ? 'tab-toggle-btn-active' : ''"
+                @click="activeTab = 'history'"
+                data-test="alert-history-tab-history"
+              >
+                <q-icon name="history" size="14px" />
+                History
+              </button>
+              <button
+                class="tab-toggle-btn"
+                :class="
+                  activeTab === 'condition' ? 'tab-toggle-btn-active' : ''
+                "
+                @click="activeTab = 'condition'"
+                data-test="alert-history-tab-condition"
+              >
+                <q-icon name="code" size="14px" />
+                Condition
+              </button>
             </div>
           </div>
         </div>
-        <div class="col-auto tw:flex tw:items-center">
+        <div class="col-auto tw:flex tw:items-center tw:gap-1">
+          <DateTime
+            :style="activeTab !== 'history' ? 'visibility: hidden' : ''"
+            ref="dateTimeRef"
+            auto-apply
+            :default-type="dateTimeType"
+            :default-absolute-time="{
+              startTime: absoluteTime.startTime,
+              endTime: absoluteTime.endTime,
+            }"
+            :default-relative-time="relativeTime"
+            data-test="alert-history-drawer-date-picker"
+            @on:date-change="updateDateTime"
+          />
           <q-btn
-            data-test="alert-details-edit-btn"
-            flat
-            round
-            dense
-            icon="edit"
-            @click="editAlertFromDrawer"
-          >
-            <q-tooltip>{{ t('alerts.edit') }}</q-tooltip>
-          </q-btn>
-          <q-btn
-            data-test="alert-details-refresh-btn"
-            class=""
-            flat
-            dense
-            no-caps
-            @click="refreshHistory"
-            :loading="isLoadingHistory"
-            :disable="isLoadingHistory"
-          >
-            <q-icon name="refresh" size="18px" />
-            <q-tooltip>
-              Refresh History
-            </q-tooltip>
-          </q-btn>
-          <q-btn
-            data-test="alert-details-close-btn"
             v-close-popup="true"
             round
-            dense
             flat
             icon="cancel"
+            data-test="alert-details-close-btn"
           />
         </div>
       </div>
@@ -89,125 +144,384 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
 
     <!-- Content -->
-    <div class="tw:mx-2 q-py-md alert-details-content" v-if="alertDetails">
-      <!-- SQL Query / PromQL Query / Conditions -->
-      <div class="tw:mb-3">
-        <div class="tw:flex tw:items-center tw:justify-between tw:mb-1">
-          <div class="section-label">
-            {{ alertDetails.type == "sql" ? t('alerts.alertDetails.sqlQuery') : alertDetails.type == "promql" ? t('alerts.alertDetails.promqlQuery') : t('alerts.alertDetails.conditions') }}
-          </div>
-          <q-btn
-            v-if="alertDetails.conditions != '' && alertDetails.conditions != '--'"
-            @click="copyToClipboard(alertDetails.conditions, alertDetails.type == 'sql' ? t('alerts.alertDetails.sqlQuery') : alertDetails.type == 'promql' ? t('alerts.alertDetails.promqlQuery') : t('alerts.alertDetails.conditions'))"
-            size="sm"
-            flat
-            dense
-            icon="content_copy"
-            class="tw:ml-2"
-            data-test="alert-details-copy-conditions-btn"
+    <div
+      class="tw:flex tw:flex-col"
+      style="height: calc(100vh - 60px); overflow: hidden"
+      v-if="alertDetails"
+    >
+      <!-- Tab Panels -->
+      <q-tab-panels
+        v-model="activeTab"
+        animated
+        class="tw:flex-1 tw:overflow-hidden tw:bg-transparent"
+        style="display: flex; flex-direction: column"
+      >
+        <!-- History Panel -->
+        <q-tab-panel
+          name="history"
+          class="tw:flex tw:flex-col tw:h-full tw:p-0 tw:overflow-hidden"
+        >
+          <div
+            class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:pt-1"
           >
-            <q-tooltip>{{ t('alerts.alertDetails.copy') }}</q-tooltip>
-          </q-btn>
-        </div>
-        <pre
-          class="el-border el-border-radius tw:p-2 tw:text-sm tw:overflow-x-auto"
-          style="white-space: pre-wrap"
-        >{{
-          alertDetails.conditions != "" && alertDetails.conditions != "--"
-            ? (alertDetails.type == 'sql' || alertDetails.type == 'promql' ? alertDetails.conditions : alertDetails.conditions.length != 2 ? `if ${alertDetails.conditions}` : t('alerts.alertDetails.noCondition'))
-            : t('alerts.alertDetails.noCondition')
-        }}</pre>
-      </div>
-
-      <!-- Description (only show if exists) -->
-      <div v-if="alertDetails.description" class="tw:mb-3">
-        <div class="section-label tw:mb-1">{{ t('common.description') }}</div>
-        <pre
-          class="el-border el-border-radius tw:p-2 tw:text-sm"
-          style="white-space: pre-wrap"
-        >{{ alertDetails.description }}</pre>
-      </div>
-
-      <!-- Alert History Table -->
-      <div class="tw:mb-6 tw:flex tw:flex-col" style="min-height: 300px;">
-        <div v-if="isLoadingHistory" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1">
-          <q-spinner-hourglass size="32px" color="primary" />
-          <div class="tw:text-sm tw:mt-3" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'">
-            {{ t('alerts.alertDetails.loadingHistory') }}
-          </div>
-        </div>
-
-        <div
-          v-else-if="alertHistory.length === 0"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1"
-          :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
-        >
-          <q-icon name="history" size="48px" class="tw:mb-2 tw:opacity-30" />
-          <div class="tw:text-sm">{{ t('alerts.alertDetails.noHistoryAvailable') }}</div>
-        </div>
-
-        <q-table
-          v-else
-          ref="qTableRef"
-          :rows="alertHistory"
-          :columns="historyTableColumns"
-          row-key="timestamp"
-          v-model:pagination="pagination"
-          @request="onRequest"
-          :style="tableHeight"
-          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          data-test="alert-details-history-table"
-        >
-          <template v-slot:body="props">
-            <q-tr :props="props">
-              <q-td v-for="col in historyTableColumns" :key="col.name" :props="props">
-                <template v-if="col.name === 'status'">
-                  <q-badge
-                    :color="getStatusColor(props.row.status)"
-                    :label="formatStatus(props.row.status)"
-                  />
-                </template>
-                <template v-else-if="col.name === 'timestamp'">
-                  {{ formatTimestamp(props.row.timestamp) }}
-                </template>
-                <template v-else-if="col.name === 'evaluation_time'">
-                  {{ props.row.evaluation_took_in_secs ? props.row.evaluation_took_in_secs.toFixed(3) : '-' }}
-                </template>
-                <template v-else-if="col.name === 'query_time'">
-                  {{ props.row.query_took || '-' }}
-                </template>
-                <template v-else-if="col.name === 'error'">
-                  <div v-if="props.row.error" class="tw:flex tw:items-center">
-                    <q-icon name="error" size="20px" class="tw:text-red-500 tw:cursor-pointer">
-                      <q-tooltip class="tw:text-xs tw:max-w-md">
-                        {{ props.row.error }}
-                      </q-tooltip>
-                    </q-icon>
-                  </div>
-                  <span v-else>--</span>
-                </template>
-              </q-td>
-            </q-tr>
-          </template>
-
-          <template #bottom="scope">
-            <div class="bottom-btn tw:h-[48px] tw:flex tw:w-full">
-              <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[220px] tw:mr-md">
-                {{ resultTotal }} {{ t('alerts.alertDetails.results') }}
+            <!-- Loading state -->
+            <div
+              v-if="isLoadingHistory"
+              class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:gap-3"
+            >
+              <q-spinner-hourglass size="32px" color="primary" />
+              <div
+                class="tw:text-sm"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'tw:text-gray-400'
+                    : 'tw:text-gray-500'
+                "
+              >
+                {{ t("alerts.alertDetails.loadingHistory") }}
               </div>
-              <QTablePagination
-                :scope="scope"
-                :position="'bottom'"
-                :resultTotal="resultTotal"
-                :perPageOptions="perPageOptions"
-                @update:changeRecordPerPage="changePagination"
-                @update:changePagination="onPageChange"
-              />
-
             </div>
-          </template>
-        </q-table>
-      </div>
+
+            <!-- Empty state -->
+            <div
+              v-else-if="alertHistory.length === 0"
+              class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:gap-2"
+            >
+              <div
+                class="tw:w-14 tw:h-14 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:mb-1"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'tw:bg-gray-800'
+                    : 'tw:bg-gray-100'
+                "
+              >
+                <q-icon
+                  name="history_toggle_off"
+                  size="28px"
+                  :color="store.state.theme === 'dark' ? 'grey-6' : 'grey-5'"
+                />
+              </div>
+              <div
+                class="tw:text-sm tw:font-medium"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'tw:text-gray-400'
+                    : 'tw:text-gray-600'
+                "
+              >
+                {{ t("alerts.alertDetails.noHistoryAvailable") }}
+              </div>
+              <div
+                class="tw:text-xs"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'tw:text-gray-600'
+                    : 'tw:text-gray-400'
+                "
+              >
+                Try expanding the time range
+              </div>
+            </div>
+
+            <!-- History Table -->
+            <div
+              v-else
+              class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:mb-2"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'code-block-dark'
+                  : 'code-block-light'
+              "
+            >
+              <q-table
+                ref="qTableRef"
+                :rows="alertHistory"
+                :columns="historyTableColumns"
+                row-key="timestamp"
+                v-model:pagination="pagination"
+                @request="onRequest"
+                style="flex: 1; overflow: hidden"
+                class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky history-table"
+                data-test="alert-details-history-table"
+              >
+                <template v-slot:body="props">
+                  <q-tr :props="props" :class="getRowClass(props.row.status)">
+                    <q-td
+                      v-for="col in historyTableColumns"
+                      :key="col.name"
+                      :props="props"
+                    >
+                      <template v-if="col.name === '#'">
+                        <span
+                          class="tw:text-[13px] tw:tabular-nums"
+                          :class="
+                            store.state.theme === 'dark'
+                              ? 'tw:text-gray-500'
+                              : 'tw:text-gray-400'
+                          "
+                        >
+                          {{
+                            (currentPage - 1) * selectedPerPage +
+                            props.rowIndex +
+                            1
+                          }}
+                        </span>
+                      </template>
+                      <template v-else-if="col.name === 'status'">
+                        <q-chip
+                          dense
+                          size="sm"
+                          :icon="getStatusChipIcon(props.row.status)"
+                          :label="formatStatus(props.row.status)"
+                          :color="getStatusChipColor(props.row.status)"
+                          :text-color="getStatusChipTextColor(props.row.status)"
+                          class="tw:cursor-default"
+                          data-test="alert-history-status-chip"
+                        >
+                          <q-tooltip
+                            v-if="props.row.error"
+                            max-width="300px"
+                            class="tw:text-xs tw:break-words"
+                          >
+                            {{ props.row.error }}
+                          </q-tooltip>
+                        </q-chip>
+                      </template>
+                      <template v-else-if="col.name === 'timestamp'">
+                        <span class="tw:text-[13px]">{{
+                          formatTimestamp(props.row.timestamp)
+                        }}</span>
+                        <q-tooltip class="tw:text-xs">
+                          {{ formatTimestampFull(props.row.timestamp) }}
+                        </q-tooltip>
+                      </template>
+                      <template v-else-if="col.name === 'evaluation_time'">
+                        <span class="tw:text-[13px] tw:tabular-nums">
+                          {{
+                            props.row.evaluation_took_in_secs
+                              ? props.row.evaluation_took_in_secs.toFixed(3) +
+                                "s"
+                              : "—"
+                          }}
+                        </span>
+                      </template>
+                      <template v-else-if="col.name === 'query_time'">
+                        <span class="tw:text-[13px] tw:tabular-nums">
+                          {{
+                            props.row.query_took
+                              ? props.row.query_took + "ms"
+                              : "—"
+                          }}
+                        </span>
+                      </template>
+                      <template v-else-if="col.name === 'anomaly_count'">
+                        <span
+                          class="tw:text-[13px] tw:tabular-nums"
+                          :class="
+                            props.row.anomaly_count > 0
+                              ? 'tw:text-red-500 tw:font-medium'
+                              : ''
+                          "
+                        >
+                          {{
+                            props.row.anomaly_count != null
+                              ? props.row.anomaly_count
+                              : "—"
+                          }}
+                        </span>
+                      </template>
+                    </q-td>
+                  </q-tr>
+                </template>
+
+                <template #bottom="scope">
+                  <div class="tw:flex tw:items-center tw:w-full tw:h-[48px]">
+                    <div
+                      class="o2-table-footer-title tw:flex tw:items-center tw:w-[220px]"
+                    >
+                      {{ resultTotal }} {{ t("alerts.alertDetails.results") }}
+                    </div>
+                    <QTablePagination
+                      :scope="scope"
+                      :position="'bottom'"
+                      :resultTotal="resultTotal"
+                      :perPageOptions="perPageOptions"
+                      @update:changeRecordPerPage="changePagination"
+                      @update:changePagination="onPageChange"
+                    />
+                  </div>
+                </template>
+              </q-table>
+            </div>
+          </div>
+        </q-tab-panel>
+
+        <!-- Condition Panel -->
+        <q-tab-panel
+          name="condition"
+          class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden tw:p-0"
+        >
+          <div
+            class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:pt-2 tw:pb-2"
+          >
+            <!-- Anomaly detection condition view — mirrors the alert SQL code block -->
+            <template v-if="isAnomaly">
+              <div
+                class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'code-block-dark'
+                    : 'code-block-light'
+                "
+              >
+                <div
+                  class="code-block-header tw:shrink-0"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'code-block-header-dark'
+                      : 'code-block-header-light'
+                  "
+                >
+                  <div class="tw:flex tw:items-center tw:gap-1.5">
+                    <span
+                      class="tw:text-[11px] tw:font-medium"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'tw:text-gray-400'
+                          : 'tw:text-gray-500'
+                      "
+                    >
+                      SQL
+                    </span>
+                  </div>
+                  <q-btn
+                    v-if="anomalySql"
+                    @click="copyToClipboard(anomalySql, 'SQL')"
+                    flat
+                    dense
+                    size="xs"
+                    icon="content_copy"
+                    :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
+                    data-test="anomaly-details-copy-sql-btn"
+                  >
+                    <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
+                  </q-btn>
+                </div>
+                <pre
+                  class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
+                  >{{ anomalySql || t("alerts.alertDetails.noCondition") }}</pre
+                >
+              </div>
+            </template>
+
+            <!-- Regular alert condition view -->
+            <template v-else>
+              <div
+                class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'code-block-dark'
+                    : 'code-block-light'
+                "
+              >
+                <!-- Code block header bar — stays fixed -->
+                <div
+                  class="code-block-header tw:shrink-0"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'code-block-header-dark'
+                      : 'code-block-header-light'
+                  "
+                >
+                  <div class="tw:flex tw:items-center tw:gap-1.5">
+                    <span
+                      class="tw:text-[11px] tw:font-medium"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'tw:text-gray-400'
+                          : 'tw:text-gray-500'
+                      "
+                    >
+                      {{
+                        alertDetails.type === "sql"
+                          ? "SQL"
+                          : alertDetails.type === "promql"
+                            ? "PromQL"
+                            : "Conditions"
+                      }}
+                    </span>
+                  </div>
+                  <q-btn
+                    v-if="
+                      alertDetails.conditions &&
+                      alertDetails.conditions !== '' &&
+                      alertDetails.conditions !== '--'
+                    "
+                    @click="
+                      copyToClipboard(
+                        alertDetails.conditions,
+                        alertDetails.type === 'sql'
+                          ? t('alerts.alertDetails.sqlQuery')
+                          : alertDetails.type === 'promql'
+                            ? t('alerts.alertDetails.promqlQuery')
+                            : t('alerts.alertDetails.conditions'),
+                      )
+                    "
+                    flat
+                    dense
+                    size="xs"
+                    icon="content_copy"
+                    :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
+                    data-test="alert-details-copy-conditions-btn"
+                  >
+                    <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
+                  </q-btn>
+                </div>
+                <!-- Code content — scrolls internally -->
+                <pre
+                  class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
+                  >{{
+                    alertDetails.conditions !== "" &&
+                    alertDetails.conditions !== "--"
+                      ? alertDetails.type === "sql" ||
+                        alertDetails.type === "promql"
+                        ? alertDetails.conditions
+                        : alertDetails.conditions.length !== 2
+                          ? `if ${alertDetails.conditions}`
+                          : t("alerts.alertDetails.noCondition")
+                      : t("alerts.alertDetails.noCondition")
+                  }}</pre
+                >
+              </div>
+            </template>
+
+            <!-- Description (only show if exists) -->
+            <div v-if="alertDetails.description" class="tw:mt-3 tw:shrink-0">
+              <div
+                class="tw:flex tw:items-center tw:gap-1.5 tw:text-[12px] tw:font-semibold tw:uppercase tw:tracking-wider tw:mb-1"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'tw:text-gray-400'
+                    : 'tw:text-gray-500'
+                "
+              >
+                <q-icon name="info_outline" size="13px" />
+                {{ t("common.description") }}
+              </div>
+              <div
+                class="tw:text-[13px] tw:px-3 tw:py-2 tw:rounded tw:leading-relaxed"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'tw:bg-gray-800 tw:text-gray-300'
+                    : 'tw:bg-gray-50 tw:text-gray-700'
+                "
+              >
+                {{ alertDetails.description }}
+              </div>
+            </div>
+          </div>
+        </q-tab-panel>
+      </q-tab-panels>
     </div>
   </div>
 </template>
@@ -217,8 +531,11 @@ import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
+import DateTime from "@/components/DateTime.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
+import anomalyDetectionService from "@/services/anomaly_detection";
+import { buildAnomalyPreviewSql } from "@/utils/alerts/anomalySqlBuilder";
 import type { Ref } from "vue";
 
 // Composables
@@ -230,18 +547,51 @@ const $q = useQuasar();
 interface Props {
   alertDetails: any;
   alertId: string;
+  alertType?: string;
 }
 
 const props = defineProps<Props>();
 
-const emit = defineEmits(["edit"]);
+const isAnomaly = computed(() => props.alertType === "anomaly_detection");
+
+// Full config fetched from the dedicated anomaly detection endpoint.
+// The list API only returns summary fields; we need this for the Condition tab.
+const fullAnomalyConfig = ref<any>(null);
+
+const anomalySql = computed(() => {
+  const d = fullAnomalyConfig.value || props.alertDetails;
+  if (!d) return "";
+  return buildAnomalyPreviewSql(d);
+});
+
+const emit = defineEmits([]);
 
 const resultTotal = ref(0);
+
+// Tabs
+const activeTab = ref("history");
 
 // Refs
 const alertHistory: Ref<any[]> = ref([]);
 const isLoadingHistory = ref(false);
 const qTableRef: Ref<any> = ref(null);
+
+// Date time - default to last 15 minutes (relative)
+const dateTimeRef = ref<any>(null);
+const dateTimeType = ref("relative");
+const relativeTime = ref("15m");
+const _now = Date.now();
+const _fifteenMinutesAgo = _now - 15 * 60 * 1000;
+const absoluteTime = ref({
+  startTime: _fifteenMinutesAgo * 1000, // microseconds
+  endTime: _now * 1000, // microseconds
+});
+const dateTimeValues = ref({
+  startTime: _fifteenMinutesAgo * 1000,
+  endTime: _now * 1000,
+  type: "relative",
+  relativeTimePeriod: "15m",
+});
 
 // Pagination (server-side pagination)
 const selectedPerPage = ref<number>(50);
@@ -252,14 +602,12 @@ const pagination: any = ref({
   rowsNumber: 0,
 });
 
-
 const perPageOptions = [
   { label: "10", value: 10 },
   { label: "20", value: 20 },
   { label: "50", value: 50 },
-  { label: "100", value: 100 }
+  { label: "100", value: 100 },
 ];
-
 
 const onRequest = async (requestProps: any) => {
   const { page, rowsPerPage } = requestProps.pagination;
@@ -267,7 +615,6 @@ const onRequest = async (requestProps: any) => {
   selectedPerPage.value = rowsPerPage;
   isLoadingHistory.value = true;
   await fetchAlertHistory(props.alertId);
-  // Update local pagination object after fetching
   pagination.value.page = page;
   pagination.value.rowsPerPage = rowsPerPage;
   isLoadingHistory.value = false;
@@ -278,82 +625,136 @@ const changePagination = (val: { label: string; value: any }) => {
   pagination.value.rowsPerPage = val.value;
   pagination.value.page = 1;
   qTableRef.value?.requestServerInteraction({
-    pagination: pagination.value
+    pagination: pagination.value,
   });
 };
-
 
 const onPageChange = (page: number) => {
   pagination.value.page = page;
   qTableRef.value?.requestServerInteraction({
-    pagination: pagination.value
+    pagination: pagination.value,
   });
 };
 
-// Computed property for dynamic table height
-const tableHeight = computed(() => {
-  // Base height calculation: 100vh - header - padding - conditions section
-  // If description exists, reduce more height; otherwise give more space to table
-  if (alertHistory.value.length === 0) {
-    return 'width: 100%';
-  }
-
-  const hasDescription = props.alertDetails?.description;
-  // With description: ~242px offset, Without description: ~190px offset (give ~52px more)
-  const heightOffset = hasDescription ? '242px' : '166px';
-  return `width: 100%; height: calc(100vh - ${heightOffset})`;
-});
-
-// Constants
-const historyTableColumns = [
+// Columns
+const alertHistoryColumns = [
   {
-    name: 'timestamp',
-    label: t('alerts.historyTable.timestamp'),
-    field: 'timestamp',
-    align: 'left' as const,
-    sortable: true
+    name: "#",
+    label: "#",
+    field: "#",
+    align: "left" as const,
+    sortable: false,
+    style: "width: 48px;",
   },
   {
-    name: 'status',
-    label: t('alerts.historyTable.status'),
-    field: 'status',
-    align: 'left' as const,
-    sortable: true
+    name: "timestamp",
+    label: t("alerts.historyTable.timestamp"),
+    field: "timestamp",
+    align: "left" as const,
+    sortable: true,
+    style: "width: 140px;",
   },
   {
-    name: 'evaluation_time',
-    label: t('alerts.historyTable.evaluationTime'),
-    field: 'evaluation_took_in_secs',
-    align: 'center' as const,
-    sortable: true
+    name: "status",
+    label: t("alerts.historyTable.status"),
+    field: "status",
+    align: "left" as const,
+    sortable: true,
+    style: "width: 110px;",
   },
   {
-    name: 'query_time',
-    label: t('alerts.historyTable.queryTime'),
-    field: 'query_took',
-    align: 'center' as const,
-    sortable: true
+    name: "evaluation_time",
+    label: t("alerts.historyTable.evaluationTime"),
+    field: "evaluation_took_in_secs",
+    align: "right" as const,
+    sortable: true,
+    style: "width: 130px;",
   },
   {
-    name: 'error',
-    label: t('alerts.historyTable.error'),
-    field: 'error',
-    align: 'center' as const,
-    sortable: false
+    name: "query_time",
+    label: t("alerts.historyTable.queryTime"),
+    field: "query_took",
+    align: "right" as const,
+    sortable: true,
+    style: "width: 120px;",
+  },
+  {
+    name: "error",
+    label: t("alerts.historyTable.error"),
+    field: "error",
+    align: "left" as const,
+    sortable: false,
   },
 ];
 
+const anomalyHistoryColumns = [
+  {
+    name: "#",
+    label: "#",
+    field: "#",
+    align: "left" as const,
+    sortable: false,
+    style: "width: 48px;",
+  },
+  {
+    name: "timestamp",
+    label: t("alerts.historyTable.timestamp"),
+    field: "timestamp",
+    align: "left" as const,
+    sortable: true,
+    style: "width: 140px;",
+  },
+  {
+    name: "status",
+    label: "Result",
+    field: "status",
+    align: "left" as const,
+    sortable: true,
+    style: "width: 120px;",
+  },
+  {
+    name: "evaluation_time",
+    label: t("alerts.historyTable.evaluationTime"),
+    field: "evaluation_took_in_secs",
+    align: "right" as const,
+    sortable: true,
+    style: "width: 130px;",
+  },
+  {
+    name: "anomaly_count",
+    label: "Anomalies",
+    field: "anomaly_count",
+    align: "right" as const,
+    sortable: true,
+    style: "width: 120px;",
+  },
+];
+
+const historyTableColumns = computed(() =>
+  isAnomaly.value ? anomalyHistoryColumns : alertHistoryColumns,
+);
+
 // Helper Functions
-const getStatusColor = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case "firing":
-    case "error":
-      return "negative";
-    case "ok":
-    case "success":
-      return "positive";
-    default:
-      return "grey";
+
+const getRowClass = (status: string) => {
+  if (store.state.theme === "dark") {
+    switch (status?.toLowerCase()) {
+      case "firing":
+      case "error":
+      case "anomaly":
+        return "row-error-dark";
+      default:
+        return "";
+    }
+  } else {
+    switch (status?.toLowerCase()) {
+      case "firing":
+      case "error":
+      case "anomaly":
+        return "row-error-light";
+      default:
+        return "";
+    }
   }
 };
 
@@ -362,31 +763,86 @@ const formatStatus = (status: string) => {
   return status.charAt(0).toUpperCase() + status.slice(1);
 };
 
+const getStatusChipIcon = (status: string) => {
+  switch (status?.toLowerCase()) {
+    case "firing":
+    case "error":
+    case "anomaly":
+      return "error_outline";
+    case "ok":
+    case "success":
+    case "normal":
+      return "check_circle_outline";
+    case "skipped":
+      return "block";
+    case "pending":
+      return "schedule";
+    default:
+      return "help_outline";
+  }
+};
+
+const getStatusChipColor = (status: string) => {
+  switch (status?.toLowerCase()) {
+    case "firing":
+    case "error":
+    case "anomaly":
+      return "red-1";
+    case "ok":
+    case "success":
+    case "normal":
+      return "green-1";
+    case "skipped":
+      return "amber-1";
+    case "pending":
+      return "blue-1";
+    default:
+      return "grey-3";
+  }
+};
+
+const getStatusChipTextColor = (status: string) => {
+  switch (status?.toLowerCase()) {
+    case "firing":
+    case "error":
+    case "anomaly":
+      return "red-9";
+    case "ok":
+    case "success":
+    case "normal":
+      return "green-9";
+    case "skipped":
+      return "amber-9";
+    case "pending":
+      return "blue-9";
+    default:
+      return "grey-8";
+  }
+};
+
 const formatTimestamp = (timestamp: number) => {
   if (!timestamp) return "N/A";
   const now = Date.now() * 1000; // microseconds
   const diff = now - timestamp;
 
-  // Less than 1 hour
   if (diff < 3600000000) {
     const minutes = Math.floor(diff / 60000000);
     return `${minutes} min ago`;
   }
-
-  // Less than 24 hours
   if (diff < 86400000000) {
     const hours = Math.floor(diff / 3600000000);
-    return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+    return `${hours}h ago`;
   }
-
-  // Less than 7 days
   if (diff < 604800000000) {
     const days = Math.floor(diff / 86400000000);
-    return `${days} day${days > 1 ? "s" : ""} ago`;
+    return `${days}d ago`;
   }
+  return date.formatDate(timestamp / 1000, "MMM DD, HH:mm");
+};
 
-  // Format as date
-  return date.formatDate(timestamp / 1000, "MMM DD, YYYY HH:mm");
+const formatTimestampFull = (timestamp: number) => {
+  if (!timestamp) return "N/A";
+  return date.formatDate(timestamp / 1000, "MMM DD, YYYY HH:mm:ss");
 };
 
 // Main Functions
@@ -394,27 +850,27 @@ const fetchAlertHistory = async (alertId: string) => {
   if (!alertId) return;
 
   try {
-    // Get history for last 30 days
-    const endTime = Date.now() * 1000; // Convert to microseconds
-    const startTime = endTime - (30 * 24 * 60 * 60 * 1000000); // 30 days ago in microseconds
-
-    // Calculate offset for server-side pagination
+    const startTime = dateTimeValues.value.startTime;
+    const endTime = dateTimeValues.value.endTime;
     const from = (currentPage.value - 1) * selectedPerPage.value;
 
+    const historyParams: Record<string, any> = {
+      size: selectedPerPage.value,
+      from: from,
+      start_time: startTime,
+      end_time: endTime,
+    };
+    if (isAnomaly.value) {
+      historyParams.anomaly_id = alertId;
+    } else {
+      historyParams.alert_id = alertId;
+    }
     const response = await alertsService.getHistory(
       store?.state?.selectedOrganization?.identifier,
-      {
-        alert_id: alertId,
-        size: selectedPerPage.value,
-        from: from,
-        start_time: startTime,
-        end_time: endTime
-      }
+      historyParams,
     );
     alertHistory.value = response.data?.hits || [];
     resultTotal.value = response.data?.total || 0;
-
-    // Update pagination rowsNumber for table
     pagination.value.rowsNumber = response.data?.total || 0;
   } catch (error: any) {
     alertHistory.value = [];
@@ -422,29 +878,42 @@ const fetchAlertHistory = async (alertId: string) => {
     pagination.value.rowsNumber = 0;
     $q.notify({
       type: "negative",
-      message: error.response?.data?.message || error.message || t("alerts.failedToFetchHistory"),
+      message:
+        error.response?.data?.message ||
+        error.message ||
+        t("alerts.failedToFetchHistory"),
       timeout: 5000,
     });
   }
 };
 
-const refreshHistory = async () => {
-  if (props.alertId) {
-      // Reset pagination to defaults
-    pagination.value.page = 1;
-    pagination.value.rowsPerPage = 50;
-    currentPage.value = 1;
-    selectedPerPage.value = 50;
-    // Fetch with reset pagination
-    isLoadingHistory.value = true;
-    await fetchAlertHistory(props.alertId);
-    isLoadingHistory.value = false;
-  }
-};
+const updateDateTime = (value: any) => {
+  dateTimeValues.value = {
+    startTime: value.startTime,
+    endTime: value.endTime,
+    type: value.relativeTimePeriod ? "relative" : "absolute",
+    relativeTimePeriod: value.relativeTimePeriod || "",
+  };
 
-const editAlertFromDrawer = () => {
-  if (!props.alertDetails) return;
-  emit("edit", props.alertDetails);
+  if (value.relativeTimePeriod) {
+    dateTimeType.value = "relative";
+    relativeTime.value = value.relativeTimePeriod;
+  } else {
+    dateTimeType.value = "absolute";
+    absoluteTime.value = {
+      startTime: value.startTime,
+      endTime: value.endTime,
+    };
+  }
+
+  pagination.value.page = 1;
+  currentPage.value = 1;
+  if (props.alertId) {
+    isLoadingHistory.value = true;
+    fetchAlertHistory(props.alertId).finally(() => {
+      isLoadingHistory.value = false;
+    });
+  }
 };
 
 const copyToClipboard = (text: string, type: string) => {
@@ -454,14 +923,14 @@ const copyToClipboard = (text: string, type: string) => {
       $q.notify({
         type: "positive",
         message: `${type} Copied Successfully!`,
-        timeout: 5000,
+        timeout: 3000,
       });
     })
     .catch(() => {
       $q.notify({
         type: "negative",
         message: "Error while copy content.",
-        timeout: 5000,
+        timeout: 3000,
       });
     });
 };
@@ -471,33 +940,145 @@ watch(
   () => props.alertId,
   async (newVal) => {
     if (newVal) {
-      // Reset to first page when alert changes
       pagination.value.page = 1;
       currentPage.value = 1;
-      // For initial load or when qTableRef is not ready, fetch directly
       if (!qTableRef.value) {
         isLoadingHistory.value = true;
         await fetchAlertHistory(newVal);
         isLoadingHistory.value = false;
       } else {
-        // Trigger table to fetch data
         qTableRef.value?.requestServerInteraction({
-          pagination: pagination.value
+          pagination: pagination.value,
         });
+      }
+      // Fetch full config for the Condition tab when this is an anomaly detection alert.
+      if (isAnomaly.value) {
+        try {
+          const org = store?.state?.selectedOrganization?.identifier;
+          const res = await anomalyDetectionService.getConfig(org, newVal);
+          fullAnomalyConfig.value = res.data;
+        } catch {
+          fullAnomalyConfig.value = null;
+        }
+      } else {
+        fullAnomalyConfig.value = null;
       }
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 </script>
 
 <style lang="scss" scoped>
-.alert-details-content {
-  max-height: calc(100vh - 80px);
+/* ── Tab toggle (header) ── */
+.tab-toggle {
+  display: flex;
+  align-items: center;
+  height: 1.625rem; /* 26px — same as chips */
+  border-radius: 6px;
+  border: 1px solid;
+  overflow: hidden;
+}
+.tab-toggle-light {
+  border-color: #d1d5db;
+  background: #f3f4f6;
+}
+.tab-toggle-dark {
+  border-color: #374151;
+  background: #1f2937;
+}
+.tab-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px;
+  height: 100%;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  color: inherit;
+  line-height: 1;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.tab-toggle-btn + .tab-toggle-btn {
+  border-left: 1px solid;
+  border-color: inherit;
+}
+.tab-toggle-light .tab-toggle-btn-active {
+  background: #fff;
+  color: #1d4ed8;
+}
+.tab-toggle-dark .tab-toggle-btn-active {
+  background: #374151;
+  color: #60a5fa;
 }
 
-.section-label {
-  font-size: 0.875rem;
-  font-weight: 600;
+/* ── Code Block ── */
+.code-block {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid;
+}
+.code-block-light {
+  border-color: #e5e7eb;
+  background: #f9fafb;
+}
+.code-block-dark {
+  border-color: #374151;
+  background: #111827;
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 1px solid;
+}
+.code-block-header-light {
+  background: #f3f4f6;
+  border-color: #e5e7eb;
+}
+.code-block-header-dark {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+.code-block-content {
+  padding: 10px 14px;
+  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  font-size: 13px;
+}
+
+/* ── Row tints ── */
+.row-error-light {
+  background: #fff5f5 !important;
+}
+.row-error-dark {
+  background: #2d1b1b !important;
+}
+
+/* ── Table layout ── */
+.history-table {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* ── Tab panels fill height ── */
+:deep(.q-tab-panels) {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+:deep(.q-tab-panel) {
+  flex: 1;
 }
 </style>

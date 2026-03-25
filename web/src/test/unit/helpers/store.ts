@@ -89,7 +89,7 @@ const store = createStore({
       timestamp_column: "_timestamp",
       all_fields_name: "_all",
       default_secondary_index_fields: ["level"],
-      service_graph_enabled: true,
+      default_quick_mode_fields: [],
     },
     organizationData: {
       organizationPasscode: "",
@@ -109,7 +109,12 @@ const store = createStore({
       isDataIngested: false,
       allDashboardData: {},
       foldersByType: [],
-    }
+    },
+    alertListFilters: {
+      searchQuery: "",
+      filterQuery: "",
+      searchAcrossFolders: false,
+    },
   },
   mutations: {
     login(state, payload) {
@@ -259,6 +264,9 @@ const store = createStore({
     },
     clearPendingShortURL(state) {
       // Mock mutation for tests - clears pending short URL state
+    },
+    setAlertListFilters(state, payload) {
+      state.alertListFilters = { ...state.alertListFilters, ...payload };
     },
   },
   modules: {

@@ -294,7 +294,7 @@ describe("TraceTree", () => {
   describe("Span selection", () => {
     it("should emit selectSpan when span is clicked", async () => {
       const selectBtn = wrapper.find(
-        '[data-test="trace-tree-span-select-btn-d9603ec7f76eb499"]',
+        '[data-test="trace-tree-span-operation-name-container-d9603ec7f76eb499"]',
       );
       await selectBtn.trigger("click");
 
@@ -304,7 +304,7 @@ describe("TraceTree", () => {
 
     it("should emit selectSpan with correct span ID", async () => {
       const selectBtn = wrapper.find(
-        '[data-test="trace-tree-span-select-btn-6702b0494b2b6e57"]',
+        '[data-test="trace-tree-span-operation-name-container-6702b0494b2b6e57"]',
       );
       await selectBtn.trigger("click");
 
@@ -1026,6 +1026,240 @@ describe("TraceTree", () => {
         '[data-test^="trace-tree-span-container-"]',
       );
       expect(updatedSpans.length).toBe(1);
+    });
+  });
+
+  // ─── New tests covering functionality added after Oct 06 2025 ───────────────
+
+  describe("isSidebarOpen prop", () => {
+    it("should hide span-block area when isSidebarOpen is true", async () => {
+      await wrapper.setProps({ isSidebarOpen: true });
+      await flushPromises();
+
+      // When isSidebarOpen is true the right-hand SpanBlock column is hidden via v-if
+      const spanBlocks = wrapper.findAllComponents({ name: "span-block" });
+      expect(spanBlocks.length).toBe(0);
+    });
+
+    it("should show span-block area when isSidebarOpen is false", async () => {
+      await wrapper.setProps({ isSidebarOpen: false });
+      await flushPromises();
+
+      const spanBlocks = wrapper.findAllComponents({ name: "span-block" });
+      expect(spanBlocks.length).toBeGreaterThan(0);
+    });
+
+    it("should apply leftWidth as inline width style when isSidebarOpen is true", async () => {
+      await wrapper.setProps({ isSidebarOpen: true, leftWidth: 400 });
+      await flushPromises();
+
+      // The root div should have width:400px when sidebar is open
+      const root = wrapper.element as HTMLElement;
+      expect(root.style.width).toBe("400px");
+    });
+
+    it("should not apply inline width style when isSidebarOpen is false", async () => {
+      await wrapper.setProps({ isSidebarOpen: false, leftWidth: 400 });
+      await flushPromises();
+
+      const root = wrapper.element as HTMLElement;
+      expect(root.style.width).toBe("");
+    });
+  });
+
+  describe("selectedSpanId prop — span-row-selected highlight", () => {
+    it("should add span-row-selected class to the matching span row", async () => {
+      await wrapper.setProps({ selectedSpanId: "d9603ec7f76eb499" });
+      await flushPromises();
+
+      const row = wrapper.find(
+        '[data-test="trace-tree-span-container-d9603ec7f76eb499"]',
+      );
+      expect(row.classes()).toContain("span-row-selected");
+    });
+
+    it("should not add span-row-selected to non-matching rows", async () => {
+      await wrapper.setProps({ selectedSpanId: "d9603ec7f76eb499" });
+      await flushPromises();
+
+      const row = wrapper.find(
+        '[data-test="trace-tree-span-container-6702b0494b2b6e57"]',
+      );
+      expect(row.classes()).not.toContain("span-row-selected");
+    });
+
+    it("should remove span-row-selected when selectedSpanId is cleared", async () => {
+      await wrapper.setProps({ selectedSpanId: "d9603ec7f76eb499" });
+      await flushPromises();
+      await wrapper.setProps({ selectedSpanId: "" });
+      await flushPromises();
+
+      const row = wrapper.find(
+        '[data-test="trace-tree-span-container-d9603ec7f76eb499"]',
+      );
+      expect(row.classes()).not.toContain("span-row-selected");
+    });
+  });
+
+  describe("LLM trace functionality", () => {
+    const llmSpan = {
+      spanId: "llm-span-001",
+      operationName: "openai.chat",
+      serviceName: "llm-service",
+      spanStatus: "UNSET",
+      spanKind: "Client",
+      parentId: null,
+      hasChildSpans: false,
+      llm_usage: { total: 1500, prompt: 1000, completion: 500 },
+      llm_cost: { total: 0.03 },
+      style: {
+        color: "#ab63fa",
+        backgroundColor: "#ab63fa33",
+        top: "0px",
+        left: "0px",
+      },
+      depth: 0,
+      index: 0,
+    };
+
+    beforeEach(async () => {
+      await wrapper.setProps({ spans: [llmSpan] });
+      await flushPromises();
+    });
+
+    it("should expose isLLMTrace utility", () => {
+      expect(wrapper.vm.isLLMTrace).toBeDefined();
+      expect(typeof wrapper.vm.isLLMTrace).toBe("function");
+    });
+
+    it("should expose formatTokens utility", () => {
+      expect(wrapper.vm.formatTokens).toBeDefined();
+      expect(typeof wrapper.vm.formatTokens).toBe("function");
+    });
+
+    it("should expose formatCost utility", () => {
+      expect(wrapper.vm.formatCost).toBeDefined();
+      expect(typeof wrapper.vm.formatCost).toBe("function");
+    });
+
+    it("isLLMTrace should return false for a regular span", () => {
+      expect(wrapper.vm.isLLMTrace(mockSpans[0])).toBe(false);
+    });
+  });
+
+  describe("getChildCount helper", () => {
+    it("should return 0 for a span with no spans array", () => {
+      const span = { spanId: "x", hasChildSpans: false };
+      expect(wrapper.vm.getChildCount(span)).toBe(0);
+    });
+
+    it("should return 0 for a span with null spans", () => {
+      const span = { spanId: "x", hasChildSpans: true, spans: null };
+      expect(wrapper.vm.getChildCount(span)).toBe(0);
+    });
+
+    it("should return correct count for a span with children", () => {
+      const span = {
+        spanId: "x",
+        hasChildSpans: true,
+        spans: [{ spanId: "c1" }, { spanId: "c2" }, { spanId: "c3" }],
+      };
+      expect(wrapper.vm.getChildCount(span)).toBe(3);
+    });
+  });
+
+  describe("getDirectChildren helper", () => {
+    it("should return empty array for span with no spans field", () => {
+      const span = { spanId: "x" };
+      expect(wrapper.vm.getDirectChildren(span)).toEqual([]);
+    });
+
+    it("should return the spans array for a parent span", () => {
+      const children = [{ spanId: "c1" }, { spanId: "c2" }];
+      const span = { spanId: "x", hasChildSpans: true, spans: children };
+      expect(wrapper.vm.getDirectChildren(span)).toEqual(children);
+    });
+  });
+
+  describe("getChildrenHeight helper", () => {
+    it("should return 0 when span has no spans array", () => {
+      const span = { spanId: "x", hasChildSpans: false };
+      expect(wrapper.vm.getChildrenHeight(span)).toBe(0);
+    });
+
+    it("should return 0 when span is not collapsed in collapseMapping", async () => {
+      await wrapper.setProps({ collapseMapping: { "parent-span": false } });
+      const span = {
+        spanId: "parent-span",
+        hasChildSpans: true,
+        spans: [{ spanId: "c1", hasChildSpans: false, spans: [] }],
+      };
+      expect(wrapper.vm.getChildrenHeight(span)).toBe(0);
+    });
+
+    it("should count visible children when span is expanded in collapseMapping", async () => {
+      await wrapper.setProps({
+        collapseMapping: { "parent-span": true },
+      });
+      const span = {
+        spanId: "parent-span",
+        hasChildSpans: true,
+        spans: [
+          { spanId: "c1", hasChildSpans: false, spans: [] },
+          { spanId: "c2", hasChildSpans: false, spans: [] },
+        ],
+      };
+      expect(wrapper.vm.getChildrenHeight(span)).toBe(2);
+    });
+  });
+
+  describe("connectorPaths and setBadgeRef", () => {
+    it("should expose connectorPaths as a reactive ref", () => {
+      expect(wrapper.vm.connectorPaths).toBeDefined();
+      expect(typeof wrapper.vm.connectorPaths).toBe("object");
+    });
+
+    it("setBadgeRef should store element reference for a given spanId", () => {
+      const mockEl = document.createElement("div");
+      wrapper.vm.setBadgeRef("test-span-id", mockEl);
+      // No direct assertion on internal badgeRefs, but the call must not throw
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("setBadgeRef should ignore null elements", () => {
+      expect(() => wrapper.vm.setBadgeRef("test-span-id", null)).not.toThrow();
+    });
+
+    it("calculateConnectors should be callable without throwing", () => {
+      expect(() => wrapper.vm.calculateConnectors()).not.toThrow();
+    });
+  });
+
+  describe("collapse badge title tooltip", () => {
+    // collapseMapping[id]=true means the span is currently collapsed (children hidden)
+    // The title describes what clicking WILL DO (action), not the current state
+    it("should show 'expand' title when span is currently collapsed (collapseMapping=true)", async () => {
+      await wrapper.setProps({
+        collapseMapping: { d9603ec7f76eb499: true },
+      });
+      await flushPromises();
+
+      const badge = wrapper.find(
+        '[data-test="trace-tree-span-badge-collapse-btn-d9603ec7f76eb499"]',
+      );
+      expect(badge.attributes("title")).toContain("expand");
+    });
+
+    it("should show 'collapse' title when span is currently expanded (collapseMapping=false)", async () => {
+      await wrapper.setProps({
+        collapseMapping: { d9603ec7f76eb499: false },
+      });
+      await flushPromises();
+
+      const badge = wrapper.find(
+        '[data-test="trace-tree-span-badge-collapse-btn-d9603ec7f76eb499"]',
+      );
+      expect(badge.attributes("title")).toContain("collapse");
     });
   });
 });

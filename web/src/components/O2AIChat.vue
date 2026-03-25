@@ -522,6 +522,31 @@
                           </div>
                         </div>
                       </template>
+                      <!-- Tool response: list items from normalized { total, items } -->
+                      <template v-else-if="block.response && block.response.items && Array.isArray(block.response.items)">
+                        <div v-if="block.response.items.length > 0" class="detail-item">
+                          <div class="detail-header">
+                            <span class="detail-label">Items</span>
+                            <q-btn
+                              flat
+                              dense
+                              size="xs"
+                              icon="content_copy"
+                              class="copy-btn"
+                              @click.stop="copyToClipboard(JSON.stringify(block.response.items, null, 2))"
+                            >
+                              <q-tooltip>Copy items</q-tooltip>
+                            </q-btn>
+                          </div>
+                          <div class="tool-response-hits">
+                            <div v-for="(item, iIdx) in block.response.items" :key="iIdx" class="tool-response-list-item">
+                              <div v-for="(val, key) in item" :key="key" class="hit-field">
+                                <span class="hit-key">{{ key }}:</span> {{ typeof val === 'object' ? JSON.stringify(val) : val }}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
                       <!-- Tool response: generic fallback (string or other) -->
                       <div v-else-if="block.response" class="detail-item">
                         <div class="detail-header">
@@ -1050,7 +1075,10 @@ export default defineComponent({
       deleteChatById: dbDeleteChatById,
       clearAllHistory: dbClearAllHistory,
       updateChatTitle: dbUpdateChatTitle,
-    } = useChatHistory();
+    } = useChatHistory(
+      () => store.state.userInfo.email ?? '',
+      () => store.state.selectedOrganization.identifier ?? '',
+    );
 
     const currentChatTimestamp = ref<string | null>(null);
     const saveHistoryLoading = ref(false);
@@ -1184,6 +1212,28 @@ export default defineComponent({
         clearInterval(analyzingRotationInterval.value);
         analyzingRotationInterval.value = null;
       }
+    };
+
+    // Flush any in-progress streaming text into the last assistant text block
+    // and reset streaming state. Called before inserting non-text blocks
+    // (confirmation_required, navigation_action) so the text preceding them is
+    // not lost.
+    const finalizeTextBlock = () => {
+      if (currentTextSegment.value) {
+        const lm = chatMessages.value[chatMessages.value.length - 1];
+        if (lm && lm.role === 'assistant' && lm.contentBlocks) {
+          const lb = lm.contentBlocks[lm.contentBlocks.length - 1];
+          if (lb && lb.type === 'text') {
+            lb.text = currentTextSegment.value;
+          }
+        }
+      }
+      if (typewriterAnimationId.value) {
+        cancelAnimationFrame(typewriterAnimationId.value);
+        typewriterAnimationId.value = null;
+      }
+      currentTextSegment.value = '';
+      displayedStreamingContent.value = '';
     };
 
     // Interval ID for title animation
@@ -1622,6 +1672,8 @@ export default defineComponent({
 
                   // Handle confirmation_required events - add inline confirmation block in chat
                   if (data && data.type === 'confirmation_required') {
+                    finalizeTextBlock();
+
                     // Check if this is a navigation action and auto navigation is enabled
                     if (data.tool === 'navigation_action' && isAutoNavigationEnabled.value) {
                       // Auto-approve navigation without showing confirmation
@@ -1685,7 +1737,8 @@ export default defineComponent({
                         type: 'tool_call',
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
-                        context: activeToolCall.value.context
+                        context: activeToolCall.value.context,
+                        call_id: activeToolCall.value.call_id
                       };
                       let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                       if (lastMessage && lastMessage.role === 'assistant') {
@@ -1700,27 +1753,11 @@ export default defineComponent({
                     activeToolCall.value = {
                       tool: data.tool,
                       message: data.message,
-                      context: data.context || {}
+                      context: data.context || {},
+                      call_id: data.call_id || undefined
                     };
 
-                    // Finalize any in-progress text block before resetting
-                    // (typewriter animation may not have caught up yet)
-                    if (currentTextSegment.value) {
-                      const lm = chatMessages.value[chatMessages.value.length - 1];
-                      if (lm && lm.role === 'assistant' && lm.contentBlocks) {
-                        const lb = lm.contentBlocks[lm.contentBlocks.length - 1];
-                        if (lb && lb.type === 'text') {
-                          lb.text = currentTextSegment.value;
-                        }
-                      }
-                    }
-                    // Stop typewriter and reset for next segment
-                    if (typewriterAnimationId.value) {
-                      cancelAnimationFrame(typewriterAnimationId.value);
-                      typewriterAnimationId.value = null;
-                    }
-                    currentTextSegment.value = '';
-                    displayedStreamingContent.value = '';
+                    finalizeTextBlock();
                     await scrollToBottom();
                     continue;
                   }
@@ -1734,7 +1771,8 @@ export default defineComponent({
                         type: 'tool_call',
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
-                        context: activeToolCall.value.context
+                        context: activeToolCall.value.context,
+                        call_id: activeToolCall.value.call_id
                       };
                       if (lastMessage && lastMessage.role === 'assistant') {
                         if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
@@ -1801,7 +1839,8 @@ export default defineComponent({
                         type: 'tool_call',
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
-                        context: activeToolCall.value.context
+                        context: activeToolCall.value.context,
+                        call_id: activeToolCall.value.call_id
                       };
                       let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                       if (lastMessage && lastMessage.role === 'assistant') {
@@ -1837,13 +1876,20 @@ export default defineComponent({
                       );
                     }
 
+                    // Match by call_id if available, fall back to tool name
+                    const matchesActiveToolCall = activeToolCall.value && (
+                      (data.call_id && activeToolCall.value.call_id === data.call_id) ||
+                      (!data.call_id && activeToolCall.value.tool === data.tool)
+                    );
+
                     // If active tool call matches, complete it with result data
-                    if (activeToolCall.value && activeToolCall.value.tool === data.tool) {
+                    if (matchesActiveToolCall) {
                       const completedToolBlock: ContentBlock = {
                         type: 'tool_call',
-                        tool: activeToolCall.value.tool,
-                        message: activeToolCall.value.message,
-                        context: activeToolCall.value.context,
+                        tool: activeToolCall.value!.tool,
+                        message: activeToolCall.value!.message,
+                        context: activeToolCall.value!.context,
+                        call_id: activeToolCall.value!.call_id,
                         ...resultData,
                         ...(navigationAction && { navigationAction })
                       };
@@ -1861,7 +1907,10 @@ export default defineComponent({
                       if (lastMessage && lastMessage.contentBlocks) {
                         for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
                           const block = lastMessage.contentBlocks[i];
-                          if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
+                          const blockMatches = data.call_id
+                            ? (block.call_id === data.call_id)
+                            : (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined);
+                          if (blockMatches) {
                             Object.assign(block, resultData);
                             if (navigationAction) {
                               block.navigationAction = navigationAction;
@@ -1873,7 +1922,10 @@ export default defineComponent({
                       // Also check pending tool calls
                       for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
                         const block = pendingToolCalls.value[i];
-                        if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
+                        const blockMatches = data.call_id
+                          ? (block.call_id === data.call_id)
+                          : (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined);
+                        if (blockMatches) {
                           Object.assign(block, resultData);
                           break;
                         }
@@ -1886,6 +1938,7 @@ export default defineComponent({
                   // Handle navigation_action events - check auto navigation setting
                   // (clickable buttons on tool results are generated by frontend from tool_result data)
                   if (data && data.type === 'navigation_action') {
+                    finalizeTextBlock();
                     const navAction: NavigationAction = {
                       resource_type: data.resource_type,
                       action: data.action,
@@ -1948,6 +2001,7 @@ export default defineComponent({
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
                         context: activeToolCall.value.context,
+                        call_id: activeToolCall.value.call_id,
                         success: false,
                         resultMessage: data.message || 'Tool execution failed',
                         errorType: data.error_type || undefined,
@@ -1996,7 +2050,8 @@ export default defineComponent({
                         type: 'tool_call',
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
-                        context: activeToolCall.value.context
+                        context: activeToolCall.value.context,
+                        call_id: activeToolCall.value.call_id
                       };
                       let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                       if (lastMessage && lastMessage.role === 'assistant') {
@@ -2109,7 +2164,8 @@ export default defineComponent({
                       type: 'tool_call',
                       tool: activeToolCall.value.tool,
                       message: activeToolCall.value.message,
-                      context: activeToolCall.value.context
+                      context: activeToolCall.value.context,
+                      call_id: activeToolCall.value.call_id
                     };
                     let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                     if (lastMessage && lastMessage.role === 'assistant') {
@@ -2124,25 +2180,11 @@ export default defineComponent({
                   activeToolCall.value = {
                     tool: data.tool,
                     message: data.message,
-                    context: data.context || {}
+                    context: data.context || {},
+                    call_id: data.call_id || undefined
                   };
 
-                  // Finalize any in-progress text block before resetting
-                  if (currentTextSegment.value) {
-                    const lm = chatMessages.value[chatMessages.value.length - 1];
-                    if (lm && lm.role === 'assistant' && lm.contentBlocks) {
-                      const lb = lm.contentBlocks[lm.contentBlocks.length - 1];
-                      if (lb && lb.type === 'text') {
-                        lb.text = currentTextSegment.value;
-                      }
-                    }
-                  }
-                  if (typewriterAnimationId.value) {
-                    cancelAnimationFrame(typewriterAnimationId.value);
-                    typewriterAnimationId.value = null;
-                  }
-                  currentTextSegment.value = '';
-                  displayedStreamingContent.value = '';
+                  finalizeTextBlock();
                   continue;
                 }
 
@@ -2155,7 +2197,8 @@ export default defineComponent({
                       type: 'tool_call',
                       tool: activeToolCall.value.tool,
                       message: activeToolCall.value.message,
-                      context: activeToolCall.value.context
+                      context: activeToolCall.value.context,
+                      call_id: activeToolCall.value.call_id
                     };
                     if (lastMessage && lastMessage.role === 'assistant') {
                       if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
@@ -2222,7 +2265,8 @@ export default defineComponent({
                       type: 'tool_call',
                       tool: activeToolCall.value.tool,
                       message: activeToolCall.value.message,
-                      context: activeToolCall.value.context
+                      context: activeToolCall.value.context,
+                      call_id: activeToolCall.value.call_id
                     };
                     let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                     if (lastMessage && lastMessage.role === 'assistant') {
@@ -2245,14 +2289,22 @@ export default defineComponent({
                     errorType: data.error_type || undefined,
                     suggestion: data.suggestion || undefined,
                     details: data.details || undefined,
+                    response: data.response || undefined,
                   };
 
-                  if (activeToolCall.value && activeToolCall.value.tool === data.tool) {
+                  // Match by call_id if available, fall back to tool name
+                  const matchesActive = activeToolCall.value && (
+                    (data.call_id && activeToolCall.value.call_id === data.call_id) ||
+                    (!data.call_id && activeToolCall.value.tool === data.tool)
+                  );
+
+                  if (matchesActive) {
                     const completedToolBlock: ContentBlock = {
                       type: 'tool_call',
-                      tool: activeToolCall.value.tool,
-                      message: activeToolCall.value.message,
-                      context: activeToolCall.value.context,
+                      tool: activeToolCall.value!.tool,
+                      message: activeToolCall.value!.message,
+                      context: activeToolCall.value!.context,
+                      call_id: activeToolCall.value!.call_id,
                       ...resultData
                     };
                     let lastMessage = chatMessages.value[chatMessages.value.length - 1];
@@ -2268,7 +2320,10 @@ export default defineComponent({
                     if (lastMessage && lastMessage.contentBlocks) {
                       for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
                         const block = lastMessage.contentBlocks[i];
-                        if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
+                        const blockMatches = data.call_id
+                          ? (block.call_id === data.call_id)
+                          : (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined);
+                        if (blockMatches) {
                           Object.assign(block, resultData);
                           break;
                         }
@@ -2276,7 +2331,10 @@ export default defineComponent({
                     }
                     for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
                       const block = pendingToolCalls.value[i];
-                      if (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined) {
+                      const blockMatches = data.call_id
+                        ? (block.call_id === data.call_id)
+                        : (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined);
+                      if (blockMatches) {
                         Object.assign(block, resultData);
                         break;
                       }
@@ -2293,6 +2351,7 @@ export default defineComponent({
                       tool: activeToolCall.value.tool,
                       message: activeToolCall.value.message,
                       context: activeToolCall.value.context,
+                      call_id: activeToolCall.value.call_id,
                       success: false,
                       resultMessage: data.message || 'Tool execution failed',
                       errorType: data.error_type || undefined,
@@ -2339,7 +2398,8 @@ export default defineComponent({
                       type: 'tool_call',
                       tool: activeToolCall.value.tool,
                       message: activeToolCall.value.message,
-                      context: activeToolCall.value.context
+                      context: activeToolCall.value.context,
+                      call_id: activeToolCall.value.call_id
                     };
                     let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                     if (lastMessage && lastMessage.role === 'assistant') {
@@ -3139,7 +3199,19 @@ export default defineComponent({
         }
 
         if (!response.ok) {
-          throw response;
+          // Read the actual error body before throwing
+          let errorBody = null;
+          try {
+            errorBody = await response.json();
+          } catch (_) {
+            // body may not be JSON
+          }
+          const err: any = new Error(
+            errorBody?.message || `Server error (${response.status})`
+          );
+          err.status = response.status;
+          err.errorBody = errorBody;
+          throw err;
         }
 
         if (!response.body) {
@@ -3158,20 +3230,18 @@ export default defineComponent({
         if (chatMessages.value.length > 0 && chatMessages.value[chatMessages.value.length - 1].role === 'assistant' && !chatMessages.value[chatMessages.value.length - 1].content) {
           chatMessages.value.pop();
         }
-        let errorMessage = 'Error: Unable to get response from the server. Please try again later.';
-        //we need to handle the 403 error seperately and show the error message to the user
+        let errorMessage: string;
         if (error.status === 403) {
-          chatMessages.value.push({
-            role: 'assistant',
-            content: 'Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.'
-          });
+          errorMessage = 'Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.';
+        } else if (error.message && error.message !== 'No response body') {
+          errorMessage = error.message;
         } else {
-          // Always create a new assistant message with error since we don't pre-create empty ones
-          chatMessages.value.push({
-            role: 'assistant',
-            content: errorMessage
-          });
+          errorMessage = 'Error: Unable to get response from the server. Please try again later.';
         }
+        chatMessages.value.push({
+          role: 'assistant',
+          content: errorMessage
+        });
         await saveToHistory(); // Save after error
       }
 
@@ -3746,6 +3816,20 @@ export default defineComponent({
       }
     });
 
+    // Watch for organization switches — reset current chat and reload history
+    // scoped to the new org so users never see cross-org chat history.
+    watch(
+      () => store.state.selectedOrganization?.identifier,
+      (newOrgId, oldOrgId) => {
+        if (newOrgId && newOrgId !== oldOrgId) {
+          addNewChat();
+          if (props.isOpen) {
+            loadHistory();
+          }
+        }
+      },
+    );
+
     // Only fetch initial message if component starts as open
     onMounted(() => {
       if (props.isOpen) {
@@ -4225,7 +4309,8 @@ export default defineComponent({
           return { text: 'Query failed', highlight: null, suffix: '' };
         }
         if (block.response?.total !== undefined) {
-          return { text: 'Queried logs ', highlight: `(${block.response.total} results)`, suffix: '' };
+          const streamType = block.context?.type || 'logs';
+          return { text: `Queried ${streamType} `, highlight: `(${block.response.total} results)`, suffix: '' };
         }
       }
       if (block.tool === 'StreamSchema' && block.context?.stream_name) {
@@ -4239,6 +4324,11 @@ export default defineComponent({
       }
       if (block.tool === 'GetDashboard' && block.context?.dashboard_id) {
         return { text: 'Fetched dashboard ', highlight: block.context.dashboard_id, suffix: '' };
+      }
+      // List tools: show count from normalized { total, items } response
+      if (block.response?.total !== undefined && block.success !== false) {
+        const base = block.message || block.tool || 'Listed';
+        return { text: base + ' ', highlight: `(Found ${block.response.total})`, suffix: '' };
       }
       // Generic fallback
       if (block.success === false && block.resultMessage) {
@@ -4657,7 +4747,7 @@ export default defineComponent({
 
       &:focus-within {
         border: 1px solid transparent;
-        box-shadow: 0 0 0 2px #667eea;
+        box-shadow: 0 0 0 2px #8B5CF6;
       }
     }
 
@@ -5012,7 +5102,7 @@ export default defineComponent({
 
 // Avatar styling for user messages
 .light-user-avatar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
   color: white;
 }
 
@@ -5023,19 +5113,19 @@ export default defineComponent({
 
 // Send button gradient styling
 .send-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
   transition: all 0.3s ease !important;
-  box-shadow: 0 4px 15px 0 rgba(102, 126, 234, 0.3) !important;
-  
+  box-shadow: 0 4px 15px 0 rgba(139, 92, 246, 0.3) !important;
+
   &:hover:not(.disabled):not([disabled]):not(:disabled) {
-    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%) !important;
-    box-shadow: 0 6px 20px 0 rgba(102, 126, 234, 0.4) !important;
+    background: linear-gradient(135deg, #7C3AED 0%, #DB2777 100%) !important;
+    box-shadow: 0 6px 20px 0 rgba(139, 92, 246, 0.4) !important;
     transform: translateY(-1px) !important;
   }
-  
+
   &:active:not(.disabled):not([disabled]):not(:disabled) {
     transform: translateY(0) !important;
-    box-shadow: 0 2px 10px 0 rgba(102, 126, 234, 0.3) !important;
+    box-shadow: 0 2px 10px 0 rgba(139, 92, 246, 0.3) !important;
   }
 
 }
@@ -5263,8 +5353,8 @@ export default defineComponent({
   }
   
   body.body--dark & {
-    border: 2px solid #667eea !important;
-    color: #667eea !important;
+    border: 2px solid #8B5CF6 !important;
+    color: #8B5CF6 !important;
     background: rgba(30, 30, 30, 0.9) !important;
   }
   
@@ -5428,12 +5518,12 @@ export default defineComponent({
     font-weight: 500;
 
     .light-mode & {
-      background: rgba(102, 126, 234, 0.1);
-      color: #667eea;
+      background: rgba(139, 92, 246, 0.1);
+      color: #8B5CF6;
     }
 
     .dark-mode & {
-      background: rgba(102, 126, 234, 0.2);
+      background: rgba(139, 92, 246, 0.2);
       color: #a0aec0;
     }
   }
@@ -5886,6 +5976,18 @@ export default defineComponent({
     &:not(:last-child) {
       border-bottom: 1px solid rgba(128, 128, 128, 0.15);
       padding-bottom: 4px;
+    }
+  }
+
+  .tool-response-list-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 0;
+
+    &:not(:last-child) {
+      border-bottom: 1px solid rgba(128, 128, 128, 0.15);
+      padding-bottom: 6px;
     }
   }
 

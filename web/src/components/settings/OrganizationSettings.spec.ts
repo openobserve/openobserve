@@ -431,6 +431,7 @@ describe("OrganizationSettings", () => {
           span_id_field_name: "custom_span_id",
           toggle_ingestion_logs: true,
           cross_links: [],
+          usage_stream_enabled: false,
         }
       );
     });
@@ -449,6 +450,7 @@ describe("OrganizationSettings", () => {
         span_id_field_name: "new_span",
         toggle_ingestion_logs: false,
         cross_links: [],
+        usage_stream_enabled: false,
       });
     });
 
@@ -739,6 +741,7 @@ describe("OrganizationSettings", () => {
           span_id_field_name: "integration_span_id",
           toggle_ingestion_logs: true,
           cross_links: [],
+          usage_stream_enabled: false,
         }
       );
 
@@ -748,6 +751,7 @@ describe("OrganizationSettings", () => {
         span_id_field_name: "integration_span_id",
         toggle_ingestion_logs: true,
         cross_links: [],
+        usage_stream_enabled: false,
       });
       
       expect(mockNotify).toHaveBeenCalledWith({

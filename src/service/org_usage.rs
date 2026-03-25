@@ -34,6 +34,7 @@ pub async fn get_org_usage(
         .map_err(|e| billings::BillingError::PartialUsageResults(e.to_string()))?
         .into_iter()
         .filter_map(|hit| json::from_value::<OrgUsageQueryResult>(hit).ok())
+        .filter(|r| r.event.is_billable())
         .collect::<Vec<_>>();
 
     let (data_retention_query, ..) =

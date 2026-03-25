@@ -16,27 +16,6 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div>
-    <div class="q-mb-sm" style="font-weight: 600">
-      <span>{{ t("dashboard.drilldown") }}</span>
-      <q-btn
-        no-caps
-        padding="xs"
-        class=""
-        size="sm"
-        flat
-        icon="info_outline"
-        data-test="dashboard-addpanel-config-drilldown-info"
-      >
-        <q-tooltip
-          class="bg-grey-8"
-          anchor="bottom middle"
-          self="top middle"
-          max-width="250px"
-        >
-          {{ t("dashboard.drilldownTooltip") }}
-        </q-tooltip>
-      </q-btn>
-    </div>
     <div
       v-for="(data, index) in dashboardPanelData.data.config.drilldown"
       :key="JSON.stringify(data) + index"
@@ -97,7 +76,7 @@ import { defineComponent, inject, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import DrilldownPopUp from "./DrilldownPopUp.vue";
 import { useStore } from "vuex";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import AppDialog from "../../common/AppDialog.vue";
 import { onBeforeMount } from "vue";
 

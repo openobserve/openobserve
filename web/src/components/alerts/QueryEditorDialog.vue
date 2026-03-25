@@ -747,7 +747,7 @@ const onFunctionClear = () => {
 };
 
 // Build multi-window query - includes all multi-windows automatically
-const buildMultiWindowQuery = (sql: string, fn: boolean, periodInMicroseconds: number) => {
+const buildMultiWindowQuery = (sql: string, periodInMicroseconds: number) => {
   const queryToSend: any[] = [];
 
   // Guard: If multiTimeRange is null, undefined, or empty, return empty array
@@ -783,7 +783,6 @@ const buildMultiWindowQuery = (sql: string, fn: boolean, periodInMicroseconds: n
       individualQuery.start_time = startTime - periodInMicroseconds;
       individualQuery.end_time = startTime;
       individualQuery.sql = sql;
-      individualQuery.query_fn = fn ? b64EncodeUnicode(vrlFunctionContent.value) : null;
       queryToSend.push(individualQuery);
     } else {
       console.warn("Invalid format:", date);
@@ -812,28 +811,22 @@ const triggerQuery = async (fn = false) => {
     const startTime = endTime - periodInMicroseconds;
     console.log('[QueryEditorDialog] Time range:', { startTime, endTime, periodInMicroseconds });
 
-    queryReq.query.query_fn = null;
+    queryReq.query.query_fn = fn ? b64EncodeUnicode(vrlFunctionContent.value) : null;
     queryReq.query.sql_mode = true;
     queryReq.query.per_query_response = true;
 
     console.log('[QueryEditorDialog] Step 4: Building query to send...');
-    //initial query to send like with period for suppose we have 10minutes of period then we will send 10 minutes of data
-    //so we will send 10 minutes of data in initial query
-    //and then if any multi window offset is selected then we will call buildMultiWindowQuery function to get the query to send
-    //and then we will push the query to send to the queryReq.query.sql
-
     let queryToSend = [
       {
         start_time: startTime,
         end_time: endTime,
         sql: queryReq.query.sql,
-        query_fn: fn ? b64EncodeUnicode(vrlFunctionContent.value) : null
       }
     ];
     console.log('[QueryEditorDialog] Initial queryToSend:', queryToSend);
 
     console.log('[QueryEditorDialog] Step 5: Calling buildMultiWindowQuery...');
-    const multiWindowQueries = buildMultiWindowQuery(queryReq.query.sql, fn, periodInMicroseconds);
+    const multiWindowQueries = buildMultiWindowQuery(queryReq.query.sql, periodInMicroseconds);
     console.log('[QueryEditorDialog] Multi-window queries:', multiWindowQueries);
 
     queryToSend.push(...multiWindowQueries);
@@ -1035,7 +1028,7 @@ const getBtnLogo = computed(() => {
 
   return store.state.theme === 'dark'
     ? getImageURL('images/common/ai_icon_dark.svg')
-    : getImageURL('images/common/ai_icon.svg')
+    : getImageURL('images/common/ai_icon_gradient.svg')
 })
 </script>
 
@@ -1070,15 +1063,17 @@ const getBtnLogo = computed(() => {
 
 .ai-hover-btn {
   opacity: 1;
-  transition: background-color 0.2s ease;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
 
   &:hover {
-    background-color: rgba(121, 128, 204, 0.1);
+    background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
+    box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
   }
 }
 
 .ai-btn-active {
-  background-color: rgba(121, 128, 204, 0.2);
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
 }
 
 // Force no transitions on collapsible output sections
@@ -1088,18 +1083,18 @@ const getBtnLogo = computed(() => {
 
 // AI Generate Button Styling (matches O2 AI Assistant - purple gradient)
 .o2-ai-generate-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
   color: white !important;
   border: none !important;
   font-size: 0.6875rem !important; // 11px
   font-weight: 600 !important;
   line-height: 1rem !important; // 16px
   transition: all 0.3s ease !important;
-  box-shadow: 0 0.25rem 0.9375rem 0 rgba(102, 126, 234, 0.3) !important; // 0 4px 15px
+  box-shadow: 0 0.25rem 0.9375rem 0 rgba(139, 92, 246, 0.3) !important; // 0 4px 15px
   padding: 0 0.75rem !important; // 0 12px
 
   &:hover {
-    box-shadow: 0 0.375rem 1.25rem 0 rgba(102, 126, 234, 0.5) !important; // 0 6px 20px
+    box-shadow: 0 0.375rem 1.25rem 0 rgba(139, 92, 246, 0.5) !important; // 0 6px 20px
     transform: translateY(-1px);
   }
 

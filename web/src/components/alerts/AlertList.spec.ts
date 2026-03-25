@@ -15,8 +15,17 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { nextTick } from "vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
+
+// Mock aws-exports so isEnterprise / isCloud can be controlled per-test
+vi.mock("@/aws-exports", () => ({
+  default: {
+    isCloud: "false",
+    isEnterprise: "false",
+  },
+}));
 
 // Mock services before importing component (follow reference style)
 vi.mock("@/services/alerts", () => ({
@@ -27,6 +36,8 @@ vi.mock("@/services/alerts", () => ({
     delete_by_alert_id: vi.fn(),
     create_by_alert_id: vi.fn(),
     getHistory: vi.fn(),
+    export_by_id: vi.fn(),
+    retrain_by_id: vi.fn(),
   },
 }));
 vi.mock("@/services/alert_templates", () => ({
@@ -41,6 +52,7 @@ vi.mock("@/services/alert_destination", () => ({
 }));
 
 import AlertList from "@/components/alerts/AlertList.vue";
+import config from "@/aws-exports";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -163,6 +175,8 @@ beforeEach(() => {
   // ensure foldersByType has 'alerts' key and alerts map exists
   (store.state as any).organizationData.foldersByType = [{ type: 'alerts', folders: [{ id: 'default', name: 'Default' }] }];
   (store.state as any).organizationData.allAlertsListByFolderId = {};
+  // Reset alert list filters to prevent leaking between tests
+  (store.state as any).alertListFilters = { searchQuery: "", filterQuery: "", searchAcrossFolders: false };
 
   alertsDB = [
     makeAlert(1, { is_real_time: false, enabled: true, name: "Scheduled Alert A", owner: "averylongownername@example.com" }),
@@ -198,6 +212,15 @@ beforeEach(() => {
 
   (alertsSvc.getHistory as any) = vi.fn().mockImplementation(async () => {
     return Promise.resolve({ data: { total: 0, hits: [] } } as any);
+  });
+
+  (alertsSvc.export_by_id as any) = vi.fn().mockImplementation(async (_org: any, id: string) => {
+    const alert = alertsDB.find((a) => a.alert_id === id) ?? { name: "exported" };
+    return Promise.resolve({ data: { ...alert } } as any);
+  });
+
+  (alertsSvc.retrain_by_id as any) = vi.fn().mockImplementation(async () => {
+    return Promise.resolve({ data: { code: 200 } } as any);
   });
 
   (alertsSvc.create_by_alert_id as any) = vi.fn().mockImplementation(async (_org: any, body: any, folder?: string) => {
@@ -694,7 +717,7 @@ describe("AlertList - additional validations", () => {
       await flushPromises();
 
       expect(wrapper.vm.filteredResults.every((r: any) => predicate(r))).toBe(true);
-    });
+    }, 10000);
   });
 
   it("openMenu stops event propagation (no error)", async () => {
@@ -779,13 +802,16 @@ describe("AlertList - micro validations", () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
     wrapper.vm.filterQuery = "abc";
+    await nextTick();
     wrapper.vm.searchAcrossFolders = true;
     await flushPromises();
     expect(wrapper.vm.searchQuery).toBe("abc");
 
     wrapper.vm.searchAcrossFolders = false;
     await flushPromises();
-    expect(wrapper.vm.filterQuery).toBe("abc");
+    // When toggling off, both queries are cleared to reset cross-folder results
+    expect(wrapper.vm.filterQuery).toBeNull();
+    expect(wrapper.vm.searchQuery).toBeNull();
   }, 10000);
 
   it("editAlert fetches by alert_id then opens form", async () => {
@@ -849,6 +875,93 @@ describe("AlertList - micro validations", () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
     expect(typeof wrapper.vm.filteredResults[0].last_triggered_at).toBe("string");
+  });
+});
+
+// 11. isAnomalyDetectionEnabled computed
+describe("AlertList - isAnomalyDetectionEnabled", () => {
+  beforeEach(() => {
+    // Reset to defaults: non-enterprise frontend, no build_type
+    (config as any).isEnterprise = "false";
+    (config as any).isCloud = "false";
+    delete (store.state as any).zoConfig.build_type;
+  });
+
+  it("should enable anomalyDetection tab when isEnterprise=true, isCloud=false, and build_type is not opensource", async () => {
+    (config as any).isEnterprise = "true";
+    (config as any).isCloud = "false";
+    (store.state as any).zoConfig.build_type = "enterprise";
+
+    const wrapper: any = await mountAlertList();
+    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
+    expect(tabValues).toContain("anomalyDetection");
+  });
+
+  it("should disable anomalyDetection tab when build_type=opensource even when enterprise flags are set", async () => {
+    (config as any).isEnterprise = "true";
+    (config as any).isCloud = "false";
+    (store.state as any).zoConfig.build_type = "opensource";
+
+    const wrapper: any = await mountAlertList();
+    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
+    expect(tabValues).not.toContain("anomalyDetection");
+  });
+
+  it("should enable anomalyDetection tab when isCloud=true (cloud build)", async () => {
+    (config as any).isEnterprise = "true";
+    (config as any).isCloud = "true";
+    (store.state as any).zoConfig.build_type = "enterprise";
+
+    const wrapper: any = await mountAlertList();
+    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
+    expect(tabValues).toContain("anomalyDetection");
+  });
+
+  it("should disable anomalyDetection tab when isEnterprise=false (opensource frontend)", async () => {
+    (config as any).isEnterprise = "false";
+    (config as any).isCloud = "false";
+    (store.state as any).zoConfig.build_type = "enterprise";
+
+    const wrapper: any = await mountAlertList();
+    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
+    expect(tabValues).not.toContain("anomalyDetection");
+  });
+
+  it("should disable anomalyDetection tab by default (no env vars set)", async () => {
+    // isEnterprise defaults to "false" → feature disabled
+    const wrapper: any = await mountAlertList();
+    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
+    expect(tabValues).not.toContain("anomalyDetection");
+  });
+
+  it("should include anomalyDetection tab in alertTabs when enabled", async () => {
+    (config as any).isEnterprise = "true";
+    (config as any).isCloud = "false";
+    (store.state as any).zoConfig.build_type = "enterprise";
+
+    const wrapper: any = await mountAlertList();
+    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
+    expect(tabValues).toContain("anomalyDetection");
+  });
+
+  it("should exclude anomalyDetection tab from alertTabs when disabled", async () => {
+    (config as any).isEnterprise = "false";
+    (config as any).isCloud = "false";
+
+    const wrapper: any = await mountAlertList();
+    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
+    expect(tabValues).not.toContain("anomalyDetection");
+  });
+
+  it("should fall back activeTab to 'all' when anomalyDetection tab requested but feature disabled", async () => {
+    (config as any).isEnterprise = "false";
+    (config as any).isCloud = "false";
+
+    const wrapper: any = await mountAlertList();
+    // Simulate URL query requesting anomalyDetection tab when feature is off
+    wrapper.vm.router.currentRoute.value.query = { tab: "anomalyDetection" } as any;
+    // The computed initialises activeTab to 'all' when the feature is disabled
+    expect(wrapper.vm.activeTab).not.toBe("anomalyDetection");
   });
 });
 

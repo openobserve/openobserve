@@ -19,6 +19,7 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
 import PatternDetailsDialog from "./PatternDetailsDialog.vue";
 import store from "@/test/unit/helpers/store";
+import i18n from "@/locales";
 
 installQuasar({
   plugins: [quasar.Dialog, quasar.Notify],
@@ -62,6 +63,7 @@ describe("PatternDetailsDialog", () => {
         totalPatterns: totalPatterns,
       },
       global: {
+        plugins: [i18n],
         provide: { store },
         stubs: {
           "q-dialog": {
@@ -119,12 +121,12 @@ describe("PatternDetailsDialog", () => {
       });
 
       const text = wrapper.text();
-      expect(text).toContain("This pattern is detected as an anomaly");
+      expect(text).toContain("This pattern is detected as a rare pattern");
     });
 
     it("should not display anomaly banner when pattern is not anomaly", () => {
       const text = wrapper.text();
-      expect(text).not.toContain("This pattern is detected as an anomaly");
+      expect(text).not.toContain("This pattern is detected as a rare pattern");
     });
   });
 
@@ -314,6 +316,7 @@ describe("PatternDetailsDialog", () => {
           totalPatterns: 10,
         },
         global: {
+          plugins: [i18n],
           provide: { store },
           stubs: {
             "q-dialog": {
@@ -326,6 +329,134 @@ describe("PatternDetailsDialog", () => {
 
       const card = wrapperWithoutPattern.find(".detail-table-dialog");
       expect(card.exists()).toBe(false);
+    });
+  });
+
+  // --- New tests covering functionality not previously tested ---
+
+  describe("variableColumns definition", () => {
+    it("should render Variable Name column header in variables table", () => {
+      const text = wrapper.text();
+      expect(text).toContain("Variable Name");
+    });
+
+    it("should render Type column header in variables table", () => {
+      const text = wrapper.text();
+      expect(text).toContain("Type");
+    });
+
+    it("should display var_type chips for each variable row", () => {
+      // string and ip are the var_type values in mockSelectedPattern
+      const text = wrapper.text();
+      expect(text).toContain("string");
+      expect(text).toContain("ip");
+    });
+
+    it("should fall back to var_ prefix name when variable name is absent", async () => {
+      await wrapper.setProps({
+        selectedPattern: {
+          ...mockSelectedPattern,
+          pattern: {
+            ...mockSelectedPattern.pattern,
+            variables: [{ index: 3, name: "", var_type: "numeric" }],
+          },
+        },
+      });
+      const text = wrapper.text();
+      expect(text).toContain("var_3");
+    });
+  });
+
+  describe("No variables detected fallback", () => {
+    it("should display 'No variables detected' when examples array is absent", async () => {
+      await wrapper.setProps({
+        selectedPattern: {
+          ...mockSelectedPattern,
+          pattern: {
+            ...mockSelectedPattern.pattern,
+            examples: undefined,
+          },
+        },
+      });
+      const text = wrapper.text();
+      expect(text).toContain("No variables detected");
+    });
+
+    it("should display 'No variables detected' when first example has no variables property", async () => {
+      await wrapper.setProps({
+        selectedPattern: {
+          ...mockSelectedPattern,
+          pattern: {
+            ...mockSelectedPattern.pattern,
+            examples: [{ log_message: "bare log" }],
+          },
+        },
+      });
+      const text = wrapper.text();
+      expect(text).toContain("No variables detected");
+    });
+  });
+
+  describe("update:modelValue emit", () => {
+    it("should pass modelValue prop correctly when false", async () => {
+      const wrapperClosed = mount(PatternDetailsDialog, {
+        props: {
+          modelValue: false,
+          selectedPattern: mockSelectedPattern,
+          totalPatterns: 10,
+        },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            "q-dialog": {
+              template: '<div class="q-dialog"><slot></slot></div>',
+              props: ["modelValue"],
+              emits: ["update:modelValue"],
+            },
+          },
+        },
+      });
+      expect(wrapperClosed.props("modelValue")).toBe(false);
+    });
+  });
+
+  describe("LogsHighLighting in example logs", () => {
+    it("should render example log entries in the examples section", () => {
+      const text = wrapper.text();
+      expect(text).toContain("User john logged in from IP 192.168.1.1");
+    });
+
+    it("should render all example log entries when multiple examples exist", () => {
+      const text = wrapper.text();
+      expect(text).toContain("User jane logged in from IP 10.0.0.1");
+    });
+  });
+
+  describe("Pattern index edge cases", () => {
+    it("should show 'Pattern 6 of 10' when index is 5", async () => {
+      await wrapper.setProps({
+        selectedPattern: { ...mockSelectedPattern, index: 5 },
+      });
+      const text = wrapper.text();
+      expect(text).toContain("Pattern 6 of 10");
+    });
+
+    it("should show '6 of 10' counter in footer when index is 5", async () => {
+      await wrapper.setProps({
+        selectedPattern: { ...mockSelectedPattern, index: 5 },
+      });
+      const text = wrapper.text();
+      expect(text).toMatch(/6\s+of\s+10/);
+    });
+
+    it("should enable next button when not on last pattern", async () => {
+      await wrapper.setProps({
+        selectedPattern: { ...mockSelectedPattern, index: 3 },
+        totalPatterns: 10,
+      });
+      const nextBtn = wrapper.find('[data-test="pattern-detail-next-btn"]');
+      expect(nextBtn.attributes("disabled")).toBeUndefined();
     });
   });
 });

@@ -177,9 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon="psychology"
             :title="span.llm_model_name"
           >
-            <span class="chip-value text-bold">{{
-              span.llm_model_name
-            }}</span>
+            <span class="chip-value text-bold">{{ span.llm_model_name }}</span>
           </q-chip>
 
           <!-- Token Usage Group -->
@@ -311,10 +309,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         name="preview"
         class="llm-preview-panel q-pa-md"
       >
-        <div class="llm-preview-container tw:overflow-x-auto">
+        <div class="llm-preview-container tw:overflow-x-auto tw:w-full">
           <!-- Input and Output Side by Side -->
           <div
-            class="flex q-col-gutter-md io-container"
+            class="flex io-container tw:w-full!"
             :class="{ 'io-container-dark': isDarkMode }"
             ref="ioContainerRef"
           >
@@ -348,10 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="llm-content-box">
-                <div
-                  v-if="!hasContent(span.llm_input)"
-                  class="no-data-message"
-                >
+                <div v-if="!hasContent(span.llm_input)" class="no-data-message">
                   No data available
                 </div>
                 <LLMContentRenderer
@@ -524,78 +519,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="trace-details-sidebar-attributes-table"
         ></pre>
       </q-tab-panel>
-      <q-tab-panel name="events">
-        <q-table
-          v-if="spanDetails.events.length"
-          ref="qTable"
-          data-test="trace-details-sidebar-events-table"
-          :rows="spanDetails.events"
-          :columns="eventColumns"
-          row-key="name"
-          :rows-per-page-options="[0]"
-          class="q-table o2-quasar-table trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
-          :class="
-            isLLMSpan && llmMetrics && span.llm_model_name
-              ? 'tab-content-with-llm-metrics'
-              : 'tab-content-without-llm-metrics'
-          "
-          dense
-        >
-          <template v-slot:body="props">
-            <q-tr
-              :data-test="`trace-event-details-${
-                props.row[store.state.zoConfig.timestamp_column]
-              }`"
-              :key="props.key"
-              @click="expandEvent(props.rowIndex)"
-              style="cursor: pointer"
-              class="pointer"
-            >
-              <q-td
-                v-for="(column, columnIndex) in eventColumns"
-                :key="props.rowIndex + '-' + column.name"
-                class="field_list text-left"
-                style="cursor: pointer"
-                :style="
-                  columnIndex > 0
-                    ? { whiteSpace: 'normal', wordBreak: 'break-word' }
-                    : {}
-                "
-              >
-                <div class="flex row items-center no-wrap">
-                  <q-btn
-                    v-if="column.name === '@timestamp'"
-                    :icon="
-                      expandedEvents[props.rowIndex.toString()]
-                        ? 'expand_more'
-                        : 'chevron_right'
-                    "
-                    dense
-                    size="xs"
-                    flat
-                    class="q-mr-xs"
-                    @click.stop="expandEvent(props.rowIndex)"
-                  ></q-btn>
-                  <span
-                    v-if="column.name !== '@timestamp'"
-                    v-html="
-                      highlightTextMatch(column.prop(props.row), searchQuery)
-                    "
-                  />
-                  <span v-else> {{ column.prop(props.row) }}</span>
-                </div>
-              </q-td>
-            </q-tr>
-            <q-tr v-if="expandedEvents[props.rowIndex.toString()]">
-              <q-td colspan="2">
-                <pre
-                  class="log_json_content"
-                  v-html="highlightedJSON(props.row)"
-                />
-              </q-td>
-            </q-tr>
-          </template>
-        </q-table>
+      <q-tab-panel
+        name="events"
+        class="tw:p-0 tw:flex tw:flex-col tw:h-[30.6rem]!"
+      >
+        <template v-if="spanDetails.events.length">
+          <!-- Wrap toggle toolbar -->
+          <div class="tw:flex tw:items-center tw:gap-2 tw:pb-[0.325rem]">
+            <q-toggle
+              class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center tw:py-0!"
+              size="xs"
+              flat
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-toggle-button-xs-dark'
+                  : 'o2-toggle-button-xs-light'
+              "
+              v-model="eventsWrap"
+              label="Wrap"
+            />
+          </div>
+          <!-- TenstackTable for events -->
+          <div
+            class="tw:flex-1 tw:overflow-hidden tab-content-dynamic-height tw:border-1 tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded"
+            :class="
+              isLLMSpan && llmMetrics && span.llm_model_name
+                ? 'tab-content-with-llm-metrics'
+                : 'tab-content-without-llm-metrics'
+            "
+            data-test="trace-details-sidebar-events-table"
+          >
+            <TenstackTable
+              :rows="spanDetails.events"
+              :columns="eventsTableColumns"
+              :wrap="eventsWrap"
+              :enable-row-expand="true"
+              :enable-text-highlight="false"
+              :enable-status-bar="false"
+              :default-columns="false"
+              :row-height="28"
+              :enable-ai-context-button="false"
+              @update:columnOrder="handleEventsColumnOrder"
+              @update:columnSizes="handleEventsColumnSizes"
+            />
+          </div>
+        </template>
         <div
           v-else
           class="full-width text-center tw:flex tw:items-center tw:justify-center q-pt-lg text-bold tab-content-dynamic-height"
@@ -768,7 +736,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="searchTableRef"
             style="max-height: 20rem"
             :items="spanLinks"
-            class="tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+            class="trace-detail-tab-table tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
             data-test="trace-details-sidebar-links-table"
           >
             <template v-slot:before>
@@ -941,7 +909,9 @@ import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import config from "@/aws-exports";
+import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
+import TenstackTable from "@/components/TenstackTable.vue";
 import {
   isLLMTrace,
   parseUsageDetails,
@@ -983,6 +953,7 @@ export default defineComponent({
   components: {
     LogsHighLighting,
     LLMContentRenderer,
+    TenstackTable,
     CorrelatedLogsTable,
     TelemetryCorrelationDashboard: defineAsyncComponent(
       () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
@@ -1241,6 +1212,107 @@ export default defineComponent({
       },
     ]);
 
+    const eventsWrap = ref(false);
+
+    const eventsColOrder = ref<string[]>([]);
+    const eventsColSizes = ref<Record<string, number>>({});
+
+    const handleEventsColumnOrder = (newOrder: string[]) => {
+      eventsColOrder.value = newOrder;
+    };
+
+    const handleEventsColumnSizes = (
+      cssVarSizes: Record<string, number>,
+      colIdMap: Record<string, string>,
+    ) => {
+      // cssVarSizes keys are "--col-{sanitizedId}-size"; use colIdMap to resolve originals
+      const sizes: Record<string, number> = { ...eventsColSizes.value };
+      for (const [sanitizedId, originalId] of Object.entries(colIdMap)) {
+        const cssKey = `--col-${sanitizedId}-size`;
+        if (cssVarSizes[cssKey] !== undefined) {
+          sizes[originalId] = cssVarSizes[cssKey];
+        }
+      }
+      eventsColSizes.value = sizes;
+    };
+
+    const eventsTableColumns = computed(() => {
+      const events = spanDetails.value.events;
+      if (!events || !events.length) return [];
+
+      const tsCol = store.state.zoConfig.timestamp_column;
+      const allKeys = new Set<string>();
+      events.forEach((event: any) => {
+        Object.keys(event).forEach((key) => allKeys.add(key));
+      });
+
+      const cols: any[] = [];
+
+      // Timestamp first
+      if (allKeys.has(tsCol)) {
+        cols.push({
+          accessorKey: tsCol,
+          id: tsCol,
+          header: "Timestamp",
+          size: eventsColSizes.value[tsCol] ?? 220,
+          accessorFn: (row: any) =>
+            date.formatDate(
+              Math.floor(row[tsCol] / 1000000),
+              "MMM DD, YYYY HH:mm:ss.SSS Z",
+            ),
+          meta: {
+            headerClass:
+              "tw:border-b tw:border-r tw:border-b-[var(--o2-border-color)]",
+            cellClass: "tw:border-r tw:border-b-[var(--o2-border-color)]",
+          },
+        });
+        allKeys.delete(tsCol);
+      }
+
+      // All remaining keys
+      allKeys.forEach((key) => {
+        cols.push({
+          accessorKey: key,
+          id: key,
+          header: key,
+          size: eventsColSizes.value[key] ?? 200,
+          accessorFn: (row: any) => {
+            const val = row[key];
+            if (val === null || val === undefined) return "";
+            if (val === "string") {
+              try {
+                return JSON.parse(val);
+              } catch (err) {
+                return String(val);
+              }
+            }
+            return typeof val === "object" ? JSON.stringify(val) : String(val);
+          },
+          meta: {
+            headerClass:
+              "tw:border-b tw:border-r tw:border-b-[var(--o2-border-color)]",
+            cellClass: "tw:border-r tw:border-b-[var(--o2-border-color)]",
+          },
+        });
+      });
+
+      // Apply saved column order (only for IDs that still exist in current cols)
+      if (eventsColOrder.value.length) {
+        const colMap = new Map(cols.map((c) => [c.id, c]));
+        const ordered = eventsColOrder.value
+          .filter((id) => colMap.has(id))
+          .map((id) => colMap.get(id)!);
+        // Append any new columns not present in the saved order
+        const orderedIds = new Set(eventsColOrder.value);
+        cols
+          .filter((c) => !orderedIds.has(c.id))
+          .forEach((c) => ordered.push(c));
+        return ordered;
+      }
+
+      return cols;
+    });
+
     const exceptionEventColumns = ref([
       {
         name: "@timestamp",
@@ -1293,15 +1365,9 @@ export default defineComponent({
       else expandedEvents.value[index.toString()] = true;
     };
 
-    const getSpanKind = (id: number) => {
-      const spanKindMapping: { [key: number]: string } = {
-        1: "Server",
-        2: "Client",
-        3: "Producer",
-        4: "Consumer",
-        5: "Internal",
-      };
-      return spanKindMapping[id] || id;
+    const getSpanKind = (id: number | string | null | undefined): string => {
+      if (id === null || id === undefined || id === "") return "Unspecified";
+      return SPAN_KIND_MAP[String(id)] || String(id);
     };
 
     const getFormattedSpanDetails = () => {
@@ -1322,6 +1388,17 @@ export default defineComponent({
           ),
           "MMM DD, YYYY HH:mm:ss.SSS Z",
         );
+
+      spanDetails.attrs["start_time"] = date.formatDate(
+        Math.floor(spanDetails.attrs["start_time"] / 1000000),
+        "MMM DD, YYYY HH:mm:ss.SSS Z",
+      );
+
+      spanDetails.attrs["end_time"] = date.formatDate(
+        Math.floor(spanDetails.attrs["end_time"] / 1000000),
+        "MMM DD, YYYY HH:mm:ss.SSS Z",
+      );
+
       spanDetails.attrs.span_kind = getSpanKind(spanDetails.attrs.span_kind);
 
       try {
@@ -1356,7 +1433,10 @@ export default defineComponent({
         processes.value = {};
         Object.keys(props.span).forEach((key: string) => {
           if (!span_details.has(key)) {
-            tags.value[key] = props.span[key];
+            tags.value[key] =
+              key === "span_kind"
+                ? getSpanKind(props.span[key])
+                : props.span[key];
           }
         });
 
@@ -1954,6 +2034,10 @@ export default defineComponent({
       eventColumns,
       expandedEvents,
       expandEvent,
+      eventsWrap,
+      eventsTableColumns,
+      handleEventsColumnOrder,
+      handleEventsColumnSizes,
       pagination,
       spanDetails,
       store,
@@ -2003,7 +2087,7 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.span_details_tab-panels {
+.trace-detail-tab-table {
   table {
     border-collapse: separate;
     border-spacing: 0;
@@ -2063,7 +2147,7 @@ export default defineComponent({
   }
 }
 
-.span_details_tab-panels table.q-table {
+.trace-detail-tab-table table.q-table {
   background: rgba(240, 240, 245, 0.8);
   backdrop-filter: blur(0.625rem);
   border: 0.125rem solid rgba(100, 100, 120, 0.5);
@@ -2546,9 +2630,9 @@ body.body--dark {
     gap: 0.5rem;
     width: calc(100vw - 350px);
     height: calc(
-      100vh - 296px
+      100vh - 17.2rem
     ); // Fixed height for the container (with 2-row toolbar for LLM spans)
-    max-height: calc(100vh - 296px);
+    max-height: calc(100vh - 17.2rem);
     align-items: stretch; // Ensure equal heights
     overflow: hidden; // Prevent scroll at outer level
   }
@@ -2564,7 +2648,7 @@ body.body--dark {
     flex: 1; // Take all available space
     height: 100%; // Take full height of parent
     max-height: calc(
-      100vh - 338px
+      100% - 1.625rem
     ); // Container height minus label/button height (with 2-row toolbar)
     border: 1px solid var(--o2-border-color);
     border-radius: 4px;
@@ -2604,7 +2688,7 @@ body.body--dark {
   // Fullscreen styles for the entire IO container (both Input and Output side by side)
   .io-container:fullscreen {
     background-color: #f5f5f5;
-    padding-bottom: 1rem;
+    padding: 0.75rem;
     height: 100vh; // Full viewport height in fullscreen
     max-height: 100vh;
     display: flex;
@@ -2708,7 +2792,7 @@ body.body--dark {
 <style lang="scss">
 // Dark theme support for glassmorphic tables
 .body--dark {
-  .span_details_tab-panels {
+  .trace-detail-tab-table {
     table {
       // background: rgba(255, 255, 255, 0.05);
       // border: 0.125rem solid rgba(255, 255, 255, 0.3);
@@ -2724,7 +2808,7 @@ body.body--dark {
 
 // Light theme support for glassmorphic tables
 .body--light {
-  .span_details_tab-panels {
+  .trace-detail-tab-table {
     table {
       // background: rgba(240, 240, 245, 0.8);
       // border: 0.125rem solid rgba(100, 100, 120, 0.5);

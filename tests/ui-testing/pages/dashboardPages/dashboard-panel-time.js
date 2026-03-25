@@ -127,14 +127,7 @@ export default class DashboardPanelTime {
     await dateTimeDialog.locator('[data-test="date-time-absolute-tab"]').click();
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
 
-    // Click the left chevron button (if needed)
-    await this.page
-      .locator("button")
-      .filter({ hasText: "chevron_left" })
-      .first()
-      .click();
-
-    // Select the start and end days dynamically
+    // Select the start and end days dynamically (calendar is on current month)
     await this.page
       .getByRole("button", { name: String(startDay) })
       .last()
@@ -176,14 +169,7 @@ export default class DashboardPanelTime {
     await dateTimeDialog.locator('[data-test="date-time-absolute-tab"]').click();
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
 
-    // Click the left chevron button (if needed)
-    await this.page
-      .locator("button")
-      .filter({ hasText: "chevron_left" })
-      .first()
-      .click();
-
-    // Select the start and end days dynamically
+    // Select the start and end days dynamically (calendar is on current month)
     await this.page
       .getByRole("button", { name: String(startDay) })
       .last()

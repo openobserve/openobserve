@@ -16,29 +16,8 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div>
-    <div class="q-mb-sm" style="font-weight: 600">
-      <span>{{ t("dashboard.markLines") }}</span>
-      <q-btn
-        no-caps
-        padding="xs"
-        class=""
-        size="sm"
-        flat
-        icon="info_outline"
-        data-test="dashboard-addpanel-config-markline-info"
-      >
-        <q-tooltip
-          class="bg-grey-8"
-          anchor="bottom middle"
-          self="top middle"
-          max-width="250px"
-        >
-          {{ t("dashboard.markLinesTooltip") }}
-        </q-tooltip>
-      </q-btn>
-    </div>
     <div
-      v-for="(, index) in dashboardPanelData.data.config.mark_line"
+      v-for="(,index) in dashboardPanelData.data.config.mark_line"
       :key="index"
     >
       <div
@@ -63,7 +42,8 @@
             stack-label
             emit-value
             :data-test="`dashboard-config-markline-type-${index}`"
-           hide-bottom-space></q-select>
+            hide-bottom-space
+          ></q-select>
           <q-input
             v-model="dashboardPanelData.data.config.mark_line[index].name"
             :label="t('dashboard.markLineLabel')"
@@ -76,11 +56,12 @@
             label-slot
             style="width: 100%"
             :data-test="`dashboard-config-markline-name-${index}`"
-           hide-bottom-space/>
+            hide-bottom-space
+          />
           <q-input
             v-if="
               ['xAxis', 'yAxis'].includes(
-                dashboardPanelData.data.config.mark_line[index].type
+                dashboardPanelData.data.config.mark_line[index].type,
               )
             "
             v-model="dashboardPanelData.data.config.mark_line[index].value"
@@ -93,8 +74,9 @@
             dense
             label-slot
             style="width: 100%"
-            :data-test="`dashboard-config-markline-name-${index}`"
-           hide-bottom-space/>
+            :data-test="`dashboard-config-markline-value-${index}`"
+            hide-bottom-space
+          />
         </div>
 
         <q-icon
@@ -122,7 +104,7 @@
 import { defineComponent, inject } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { onBeforeMount } from "vue";
 
 export default defineComponent({
@@ -142,10 +124,10 @@ export default defineComponent({
 
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
     const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey
+      dashboardPanelDataPageKey,
     );
 
     onBeforeMount(() => {

@@ -34,7 +34,9 @@ use utoipa::ToSchema;
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
-        utils::{auth::UserEmail, http::get_or_create_trace_id},
+        utils::{
+            auth::UserEmail, http::get_or_create_trace_id, stream::get_settings_max_query_range,
+        },
     },
     handler::http::extractors::Headers,
     service::{
@@ -47,6 +49,9 @@ use crate::{
 pub struct AlertHistoryQuery {
     /// Filter by specific alert name
     pub alert_id: Option<Ksuid>,
+    /// Filter by anomaly detection config ID (mutually exclusive with alert_id).
+    /// When set, queries the _anomalies stream instead of the triggers stream.
+    pub anomaly_id: Option<String>,
     /// Start time in Unix timestamp microseconds
     pub start_time: Option<i64>,
     /// End time in Unix timestamp microseconds
@@ -92,6 +97,9 @@ pub struct AlertHistoryEntry {
     pub grouped: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub group_size: Option<i32>,
+    /// Number of anomalies found in this evaluation run (anomaly detection only).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anomaly_count: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -166,9 +174,27 @@ pub async fn get_alert_history(
 
     // Set default time range (last 7 days if not specified)
     let end_time = query.end_time.unwrap_or_else(now_micros);
-    let start_time = query
+    let mut start_time = query
         .start_time
         .unwrap_or_else(|| (Utc::now() - Duration::try_days(7).unwrap()).timestamp_micros());
+
+    // Check the max query range allowed on the triggers stream
+    if let Some(settings) =
+        infra::schema::get_settings(&org_id, TRIGGERS_STREAM, StreamType::Logs).await
+    {
+        let max_query_range = get_settings_max_query_range(
+            settings.max_query_range,
+            &org_id,
+            Some(&user_email.user_id),
+        )
+        .await;
+        if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
+            start_time = end_time - max_query_range * 3600 * 1_000_000;
+            log::warn!(
+                "Start time for alert History api for org {org_id} updated as per max query range set for triggers stream"
+            )
+        }
+    }
 
     // Validate time range
     if start_time >= end_time {
@@ -215,6 +241,177 @@ pub async fn get_alert_history(
     } else {
         "DESC" // Default sort order
     };
+
+    // Anomaly detection history: query the triggers stream with module = 'anomaly_detection'.
+    // The anomaly_count is stored in success_response as {"anomalies_found": N}.
+    // Result is derived: "anomaly" when count > 0, "normal" when 0, "failed"/"skipped" on error.
+    if let Some(ref anomaly_id) = query.anomaly_id {
+        let escaped_id = escape_like(anomaly_id);
+        let where_clause = format!(
+            "module = 'anomaly_detection' AND key LIKE '%/{escaped_id}' \
+             AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
+        );
+
+        let trace_id = get_or_create_trace_id(req.headers(), &Span::current());
+
+        let count_sql =
+            format!("SELECT _timestamp FROM \"{TRIGGERS_STREAM}\" WHERE {where_clause}");
+        let count_req = SearchRequest {
+            query: SearchQuery {
+                sql: count_sql,
+                start_time,
+                end_time,
+                from: 0,
+                size: 1,
+                track_total_hits: true,
+                ..Default::default()
+            },
+            regions: vec![],
+            clusters: vec![],
+            timeout: 0,
+            use_cache: false,
+            ..Default::default()
+        };
+        let total_count = match SearchService::search(
+            &trace_id,
+            &org_id,
+            StreamType::Logs,
+            Some(user_email.user_id.clone()),
+            &count_req,
+        )
+        .instrument(Span::current())
+        .await
+        {
+            Ok(r) => r.total,
+            Err(e) => {
+                // Triggers stream doesn't exist yet — treat as empty.
+                let msg = e.to_string().to_lowercase();
+                if msg.contains("not found") || msg.contains("stream not found") {
+                    return MetaHttpResponse::json(AlertHistoryResponse {
+                        total: 0,
+                        from,
+                        size,
+                        hits: vec![],
+                    });
+                }
+                log::error!("Failed to get anomaly history count: {e}");
+                return MetaHttpResponse::internal_error(format!(
+                    "Failed to get anomaly history count: {e}"
+                ));
+            }
+        };
+
+        if total_count == 0 || from >= total_count as i64 {
+            return MetaHttpResponse::json(AlertHistoryResponse {
+                total: total_count,
+                from,
+                size,
+                hits: vec![],
+            });
+        }
+
+        let data_sql = format!(
+            "SELECT _timestamp, status, evaluation_took_in_secs, error, success_response \
+             FROM \"{TRIGGERS_STREAM}\" WHERE {where_clause} \
+             ORDER BY {sort_column} {sort_order} LIMIT {size} OFFSET {from}"
+        );
+        let data_req = SearchRequest {
+            query: SearchQuery {
+                sql: data_sql,
+                start_time,
+                end_time,
+                from: 0,
+                size,
+                track_total_hits: false,
+                ..Default::default()
+            },
+            regions: vec![],
+            clusters: vec![],
+            timeout: 0,
+            use_cache: false,
+            ..Default::default()
+        };
+        let search_result = match SearchService::search(
+            &trace_id,
+            &org_id,
+            StreamType::Logs,
+            Some(user_email.user_id.clone()),
+            &data_req,
+        )
+        .instrument(Span::current())
+        .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                log::error!("Failed to search anomaly history: {e}");
+                return MetaHttpResponse::internal_error(format!(
+                    "Failed to search anomaly history: {e}"
+                ));
+            }
+        };
+
+        let hits: Vec<AlertHistoryEntry> = search_result
+            .hits
+            .into_iter()
+            .map(|hit| {
+                let raw_status = hit
+                    .get("status")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown");
+                // Derive result: parse anomalies_found from success_response JSON.
+                let anomaly_count = hit
+                    .get("success_response")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
+                    .and_then(|v| v["anomalies_found"].as_i64())
+                    .unwrap_or(0);
+                let result = match raw_status {
+                    "failed" => "failed".to_string(),
+                    "skipped" => "skipped".to_string(),
+                    _ => {
+                        if anomaly_count > 0 {
+                            "anomaly".to_string()
+                        } else {
+                            "normal".to_string()
+                        }
+                    }
+                };
+                AlertHistoryEntry {
+                    timestamp: hit.get("_timestamp").and_then(|v| v.as_i64()).unwrap_or(0),
+                    alert_name: String::new(),
+                    org: org_id.clone(),
+                    status: result,
+                    is_realtime: false,
+                    is_silenced: false,
+                    start_time: hit.get("_timestamp").and_then(|v| v.as_i64()).unwrap_or(0),
+                    end_time: hit.get("_timestamp").and_then(|v| v.as_i64()).unwrap_or(0),
+                    retries: 0,
+                    error: hit.get("error").and_then(|v| v.as_str()).map(String::from),
+                    success_response: None,
+                    is_partial: None,
+                    delay_in_secs: None,
+                    evaluation_took_in_secs: hit
+                        .get("evaluation_took_in_secs")
+                        .and_then(|v| v.as_f64()),
+                    source_node: None,
+                    query_took: None,
+                    dedup_enabled: None,
+                    dedup_suppressed: None,
+                    dedup_count: None,
+                    grouped: None,
+                    group_size: None,
+                    anomaly_count: Some(anomaly_count as i32),
+                }
+            })
+            .collect();
+
+        return MetaHttpResponse::json(AlertHistoryResponse {
+            total: total_count,
+            from,
+            size,
+            hits,
+        });
+    }
 
     // If alert_id filter is provided, validate it exists
     let _folder_id = if let Some(alert_id) = query.alert_id {
@@ -414,6 +611,16 @@ pub async fn get_alert_history(
     {
         Ok(result) => result.total,
         Err(e) => {
+            // Triggers stream doesn't exist yet (no alert has ever fired in this org).
+            let msg = e.to_string().to_lowercase();
+            if msg.contains("stream not found") || msg.contains("not found") {
+                return MetaHttpResponse::json(AlertHistoryResponse {
+                    total: 0,
+                    from,
+                    size,
+                    hits: vec![],
+                });
+            }
             log::error!("Failed to get alert history count: {}", e);
             return MetaHttpResponse::internal_error(format!(
                 "Failed to get alert history count: {e}"
@@ -542,6 +749,7 @@ pub async fn get_alert_history(
                 .get("group_size")
                 .and_then(|v| v.as_i64())
                 .map(|v| v as i32),
+            anomaly_count: None,
         });
     }
 
@@ -564,6 +772,7 @@ mod tests {
     fn test_alert_history_query_defaults() {
         let query = AlertHistoryQuery {
             alert_id: None,
+            anomaly_id: None,
             start_time: None,
             end_time: None,
             from: None,
@@ -605,6 +814,7 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            anomaly_count: None,
         };
 
         assert_eq!(entry.alert_name, "test_alert");
@@ -655,6 +865,7 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            anomaly_count: None,
         };
 
         let response = AlertHistoryResponse {
@@ -694,6 +905,7 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            anomaly_count: None,
         };
 
         assert_eq!(entry.status, "error");
@@ -708,6 +920,7 @@ mod tests {
         // Test pagination parameters
         let query = AlertHistoryQuery {
             alert_id: None,
+            anomaly_id: None,
             start_time: None,
             end_time: None,
             from: Some(100),
@@ -742,6 +955,7 @@ mod tests {
         for field in sort_fields {
             let query = AlertHistoryQuery {
                 alert_id: None,
+                anomaly_id: None,
                 start_time: None,
                 end_time: None,
                 from: None,
@@ -760,6 +974,7 @@ mod tests {
         // Test ascending order
         let query_asc = AlertHistoryQuery {
             alert_id: None,
+            anomaly_id: None,
             start_time: None,
             end_time: None,
             from: None,
@@ -772,6 +987,7 @@ mod tests {
         // Test descending order
         let query_desc = AlertHistoryQuery {
             alert_id: None,
+            anomaly_id: None,
             start_time: None,
             end_time: None,
             from: None,
@@ -903,6 +1119,7 @@ mod tests {
             dedup_count: Some(1),
             grouped: Some(false),
             group_size: None,
+            anomaly_count: None,
         };
 
         let json = serde_json::to_string(&entry).unwrap();
@@ -939,6 +1156,7 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            anomaly_count: None,
         };
 
         let response = AlertHistoryResponse {

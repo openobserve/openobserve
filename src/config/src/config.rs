@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 34;
+pub const DB_SCHEMA_VERSION: u64 = 35;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -73,6 +73,11 @@ pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024; // this can't be change, it will cause segment matching error
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
+pub const SOURCEMAP_ZIP_MAX_SIZE: usize = 1024 * 1024 * 100; // 100 MB
+// max file size for individual sourcemap. We temp cache these in mem,
+// so it will affect spikes in mem at resolving stacktrace
+pub const SOURCEMAP_FILE_MAX_SIZE: u64 = 1024 * 1024 * 5; // 5 MB
+pub const SOURCEMAP_MEM_CACHE_SIZE: usize = 10000;
 
 #[inline]
 pub fn get_batch_size() -> usize {
@@ -859,6 +864,12 @@ pub struct Common {
     pub timestamp_compression_disabled: bool,
     #[env_config(name = "ZO_FEATURE_INGESTER_NONE_COMPRESSION", default = false)]
     pub feature_ingester_none_compression: bool,
+    #[env_config(
+        name = "ZO_FEATURE_SHOW_FTS_FIELD_VALUES",
+        default = false,
+        help = "Show field values dropdown for full text search fields in the logs page field list"
+    )]
+    pub show_fts_field_values: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
     pub feature_fulltext_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_INDEX_EXTRA_FIELDS", default = "")]
@@ -1894,20 +1905,6 @@ pub struct Log {
     // logger timestamp local setup, eg: %Y-%m-%dT%H:%M:%SZ
     #[env_config(name = "ZO_LOG_LOCAL_TIME_FORMAT", default = "")]
     pub local_time_format: String,
-    #[env_config(name = "ZO_EVENTS_ENABLED", default = false)]
-    pub events_enabled: bool,
-    #[env_config(
-        name = "ZO_EVENTS_AUTH",
-        default = "cm9vdEBleGFtcGxlLmNvbTpUZ0ZzZFpzTUZQdzg2SzRK"
-    )]
-    pub events_auth: String,
-    #[env_config(
-        name = "ZO_EVENTS_EP",
-        default = "https://api.openobserve.ai/api/debug/events/_json"
-    )]
-    pub events_url: String,
-    #[env_config(name = "ZO_EVENTS_BATCH_SIZE", default = 10)]
-    pub events_batch_size: usize,
 }
 
 #[derive(Serialize, Debug, EnvConfig, Default)]
@@ -2450,7 +2447,7 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // HACK for thread_num equal to CPU core * 4
     if cfg.limit.query_thread_num == 0 {
         if cfg.common.local_mode {
-            cfg.limit.query_thread_num = cpu_num * 2;
+            cfg.limit.query_thread_num = cpu_num;
         } else {
             cfg.limit.query_thread_num = cpu_num * 4;
         }

@@ -114,8 +114,7 @@ describe("PatternCard", () => {
         '[data-test="pattern-card-0-anomaly-badge"]',
       );
       expect(anomalyBadge.exists()).toBe(true);
-      // The badge now shows only the warning icon, not the text
-      expect(anomalyBadge.text()).toContain("⚠️");
+      expect(anomalyBadge.text()).toContain("Rare Pattern");
     });
 
     it("should not display anomaly badge when pattern is not an anomaly", () => {
@@ -268,6 +267,86 @@ describe("PatternCard", () => {
       // Tooltip component may not be rendered in test environment
       // but we can verify the component structure is correct
       expect(anomalyBadge.exists()).toBe(true);
+    });
+  });
+
+  // --- New tests added to cover Mar 2 changes ---
+
+  describe("wrap prop", () => {
+    it("should apply tw:truncate class on template when wrap is false (default)", () => {
+      const template = wrapper.find('[data-test="pattern-card-0-template"]');
+      expect(template.classes()).toContain("tw:truncate");
+      expect(template.classes()).not.toContain("tw:break-all");
+    });
+
+    it("should apply tw:break-all class on template when wrap is true", async () => {
+      await wrapper.setProps({ wrap: true });
+      const template = wrapper.find('[data-test="pattern-card-0-template"]');
+      expect(template.classes()).toContain("tw:break-all");
+      expect(template.classes()).not.toContain("tw:truncate");
+    });
+
+    it("should revert to tw:truncate when wrap is toggled back to false", async () => {
+      await wrapper.setProps({ wrap: true });
+      await wrapper.setProps({ wrap: false });
+      const template = wrapper.find('[data-test="pattern-card-0-template"]');
+      expect(template.classes()).toContain("tw:truncate");
+    });
+  });
+
+  describe("LogsHighLighting integration", () => {
+    it("should render a child component for the pattern template text", () => {
+      const template = wrapper.find('[data-test="pattern-card-0-template"]');
+      // LogsHighLighting is used to render the template; the container should exist
+      expect(template.exists()).toBe(true);
+    });
+
+    it("should set title attribute on template div to the pattern template string", () => {
+      const template = wrapper.find('[data-test="pattern-card-0-template"]');
+      expect(template.attributes("title")).toBe(mockPattern.template);
+    });
+  });
+
+  describe("Details icon tooltip variable/example counts", () => {
+    it("should render details icon button", () => {
+      const detailsIcon = wrapper.find(
+        '[data-test="pattern-card-0-details-icon"]',
+      );
+      expect(detailsIcon.exists()).toBe(true);
+    });
+
+    it("should emit click event when details icon button is clicked", async () => {
+      const detailsIcon = wrapper.find(
+        '[data-test="pattern-card-0-details-icon"]',
+      );
+      await detailsIcon.trigger("click");
+      expect(wrapper.emitted("click")).toBeTruthy();
+      expect(wrapper.emitted("click")![0]).toEqual([mockPattern, mockIndex]);
+    });
+
+    it("should emit click with correct pattern when pattern has no examples", async () => {
+      const patternNoExamples = { ...mockPattern, examples: [] };
+      await wrapper.setProps({ pattern: patternNoExamples });
+      const detailsIcon = wrapper.find(
+        '[data-test="pattern-card-0-details-icon"]',
+      );
+      await detailsIcon.trigger("click");
+      expect(wrapper.emitted("click")).toBeTruthy();
+      expect(wrapper.emitted("click")![0][0]).toEqual(patternNoExamples);
+    });
+
+    it("should emit click with correct pattern when examples have no variables", async () => {
+      const patternNoVars = {
+        ...mockPattern,
+        examples: [{ log_message: "some log", variables: undefined }],
+      };
+      await wrapper.setProps({ pattern: patternNoVars });
+      const detailsIcon = wrapper.find(
+        '[data-test="pattern-card-0-details-icon"]',
+      );
+      await detailsIcon.trigger("click");
+      expect(wrapper.emitted("click")).toBeTruthy();
+      expect(wrapper.emitted("click")![0][0]).toEqual(patternNoVars);
     });
   });
 });

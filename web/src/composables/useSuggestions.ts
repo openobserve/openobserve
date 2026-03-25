@@ -307,16 +307,14 @@ const useSqlSuggestions = () => {
 
     const columnValueRegex = /(\w+)\s*=\s*$|\w+\s+IN\s+\($/i;
 
-    let match;
-    while ((match = columnValueRegex.exec(whereClause)) !== null) {
+    const match = columnValueRegex.exec(whereClause);
+    if (match !== null) {
       const column = match[1];
 
       if (cursorIndex <= match.index + match[0].length - 1) {
         labelMeta.focusOn = "value";
         labelMeta.isFocused = true;
         labelMeta.meta.label = column;
-
-        break; // Exit the loop after processing the match
       }
     }
     return labelMeta;

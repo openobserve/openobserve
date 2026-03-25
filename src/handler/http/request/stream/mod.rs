@@ -221,7 +221,7 @@ pub async fn create(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update stream settings", "category": "streams"}))
+        ("x-o2-mcp" = json!({"description": "Update stream settings", "category": "streams", "requires_confirmation": true}))
     )
 )]
 pub async fn update_settings(
@@ -452,7 +452,11 @@ pub async fn delete(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all streams", "category": "streams"}))
+        ("x-o2-mcp" = json!({
+            "description": "List all streams",
+            "category": "streams",
+            "summary_fields": ["name", "stream_type", "stats.storage_size"]
+        }))
     )
 )]
 pub async fn list(

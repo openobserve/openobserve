@@ -1,30 +1,9 @@
 <template>
   <div>
-    <div class="q-mb-sm" style="font-weight: 600">
-      <span>Override Config</span>
-      <q-btn
-        no-caps
-        padding="xs"
-        size="sm"
-        flat
-        icon="info_outline"
-        data-test="dashboard-addpanel-config-drilldown-info"
-      >
-        <q-tooltip
-          class="bg-grey-8"
-          anchor="bottom middle"
-          self="top middle"
-          max-width="250px"
-        >
-          Map units to the selected columns for enhanced data visualization.
-        </q-tooltip>
-      </q-btn>
-    </div>
-
     <q-btn
       @click="openOverrideConfigPopup"
       style="cursor: pointer; padding: 0px 5px"
-      :label="' Add field override'"
+      :label="t('dashboard.addFieldOverride')"
       no-caps
       data-test="dashboard-addpanel-config-override-config-add-btn"
       class="el-border"
@@ -46,9 +25,10 @@
 
 <script lang="ts">
 import { defineComponent, ref, inject, onBeforeMount } from "vue";
+import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OverrideConfigPopup from "../OverrideConfigPopup.vue";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 
 interface Column {
   alias: string;
@@ -70,6 +50,7 @@ export default defineComponent({
     },
   },
   setup(props) {
+    const { t } = useI18n();
     const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
@@ -144,7 +125,6 @@ export default defineComponent({
           alias: columnName,
           label: columnName,
         }));
-
       } else {
         const x = dashboardPanelData.data.queries[0].fields.x || [];
         const y = dashboardPanelData.data.queries[0].fields.y || [];
@@ -199,6 +179,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       store,
       dashboardPanelData,
       showOverrideConfigPopup,

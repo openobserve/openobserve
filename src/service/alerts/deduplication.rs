@@ -161,11 +161,11 @@ pub async fn apply_deduplication(
     db: &DatabaseConnection,
     alert: &Alert,
     result_rows: Vec<Map<String, Value>>,
-) -> Result<Vec<Map<String, Value>>, sea_orm::DbErr> {
+) -> Result<(Vec<Map<String, Value>>, bool), sea_orm::DbErr> {
     // Check if per-alert deduplication is enabled
     let dedup_config = match &alert.deduplication {
         Some(config) if config.enabled => config,
-        _ => return Ok(result_rows), // Deduplication disabled, return all rows
+        _ => return Ok((result_rows, false)), // Deduplication disabled, return all rows
     };
 
     // Get semantic groups from system_settings — the single source of truth
@@ -187,6 +187,7 @@ pub async fn apply_deduplication(
         &semantic_groups,
     )
     .await
+    .map(|result| (result, true))
 }
 
 /// Enterprise implementation of apply_deduplication

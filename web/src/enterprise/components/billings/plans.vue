@@ -24,6 +24,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <trial-period class="q-mb-md" currentPage="billing"></trial-period>
+    <!-- AI Credits card -->
+    <div v-if="aiUsage" class="tw:grid tw:grid-cols-1 tw:gap-4 tw:w-full tw:mb-4">
+      <div class="feature-card">
+        <div class="tile-content text-center column justify-between">
+          <div class="column justify-between">
+            <div class="row justify-between items-center">
+              <div class="usage-tile-title">{{ t("billing.aiCredits") }}</div>
+              <div style="opacity: 0.8;">
+                <img :src="aiIcon" />
+              </div>
+            </div>
+            <q-badge
+              :color="aiModeBadgeColor"
+              :label="aiModeLabel"
+              class="q-mt-sm"
+              style="width: fit-content;"
+            />
+          </div>
+          <div class="q-mt-md q-mb-sm">
+            <q-linear-progress
+              :value="aiUsageRatio"
+              size="12px"
+              rounded
+              :color="aiUsageRatio >= 1 ? 'negative' : aiUsageRatio >= 0.9 ? 'warning' : 'primary'"
+              track-color="grey-3"
+            />
+          </div>
+          <div class="usage-data-to-display row items-end">
+            {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }} credits used
+          </div>
+          <div v-if="aiUsage.mode === 'exhausted'" class="text-negative q-mt-sm" style="font-size: 13px;">
+            {{ t("billing.aiExhaustedMessage") }}
+          </div>
+          <div v-else-if="aiUsage.mode === 'pay_as_you_go'" class="text-info q-mt-sm" style="font-size: 13px;">
+            {{ t("billing.aiPaygMessage") }}
+          </div>
+        </div>
+      </div>
+    </div>
     <div
       v-if="
         store.state.selectedOrganization.hasOwnProperty('note') &&
@@ -45,25 +84,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <pro-plan
         :planType="planType"
         :billingProvider="billingProvider"
+        :features="proPlanFeatures"
+        :pricingError="pricingError"
         @update:proSubscription="onLoadSubscription(config.paidPlan)"
         @update:cancelSubscription="onUnsubscribe"
       ></pro-plan>
-      <enterprise-plan></enterprise-plan>
+      <enterprise-plan
+        :features="enterprisePlanFeatures"
+        :pricingError="pricingError"
+      ></enterprise-plan>
     </div>
   </q-page>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import EnterprisePlan from "./enterprisePlan.vue";
 import ProPlan from "./proPlan.vue";
 import BillingService from "@/services/billings";
 import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
-import { useLocalOrganization, convertToTitleCase } from "@/utils/zincutils";
+import { useLocalOrganization, convertToTitleCase, getImageURL } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
+import { siteURL } from "@/constants/config";
 
 export default defineComponent({
   name: "plans",
@@ -75,9 +120,67 @@ export default defineComponent({
   emits: ["update:proSubscription"],
   async mounted() {
     this.loading = true;
-    await this.loadSubscription();
+    await Promise.all([this.loadSubscription(), this.fetchPricingData()]);
+    this.fetchAiUsage();
   },
   methods: {
+    fetchAiUsage() {
+      BillingService.get_ai_usage(
+        this.store.state.selectedOrganization.identifier
+      )
+        .then((res: any) => {
+          this.aiUsage = res.data;
+        })
+        .catch(() => {
+          // AI usage not available
+        });
+    },
+    async fetchPricingData() {
+      try {
+        const response = await fetch(siteURL.pricingJsonUrl);
+        const json = await response.json();
+        const cloudPlans = json?.data?.[0]?.cloud ?? [];
+        const mapFeatures = (jsonFeatures: any[]) =>
+          jsonFeatures.map((f: any) => ({
+            name: f.title,
+            price: f.price ?? "",
+            is_parent: !f.isSubItem,
+          }));
+        const payAsYouGo =
+          cloudPlans.find((p: any) =>
+            p.title?.toLowerCase().includes("pay as you go"),
+          ) ?? cloudPlans[0];
+        const enterprise =
+          cloudPlans.find((p: any) =>
+            p.title?.toLowerCase().includes("enterprise"),
+          ) ?? cloudPlans[1];
+
+        const proFeatures = payAsYouGo?.features
+          ? mapFeatures(payAsYouGo.features)
+          : [];
+        const entFeatures = enterprise?.features
+          ? mapFeatures(enterprise.features)
+          : [];
+
+        const diff = proFeatures.length - entFeatures.length + 3;
+        const paddedEntFeatures =
+          diff > 0
+            ? [
+                ...entFeatures,
+                ...Array.from({ length: diff }, () => ({
+                  name: "",
+                  price: "",
+                  is_parent: false,
+                })),
+              ]
+            : entFeatures;
+
+        this.proPlanFeatures = proFeatures;
+        this.enterprisePlanFeatures = paddedEntFeatures;
+      } catch {
+        this.pricingError = true;
+      }
+    },
     onLoadSubscription(planType: string) {
       this.proLoading = true;
       if (this.listSubscriptionResponse.card != undefined) {
@@ -206,6 +309,35 @@ export default defineComponent({
     const proLoading: any = ref(false);
     const currentPlanDetail = ref();
     const billingProvider = ref("");
+    const aiUsage = ref<any>(null);
+    const aiIcon = computed(() =>
+      store.state.theme === "dark"
+        ? getImageURL("images/common/ai_icon_dark.svg")
+        : getImageURL("images/common/ai_icon_gradient.svg")
+    );
+    const aiUsageRatio = computed(() => {
+      if (!aiUsage.value || !aiUsage.value.credits_limit) return 0;
+      return Math.min(aiUsage.value.credits_used / aiUsage.value.credits_limit, 1);
+    });
+    const aiModeBadgeColor = computed(() => {
+      if (!aiUsage.value) return 'grey';
+      switch (aiUsage.value.mode) {
+        case 'pay_as_you_go': return 'blue';
+        case 'exhausted': return 'red';
+        default: return 'green';
+      }
+    });
+    const aiModeLabel = computed(() => {
+      if (!aiUsage.value) return '';
+      switch (aiUsage.value.mode) {
+        case 'pay_as_you_go': return t("billing.aiModePayAsYouGo");
+        case 'exhausted': return t("billing.aiModeExhausted");
+        default: return t("billing.aiModeFree");
+      }
+    });
+    const proPlanFeatures: any = ref([]);
+    const enterprisePlanFeatures: any = ref([]);
+    const pricingError = ref(false);
 
     const retrieveHostedPage = () => {
       BillingService.retrieve_hosted_page(
@@ -235,6 +367,14 @@ export default defineComponent({
       proLoading,
       currentPlanDetail,
       billingProvider,
+      aiUsage,
+      aiIcon,
+      aiUsageRatio,
+      aiModeBadgeColor,
+      aiModeLabel,
+      proPlanFeatures,
+      enterprisePlanFeatures,
+      pricingError,
     };
   },
 });

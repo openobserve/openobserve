@@ -33,14 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div style="flex: 1">
         <div style="display: flex; flex-direction: row">
           <div class="layout-name">
-            {{
-              dashboardPanelData.data.type == "table"
-                ? t("panel.firstColumn")
-                : dashboardPanelData.data.type == "h-bar" ||
-                    dashboardPanelData.data.type == "h-stacked"
-                  ? t("panel.yAxis")
-                  : t("panel.xAxis")
-            }}
+            {{ currentXLabel }}
             <q-icon name="info_outline" class="q-ml-xs">
               <q-tooltip>
                 {{ xAxisHint }}
@@ -128,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               dashboardPanelData.layout.currentQueryIndex
                             ].fields.x[index].isDerived
                               ? 'auto'
-                              : '771px',
+                              : FIELD_FUNCTION_MENU_WIDTH,
                         }"
                       >
                         <div>
@@ -186,6 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         style="flex: 1"
         v-if="
+          dashboardPanelData.data.type == 'table' ||
           dashboardPanelData.data.type == 'area' ||
           dashboardPanelData.data.type == 'bar' ||
           dashboardPanelData.data.type == 'line' ||
@@ -197,25 +191,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <div style="display: flex; flex-direction: row" class="q-pl-md">
-          <!-- Separator between X and Breakdown -->
+          <!-- Separator between X and Breakdown/Pivot -->
           <q-separator vertical class="q-mr-md" />
           <div class="layout-name" style="min-width: 0 !important">
-            {{ t("panel.breakdown") }}
+            {{
+              dashboardPanelData.data.type == 'table'
+                ? t("panel.pivotField")
+                : t("panel.breakdown")
+            }}
             <q-icon name="info_outline" class="q-ml-xs">
               <q-tooltip>
                 <span
-                  v-if="
+                  v-if="dashboardPanelData.data.type == 'table'"
+                >
+                  {{ t("panel.pivotFieldTooltip") }}
+                </span>
+                <span
+                  v-else-if="
                     dashboardPanelData.data.type == 'h-bar' ||
                     dashboardPanelData.data.type == 'h-stacked'
                   "
                 >
-                  Use these fields to split the data into different sections on
-                  the Y axis for a clearer view.
+                  {{ t("panel.breakdownTooltipHBar") }}
                 </span>
 
                 <span v-else>
-                  Use these fields to split the data into different sections on
-                  the X axis for a clearer view.
+                  {{ t("panel.breakdownTooltipDefault") }}
                 </span>
               </q-tooltip>
             </q-icon>
@@ -303,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               dashboardPanelData.layout.currentQueryIndex
                             ].fields.breakdown[index].isDerived
                               ? 'auto'
-                              : '771px',
+                              : FIELD_FUNCTION_MENU_WIDTH,
                         }"
                       >
                         <div>
@@ -362,14 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- y axis container -->
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
-        {{
-          dashboardPanelData.data.type == "table"
-            ? t("panel.otherColumn")
-            : dashboardPanelData.data.type == "h-bar" ||
-                dashboardPanelData.data.type == "h-stacked"
-              ? t("panel.xAxis")
-              : t("panel.yAxis")
-        }}
+        {{ currentYLabel }}
         <q-icon name="info_outline" class="q-ml-xs">
           <q-tooltip>
             {{ yAxisHint }}
@@ -456,7 +450,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dashboardPanelData.layout.currentQueryIndex
                         ].fields.y[index].isDerived
                           ? 'auto'
-                          : '771px',
+                          : FIELD_FUNCTION_MENU_WIDTH,
                     }"
                   >
                     <div>
@@ -608,7 +602,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dashboardPanelData.layout.currentQueryIndex
                           ].fields.z[index].isDerived
                             ? 'auto'
-                            : '771px',
+                            : FIELD_FUNCTION_MENU_WIDTH,
                       }"
                     >
                       <div>
@@ -704,7 +698,7 @@ import {
   onMounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 import DashboardGeoMapsQueryBuilder from "./DashboardGeoMapsQueryBuilder.vue";
 import DashboardMapsQueryBuilder from "./DashboardMapsQueryBuilder.vue";
@@ -718,7 +712,7 @@ import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOpti
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import { useStore } from "vuex";
-import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
+import { MAX_FIELD_LABEL_CHARS, FIELD_FUNCTION_MENU_WIDTH } from "@/utils/dashboard/constants";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
 import OperationsList from "@/components/promql/components/OperationsList.vue";
 import PromQLBuilderOptions from "@/components/promql/components/PromQLBuilderOptions.vue";
@@ -781,7 +775,10 @@ export default defineComponent({
       isAddBreakdownNotAllowed,
       cleanupDraggingFields,
       selectedStreamFieldsBasedOnUserDefinedSchema,
-      fetchPromQLLabels
+      fetchPromQLLabels,
+      currentXLabel,
+      currentYLabel,
+      isPivotMode,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     const { parsePromQlQuery } = usePromqlSuggestions();
@@ -968,13 +965,14 @@ export default defineComponent({
 
           // In custom query mode, use the field's alias/column (which matches the SQL column name)
           // instead of the raw field name from args, since custom mode fields represent SQL result columns
-          const isCustomQuery = dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery;
+          const isCustomQuery =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].customQuery;
 
           const fieldObj = {
             name: isCustomQuery
-              ? (dragElement?.alias || firstFieldTypeArg.field)
+              ? dragElement?.alias || firstFieldTypeArg.field
               : firstFieldTypeArg.field,
             streamAlias: firstFieldTypeArg.streamAlias,
           };
@@ -1224,7 +1222,9 @@ export default defineComponent({
             ].fields?.stream
           : "",
       );
-      return label?.length > MAX_FIELD_LABEL_CHARS ? label.substring(0, MAX_FIELD_LABEL_CHARS) + "..." : label;
+      return label?.length > MAX_FIELD_LABEL_CHARS
+        ? label.substring(0, MAX_FIELD_LABEL_CHARS) + "..."
+        : label;
     };
 
     const xLabel = computed(() => {
@@ -1263,8 +1263,11 @@ export default defineComponent({
 
     // PromQL Builder Mode (queryType = "promql" with customQuery = false)
     const promqlBuilderMode = computed(
-      () => dashboardPanelData.data.queryType == "promql" &&
-           !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery
+      () =>
+        dashboardPanelData.data.queryType == "promql" &&
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.customQuery,
     );
 
     const promqlBuilderQuery = reactive<PromVisualQuery>({
@@ -1284,7 +1287,7 @@ export default defineComponent({
           promqlBuilderQuery.metric = newStream;
         }
       },
-      { immediate: true }
+      { immediate: true },
     );
 
     // Initialize from existing query if available
@@ -1302,10 +1305,11 @@ export default defineComponent({
           }
           // Load saved builder state from schema
           promqlBuilderQuery.labels = currentQuery?.fields?.promql_labels || [];
-          promqlBuilderQuery.operations = currentQuery?.fields?.promql_operations || [];
+          promqlBuilderQuery.operations =
+            currentQuery?.fields?.promql_operations || [];
         }
       },
-      { immediate: true }
+      { immediate: true },
     );
 
     // Watch for query index changes to load the correct builder state
@@ -1323,9 +1327,10 @@ export default defineComponent({
           }
           // Load saved builder state
           promqlBuilderQuery.labels = currentQuery?.fields?.promql_labels || [];
-          promqlBuilderQuery.operations = currentQuery?.fields?.promql_operations || [];
+          promqlBuilderQuery.operations =
+            currentQuery?.fields?.promql_operations || [];
         }
-      }
+      },
     );
 
     // Deep watcher to rebuild PromQL query when any field changes
@@ -1349,17 +1354,17 @@ export default defineComponent({
         try {
           const query = promQueryModeller.renderQuery(promqlBuilderQuery);
           currentQuery.query = query;
-        } catch (error) {
-        }
+        } catch (error) {}
       },
-      { deep: true }
+      { deep: true },
     );
 
     // Watch for query changes in PromQL custom mode and extract metric name to set as stream
     watch(
-      () => dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ]?.query,
+      () =>
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.query,
       (newQuery) => {
         // Only process if in PromQL custom mode (not builder mode)
         if (promqlMode.value && !promqlBuilderMode.value && newQuery) {
@@ -1367,19 +1372,21 @@ export default defineComponent({
           const metricName = parsedQuery?.metricName;
 
           if (metricName) {
-            const currentQuery = dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ];
+            const currentQuery =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ];
             // Set the extracted metric name as the stream
             currentQuery.fields.stream = metricName;
           }
         }
-      }
+      },
     );
 
     return {
       showXAxis,
       t,
+      FIELD_FUNCTION_MENU_WIDTH,
       panelName,
       panelDesc,
       dashboardPanelData,
@@ -1413,6 +1420,10 @@ export default defineComponent({
       bLabel,
       onFieldDragStart,
       onDragEnd,
+      currentXLabel,
+      currentYLabel,
+      isPivotMode,
+      reorderItems,
     };
   },
 });
@@ -1455,12 +1466,14 @@ export default defineComponent({
   // white-space: nowrap;
   overflow-x: auto;
 }
+
 .layout-separator {
   display: flex;
   align-items: center;
   margin-left: 2px;
   margin-right: 2px;
 }
+
 .layout-name {
   white-space: nowrap;
   min-width: 130px;
@@ -1495,6 +1508,7 @@ export default defineComponent({
   align-items: center;
   position: relative;
 }
+
 .color-input-wrapper input[type="color"] {
   position: absolute;
   height: 4em;
@@ -1507,6 +1521,7 @@ export default defineComponent({
   margin: 0;
   padding: 0;
 }
+
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
@@ -1516,6 +1531,7 @@ export default defineComponent({
     padding: 0.5rem;
   }
 }
+
 .index-menu {
   width: 100%;
 
@@ -1529,6 +1545,7 @@ export default defineComponent({
         padding-top: 0px !important;
       }
     }
+
     &__native :first-of-type {
       padding-top: 0.25rem;
     }
@@ -1540,13 +1557,16 @@ export default defineComponent({
 
   .index-table {
     width: 100%;
+
     // border: 1px solid rgba(0, 0, 0, 0.02);
     .q-table {
       display: block;
     }
+
     tr {
       margin-bottom: 1px;
     }
+
     tbody,
     tr,
     td {
@@ -1558,10 +1578,12 @@ export default defineComponent({
     .q-table__top {
       padding: 0px;
     }
+
     .q-table__control,
     label.q-field {
       width: 100%;
     }
+
     .q-table thead tr,
     .q-table tbody td {
       height: auto;
@@ -1571,6 +1593,7 @@ export default defineComponent({
       border-bottom: unset;
     }
   }
+
   .field-table {
     width: 100%;
   }
@@ -1631,6 +1654,7 @@ export default defineComponent({
           opacity: 0;
         }
       }
+
       &:hover {
         .field_overlay {
           box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
@@ -1642,6 +1666,7 @@ export default defineComponent({
         }
       }
     }
+
     &:hover {
       .field_overlay {
         box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
@@ -1654,6 +1679,7 @@ export default defineComponent({
     }
   }
 }
+
 .q-item {
   // color: $dark-page;
   min-height: 1.3rem;
@@ -1679,12 +1705,14 @@ export default defineComponent({
     color: $primary;
   }
 }
+
 .q-field--dense .q-field__before,
 .q-field--dense .q-field__prepend {
   padding: 0px 0px 0px 0px;
   height: auto;
   line-height: auto;
 }
+
 .q-field__native,
 .q-field__input {
   padding: 0px 0px 0px 0px;
@@ -1693,6 +1721,7 @@ export default defineComponent({
 .q-field--dense .q-field__label {
   top: 5px;
 }
+
 .q-field--dense .q-field__control,
 .q-field--dense .q-field__marginal {
   height: 34px;

@@ -58,17 +58,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-td :props="props" side>
           <q-btn
             :label="t('invitation.accept')"
-            class="q-mr-sm o2-primary-button"
+            class="q-mr-sm o2-primary-button no-hover"
             no-caps
+            flat
             dense
             @click="acceptInvitation(props.row)"
             :data-test="`accept-invitation-${props.row.token}`"
           />
           <q-btn
             :label="t('invitation.reject')"
-            dense
             class="o2-secondary-button"
             no-caps
+            flat
+            dense
             @click="rejectInvitation(props.row)"
             :data-test="`reject-invitation-${props.row.token}`"
           />
@@ -421,6 +423,7 @@ export default defineComponent({
       confirmAcceptInvitation,
       confirmRejectInvitation,
       fetchPendingInvitations,
+      formatExpiry,
     };
   },
 });
@@ -452,6 +455,12 @@ export default defineComponent({
   .q-btn {
     font-size: 0.75rem;
     font-weight: 700;
+  }
+}
+
+.no-hover {
+  &:hover {
+    color: black !important;
   }
 }
 </style>

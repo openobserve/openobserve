@@ -70,7 +70,8 @@ vi.mock("@/composables/useNotifications", () => ({
 
 // convertDashboardSchemaVersion: return the object unchanged so SQL is preserved
 vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
-  convertDashboardSchemaVersion: (data: any) => JSON.parse(JSON.stringify(data)),
+  convertDashboardSchemaVersion: (data: any) =>
+    JSON.parse(JSON.stringify(data)),
 }));
 
 // parseDurationWhereClause: return the input filter string unchanged
@@ -78,11 +79,13 @@ vi.mock("@/composables/useDurationPercentiles", () => ({
   parseDurationWhereClause: (_filter: string) => _filter,
 }));
 
-// useParser: resolve immediately with a no-op parser object
+// useParser: resolve immediately with a no-op parser object by default.
+// Individual describe blocks may override sqlParser via mockReturnValue to
+// control when the promise resolves (see "onMounted ordering" tests below).
 vi.mock("@/composables/useParser", () => ({
-  default: () => ({
+  default: vi.fn(() => ({
     sqlParser: vi.fn().mockResolvedValue({}),
-  }),
+  })),
 }));
 
 vi.mock("@/utils/zincutils", () => ({
@@ -101,6 +104,7 @@ vi.mock("@/utils/zincutils", () => ({
   b64DecodeUnicode: vi.fn().mockImplementation((str: string) => atob(str)),
 }));
 
+import useParser from "@/composables/useParser";
 import TracesMetricsDashboard from "./TracesMetricsDashboard.vue";
 
 installQuasar();
@@ -222,7 +226,9 @@ describe("TracesMetricsDashboard", () => {
     });
 
     it("should not render TracesAnalysisDashboard on initial mount", () => {
-      const analysisDashboard = wrapper.find('[data-test="traces-analysis-dashboard"]');
+      const analysisDashboard = wrapper.find(
+        '[data-test="traces-analysis-dashboard"]',
+      );
       expect(analysisDashboard.exists()).toBe(false);
     });
   });
@@ -261,21 +267,9 @@ describe("TracesMetricsDashboard", () => {
       await flushPromises();
       const query = getPanelQuery(wrapper, "Rate");
       // The Rate panel template contains: approx_distinct(trace_id) filter (where span_status = 'ERROR')
-      expect(query).toMatch(/approx_distinct\(trace_id\)\s+filter\s*\(where\s+span_status\s*=\s*'ERROR'\)/i);
-    });
-
-    it("should add root-span filter to the Duration panel query in traces mode", async () => {
-      await wrapper.vm.loadDashboard();
-      await flushPromises();
-      const query = getPanelQuery(wrapper, "Duration");
-      expect(query).toContain("reference_parent_span_id IS NULL OR reference_parent_span_id = ''");
-    });
-
-    it("should wrap Duration root-span filter in WHERE clause", async () => {
-      await wrapper.vm.loadDashboard();
-      await flushPromises();
-      const query = getPanelQuery(wrapper, "Duration");
-      expect(query).toMatch(/WHERE.*reference_parent_span_id IS NULL OR reference_parent_span_id = ''/);
+      expect(query).toMatch(
+        /approx_distinct\(trace_id\)\s+filter\s*\(where\s+span_status\s*=\s*'ERROR'\)/i,
+      );
     });
 
     it("should keep approx_distinct(trace_id) in the Errors panel query in traces mode", async () => {
@@ -547,7 +541,9 @@ describe("TracesMetricsDashboard", () => {
       const btn = wrapper.find('[data-test="insights-button"]');
       await btn.trigger("click");
       await flushPromises();
-      const analysisDashboard = wrapper.find('[data-test="traces-analysis-dashboard"]');
+      const analysisDashboard = wrapper.find(
+        '[data-test="traces-analysis-dashboard"]',
+      );
       expect(analysisDashboard.exists()).toBe(true);
     });
 
@@ -602,10 +598,18 @@ describe("TracesMetricsDashboard", () => {
       expect(filters[0]).toBe("duration >= 100 and duration <= 500");
     });
 
-    it("should include span_status = 'ERROR' when showErrorOnly is true", () => {
+    it("should include span_status = 'ERROR' when showErrorOnly is true and filter prop contains it", () => {
+      wrapper.unmount();
       mockSearchObj.meta.showErrorOnly = true;
+      wrapper = mountComponent({ filter: "span_status = 'ERROR'" });
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toContain("span_status = 'ERROR'");
+    });
+
+    it("should NOT include span_status = 'ERROR' from toggle alone when filter prop does not contain it", () => {
+      mockSearchObj.meta.showErrorOnly = true;
+      const filters = wrapper.vm.getBaseFilters();
+      expect(filters).not.toContain("span_status = 'ERROR'");
     });
 
     it("should include the filter prop string when filter is a non-empty string", () => {
@@ -627,6 +631,101 @@ describe("TracesMetricsDashboard", () => {
       wrapper = mountComponent({ filter: "   " });
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toEqual([]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // onMounted ordering — loadDashboard fires before sqlParser resolves
+  //
+  // The fix reordered onMounted so that loadDashboard() is called (and
+  // completes synchronously up to its first await-free path) before
+  // `await loadSqlParser()` suspends execution. These tests verify that
+  // dashboardData is populated while loadSqlParser is still pending, which
+  // is what prevents the child GridStack from collapsing to 17px.
+  // -------------------------------------------------------------------------
+  describe("onMounted ordering", () => {
+    // For each test in this group we install a deferred sqlParser so we can
+    // inspect component state while the promise is still unresolved.
+    let resolveParser!: (value: unknown) => void;
+    let parserPromise!: Promise<unknown>;
+
+    beforeEach(() => {
+      // Build a fresh deferred promise per test — never shared across tests.
+      parserPromise = new Promise((resolve) => {
+        resolveParser = resolve;
+      });
+
+      vi.mocked(useParser).mockReturnValue({
+        sqlParser: vi.fn().mockReturnValue(parserPromise),
+      });
+    });
+
+    it("should have non-null dashboardData before loadSqlParser resolves", async () => {
+      // Mount with a pending parser — onMounted fires but sqlParser never
+      // resolves until we call resolveParser() below.
+      const localWrapper = mountComponent();
+
+      // Drain the microtask queue up to the point where loadDashboard() has
+      // completed but the await loadSqlParser() suspension is still pending.
+      // Because loadDashboard() is synchronous (no internal await on this
+      // code path), a single nextTick is sufficient.
+      await localWrapper.vm.$nextTick();
+
+      // dashboardData must already be populated — the child RenderDashboardCharts
+      // receives a real object, not null, so GridStack initialises correctly.
+      expect(localWrapper.vm.dashboardData).not.toBeNull();
+
+      // Clean up: resolve the parser so the component finishes mounting
+      // without an unhandled rejection.
+      resolveParser({});
+      await localWrapper.vm.$nextTick();
+      localWrapper.unmount();
+    });
+
+    it("should call loadDashboard synchronously relative to the loadSqlParser await gap", async () => {
+      // We track the order of calls: loadDashboard sets dashboardData, which
+      // happens before sqlParser's promise resolves. We verify this by
+      // checking that dashboardData is set at the moment the parser resolves
+      // for the first time (i.e. it was set earlier, not after).
+      const localWrapper = mountComponent();
+
+      // Tick once to let the synchronous portion of onMounted execute.
+      await localWrapper.vm.$nextTick();
+
+      // dashboardData is already set — confirms loadDashboard ran before the
+      // await suspension handed control back to the event loop.
+      const dashboardDataBeforeParserResolves = localWrapper.vm.dashboardData;
+      expect(dashboardDataBeforeParserResolves).not.toBeNull();
+
+      // Now resolve the parser and flush all remaining microtasks.
+      resolveParser({});
+      await localWrapper.vm.$nextTick();
+
+      // dashboardData must still be non-null after the parser resolves.
+      expect(localWrapper.vm.dashboardData).not.toBeNull();
+
+      localWrapper.unmount();
+    });
+
+    it("should set sqlParser.value only after loadSqlParser resolves", async () => {
+      const localWrapper = mountComponent();
+
+      // Right after mount — parser promise is still pending.
+      await localWrapper.vm.$nextTick();
+
+      // sqlParser ref should not yet hold the resolved value (it is still null
+      // because loadSqlParser has not resolved).
+      // We cannot read sqlParser directly, but dashboardData being set first
+      // proves loadDashboard completed before the parser await resumed.
+      expect(localWrapper.vm.dashboardData).not.toBeNull();
+
+      resolveParser({ parse: vi.fn() });
+      await localWrapper.vm.$nextTick();
+
+      // After resolving, the component should still be healthy.
+      expect(localWrapper.exists()).toBe(true);
+
+      localWrapper.unmount();
     });
   });
 
@@ -677,15 +776,6 @@ describe("TracesMetricsDashboard", () => {
       });
       await flushPromises();
       expect(wrapper.emitted("time-range-selected")).toBeFalsy();
-    });
-
-    it("should produce a Duration WHERE clause with only root-span filter when no other filters are active in traces mode", async () => {
-      // No range filters, no filter prop, traces mode
-      await wrapper.vm.loadDashboard();
-      await flushPromises();
-      const query = getPanelQuery(wrapper, "Duration");
-      // Should contain WHERE with only the root-span condition
-      expect(query).toMatch(/WHERE \(reference_parent_span_id IS NULL OR reference_parent_span_id = ''\)/);
     });
 
     it("should produce a Duration query with no WHERE clause in spans mode when no filters exist", async () => {

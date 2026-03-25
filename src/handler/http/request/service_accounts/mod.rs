@@ -64,7 +64,11 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List service accounts", "category": "users"}))
+        ("x-o2-mcp" = json!({
+            "description": "List service accounts",
+            "category": "users",
+            "summary_fields": ["email", "role", "first_name", "last_name"]
+        }))
     )
 )]
 pub async fn list(Path(org_id): Path<String>, Headers(user_email): Headers<UserEmail>) -> Response {
@@ -206,7 +210,7 @@ pub async fn update(
         return MetaHttpResponse::forbidden("Service Accounts Not Enabled");
     }
 
-    let email_id = email_id.trim().to_lowercase();
+    let email_id = email_id.trim().to_string();
 
     let rotate_token = match query.get("rotateToken") {
         Some(s) => match s.to_lowercase().as_str() {

@@ -72,6 +72,8 @@ describe("SearchResult Component", () => {
           ChartRenderer: true,
           SanitizedHtmlRenderer: true,
           TenstackTable: true,
+          PatternDetailsDialog: true,
+          TracesAnalysisDashboard: true,
         },
       },
       props: {
@@ -584,6 +586,126 @@ describe("SearchResult Component", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.pageNumberInput).toBe(7);
+    });
+  });
+
+  describe("Volume Analysis Dashboard", () => {
+    it("should open volume analysis dashboard", () => {
+      wrapper.vm.showVolumeAnalysisDashboard = false;
+      wrapper.vm.openVolumeAnalysisDashboard();
+      expect(wrapper.vm.showVolumeAnalysisDashboard).toBe(true);
+    });
+
+    it("should close volume analysis dashboard", () => {
+      wrapper.vm.showVolumeAnalysisDashboard = true;
+      wrapper.vm.closeVolumeAnalysisDashboard();
+      expect(wrapper.vm.showVolumeAnalysisDashboard).toBe(false);
+    });
+
+    it("openVolumeAnalysisDashboard is a function", () => {
+      expect(typeof wrapper.vm.openVolumeAnalysisDashboard).toBe("function");
+    });
+
+    it("closeVolumeAnalysisDashboard is a function", () => {
+      expect(typeof wrapper.vm.closeVolumeAnalysisDashboard).toBe("function");
+    });
+  });
+
+  describe("Pattern Details Navigation", () => {
+    it("should open pattern details and set selectedPattern", () => {
+      const mockPattern = { template: "INFO action <*> at 14:47", count: 10 };
+      wrapper.vm.openPatternDetails(mockPattern, 2);
+      expect(wrapper.vm.selectedPattern).toEqual({ pattern: mockPattern, index: 2 });
+      expect(wrapper.vm.showPatternDetails).toBe(true);
+    });
+
+    it("should navigate to next pattern when next=true and not at end", () => {
+      const patterns = [
+        { template: "pattern 0" },
+        { template: "pattern 1" },
+        { template: "pattern 2" },
+      ];
+      wrapper.vm.patternsState = { patterns: { patterns } };
+      wrapper.vm.selectedPattern = { pattern: patterns[0], index: 0 };
+
+      wrapper.vm.navigatePatternDetail(true, false);
+
+      expect(wrapper.vm.selectedPattern.index).toBe(1);
+      expect(wrapper.vm.selectedPattern.pattern).toEqual(patterns[1]);
+    });
+
+    it("should navigate to previous pattern when prev=true and not at start", () => {
+      const patterns = [
+        { template: "pattern 0" },
+        { template: "pattern 1" },
+        { template: "pattern 2" },
+      ];
+      wrapper.vm.patternsState = { patterns: { patterns } };
+      wrapper.vm.selectedPattern = { pattern: patterns[2], index: 2 };
+
+      wrapper.vm.navigatePatternDetail(false, true);
+
+      expect(wrapper.vm.selectedPattern.index).toBe(1);
+    });
+
+    it("should not navigate past the last pattern", () => {
+      const patterns = [{ template: "pattern 0" }, { template: "pattern 1" }];
+      wrapper.vm.patternsState = { patterns: { patterns } };
+      wrapper.vm.selectedPattern = { pattern: patterns[1], index: 1 };
+
+      wrapper.vm.navigatePatternDetail(true, false);
+
+      expect(wrapper.vm.selectedPattern.index).toBe(1);
+    });
+
+    it("should not navigate before the first pattern", () => {
+      const patterns = [{ template: "pattern 0" }, { template: "pattern 1" }];
+      wrapper.vm.patternsState = { patterns: { patterns } };
+      wrapper.vm.selectedPattern = { pattern: patterns[0], index: 0 };
+
+      wrapper.vm.navigatePatternDetail(false, true);
+
+      expect(wrapper.vm.selectedPattern.index).toBe(0);
+    });
+
+    it("should do nothing in navigatePatternDetail if selectedPattern is null", () => {
+      wrapper.vm.selectedPattern = null;
+      expect(() => wrapper.vm.navigatePatternDetail(true, false)).not.toThrow();
+    });
+  });
+
+  describe("Correlation Panel", () => {
+    it("should have showCorrelation initialized to false", () => {
+      expect(wrapper.vm.showCorrelation).toBe(false);
+    });
+
+    it("should have correlationContext initialized to null", () => {
+      expect(wrapper.vm.correlationContext).toBeNull();
+    });
+
+    it("should have correlationDashboardProps initialized to null", () => {
+      expect(wrapper.vm.correlationDashboardProps).toBeNull();
+    });
+
+    it("should have correlationLoading initialized to false", () => {
+      expect(wrapper.vm.correlationLoading).toBe(false);
+    });
+
+    it("openLogDetailsWithCorrelation function exists", () => {
+      expect(typeof wrapper.vm.openLogDetailsWithCorrelation).toBe("function");
+    });
+  });
+
+  describe("Histogram Selection", () => {
+    it("should have hasHistogramSelection initialized to false", () => {
+      expect(wrapper.vm.hasHistogramSelection).toBe(false);
+    });
+
+    it("should have histogramSelectionRange initialized with zero values", () => {
+      expect(wrapper.vm.histogramSelectionRange).toMatchObject({
+        start: 0,
+        end: 0,
+      });
     });
   });
 });

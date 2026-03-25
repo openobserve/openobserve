@@ -34,7 +34,7 @@ vi.mock("@/services/segment_analytics", () => ({
 }));
 
 vi.mock("@/aws-exports", () => ({
-  default: { isCloud: "false" },
+  default: { isCloud: "false", isEnterprise: "true" },
 }));
 
 // getImageURL is called by the metricsIcon computed; stub to avoid asset loading.
@@ -332,9 +332,6 @@ describe("SearchBar", () => {
     // Fresh searchObj per test — mutations cannot bleed across tests.
     searchObjInstance = makeSearchObj();
 
-    // Ensure store flag is reset.
-    store.state.zoConfig.service_graph_enabled = true;
-
     // Spy on router so updateDateTime's route guard does not early-return.
     vi.spyOn(router, "currentRoute", "get").mockReturnValue({
       value: {
@@ -362,8 +359,7 @@ describe("SearchBar", () => {
 
   // -------------------------------------------------------------------------
   describe("tab toggle visibility", () => {
-    it("should render tab toggle buttons when service_graph_enabled is true", async () => {
-      store.state.zoConfig.service_graph_enabled = true;
+    it("should render tab toggle buttons on enterprise", async () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
@@ -376,19 +372,6 @@ describe("SearchBar", () => {
       expect(
         wrapper.find('[data-test="traces-service-graph-toggle"]').exists(),
       ).toBe(true);
-    });
-
-    it("should not render tab toggle buttons when service_graph_enabled is false", async () => {
-      store.state.zoConfig.service_graph_enabled = false;
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="traces-search-toggle"]').exists()).toBe(
-        false,
-      );
-      expect(
-        wrapper.find('[data-test="traces-service-graph-toggle"]').exists(),
-      ).toBe(false);
     });
   });
 
@@ -722,12 +705,12 @@ describe("SearchBar", () => {
       expect(wrapper.emitted("searchdata")).toHaveLength(1);
     });
 
-    it("should be disabled when isLoading prop is true", async () => {
+    it("should show cancel button when isLoading prop is true on enterprise", async () => {
       wrapper = mountSearchBar({ isLoading: true });
       await flushPromises();
 
-      const runBtn = wrapper.find('[data-test="logs-search-bar-refresh-btn"]');
-      expect(runBtn.classes()).toContain("disabled");
+      expect(wrapper.find('[data-test="traces-search-bar-cancel-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(false);
     });
 
     it("should not emit searchdata when searchObj.loading is true", async () => {
@@ -975,7 +958,7 @@ describe("SearchBar", () => {
       await flushPromises();
 
       expect(searchObjInstance.data.stream.addToFilter).toBe("");
-      expect(searchObjInstance.data.query).toContain("field='val'");
+      expect(searchObjInstance.data.editorValue).toContain("field='val'");
     });
 
     it('should transform "field=\'null\'" to "field is null" in the filter', async () => {
@@ -990,7 +973,7 @@ describe("SearchBar", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      expect(searchObjInstance.data.query).toContain("field is null");
+      expect(searchObjInstance.data.editorValue).toContain("field is null");
     });
 
     it("should use the filter as the full query when there is no existing query and no pipe", async () => {
@@ -1005,7 +988,76 @@ describe("SearchBar", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      expect(searchObjInstance.data.query).toBe("service_name='svc-a'");
+      expect(searchObjInstance.data.editorValue).toBe("service_name='svc-a'");
+    });
+
+    it("should not duplicate the filter when the same condition already exists in the query", async () => {
+      searchObjInstance.data.editorValue = "span_status='ERROR'";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const mockSetValue = vi.fn();
+      (wrapper.vm as any).queryEditorRef = { setValue: mockSetValue };
+
+      searchObjInstance.data.stream.addToFilter = "span_status='ERROR'";
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      expect(searchObjInstance.data.editorValue).toBe("span_status='ERROR'");
+    });
+
+    it("should replace an existing condition for the same field rather than appending", async () => {
+      searchObjInstance.data.editorValue = "span_status='ERROR'";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const mockSetValue = vi.fn();
+      (wrapper.vm as any).queryEditorRef = { setValue: mockSetValue };
+
+      searchObjInstance.data.stream.addToFilter = "span_status='OK'";
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      expect(searchObjInstance.data.editorValue).toBe("span_status='OK'");
+    });
+
+    it("should append with 'and' when the filter field does not exist in the current query", async () => {
+      searchObjInstance.data.editorValue = "service_name='svc-a'";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const mockSetValue = vi.fn();
+      (wrapper.vm as any).queryEditorRef = { setValue: mockSetValue };
+
+      searchObjInstance.data.stream.addToFilter = "span_status='ERROR'";
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      expect(searchObjInstance.data.editorValue).toBe(
+        "service_name='svc-a' and span_status='ERROR'",
+      );
+    });
+
+    it("should append filter when the filter expression has no parseable field name", async () => {
+      // A bare keyword without an operator (=, !=, >=, etc.) causes
+      // getFieldFromExpression to return null. With the new logic the caller
+      // treats a null field as "no replacement possible" and falls through to
+      // the append path, producing: <existing> and <filter>.
+      searchObjInstance.data.editorValue = "service_name='svc-a'";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const mockSetValue = vi.fn();
+      (wrapper.vm as any).queryEditorRef = { setValue: mockSetValue };
+
+      // "some bare keyword" has no operator — getFieldFromExpression returns null
+      searchObjInstance.data.stream.addToFilter = "some bare keyword";
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      expect(searchObjInstance.data.editorValue).toBe(
+        "service_name='svc-a' and some bare keyword",
+      );
     });
   });
 
@@ -1136,15 +1188,17 @@ describe("SearchBar", () => {
       expect(wrapper.props("fieldValues")).toHaveProperty("service_name");
     });
 
-    it("should disable the run query button when isLoading changes to true", async () => {
+    it("should switch to cancel button when isLoading changes to true on enterprise", async () => {
       wrapper = mountSearchBar({ isLoading: false });
       await flushPromises();
+
+      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(true);
 
       await wrapper.setProps({ isLoading: true });
       await flushPromises();
 
-      const runBtn = wrapper.find('[data-test="logs-search-bar-refresh-btn"]');
-      expect(runBtn.classes()).toContain("disabled");
+      expect(wrapper.find('[data-test="traces-search-bar-cancel-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(false);
     });
   });
 });

@@ -24,6 +24,7 @@ const i18n = createI18n({
       'queries.queryRange': 'Query Range',
       'queries.queryType': 'Query Type',
       'queries.status': 'Status',
+      'queries.querySource': 'Query Source',
       'alerts.streamType': 'Stream Type',
       'common.actions': 'Actions',
       'queries.cancelQuery': 'Cancel Query',
@@ -244,6 +245,14 @@ describe('RunningQueriesList.vue', () => {
       const column = wrapper.vm.columns.find((col: any) => col.name === 'search_type');
       expect(column).toBeDefined();
       expect(column.field).toBe('search_type');
+      expect(column.sortable).toBe(true);
+      expect(column.align).toBe('left');
+    });
+
+    it('should have correct column for query_source', () => {
+      const column = wrapper.vm.columns.find((col: any) => col.name === 'query_source');
+      expect(column).toBeDefined();
+      expect(column.field).toBe('query_source');
       expect(column.sortable).toBe(true);
       expect(column.align).toBe('left');
     });

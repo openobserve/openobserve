@@ -150,33 +150,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
       </q-input>
-
-      <q-select
-        v-model="mapsMapType"
-        :options="['world']"
-        :label="t('dashboard.mapsMapType')"
-        borderless
-        dense
-        class="q-py-sm showLabelOnTop"
-        stack-label
-        data-test="dashboard-config-maps-type"
-      >
-        <template v-slot:label>
-          <div class="row items-center all-pointer-events tw:mb-[-5px]">
-            {{ t("dashboard.mapsMapType") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
-            <q-tooltip class="bg-grey-8" max-width="250px">
-              Map type to display. Default: "world"
-            </q-tooltip>
-          </div>
-        </template>
-      </q-select>
     </div>
 
     <!-- Table Configuration -->
     <div v-if="chartType === 'table'" class="table-config">
       <!-- PromQL Table Mode -->
       <q-select
+        v-show="isConfigOptionVisible('promqlTable', 'promql-table-mode')"
         v-model="promqlTableMode"
         :options="promqlTableModeOptions"
         :label="t('dashboard.promqlTableMode')"
@@ -211,6 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-select>
       <template v-if="promqlTableMode === 'all'">
         <q-select
+          v-show="isConfigOptionVisible('promqlTable', 'table-aggregations')"
           v-model="tableAggregations"
           :options="aggregationOptions"
           :label="t('dashboard.tableAggregations')"
@@ -263,9 +244,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'
         "
       >
-        <div class="q-mb-sm text-subtitle2 q-mt-md">Column Filters</div>
+        <div
+          v-show="isConfigOptionVisible('promqlTable', 'visible-columns') || isConfigOptionVisible('promqlTable', 'hidden-columns')"
+          class="q-mb-sm text-subtitle2 q-mt-md"
+        >
+          Column Filters
+        </div>
 
         <q-select
+          v-show="isConfigOptionVisible('promqlTable', 'visible-columns')"
           v-model="visibleColumns"
           :options="visibleColumnsFilteredOptions"
           :label="t('dashboard.visibleColumns')"
@@ -322,6 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-select>
 
         <q-select
+          v-show="isConfigOptionVisible('promqlTable', 'hidden-columns')"
           v-model="hiddenColumns"
           :options="hiddenColumnsFilteredOptions"
           :label="t('dashboard.hiddenColumns')"
@@ -384,9 +372,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'
         "
       >
-        <div class="q-mb-sm text-subtitle2 q-mt-md">Sticky Columns</div>
+        <div
+          v-show="isConfigOptionVisible('promqlTable', 'sticky-first-column') || isConfigOptionVisible('promqlTable', 'sticky-columns')"
+          class="q-mb-sm text-subtitle2 q-mt-md"
+        >
+          Sticky Columns
+        </div>
 
         <q-toggle
+          v-show="isConfigOptionVisible('promqlTable', 'sticky-first-column')"
           v-model="stickyFirstColumn"
           data-test="dashboard-config-sticky-first-column"
           class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
@@ -410,6 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-toggle>
 
         <q-select
+          v-show="isConfigOptionVisible('promqlTable', 'sticky-columns')"
           v-model="stickyColumns"
           :options="stickyColumnsFilteredOptions"
           :label="t('dashboard.stickyColumns')"
@@ -473,9 +468,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'
         "
       >
-        <div class="q-mb-sm q-mt-md" style="font-weight: 600">
-        </div>
+        <div v-show="isConfigOptionVisible('promqlTable', 'configure-column-order')" class="q-mb-sm q-mt-md" style="font-weight: 600"></div>
         <q-btn
+          v-show="isConfigOptionVisible('promqlTable', 'configure-column-order')"
           @click="openColumnOrderPopup"
           style="cursor: pointer; padding: 0px 5px"
           :label="t(`dashboard.configureColumnOrder`)"
@@ -505,7 +500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, computed, ref, inject, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ColumnOrderPopUp from "./ColumnOrderPopUp.vue";
 
 export default defineComponent({
@@ -517,6 +512,10 @@ export default defineComponent({
     chartType: {
       type: String,
       required: true,
+    },
+    isConfigOptionVisible: {
+      type: Function,
+      default: () => true,
     },
   },
   setup(props) {

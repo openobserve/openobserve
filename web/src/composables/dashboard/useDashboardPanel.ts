@@ -1,0 +1,1605 @@
+// Copyright 2023 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { reactive, computed, watch, onBeforeMount, onUnmounted } from "vue";
+import { useStore } from "vuex";
+import useNotifications from "../useNotifications";
+import { b64EncodeUnicode, isStreamingEnabled } from "@/utils/zincutils";
+import { extractFields, getStreamNameFromQuery } from "@/utils/query/sqlUtils";
+import { validatePanel } from "@/utils/dashboard/panelValidation";
+import useStreams from "../useStreams";
+import useValuesWebSocket from "./useValuesWebSocket";
+import queryService from "@/services/search";
+import metricsService from "@/services/metrics";
+import logsUtils from "../useLogs/logsUtils";
+import {
+  buildSQLChartQuery,
+  geoMapChart,
+  mapChart,
+  sankeyChartQuery,
+} from "@/utils/dashboard/dashboardAutoQueryBuilder";
+import { usePanelFields } from "@/composables/dashboard/usePanelFields";
+import { usePanelAggregation } from "@/composables/dashboard/usePanelAggregation";
+import {
+  getDefaultDashboardPanelData,
+  getDefaultCustomChartText,
+} from "@/composables/dashboard/useDashboardPanelDefaults";
+let parser: any;
+
+const dashboardPanelDataObj: any = {};
+
+const useDashboardPanelData = (pageKey: string = "dashboard") => {
+  const store = useStore();
+  const { showErrorNotification } = useNotifications();
+  const { getStreams, getStream } = useStreams();
+  const valuesWebSocket = useValuesWebSocket();
+
+  // Initialize the state for this page key if it doesn't already exist
+  if (!dashboardPanelDataObj[pageKey]) {
+    dashboardPanelDataObj[pageKey] = reactive({
+      ...getDefaultDashboardPanelData(store),
+    });
+  }
+
+  const dashboardPanelData = reactive(dashboardPanelDataObj[pageKey]);
+  const cleanupDraggingFields = () => {
+    dashboardPanelData.meta.dragAndDrop.currentDragArea = null;
+    dashboardPanelData.meta.dragAndDrop.targetDragIndex = -1;
+    dashboardPanelData.meta.dragAndDrop.dragging = false;
+    dashboardPanelData.meta.dragAndDrop.dragElement = null;
+    dashboardPanelData.meta.dragAndDrop.dragSource = null;
+    dashboardPanelData.meta.dragAndDrop.dragSourceIndex = null;
+  };
+
+  // get default queries
+  const getDefaultQueries = () => {
+    return getDefaultDashboardPanelData(store).data.queries;
+  };
+
+  const {
+    promqlMode,
+    isAddXAxisNotAllowed,
+    isAddBreakdownNotAllowed,
+    isAddYAxisNotAllowed,
+    isAddZAxisNotAllowed,
+    generateLabelFromName,
+    updateArrayAlias,
+    addXAxisItem,
+    addYAxisItem,
+    addZAxisItem,
+    addBreakDownAxisItem,
+    addLatitude,
+    addLongitude,
+    addWeight,
+    addMapName,
+    addMapValue,
+    addSource,
+    addTarget,
+    addValue,
+    removeXAxisItemByIndex,
+    removeYAxisItemByIndex,
+    removeZAxisItemByIndex,
+    removeBreakdownItemByIndex,
+    removeFilterItem,
+    removeLatitude,
+    removeLongitude,
+    removeWeight,
+    removeMapName,
+    removeMapValue,
+    removeSource,
+    removeTarget,
+    removeValue,
+    resetFields,
+    removeXYFilters,
+    setFieldsBasedOnChartTypeValidation,
+    isPivotMode,
+  } = usePanelFields({ dashboardPanelData, store });
+
+  const { resetAggregationFunction } = usePanelAggregation({
+    dashboardPanelData,
+    getDefaultQueries,
+    getDefaultCustomChartText,
+  });
+
+  const addQuery = () => {
+    const newQuery: any = {
+      query: "",
+      vrlFunctionQuery: "",
+      customQuery:
+        dashboardPanelData?.data?.queries?.[
+          dashboardPanelData?.layout?.currentQueryIndex
+        ]?.customQuery ?? false,
+      fields: {
+        stream:
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream,
+        stream_type:
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream_type,
+        x: [],
+        y: [],
+        z: [],
+        breakdown: [],
+        promql_labels: [],
+        promql_operations: [],
+        filter: {
+          filterType: "group",
+          logicalOperator: "AND",
+          conditions: [],
+        },
+        latitude: null,
+        longitude: null,
+        weight: null,
+        name: null,
+        value_for_maps: null,
+        source: null,
+        target: null,
+        value: null,
+      },
+      config: {
+        promql_legend: "",
+        layer_type: "scatter",
+        weight_fixed: 1,
+      },
+    };
+    dashboardPanelData.data.queries.push(newQuery);
+  };
+
+  const removeQuery = (index: number) => {
+    dashboardPanelData.data.queries.splice(index, 1);
+  };
+
+  const resetDashboardPanelData = () => {
+    Object.assign(dashboardPanelData, getDefaultDashboardPanelData(store));
+  };
+
+  const resetDashboardPanelDataAndAddTimeField = () => {
+    resetDashboardPanelData();
+
+    // add _timestamp field in x axis as default
+    addXAxisItem({
+      name: store.state.zoConfig.timestamp_column ?? "_timestamp",
+    });
+  };
+
+  // Watch queryType and toggle off VRL functions when switching to PromQL
+  watch(
+    () => dashboardPanelData.data.queryType,
+    (newQueryType) => {
+      if (newQueryType === "promql") {
+        dashboardPanelData.layout.vrlFunctionToggle = false;
+      }
+    },
+  );
+
+  const selectedStreamFieldsBasedOnUserDefinedSchema = computed(() => {
+    if (
+      store.state.zoConfig.user_defined_schemas_enabled &&
+      dashboardPanelData.meta.stream.userDefinedSchema.length > 0 &&
+      dashboardPanelData.meta.stream.useUserDefinedSchemas ==
+        "user_defined_schema"
+    ) {
+      return dashboardPanelData.meta.stream.userDefinedSchema ?? [];
+    }
+
+    return dashboardPanelData.meta.stream.selectedStreamFields ?? [];
+  });
+
+  async function loadStreamFields(streamName: string) {
+    try {
+      if (!streamName) return { name: streamName, schema: [], settings: {} };
+
+      // Create a new request and store it in the cache
+      return await getStream(
+        streamName,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type ?? "logs",
+        true,
+      );
+    } catch (e: any) {
+      return { name: streamName, schema: [], settings: {} };
+    }
+  }
+
+  // Track if updateGroupedFields is currently running to prevent race conditions
+  let isUpdatingGroupedFields = false;
+  let pendingUpdateGroupedFields = false;
+
+  // Helper function to update grouped fields
+  const updateGroupedFields = async () => {
+    // If already updating, mark that we need to run again after completion
+    if (isUpdatingGroupedFields) {
+      pendingUpdateGroupedFields = true;
+      return;
+    }
+
+    isUpdatingGroupedFields = true;
+    pendingUpdateGroupedFields = false;
+
+    try {
+      // For PromQL queries, collect streams from ALL queries
+      if (dashboardPanelData.data.queryType === "promql") {
+        const allStreams = new Set<string>();
+
+        // Iterate through all queries to collect unique streams
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          if (query?.fields?.stream) {
+            allStreams.add(query.fields.stream);
+          }
+        });
+
+        if (allStreams.size === 0) return;
+
+        // Fetch stream fields for all unique streams
+        const groupedFields = await Promise.all(
+          Array.from(allStreams).map(async (streamName) => {
+            const streamData = await loadStreamFields(streamName);
+            return streamData;
+          }),
+        );
+
+        // Filter out any invalid entries (streams with no name)
+        dashboardPanelData.meta.streamFields.groupedFields =
+          groupedFields.filter((field: any) => field?.name);
+      } else {
+        const currentStream =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream;
+        if (!currentStream) return;
+
+        // Collect streams (main + joins)
+        const joinsStreams = [
+          { stream: currentStream, streamAlias: undefined },
+          ...(dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].joins?.filter((stream: any) => stream?.stream) ?? []),
+        ];
+
+        // Fetch stream fields
+        const groupedFields = await Promise.all(
+          joinsStreams.map(async (stream: any) => {
+            const streamData = await loadStreamFields(stream?.stream);
+            return {
+              ...streamData,
+              stream_alias: stream?.streamAlias,
+            };
+          }),
+        );
+
+        // Filter out any invalid entries (streams with no name)
+        dashboardPanelData.meta.streamFields.groupedFields =
+          groupedFields.filter((field: any) => field?.name);
+      }
+    } finally {
+      isUpdatingGroupedFields = false;
+      // If there was a pending update request, run it now
+      if (pendingUpdateGroupedFields) {
+        updateGroupedFields();
+      }
+    }
+  };
+
+  const getAllSelectedStreams = () => {
+    // get all streams
+    // mainStream + all join streams
+
+    return [
+      {
+        stream:
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream,
+      },
+      ...((
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.joins ?? []
+      )?.map((join: any) => ({
+        stream: join.stream,
+        streamAlias: join.streamAlias,
+      })) ?? []),
+    ];
+  };
+
+  const getStreamNameFromStreamAlias = (streamAlias: string) => {
+    if (!streamAlias)
+      return dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.stream;
+    const allStreams = getAllSelectedStreams();
+    return allStreams.find((field: any) => field.streamAlias == streamAlias)
+      ?.stream;
+  };
+
+  const addFilteredItem = async (row: {
+    name: string;
+    streamAlias?: string;
+    stream: string;
+  }) => {
+    const currentQuery =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ];
+
+    // Ensure the filter array is initialized
+    if (!currentQuery.fields.filter) {
+      currentQuery.fields.filter = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [],
+      };
+    }
+
+    // Add the new filter item
+    currentQuery.fields.filter.conditions.push({
+      type: "list",
+      values: [],
+      column: { field: row.name, streamAlias: row.streamAlias },
+      operator: null,
+      value: null,
+      logicalOperator: "AND",
+      filterType: "condition",
+    });
+
+    // Ensure the filterValue array is initialized
+    if (!dashboardPanelData.meta.filterValue) {
+      dashboardPanelData.meta.filterValue = [];
+    }
+
+    try {
+      const queryReq = {
+        org_identifier: store.state.selectedOrganization.identifier,
+        stream_name: row.stream,
+        start_time: new Date(
+          dashboardPanelData.meta.dateTime["start_time"].toISOString(),
+        ).getTime(),
+        end_time: new Date(
+          dashboardPanelData.meta.dateTime["end_time"].toISOString(),
+        ).getTime(),
+        fields: [row.name],
+        size: 100,
+        type: currentQuery.fields.stream_type,
+        no_count: true,
+      };
+
+      const res = await valuesWebSocket.fetchFieldValues(
+        queryReq,
+        dashboardPanelData,
+        row,
+      );
+    } catch (error: any) {
+      const errorDetailValue =
+        error.response?.data.error_detail ||
+        error.response?.data.message ||
+        "Something went wrong!";
+      const trimmedErrorMessage =
+        errorDetailValue.length > 300
+          ? errorDetailValue.slice(0, 300) + " ..."
+          : errorDetailValue;
+
+      showErrorNotification(trimmedErrorMessage);
+    }
+  };
+
+  const loadFilterItem = async (row: {
+    field: string;
+    streamAlias?: string;
+  }) => {
+    try {
+      const queryReq = {
+        org_identifier: store.state.selectedOrganization.identifier,
+        stream_name: row.streamAlias
+          ? getStreamNameFromStreamAlias(row.streamAlias)
+          : dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream,
+        start_time: new Date(
+          dashboardPanelData?.meta?.dateTime?.["start_time"]?.toISOString(),
+        ).getTime(),
+        end_time: new Date(
+          dashboardPanelData?.meta?.dateTime?.["end_time"]?.toISOString(),
+        ).getTime(),
+        fields: [row.field],
+        size: 100,
+        type: dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type,
+        no_count: true,
+      };
+
+      const response = await valuesWebSocket.fetchFieldValues(
+        queryReq,
+        dashboardPanelData,
+        row,
+      );
+    } catch (error: any) {
+      const errorDetailValue =
+        error.response?.data.error_detail ||
+        error.response?.data.message ||
+        "Something went wrong!";
+      const trimmedErrorMessage =
+        errorDetailValue.length > 300
+          ? errorDetailValue.slice(0, 300) + " ..."
+          : errorDetailValue;
+      showErrorNotification(trimmedErrorMessage);
+    }
+  };
+
+  // This function updates the x and y fields of a custom query in the dashboard panel data
+  const updateXYFieldsForCustomQueryMode = () => {
+    // Check if the custom query is enabled and PromQL mode is disabled
+    if (
+      !promqlMode.value &&
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].customQuery == true
+    ) {
+      // clear joins when switching to custom query mode
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].joins = [];
+
+      // first, remove all derived fields from x,y,z,latitude,longitude,weight,source,target,value
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.x = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields?.x?.filter((it: any) => !it.isDerived);
+
+      // remove from y axis
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.y = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields?.y?.filter((it: any) => !it.isDerived);
+
+      // remove from z axis
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.z = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields?.z?.filter((it: any) => !it.isDerived);
+
+      // remove from breakdown
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.breakdown = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields?.breakdown?.filter((it: any) => !it.isDerived);
+
+      // remove from latitude
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.latitude?.alias &&
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.latitude?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.latitude = null;
+      }
+
+      // remove from longitude
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.longitude?.alias &&
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.longitude?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.longitude = null;
+      }
+
+      // remove from weight
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.weight?.alias &&
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.weight?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.weight = null;
+      }
+
+      // remove from source
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.source?.alias &&
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.source?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.source = null;
+      }
+
+      // remove from target
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.target?.alias &&
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.target?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.target = null;
+      }
+
+      // remove from value
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.value?.alias &&
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.value?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.value = null;
+      }
+
+      // remove from name
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.name?.alias &&
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.name?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.name = null;
+      }
+
+      // remove from value_for_maps
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.value_for_maps?.alias &&
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.value_for_maps?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.value_for_maps = null;
+      }
+
+      // Loop through each custom query field in the dashboard panel data's stream meta
+      dashboardPanelData.meta.stream.customQueryFields.forEach(
+        (it: any, index: number) => {
+          // Get the name of the current custom query field
+          const { name } = it;
+
+          // Determine the current field type based on the name
+          let field;
+          if (name === "latitude") {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.latitude;
+          } else if (name === "longitude") {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.longitude;
+          } else if (name === "weight") {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.weight;
+          } else if (name === "name") {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.name;
+          } else if (name === "value_for_maps") {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.value_for_maps;
+          } else if (name === "source") {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.source;
+          } else if (name === "target") {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.target;
+          } else if (name === "value") {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.value;
+          } else {
+            // For other field types (x, y, z), determine the type and index as before
+            let currentFieldType;
+
+            if (
+              index <
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.x.length
+            ) {
+              currentFieldType = "x";
+            } else if (
+              index <
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.x.length +
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.y.length
+            ) {
+              currentFieldType = "y";
+            } else if (
+              index <
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.x.length +
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.y.length +
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.breakdown.length
+            ) {
+              currentFieldType = "breakdown";
+            } else {
+              currentFieldType = "z";
+            }
+
+            if (currentFieldType === "x") {
+              field =
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.x[index];
+            } else if (currentFieldType === "y") {
+              field =
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.y[
+                  index -
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.x.length
+                ];
+            } else if (currentFieldType === "breakdown") {
+              field =
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.breakdown[
+                  index -
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.x.length -
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.y.length
+                ];
+            } else {
+              field =
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.z[
+                  index -
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.x.length -
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.y.length
+                ];
+            }
+            // If the current field is a y or z field, set the aggregation function to "count"
+            if (
+              (currentFieldType === "y" || currentFieldType === "z") &&
+              !field.isDerived
+            ) {
+              field.functionName = "count";
+              // take first arg
+              field.args = field.args.length ? [field?.args?.[0]] : [];
+            }
+          }
+
+          // Update the properties of the current field
+          field.alias = name; // Set the alias to the name of the custom query field
+          field.column = name; // Set the column to the name of the custom query field
+          field.color = null; // Reset the color to null
+        },
+      );
+    }
+  };
+
+  // this updates the fields when you switch from the auto to custom
+  const updateXYFieldsOnCustomQueryChange = (oldCustomQueryFields: any) => {
+    // Create a copy of the old custom query fields array
+    const oldArray = oldCustomQueryFields;
+    // Create a deep copy of the new custom query fields array
+    const newArray = JSON.parse(
+      JSON.stringify(dashboardPanelData.meta.stream.customQueryFields),
+    );
+
+    // Check if the length of the old and new arrays are the same
+    if (oldArray.length == newArray.length) {
+      // Create an array to store the indexes of changed fields
+      const changedIndex: any = [];
+      // Iterate through the new array
+      newArray.forEach((obj: any, index: any) => {
+        const { name } = obj;
+        // Check if the name of the field at the same index in the old array is different
+        if (oldArray[index].name != name) {
+          changedIndex.push(index);
+        }
+      });
+      // Check if there is only one changed field
+      if (changedIndex.length == 1) {
+        const oldName = oldArray[changedIndex[0]]?.name;
+
+        let fieldIndex = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.x?.findIndex((it: any) => it?.alias == oldName);
+        // Check if the field is in the x fields array
+        if (fieldIndex >= 0) {
+          const newName = newArray[changedIndex[0]]?.name;
+          const field =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.x[fieldIndex];
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+        // Check if the field is in the breakdown fields array
+        fieldIndex = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown?.findIndex((it: any) => it?.alias == oldName);
+        if (fieldIndex >= 0) {
+          const newName = newArray[changedIndex[0]]?.name;
+          const field =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.breakdown[fieldIndex];
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+        // Check if the field is in the y fields array
+        fieldIndex = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y?.findIndex((it: any) => it?.alias == oldName);
+        if (fieldIndex >= 0) {
+          const newName = newArray[changedIndex[0]]?.name;
+          const field =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.y[fieldIndex];
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+        // Check if the field is in the z fields array
+        fieldIndex = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z?.findIndex((it: any) => it?.alias == oldName);
+        if (fieldIndex >= 0) {
+          const newName = newArray[changedIndex[0]]?.name;
+          const field =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.z[fieldIndex];
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+
+        //Check if the field is in the latitude fields
+        let field =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.latitude;
+
+        if (field && field.alias == oldName) {
+          const newName = newArray[changedIndex[0]]?.name;
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+
+        //Check if the field is in the longitude fields array
+        field =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.longitude;
+
+        if (field && field.alias == oldName) {
+          const newName = newArray[changedIndex[0]]?.name;
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+
+        //Check if the field is in the weight fields array
+        field =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.weight;
+
+        if (field && field.alias == oldName) {
+          const newName = newArray[changedIndex[0]]?.name;
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+
+        //Check if the field is in the name fields
+        field =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.name;
+
+        if (field && field.alias == oldName) {
+          const newName = newArray[changedIndex[0]]?.name;
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+
+        //Check if the field is in the value fields
+        field =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.value_for_maps;
+
+        if (field && field.alias == oldName) {
+          const newName = newArray[changedIndex[0]]?.name;
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+
+        //Check if the field is in the source fields array
+        field =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.source;
+
+        if (field && field.alias == oldName) {
+          const newName = newArray[changedIndex[0]]?.name;
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+
+        //Check if the field is in the target fields array
+        field =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.target;
+
+        if (field && field.alias == oldName) {
+          const newName = newArray[changedIndex[0]]?.name;
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+
+        //Check if the field is in the value fields array
+        field =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.value;
+
+        if (field && field.alias == oldName) {
+          const newName = newArray[changedIndex[0]]?.name;
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+      }
+    }
+  };
+
+  onBeforeMount(async () => {
+    await importSqlParser();
+  });
+
+  onUnmounted(async () => {
+    parser = null;
+  });
+
+  const importSqlParser = async () => {
+    const useSqlParser: any = await import("@/composables/useParser");
+    const { sqlParser }: any = useSqlParser.default();
+    parser = await sqlParser();
+
+    // do not allow to modify custom query fields for logs page
+    updateQueryValue(pageKey == "logs" ? true : false);
+  };
+
+  // based on chart type it will create auto sql query
+  const makeAutoSQLQuery = async () => {
+    // only continue if current mode is auto query generation
+    if (
+      !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].customQuery
+    ) {
+      if (!dashboardPanelData?.meta?.streamFields?.groupedFields?.length) {
+        return;
+      }
+
+      // Don't generate auto query for promql query type
+      if (dashboardPanelData?.data?.queryType === "promql") {
+        return;
+      }
+
+      let query = "";
+      if (dashboardPanelData.data.type == "geomap") {
+        query = geoMapChart(dashboardPanelData);
+      } else if (dashboardPanelData.data.type == "sankey") {
+        query = sankeyChartQuery(dashboardPanelData);
+      } else if (dashboardPanelData.data.type == "maps") {
+        query = mapChart(dashboardPanelData);
+      } else {
+        query = buildSQLChartQuery({
+          queryData:
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ],
+          chartType: dashboardPanelData.data.type,
+          dashboardPanelData,
+        });
+      }
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].query = query;
+      return query;
+    }
+  };
+  const { checkTimestampAlias } = logsUtils();
+  // Replace the existing validatePanel function with a wrapper that calls the generic function
+  const validatePanelWrapper = (
+    errors: string[],
+    isFieldsValidationRequired: boolean = true,
+  ) => {
+    validatePanel(
+      dashboardPanelData,
+      errors,
+      isFieldsValidationRequired,
+      [
+        ...selectedStreamFieldsBasedOnUserDefinedSchema.value,
+        ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
+        ...dashboardPanelData.meta.stream.customQueryFields,
+      ],
+      pageKey,
+      store,
+      checkTimestampAlias,
+    );
+  };
+
+  const VARIABLE_PLACEHOLDER = "substituteValue";
+
+  const validateQuery = (query: any, variables: any) => {
+    // Helper to test one replacement (string or number)
+    const testReplacement = (q: any, varName: any, replacement: any) => {
+      const regex = new RegExp(`\\$(?:{${varName}}|${varName})(?!\\w)`, "g");
+      return q.replace(regex, replacement);
+    };
+
+    // Recursive validation function
+    const validateRecursive: any = (currentQuery: any, remainingVars: any) => {
+      if (!remainingVars.length) {
+        try {
+          // Try parsing the current query
+          parser.astify(currentQuery);
+          return currentQuery; // Return valid query
+        } catch (error) {
+          return null; // Invalid query
+        }
+      }
+
+      // Process next variable
+      const [varName, ...restVars] = remainingVars;
+
+      // Try as string
+      const stringQuery = testReplacement(
+        currentQuery,
+        varName,
+        "VARIABLE_PLACEHOLDER",
+      );
+      const resultAsString: any = validateRecursive(stringQuery, restVars);
+      if (resultAsString) return resultAsString; // Found valid query
+
+      // Try as number
+      const numericQuery = testReplacement(currentQuery, varName, "10");
+      const resultAsNumber = validateRecursive(numericQuery, restVars);
+      if (resultAsNumber) return resultAsNumber; // Found valid query
+
+      // If neither works, return null
+      throw new Error("Invalid query");
+    };
+
+    return validateRecursive(query, variables);
+  };
+
+  // Extract variables from the query
+  const extractVariables = (query: any) => {
+    const matches = query.match(/\$(\w+|\{\w+\})/g);
+    return matches
+      ? [...new Set(matches.map((v: any) => v.replace(/^\$|\{|\}/g, "")))]
+      : [];
+  };
+
+  // now check if the correct stream is selected
+  function isDummyStreamName(tableName: any) {
+    return tableName?.includes("VARIABLE_PLACEHOLDER");
+  }
+
+  // This function parses the custom query and generates the errors and custom fields
+  const updateQueryValue = async (
+    shouldSkipCustomQueryFields: boolean = false,
+  ) => {
+    // store the query in the dashboard panel data
+    // dashboardPanelData.meta.editorValue = value;
+    // dashboardPanelData.data.query = value;
+
+    if (
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].customQuery &&
+      dashboardPanelData.data.queryType != "promql" &&
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].query
+    ) {
+      // empty the errors
+      dashboardPanelData.meta.errors.queryErrors = [];
+
+      // Get the parsed query
+      try {
+        let currentQuery =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].query;
+
+        // replace variables with dummy values to verify query is correct or not
+        if (/\${[a-zA-Z0-9_-]+:csv}/.test(currentQuery)) {
+          currentQuery = currentQuery.replaceAll(
+            /\${[a-zA-Z0-9_-]+:csv}/g,
+            "1,2",
+          );
+        }
+        if (/\${[a-zA-Z0-9_-]+:singlequote}/.test(currentQuery)) {
+          currentQuery = currentQuery.replaceAll(
+            /\${[a-zA-Z0-9_-]+:singlequote}/g,
+            "'1','2'",
+          );
+        }
+        if (/\${[a-zA-Z0-9_-]+:doublequote}/.test(currentQuery)) {
+          currentQuery = currentQuery.replaceAll(
+            /\${[a-zA-Z0-9_-]+:doublequote}/g,
+            '"1","2"',
+          );
+        }
+        if (/\${[a-zA-Z0-9_-]+:pipe}/.test(currentQuery)) {
+          currentQuery = currentQuery.replaceAll(
+            /\${[a-zA-Z0-9_-]+:pipe}/g,
+            "1|2",
+          );
+        }
+
+        const variables = extractVariables(currentQuery); // Extract all unique variables
+        const validatedQuery = validateQuery(currentQuery, variables);
+
+        if (validatedQuery) {
+          dashboardPanelData.meta.parsedQuery = parser.astify(validatedQuery);
+        } else {
+          dashboardPanelData.meta.parsedQuery = null;
+        }
+      } catch (e) {
+        // exit if not able to parse query
+        return null;
+      }
+      if (!dashboardPanelData.meta.parsedQuery) {
+        return;
+      }
+
+      // We have the parsed query, now get the columns and tables
+      // get the columns first
+      if (
+        Array.isArray(dashboardPanelData.meta.parsedQuery?.columns) &&
+        dashboardPanelData.meta.parsedQuery?.columns?.length > 0 &&
+        !shouldSkipCustomQueryFields
+      ) {
+        const oldCustomQueryFields = JSON.parse(
+          JSON.stringify(dashboardPanelData.meta.stream.customQueryFields),
+        );
+        dashboardPanelData.meta.stream.customQueryFields = [];
+
+        const fields = extractFields(
+          dashboardPanelData.meta.parsedQuery,
+          store.state.zoConfig.timestamp_column ?? "_timestamp",
+        );
+
+        if (Array.isArray(fields)) {
+          fields.forEach((field: any) => {
+            const fieldAlias = field.alias ?? field.column;
+            if (
+              !dashboardPanelData.meta.stream.customQueryFields.find(
+                (it: any) => it.name == fieldAlias,
+              )
+            ) {
+              dashboardPanelData.meta.stream.customQueryFields.push({
+                name: fieldAlias,
+                type: "",
+              });
+            }
+          });
+        }
+
+        // update the existing x and y axis fields
+        updateXYFieldsOnCustomQueryChange(oldCustomQueryFields);
+      } else if (!shouldSkipCustomQueryFields) {
+        dashboardPanelData.meta.errors.queryErrors.push("Invalid Columns");
+      }
+
+      const currentQuery =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ];
+
+      const tableName = await getStreamNameFromQuery(currentQuery?.query ?? "");
+
+      if (tableName) {
+        const streamFound = dashboardPanelData.meta.stream.streamResults.find(
+          (it: any) => it.name == tableName,
+        );
+
+        if (streamFound) {
+          if (currentQuery.fields.stream != streamFound.name) {
+            currentQuery.fields.stream = streamFound.name;
+          }
+        } else if (isDummyStreamName(tableName)) {
+          // nothing to do as the stream is dummy
+        }
+      }
+    }
+  };
+
+  watch(
+    () => [
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].query,
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].customQuery, // Only watch for custom query mode changes
+      selectedStreamFieldsBasedOnUserDefinedSchema.value,
+    ],
+    async (newVal, oldVal) => {
+      // if pageKey is logs, then return
+      // because custom query fields will be extracted from the query using the result schema api
+      // NOW: we need to only skip custom query fields for logs page
+      // not stream selection, so commented below code and in updateQueryValue function will skip custom query fields extraction
+      // if (pageKey == "logs") {
+      //   return;
+      // }
+
+      // Check if customQuery mode has changed
+      const customQueryChanged = newVal[1] !== oldVal[1];
+
+      // Only continue if the current mode is "show custom query"
+      if (
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery &&
+        dashboardPanelData.data.queryType == "sql"
+      ) {
+        // Call the updateQueryValue function
+        // will skip custom query fields extraction for logs page
+        if (parser) await updateQueryValue(pageKey == "logs" ? true : false);
+      } else if (customQueryChanged) {
+        // Only clear lists when switching modes
+        // auto query mode selected
+        // remove the custom fields from the list
+        dashboardPanelData.meta.stream.customQueryFields = [];
+        dashboardPanelData.meta.stream.vrlFunctionFieldList = []; // Clear VRL function field list
+      }
+      // if (dashboardPanelData.data.queryType == "promql") {
+      //     updatePromQLQuery()
+      // }
+    },
+    { deep: true },
+  );
+
+  const currentXLabel = computed(() => {
+    if (dashboardPanelData.data.type == "table") {
+      return isPivotMode.value ? "Row Fields" : "First Column";
+    }
+    return dashboardPanelData.data.type == "h-bar" ? "Y-Axis" : "X-Axis";
+  });
+
+  const currentYLabel = computed(() => {
+    if (dashboardPanelData.data.type == "table") {
+      return isPivotMode.value ? "Value Fields" : "Other Columns";
+    }
+    return dashboardPanelData.data.type == "h-bar" ? "X-Axis" : "Y-Axis";
+  });
+
+  // Function to get result schema
+  const getResultSchema = async (
+    query: string,
+    abortSignal?: AbortSignal,
+    startISOTimestamp?: number,
+    endISOTimestamp?: number,
+  ): Promise<{
+    group_by: string[];
+    projections: string[];
+    timeseries_field: string | null;
+  }> => {
+    // get extracted fields from the query
+    const schemaRes = await queryService.result_schema(
+      {
+        org_identifier: store.state.selectedOrganization.identifier,
+        query: {
+          query: {
+            sql: store.state.zoConfig.sql_base64_enabled
+              ? b64EncodeUnicode(query)
+              : query,
+            query_fn: null,
+            start_time: startISOTimestamp,
+            end_time: endISOTimestamp,
+            size: -1,
+            histogram_interval: undefined,
+            streaming_output: false,
+            streaming_id: null,
+          },
+          ...(store.state.zoConfig.sql_base64_enabled
+            ? { encoding: "base64" }
+            : {}),
+        },
+        page_type: "dashboards",
+        is_streaming: isStreamingEnabled(store.state),
+      },
+      "dashboards",
+    );
+
+    // if abort signal is received, throw an error
+    if (abortSignal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+
+    return schemaRes.data;
+  };
+
+  // Function to determine chart type based on extracted fields
+  const determineChartType = (extractedFields: {
+    group_by: string[];
+    projections: string[];
+    timeseries_field: string | null;
+  }): string => {
+    // If VRL functions are present, always default to table chart
+    if (dashboardPanelData.meta.stream.vrlFunctionFieldList.length > 0) {
+      return "table";
+    }
+
+    if (
+      extractedFields.timeseries_field &&
+      extractedFields.group_by.length <= 2
+    ) {
+      return "line";
+    } else {
+      return "table";
+    }
+  };
+
+  // Function to convert result schema to x, y, breakdown fields
+  const convertSchemaToFields = (
+    extractedFields: {
+      group_by: string[];
+      projections: string[];
+      timeseries_field: string | null;
+    },
+    chartType: string,
+  ): {
+    x: string[];
+    y: string[];
+    breakdown: string[];
+  } => {
+    // For table charts, add all projections to x-axis since tables display all fields as columns
+    if (chartType === "table") {
+      return {
+        x: [...extractedFields.projections],
+        y: [],
+        breakdown: [],
+      };
+    }
+
+    // For non-table charts, use the original logic
+    // remove group by and timeseries field from projections, while using it on y axis
+    const yAxisFields = extractedFields.projections.filter(
+      (field) =>
+        !extractedFields.group_by.includes(field) &&
+        field !== extractedFields.timeseries_field,
+    );
+
+    const fields = {
+      x: [] as string[],
+      y: yAxisFields,
+      breakdown: [] as string[],
+    };
+
+    // add timestamp as x axis
+    if (extractedFields.timeseries_field) {
+      fields.x.push(extractedFields.timeseries_field);
+    }
+
+    extractedFields.group_by.forEach((field: any) => {
+      if (field != extractedFields.timeseries_field) {
+        // if x axis is empty then first add group by as x axis
+        if (fields.x.length == 0) {
+          fields.x.push(field);
+        } else {
+          fields.breakdown.push(field);
+        }
+      }
+    });
+
+    return fields;
+  };
+
+  // For visualization, we need to set the custom query fields
+  const setCustomQueryFields = async (
+    extractedFieldsParam?: {
+      group_by: string[];
+      projections: string[];
+      timeseries_field: string | null;
+    },
+    autoSelectChartType: boolean = true,
+    abortSignal?: AbortSignal,
+  ) => {
+    resetFields();
+
+    // Helper function to process extracted fields and populate axes
+    const processExtractedFields = (
+      extractedFields: {
+        group_by: string[];
+        projections: string[];
+        timeseries_field: string | null;
+      },
+      autoSelectChartType: boolean = true,
+    ) => {
+      // remove all fields from custom query fields
+      dashboardPanelData.meta.stream.customQueryFields = [];
+
+      // add all fields to custom query fields
+      extractedFields.projections.forEach((field: any) => {
+        dashboardPanelData.meta.stream.customQueryFields.push({
+          name: field,
+          type: "",
+        });
+      });
+
+      // Determine chart type
+      const chartType = autoSelectChartType
+        ? determineChartType(extractedFields)
+        : dashboardPanelData.data.type;
+      dashboardPanelData.data.type = chartType;
+
+      // Convert schema to fields
+      const fields = convertSchemaToFields(extractedFields, chartType);
+
+      // Set fields using existing validation function
+      setFieldsBasedOnChartTypeValidation(fields, chartType);
+    };
+
+    // If extractedFieldsParam is provided, use it directly to avoid duplicate API call
+    if (extractedFieldsParam) {
+      processExtractedFields(extractedFieldsParam, autoSelectChartType);
+      return;
+    }
+
+    const timestamps = dashboardPanelData.meta.dateTime;
+    let startISOTimestamp: any;
+    let endISOTimestamp: any;
+    if (
+      timestamps?.start_time &&
+      timestamps?.end_time &&
+      timestamps.start_time != "Invalid Date" &&
+      timestamps.end_time != "Invalid Date"
+    ) {
+      startISOTimestamp = new Date(
+        timestamps.start_time.toISOString(),
+      ).getTime();
+      endISOTimestamp = new Date(timestamps.end_time.toISOString()).getTime();
+    } else {
+      return;
+    }
+
+    const currentQuery =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].query;
+
+    const extractedFields = await getResultSchema(
+      currentQuery,
+      abortSignal,
+      startISOTimestamp,
+      endISOTimestamp,
+    );
+    processExtractedFields(extractedFields, autoSelectChartType);
+  };
+
+  // Fetch available labels and their values for PromQL builder
+  const fetchPromQLLabels = async (metric: string) => {
+    if (!metric || !dashboardPanelData.meta.promql) return;
+
+    // Update shared meta
+    dashboardPanelData.meta.promql.loadingLabels = true;
+
+    try {
+      const endTime = Math.floor(Date.now() * 1000); // microseconds
+      const startTime = endTime - 24 * 60 * 60 * 1000000; // 24 hours ago in microseconds
+
+      const response = await metricsService.get_promql_series({
+        org_identifier: store.state.selectedOrganization.identifier,
+        labels: `{__name__="${metric}"}`,
+        start_time: startTime,
+        end_time: endTime,
+      });
+
+      if (
+        response.data &&
+        response.data.data &&
+        response.data.data.length > 0
+      ) {
+        // Extract all unique label keys and their values from the series
+        const labelSet = new Set<string>();
+        const valuesMap = new Map<string, Set<string>>();
+
+        response.data.data.forEach((series: any) => {
+          Object.keys(series).forEach((key) => {
+            if (key !== "__name__") {
+              labelSet.add(key);
+
+              // Collect all values for this label key
+              if (!valuesMap.has(key)) {
+                valuesMap.set(key, new Set<string>());
+              }
+              valuesMap.get(key)!.add(series[key]);
+            }
+          });
+        });
+
+        // Save to shared meta
+        dashboardPanelData.meta.promql.availableLabels =
+          Array.from(labelSet).sort();
+
+        // Convert Sets to sorted arrays and store in the map
+        const newLabelValuesMap = new Map<string, string[]>();
+        valuesMap.forEach((valueSet, labelKey) => {
+          newLabelValuesMap.set(labelKey, Array.from(valueSet).sort());
+        });
+        dashboardPanelData.meta.promql.labelValuesMap = newLabelValuesMap;
+      } else {
+        dashboardPanelData.meta.promql.availableLabels = [];
+        dashboardPanelData.meta.promql.labelValuesMap = new Map();
+      }
+    } catch (error) {
+      dashboardPanelData.meta.promql.availableLabels = [];
+      dashboardPanelData.meta.promql.labelValuesMap = new Map();
+    } finally {
+      dashboardPanelData.meta.promql.loadingLabels = false;
+    }
+  };
+
+  return {
+    dashboardPanelData,
+    resetDashboardPanelData,
+    resetDashboardPanelDataAndAddTimeField,
+    updateArrayAlias,
+    addXAxisItem,
+    addYAxisItem,
+    addZAxisItem,
+    addBreakDownAxisItem,
+    addLatitude,
+    addLongitude,
+    addWeight,
+    addMapName,
+    addMapValue,
+    addSource,
+    addTarget,
+    addValue,
+    removeXAxisItemByIndex,
+    removeYAxisItemByIndex,
+    removeZAxisItemByIndex,
+    removeBreakdownItemByIndex,
+    removeFilterItem,
+    removeLatitude,
+    removeLongitude,
+    removeWeight,
+    removeMapName,
+    removeMapValue,
+    removeSource,
+    removeTarget,
+    removeValue,
+    addFilteredItem,
+    loadFilterItem,
+    removeXYFilters,
+    updateXYFieldsForCustomQueryMode,
+    updateXYFieldsOnCustomQueryChange,
+    isAddXAxisNotAllowed,
+    isAddBreakdownNotAllowed,
+    isAddYAxisNotAllowed,
+    isAddZAxisNotAllowed,
+    promqlMode,
+    isPivotMode,
+    addQuery,
+    removeQuery,
+    resetAggregationFunction,
+    cleanupDraggingFields,
+    getDefaultQueries,
+    validatePanel: validatePanelWrapper,
+    makeAutoSQLQuery,
+    currentXLabel,
+    currentYLabel,
+    generateLabelFromName,
+    selectedStreamFieldsBasedOnUserDefinedSchema,
+    updateGroupedFields,
+    getAllSelectedStreams,
+    setCustomQueryFields,
+    getResultSchema,
+    determineChartType,
+    convertSchemaToFields,
+    setFieldsBasedOnChartTypeValidation,
+    getDefaultDashboardPanelData,
+    getStreamNameFromStreamAlias,
+    fetchPromQLLabels,
+  };
+};
+export default useDashboardPanelData;

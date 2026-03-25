@@ -79,6 +79,7 @@ pub(crate) mod error_utils;
 pub mod multi_streams;
 pub mod query_manager;
 pub mod saved_view;
+#[cfg(feature = "enterprise")]
 pub mod search_inspector;
 pub mod search_job;
 pub mod search_stream;
@@ -179,6 +180,7 @@ async fn can_use_distinct_stream(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("type" = Option<String>, Query, description = "Stream type. Must be one of: logs, metrics, traces. Defaults to logs if not specified."),
         ("is_ui_histogram" = Option<bool>, Query, description = "Whether to return histogram data for UI (default: false)"),
         ("is_multi_stream_search" = Option<bool>, Query, description = "Indicate is search is for multi stream (default: false)"),
         ("validate" = Option<bool>, Query, description = "Validate query fields against stream schema and User-Defined Schema (UDS). When enabled, returns error if queried fields are not in schema or not allowed by UDS (default: false)"),
@@ -223,7 +225,7 @@ async fn can_use_distinct_stream(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Search data with SQL query, you can use `match_all('something')` to search with full text search, also you can use `str_match(field, 'something')` to search in a specific field; start_time, end_time can't be zero, need to valid micro timestamp.", "category": "search"}))
+        ("x-o2-mcp" = json!({"description": "Search data with SQL query, you can use `match_all('something')` to search with full text search, also you can use `str_match(field, 'something')` to search in a specific field; start_time, end_time can't be zero, need to valid micro timestamp. Note: in summary mode, response is stripped to hits/total/took/columns/scan_size/function_error and hits are capped at 100. Use LIMIT in your SQL or request detail='full' if you need more.", "category": "search"}))
     )
 )]
 pub async fn search(
@@ -524,6 +526,7 @@ pub async fn search(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "stream_name name"),
+        ("type" = Option<String>, Query, description = "Stream type. Must be one of: logs, metrics, traces. Defaults to logs if not specified."),
         ("key" = i64, Query, description = "around key"),
         ("size" = i64, Query, description = "around size"),
         ("regions" = Option<String>, Query, description = "regions, split by comma"),
@@ -559,7 +562,7 @@ pub async fn search(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Search logs around a timestamp", "category": "search"}))
+        ("x-o2-mcp" = json!({"description": "Search logs around a timestamp. Note: in summary mode, hits are capped at 100 and only hits/total/took/columns/scan_size/function_error are returned.", "category": "search"}))
     )
 )]
 pub async fn around_v1(
@@ -758,6 +761,7 @@ pub async fn around_v2(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "stream_name name"),
+        ("type" = Option<String>, Query, description = "Stream type. Must be one of: logs, metrics, traces. Defaults to logs if not specified."),
         ("fields" = String, Query, description = "fields, split by comma"),
         ("filter" = Option<String>, Query, description = "filter, eg: a=b"),
         ("keyword" = Option<String>, Query, description = "keyword, eg: abc"),
@@ -1424,8 +1428,9 @@ async fn values_v1(
         ("Authorization"= [])
     ),
     params(
-        ("enable_align_histogram" = bool, Query, description = "Enable align histogram"),
         ("org_id" = String, Path, description = "Organization name"),
+        ("type" = Option<String>, Query, description = "Stream type. Must be one of: logs, metrics, traces. Defaults to logs if not specified."),
+        ("enable_align_histogram" = bool, Query, description = "Enable align histogram"),
     ),
     request_body(content = inline(config::meta::search::SearchPartitionRequest), description = "Search query", content_type = "application/json", example = json!({
         "sql": "select * from k8s ",

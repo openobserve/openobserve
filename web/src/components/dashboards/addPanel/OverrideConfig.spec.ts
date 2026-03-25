@@ -26,40 +26,42 @@ import router from "@/test/unit/helpers/router";
 const mockDashboardPanelData = {
   data: {
     config: {
-      override_config: []
+      override_config: [],
     },
-    queries: [{
-      fields: {
-        x: [
-          { alias: "timestamp", label: "Timestamp" },
-          { alias: "user_id", label: "User ID" }
-        ],
-        y: [
-          { alias: "count", label: "Count" },
-          { alias: "duration", label: "Duration" }
-        ]
-      }
-    }],
+    queries: [
+      {
+        fields: {
+          x: [
+            { alias: "timestamp", label: "Timestamp" },
+            { alias: "user_id", label: "User ID" },
+          ],
+          y: [
+            { alias: "count", label: "Count" },
+            { alias: "duration", label: "Duration" },
+          ],
+        },
+      },
+    ],
     type: "line",
-    queryType: "sql" // Default to SQL mode
+    queryType: "sql", // Default to SQL mode
   },
   layout: {
-    currentQueryIndex: 0
+    currentQueryIndex: 0,
   },
   meta: {
     streamFields: {
-      groupedFields: []
-    }
-  }
+      groupedFields: [],
+    },
+  },
 };
 
 const mockPromqlMode = { value: false };
 
-vi.mock("@/composables/useDashboardPanel", () => ({
+vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(() => ({
     dashboardPanelData: mockDashboardPanelData,
-    promqlMode: mockPromqlMode
-  }))
+    promqlMode: mockPromqlMode,
+  })),
 }));
 
 installQuasar({
@@ -72,24 +74,24 @@ describe("OverrideConfig", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    store.state.theme = 'light';
+    store.state.theme = "light";
     mockDashboardPanelData.data.config.override_config = [];
-    mockDashboardPanelData.data.queryType = 'sql';
+    mockDashboardPanelData.data.queryType = "sql";
     mockPromqlMode.value = false;
     mockDashboardPanelData.data.queries[0].fields = {
       x: [
         { alias: "timestamp", label: "Timestamp" },
-        { alias: "user_id", label: "User ID" }
+        { alias: "user_id", label: "User ID" },
       ],
       y: [
         { alias: "count", label: "Count" },
-        { alias: "duration", label: "Duration" }
-      ]
+        { alias: "duration", label: "Duration" },
+      ],
     };
     mockDashboardPanelData.meta = {
       streamFields: {
-        groupedFields: []
-      }
+        groupedFields: [],
+      },
     };
   });
 
@@ -102,24 +104,24 @@ describe("OverrideConfig", () => {
   const createWrapper = (props = {}) => {
     return mount(OverrideConfig, {
       props: {
-        ...props
+        ...props,
       },
       global: {
         plugins: [i18n, store, router],
         provide: {
-          dashboardPanelDataPageKey: "dashboard"
+          dashboardPanelDataPageKey: "dashboard",
         },
         stubs: {
-          'OverrideConfigPopup': {
+          OverrideConfigPopup: {
             template: '<div data-test="override-config-popup"></div>',
-            emits: ['close', 'save'],
-            props: ['columns', 'overrideConfig']
-          }
+            emits: ["close", "save"],
+            props: ["columns", "overrideConfig"],
+          },
         },
         mocks: {
-          $t: (key: string) => key
-        }
-      }
+          $t: (key: string) => key,
+        },
+      },
     });
   };
 
@@ -127,20 +129,39 @@ describe("OverrideConfig", () => {
     it("should render override config section", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.text()).toContain('Override Config');
+      // Title block was removed in config redesign (PR #10917);
+      // the section header is now rendered by the parent ConfigPanel expansion item.
+      expect(wrapper.exists()).toBe(true);
     });
 
     it("should render info tooltip button", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-info"]').exists()).toBe(true);
+      // Info tooltip button was removed from this component in config redesign (PR #10917).
+      expect(
+        wrapper
+          .find('[data-test="dashboard-addpanel-config-drilldown-info"]')
+          .exists(),
+      ).toBe(false);
     });
 
     it("should render add field override button", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-override-config-add-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-override-config-add-btn"]').text()).toBe('Add field override');
+      expect(
+        wrapper
+          .find(
+            '[data-test="dashboard-addpanel-config-override-config-add-btn"]',
+          )
+          .exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find(
+            '[data-test="dashboard-addpanel-config-override-config-add-btn"]',
+          )
+          .text(),
+      ).toBe("Add field override");
     });
 
     it("should not show dialog initially", () => {
@@ -193,8 +214,10 @@ describe("OverrideConfig", () => {
     it("should show dialog when add button is clicked", async () => {
       wrapper = createWrapper();
 
-      const addBtn = wrapper.find('[data-test="dashboard-addpanel-config-override-config-add-btn"]');
-      await addBtn.trigger('click');
+      const addBtn = wrapper.find(
+        '[data-test="dashboard-addpanel-config-override-config-add-btn"]',
+      );
+      await addBtn.trigger("click");
 
       expect(wrapper.vm.showOverrideConfigPopup).toBe(true);
     });
@@ -203,12 +226,17 @@ describe("OverrideConfig", () => {
       wrapper = createWrapper();
 
       const initialColumnsLength = wrapper.vm.columns.length;
-      
-      // Modify fields to test fetchColumns
-      mockDashboardPanelData.data.queries[0].fields.x.push({ alias: "new_field", label: "New Field" });
 
-      const addBtn = wrapper.find('[data-test="dashboard-addpanel-config-override-config-add-btn"]');
-      await addBtn.trigger('click');
+      // Modify fields to test fetchColumns
+      mockDashboardPanelData.data.queries[0].fields.x.push({
+        alias: "new_field",
+        label: "New Field",
+      });
+
+      const addBtn = wrapper.find(
+        '[data-test="dashboard-addpanel-config-override-config-add-btn"]',
+      );
+      await addBtn.trigger("click");
 
       expect(wrapper.vm.columns.length).toBe(initialColumnsLength + 1);
     });
@@ -216,7 +244,7 @@ describe("OverrideConfig", () => {
     it("should have openOverrideConfigPopup method", () => {
       wrapper = createWrapper();
 
-      expect(typeof wrapper.vm.openOverrideConfigPopup).toBe('function');
+      expect(typeof wrapper.vm.openOverrideConfigPopup).toBe("function");
     });
 
     it("should open dialog through method call", () => {
@@ -234,20 +262,22 @@ describe("OverrideConfig", () => {
 
       const newOverrideConfig = [
         { field: "count", unit: "ms" },
-        { field: "duration", unit: "seconds" }
+        { field: "duration", unit: "seconds" },
       ];
 
       wrapper.vm.showOverrideConfigPopup = true;
       wrapper.vm.saveOverrideConfigConfig(newOverrideConfig);
 
-      expect(mockDashboardPanelData.data.config.override_config).toEqual(newOverrideConfig);
+      expect(mockDashboardPanelData.data.config.override_config).toEqual(
+        newOverrideConfig,
+      );
       expect(wrapper.vm.showOverrideConfigPopup).toBe(false);
     });
 
     it("should have saveOverrideConfigConfig method", () => {
       wrapper = createWrapper();
 
-      expect(typeof wrapper.vm.saveOverrideConfigConfig).toBe('function');
+      expect(typeof wrapper.vm.saveOverrideConfigConfig).toBe("function");
     });
 
     it("should handle empty override config", () => {
@@ -262,14 +292,14 @@ describe("OverrideConfig", () => {
     it("should apply override configs after saving", () => {
       wrapper = createWrapper();
 
-      const overrideConfig = [
-        { field: "count", unit: "items" }
-      ];
+      const overrideConfig = [{ field: "count", unit: "items" }];
 
       wrapper.vm.saveOverrideConfigConfig(overrideConfig);
 
       // Check that columns have been updated with format functions
-      const countColumn = wrapper.vm.columns.find((col: any) => col.name === "count");
+      const countColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "count",
+      );
       if (countColumn && countColumn.format) {
         expect(countColumn.format(100)).toBe("100 items");
       }
@@ -280,13 +310,17 @@ describe("OverrideConfig", () => {
     it("should apply override configs to columns", () => {
       mockDashboardPanelData.data.config.override_config = {
         count: "ms",
-        duration: "seconds"
+        duration: "seconds",
       };
-      
+
       wrapper = createWrapper();
 
-      const countColumn = wrapper.vm.columns.find((col: any) => col.name === "count");
-      const durationColumn = wrapper.vm.columns.find((col: any) => col.name === "duration");
+      const countColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "count",
+      );
+      const durationColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "duration",
+      );
 
       expect(countColumn?.format).toBeDefined();
       expect(durationColumn?.format).toBeDefined();
@@ -294,12 +328,14 @@ describe("OverrideConfig", () => {
 
     it("should format values with units correctly", () => {
       mockDashboardPanelData.data.config.override_config = {
-        count: "items"
+        count: "items",
       };
-      
+
       wrapper = createWrapper();
 
-      const countColumn = wrapper.vm.columns.find((col: any) => col.name === "count");
+      const countColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "count",
+      );
       if (countColumn && countColumn.format) {
         expect(countColumn.format(150)).toBe("150 items");
         expect(countColumn.format(0)).toBe("0 items");
@@ -309,10 +345,12 @@ describe("OverrideConfig", () => {
 
     it("should handle columns without override config", () => {
       mockDashboardPanelData.data.config.override_config = [];
-      
+
       wrapper = createWrapper();
 
-      const timestampColumn = wrapper.vm.columns.find((col: any) => col.name === "timestamp");
+      const timestampColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "timestamp",
+      );
       if (timestampColumn && timestampColumn.format) {
         expect(timestampColumn.format(1000)).toBe("1000 ");
       }
@@ -321,29 +359,29 @@ describe("OverrideConfig", () => {
 
   describe("Theme Integration", () => {
     it("should handle light theme", async () => {
-      store.state.theme = 'light';
+      store.state.theme = "light";
       wrapper = createWrapper();
 
-      expect(wrapper.vm.store.state.theme).toBe('light');
+      expect(wrapper.vm.store.state.theme).toBe("light");
     });
 
     it("should handle dark theme", async () => {
-      store.state.theme = 'dark';
+      store.state.theme = "dark";
       wrapper = createWrapper();
 
-      expect(wrapper.vm.store.state.theme).toBe('dark');
+      expect(wrapper.vm.store.state.theme).toBe("dark");
     });
 
     it("should pass correct theme class to popup", async () => {
-      store.state.theme = 'dark';
+      store.state.theme = "dark";
       wrapper = createWrapper();
 
       wrapper.vm.showOverrideConfigPopup = true;
       await wrapper.vm.$nextTick();
 
-      const popup = wrapper.findComponent({ name: 'OverrideConfigPopup' });
+      const popup = wrapper.findComponent({ name: "OverrideConfigPopup" });
       if (popup.exists()) {
-        expect(popup.classes()).toContain('dark-mode');
+        expect(popup.classes()).toContain("dark-mode");
       }
     });
   });
@@ -354,9 +392,9 @@ describe("OverrideConfig", () => {
         data: {
           config: {},
           queries: [{ fields: { x: [], y: [] } }],
-          type: "line"
+          type: "line",
         },
-        layout: { currentQueryIndex: 0 }
+        layout: { currentQueryIndex: 0 },
       };
 
       // Simulate initialization as component would do
@@ -364,7 +402,9 @@ describe("OverrideConfig", () => {
         mockDataWithoutOverrideConfig.data.config.override_config = [];
       }
 
-      expect(mockDataWithoutOverrideConfig.data.config.override_config).toEqual([]);
+      expect(mockDataWithoutOverrideConfig.data.config.override_config).toEqual(
+        [],
+      );
     });
 
     it("should not override existing override_config array", () => {
@@ -373,7 +413,9 @@ describe("OverrideConfig", () => {
 
       wrapper = createWrapper();
 
-      expect(mockDashboardPanelData.data.config.override_config).toEqual(existingConfig);
+      expect(mockDashboardPanelData.data.config.override_config).toEqual(
+        existingConfig,
+      );
     });
   });
 
@@ -382,7 +424,9 @@ describe("OverrideConfig", () => {
       wrapper = createWrapper();
 
       expect(wrapper.vm.dashboardPanelData).toBeDefined();
-      expect(wrapper.vm.dashboardPanelData.data.config.override_config).toBeDefined();
+      expect(
+        wrapper.vm.dashboardPanelData.data.config.override_config,
+      ).toBeDefined();
     });
 
     it("should work with injected dashboard panel data key", () => {
@@ -394,7 +438,7 @@ describe("OverrideConfig", () => {
     it("should handle queries with different field structures", () => {
       mockDashboardPanelData.data.queries[0].fields = {
         x: [{ alias: "time", label: "Time" }],
-        y: [{ alias: "value", label: "Value" }]
+        y: [{ alias: "value", label: "Value" }],
       };
 
       wrapper = createWrapper();
@@ -420,7 +464,13 @@ describe("OverrideConfig", () => {
       wrapper = createWrapper();
 
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-override-config-add-btn"]').exists()).toBe(true);
+      expect(
+        wrapper
+          .find(
+            '[data-test="dashboard-addpanel-config-override-config-add-btn"]',
+          )
+          .exists(),
+      ).toBe(true);
     });
 
     it("should handle null override config configuration", () => {
@@ -428,9 +478,9 @@ describe("OverrideConfig", () => {
         data: {
           config: { override_config: null },
           queries: [{ fields: { x: [], y: [] } }],
-          type: "line"
+          type: "line",
         },
-        layout: { currentQueryIndex: 0 }
+        layout: { currentQueryIndex: 0 },
       };
 
       // Simulate initialization as component would do
@@ -438,12 +488,14 @@ describe("OverrideConfig", () => {
         mockDataWithNullOverrideConfig.data.config.override_config = [];
       }
 
-      expect(mockDataWithNullOverrideConfig.data.config.override_config).toEqual([]);
+      expect(
+        mockDataWithNullOverrideConfig.data.config.override_config,
+      ).toEqual([]);
     });
 
     it("should handle component unmounting gracefully", () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.exists()).toBe(true);
       expect(() => wrapper.unmount()).not.toThrow();
     });
@@ -467,14 +519,14 @@ describe("OverrideConfig", () => {
     it("should have correct component name", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.$options.name).toBe('OverrideConfig');
+      expect(wrapper.vm.$options.name).toBe("OverrideConfig");
     });
 
     it("should have all required methods", () => {
       wrapper = createWrapper();
 
-      expect(typeof wrapper.vm.openOverrideConfigPopup).toBe('function');
-      expect(typeof wrapper.vm.saveOverrideConfigConfig).toBe('function');
+      expect(typeof wrapper.vm.openOverrideConfigPopup).toBe("function");
+      expect(typeof wrapper.vm.saveOverrideConfigConfig).toBe("function");
     });
 
     it("should have all required data properties", () => {
@@ -499,16 +551,16 @@ describe("OverrideConfig", () => {
   describe("Column Format Functions", () => {
     it("should create format functions for columns", () => {
       mockDashboardPanelData.data.config.override_config = [
-        { count: "requests" }
+        { count: "requests" },
       ];
-      
+
       wrapper = createWrapper();
 
       const columns = wrapper.vm.columns;
       const countColumn = columns.find((col: any) => col.field === "count");
 
       expect(countColumn.format).toBeDefined();
-      expect(typeof countColumn.format).toBe('function');
+      expect(typeof countColumn.format).toBe("function");
     });
 
     it("should map column properties correctly", () => {
@@ -527,20 +579,27 @@ describe("OverrideConfig", () => {
         count: "requests/min",
         duration: "ms",
         timestamp: "",
-        user_id: "ID"
+        user_id: "ID",
       };
-      
+
       wrapper = createWrapper();
 
       const columns = wrapper.vm.columns;
-      
-      const countColumn = columns.find((col: any) => col.field === "count");
-      const durationColumn = columns.find((col: any) => col.field === "duration");
-      const timestampColumn = columns.find((col: any) => col.field === "timestamp");
 
-      if (countColumn?.format) expect(countColumn.format(100)).toBe("100 requests/min");
-      if (durationColumn?.format) expect(durationColumn.format(500)).toBe("500 ms");
-      if (timestampColumn?.format) expect(timestampColumn.format(123456789)).toBe("123456789 ");
+      const countColumn = columns.find((col: any) => col.field === "count");
+      const durationColumn = columns.find(
+        (col: any) => col.field === "duration",
+      );
+      const timestampColumn = columns.find(
+        (col: any) => col.field === "timestamp",
+      );
+
+      if (countColumn?.format)
+        expect(countColumn.format(100)).toBe("100 requests/min");
+      if (durationColumn?.format)
+        expect(durationColumn.format(500)).toBe("500 ms");
+      if (timestampColumn?.format)
+        expect(timestampColumn.format(123456789)).toBe("123456789 ");
     });
   });
 
@@ -557,15 +616,14 @@ describe("OverrideConfig", () => {
       expect(wrapper.vm.showOverrideConfigPopup).toBe(true);
 
       // Save config
-      const newConfig = [
-        { count: "items" },
-        { duration: "seconds" }
-      ];
+      const newConfig = [{ count: "items" }, { duration: "seconds" }];
       wrapper.vm.saveOverrideConfigConfig(newConfig);
 
       // Verify final state
       expect(wrapper.vm.showOverrideConfigPopup).toBe(false);
-      expect(mockDashboardPanelData.data.config.override_config).toEqual(newConfig);
+      expect(mockDashboardPanelData.data.config.override_config).toEqual(
+        newConfig,
+      );
     });
 
     it("should handle dynamic field changes", async () => {
@@ -575,7 +633,10 @@ describe("OverrideConfig", () => {
       const initialColumnsLength = wrapper.vm.columns.length;
 
       // Simulate field changes
-      mockDashboardPanelData.data.queries[0].fields.y.push({ alias: "new_metric", label: "New Metric" });
+      mockDashboardPanelData.data.queries[0].fields.y.push({
+        alias: "new_metric",
+        label: "New Metric",
+      });
 
       // Open popup (which fetches columns)
       wrapper.vm.openOverrideConfigPopup();

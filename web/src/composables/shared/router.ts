@@ -17,6 +17,7 @@ import {
   routeGuard,
   useLocalUserInfo,
   useLocalCurrentUser,
+  invalidateLoginData,
 } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import Home from "@/views/HomeView.vue";
@@ -27,6 +28,7 @@ import Error404 from "@/views/Error404.vue";
 import ShortUrl from "@/views/ShortUrl.vue";
 
 const Search = () => import("@/plugins/logs/Index.vue");
+const SearchJobInspector = () => import("@/plugins/logs/SearchJobInspector.vue");
 const AppMetrics = () => import("@/plugins/metrics/Index.vue");
 const AppTraces = () => import("@/plugins/traces/Index.vue");
 const PromQLQueryBuilder = () => import("@/views/PromQL/QueryBuilder.vue");
@@ -54,6 +56,8 @@ const ErrorViewer = () => import("@/views/RUM/ErrorViewer.vue");
 const AppPerformance = () => import("@/views/RUM/AppPerformance.vue");
 const AppErrors = () => import("@/views/RUM/AppErrors.vue");
 const AppSessions = () => import("@/views/RUM/AppSessions.vue");
+const SourceMaps = () => import("@/views/RUM/SourceMaps.vue");
+const UploadSourceMaps = () => import("@/views/RUM/UploadSourceMaps.vue");
 
 const ReportList = () => import("@/components/reports/ReportList.vue");
 const CreateReport = () => import("@/components/reports/CreateReport.vue");
@@ -89,6 +93,8 @@ const useRoutes = () => {
     {
       path: "/logout",
       beforeEnter(to: any, from: any, next: any) {
+        // Clear backend auth cookies before redirecting to login (#10900)
+        invalidateLoginData();
         useLocalCurrentUser("", true);
         useLocalUserInfo("", true);
 
@@ -122,6 +128,18 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         title: "Logs",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "logs/inspector",
+      name: "searchJobInspector",
+      component: SearchJobInspector,
+      meta: {
+        keepAlive: false,
+        title: "Search Job Inspector",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -384,8 +402,7 @@ const useRoutes = () => {
     {
       path: "alerts/anomaly/add",
       name: "addAnomalyDetection",
-      component: () =>
-        import("@/views/AddAnomalyDetectionView.vue"),
+      component: () => import("@/views/AddAlertView.vue"),
       meta: {
         title: "Add Anomaly Detection",
       },
@@ -402,8 +419,7 @@ const useRoutes = () => {
     {
       path: "alerts/anomaly/edit/:anomaly_id",
       name: "editAnomalyDetection",
-      component: () =>
-        import("@/views/AddAnomalyDetectionView.vue"),
+      component: () => import("@/views/AddAlertView.vue"),
       meta: {
         title: "Edit Anomaly Detection",
       },
@@ -511,6 +527,28 @@ const useRoutes = () => {
           props: true,
           meta: {
             keepAlive: true,
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "source-maps",
+          name: "SourceMaps",
+          component: SourceMaps,
+          meta: {
+            keepAlive: true,
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "upload-source-maps",
+          name: "UploadSourceMaps",
+          component: UploadSourceMaps,
+          meta: {
+            keepAlive: false,
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);

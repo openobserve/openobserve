@@ -13,14 +13,11 @@
         :title="row.name"
       >
         <div
-          class="field_label ellipsis tw:flex tw:items-center"
-          style="width: calc(100% - 28px); font-size: 14px"
+          class="field_label tw:ellipsis! tw:flex tw:items-center tw:w-full"
+          style="font-size: 14px"
           :title="row.label || row.name"
         >
-          <span
-            v-if="row.dataType"
-            class="field-type-container"
-          >
+          <span v-if="row.dataType" class="field-type-container">
             <q-icon
               class="field-expand-icon"
               :name="isExpanded ? 'expand_less' : 'expand_more'"
@@ -29,15 +26,34 @@
           </span>
           {{ row.label || row.name }}
         </div>
-        <div class="field_overlay">
+        <div
+          class="field_overlay tw:bg-[var(--o2-hover-accent)] tw:absolute tw:right-0! tw:h-full tw:top-0 tw:flex! tw:items-center! tw:rounded"
+        >
           <q-btn
             :data-test="`log-search-index-list-filter-${row.name}-field-btn`"
             :icon="outlinedAdd"
-            style="margin-right: 0.375rem"
-            size="6px"
-            class="q-mr-sm"
+            size="0.4rem"
+            class="tw:mx-[0.375rem]!"
             @click.stop="addSearchTerm(`${row.name}=''`)"
             round
+          />
+          <q-icon
+            :data-test="`log-search-index-list-add-${row.name}-field-btn`"
+            v-if="showVisibilityToggle && !isFieldSelected"
+            :name="outlinedVisibility"
+            size="1.1rem"
+            title="Add field to table"
+            class="tw:cursor-pointer! tw:mr-[0.375rem]!"
+            @click.stop="$emit('toggle-field', row)"
+          />
+          <q-icon
+            :data-test="`log-search-index-list-remove-${row.name}-field-btn`"
+            v-if="showVisibilityToggle && isFieldSelected"
+            :name="outlinedVisibilityOff"
+            size="1.1rem"
+            title="Remove field from table"
+            class="tw:cursor-pointer! tw:mr-[0.375rem]!"
+            @click.stop="$emit('toggle-field', row)"
           />
         </div>
       </div>
@@ -66,10 +82,10 @@
               >
                 {{ formatDuration(percentiles[p.key]) }}
               </span>
-              <div class="tw:flex tw:gap-[0.15rem]">
+              <div class="tw:flex">
                 <q-btn
                   :data-test="`log-search-subfield-list-equal-${row.name}-field-btn`"
-                  size="0.25rem"
+                  size="0.3rem"
                   round
                   :title="`duration >= ${formatDuration(percentiles[p.key])}`"
                   @click.stop="
@@ -77,7 +93,7 @@
                       `duration>='${formatTimeWithSuffix(percentiles[p.key])}'`,
                     )
                   "
-                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
+                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
                 >
                   <q-icon
                     :name="outlinedArrowForwardIos"
@@ -86,7 +102,7 @@
                 </q-btn>
                 <q-btn
                   :data-test="`log-search-subfield-list-not-equal-${row.name}-field-btn`"
-                  size="0.25rem"
+                  size="0.3rem"
                   round
                   :title="`duration <= ${formatDuration(percentiles[p.key])}`"
                   @click.stop="
@@ -94,7 +110,7 @@
                       `duration<='${formatTimeWithSuffix(percentiles[p.key])}'`,
                     )
                   "
-                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
+                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.625rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
                 >
                   <q-icon
                     :name="outlinedArrowBackIos"
@@ -104,13 +120,20 @@
               </div>
             </div>
           </template>
+          <!-- No values found -->
+          <div
+            v-else-if="!hasPercentiles"
+            class="q-pl-md q-py-xs text-subtitle2"
+          >
+            {{ percentileErrMsg || "No values found" }}
+          </div>
         </template>
         <FieldValuesPanel
           v-else
           ref="fieldValuesPanelRef"
           :field-name="row.name"
           :field-values="
-            fieldValues[row.name] || {
+            mappedFieldValues || {
               isLoading: false,
               values: [],
               hasMore: false,
@@ -120,6 +143,8 @@
           :show-multi-select="true"
           :default-values-count="defaultValuesCount"
           :theme="store.state.theme"
+          :active-include-values="activeIncludeValues"
+          :active-exclude-values="activeExcludeValues"
           @add-search-term="handleAddSearchTerm"
           @add-multiple-search-terms="handleAddMultipleSearchTerms"
           @load-more-values="handleLoadMoreValues"
@@ -131,7 +156,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, unref } from "vue";
 import useTraces from "@/composables/useTraces";
 import {
   b64EncodeUnicode,
@@ -140,7 +165,11 @@ import {
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
-import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
+import {
+  outlinedAdd,
+  outlinedVisibility,
+  outlinedVisibilityOff,
+} from "@quasar/extras/material-icons-outlined";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import {
   removeFieldFromWhereAST,
@@ -154,13 +183,38 @@ import {
   outlinedArrowBackIos,
   outlinedArrowForwardIos,
 } from "@quasar/extras/material-icons-outlined";
+import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 
 const props = defineProps({
   row: {
     type: Object,
     default: () => null,
   },
+  activeIncludeValues: {
+    type: Array as () => string[],
+    default: () => [],
+  },
+  activeExcludeValues: {
+    type: Array as () => string[],
+    default: () => [],
+  },
+  selectedFields: {
+    type: Array as () => string[],
+    default: () => [],
+  },
+  showVisibilityToggle: {
+    type: Boolean,
+    default: true,
+  },
 });
+
+defineEmits<{
+  "toggle-field": [field: any];
+}>();
+
+const isFieldSelected = computed(() =>
+  props.selectedFields.includes(props.row?.name),
+);
 
 const isExpanded = ref(false);
 const fieldValuesPanelRef = ref();
@@ -186,6 +240,7 @@ const {
   isLoading: durationPercentilesLoading,
   fetchPercentiles,
   cancelFetch: cancelPercentileFetch,
+  errMsg: percentileErrMsg,
 } = useDurationPercentiles();
 
 const hasPercentiles = computed(() =>
@@ -211,25 +266,71 @@ const store = useStore();
 const { searchObj } = useTraces();
 const { fieldValues, fetchFieldValues, cancelFieldStream, resetFieldValues } =
   useFieldValuesStream();
+
+const EMPTY_FIELD_VALUES = {
+  isLoading: false,
+  values: [],
+  hasMore: false,
+  errMsg: "",
+};
+
+const mappedFieldValues = computed(() => {
+  const entry = unref(fieldValues)[props.row?.name] ?? EMPTY_FIELD_VALUES;
+  if (props.row?.name !== "span_kind") return entry;
+  return {
+    ...entry,
+    values: entry.values.map((v: { key: string; count: number }) => ({
+      ...v,
+      label:
+        v.key === null || v.key === undefined || v.key === ""
+          ? "Unspecified"
+          : (SPAN_KIND_MAP[v.key] ?? v.key),
+    })),
+  };
+});
 const { fnParsedSQL, fnUnparsedSQL } = logsUtils();
 
 const defaultValuesCount = computed(
   () => store.state.zoConfig?.query_values_default_num || 10,
 );
 
+const showFtsFieldValues = computed(
+  () => store.state.zoConfig?.show_fts_field_values ?? false,
+);
+
 const addSearchTerm = (term: string) => {
   searchObj.data.stream.addToFilter = term;
 };
 
-const buildSql = () => {
-  let query = searchObj.data.editorValue;
-  let parseQuery = query.split("|");
-  let whereClause = "";
-  if (parseQuery.length > 1) {
-    whereClause = parseQuery[1].trim();
-  } else {
-    whereClause = parseQuery[0].trim();
-  }
+/**
+ * Remove conditions referencing `fieldName` from a flat AND-chained WHERE
+ * string.  Returns an empty string when all conditions are removed.
+ */
+const removeFieldFromWhere = (
+  whereClause: string,
+  fieldName: string,
+): string => {
+  const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Single condition: field='val', field!='val', field>=val, etc.
+  const fieldPattern = new RegExp(`^"?${escaped}"?\\s*[=!<>]`, "i");
+  // Parenthesized multi-value group: (field='x' or field='y')
+  const multiPattern = new RegExp(`^\\(\\s*"?${escaped}"?\\s*[=!<>]`, "i");
+  const remaining = whereClause.split(/\s+AND\s+/i).filter((cond) => {
+    const trimmed = cond.trim();
+    return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
+  });
+  return remaining.join(" AND ");
+};
+
+/**
+ * Build base64-encoded SQL for field-value queries with the expanded field's
+ * own filter excluded from the WHERE clause so value counts are unbiased.
+ */
+const buildSql = (): string => {
+  const fieldName = props.row.name;
+  const query = searchObj.data.editorValue;
+  const parts = query.split("|");
+  let whereClause = (parts.length > 1 ? parts[1] : parts[0]).trim();
 
   const durationParseResult = parseDurationWhereClause(
     whereClause,
@@ -240,64 +341,17 @@ const buildSql = () => {
     whereClause = durationParseResult;
   }
 
-  let query_context =
-    `SELECT * FROM "` +
-    searchObj.data.stream.selectedStream.value +
-    `" [WHERE_CLAUSE]`;
+  const streamName = searchObj.data.stream.selectedStream.value;
+  let sql = `SELECT * FROM "${streamName}"`;
 
-  if (whereClause.trim() !== "") {
-    whereClause = whereClause
-      .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
-      .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
-      .replace(/<(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <");
-
-    whereClause = whereClause
-      .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-      .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-      .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
-      .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
-
-    const parsedSQL = whereClause.split(" ");
-    searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-      parsedSQL.forEach((node: any, index: any) => {
-        if (node == field.name) {
-          node = node.replaceAll('"', "");
-          parsedSQL[index] = '"' + node + '"';
-        }
-      });
-    });
-
-    whereClause = parsedSQL.join(" ");
-    query_context = query_context
-      .split("[WHERE_CLAUSE]")
-      .join(" WHERE " + whereClause);
-  } else {
-    query_context = query_context.replace("[WHERE_CLAUSE]", "");
-  }
-
-  // Remove the expanded field's own filter so value counts are not constrained
-  // by the condition the user is exploring.
-  let sqlForValues = query_context;
-  try {
-    const parsedForValues = fnParsedSQL(query_context);
-    if (parsedForValues?.from?.length > 0) {
-      const modifiedWhere = removeFieldFromWhereAST(
-        parsedForValues.where,
-        props.row.name,
-      );
-      const modifiedSQL = fnUnparsedSQL({
-        ...parsedForValues,
-        where: modifiedWhere,
-      }).replace(/`/g, '"');
-      if (modifiedSQL) {
-        sqlForValues = modifiedSQL;
-      }
+  if (whereClause !== "") {
+    const filteredWhere = removeFieldFromWhere(whereClause, fieldName);
+    if (filteredWhere.trim() !== "") {
+      sql += ` WHERE ${filteredWhere}`;
     }
-  } catch {
-    // Fall back to original SQL if AST manipulation fails
   }
 
-  return b64EncodeUnicode(sqlForValues) || "";
+  return b64EncodeUnicode(sql) || "";
 };
 
 const fetchValues = (from: number = 0, keyword: string = "") => {
@@ -323,7 +377,7 @@ const fetchValues = (from: number = 0, keyword: string = "") => {
 };
 
 const openFilterCreator = (event: any, { ftsKey }: any) => {
-  if (ftsKey) {
+  if (ftsKey && !showFtsFieldValues.value) {
     event.stopPropagation();
     event.preventDefault();
     return;

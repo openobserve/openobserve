@@ -537,6 +537,8 @@ export const convertTimeFromMicroToMilli = (time: number) => {
 };
 
 export const formatLargeNumber = (number: number) => {
+  if (number === undefined || number === null) return "";
+
   if (number >= 1000000000) {
     return (number / 1000000000).toFixed(1) + "B";
   } else if (number >= 1000000) {
@@ -634,6 +636,7 @@ export const mergeRoutes: any = (route1: any, route2: any) => {
 };
 
 export function formatDuration(ms: number) {
+  if (!ms || ms === 0) return "0 sec";
   const seconds = (ms / 1000).toFixed(2);
   const minutes = (Number(seconds) / 60).toFixed(2);
   const hours = (Number(minutes) / 60).toFixed(2);

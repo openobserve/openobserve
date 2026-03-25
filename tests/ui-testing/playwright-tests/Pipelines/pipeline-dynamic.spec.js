@@ -1,25 +1,27 @@
 import { test, expect } from '@playwright/test';
 import PageManager from '../../pages/page-manager.js';
-import { LoginPage } from '../../pages/generalPages/loginPage.js';
 import logsdata from '../../../test-data/logs_data.json';
 import { getHeaders, getIngestionUrl, sendRequest } from '../../utils/apiUtils.js';
 const testLogger = require('../utils/test-logger.js');
+const path = require('path');
+
+// Use stored authentication state from global setup instead of logging in each test
+const authFile = path.join(__dirname, '../utils/auth/user.json');
 
 test.describe('Pipeline Dynamic Stream Names', { tag: ['@all', '@pipelines', '@pipelinesDynamic'] }, () => {
 
   let page;
+  let context;
   let pageManager;
-  let loginPage;
 
   test.beforeAll(async ({ browser }) => {
-    page = await browser.newPage();
+    context = await browser.newContext({ storageState: authFile });
+    page = await context.newPage();
     pageManager = new PageManager(page);
-    loginPage = new LoginPage(page);
 
-    // Login using LoginPage - happens only once before all tests
-    await loginPage.gotoLoginPage();
-    await loginPage.loginAsInternalUser();
-    await loginPage.login();
+    // Navigate to base URL so the UI is loaded (required for storageState auth)
+    await page.goto(`${process.env.ZO_BASE_URL}/web/?org_identifier=${process.env.ORGNAME}`);
+    await page.waitForLoadState('networkidle').catch(() => {});
   });
 
   test.beforeEach(async () => {
@@ -48,12 +50,11 @@ test.describe('Pipeline Dynamic Stream Names', { tag: ['@all', '@pipelines', '@p
 
   test.afterAll(async () => {
     // Add a wait before closing to ensure all operations are complete
-
-
     await page.waitForTimeout(2000);
     if (!page.isClosed()) {
       await page.close();
     }
+    await context.close();
   });
 
   test('Verify pipeline with dynamic destination name using kubernetes_container_name', async () => {

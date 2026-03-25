@@ -1,10 +1,13 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
+const { isCloudEnvironment } = require('../utils/cloud-auth.js');
 
 test.describe.configure({ mode: 'parallel' });
 
+// Service accounts tab (data-test="iam-service-accounts-tab") does not exist on cloud UI
 test.describe("Service Account for API access", () => {
+    test.skip(isCloudEnvironment(), 'Service accounts tab not available on cloud UI');
     let pageManager;
 
     test("Error Message displayed if Email Blank", async ({ page }, testInfo) => {

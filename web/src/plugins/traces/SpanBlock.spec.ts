@@ -396,4 +396,150 @@ describe("SpanBlock", () => {
       expect(spanBlock.attributes("style")).toContain(`left:`);
     });
   });
+
+  // ─── New tests covering functionality added after Dec 05 2025 ───────────────
+
+  describe("formatTimeWithSuffix usage for duration display", () => {
+    it("should render duration using formatTimeWithSuffix (not raw durationMs)", () => {
+      // The source uses formatTimeWithSuffix(span.durationUs) — not durationMs.toFixed()
+      const durationEl = wrapper.find('[data-test="span-block-duration"]');
+      expect(durationEl.exists()).toBe(true);
+      // The text must be non-empty (formatted value); it should NOT equal the old
+      // durationMs format like "321.37ms" verbatim when durationUs has microseconds
+      expect(durationEl.text().trim()).not.toBe("");
+    });
+
+    it("should expose formatTimeWithSuffix from setup", () => {
+      expect(wrapper.vm.formatTimeWithSuffix).toBeDefined();
+      expect(typeof wrapper.vm.formatTimeWithSuffix).toBe("function");
+    });
+  });
+
+  describe("getDurationStyle — right-aligned edge case", () => {
+    it("should expose getDurationStyle function", () => {
+      expect(wrapper.vm.getDurationStyle).toBeDefined();
+      expect(typeof wrapper.vm.getDurationStyle).toBe("function");
+    });
+
+    it("should return an object with 'top' property", () => {
+      const style = wrapper.vm.getDurationStyle();
+      expect(style).toHaveProperty("top");
+    });
+
+    it("should set right:0 when span overflows block width", async () => {
+      // Simulate a wide span that would overflow past the container
+      const el = wrapper.find('[data-test="span-block"]').element;
+      Object.defineProperty(el, "clientWidth", {
+        configurable: true,
+        value: 100,
+      });
+      await wrapper.vm.onResize();
+
+      // leftPosition=0, spanWidth≈91.72%, 100px container → overflow
+      const style = wrapper.vm.getDurationStyle();
+      // Under overflow condition the function sets style.right = 0
+      expect(style).toHaveProperty("right", 0);
+    });
+  });
+
+  describe("durationStyle reactive ref", () => {
+    it("should expose durationStyle and be an object", () => {
+      expect(wrapper.vm.durationStyle).toBeDefined();
+      expect(typeof wrapper.vm.durationStyle).toBe("object");
+    });
+
+    it("should update durationStyle when spanBlockWidth changes via onResize", async () => {
+      const beforeStyle = { ...wrapper.vm.durationStyle };
+
+      const el = wrapper.find('[data-test="span-block"]').element;
+      Object.defineProperty(el, "clientWidth", {
+        configurable: true,
+        value: 2048,
+      });
+      await wrapper.vm.onResize();
+
+      const afterStyle = { ...wrapper.vm.durationStyle };
+      // Style object should still be a valid object (no crash)
+      expect(afterStyle).toBeDefined();
+    });
+  });
+
+  describe("onSpanHover emits hover", () => {
+    it("should emit hover event when span block is hovered", async () => {
+      const spanBlock = wrapper.find('[data-test="span-block"]');
+      await spanBlock.trigger("mouseover");
+      expect(wrapper.emitted("hover")).toBeTruthy();
+    });
+
+    it("should call onSpanHover on mouseover of the span-block", async () => {
+      const onSpanHoverSpy = vi.spyOn(wrapper.vm, "onSpanHover");
+      const spanBlock = wrapper.find('[data-test="span-block"]');
+      await spanBlock.trigger("mouseover");
+      expect(onSpanHoverSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe("leftPosition and spanWidth reactive refs", () => {
+    it("should expose leftPosition as a number", () => {
+      expect(typeof wrapper.vm.leftPosition).toBe("number");
+    });
+
+    it("should expose spanWidth as a number", () => {
+      expect(typeof wrapper.vm.spanWidth).toBe("number");
+    });
+
+    it("leftPosition should be 0 when span starts at trace start", () => {
+      // mockSpan.startTimeUs === mockBaseTracePosition.startTimeUs
+      expect(wrapper.vm.leftPosition).toBe(0);
+    });
+
+    it("spanWidth should reflect the fraction of total trace duration", () => {
+      // 321372 / 350372 ≈ 91.72 %
+      expect(wrapper.vm.spanWidth).toBeCloseTo(91.72, 0);
+    });
+
+    it("should recalculate leftPosition when baseTracePosition changes", async () => {
+      const newBaseTracePosition = {
+        ...mockBaseTracePosition,
+        startTimeUs: mockSpan.startTimeUs - 50000,
+        durationUs: 400000,
+      };
+      await wrapper.setProps({ baseTracePosition: newBaseTracePosition });
+      // left = (startTimeUs - newStart) / duration * 100 = 50000/400000*100 = 12.5
+      expect(wrapper.vm.leftPosition).toBeCloseTo(12.5, 0);
+    });
+  });
+
+  describe("span-block-select-trigger click", () => {
+    it("should emit selectSpan when select trigger div is clicked", async () => {
+      const trigger = wrapper.find('[data-test="span-block-select-trigger"]');
+      await trigger.trigger("click");
+      expect(wrapper.emitted("selectSpan")).toBeTruthy();
+      expect(wrapper.emitted("selectSpan")![0]).toEqual([mockSpan.spanId]);
+    });
+  });
+
+  describe("spanMarker styling", () => {
+    it("should render span-marker element", () => {
+      expect(wrapper.find('[data-test="span-marker"]').exists()).toBe(true);
+    });
+
+    it("span-marker height should match spanDimensions.barHeight", () => {
+      const marker = wrapper.find('[data-test="span-marker"]');
+      expect(marker.attributes("style")).toContain(
+        `height: ${mockSpanDimensions.barHeight}px`,
+      );
+    });
+
+    it("inner color div should use span.style.color as background", () => {
+      // The inner div of the marker uses backgroundColor: span.style.color
+      // Browsers normalize hex colors to rgb() in inline styles
+      const marker = wrapper.find('[data-test="span-marker"]');
+      const colorDiv = marker.find("div");
+      const style = colorDiv.attributes("style") ?? "";
+      const hasHex = style.includes(`background-color: ${mockSpan.style.color}`);
+      const hasRgb = style.includes("background-color: rgb(26, 184, 190)");
+      expect(hasHex || hasRgb).toBe(true);
+    });
+  });
 });

@@ -29,13 +29,11 @@ use config::{
     meta::triggers::{Trigger, TriggerModule, TriggerStatus},
     utils::size::bytes_to_human_readable,
 };
-use log::LevelFilter;
 use openobserve::{
     cli::basic::cli,
     common::{
         infra::{self as common_infra, cluster},
         meta,
-        utils::zo_logger,
     },
     handler::{
         grpc::{
@@ -174,14 +172,6 @@ async fn main() -> Result<(), anyhow::Error> {
     let enable_tokio_console = false;
     let mut tracer_provider = None;
     let _guard: Option<WorkerGuard> = if enable_tokio_console {
-        None
-    } else if cfg.log.events_enabled {
-        let logger = zo_logger::ZoLogger {
-            sender: zo_logger::EVENT_SENDER.clone(),
-        };
-        log::set_boxed_logger(Box::new(logger)).map(|()| {
-            log::set_max_level(LevelFilter::from_str(&cfg.log.level).unwrap_or(LevelFilter::Info))
-        })?;
         None
     } else if cfg.common.should_create_span() {
         log::info!("OpenTelemetry tracing enabled - initializing tracer provider");
@@ -388,9 +378,6 @@ async fn main() -> Result<(), anyhow::Error> {
         .await
         .expect("Deferred jobs failed to init");
 
-    if cfg.log.events_enabled {
-        tokio::task::spawn(zo_logger::send_logs());
-    }
     if cfg.common.telemetry_enabled {
         tokio::task::spawn(async move {
             meta::telemetry::Telemetry::new()
@@ -463,10 +450,10 @@ async fn main() -> Result<(), anyhow::Error> {
     if !cfg.common.tracing_enabled
         && (cfg.common.tracing_search_enabled || cfg.common.search_inspector_enabled)
     {
-        if let Err(e) = init_http_server_without_tracing().await {
+        if let Err(e) = init_http_server(false).await {
             log::error!("HTTP server runs failed: {e}");
         }
-    } else if let Err(e) = init_http_server().await {
+    } else if let Err(e) = init_http_server(true).await {
         log::error!("HTTP server runs failed: {e}");
     }
     log::info!("HTTP server stopped");
@@ -698,7 +685,7 @@ async fn init_router_grpc_server(
     Ok(())
 }
 
-async fn init_http_server() -> Result<(), anyhow::Error> {
+async fn init_http_server(with_tracing: bool) -> Result<(), anyhow::Error> {
     let cfg = get_config();
 
     let haddr: SocketAddr = if cfg.http.ipv6_enabled {
@@ -720,79 +707,17 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
     log::info!("Starting {scheme} server at: {haddr}");
 
     // Build the router
-    let app = create_app_router()
+    let mut app = create_app_router()
         .layer(config::axum::middlewares::AccessLogLayer::new(
             config::axum::middlewares::get_http_access_log_format(),
         ))
         .layer(config::axum::middlewares::SlowLogLayer::new(
             cfg.limit.http_slow_log_threshold,
         ))
-        .layer(CompressionLayer::new())
-        .layer(TraceLayer::new_for_http());
-
-    if cfg.http.tls_enabled {
-        // TLS server using axum-server
-        let tls_config = axum_server::tls_rustls::RustlsConfig::from_pem_file(
-            &cfg.http.tls_cert_path,
-            &cfg.http.tls_key_path,
-        )
-        .await?;
-
-        let handle = axum_server::Handle::new();
-        let shutdown_timeout = cfg.limit.http_shutdown_timeout;
-
-        // Spawn task to handle shutdown signal
-        tokio::spawn({
-            let handle = handle.clone();
-            async move {
-                shutdown_signal().await;
-                handle
-                    .graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout as u64))));
-            }
-        });
-
-        axum_server::bind_rustls(haddr, tls_config)
-            .handle(handle)
-            .serve(app.into_make_service())
-            .await?;
-    } else {
-        // Non-TLS server
-        let listener = TcpListener::bind(haddr).await?;
-        axum::serve(listener, app.into_make_service())
-            .with_graceful_shutdown(shutdown_signal())
-            .await?;
-    }
-
-    Ok(())
-}
-
-async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-
-    let haddr: SocketAddr = if cfg.http.ipv6_enabled {
-        format!("[::]:{}", cfg.http.port).parse()?
-    } else {
-        let ip = if !cfg.http.addr.is_empty() {
-            cfg.http.addr.clone()
-        } else {
-            "0.0.0.0".to_string()
-        };
-        format!("{}:{}", ip, cfg.http.port).parse()?
-    };
-
-    let scheme = if cfg.http.tls_enabled {
-        "HTTPS"
-    } else {
-        "HTTP"
-    };
-    log::info!("Starting {scheme} server at: {haddr}");
-
-    // Build the router without tracing
-    let app = create_app_router()
-        .layer(config::axum::middlewares::SlowLogLayer::new(
-            cfg.limit.http_slow_log_threshold,
-        ))
         .layer(CompressionLayer::new());
+    if with_tracing {
+        app = app.layer(TraceLayer::new_for_http());
+    }
 
     if cfg.http.tls_enabled {
         // TLS server using axum-server

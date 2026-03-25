@@ -16,7 +16,7 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div>
-    <div class="q-mb-sm" style="font-weight: 600">
+    <div class="q-mb-sm" style="font-weight: 600; display: flex; align-items: center">
       <span>{{ t("dashboard.colorBySeriesTitle") }}</span>
       <q-btn
         no-caps
@@ -67,7 +67,7 @@
 import { defineComponent, inject, ref, computed, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ColorBySeriesPopUp from "./ColorBySeriesPopUp.vue";
 export default defineComponent({
   name: "ColorBySeries",

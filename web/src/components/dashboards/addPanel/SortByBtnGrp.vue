@@ -9,22 +9,32 @@
       data-test="dashboard-sort-by-item-clear"
     />
     <q-btn
-      :class="[fieldObj.sortBy === 'ASC' ? 'selected' : '', 'tw:px-2', 'custom-border']"
+      :class="[
+        fieldObj.sortBy === 'ASC' ? 'selected' : '',
+        'tw:px-2',
+        'custom-border',
+      ]"
       @click="updateSortOption('ASC')"
       data-test="dashboard-sort-by-item-asc"
-      ><AscSort
-    /></q-btn>
+    >
+      <AscSort />
+    </q-btn>
     <q-btn
-      :class="[fieldObj.sortBy === 'DESC' ? 'selected' : '', 'tw:px-2.5', 'el-border']"
+      :class="[
+        fieldObj.sortBy === 'DESC' ? 'selected' : '',
+        'tw:px-2.5',
+        'el-border',
+      ]"
       @click="updateSortOption('DESC')"
       data-test="dashboard-sort-by-item-desc"
-      ><DescSort
-    /></q-btn>
+    >
+      <DescSort />
+    </q-btn>
   </q-btn-group>
 </template>
 
 <script lang="ts">
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { defineComponent } from "vue";
 import AscSort from "@/components/icons/AscSort.vue";
 import DescSort from "@/components/icons/DescSort.vue";
@@ -69,12 +79,14 @@ export default defineComponent({
 .no-border {
   border: none !important;
 }
+
 .custom-border {
   border-top: 0px solid !important;
   border-bottom: 0px solid !important;
   border-left: 1px solid #d5d5d5 !important;
   border-right: 1px solid #d5d5d5 !important;
 }
+
 .q-btn {
   border: none;
 }
