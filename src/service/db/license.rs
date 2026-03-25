@@ -32,10 +32,7 @@ pub async fn update() -> Result<(), anyhow::Error> {
         )
         .await?;
 
-    o2_enterprise::enterprise::license::update_license(
-        crate::service::self_reporting::search::get_usage,
-    )
-    .await?;
+    o2_enterprise::enterprise::license::update_license().await?;
     Ok(())
 }
 
@@ -56,11 +53,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
 
         match ev {
-            Event::Put(_) => match o2_enterprise::enterprise::license::update_license(
-                crate::service::self_reporting::search::get_usage,
-            )
-            .await
-            {
+            Event::Put(_) => match o2_enterprise::enterprise::license::update_license().await {
                 Ok(_) => {
                     log::info!("successfully updated local license")
                 }
