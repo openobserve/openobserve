@@ -15,39 +15,40 @@ EMAIL = os.getenv('ZO_ROOT_USER_EMAIL', 'root@example.com')
 PASSWORD = os.getenv('ZO_ROOT_USER_PASSWORD', 'Complexpass#123')
 ORG_ID = os.getenv('ORGNAME', 'default')
 
-# Create session with Basic Auth
-api_session = requests.Session()
-basic_auth = base64.b64encode(f"{EMAIL}:{PASSWORD}".encode()).decode()
-api_session.headers.update({"Authorization": f"Basic {basic_auth}"})
-
-now = int(time.time() * 1000)
-
-# Minimal RUM performance data
-rum_performance = [
-    {
-        "date": now,
-        "type": "view",
-        "view": {
-            "id": "init-view-001",
-            "url": "http://localhost:8089/",
-            "name": "Initial View",
-            "loading_time": 100,
-            "time_spent": 1000
-        },
-        "service": "o2-sourcemap-test-app",
-        "version": "1.0.0-init",
-        "session": {
-            "id": "init-session-001",
-            "type": "user"
-        },
-        "application": {
-            "id": "o2-sourcemap-test-app"
-        }
-    }
-]
 
 def ingest_rum_performance():
     """Ingest RUM performance data to create _rumdata stream."""
+
+    # Create session with Basic Auth (moved inside function to avoid import-time side effects)
+    api_session = requests.Session()
+    basic_auth = base64.b64encode(f"{EMAIL}:{PASSWORD}".encode()).decode()
+    api_session.headers.update({"Authorization": f"Basic {basic_auth}"})
+
+    now = int(time.time() * 1000)
+
+    # Minimal RUM performance data
+    rum_performance = [
+        {
+            "date": now,
+            "type": "view",
+            "view": {
+                "id": "init-view-001",
+                "url": "http://localhost:8089/",
+                "name": "Initial View",
+                "loading_time": 100,
+                "time_spent": 1000
+            },
+            "service": "o2-sourcemap-test-app",
+            "version": "1.0.0-init",
+            "session": {
+                "id": "init-session-001",
+                "type": "user"
+            },
+            "application": {
+                "id": "o2-sourcemap-test-app"
+            }
+        }
+    ]
 
     print(f"Ingesting RUM performance data to {BASE_URL}")
 

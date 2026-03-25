@@ -438,32 +438,50 @@ def test_p2_deleted_sourcemaps_return_graceful_null(create_session, base_url, or
     """
     P2 - EDGE CASE TEST
     Resolve after deleting sourcemaps returns graceful null.
+
+    Uses separate service/version to avoid affecting shared state used by other tests.
     """
     session = create_session
     url = base_url
 
-    # Delete sourcemaps
+    # Use separate service/version to avoid touching shared sourcemaps
+    delete_test_service = 'o2-sourcemap-delete-test'
+    delete_test_env = 'testing'
+    delete_test_version = '1.0.0-delete-test'
+
+    # Upload sourcemaps with separate service/version
+    upload_sourcemaps(
+        session,
+        url,
+        org_id,
+        test_app_build['sourcemaps_zip'],
+        delete_test_service,
+        delete_test_env,
+        delete_test_version
+    )
+
+    # Delete these separate sourcemaps
     delete_response = delete_sourcemaps(
         session,
         url,
         org_id,
-        test_app_build['config']['service'],
-        test_app_build['config']['env'],
-        test_app_build['config']['version']
+        delete_test_service,
+        delete_test_env,
+        delete_test_version
     )
 
     assert delete_response.status_code == 200, f"Delete failed: {delete_response.status_code}"
 
-    # Try to resolve
+    # Try to resolve using deleted sourcemaps
     stacktrace = get_expected_stacktrace('type_error', test_app_build['hashes'])
 
     result = resolve_stacktrace(
         session,
         url,
         org_id,
-        test_app_build['config']['service'],
-        test_app_build['config']['env'],
-        test_app_build['config']['version'],
+        delete_test_service,
+        delete_test_env,
+        delete_test_version,
         stacktrace
     )
 
@@ -471,18 +489,7 @@ def test_p2_deleted_sourcemaps_return_graceful_null(create_session, base_url, or
     for frame in frames:
         assert frame['source_info'] is None, "Expected source_info to be null for deleted maps"
 
-    # Re-upload for subsequent tests
-    upload_sourcemaps(
-        session,
-        url,
-        org_id,
-        test_app_build['sourcemaps_zip'],
-        test_app_build['config']['service'],
-        test_app_build['config']['env'],
-        test_app_build['config']['version']
-    )
-
-    logger.info("✅ Deleted sourcemaps: Graceful null returned, re-uploaded for other tests")
+    logger.info("✅ Deleted sourcemaps: Graceful null returned (used separate service/version)")
 
 
 def test_p2_source_context_validation(create_session, base_url, org_id):

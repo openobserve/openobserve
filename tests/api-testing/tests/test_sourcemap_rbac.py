@@ -15,8 +15,14 @@ Prerequisites:
 
 Note:
 - Tests marked with @pytest.mark.skip for OSS CI (enterprise-only feature)
-- Some expected behaviors are TBD and will be discovered empirically
 - Tests must run serially due to shared module-scoped fixture
+
+IMPORTANT - Discovery Test Pattern:
+These tests use if/elif to accept both authorized and unauthorized responses.
+This is INTENTIONAL to discover actual RBAC behavior empirically, as the
+spec is not fully defined. Tests log the discovered behavior and document it.
+Once RBAC behavior is confirmed, update tests to assert specific expected codes.
+TODO: Update to strict assertions once RBAC enforcement is confirmed.
 """
 
 import pytest
