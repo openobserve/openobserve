@@ -2769,7 +2769,7 @@ export default defineComponent({
     const shouldMoveSqlToggleToMenu = computed(
       () => windowWidth.value <= 1280,
     );
-    const shouldMoveShareToMenu = computed(() => windowWidth.value <= 1100);
+    const shouldMoveShareToMenu = computed(() => windowWidth.value <= 1024);
     const vrlEditorNlpMode = ref(false); // Track VRL editor's AI mode
 
     const confirmUpdate = ref(false);
