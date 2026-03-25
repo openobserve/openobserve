@@ -357,11 +357,16 @@ test.describe("Traces Autocomplete Value Suggestions", () => {
             }
         }
 
-        // Only assert if we have records to check
+        // Assert isolation is valid - require at least some records to verify
         if (tracesRecords.length > 0 || logsRecords.length > 0) {
             expect(isolationValid, 'Stream type isolation should be maintained').toBe(true);
+            testLogger.info('✅ Stream type isolation verified with records');
         } else {
-            testLogger.info('No records to verify isolation - test passes by default');
+            // No records means we can't verify isolation - this is a test gap, not a pass
+            testLogger.warn('No records to verify isolation - consider running field expansion first');
+            // Still pass but with soft expectation to flag in reports
+            expect.soft(tracesRecords.length + logsRecords.length,
+                'Isolation test requires records - run field expansion tests first').toBeGreaterThan(0);
         }
 
         testLogger.info('Isolation test completed');

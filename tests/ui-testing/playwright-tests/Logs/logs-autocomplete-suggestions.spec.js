@@ -1222,6 +1222,10 @@ test.describe("Autocomplete Value Suggestions - Cold Start & TTL", () => {
                         db.close();
                         resolve();
                     };
+                    getReq.onerror = () => {
+                        db.close();
+                        reject(getReq.error);
+                    };
                 };
             });
         }, { key: `${orgName}|logs|${streamName}|${fieldName}` });
