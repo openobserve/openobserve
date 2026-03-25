@@ -11,29 +11,31 @@ Test Coverage:
 - Delete sourcemaps
 
 Prerequisites:
-- OpenObserve running on ZO_BASE_URL
+- OpenObserve ENTERPRISE build running on ZO_BASE_URL
 - RUM enabled (ZO_RUM_ENABLED=true)
-- Test app at tests/ui-testing/MD_Files/Sourcemaps/o2-sourcemap-test-app/
-- npm installed in test app directory
+- Static sourcemap fixtures at tests/api-testing/fixtures/sourcemaps/
 
-Note: Tests must run serially due to shared module-scoped fixture.
-Use: pytest test_sourcemap_api.py -v (no -n flag for parallel)
+Note:
+- Tests use pre-built sourcemaps (no build step required)
+- Tests marked with @pytest.mark.skip for OSS CI (enterprise-only feature)
+- Tests must run serially due to shared module-scoped fixture
+- Use: pytest test_sourcemap_api.py -v (no -n flag for parallel)
 """
 
 import pytest
 import logging
 
-# Mark all tests in this module to run serially
-pytestmark = pytest.mark.order(1)
+# Mark all tests in this module to run serially and skip in OSS (enterprise-only feature)
+pytestmark = [
+    pytest.mark.order(1),
+    pytest.mark.skip(reason="Sourcemaps is an enterprise feature and cannot be tested in CI with non-enterprise build")
+]
 from sourcemap_helpers import (
-    build_test_app,
-    serve_test_app,
-    stop_test_app_server,
+    load_static_sourcemaps,
     upload_sourcemaps,
     list_sourcemaps,
     delete_sourcemaps,
     resolve_stacktrace,
-    get_rum_token,
     get_expected_stacktrace,
     EXPECTED_RESOLUTIONS
 )
@@ -48,29 +50,26 @@ test_app_server = {}
 @pytest.fixture(scope="module", autouse=True)
 def setup_test_app(create_session, base_url, org_id):
     """
-    Build and serve test app once for all tests in this module.
+    Load static sourcemaps and upload once for all tests in this module.
 
     This fixture:
-    1. Fetches RUM token
-    2. Builds test app with updated SDK config
-    3. Serves app on port 8089
-    4. Uploads sourcemaps
-    5. Cleans up after all tests
+    1. Loads pre-built sourcemaps from fixtures
+    2. Uploads sourcemaps to API
+    3. Cleans up after all tests
+
+    Note: Uses static fixtures instead of building test app dynamically.
+    This allows tests to run in CI without Node.js/webpack dependencies.
     """
     global test_app_build, test_app_server
 
     session = create_session
     url = base_url
 
-    logger.info("========== SETUP: Building and serving test app ==========")
+    logger.info("========== SETUP: Loading static sourcemaps ==========")
 
     try:
-        # 1. Get RUM token
-        rum_token = get_rum_token(session, url, org_id)
-
-        # 2. Build test app
-        test_app_build = build_test_app(
-            rum_token,
+        # 1. Load static sourcemaps from fixtures
+        test_app_build = load_static_sourcemaps(
             config={
                 'service': 'o2-sourcemap-test-app',
                 'env': 'testing',
@@ -79,10 +78,10 @@ def setup_test_app(create_session, base_url, org_id):
             }
         )
 
-        # 3. Serve test app
-        test_app_server = serve_test_app(test_app_build['dist_path'], port=8089)
+        # 2. No test app server needed (using static fixtures)
+        test_app_server = None
 
-        # 4. Upload sourcemaps
+        # 3. Upload sourcemaps
         upload_sourcemaps(
             session,
             url,
@@ -115,11 +114,7 @@ def setup_test_app(create_session, base_url, org_id):
         except Exception as e:
             logger.warning(f"Cleanup: Failed to delete sourcemaps: {e}")
 
-        # Stop HTTP server
-        try:
-            stop_test_app_server(test_app_server)
-        except Exception as e:
-            logger.warning(f"Cleanup: Failed to stop server: {e}")
+        # Note: No HTTP server to stop (using static fixtures)
 
         logger.info("========== TEARDOWN COMPLETE ==========")
 

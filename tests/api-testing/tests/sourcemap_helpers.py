@@ -9,12 +9,66 @@ import subprocess
 import time
 import signal
 import logging
+import json
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Path to test app
+# Path to static fixtures (pre-built sourcemaps)
+FIXTURES_DIR = Path(__file__).parent.parent / "fixtures" / "sourcemaps"
+
+# Path to test app (deprecated - tests now use static fixtures)
 TEST_APP_DIR = Path(__file__).parent.parent.parent / "ui-testing" / "MD_Files" / "Sourcemaps" / "o2-sourcemap-test-app"
+
+
+def load_static_sourcemaps(config=None):
+    """
+    Load pre-built sourcemaps from fixtures directory.
+
+    This replaces the dynamic build approach - tests use static sourcemaps
+    committed to the repository instead of building the test app.
+
+    Args:
+        config (dict): Configuration options (service, env, version, org)
+
+    Returns:
+        dict: Build result compatible with test expectations
+    """
+    # Default config
+    if config is None:
+        config = {}
+
+    service = config.get('service', 'o2-sourcemap-test-app')
+    env = config.get('env', 'testing')
+    version = config.get('version', '1.0.0-static')
+    org = config.get('org', 'default')
+
+    logger.info(f"Loading static sourcemaps: service={service}, env={env}, version={version}")
+
+    # Load hashes from JSON
+    hashes_file = FIXTURES_DIR / "hashes.json"
+    if not hashes_file.exists():
+        raise FileNotFoundError(f"Hashes file not found: {hashes_file}")
+
+    with open(hashes_file, 'r') as f:
+        hashes = json.load(f)
+
+    logger.info(f"Loaded content hashes: {hashes}")
+
+    # Path to sourcemaps ZIP
+    sourcemaps_zip = FIXTURES_DIR / "sourcemaps.zip"
+    if not sourcemaps_zip.exists():
+        raise FileNotFoundError(f"Sourcemaps ZIP not found: {sourcemaps_zip}")
+
+    logger.info(f"Using sourcemaps ZIP: {sourcemaps_zip}")
+
+    return {
+        'app_dir': str(FIXTURES_DIR),
+        'dist_path': str(FIXTURES_DIR),
+        'hashes': hashes,
+        'sourcemaps_zip': str(sourcemaps_zip),
+        'config': {'service': service, 'env': env, 'version': version, 'org': org}
+    }
 
 
 def build_test_app(rum_token, config=None):

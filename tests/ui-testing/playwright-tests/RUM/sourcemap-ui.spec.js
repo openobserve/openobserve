@@ -12,19 +12,21 @@
  * - Stack trace display
  *
  * Prerequisites:
- * - OpenObserve running on localhost:5080
+ * - OpenObserve ENTERPRISE build running on localhost:5080
  * - RUM enabled
- * - Errors ingested (from test app or test_sourcemap_api.py)
+ * - RUM errors auto-ingested via global setup (rum-error-ingestion.js)
  *
- * Note: Pretty tab with resolved source code not yet implemented in UI.
- * These tests validate basic error display functionality.
+ * Note:
+ * - Tests tagged with @enterprise (enterprise-only feature)
+ * - Pretty tab with resolved source code not yet implemented in UI
+ * - These tests validate basic error display functionality
  */
 
 const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 
-test.describe("Sourcemap UI Tests", () => {
+test.describe("Sourcemap UI Tests", { tag: '@enterprise' }, () => {
   // Run tests in parallel for faster execution
   test.describe.configure({ mode: 'parallel' });
   let pm;

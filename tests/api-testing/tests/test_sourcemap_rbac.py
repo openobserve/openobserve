@@ -9,12 +9,14 @@ Test Coverage:
 - Admin role permissions (can delete)
 
 Prerequisites:
-- OpenObserve running on ZO_BASE_URL
+- OpenObserve ENTERPRISE build running on ZO_BASE_URL
 - Root user credentials for user creation
 - Sourcemaps uploaded (from test_sourcemap_api.py)
 
-Note: Some expected behaviors are TBD and will be discovered empirically.
-Tests must run serially due to shared module-scoped fixture.
+Note:
+- Tests marked with @pytest.mark.skip for OSS CI (enterprise-only feature)
+- Some expected behaviors are TBD and will be discovered empirically
+- Tests must run serially due to shared module-scoped fixture
 """
 
 import pytest
@@ -22,8 +24,11 @@ import logging
 import base64
 import requests
 
-# Mark all tests in this module to run serially
-pytestmark = pytest.mark.order(2)
+# Mark all tests in this module to run serially and skip in OSS (enterprise-only feature)
+pytestmark = [
+    pytest.mark.order(2),
+    pytest.mark.skip(reason="Sourcemaps is an enterprise feature and cannot be tested in CI with non-enterprise build")
+]
 
 logger = logging.getLogger(__name__)
 
