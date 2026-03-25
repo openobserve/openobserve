@@ -318,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="dashboardPanelData.data.config.table_pagination"
       :label="t('dashboard.pagination')"
       data-test="dashboard-config-show-pagination"
-      class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
+      class="tw-h-[36px] -tw-ml-2 o2-toggle-button-lg"
       size="lg"
       :class="
         store.state.theme === 'dark'
@@ -350,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-slot:label>
         <div class="row items-center all-pointer-events">
-          {{ t('dashboard.rowsPerPage') }}
+          {{ t("dashboard.rowsPerPage") }}
           <div>
             <q-icon
               class="q-ml-xs"
@@ -364,7 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               self="bottom middle"
               max-width="250px"
             >
-              {{ t('dashboard.rowsPerPageTooltip') }}
+              {{ t("dashboard.rowsPerPageTooltip") }}
             </q-tooltip>
           </div>
         </div>
