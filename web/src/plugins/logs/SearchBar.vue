@@ -2172,6 +2172,7 @@ import {
   timestampToTimezoneDate,
   b64EncodeUnicode,
   buildDateTimeObject,
+  needsSqlQuoting,
 } from "@/utils/zincutils";
 
 import savedviewsService from "@/services/saved_views";
@@ -4318,7 +4319,7 @@ export default defineComponent({
     function buildStreamQuery(stream, fieldList, isQuickMode) {
       const selectFields =
         fieldList.length > 0 && isQuickMode
-          ? fieldList.map((field) => `"${field}"`).join(",")
+          ? fieldList.map((field) => needsSqlQuoting(field) ? `"${field}"` : field).join(",")
           : "*";
 
       return QUERY_TEMPLATE.replace("[STREAM_NAME]", stream).replace(

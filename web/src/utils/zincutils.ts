@@ -1533,7 +1533,7 @@ const SQL_RESERVED_WORDS = new Set([
   "when", "then", "else", "end", "between", "like", "exists", "asc", "desc",
   "insert", "update", "delete", "create", "drop", "alter", "table", "index",
   "view", "into", "values", "set", "inner", "outer", "left", "right", "full",
-  "cross", "natural", "using", "count", "sum", "avg", "min", "max",
+  "cross", "natural", "using", "count", "sum", "avg", "min", "max", "user", "role"
 ]);
 
 export const needsSqlQuoting = (field: string): boolean => {

@@ -443,6 +443,7 @@ import {
   deepCopy,
   b64EncodeUnicode,
   addSpacesToOperators,
+  needsSqlQuoting,
 } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
@@ -1390,7 +1391,7 @@ export default defineComponent({
                 );
 
                 for (const [index, token] of parsedFilterQuery.entries()) {
-                  if (streamFieldNames.has(token)) {
+                  if (streamFieldNames.has(token) && needsSqlQuoting(token)) {
                     parsedFilterQuery[index] = `"${token}"`;
                   }
                 }
@@ -1447,7 +1448,7 @@ export default defineComponent({
                 searchObj.data.query = searchObj.data.query.replace(
                   /\[FIELD_LIST\]/g,
                   searchObj.data.stream.interestingFieldList
-                    .map((field: string) => `"${field}"`)
+                    .map((field: string) => needsSqlQuoting(field) ? `"${field}"` : field)
                     .join(","),
                 );
               } else {
@@ -1570,7 +1571,9 @@ export default defineComponent({
       );
 
       // Modify the query based on stream name
-      const newQuery = fnUnparsedSQL(parsedSQL).replace(/`/g, '"');
+      const newQuery = fnUnparsedSQL(parsedSQL).replace(/`([^`]+)`/g, (_, field) =>
+        needsSqlQuoting(field) ? `"${field}"` : field,
+      );
 
       if (newQuery) {
         searchObj.data.query = newQuery;
@@ -1661,7 +1664,7 @@ export default defineComponent({
         let field_list: string = "*";
         if (searchObj.data.stream.interestingFieldList.length > 0) {
           field_list = searchObj.data.stream.interestingFieldList
-            .map((field: string) => `"${field}"`)
+            .map((field: string) => needsSqlQuoting(field) ? `"${field}"` : field)
             .join(",");
         }
         if (searchObj.meta.sqlMode == true) {

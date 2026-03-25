@@ -183,6 +183,7 @@ import {
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { needsSqlQuoting } from "@/utils/zincutils";
 import { cloneDeep } from "lodash-es";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import searchService from "@/services/search";
@@ -678,8 +679,10 @@ export default defineComponent({
           /^([^=!<>\s()"]+)(\s*(?:!=|=)\s*.*)$/,
         );
         if (fieldAndOperator) {
-          searchObj.data.stream.addToFilter =
-            `"${fieldAndOperator[1]}"${fieldAndOperator[2]}`;
+          const fieldName = fieldAndOperator[1];
+          searchObj.data.stream.addToFilter = needsSqlQuoting(fieldName)
+            ? `"${fieldName}"${fieldAndOperator[2]}`
+            : `${fieldName}${fieldAndOperator[2]}`;
           return;
         }
       }
