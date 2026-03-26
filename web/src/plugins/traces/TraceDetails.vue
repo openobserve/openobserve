@@ -954,6 +954,8 @@ export default defineComponent({
         ? searchObj.data.editorValue + " and " + localEditorValue.value
         : localEditorValue.value;
       showFilterPopover.value = false;
+      localEditorValue.value = "";
+      areFiltersAdded.value = false;
       const query: any = cloneDeep(router.currentRoute.value.query);
       delete query.trace_id;
       if (searchObj.data.datetime.type === "relative") {

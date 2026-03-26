@@ -450,7 +450,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- JSON View -->
         <div
           v-if="attributesViewMode === 'json'"
-          class="tw:grow:1 tw:overflow-auto"
+          class="tw:grow-1 tw:overflow-auto"
         >
           <json-preview
             :value="attributesForDisplay"

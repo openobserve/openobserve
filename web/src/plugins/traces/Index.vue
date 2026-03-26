@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       parseInt(searchObj.data.errorCode) == 0 &&
                       !searchObj.loading
                     "
-                    data-test="traces-search-result-not-found-text"
+                    data-test="traces-search-error-text"
                     class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
                   >
                     <q-icon name="info" color="primary" size="md" />
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div
-                    data-test="traces-search-result-not-found-text"
+                    data-test="traces-search-not-started-text"
                     v-else-if="
                       isStreamSelected &&
                       !searchObj.searchApplied &&

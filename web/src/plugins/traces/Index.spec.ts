@@ -601,7 +601,7 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(
         wrapper
-          .find('[data-test="traces-search-result-not-found-text"]')
+          .find('[data-test="traces-search-not-started-text"]')
           .exists(),
       ).toBe(true);
     });
@@ -717,7 +717,7 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(
         wrapper
-          .find('[data-test="traces-search-result-not-found-text"]')
+          .find('[data-test="traces-search-error-text"]')
           .exists(),
       ).toBe(true);
     });
