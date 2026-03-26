@@ -643,6 +643,7 @@ export default defineComponent({
       initialLogsState,
       resetStreamData,
       fieldValues,
+      resetSearchError,
     } = searchState();
     const { getStreamList, updateGridColumns, extractFields } =
       useStreamFields();
@@ -973,6 +974,9 @@ export default defineComponent({
      * Handles validation, loading states, and error handling
      */
     const extractPatternsForCurrentQuery = async (clear_cache = false) => {
+      // Clear any stale error from previous logs search
+      resetSearchError();
+
       searchObj.meta.resultGrid.showPagination = false;
       searchObj.loading = true;
 

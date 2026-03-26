@@ -70,9 +70,6 @@ export const fillMissingValues = (
   const origin = new Date(Date.UTC(2001, 0, 1, 0, 0, 0, 0));
   const binnedDate = dateBin(interval, startTime, origin);
 
-  // Convert interval to milliseconds
-  const intervalMillis = interval * 1000;
-
   // Identify the time-based key
   const searchQueryDataFirstEntry = processedData[0];
 
@@ -84,10 +81,6 @@ export const fillMissingValues = (
   if (!timeBasedKey) {
     return JSON.parse(JSON.stringify(processedData));
   }
-
-  // Extract and process metaDataEndTime
-  const metaDataEndTime = metadata?.queries[0]?.endTime?.toString() ?? 0;
-  const endTime = new Date(parseInt(metaDataEndTime) / 1000);
 
   const xAxisKeysWithoutTimeStamp = xAxisKeys.filter(
     (key: any) => key !== timeBasedKey,
@@ -107,43 +100,90 @@ export const fillMissingValues = (
     processedData.map((d: any) => getDataValue(d, uniqueKey)),
   );
 
-  const filledData: any = [];
-  let currentTime = binnedDate;
-  // Create a map of existing data
+  const intervalMillis = interval * 1000;
+
+  // Use metadata endTime for the fill range end (user's selected end time).
+  const metaDataEndTime = metadata?.queries[0]?.endTime?.toString() ?? 0;
+  const endTime = new Date(parseInt(metaDataEndTime) / 1000);
+  const endTimeForFill = format(
+    toZonedTime(endTime, "UTC"),
+    "yyyy-MM-dd'T'HH:mm:ss",
+  );
+
+  // Use resultMetaData's last entry's time_offset.start_time as the fill start.
+  // Chunks arrive right-to-left (latest first), so the last entry has the earliest start.
+  const resultMetaStartTime =
+    resultMetaData?.[resultMetaData.length - 1]?.time_offset?.start_time ?? 0;
+  const fillStartTime = resultMetaStartTime
+    ? new Date(resultMetaStartTime / 1000)
+    : binnedDate;
+  const binnedFillStart = dateBin(interval, fillStartTime, origin);
+
+  // Build map from processedData for O(1) lookup
+  const hasBreakdown =
+    xAxisKeysWithoutTimeStamp.length > 0 ||
+    breakdownAxisKeysWithoutTimeStamp.length > 0;
   const searchDataMap = new Map();
   processedData?.forEach((d: any) => {
-    const key =
-      xAxisKeysWithoutTimeStamp.length > 0 ||
-      breakdownAxisKeysWithoutTimeStamp.length > 0
-        ? `${getDataValue(d, timeKey)}-${getDataValue(d, uniqueKey)}`
-        : `${getDataValue(d, timeKey)}`;
-
+    const key = hasBreakdown
+      ? `${getDataValue(d, timeKey)}-${getDataValue(d, uniqueKey)}`
+      : `${getDataValue(d, timeKey)}`;
     searchDataMap.set(key, d);
   });
 
-  while (currentTime <= endTime) {
-    const currentFormattedTime = format(
-      toZonedTime(currentTime, "UTC"),
+  const filledData: any = [];
+
+  // Anchor entry: single null at user's selected start time to pin ECharts x-axis.
+  // Skip if fill loop already covers user's start (all data has arrived).
+  if (binnedFillStart > binnedDate) {
+    const anchorFormattedTime = format(
+      toZonedTime(binnedDate, "UTC"),
       "yyyy-MM-dd'T'HH:mm:ss",
     );
+    if (!hasBreakdown) {
+      const anchorEntry: any = { [timeKey]: anchorFormattedTime };
+      keys.forEach((key) => {
+        if (key !== timeKey) anchorEntry[key] = noValueConfigOption;
+      });
+      filledData.push(anchorEntry);
+    } else {
+      uniqueXAxisValues.forEach((uniqueValue: any) => {
+        const anchorEntry: any = {
+          [timeKey]: anchorFormattedTime,
+          [uniqueKey]: uniqueValue,
+        };
+        keys.forEach((key) => {
+          if (key !== timeKey && key !== uniqueKey) {
+            anchorEntry[key] = noValueConfigOption;
+          }
+        });
+        filledData.push(anchorEntry);
+      });
+    }
+  }
 
-    if (
-      xAxisKeysWithoutTimeStamp.length === 0 &&
-      breakdownAxisKeysWithoutTimeStamp.length === 0
-    ) {
+  // Fill slot-by-slot in chronological order from binnedFillStart
+  // (resultMetaData start) to endTimeForFill (user's end).
+  // Only covers the range where streaming data has been received.
+  let currentTime = binnedFillStart;
+  let currentFormattedTime = format(
+    toZonedTime(currentTime, "UTC"),
+    "yyyy-MM-dd'T'HH:mm:ss",
+  );
+
+  while (currentFormattedTime <= endTimeForFill) {
+    if (!hasBreakdown) {
       const key = `${currentFormattedTime}`;
       const currentData = searchDataMap.get(key);
-      const nullEntry: any = {
-        [timeKey]: currentFormattedTime,
-        ...currentData,
-      };
-      if (!currentData) {
+      if (currentData) {
+        filledData.push(currentData);
+      } else {
+        const nullEntry: any = { [timeKey]: currentFormattedTime };
         keys.forEach((key) => {
           if (key !== timeKey) nullEntry[key] = noValueConfigOption;
         });
+        filledData.push(nullEntry);
       }
-
-      filledData.push(nullEntry);
     } else {
       uniqueXAxisValues.forEach((uniqueValue: any) => {
         const key = `${currentFormattedTime}-${uniqueValue}`;
@@ -155,19 +195,21 @@ export const fillMissingValues = (
             [timeKey]: currentFormattedTime,
             [uniqueKey]: uniqueValue,
           };
-
           keys.forEach((key) => {
             if (key !== timeKey && key !== uniqueKey) {
               nullEntry[key] = noValueConfigOption;
             }
           });
-
           filledData.push(nullEntry);
         }
       });
     }
 
     currentTime = new Date(currentTime.getTime() + intervalMillis);
+    currentFormattedTime = format(
+      toZonedTime(currentTime, "UTC"),
+      "yyyy-MM-dd'T'HH:mm:ss",
+    );
   }
 
   return filledData;
