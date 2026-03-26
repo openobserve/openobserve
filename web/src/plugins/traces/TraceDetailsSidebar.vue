@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </q-tabs>
     <q-separator style="width: 100%" />
-    <q-tab-panels v-model="activeTab" class="span_details_tab-panels tw:grow-1">
+    <q-tab-panels v-model="activeTab" class="span_details_tab-panels tw:grow">
       <!-- LLM Preview Tab Panel -->
       <q-tab-panel
         v-if="isLLMSpan"
@@ -450,7 +450,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- JSON View -->
         <div
           v-if="attributesViewMode === 'json'"
-          class="tw:grow-1 tw:overflow-auto"
+          class="tw:grow tw:overflow-auto"
         >
           <json-preview
             :value="attributesForDisplay"
