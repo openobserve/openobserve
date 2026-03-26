@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
+  <div class="tw:flex tw:flex-col tw:h-full">
     <div
       class="flex justify-start items-center tw:pl-3 tw:pr-2 tw:h-[2rem] tw:border-b tw:border-solid tw:border-b-[var(--o2-border-color)]"
       data-test="trace-details-sidebar-header"
@@ -255,16 +255,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <q-tab
-        name="tags"
-        :label="t('common.tags')"
+        name="attributes"
+        :label="t('common.attributes')"
         style="text-transform: capitalize"
-        data-test="trace-details-sidebar-tabs-tags"
-      />
-      <q-tab
-        name="process"
-        :label="t('common.process')"
-        style="text-transform: capitalize"
-        data-test="trace-details-sidebar-tabs-process"
+        data-test="trace-details-sidebar-tabs-attributes"
       />
       <q-tab
         name="events"
@@ -284,12 +278,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="text-transform: capitalize"
         data-test="trace-details-sidebar-tabs-links"
       />
-      <q-tab
-        name="attributes"
-        :label="t('common.attributes')"
-        style="text-transform: capitalize"
-        data-test="trace-details-sidebar-tabs-attributes"
-      />
       <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
       <q-tab
         v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
@@ -307,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </q-tabs>
     <q-separator style="width: 100%" />
-    <q-tab-panels v-model="activeTab" class="span_details_tab-panels">
+    <q-tab-panels v-model="activeTab" class="span_details_tab-panels tw:grow-1">
       <!-- LLM Preview Tab Panel -->
       <q-tab-panel
         v-if="isLLMSpan"
@@ -426,250 +414,149 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-tab-panel>
 
-      <q-tab-panel name="tags">
-        <q-table
-          ref="qTable"
-          data-test="schema-log-stream-field-mapping-table"
-          :rows="getTagRows"
-          :columns="tagColumns"
-          :row-key="(row) => 'tr_' + row.name"
-          :rows-per-page-options="[0]"
-          class="q-table trace-detail-tab-table o2-quasar-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
+      <q-tab-panel
+        name="attributes"
+        class="q-pa-none tw:flex tw:flex-col tw:overflow-hidden"
+      >
+        <!-- View mode toggle toolbar -->
+        <div class="tw:flex tw:items-center tw:justify-start tw:pb-[0.3rem]">
+          <q-btn-toggle
+            v-model="attributesViewMode"
+            no-caps
+            toggle-color="primary"
+            text-color="primary"
+            bordered
+            class="tw:rounded!"
+            :options="[
+              {
+                value: 'json',
+                label: 'JSON',
+                attrs: {
+                  class:
+                    'tw:px-[0.5rem]! tw:py-[0.1rem]! tw:min-h-auto! tw:text-[0.7rem]! tw:tracking-[0.03rem]',
+                },
+              },
+              {
+                value: 'table',
+                label: 'Table',
+                attrs: {
+                  class:
+                    'tw:px-[0.5rem]! tw:min-h-auto! tw:py-[0.1rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]',
+                },
+              },
+            ]"
+          />
+        </div>
+        <!-- JSON View -->
+        <div
+          v-if="attributesViewMode === 'json'"
+          class="tw:grow:1 tw:overflow-auto"
+        >
+          <json-preview
+            :value="attributesForDisplay"
+            :highlight-query="searchQuery"
+            data-test="trace-details-sidebar-attributes-table"
+          >
+            <template #field-dropdown="{ field, value: fieldValue }">
+              <q-item
+                v-for="action in filterActions"
+                :key="action.operator"
+                clickable
+                v-close-popup
+                @click.stop="
+                  $emit('apply-filter-immediately', {
+                    field,
+                    value: fieldValue,
+                    operator: action.operator,
+                  })
+                "
+              >
+                <q-item-section>
+                  <q-item-label>
+                    <q-btn
+                      size="0.375rem"
+                      round
+                      class="tw:mr-[0.25rem]! pointer"
+                    >
+                      <q-icon
+                        color="currentColor"
+                        class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
+                      >
+                        <component :is="action.iconComponent" />
+                      </q-icon>
+                    </q-btn>
+                    <span class="tw:text-[0.85rem]!">{{
+                      $t("traces.applyAndSearch")
+                    }}</span>
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
+            </template>
+          </json-preview>
+        </div>
+        <!-- Table View -->
+        <div
+          v-else
+          class="tw:flex-1 tw:overflow-hidden tab-content-dynamic-height tw:border-1 tw:border-solid tw:border-[var(--o2-border-color)]"
           :class="
             isLLMSpan && llmMetrics && span.llm_model_name
               ? 'tab-content-with-llm-metrics'
               : 'tab-content-without-llm-metrics'
           "
-          id="schemaFieldList"
-          dense
+          data-test="trace-details-sidebar-attributes-tenstack-table"
         >
-          <template v-slot:body-cell="props">
-            <q-td
-              class="text-left tw:text-[0.85rem]! cell-with-max-height"
-              :class="[
-                props.col.name === 'field'
-                  ? 'tw:text-[var(--o2-json-key)]'
-                  : '',
-                props.col.name === 'value' ? 'filter-cell' : '',
-              ]"
-            >
-              <div v-if="props.col.name === 'value'" class="cell-content">
-                <div class="tw:w-fit! tw:inline-block">
-                  <q-btn-dropdown
-                    data-test="log-details-include-exclude-field-btn"
-                    size="0.5rem"
-                    flat
-                    outlined
-                    filled
-                    dense
-                    class="pointer tw:pl-0! tw:text-[var(--o2-text-4)]!"
-                    :name="'img:' + getImageURL('images/common/add_icon.svg')"
-                    aria-label="Add icon"
+          <TenstackTable
+            :rows="attributesTableRows"
+            :columns="attributesTableColumns"
+            :enable-row-expand="false"
+            :enable-text-highlight="false"
+            :enable-status-bar="false"
+            :default-columns="false"
+            :enable-column-reorder="false"
+            :row-height="28"
+            :enable-ai-context-button="false"
+          >
+            <template #cell-value="{ item }">
+              <AttributeValueCell :field="item.field" :value="item.value">
+                <template #dropdown="{ field, value: fieldValue }">
+                  <q-item
+                    v-for="action in filterActions"
+                    :key="action.operator"
+                    clickable
+                    v-close-popup
+                    @click.stop="
+                      $emit('apply-filter-immediately', {
+                        field,
+                        value: fieldValue,
+                        operator: action.operator,
+                      })
+                    "
                   >
-                    <q-list class="logs-table-list tw:p-[0.25rem]!">
-                      <q-item
-                        clickable
-                        v-close-popup
-                        @click.stop="
-                          $emit('apply-filter-immediately', {
-                            field: props.row.field,
-                            value: props.row.value,
-                            operator: '=',
-                          })
-                        "
-                        class="tw:rounded"
-                      >
-                        <q-item-section>
-                          <q-item-label
-                            ><q-btn
-                              title="Apply & Search (=)"
-                              size="0.375rem"
-                              round
-                              class="tw:mr-[0.25rem]! pointer"
-                            >
-                              <q-icon
-                                color="currentColor"
-                                class="tw:w-[0.75rem]! tw:h-[0.75rem]!"
-                              >
-                                <EqualIcon></EqualIcon>
-                              </q-icon> </q-btn
-                            ><span class="tw:text-[0.85rem]!"
-                              >Apply & Search</span
-                            ></q-item-label
+                    <q-item-section>
+                      <q-item-label>
+                        <q-btn
+                          size="0.375rem"
+                          round
+                          class="tw:mr-[0.25rem]! pointer"
+                        >
+                          <q-icon
+                            color="currentColor"
+                            class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
                           >
-                        </q-item-section>
-                      </q-item>
-                      <q-item
-                        clickable
-                        v-close-popup
-                        @click.stop="
-                          $emit('apply-filter-immediately', {
-                            field: props.row.field,
-                            value: props.row.value,
-                            operator: '!=',
-                          })
-                        "
-                        class="tw:rounded"
-                      >
-                        <q-item-section>
-                          <q-item-label
-                            ><q-btn
-                              title="Apply & Search (≠)"
-                              size="0.375rem"
-                              round
-                              class="pointer"
-                            >
-                              <q-icon color="currentColor">
-                                <NotEqualIcon
-                                  class="tw:w-[0.75rem]! tw:h-[0.75rem]!"
-                                ></NotEqualIcon>
-                              </q-icon> </q-btn
-                            ><span class="tw:text-[0.85rem]!">
-                              Apply & Search</span
-                            ></q-item-label
-                          >
-                        </q-item-section>
-                      </q-item>
-                      <q-separator v-if="showPendingFilter" />
-                      <q-item
-                        v-if="showPendingFilter"
-                        clickable
-                        v-close-popup
-                        @click.stop="
-                          $emit('add-filter', {
-                            field: props.row.field,
-                            value: props.row.value,
-                            operator: '=',
-                          })
-                        "
-                        class="tw:rounded"
-                      >
-                        <q-item-section>
-                          <q-item-label
-                            ><q-btn
-                              title="Add to pending"
-                              size="6px"
-                              round
-                              class="tw:mr-[0.25rem]! pointer"
-                            >
-                              <q-icon color="currentColor">
-                                <EqualIcon
-                                  class="tw:w-[0.65rem]! tw:h-[0.65rem]!"
-                                ></EqualIcon>
-                              </q-icon> </q-btn
-                            ><span class="tw:text-[0.85rem]!"
-                              >Add to pending</span
-                            ></q-item-label
-                          >
-                        </q-item-section>
-                      </q-item>
-                      <q-item
-                        v-if="showPendingFilter"
-                        clickable
-                        v-close-popup
-                        @click.stop="
-                          $emit('add-filter', {
-                            field: props.row.field,
-                            value: props.row.value,
-                            operator: '!=',
-                          })
-                        "
-                        class="tw:rounded"
-                      >
-                        <q-item-section>
-                          <q-item-label
-                            ><q-btn
-                              title="Add to pending"
-                              size="6px"
-                              round
-                              class="tw:mr-[0.25rem]! pointer"
-                            >
-                              <q-icon color="currentColor">
-                                <NotEqualIcon
-                                  class="tw:w-[0.65rem]! tw:h-[0.65rem]!"
-                                ></NotEqualIcon>
-                              </q-icon> </q-btn
-                            ><span class="tw:text-[0.85rem]!"
-                              >Add to pending</span
-                            ></q-item-label
-                          >
-                        </q-item-section>
-                      </q-item>
-                    </q-list>
-                  </q-btn-dropdown>
-                </div>
-                <span
-                  class="tw:min-w-0 tw:inline! tw:w-auto!"
-                  v-html="
-                    highlightTextMatch(props.row[props.col.name], searchQuery)
-                  "
-                />
-              </div>
-              <div v-else class="cell-content">
-                <span>{{ props.row[props.col.name] }}</span>
-              </div>
-            </q-td>
-          </template>
-        </q-table>
-      </q-tab-panel>
-      <q-tab-panel name="process">
-        <q-table
-          ref="qTable"
-          data-test="trace-details-sidebar-process-table"
-          :rows="getProcessRows"
-          :columns="processColumns"
-          :row-key="(row) => 'tr_' + row.name"
-          :rows-per-page-options="[0]"
-          class="q-table o2-quasar-table trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
-          :class="
-            isLLMSpan && llmMetrics && span.llm_model_name
-              ? 'tab-content-with-llm-metrics'
-              : 'tab-content-without-llm-metrics'
-          "
-          dense
-        >
-          <template v-slot:body-cell="props">
-            <q-td
-              class="text-left tw:text-[0.85rem]! cell-with-max-height"
-              :class="
-                props.col.name === 'field' ? 'tw:text-[var(--o2-json-key)]' : ''
-              "
-            >
-              <div class="cell-content">
-                <span
-                  v-if="props.col.name === 'value'"
-                  v-html="
-                    highlightTextMatch(props.row[props.col.name], searchQuery)
-                  "
-                />
-                <span v-else>
-                  {{ props.row[props.col.name] }}
-                </span>
-              </div>
-            </q-td>
-          </template>
-        </q-table>
-      </q-tab-panel>
-      <q-tab-panel name="attributes" class="q-pa-none">
-        <q-btn
-          :label="t('common.copyToClipboard')"
-          dense
-          size="sm"
-          no-caps
-          class="tw:mb-[0.375rem] q-px-sm copy-log-btn q-mr-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:font-normal"
-          icon="content_copy"
-          @click="copyAttributesToClipboard"
-        />
-        <pre
-          class="attr-text tab-content-dynamic-height-with-header"
-          :class="
-            isLLMSpan && llmMetrics && span.llm_model_name
-              ? 'tab-content-with-llm-metrics'
-              : 'tab-content-without-llm-metrics'
-          "
-          v-html="highlightedAttributes"
-          data-test="trace-details-sidebar-attributes-table"
-        ></pre>
+                            <component :is="action.iconComponent" />
+                          </q-icon>
+                        </q-btn>
+                        <span class="tw:text-[0.85rem]!">{{
+                          $t("traces.applyAndSearch")
+                        }}</span>
+                      </q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </template>
+              </AttributeValueCell>
+            </template>
+          </TenstackTable>
+        </div>
       </q-tab-panel>
       <q-tab-panel
         name="events"
@@ -945,7 +832,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-tab-panel>
 
       <!-- Correlated Logs Tab Panel -->
-      <q-tab-panel name="correlated-logs" class="q-pa-none full-height">
+      <q-tab-panel
+        name="correlated-logs"
+        class="q-pa-none full-height traces-correlated-logs-container"
+      >
         <CorrelatedLogsTable
           v-if="correlationProps"
           :service-name="correlationProps.serviceName"
@@ -993,7 +883,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-tab-panel>
 
       <!-- Correlated Metrics Tab Panel -->
-      <q-tab-panel name="correlated-metrics" class="q-pa-none full-height">
+      <q-tab-panel
+        name="correlated-metrics"
+        class="q-pa-none full-height traces-correlated-metrics-container"
+      >
         <TelemetryCorrelationDashboard
           v-if="correlationProps"
           mode="embedded-tabs"
@@ -1010,7 +903,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :fts-fields="correlationProps.ftsFields"
           :time-range="correlationProps.timeRange"
           :hide-dimension-filters="true"
-          @close="activeTab = 'tags'"
+          @close="activeTab = 'attributes'"
         />
         <!-- Loading/Empty state when no data -->
         <div
@@ -1061,6 +954,7 @@ import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
 import { onMounted, onUnmounted, defineAsyncComponent, nextTick } from "vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
+import JsonPreview from "@/components/JsonPreview.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
@@ -1080,6 +974,7 @@ import DOMPurify from "dompurify";
 import { escapeHtml } from "@/utils/html";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import AttributeValueCell from "@/components/AttributeValueCell.vue";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1111,6 +1006,7 @@ export default defineComponent({
   },
   components: {
     LogsHighLighting,
+    JsonPreview,
     LLMContentRenderer,
     TenstackTable,
     CorrelatedLogsTable,
@@ -1119,6 +1015,7 @@ export default defineComponent({
     ),
     EqualIcon,
     NotEqualIcon,
+    AttributeValueCell,
   },
   emits: [
     "close",
@@ -1127,14 +1024,15 @@ export default defineComponent({
     "open-trace",
     "show-correlation",
     "add-filter",
+    "apply-filter-immediately",
+    "add-field-to-table",
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
     // Check if this is an LLM span to set default tab
     const isLLMSpan = computed(() => isLLMTrace(props.span));
-    const activeTab = ref(isLLMSpan.value ? "preview" : "tags");
+    const activeTab = ref(isLLMSpan.value ? "preview" : "attributes");
     const tags: Ref<{ [key: string]: string }> = ref({});
-    const processes: Ref<{ [key: string]: string }> = ref({});
 
     // Ref for fullscreen container (parent container with both Input and Output)
     const ioContainerRef = ref<HTMLElement | null>(null);
@@ -1223,54 +1121,57 @@ export default defineComponent({
       return lines.join("\n");
     };
 
-    const highlightedAttributes = computed(() => {
-      const colors = themeColors;
-      const attrs = spanDetails.value.attrs;
-      // remove llm input and output
+    const filterActions = [
+      { operator: "=" as const, iconComponent: EqualIcon },
+      { operator: "!=" as const, iconComponent: NotEqualIcon },
+    ];
+
+    const attributesForDisplay = computed(() => {
+      const attrs = { ...spanDetails.value.attrs };
       delete attrs.llm_input;
       delete attrs.llm_output;
-      const query = props.searchQuery;
-
-      const formatValue = (value: any): string => {
-        if (value === null) {
-          return `<span style="color: ${colors.nullValue};">${highlightTextMatch("null", query)}</span>`;
-        } else if (typeof value === "boolean") {
-          return `<span style="color: ${colors.booleanValue};">${highlightTextMatch(String(value), query)}</span>`;
-        } else if (typeof value === "number") {
-          return `<span style="color: ${colors.numberValue};">${highlightTextMatch(String(value), query)}</span>`;
-        } else if (typeof value === "string") {
-          return `<span style="color: ${colors.stringValue};">"${highlightTextMatch(value, query)}"</span>`;
-        } else if (typeof value === "object") {
-          return `<span style="color: ${colors.objectValue};">"${highlightTextMatch(JSON.stringify(value), query)}"</span>`;
-        }
-        return highlightTextMatch(String(value), query);
-      };
-
-      const lines: string[] = [];
-      lines.push('<span style="color: #9ca3af;">{</span>');
-
-      const entries = Object.entries(attrs);
-      entries.forEach(([key, value], index) => {
-        const keyHtml = `<span style="color: ${colors.key};">"${escapeHtml(key)}"</span>`;
-        const valueHtml = formatValue(value);
-        const comma =
-          index < entries.length - 1
-            ? '<span style="color: #9ca3af;">,</span>'
-            : "";
-        lines.push(
-          `  ${keyHtml}<span style="color: #9ca3af;">:</span> ${valueHtml}${comma}`,
-        );
-      });
-
-      lines.push('<span style="color: #9ca3af;">}</span>');
-      return lines.join("\n");
+      return attrs;
     });
+
+    const attributesViewMode = ref<"json" | "table">("json");
+
+    const attributesTableColumns = [
+      {
+        accessorKey: "field",
+        id: "field",
+        header: "Field",
+        size: 200,
+        meta: {
+          headerClass:
+            "tw:border-b tw:border-r tw:border-b-[var(--o2-border-color)]",
+          cellClass:
+            "tw:border-r tw:border-b-[var(--o2-border-color)] tw:text-[var(--o2-json-key)]",
+        },
+      },
+      {
+        accessorKey: "value",
+        id: "value",
+        header: "Value",
+        size: 400,
+        meta: {
+          slot: true,
+          headerClass: "tw:border-b tw:border-b-[var(--o2-border-color)]",
+          cellClass: "tw:border-b-[var(--o2-border-color)] tw:p-0!",
+        },
+      },
+    ];
+
+    const attributesTableRows = computed(() =>
+      Object.entries(attributesForDisplay.value).map(([key, value]) => ({
+        field: key,
+        value: typeof value === "string" ? value : JSON.stringify(value),
+      })),
+    );
 
     watch(
       () => props.span,
       () => {
         tags.value = {};
-        processes.value = {};
         spanDetails.value = getFormattedSpanDetails();
       },
       {
@@ -1297,30 +1198,6 @@ export default defineComponent({
 
     const getTagRows = computed(() => {
       return Object.entries(tags.value).map(([key, value]) => ({
-        field: key,
-        value: typeof value === "string" ? value : JSON.stringify(value),
-      }));
-    });
-
-    const processColumns = [
-      {
-        name: "field",
-        label: "Field",
-        field: "field",
-        align: "left" as const,
-        headerClasses: "tw:text-left!",
-      },
-      {
-        name: "value",
-        label: "Value",
-        field: "value",
-        align: "left" as const,
-        headerClasses: "tw:text-left!",
-      },
-    ];
-
-    const getProcessRows = computed(() => {
-      return Object.entries(processes.value).map(([key, value]) => ({
         field: key,
         value: typeof value === "string" ? value : JSON.stringify(value),
       }));
@@ -1594,7 +1471,6 @@ export default defineComponent({
       () => props.span,
       () => {
         tags.value = {};
-        processes.value = {};
         Object.keys(props.span).forEach((key: string) => {
           if (!span_details.has(key)) {
             tags.value[key] =
@@ -1603,12 +1479,6 @@ export default defineComponent({
                 : props.span[key];
           }
         });
-
-        processes.value["service_name"] = props.span["service_name"];
-        processes.value["service_service_instance"] =
-          props.span["service_service_instance"];
-        processes.value["service_service_version"] =
-          props.span["service_service_version"];
       },
       {
         deep: true,
@@ -2202,6 +2072,7 @@ export default defineComponent({
     return {
       t,
       activeTab,
+      filterActions,
       closeSidebar,
       eventColumns,
       expandedEvents,
@@ -2214,7 +2085,6 @@ export default defineComponent({
       spanDetails,
       store,
       tags,
-      processes,
       formatStackTrace,
       formatExceptionMessage,
       copyStackTrace,
@@ -2231,9 +2101,10 @@ export default defineComponent({
       linkColumns,
       getTagRows,
       tagColumns,
-      processColumns,
-      getProcessRows,
-      highlightedAttributes,
+      attributesForDisplay,
+      attributesViewMode,
+      attributesTableColumns,
+      attributesTableRows,
       highlightTextMatch,
       highlightedJSON,
       // Correlation
@@ -2261,6 +2132,24 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.attributes-view-toggle {
+  :deep(.q-btn) {
+    padding: 0.25rem 0.5rem;
+  }
+}
+
+:deep(.traces-correlated-metrics-container) {
+  .q-splitter--vertical .q-splitter__separator {
+    height: 100% !important;
+  }
+}
+
+:deep(.traces-correlated-logs-container) {
+  .logs-table-container .container {
+    height: 100% !important;
+  }
+}
+
 .trace-detail-tab-table {
   table {
     border-collapse: separate;
@@ -2471,8 +2360,7 @@ export default defineComponent({
 }
 .span_details_tab-panels {
   height: calc(100% - 6rem);
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 .header_bg {
@@ -2953,6 +2841,9 @@ body.body--dark {
 .span_details_tab-panels {
   .q-tab-panel {
     padding: 8px 8px 8px 8px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    height: 100%;
   }
 }
 

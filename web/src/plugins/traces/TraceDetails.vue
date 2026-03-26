@@ -139,7 +139,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <q-icon name="hub" size="14px" />
               <span data-test="span-count-text"
-                >{{ effectiveSpanList.length }} {{ t("traces.spansLabel") }}</span
+                >{{ effectiveSpanList.length }}
+                {{ t("traces.spansLabel") }}</span
               >
             </div>
 
@@ -949,7 +950,9 @@ export default defineComponent({
     };
 
     const applyAndViewTraces = () => {
-      searchObj.data.editorValue = localEditorValue.value;
+      searchObj.data.editorValue = searchObj.data.editorValue
+        ? searchObj.data.editorValue + " and " + localEditorValue.value
+        : localEditorValue.value;
       showFilterPopover.value = false;
       const query: any = cloneDeep(router.currentRoute.value.query);
       delete query.trace_id;
@@ -959,7 +962,7 @@ export default defineComponent({
         query.from = searchObj.data.datetime.startTime.toString();
         query.to = searchObj.data.datetime.endTime.toString();
       }
-      query.query = b64EncodeUnicode(localEditorValue.value);
+      query.query = b64EncodeUnicode(searchObj.data.editorValue);
       query["run-query"] = "true";
       router.push({ name: "traces", query });
     };
