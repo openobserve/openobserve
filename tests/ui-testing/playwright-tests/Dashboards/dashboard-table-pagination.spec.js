@@ -495,9 +495,16 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
-    // Check that row count text is displayed (format: "X-Y of Z")
+    // Wait for row count text to show actual data in format "X-Y of Z"
+    // (After re-apply, rows load asynchronously so we poll until the text matches)
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector('[data-test="dashboard-table-row-count"]');
+        return el && /\d+-\d+\s+of\s+\d+/.test(el.textContent ?? "");
+      },
+      { timeout: 15000 }
+    );
     const rowCount = page.locator('[data-test="dashboard-table-row-count"]');
-    await rowCount.waitFor({ state: "visible" });
     const bottomText = await rowCount.textContent();
 
     // Verify the text contains the expected format (e.g., "1-10 of 100" or similar)
@@ -1162,16 +1169,23 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     expect(hasRows, 'PromQL query "up" must return data rows for pagination test - check metrics ingestion').toBe(true);
 
     // Wait for the table bottom container which holds all pagination controls
-    const tableBottom = tablePanel.locator('[data-test="dashboard-table-pagination"]');
+    // (PromQL with legend uses a custom bottom slot that also has this data-test)
+    const tableBottom = page.locator('[data-test="dashboard-table-pagination"]');
     await tableBottom.waitFor({ state: "visible", timeout: 15000 });
 
     // Verify "Records per page" text is visible
     const rowsPerPageText = page.locator('[data-test="dashboard-table-rows-per-page-label"]');
     await expect(rowsPerPageText).toBeVisible({ timeout: 10000 });
 
-    // Verify the record count display shows correct format (e.g., "1-10 of 99")
+    // Wait for row count to show actual data in format "X-Y of Z"
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector('[data-test="dashboard-table-row-count"]');
+        return el && /\d+-\d+\s+of\s+\d+/.test(el.textContent ?? "");
+      },
+      { timeout: 15000 }
+    );
     const paginationInfo = page.locator('[data-test="dashboard-table-row-count"]');
-    await expect(paginationInfo).toBeVisible({ timeout: 5000 });
 
     // Verify pagination shows correct format (e.g., "1-10 of X" or "1-N of N" if fewer records)
     const paginationText = await paginationInfo.textContent();
