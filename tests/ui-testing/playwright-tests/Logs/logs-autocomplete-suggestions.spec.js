@@ -369,8 +369,6 @@ test.describe("Autocomplete Value Suggestions", () => {
 
     // =========================================================================
     // TEST: Value Capture from Search Results
-    // KNOWN BUG: captureFromSearchHits() not writing to IndexedDB
-    // See: schemaFields filtering issue in useStreamFields.ts
     // =========================================================================
 
     test("should capture field values to IndexedDB when running a search query", {
