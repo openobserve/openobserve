@@ -1209,20 +1209,16 @@ export default defineComponent({
     const isValid = (onlyChart = false, isFieldsValidationRequired = true) => {
       const errors = errorData.errors;
       errors.splice(0);
-      const dashboardData = dashboardPanelData;
-
-      // check if name of panel is there
-      if (!onlyChart) {
-        if (
-          dashboardData.data.title == null ||
-          dashboardData.data.title.trim() == ""
-        ) {
-          errors.push("Name of Panel is required");
-        }
-      }
 
       // will push errors in errors array
-      validatePanel(errors, isFieldsValidationRequired);
+      // checkPanelName=true on Save (!onlyChart), false on Apply
+      validatePanel(errors, isFieldsValidationRequired, !onlyChart);
+
+      // Also push errors to PanelEditor's errorData so they show in error list UI
+      if (panelEditorRef.value?.errorData?.errors && errors.length > 0) {
+        panelEditorRef.value.errorData.errors.splice(0);
+        panelEditorRef.value.errorData.errors.push(...errors);
+      }
 
       if (errors.length) {
         showErrorNotification(

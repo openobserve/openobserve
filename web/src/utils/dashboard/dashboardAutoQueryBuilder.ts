@@ -1,5 +1,5 @@
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
-import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
+import functionValidation from "@schemas/functions/functionValidation.json";
 
 export function buildSQLQueryFromInput(
   fields: any,
