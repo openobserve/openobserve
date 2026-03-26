@@ -2308,10 +2308,15 @@ export default defineComponent({
       showTraceDetails.value = true;
     };
 
-    const updateSelectedSpan = (spanId: string) => {
+    const updateSelectedSpan = (
+      spanId: string,
+      swichToWaterfall: boolean = false,
+    ) => {
       showTraceDetails.value = false;
       searchObj.data.traceDetails.showSpanDetails = true;
       searchObj.data.traceDetails.selectedSpanId = spanId;
+      if (swichToWaterfall && activeTab.value !== "waterfall")
+        activeTab.value = "waterfall";
 
       // Emit event for embedded mode
       if (props.mode === "embedded") {
