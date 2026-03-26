@@ -288,7 +288,7 @@ test.describe("Traces Autocomplete Value Suggestions", () => {
             const hasNoResults = await pm.tracesPage.isNoResultsVisible();
             if (hasNoResults) {
                 testLogger.info('No trace data available - skipping autocomplete test');
-                return;
+                test.skip(true, 'No trace data available in test environment');
             }
             testLogger.info('Search did not complete - test precondition not met');
             expect.soft(hasResults, 'Expected trace results for autocomplete test').toBe(true);
