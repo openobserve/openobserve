@@ -2776,7 +2776,9 @@
     "comingSoon": "即将推出...",
     "fetchingTrace": "正在获取您的踪迹。",
     "traceFilters": "追踪过滤器",
-    "showTraces": "显示痕迹"
+    "showTraces": "显示痕迹",
+    "applyAndSearch": "申请并搜索",
+    "addToTable": "添加到表格"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",

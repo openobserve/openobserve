@@ -2792,7 +2792,9 @@
     "comingSoon": "近日公開予定...",
     "fetchingTrace": "トレースを取得しています。",
     "traceFilters": "トレースフィルター",
-    "showTraces": "トレースを表示"
+    "showTraces": "トレースを表示",
+    "applyAndSearch": "応募と検索",
+    "addToTable": "テーブルに追加"
   },
   "actions": {
     "testAction": "アクションをテスト",

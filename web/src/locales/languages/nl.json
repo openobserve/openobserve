@@ -2771,7 +2771,9 @@
     "comingSoon": "Binnenkort beschikbaar...",
     "fetchingTrace": "Je spoor ophalen.",
     "traceFilters": "Traceerfilters",
-    "showTraces": "Sporen weergeven"
+    "showTraces": "Sporen weergeven",
+    "applyAndSearch": "Solliciteer en zoek",
+    "addToTable": "Aan tabel toevoegen"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",

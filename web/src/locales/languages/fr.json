@@ -2771,7 +2771,9 @@
     "comingSoon": "Prochainement...",
     "fetchingTrace": "À la recherche de ta trace.",
     "traceFilters": "Filtres de traçage",
-    "showTraces": "Afficher les traces"
+    "showTraces": "Afficher les traces",
+    "applyAndSearch": "Postulez et recherchez",
+    "addToTable": "Ajouter au tableau"
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",

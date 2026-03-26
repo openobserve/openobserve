@@ -2771,7 +2771,9 @@
     "comingSoon": "곧 출시됩니다...",
     "fetchingTrace": "트레이스를 가져오는 중입니다.",
     "traceFilters": "트레이스 필터",
-    "showTraces": "트레이스 보기"
+    "showTraces": "트레이스 보기",
+    "applyAndSearch": "신청 및 검색",
+    "addToTable": "테이블에 추가"
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",

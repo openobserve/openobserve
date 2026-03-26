@@ -2771,7 +2771,9 @@
     "comingSoon": "Yakında...",
     "fetchingTrace": "İzini getiriyorum.",
     "traceFilters": "İzleme Filtreleri",
-    "showTraces": "İzleri Göster"
+    "showTraces": "İzleri Göster",
+    "applyAndSearch": "Uygula ve Ara",
+    "addToTable": "Tabloya ekle"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
