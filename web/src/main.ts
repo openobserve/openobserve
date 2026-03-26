@@ -112,7 +112,12 @@ const getConfig = async () => {
             const errorStack = event.error?.stack || "";
 
             // List of error patterns to ignore
-            const ignoredErrorPatterns = [/ResizeObserver loop/i];
+            const ignoredErrorPatterns = [
+              /ResizeObserver loop/i,
+              /RS SDK/i,
+              /reo.dev/i,
+              /Cannot set properties of null (setting 'innerHTML')/,
+            ];
 
             // Check if error matches any ignored pattern
             const shouldIgnore = ignoredErrorPatterns.some(
