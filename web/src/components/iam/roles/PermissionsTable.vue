@@ -246,6 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :customFilteredPermissions="customFilteredPermissions"
                   :parent="row"
                   @updated:permission="handlePermissionChange"
+                  @updated:permission-batch="(changes: any) => emits('updated:permission-batch', changes)"
                   @expand:row="expandPermission"
                 />
               </template>
@@ -293,7 +294,7 @@ const props = defineProps({
   },
 });
 
-const emits = defineEmits(["updated:permission", "expand:row"]);
+const emits = defineEmits(["updated:permission", "updated:permission-batch", "expand:row"]);
 
 const { t } = useI18n();
 
@@ -379,6 +380,9 @@ const columns: any = [
   }
 ];
 
+// Only top-level "Type" rows are toggled by the header checkbox.
+// Child/nested rows inherit permissions through their parent type row,
+// so toggling them individually here is not needed.
 const getTopLevelTypeRows = computed(() => {
   return props.rows.filter(
     (row: any) => row?.show && row.type === "Type"
@@ -406,12 +410,13 @@ const toggleColumnAll = (colName: string) => {
     (row: any) => row.permission[colName].value
   );
   const newValue = !allChecked;
-  visibleRows.forEach((row: any) => {
-    if (row.permission[colName].value !== newValue) {
-      row.permission[colName].value = newValue;
-      handlePermissionChange(row, colName);
-    }
-  });
+  const changedRows = visibleRows
+    .filter((row: any) => row.permission[colName].value !== newValue)
+    .map((row: any) => ({ row, permission: colName, newValue }));
+
+  if (changedRows.length) {
+    emits("updated:permission-batch", changedRows);
+  }
 };
 
 const expandPermission = async (resource: any) => {
