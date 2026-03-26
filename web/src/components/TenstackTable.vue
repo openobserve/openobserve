@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     class="my-sticky-virtscroll-table tw:h-full tw:flex tw:flex-col tw:rounded-none!"
     :data-sticky-id="tableId"
-    :class="{ 'pivot-sticky-totals': stickyRowTotals }"
+    :class="{ 'pivot-sticky-totals': stickyRowTotals, 'wrap-enabled': wrap }"
     :style="store.state.printMode ? { position: 'static' } : {}"
   >
     <!-- Scroll container: grows to fill available height -->
@@ -962,7 +962,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Show pagination controls (or just the row count) for all dashboard tables -->
     <div
       v-else-if="showPagination || !!data"
-      class="row items-center full-width"
+      class="row items-center full-width" data-test="dashboard-table-pagination"
     >
       <q-space />
       <TablePaginationControls
