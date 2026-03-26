@@ -18,7 +18,7 @@ import { useStore } from "vuex";
 import useNotifications from "../useNotifications";
 import { b64EncodeUnicode, isStreamingEnabled } from "@/utils/zincutils";
 import { extractFields, getStreamNameFromQuery } from "@/utils/query/sqlUtils";
-import { validatePanel } from "@/utils/dashboard/panelValidation";
+import { validatePanel } from "@/utils/dashboard/dashboardValidator";
 import useStreams from "../useStreams";
 import useValuesWebSocket from "./useValuesWebSocket";
 import queryService from "@/services/search";
@@ -1002,10 +1002,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
   };
   const { checkTimestampAlias } = logsUtils();
-  // Replace the existing validatePanel function with a wrapper that calls the generic function
+  // Exact same call as old panelValidation.ts validatePanel()
+  // checkPanelName: when true, validates panel title is not empty (Save flow only)
   const validatePanelWrapper = (
     errors: string[],
     isFieldsValidationRequired: boolean = true,
+    checkPanelName: boolean = false,
   ) => {
     validatePanel(
       dashboardPanelData,
@@ -1019,6 +1021,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       pageKey,
       store,
       checkTimestampAlias,
+      checkPanelName,
     );
   };
 

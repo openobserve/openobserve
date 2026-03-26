@@ -241,7 +241,7 @@ import useNotifications from "@/composables/useNotifications";
 import { useStickyColumns } from "@/composables/useStickyColumns";
 import { exportFile, copyToClipboard, useQuasar } from "quasar";
 import { defineComponent, ref, watch, computed } from "vue";
-import { findFirstValidMappedValue } from "@/utils/dashboard/panelValidation";
+import { findFirstValidMappedValue } from "@/utils/dashboard/dashboardValidator";
 import { useStore } from "vuex";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
 import JsonFieldRenderer from "./JsonFieldRenderer.vue";

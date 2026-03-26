@@ -352,7 +352,7 @@ import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { useRoute, useRouter } from "vue-router";
 import useNotifications from "@/composables/useNotifications";
-import { validateSQLPanelFields } from "@/utils/dashboard/panelValidation";
+import { validateSQLPanelFields } from "@/utils/dashboard/dashboardValidator";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import { throttle } from "lodash-es";

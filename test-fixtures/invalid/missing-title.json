@@ -1,0 +1,12 @@
+{
+  "_description": "Dashboard missing title — should fail required",
+  "dashboardId": "test-no-title",
+  "version": 8,
+  "tabs": [
+    {
+      "tabId": "tab-1",
+      "name": "Default",
+      "panels": []
+    }
+  ]
+}
