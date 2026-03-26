@@ -121,6 +121,13 @@ describe("PatternList", () => {
         "exclude",
       ]);
     });
+
+    it("should emit create-alert event when triggered", async () => {
+      await wrapper.vm.$emit("create-alert", mockPatterns[0]);
+
+      expect(wrapper.emitted("create-alert")).toBeTruthy();
+      expect(wrapper.emitted("create-alert")![0]).toEqual([mockPatterns[0]]);
+    });
   });
 
   describe("Loading State", () => {

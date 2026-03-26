@@ -21,16 +21,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test="`pattern-card-${index}`"
   >
     <!-- Pattern Column -->
-    <div class="tw-flex-1 tw-min-w-0 tw-px-2">
+    <div class="tw:flex-1 tw:min-w-0 tw:px-2">
       <!-- Template rendered as tokenized chips so wildcards are visually distinct -->
       <div
-        class="pattern-template-text tw-flex tw-flex-wrap tw-items-baseline tw-gap-x-[2px] tw-gap-y-[1px]"
-        :class="[store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8', wrap ? 'tw:break-all' : 'tw:truncate']"
+        class="pattern-template-text tw:flex tw:items-baseline tw:gap-x-[2px] tw:gap-y-[1px]"
+        :class="[
+          store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8',
+          wrap
+            ? 'tw:flex-wrap tw:break-all'
+            : 'tw:flex-nowrap tw:overflow-hidden',
+        ]"
         :data-test="`pattern-card-${index}-template`"
         :title="pattern.template"
       >
         <template v-for="(tok, i) in templateTokens" :key="i">
-          <span v-if="tok.kind === 'text'" class="tw-whitespace-pre">{{ tok.value }}</span>
+          <span v-if="tok.kind === 'text'" class="tw:whitespace-pre">{{ tok.value }}</span>
           <q-chip
             v-else
             dense
@@ -46,12 +51,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :delay="300"
               class="wildcard-tooltip"
             >
-              <div class="tw-font-mono tw-text-xs">
-                <div class="tw-font-semibold tw-mb-1">{{ t("search.wildcardSampleValues") }}</div>
+              <div class="tw:font-mono tw:text-xs">
+                <div class="tw:font-semibold tw:mb-1">{{ t("search.wildcardSampleValues") }}</div>
                 <div
                   v-for="(val, vi) in tok.sampleValues.slice(0, 10)"
                   :key="vi"
-                  class="tw-truncate tw-max-w-[20rem]"
+                  class="tw:truncate tw:max-w-[20rem]"
                 >
                   {{ val }}
                 </div>
@@ -64,12 +69,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Anomaly badge with explanation tooltip -->
       <span
         v-if="pattern.is_anomaly"
-        class="text-negative text-weight-bold tw-text-[0.625rem] tw-cursor-help"
+        class="text-negative text-weight-bold tw:text-[0.625rem] tw:cursor-help"
         :data-test="`pattern-card-${index}-anomaly-badge`"
       >
         ⚠️ {{ t("search.anomalyLabel") }}
         <q-tooltip anchor="bottom middle" self="top middle" class="anomaly-tooltip">
-          <div class="tw-text-xs tw-max-w-[22rem]">{{ anomalyExplanationText }}</div>
+          <div class="tw:text-xs tw:max-w-[22rem]">{{ anomalyExplanationText }}</div>
         </q-tooltip>
       </span>
     </div>
@@ -93,27 +98,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
     </div>
 
-    <!-- Anomaly Column -->
-    <div class="tw:w-16 tw:flex-shrink-0 tw:px-2 tw:text-center">
-      <span
-        v-if="pattern.is_anomaly"
-        class="text-negative text-weight-bold tw:text-[1rem]"
-        :data-test="`pattern-card-${index}-anomaly-badge`"
-      >
-        ⚠️
-        <q-tooltip :delay="500">{{ t("search.anomalyDetected") }}</q-tooltip>
-      </span>
-      <span
-        v-else
-        class="text-grey-6 tw:text-[0.75rem]"
-        :data-test="`pattern-card-${index}-no-anomaly`"
-      >
-        --
-      </span>
-    </div>
-
     <!-- Actions Column -->
-    <div class="tw:w-20 tw:flex-shrink-0 tw:px-2 tw:flex tw:items-center">
+    <div class="tw:w-24 tw:flex-shrink-0 tw:px-2 tw:flex tw:items-center">
       <q-btn
         size="6px"
         @click.stop="$emit('include', pattern)"
@@ -154,6 +140,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}</q-tooltip>
         </q-icon>
       </q-btn>
+      <q-btn
+        size="6px"
+        class="cursor-pointer pattern-details-btn"
+        color="warning"
+        round
+        :data-test="`pattern-card-${index}-create-alert-btn`"
+        @click.stop="$emit('create-alert', pattern)"
+      >
+        <q-icon name="add_alert" style="height: 8px; width: 8px">
+          <q-tooltip>{{ t("search.createAlertFromPattern") }}</q-tooltip>
+        </q-icon>
+      </q-btn>
     </div>
   </div>
 </template>
@@ -180,6 +178,7 @@ defineEmits<{
   (e: "click", pattern: any, index: number): void;
   (e: "include", pattern: any): void;
   (e: "exclude", pattern: any): void;
+  (e: "create-alert", pattern: any): void;
 }>();
 
 const store = useStore();

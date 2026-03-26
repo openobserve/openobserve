@@ -1313,6 +1313,7 @@ export default defineComponent({
 <style lang="scss">
 .logs-query-editor {
   flex: 1;
+  min-height: 0;
   .monaco-editor,
   .monaco-editor .monaco-editor {
     padding: 0px 0px 0px 0px !important;
