@@ -15,13 +15,17 @@
 
 //! Layer 1: JSON Schema validation for v8 dashboards.
 //! Uses the same dashboard-v8.schema.json file as the FE (ajv).
+//!
+//! Note: The schema contains custom keywords (uniqueTabIds, validateFunctionArgs, etc.)
+//! that the jsonschema crate will ignore. Those are handled by native.rs (Layer 2).
 
 use once_cell::sync::Lazy;
 use serde_json::Value;
 
-/// The JSON Schema for v8 dashboards — loaded once, reused for every validation.
+/// The JSON Schema for v8 dashboards.
+/// Loaded once at startup via include_str! — same file used by FE.
 static SCHEMA_V8: Lazy<jsonschema::Validator> = Lazy::new(|| {
-    let schema_str = include_str!("../../../../../../schemas/dashboard-v8.schema.json");
+    let schema_str = include_str!("../../../../../../../schemas/dashboard-v8.schema.json");
     let schema_value: Value =
         serde_json::from_str(schema_str).expect("Invalid dashboard-v8.schema.json");
     jsonschema::validator_for(&schema_value).expect("Failed to compile dashboard JSON Schema")
@@ -29,43 +33,50 @@ static SCHEMA_V8: Lazy<jsonschema::Validator> = Lazy::new(|| {
 
 /// Shared error messages — loaded from the SAME errorMessages.json used by FE.
 static ERROR_MESSAGES: Lazy<Value> = Lazy::new(|| {
-    let json_str = include_str!("../../../../../../schemas/errorMessages.json");
+    let json_str = include_str!("../../../../../../../schemas/errorMessages.json");
     serde_json::from_str(json_str).expect("Invalid errorMessages.json")
 });
 
 /// Validates dashboard JSON against the v8 JSON Schema.
+/// Same schema file used by FE (ajv). Identical rules for the ~70% that schema can express.
 pub fn validate(json: &Value) -> Vec<super::ValidationError> {
-    if SCHEMA_V8.is_valid(json) {
-        return vec![];
+    let result = SCHEMA_V8.validate(json);
+    match result {
+        Ok(()) => vec![],
+        Err(errors) => errors
+            .map(|e| {
+                let path = e.instance_path.to_string();
+                let keyword = format!("{:?}", e.kind);
+                let message = map_error_message(&path, &keyword, &e.to_string(), json);
+                super::ValidationError {
+                    path,
+                    message,
+                    code: "SCHEMA_VALIDATION".into(),
+                }
+            })
+            .collect(),
     }
-
-    let errors: Vec<super::ValidationError> = SCHEMA_V8
-        .iter_errors(json)
-        .map(|e| {
-            let path = e.instance_path.to_string();
-            let keyword = format!("{:?}", e.kind);
-            let message = map_error_message(&path, &keyword, &e.to_string(), json);
-            super::ValidationError {
-                path,
-                message,
-                code: "SCHEMA_VALIDATION".into(),
-            }
-        })
-        .collect();
-
-    errors
 }
 
 /// Maps raw jsonschema errors to user-friendly messages using errorMessages.json.
-fn map_error_message(path: &str, keyword: &str, raw_message: &str, dashboard: &Value) -> String {
+fn map_error_message(
+    path: &str,
+    keyword: &str,
+    raw_message: &str,
+    dashboard: &Value,
+) -> String {
+    // Extract panel info from path
     if let Some(info) = extract_panel_info(path, dashboard) {
-        let field = path.split('/').next_back().unwrap_or("");
+        // Try chart-type specific messages
+        let field = path.split('/').last().unwrap_or("");
 
+        // Map jsonschema error kinds to our key format
         let error_key = if keyword.contains("MinItems") {
             format!("{}:minItems", field)
         } else if keyword.contains("MaxItems") {
             format!("{}:maxItems", field)
         } else if keyword.contains("Required") {
+            // For required errors, the missing property is often in the raw message
             format!("{}:required", field)
         } else if keyword.contains("Enum") {
             format!("{}:enum", field)
@@ -75,33 +86,40 @@ fn map_error_message(path: &str, keyword: &str, raw_message: &str, dashboard: &V
             String::new()
         };
 
-        if !error_key.is_empty()
-            && let Some(msg) = ERROR_MESSAGES
+        if !error_key.is_empty() {
+            if let Some(msg) = ERROR_MESSAGES
                 .get("chartErrors")
                 .and_then(|c| c.get(&info.chart_type))
                 .and_then(|m| m.get(&error_key))
-                .and_then(|v| v.get("dashboard"))
                 .and_then(|v| v.as_str())
-        {
-            return msg.to_string();
+            {
+                return msg.to_string();
+            }
         }
 
+        // Panel structure errors
         if keyword.contains("Enum") && path.ends_with("/type") {
-            return format!("Panel {}: Chart type is not supported.", info.id);
+            return format!(
+                "Panel {}: Chart type is not supported.",
+                info.id
+            );
         }
     }
 
-    if (path.is_empty() || path == "/")
-        && keyword.contains("Required")
-        && raw_message.contains("title")
-    {
-        return "Dashboard title is required".to_string();
+    // Dashboard-level errors
+    if path.is_empty() || path == "/" {
+        if keyword.contains("Required") {
+            if raw_message.contains("title") {
+                return "Dashboard title is required".to_string();
+            }
+        }
     }
 
     if keyword.contains("MinItems") && path.ends_with("/tabs") {
         return "Dashboard must have at least one tab".to_string();
     }
 
+    // Fallback: use raw message
     raw_message.to_string()
 }
 
@@ -112,6 +130,7 @@ struct PanelInfo {
 
 fn extract_panel_info(path: &str, dashboard: &Value) -> Option<PanelInfo> {
     let parts: Vec<&str> = path.split('/').collect();
+    // Path format: /tabs/0/panels/1/...
     if parts.len() < 5 || parts.get(1)? != &"tabs" || parts.get(3)? != &"panels" {
         return None;
     }

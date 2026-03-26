@@ -48,14 +48,14 @@ fn validate_unique_ids(dashboard: &Value, errors: &mut Vec<super::ValidationErro
     let mut panel_ids = HashSet::new();
 
     for tab in tabs {
-        if let Some(tab_id) = tab.get("tabId").and_then(|t| t.as_str())
-            && !tab_ids.insert(tab_id.to_string())
-        {
-            errors.push(super::ValidationError {
-                path: String::new(),
-                message: format!("Duplicate tab ID found: {}", tab_id),
-                code: "DUPLICATE_TAB_ID".into(),
-            });
+        if let Some(tab_id) = tab.get("tabId").and_then(|t| t.as_str()) {
+            if !tab_ids.insert(tab_id.to_string()) {
+                errors.push(super::ValidationError {
+                    path: String::new(),
+                    message: format!("Duplicate tab ID found: {}", tab_id),
+                    code: "DUPLICATE_TAB_ID".into(),
+                });
+            }
         }
 
         let panels = tab.get("panels").and_then(|p| p.as_array());
@@ -63,14 +63,14 @@ fn validate_unique_ids(dashboard: &Value, errors: &mut Vec<super::ValidationErro
 
         if let Some(panels) = panels {
             for panel in panels {
-                if let Some(panel_id) = panel.get("id").and_then(|i| i.as_str())
-                    && !panel_ids.insert(panel_id.to_string())
-                {
-                    errors.push(super::ValidationError {
-                        path: String::new(),
-                        message: format!("Duplicate panel ID found: {}", panel_id),
-                        code: "DUPLICATE_PANEL_ID".into(),
-                    });
+                if let Some(panel_id) = panel.get("id").and_then(|i| i.as_str()) {
+                    if !panel_ids.insert(panel_id.to_string()) {
+                        errors.push(super::ValidationError {
+                            path: String::new(),
+                            message: format!("Duplicate panel ID found: {}", panel_id),
+                            code: "DUPLICATE_PANEL_ID".into(),
+                        });
+                    }
                 }
 
                 if let Some(layout_i) = panel
@@ -143,10 +143,8 @@ fn validate_table_fields(dashboard: &Value, errors: &mut Vec<super::ValidationEr
                     .unwrap_or(0);
 
                 if x_len + y_len == 0 {
-                    let panel_id = panel
-                        .get("id")
-                        .and_then(|i| i.as_str())
-                        .unwrap_or("unknown");
+                    let panel_id =
+                        panel.get("id").and_then(|i| i.as_str()).unwrap_or("unknown");
                     errors.push(super::ValidationError {
                         path: String::new(),
                         message: format!(
@@ -200,7 +198,10 @@ fn validate_filter_conditions(dashboard: &Value, errors: &mut Vec<super::Validat
     }
 }
 
-fn validate_conditions_recursive(conditions: &[Value], errors: &mut Vec<super::ValidationError>) {
+fn validate_conditions_recursive(
+    conditions: &[Value],
+    errors: &mut Vec<super::ValidationError>,
+) {
     for condition in conditions {
         let filter_type = condition
             .get("filterType")

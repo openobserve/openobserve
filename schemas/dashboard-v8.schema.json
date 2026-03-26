@@ -70,8 +70,8 @@
       },
       "allOf": [
         {
-          "$comment": "pie/donut: exactly 1 x, exactly 1 y (sql only)",
-          "if": { "properties": { "type": { "enum": ["pie", "donut"] }, "queryType": { "not": { "const": "promql" } } } },
+          "$comment": "pie/donut: exactly 1 x, exactly 1 y",
+          "if": { "properties": { "type": { "enum": ["pie", "donut"] } } },
           "then": {
             "properties": {
               "queries": {
@@ -93,8 +93,8 @@
           }
         },
         {
-          "$comment": "metric: 0 x, exactly 1 y (sql only)",
-          "if": { "properties": { "type": { "const": "metric" }, "queryType": { "not": { "const": "promql" } } } },
+          "$comment": "metric: 0 x, exactly 1 y",
+          "if": { "properties": { "type": { "const": "metric" } } },
           "then": {
             "properties": {
               "queries": {
@@ -116,8 +116,8 @@
           }
         },
         {
-          "$comment": "gauge: 0 or 1 x, exactly 1 y (sql only)",
-          "if": { "properties": { "type": { "const": "gauge" }, "queryType": { "not": { "const": "promql" } } } },
+          "$comment": "gauge: 0 or 1 x, exactly 1 y",
+          "if": { "properties": { "type": { "const": "gauge" } } },
           "then": {
             "properties": {
               "queries": {
@@ -139,8 +139,8 @@
           }
         },
         {
-          "$comment": "line/area/bar/scatter/h-bar: exactly 1 x, at least 1 y (sql only)",
-          "if": { "properties": { "type": { "enum": ["line", "area", "bar", "scatter", "h-bar"] }, "queryType": { "not": { "const": "promql" } } } },
+          "$comment": "line/area/bar/scatter/h-bar: exactly 1 x, at least 1 y",
+          "if": { "properties": { "type": { "enum": ["line", "area", "bar", "scatter", "h-bar"] } } },
           "then": {
             "properties": {
               "queries": {
@@ -162,8 +162,8 @@
           }
         },
         {
-          "$comment": "heatmap: at least 1 x, at least 1 y, at least 1 z (sql only)",
-          "if": { "properties": { "type": { "const": "heatmap" }, "queryType": { "not": { "const": "promql" } } } },
+          "$comment": "heatmap: at least 1 x, at least 1 y, at least 1 z",
+          "if": { "properties": { "type": { "const": "heatmap" } } },
           "then": {
             "properties": {
               "queries": {
@@ -186,8 +186,8 @@
           }
         },
         {
-          "$comment": "stacked/h-stacked: exactly 1 x, at least 1 y, exactly 1 breakdown (sql only)",
-          "if": { "properties": { "type": { "enum": ["stacked", "h-stacked"] }, "queryType": { "not": { "const": "promql" } } } },
+          "$comment": "stacked/h-stacked: exactly 1 x, at least 1 y, exactly 1 breakdown",
+          "if": { "properties": { "type": { "enum": ["stacked", "h-stacked"] } } },
           "then": {
             "properties": {
               "queries": {
@@ -210,8 +210,8 @@
           }
         },
         {
-          "$comment": "area-stacked: exactly 1 x, exactly 1 y, exactly 1 breakdown (sql only)",
-          "if": { "properties": { "type": { "const": "area-stacked" }, "queryType": { "not": { "const": "promql" } } } },
+          "$comment": "area-stacked: exactly 1 x, exactly 1 y, exactly 1 breakdown",
+          "if": { "properties": { "type": { "const": "area-stacked" } } },
           "then": {
             "properties": {
               "queries": {
@@ -234,8 +234,8 @@
           }
         },
         {
-          "$comment": "geomap: latitude and longitude required (not null) (sql only)",
-          "if": { "properties": { "type": { "const": "geomap" }, "queryType": { "not": { "const": "promql" } } } },
+          "$comment": "geomap: latitude and longitude required (not null)",
+          "if": { "properties": { "type": { "const": "geomap" } } },
           "then": {
             "properties": {
               "queries": {
@@ -258,8 +258,8 @@
           }
         },
         {
-          "$comment": "sankey: source, target, value required (not null) (sql only)",
-          "if": { "properties": { "type": { "const": "sankey" }, "queryType": { "not": { "const": "promql" } } } },
+          "$comment": "sankey: source, target, value required (not null)",
+          "if": { "properties": { "type": { "const": "sankey" } } },
           "then": {
             "properties": {
               "queries": {
@@ -283,8 +283,8 @@
           }
         },
         {
-          "$comment": "maps: name and value_for_maps required (not null) (sql only)",
-          "if": { "properties": { "type": { "const": "maps" }, "queryType": { "not": { "const": "promql" } } } },
+          "$comment": "maps: name and value_for_maps required (not null)",
+          "if": { "properties": { "type": { "const": "maps" } } },
           "then": {
             "properties": {
               "queries": {
@@ -389,7 +389,7 @@
         "name": { "type": ["object", "null"], "additionalProperties": true },
         "value_for_maps": { "type": ["object", "null"], "additionalProperties": true },
         "filter": {
-          "type": ["object", "array"],
+          "type": "object",
           "additionalProperties": true,
           "validateFilterValues": true
         }
