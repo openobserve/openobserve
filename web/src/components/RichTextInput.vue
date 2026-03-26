@@ -645,7 +645,7 @@ export default defineComponent({
 
     &:focus-within {
       border: 1px solid transparent;
-      box-shadow: 0 0 0 2px #667eea;
+      box-shadow: 0 0 0 2px #8B5CF6;
     }
 
     .rich-text-input {

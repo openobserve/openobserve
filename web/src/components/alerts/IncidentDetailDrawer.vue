@@ -3085,15 +3085,17 @@ body.body--dark .ai-chat-panel::-webkit-scrollbar-thumb {
 
 /* AI Button Styles */
 .ai-btn-active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
 }
 
 .ai-hover-btn {
-  transition: background 0.3s ease;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
 }
 
 .ai-hover-btn:hover {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
+  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
 }
 
 .ai-icon {

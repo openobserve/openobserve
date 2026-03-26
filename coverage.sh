@@ -27,6 +27,7 @@ EOF
 _cov_test() {
     cargo llvm-cov --version >/dev/null || cargo install cargo-llvm-cov
     cargo nextest --version >/dev/null || cargo install cargo-nextest
+    cargo run -- init-db
     cargo llvm-cov nextest \
         --workspace \
         --verbose \
