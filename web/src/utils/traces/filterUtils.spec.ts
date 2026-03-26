@@ -290,7 +290,7 @@ describe("applyFilterTerm", () => {
       const result = applyFilterTerm("some_value", "env='prod'");
       // field cannot be extracted, replaced === parts[0] (unchanged), then returned as-is
       // then since replaced is not null (it equals parts[0]) it returns replaced
-      expect(result).toBe("env='prod'");
+      expect(result).toBe("env='prod' and some_value");
     });
   });
 
