@@ -578,7 +578,7 @@ pub async fn process_delta(
             stream_name,
             stream_type,
             &mut search_res,
-            trace_id,
+            &trace_id,
             "process_delta",
         )
         .await?;
