@@ -82,8 +82,8 @@ export const applyFilterTerm = (
       const fieldName = getFieldFromExpression(filter);
       const replaced = fieldName
         ? replaceExistingFieldCondition(parts[1], fieldName, filter)
-        : parts[1];
-      parts[1] = replaced !== parts[1] ? replaced : parts[1] + " and " + filter;
+        : null;
+      parts[1] = replaced !== null ? replaced : parts[1] + " and " + filter;
     } else {
       parts[1] = filter;
     }
@@ -92,8 +92,8 @@ export const applyFilterTerm = (
     const fieldName = getFieldFromExpression(filter);
     const replaced = fieldName
       ? replaceExistingFieldCondition(parts[0] as string, fieldName, filter)
-      : (parts[0] as string);
-      
+      : null;
+
     if (replaced !== null) return replaced;
     return (parts[0] as string) !== ""
       ? (parts[0] as string) + " and " + filter
