@@ -26,6 +26,11 @@
   border-radius: 0.5rem;
 }
 
+// Applied to table cells when not in defaultColumns mode
+.height-stretch {
+  align-self: stretch;
+}
+
 .cursor-pointer {
   cursor: pointer;
 }
