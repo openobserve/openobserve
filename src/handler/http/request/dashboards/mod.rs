@@ -87,6 +87,9 @@ impl From<DashboardError> for Response {
             DashboardError::PanelAlreadyExists(panel_id, tab_id) => MetaHttpResponse::conflict(
                 format!("Panel with id {panel_id} already exists in tab {tab_id}"),
             ),
+            DashboardError::PutValidationFailed(errors) => MetaHttpResponse::bad_request(
+                format!("Dashboard validation failed: {}", errors.join("; ")),
+            ),
         }
     }
 }

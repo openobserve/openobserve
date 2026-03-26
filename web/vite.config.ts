@@ -137,6 +137,7 @@ export default defineConfig({
       "@enterprise": fileURLToPath(
         new URL("./src/enterprise", import.meta.url),
       ),
+      "@schemas": path.resolve(__dirname, "../schemas"),
       stream: "rollup-plugin-node-polyfills/polyfills/stream",
       events: "rollup-plugin-node-polyfills/polyfills/events",
       assert: "assert",
