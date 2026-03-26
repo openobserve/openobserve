@@ -1052,7 +1052,7 @@ export default defineComponent({
     };
 
     const getBtnLogo = computed(() => {
-      if (isHovered.value || store.state.isAiChatEnabled) {
+      if (isHovered.value) {
         return getImageURL("images/common/ai_icon_dark.svg");
       }
 
@@ -1610,10 +1610,17 @@ body.ai-chat-open {
 }
 
 .ai-btn-active {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.35) 0%, rgba(236, 72, 153, 0.35) 100%) !important;
+
+  .header-icon {
+    opacity: 1 !important;
+  }
+}
+.ai-btn-active:hover {
   background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
 }
 .ai-hover-btn {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.25) 0%, rgba(236, 72, 153, 0.25) 100%) !important;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.30) 0%, rgba(236, 72, 153, 0.40) 100%) !important;
   transition: background 0.3s ease, box-shadow 0.3s ease;
 }
 
