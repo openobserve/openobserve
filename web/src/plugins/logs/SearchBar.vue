@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div
-          v-if="!shouldMoveTogglesToMenu"
+          v-if="!shouldMoveSqlToggleToMenu"
           class="toolbar-toggle-container element-box-shadow"
         >
           <q-toggle
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-toggle>
         </div>
         <div
-          v-if="!shouldMoveTogglesToMenu"
+          v-if="!shouldMoveSqlToggleToMenu"
           class="toolbar-toggle-container element-box-shadow"
         >
           <q-toggle
@@ -456,11 +456,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-menu>
             <q-list>
-              <!-- === TOGGLES GROUP === -->
-
-              <!-- Histogram Toggle (moved from toolbar at <= 1300px) -->
+              <!-- Histogram Toggle -->
               <q-item
-                v-if="shouldMoveTogglesToMenu"
+                v-if="shouldMoveSqlToggleToMenu"
                 clickable
                 @click="
                   searchObj.meta.showHistogram = !searchObj.meta.showHistogram
@@ -498,7 +496,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- SQL Mode Toggle (moved from toolbar at <= 1300px) -->
               <q-item
-                v-if="shouldMoveTogglesToMenu"
+                v-if="shouldMoveSqlToggleToMenu"
                 clickable
                 @click="
                   !isSqlModeDisabled &&
@@ -2768,10 +2766,10 @@ export default defineComponent({
     const shouldMoveSavedViewToMenu = computed(
       () => windowWidth.value <= 1440,
     );
-    const shouldMoveTogglesToMenu = computed(
+    const shouldMoveSqlToggleToMenu = computed(
       () => windowWidth.value <= 1280,
     );
-    const shouldMoveShareToMenu = computed(() => windowWidth.value <= 1024);
+    const shouldMoveShareToMenu = computed(() => windowWidth.value <= 1100);
     const vrlEditorNlpMode = ref(false); // Track VRL editor's AI mode
 
     const confirmUpdate = ref(false);
@@ -5372,7 +5370,7 @@ export default defineComponent({
       isGeneratingSQL,
       vrlEditorNlpMode,
       shouldMoveSavedViewToMenu,
-      shouldMoveTogglesToMenu,
+      shouldMoveSqlToggleToMenu,
       shouldMoveShareToMenu,
     };
   },
