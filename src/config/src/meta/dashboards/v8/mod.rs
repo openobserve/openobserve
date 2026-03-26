@@ -308,9 +308,10 @@ pub struct AxisArgValue {
     pub stream_alias: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum JoinType {
+    #[default]
     Inner,
     Left,
     Right,
@@ -404,15 +405,18 @@ pub struct StreamFieldObj {
     pub stream_alias: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum FilterConditionType {
+    #[default]
     List,
     Condition,
+    #[serde(other)]
+    Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct FilterCondition {
     #[serde(rename = "type")]
     pub typ: FilterConditionType,
