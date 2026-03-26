@@ -311,13 +311,13 @@ datafusion-proto = "52"
 datafusion-functions-aggregate-common = "52"
 datafusion-functions-json = "0.52.0"
 expect-test = "1.4"
-arrow = { version = "57.2.0", features = ["ipc_compression", "prettyprint"] }
-arrow-flight = "57.2.0"
-arrow-json = "57.2.0"
-arrow-schema = { version = "57.2.0", features = ["serde"] }
-parquet = { version = "57.2.0", features = ["arrow", "async", "object_store"] }
-object_store = { version = "0.12.4", features = ["aws", "azure", "gcp"] }
-sqlparser = { version = "0.59.0", features = ["serde", "visitor"] }
+arrow = { version = "57", features = ["ipc_compression", "prettyprint"] }
+arrow-flight = "57"
+arrow-json = "57"
+arrow-schema = { version = "57", features = ["serde"] }
+parquet = { version = "57", features = ["arrow", "async", "object_store"] }
+object_store = { version = "0.12", features = ["aws", "azure", "gcp"] }
+sqlparser = { version = "0.59", features = ["serde", "visitor"] }
 dotenv_config = "0.2.2"
 dotenvy = "0.15.7"
 env_logger = "0.11.8"
