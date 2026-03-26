@@ -118,7 +118,8 @@
     "copySuccess": "Panoya kopyalandı",
     "copyError": "Panoya kopyalanamadı",
     "goBack": "Geri Dön",
-    "stopGenerating": "Oluşturmayı bırak"
+    "stopGenerating": "Oluşturmayı bırak",
+    "redirectingHome": "{geri sayım} saniye içinde eve yönlendiriliyor..."
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",

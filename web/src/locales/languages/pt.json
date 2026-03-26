@@ -118,7 +118,8 @@
     "copySuccess": "Copiado para a prancheta",
     "copyError": "Falha ao copiar para a área de transferência",
     "goBack": "Voltar",
-    "stopGenerating": "Pare de gerar"
+    "stopGenerating": "Pare de gerar",
+    "redirectingHome": "Redirecionando para a página inicial em {contagem regressiva} segundos..."
   },
   "search": {
     "selectIndex": "Selecione Stream First",
