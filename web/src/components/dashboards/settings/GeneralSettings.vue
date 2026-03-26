@@ -60,6 +60,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :auto-apply-dashboard="true"
           />
         </div>
+        <div data-test="dashboard-general-setting-refresh-interval">
+          <label>Default Refresh Rate</label>
+          <AutoRefreshInterval
+            v-model="defaultRefreshInterval"
+            class="q-my-sm"
+            size="sm"
+          />
+        </div>
         <q-toggle
           v-model="dashboardData.showDynamicFilters"
           label="Show Dynamic Filters"
@@ -116,6 +124,7 @@ import { useRoute } from "vue-router";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import { useLoading } from "@/composables/useLoading";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
@@ -123,6 +132,7 @@ export default defineComponent({
   components: {
     DashboardHeader,
     DateTimePickerDashboard,
+    AutoRefreshInterval,
   },
   emits: ["save"],
   setup(props, { emit }) {
@@ -153,6 +163,8 @@ export default defineComponent({
     });
 
     let dateTimeValue: any = ref(null);
+    const defaultRefreshInterval = ref(0);
+
     const getDashboardData = async () => {
       const data = await getDashboard(
         store,
@@ -171,6 +183,8 @@ export default defineComponent({
         relativeTimePeriod: data?.defaultDatetimeDuration?.relativeTimePeriod,
         valueType: data?.defaultDatetimeDuration?.type,
       };
+
+      defaultRefreshInterval.value = data?.defaultRefreshInterval ?? 0;
     };
     onMounted(async () => {
       await getDashboardData();
@@ -208,6 +222,11 @@ export default defineComponent({
           relativeTimePeriod: dateTimeValue?.value?.relativeTimePeriod,
           type: dateTimeValue?.value?.valueType,
         };
+
+        data.defaultRefreshInterval =
+          defaultRefreshInterval.value > 0
+            ? defaultRefreshInterval.value
+            : null;
 
         // now lets save it
         await updateDashboard(
@@ -262,6 +281,7 @@ export default defineComponent({
       closeBtn,
       initialTimezone,
       dateTimeValue,
+      defaultRefreshInterval,
     };
   },
 });

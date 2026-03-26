@@ -760,6 +760,20 @@ export default defineComponent({
         refreshedVariablesData.values = [];
       }
 
+      // set default refresh interval from dashboard config if not set via URL
+      if (!route.query.refresh) {
+        const defaultRefresh =
+          currentDashboardData.data?.defaultRefreshInterval ?? null;
+        if (defaultRefresh !== null) {
+          const minRefresh =
+            store.state?.zoConfig?.min_auto_refresh_interval || 5;
+          refreshInterval.value =
+            defaultRefresh >= minRefresh ? defaultRefresh : 0;
+        } else {
+          refreshInterval.value = 0;
+        }
+      }
+
       // check if route has time related query params
       // if not, take dashboard default time settings
       if (!((route.query.from && route.query.to) || route.query.period)) {
