@@ -95,6 +95,8 @@ export const applyFilterTerm = (
       : null;
 
     if (replaced !== null) return replaced;
+    if (fieldName === null) return parts[0];
+
     return (parts[0] as string) !== ""
       ? (parts[0] as string) + " and " + filter
       : filter;
