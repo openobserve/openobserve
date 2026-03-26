@@ -312,6 +312,120 @@ describe("usePanelSQLExecutor", () => {
     });
   });
 
+  describe("getRegionClusterParams integration", () => {
+    it("spreads region cluster params into queryReq for simple queries", async () => {
+      const { ctx, fetchQueryDataWithHttpStream } = makeCtx({
+        getRegionClusterParams: vi.fn(() => ({
+          regions: ["us-east-1", "eu-west-1"],
+          clusters: ["cluster-a"],
+        })),
+      });
+
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      expect(fetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+      const [payload] = fetchQueryDataWithHttpStream.mock.calls[0];
+      expect(payload.queryReq.regions).toEqual(["us-east-1", "eu-west-1"]);
+      expect(payload.queryReq.clusters).toEqual(["cluster-a"]);
+    });
+
+    it("spreads empty object when getRegionClusterParams returns empty", async () => {
+      const { ctx, fetchQueryDataWithHttpStream } = makeCtx({
+        getRegionClusterParams: vi.fn(() => ({})),
+      });
+
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      expect(fetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+      const [payload] = fetchQueryDataWithHttpStream.mock.calls[0];
+      expect(payload.queryReq.regions).toBeUndefined();
+      expect(payload.queryReq.clusters).toBeUndefined();
+    });
+
+    it("spreads region cluster params into queryReq for time-shifted queries", async () => {
+      const panelSchema = makePanelSchema([
+        {
+          query: "SELECT * FROM logs",
+          vrlFunctionQuery: "",
+          fields: { stream: "logs", stream_type: "logs", x: [{ alias: "ts" }] },
+          config: {
+            time_shift: [{ offSet: "1d" }],
+          },
+        },
+      ]);
+
+      const { ctx, fetchQueryDataWithHttpStream } = makeCtx({
+        panelSchema,
+        getRegionClusterParams: vi.fn(() => ({
+          regions: ["ap-south-1"],
+          clusters: ["cluster-b", "cluster-c"],
+        })),
+      });
+
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      expect(fetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+      const [payload] = fetchQueryDataWithHttpStream.mock.calls[0];
+      expect(payload.queryReq.regions).toEqual(["ap-south-1"]);
+      expect(payload.queryReq.clusters).toEqual(["cluster-b", "cluster-c"]);
+    });
+
+    it("does not overwrite query fields when region params are present", async () => {
+      const { ctx, fetchQueryDataWithHttpStream } = makeCtx({
+        getRegionClusterParams: vi.fn(() => ({
+          regions: ["us-west-2"],
+          clusters: [],
+        })),
+      });
+
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      const [payload] = fetchQueryDataWithHttpStream.mock.calls[0];
+      // query fields should still be intact
+      expect(payload.queryReq.query.sql).toBe("SELECT * FROM logs");
+      // region params should be present at queryReq level
+      expect(payload.queryReq.regions).toEqual(["us-west-2"]);
+    });
+
+    it("calls getRegionClusterParams exactly once per simple query execution", async () => {
+      const getRegionClusterParams = vi.fn(() => ({}));
+      const { ctx } = makeCtx({ getRegionClusterParams });
+
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      expect(getRegionClusterParams).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls getRegionClusterParams exactly once per time-shifted query execution", async () => {
+      const panelSchema = makePanelSchema([
+        {
+          query: "SELECT * FROM logs",
+          vrlFunctionQuery: "",
+          fields: { stream: "logs", stream_type: "logs", x: [{ alias: "ts" }] },
+          config: {
+            time_shift: [{ offSet: "1d" }],
+          },
+        },
+      ]);
+
+      const getRegionClusterParams = vi.fn(() => ({
+        regions: ["us-east-1"],
+        clusters: [],
+      }));
+      const { ctx } = makeCtx({ panelSchema, getRegionClusterParams });
+
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      expect(getRegionClusterParams).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("getFallbackOrderByCol", () => {
     it("is accessible indirectly via the payload's meta.fallback_order_by_col", async () => {
       const { ctx, fetchQueryDataWithHttpStream } = makeCtx();
