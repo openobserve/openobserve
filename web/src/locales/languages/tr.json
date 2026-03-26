@@ -350,6 +350,7 @@
     "selectStreamForAI": "Yapay zekayı kullanmak için önce bir akış seçin",
     "collapseFields": "Alanları Daralt",
     "openFields": "Açık Alanlar",
+    "createAlertFromPattern": "Bu modelden uyarı oluştur",
     "aiBarSuccessPlaceholder": "Bundan sonra ne yapmak istersin?",
     "nlpModeDisabledForVisualization": "Birden çok akışla görselleştirme sırasında Doğal Dil modu devre dışı bırakılamaz",
     "patternDetailsTitle": "Desen Detayları",
@@ -2178,6 +2179,8 @@
     "resultsIncludeAllWindows": "Sonuçlar tüm çoklu pencere eklemelerini içerir",
     "runQueryForOutput": "Çıktıyı görmek için lütfen Sorguyu Çalıştır'a tıklayın",
     "applyVRLForOutput": "Kombine çıktıyı görmek için lütfen VRL Uygula'ya tıklayın",
+    "importedFromPattern": "Günlük düzeninden önceden doldurulmuş uyarı",
+    "importedFromAnomalyPattern": "Anormal günlük düzeninden önceden doldurulmuş uyarı - aciliyet ayarlarını gözden geçirin",
     "anomalyDetection": "Anomali Algılama",
     "newAnomalyDetection": "Yeni anormallik tespiti",
     "editAnomalyDetection": "Anomali algılamayı düzenle",
@@ -2202,7 +2205,7 @@
     "anomalyStatus": {
       "waiting": "Bekliyor",
       "training": "Eğitim",
-      "active": "Aktif",
+      "ready": "Hazır",
       "failed": "Başarısız",
       "disabled": "Engelli"
     },

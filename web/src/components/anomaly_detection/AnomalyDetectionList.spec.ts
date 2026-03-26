@@ -28,7 +28,7 @@ const mockConfigs = vi.hoisted(() => [
     name: "Config A",
     stream_name: "logs-stream",
     stream_type: "logs",
-    status: "active",
+    status: "ready",
     enabled: true,
     is_trained: true,
     schedule_interval: "1h",
@@ -124,7 +124,7 @@ describe("AnomalyDetectionList - statusColor", () => {
   it("returns 'positive' for active enabled row", async () => {
     const w = await mountComp();
     await flushPromises();
-    const color = (w.vm as any).statusColor({ status: "active", enabled: true });
+    const color = (w.vm as any).statusColor({ status: "ready", enabled: true });
     expect(color).toBe("positive");
   });
 
@@ -145,8 +145,34 @@ describe("AnomalyDetectionList - statusColor", () => {
   it("returns 'grey' for disabled row regardless of status", async () => {
     const w = await mountComp();
     await flushPromises();
-    const color = (w.vm as any).statusColor({ status: "active", enabled: false });
+    const color = (w.vm as any).statusColor({ status: "ready", enabled: false });
     expect(color).toBe("grey");
+  });
+});
+
+describe("AnomalyDetectionList - statusLabel", () => {
+  it("returns i18n label for 'ready' enabled row", async () => {
+    const w = await mountComp();
+    await flushPromises();
+    const label = (w.vm as any).statusLabel({ status: "ready", enabled: true });
+    expect(label).toBeTruthy();
+    expect(label).not.toBe("alerts.anomalyStatus.ready"); // i18n key was resolved
+    expect(label.toLowerCase()).toContain("ready");
+  });
+
+  it("returns disabled label when row is not enabled", async () => {
+    const w = await mountComp();
+    await flushPromises();
+    const label = (w.vm as any).statusLabel({ status: "ready", enabled: false });
+    expect(label.toLowerCase()).toContain("disabled");
+  });
+
+  it("returns i18n label for 'waiting' enabled row", async () => {
+    const w = await mountComp();
+    await flushPromises();
+    const label = (w.vm as any).statusLabel({ status: "waiting", enabled: true });
+    expect(label).toBeTruthy();
+    expect(label).not.toBe("alerts.anomalyStatus.waiting");
   });
 });
 

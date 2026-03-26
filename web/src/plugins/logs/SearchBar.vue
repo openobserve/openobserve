@@ -1389,11 +1389,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="10px"
         round
         @click="isFocused = !isFocused"
-        :class="
-          searchObj.meta.showTransformEditor
-            ? 'tw:right-[3.6rem]!'
-            : 'tw:right-[4.2rem]!'
-        "
         class="q-pa-xs tw:absolute! tw:z-50 fullscreen-hover-btn"
         :style="{
           top:
@@ -1403,6 +1398,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchObj.data.transformType === 'function')
               ? '6.5rem'
               : '3.5rem',
+          right:
+            (searchObj.meta.nlpMode && !searchObj.meta.showTransformEditor) ||
+            (vrlEditorNlpMode &&
+              searchObj.meta.showTransformEditor &&
+              searchObj.data.transformType === 'function')
+              ? '1.6rem'
+              : '4rem',
         }"
       >
         <Maximize size="0.8rem" v-if="!isFocused" />
@@ -2780,6 +2782,13 @@ export default defineComponent({
       autoCompleteData.value.fieldValues = props.fieldValues;
       autoCompleteData.value.popup.open =
         queryEditorRef?.value?.triggerAutoComplete;
+      // [NEW] Pass stream context for IndexedDB value lookups
+      autoCompleteData.value.org =
+        store.state.selectedOrganization.identifier;
+      autoCompleteData.value.streamType =
+        searchObj.data.stream.streamType ?? "logs";
+      autoCompleteData.value.streamName =
+        searchObj.data.stream.selectedStream?.[0] ?? "";
       getSuggestions();
     };
 
