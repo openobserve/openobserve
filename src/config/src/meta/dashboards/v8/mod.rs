@@ -144,6 +144,9 @@ pub enum PanelType {
     Markdown,
     #[serde(rename = "custom_chart")]
     CustomChart,
+    /// Catch-all for unknown/future panel types — prevents deserialization failure on upgrade
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -337,16 +340,18 @@ pub struct SelectedField {
     pub field: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum LogicalOperator {
+    #[default]
     And,
     Or,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum FilterType {
+    #[default]
     Condition,
     Group,
 }
@@ -360,8 +365,8 @@ pub enum PanelFilter {
     Group(GroupType),
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct GroupType {
     pub filter_type: FilterType,
     pub logical_operator: LogicalOperator,
@@ -369,9 +374,13 @@ pub struct GroupType {
     pub conditions: Vec<PanelFilter>,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum BackgroundType {
+    /// Empty string — stored dashboards may have `""` as a legacy value
+    #[default]
+    #[serde(rename = "")]
+    Empty,
     Single,
 }
 
@@ -910,14 +919,19 @@ pub enum VariableScope {
     Panels,
 }
 
+/// Wire format uses snake_case: "query_values", "constant", "textbox", "custom", "dynamic_filters"
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
-#[serde(rename_all = "snake_case")]
 pub enum VariableType {
     #[default]
+    #[serde(rename = "query_values")]
     QueryValues,
+    #[serde(rename = "constant")]
     Constant,
+    #[serde(rename = "textbox")]
     Textbox,
+    #[serde(rename = "custom")]
     Custom,
+    #[serde(rename = "dynamic_filters")]
     DynamicFilters,
 }
 
@@ -1038,6 +1052,7 @@ pub struct Trellis {
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 pub enum MapSymbolSize {
     #[default]
+    /// Intentional space in wire format — matches frontend literal `"by Value"` (see convertGeoMapData.ts)
     #[serde(rename = "by Value")]
     ByValue,
     #[serde(rename = "fixed")]
