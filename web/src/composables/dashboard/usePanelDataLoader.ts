@@ -62,6 +62,7 @@ export const usePanelDataLoader = (
   dashboardName?: any,
   folderName?: any,
   shouldRefreshWithoutCache?: any,
+  regionClusterParams?: any,
 ) => {
   const log = (...args: any[]) => {
     if (false) {
@@ -71,6 +72,19 @@ export const usePanelDataLoader = (
   let runCount = 0;
 
   const store = useStore();
+
+  const getRegionClusterParams = () => {
+    if (
+      regionClusterParams?.value?.regions ||
+      regionClusterParams?.value?.clusters
+    ) {
+      return {
+        regions: regionClusterParams.value.regions,
+        clusters: regionClusterParams.value.clusters,
+      };
+    }
+    return {};
+  };
 
   const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
     useHttpStreamingSearch();
@@ -617,6 +631,7 @@ export const usePanelDataLoader = (
     shouldFetchAnnotations,
     refreshAnnotations,
     log,
+    getRegionClusterParams,
   });
 
   const hasAtLeastOneQuery = () =>
