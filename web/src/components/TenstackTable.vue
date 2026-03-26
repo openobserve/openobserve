@@ -15,499 +15,997 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- Outer wrapper: full panel height, flex-column so pagination sits below the scroll area -->
   <div
-    ref="parentRef"
-    class="container tw:h-full tw:rounded-none! tw:overflow-x-auto tw:relative table-container"
+    class="my-sticky-virtscroll-table tw:h-full tw:flex tw:flex-col tw:rounded-none!"
+    :data-sticky-id="tableId"
+    :class="{ 'pivot-sticky-totals': stickyRowTotals }"
+    :style="store.state.printMode ? { position: 'static' } : {}"
   >
-    <table
-      v-if="table"
-      data-test="o2-table"
-      class="tw:w-full tw:table-auto"
-      :style="{
-        minWidth: '100%',
-        ...columnSizeVars,
-        minHeight: totalSize + 'px',
-        width: !defaultColumns
-          ? table.getCenterTotalSize() + 'px'
-          : wrap
-            ? width
-              ? width - 12 + 'px'
-              : '100%'
-            : '100%',
-      }"
+    <!-- Scroll container: grows to fill available height -->
+    <div
+      ref="parentRef"
+      class="container table-container tw:flex-1 tw:min-h-0 tw:overflow-auto tw:relative"
     >
-      <thead
-        class="tw:sticky tw:top-0 tw:z-10"
-        style="max-height: 44px; height: 22px"
-        v-for="headerGroup in table.getHeaderGroups()"
-        :key="headerGroup.id"
+      <table
+        v-if="table"
+        data-test="o2-table"
+        :class="['tw:w-full', !!data ? 'tw:table-fixed' : 'tw:table-auto']"
+        :style="{
+          minWidth: '100%',
+          ...columnSizeVars,
+          minHeight: showPagination || !!data ? undefined : totalSize + 'px',
+          width: !!data
+            ? '100%'
+            : !defaultColumns
+              ? table.getCenterTotalSize() + 'px'
+              : wrap
+                ? width
+                  ? width - 12 + 'px'
+                  : '100%'
+                : '100%',
+        }"
       >
-        <vue-draggable
-          v-model="columnOrder"
-          :element="'table'"
-          :animation="200"
-          :sort="enableColumnReorder && (!isResizingHeader || !defaultColumns)"
-          handle=".table-head"
-          :class="
-            enableColumnReorder && table.getState().columnOrder.length
-              ? 'tw:cursor-move!'
-              : ''
-          "
-          :style="{
-            width:
-              defaultColumns && wrap
-                ? width - 12 + 'px'
-                : defaultColumns
-                  ? tableRowSize + 'px'
-                  : table.getTotalSize() + 'px',
-            minWidth: '100%',
-            background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
-          }"
-          tag="tr"
-          @start="(event) => handleDragStart(event)"
-          @end="() => handleDragEnd()"
-          class="tw:flex items-center"
+        <!-- ── Pivot multi-level headers (dashboard only) ───────────────────── -->
+        <thead
+          v-if="pivotHeaderLevels.length > 0"
+          class="tw:sticky tw:top-0 tw:z-10"
         >
-          <th
-            v-for="header in headerGroup.headers"
-            :key="header.id"
-            :id="header.id"
-            class="tw:px-2 tw:relative table-head tw:text-ellipsis!"
+          <tr
+            v-for="(level, levelIdx) in pivotHeaderLevels"
+            :key="'hl_' + levelIdx"
+            style="max-height: 28px; height: 28px"
+          >
+            <!-- Row-field headers: first <tr> only, rowspan all levels -->
+            <th
+              v-if="levelIdx === 0"
+              v-for="col in pivotRowColumns"
+              :key="'rh_' + col.name"
+              :rowspan="pivotHeaderLevels.length"
+              class="pivot-group-header tw:cursor-pointer tw:px-2 tw:text-left"
+              :style="getStickyColumnStyle(col) as any"
+              @click="handlePivotSort(col.name)"
+            >
+              {{ col.label }}
+              <q-icon
+                :name="
+                  pivotSortState.descending ? 'arrow_downward' : 'arrow_upward'
+                "
+                size="12px"
+                class="q-ml-xs pivot-sort-icon"
+                :class="{
+                  'pivot-sort-active': pivotSortState.sortBy === col.name,
+                }"
+              />
+            </th>
+            <!-- Pivot group / value headers -->
+            <th
+              v-for="(cell, cellIdx) in level.cells"
+              :key="'c_' + levelIdx + '_' + cellIdx"
+              :colspan="cell.colspan"
+              :rowspan="cell.rowspan || 1"
+              class="tw:px-2"
+              :class="[
+                level.isLeaf
+                  ? 'pivot-value-header'
+                  : 'pivot-group-header tw:text-center',
+                { 'pivot-section-border': cell.hasBorder },
+                { 'pivot-total-col': stickyColTotals && cell._isTotalHeader },
+                { 'tw:cursor-pointer': cell._sortColumn },
+              ]"
+              :style="
+                (stickyColTotals && cell._isTotalHeader
+                  ? getStickyTotalHeaderForPivot(cell)
+                  : {}) as any
+              "
+              @click="cell._sortColumn && handlePivotSort(cell._sortColumn)"
+            >
+              {{ cell.label }}
+              <q-icon
+                v-if="level.isLeaf && cell._sortColumn"
+                :name="
+                  pivotSortState.descending ? 'arrow_downward' : 'arrow_upward'
+                "
+                size="12px"
+                class="q-ml-xs pivot-sort-icon"
+                :class="{
+                  'pivot-sort-active':
+                    pivotSortState.sortBy === cell._sortColumn,
+                }"
+              />
+            </th>
+          </tr>
+        </thead>
+
+        <!-- ── Standard TanStack headers (logs / non-pivot) ─────────────────── -->
+        <thead
+          v-else
+          class="tw:sticky tw:top-0 tw:z-10"
+          style="max-height: 44px; height: 22px"
+          v-for="headerGroup in table.getHeaderGroups()"
+          :key="headerGroup.id"
+        >
+          <vue-draggable
+            v-model="columnOrder"
+            :element="'table'"
+            :animation="200"
+            :sort="
+              enableColumnReorder && (!isResizingHeader || !defaultColumns)
+            "
+            handle=".table-head"
             :class="[
-              (header.column.columnDef.meta as any)?.align === 'center'
-                ? 'tw:text-center!'
+              // Flex only for logs/traces (enables drag-reorder + virtual-scroll alignment)
+              // Dashboard uses table-layout:auto — no flex so browser auto-sizes columns
+              !data ? 'tw:flex items-center' : '',
+              { 'dashboard-header-row': !!data },
+              enableColumnReorder && table.getState().columnOrder.length
+                ? 'tw:cursor-move!'
                 : '',
-              (header.column.columnDef.meta as any)?.align === 'right'
-                ? 'tw:text-right!'
-                : '',
-              (header.column.columnDef.meta as any)?.headerClass ?? '',
             ]"
             :style="{
-              width: `calc(var(--header-${sanitizeCssId(header?.id)}-size) * 1px)`,
-              height: rowHeight != null ? rowHeight + 'px' : undefined,
+              width:
+                defaultColumns && wrap
+                  ? width - 12 + 'px'
+                  : defaultColumns
+                    ? tableRowSize + 'px'
+                    : table.getTotalSize() + 'px',
+              minWidth: '100%',
+              background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
             }"
-            :data-test="`o2-table-th-${header.id}`"
+            tag="tr"
+            @start="(event) => handleDragStart(event)"
+            @end="() => handleDragEnd()"
           >
-            <div
-              class="tw:h-full tw:w-full tw:flex tw:items-center"
+            <th
+              v-for="header in headerGroup.headers"
+              :key="header.id"
+              :id="header.id"
+              class="tw:px-2 tw:relative table-head tw:text-ellipsis!"
               :class="[
                 (header.column.columnDef.meta as any)?.align === 'center'
-                  ? 'tw:justify-center! tw:text-center!'
+                  ? 'tw:text-center!'
                   : '',
                 (header.column.columnDef.meta as any)?.align === 'right'
-                  ? 'tw:justify-end! tw:text-right!'
+                  ? 'tw:text-right!'
                   : '',
+                (header.column.columnDef.meta as any)?.headerClass ?? '',
               ]"
+              :style="{
+                width: `calc(var(--header-${sanitizeCssId(header?.id)}-size) * 1px)`,
+                height: rowHeight != null ? rowHeight + 'px' : undefined,
+              }"
+              :data-test="`o2-table-th-${header.id}`"
             >
               <div
-                v-if="header.column.getCanResize()"
-                @dblclick="header.column.resetSize()"
-                @mousedown.self.prevent.stop="
-                  header.getResizeHandler()?.($event)
-                "
-                @touchstart.self.prevent.stop="
-                  header.getResizeHandler()?.($event)
-                "
+                class="tw:h-full tw:w-full tw:flex tw:items-center"
                 :class="[
-                  'resizer',
-                  'tw:hover:bg-[var(--o2-border-color)]',
-                  header.column.getIsResizing() ? 'isResizing' : '',
+                  (header.column.columnDef.meta as any)?.align === 'center'
+                    ? 'tw:justify-center! tw:text-center!'
+                    : '',
+                  (header.column.columnDef.meta as any)?.align === 'right'
+                    ? 'tw:justify-end! tw:text-right!'
+                    : '',
                 ]"
-                class="tw:right-0 tw:bg-transparent"
-              />
-              <div
-                v-if="!header.isPlaceholder"
-                :data-test="`o2-table-th-sort-${header.id}`"
-                :class="[
-                  'text-left',
-                  header.column.getCanSort() ||
-                  (sortBy !== undefined &&
-                    (header.column.columnDef.meta as any)?.sortable)
-                    ? 'cursor-pointer tw:gap-1'
-                    : 'cursor-pointer tw:gap-1',
-                ]"
-                @click="
-                  handleHeaderSortClick(
-                    $event,
-                    header.column,
-                    header.column.getToggleSortingHandler(),
-                  )
-                "
-                class="tw:overflow-hidden tw:whitespace-nowrap tw:text-ellipsis! tw:tracking-[0.06rem] tw:text-[var(--o2-text-2)] tw:text-[0.85rem]"
               >
-                <FlexRender
-                  :render="header.column.columnDef.header"
-                  :props="header.getContext()"
+                <div
+                  v-if="header.column.getCanResize()"
+                  @dblclick="header.column.resetSize()"
+                  @mousedown.self.prevent.stop="
+                    header.getResizeHandler()?.($event)
+                  "
+                  @touchstart.self.prevent.stop="
+                    header.getResizeHandler()?.($event)
+                  "
+                  :class="[
+                    'resizer',
+                    'tw:hover:bg-[var(--o2-border-color)]',
+                    header.column.getIsResizing() ? 'isResizing' : '',
+                  ]"
+                  class="tw:right-0 tw:bg-transparent"
                 />
-                <!-- Server-side sort icons (shown when sortBy prop is provided) -->
-                <template
-                  v-if="
-                    sortBy !== undefined &&
-                    (header.column.columnDef.meta as any)?.sortable
+                <div
+                  v-if="!header.isPlaceholder"
+                  :data-test="`o2-table-th-sort-${header.id}`"
+                  :class="[
+                    'text-left',
+                    header.column.getCanSort() ||
+                    (sortBy !== undefined &&
+                      (header.column.columnDef.meta as any)?.sortable)
+                      ? 'cursor-pointer tw:gap-1'
+                      : 'cursor-pointer tw:gap-1',
+                  ]"
+                  @click="
+                    handleHeaderSortClick(
+                      $event,
+                      header.column,
+                      header.column.getToggleSortingHandler(),
+                    )
                   "
+                  class="tw:overflow-hidden tw:whitespace-nowrap tw:text-ellipsis! tw:tracking-[0.06rem] tw:text-[var(--o2-text-2)] tw:text-[0.85rem]"
                 >
-                  <q-icon
+                  <FlexRender
+                    :render="header.column.columnDef.header"
+                    :props="header.getContext()"
+                  />
+                  <!-- Server-side sort icons (shown when sortBy prop is provided) -->
+                  <template
                     v-if="
-                      (sortFieldMap?.[header.column.id] ?? header.column.id) ===
-                      sortBy
+                      sortBy !== undefined &&
+                      (header.column.columnDef.meta as any)?.sortable
                     "
-                    :name="
-                      sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward'
-                    "
-                    data-test="tenstack-table-sort-icon-active"
-                    size="0.85rem"
-                    class="tw:text-[var(--o2-primary-color)]"
-                  />
-                  <q-icon
-                    v-else
-                    name="unfold_more"
-                    data-test="tenstack-table-sort-icon-inactive"
-                    size="0.85rem"
-                    class="tw:opacity-40"
-                  />
-                </template>
-              </div>
-              <div
-                :data-test="`o2-table-add-data-from-column-${header.column.columnDef.header}`"
-                class="tw:invisible tw:items-center tw:absolute tw:right-2 tw:top-0 tw:px-2 column-actions tw:h-full tw:flex"
-                :class="
-                  store.state.theme === 'dark' ? 'field_overlay_dark' : ''
-                "
-                v-if="
-                  (header.column.columnDef.meta as any)?.closable ||
-                  (header.column.columnDef.meta as any)?.showWrap
-                "
-              >
-                <q-icon
-                  v-if="(header.column.columnDef.meta as any).closable"
-                  :data-test="`o2-table-th-remove-${header.column.columnDef.header}-btn`"
-                  name="cancel"
-                  class="q-ma-none close-icon cursor-pointer"
+                  >
+                    <q-icon
+                      v-if="
+                        (sortFieldMap?.[header.column.id] ??
+                          header.column.id) === sortBy
+                      "
+                      :name="
+                        sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward'
+                      "
+                      data-test="tenstack-table-sort-icon-active"
+                      size="0.85rem"
+                      class="tw:text-[var(--o2-primary-color)]"
+                    />
+                    <q-icon
+                      v-else
+                      name="unfold_more"
+                      data-test="tenstack-table-sort-icon-inactive"
+                      size="0.85rem"
+                      class="tw:opacity-40"
+                    />
+                  </template>
+                </div>
+                <div
+                  :data-test="`o2-table-add-data-from-column-${header.column.columnDef.header}`"
+                  class="tw:invisible tw:items-center tw:absolute tw:right-2 tw:top-0 tw:px-2 column-actions tw:h-full tw:flex"
                   :class="
-                    store.state.theme === 'dark' ? 'text-white' : 'text-grey-7'
+                    store.state.theme === 'dark' ? 'field_overlay_dark' : ''
                   "
-                  :title="t('common.close')"
-                  size="18px"
-                  @click="closeColumn(header.column.columnDef)"
+                  v-if="
+                    (header.column.columnDef.meta as any)?.closable ||
+                    (header.column.columnDef.meta as any)?.showWrap
+                  "
                 >
-                </q-icon>
+                  <q-icon
+                    v-if="(header.column.columnDef.meta as any).closable"
+                    :data-test="`o2-table-th-remove-${header.column.columnDef.header}-btn`"
+                    name="cancel"
+                    class="q-ma-none close-icon cursor-pointer"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'text-white'
+                        : 'text-grey-7'
+                    "
+                    :title="t('common.close')"
+                    size="18px"
+                    @click="closeColumn(header.column.columnDef)"
+                  >
+                  </q-icon>
+                </div>
               </div>
-            </div>
-          </th>
-        </vue-draggable>
+            </th>
+          </vue-draggable>
 
-        <!-- Loading row: shown when there are no rows yet (initial fetch) -->
-        <tr v-if="loading && tableRows.length === 0" class="tw:w-full">
-          <td
-            :colspan="columnOrder.length"
-            class="text-bold"
-            :style="{
-              background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
-              opacity: 0.7,
-            }"
-          >
-            <slot name="loading">
-              <div
-                class="text-subtitle2 text-weight-bold tw:flex tw:items-center"
-              >
-                <q-spinner-hourglass size="20px" />
-                {{ t("confirmDialog.loading") }}
+          <!-- Loading row: shown when there are no rows yet (initial fetch) -->
+          <tr v-if="loading && tableRows.length === 0" class="tw:w-full">
+            <td
+              :colspan="columnOrder.length"
+              class="text-bold"
+              :style="{
+                background:
+                  store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
+                opacity: 0.7,
+              }"
+            >
+              <slot name="loading">
+                <div
+                  class="text-subtitle2 text-weight-bold tw:flex tw:items-center"
+                >
+                  <q-spinner-hourglass size="20px" />
+                  {{ t("confirmDialog.loading") }}
+                </div>
+              </slot>
+            </td>
+          </tr>
+          <!-- Loading banner: shown above rows while a new page is fetching -->
+          <tr v-if="loading && tableRows.length > 0" class="tw:w-full">
+            <td :colspan="columnOrder.length">
+              <slot name="loading-banner" />
+            </td>
+          </tr>
+          <tr v-if="!loading && errMsg != ''" class="tw:w-full">
+            <td
+              :colspan="columnOrder.length"
+              class="text-bold"
+              style="opacity: 0.7"
+            >
+              <div class="text-subtitle2 text-weight-bold bg-warning">
+                <q-icon size="xs" name="warning" class="q-mr-xs" />
+                {{ errMsg }}
               </div>
-            </slot>
-          </td>
-        </tr>
-        <!-- Loading banner: shown above rows while a new page is fetching -->
-        <tr v-if="loading && tableRows.length > 0" class="tw:w-full">
-          <td :colspan="columnOrder.length">
-            <slot name="loading-banner" />
-          </td>
-        </tr>
-        <tr v-if="!loading && errMsg != ''" class="tw:w-full">
-          <td
-            :colspan="columnOrder.length"
-            class="text-bold"
-            style="opacity: 0.7"
-          >
-            <div class="text-subtitle2 text-weight-bold bg-warning">
-              <q-icon size="xs" name="warning" class="q-mr-xs" />
-              {{ errMsg }}
-            </div>
-          </td>
-        </tr>
-        <tr data-test="o2-table-function-error" v-if="functionErrorMsg != ''">
-          <td
-            :colspan="columnOrder.length"
-            class="text-bold"
-            style="opacity: 0.6"
-          >
-            <div
-              class="text-subtitle2 text-weight-bold q-pl-sm"
+            </td>
+          </tr>
+          <tr data-test="o2-table-function-error" v-if="functionErrorMsg != ''">
+            <td
+              :colspan="columnOrder.length"
+              class="text-bold"
+              style="opacity: 0.6"
+            >
+              <div
+                class="text-subtitle2 text-weight-bold q-pl-sm"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'tw:bg-yellow-600'
+                    : 'tw:bg-amber-300'
+                "
+              >
+                <q-btn
+                  :icon="isFunctionErrorOpen ? 'expand_more' : 'chevron_right'"
+                  dense
+                  size="xs"
+                  flat
+                  class="q-mr-xs"
+                  data-test="table-row-expand-menu"
+                  @click.capture.stop="expandFunctionError"
+                ></q-btn
+                ><b>
+                  <q-icon name="warning" size="15px"></q-icon>
+                  {{ t("search.functionErrorLabel") }}</b
+                >
+              </div>
+            </td>
+          </tr>
+          <tr v-if="functionErrorMsg != '' && isFunctionErrorOpen">
+            <td
+              :colspan="columnOrder.length"
+              style="opacity: 0.7"
+              class="q-px-sm"
               :class="
                 store.state.theme === 'dark'
                   ? 'tw:bg-yellow-600'
                   : 'tw:bg-amber-300'
               "
             >
-              <q-btn
-                :icon="isFunctionErrorOpen ? 'expand_more' : 'chevron_right'"
-                dense
-                size="xs"
-                flat
-                class="q-mr-xs"
-                data-test="table-row-expand-menu"
-                @click.capture.stop="expandFunctionError"
-              ></q-btn
-              ><b>
-                <q-icon name="warning" size="15px"></q-icon>
-                {{ t("search.functionErrorLabel") }}</b
-              >
-            </div>
-          </td>
-        </tr>
-        <tr v-if="functionErrorMsg != '' && isFunctionErrorOpen">
-          <td
-            :colspan="columnOrder.length"
-            style="opacity: 0.7"
-            class="q-px-sm"
-            :class="
-              store.state.theme === 'dark'
-                ? 'tw:bg-yellow-600'
-                : 'tw:bg-amber-300'
-            "
-          >
-            <pre>{{ functionErrorMsg }}</pre>
-          </td>
-        </tr>
-      </thead>
-      <tbody data-test="o2-table-body" ref="tableBodyRef" class="tw:relative">
-        <template v-for="virtualRow in virtualRows" :key="virtualRow.id">
-          <tr
-            :data-test="`o2-table-detail-${
-              (tableRows[virtualRow.index] as any)[
-                store.state.zoConfig.timestamp_column || '_timestamp'
-              ]
-            }`"
-            :style="{
-              transform: `translateY(${virtualRow.start + (isFirefox ? baseOffset : 0)}px)`,
-              minWidth: '100%',
-            }"
-            :data-index="virtualRow.index"
-            :data-expanded="
-              formattedRows?.[virtualRow.index]?.original?.isExpandedRow
-            "
-            :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
-            class="tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b-[1px] tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
-            :class="[
-              defaultColumns &&
-              !wrap &&
-              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? 'tw:table-row'
-                : 'tw:flex',
-              (tableRows[virtualRow.index] as any)[
-                store.state.zoConfig.timestamp_column
-              ] === highlightTimestamp &&
-              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? store.state.theme === 'dark'
-                  ? 'tw:bg-zinc-700'
-                  : 'tw:bg-zinc-300'
-                : '',
-              'table-row-hover',
-              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? rowClass?.(tableRows[virtualRow.index] as any)
-                : undefined,
-            ]"
-            @click="
-              !(formattedRows[virtualRow.index]?.original as any)
-                ?.isExpandedRow &&
-              handleDataRowClick(tableRows[virtualRow.index], virtualRow.index)
-            "
-          >
-            <!-- Status color line for entire row -->
-            <div
-              v-if="
-                enableStatusBar &&
-                !(formattedRows[virtualRow.index]?.original as any)
-                  ?.isExpandedRow
-              "
-              class="tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:z-10"
-              :style="{
-                backgroundColor: getRowStatusColor(tableRows[virtualRow.index]),
-              }"
-            />
-            <td
-              v-if="
-                enableRowExpand &&
-                (formattedRows[virtualRow.index]?.original as any)
-                  ?.isExpandedRow
-              "
-              :colspan="columnOrder.length"
-              :data-test="`o2-table-expanded-row-${virtualRow.index}`"
-              class="tw:w-full tw:relative"
-            >
-              <json-preview
-                :value="tableRows[virtualRow.index - 1] as any"
-                show-copy-button
-                class="tw:py-[0.375rem]"
-                mode="expanded"
-                :index="calculateActualIndex(virtualRow.index - 1)"
-                :highlight-query="highlightQuery"
-                :hide-view-related="hideViewRelatedButton"
-                :hide-field-options="hideExpandFieldOptions"
-                @copy="copyLogToClipboard"
-                @add-field-to-table="addFieldToTable"
-                @add-search-term="addSearchTerm"
-                @view-trace="
-                  viewTrace(formattedRows[virtualRow.index - 1]?.original)
-                "
-                @show-correlation="
-                  showCorrelation(formattedRows[virtualRow.index - 1]?.original)
-                "
-                :streamName="jsonpreviewStreamName"
-                @send-to-ai-chat="sendToAiChat"
-              />
+              <pre>{{ functionErrorMsg }}</pre>
             </td>
-            <template v-else>
+          </tr>
+        </thead>
+        <!-- tw:relative is only needed for virtual-scroll absolute rows (logs/traces).
+           In dashboard mode (regular DOM rows) it must be absent so that
+           position:sticky on <thead> works correctly. -->
+        <tbody
+          data-test="o2-table-body"
+          ref="tableBodyRef"
+          :class="{ 'tw:relative': !data && !showPagination }"
+        >
+          <!-- ── Dashboard: regular DOM rows (no virtual scroll) ──────────────── -->
+          <!-- Used when `data` prop is present (dashboard mode) OR pagination is
+             enabled. Virtual scroll (below) is only for logs/traces. -->
+          <template v-if="showPagination || !!data">
+            <tr
+              v-for="(row, rowIdx) in pagedRows"
+              :key="row.id"
+              class="tw:border-b tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)] dashboard-data-row"
+              @click="
+                handleDataRowClick(row.original, rowIdx as number, $event)
+              "
+            >
               <td
-                v-for="(cell, cellIndex) in formattedRows[
-                  virtualRow.index
-                ].getVisibleCells()"
+                v-for="(cell, cellIndex) in row.getVisibleCells()"
                 :key="cell.id"
-                :data-test="
-                  'o2-table-column-' +
-                  virtualRow.index +
-                  '-' +
-                  cell.column.columnDef.id
-                "
-                class="tw:py-none tw:px-2 tw:items-center tw:justify-start tw:relative table-cell"
+                class="tw:py-1 tw:px-2 tw:overflow-hidden tw:relative table-cell copy-cell-td"
                 :class="[
-                  ...tableCellClass,
-                  { 'tw:pl-2': cellIndex === 0 },
                   (cell.column.columnDef.meta as any)?.align === 'center'
-                    ? 'tw:justify-center! tw:text-center!'
+                    ? 'tw:text-center!'
                     : '',
                   (cell.column.columnDef.meta as any)?.align === 'right'
-                    ? 'tw:justify-end! tw:text-right!'
+                    ? 'tw:text-right!'
                     : '',
                   (cell.column.columnDef.meta as any)?.cellClass ?? '',
+                  {
+                    'sticky-column': (cell.column.columnDef.meta as any)
+                      ?.sticky,
+                  },
+                  {
+                    'pivot-total-col':
+                      stickyColTotals &&
+                      (cell.column.columnDef.meta as any)?._isTotalColumn,
+                  },
+                  isPivotMergeNoBorder(
+                    row.original,
+                    (cell.column.columnDef.meta as any)?._col,
+                  )
+                    ? 'pivot-no-border'
+                    : '',
                 ]"
-                :style="{
-                  width:
-                    cell.column.columnDef.id !== 'source' ||
-                    cell.column.columnDef.enableResizing
-                      ? `calc(var(--col-${sanitizeCssId(cell.column.columnDef.id)}-size) * 1px)`
-                      : wrap
-                        ? width - 260 - 12 + 'px'
-                        : 'auto',
-                  height: wrap
-                    ? 'stretch'
-                    : rowHeight != null
-                      ? rowHeight + 'px'
-                      : undefined,
-                }"
-                @mouseover="handleCellMouseOver(cell)"
-                @mouseleave="handleCellMouseLeave()"
+                :style="[
+                  {
+                    width: `calc(var(--col-${sanitizeCssId(cell.column.columnDef.id)}-size) * 1px)`,
+                    height: rowHeight ? rowHeight + 'px' : undefined,
+                  },
+                  getDashboardCellStyle(cell),
+                  getStickyColumnStyle(
+                    (cell.column.columnDef.meta as any)?._col,
+                  ) as any,
+                  getStickyTotalColumnStyle(
+                    (cell.column.columnDef.meta as any)?._col,
+                  ) as any,
+                ]"
               >
-                <div
-                  class="tw:h-full tw:w-full tw:flex tw:items-center"
+                <template
+                  v-if="
+                    !isPivotMergeHidden(
+                      row.original,
+                      (cell.column.columnDef.meta as any)?._col,
+                    )
+                  "
+                >
+                  <div
+                    class="tw:h-full tw:w-full tw:flex tw:items-center"
+                    :class="[
+                      (cell.column.columnDef.meta as any)?.align === 'center'
+                        ? 'tw:justify-center!'
+                        : '',
+                      (cell.column.columnDef.meta as any)?.align === 'right'
+                        ? 'tw:justify-end!'
+                        : '',
+                    ]"
+                  >
+                    <!-- Copy button LEFT (right-aligned) -->
+                    <q-btn
+                      v-if="
+                        enableCellCopy &&
+                        (cell.column.columnDef.meta as any)?.align ===
+                          'right' &&
+                        shouldShowCopyButton(cell.getValue())
+                      "
+                      :icon="
+                        isCellCopied(rowIdx as number, cell.column.id)
+                          ? 'check'
+                          : 'content_copy'
+                      "
+                      dense
+                      size="xs"
+                      no-caps
+                      flat
+                      class="copy-btn q-mr-xs"
+                      @click.stop="
+                        copyCellContent(
+                          cell.getValue(),
+                          rowIdx as number,
+                          cell.column.id,
+                        )
+                      "
+                    />
+                    <!-- JSON field inline renderer -->
+                    <JsonFieldRenderer
+                      v-if="
+                        (cell.column.columnDef.meta as any)?.showFieldAsJson
+                      "
+                      :value="cell.getValue()"
+                    />
+                    <!-- Default value with format fn -->
+                    <span
+                      v-else
+                      :class="[
+                        !props.wrap
+                          ? 'tw:min-w-0 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap'
+                          : '',
+                        props.wrap ? 'tw:break-words' : '',
+                      ]"
+                    >
+                      {{ getDashboardCellValue(cell) }}
+                    </span>
+                    <!-- Copy button RIGHT (left/center-aligned) -->
+                    <q-btn
+                      v-if="
+                        enableCellCopy &&
+                        (cell.column.columnDef.meta as any)?.align !==
+                          'right' &&
+                        shouldShowCopyButton(cell.getValue())
+                      "
+                      :icon="
+                        isCellCopied(rowIdx as number, cell.column.id)
+                          ? 'check'
+                          : 'content_copy'
+                      "
+                      dense
+                      size="xs"
+                      no-caps
+                      flat
+                      class="copy-btn q-ml-xs"
+                      @click.stop="
+                        copyCellContent(
+                          cell.getValue(),
+                          rowIdx as number,
+                          cell.column.id,
+                        )
+                      "
+                    />
+                  </div>
+                </template>
+              </td>
+            </tr>
+          </template>
+
+          <!-- ── Virtual scroll rows (logs / traces only — no `data` prop) ────── -->
+          <template
+            v-if="!showPagination && !data"
+            v-for="virtualRow in virtualRows"
+            :key="virtualRow.index"
+          >
+            <tr
+              :data-test="`o2-table-detail-${
+                (tableRows[virtualRow.index] as any)[
+                  store.state.zoConfig.timestamp_column || '_timestamp'
+                ]
+              }`"
+              :style="{
+                transform: `translateY(${virtualRow.start + (isFirefox ? baseOffset : 0)}px)`,
+                minWidth: '100%',
+              }"
+              :data-index="virtualRow.index"
+              :data-expanded="
+                formattedRows?.[virtualRow.index]?.original?.isExpandedRow
+              "
+              :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
+              class="tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
+              :class="[
+                defaultColumns &&
+                !wrap &&
+                !(formattedRows[virtualRow.index]?.original as any)
+                  ?.isExpandedRow
+                  ? 'tw:table-row'
+                  : 'tw:flex',
+                (tableRows[virtualRow.index] as any)[
+                  store.state.zoConfig.timestamp_column
+                ] === highlightTimestamp &&
+                !(formattedRows[virtualRow.index]?.original as any)
+                  ?.isExpandedRow
+                  ? store.state.theme === 'dark'
+                    ? 'tw:bg-zinc-700'
+                    : 'tw:bg-zinc-300'
+                  : '',
+                'table-row-hover',
+                !(formattedRows[virtualRow.index]?.original as any)
+                  ?.isExpandedRow
+                  ? rowClass?.(tableRows[virtualRow.index] as any)
+                  : undefined,
+              ]"
+              @click="
+                !(formattedRows[virtualRow.index]?.original as any)
+                  ?.isExpandedRow &&
+                handleDataRowClick(
+                  tableRows[virtualRow.index],
+                  virtualRow.index,
+                  $event,
+                )
+              "
+            >
+              <!-- Status color line for entire row -->
+              <div
+                v-if="
+                  enableStatusBar &&
+                  !(formattedRows[virtualRow.index]?.original as any)
+                    ?.isExpandedRow
+                "
+                class="tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:z-10"
+                :style="{
+                  backgroundColor: getRowStatusColor(
+                    tableRows[virtualRow.index],
+                  ),
+                }"
+              />
+              <td
+                v-if="
+                  enableRowExpand &&
+                  (formattedRows[virtualRow.index]?.original as any)
+                    ?.isExpandedRow
+                "
+                :colspan="columnOrder.length"
+                :data-test="`o2-table-expanded-row-${virtualRow.index}`"
+                class="tw:w-full tw:relative"
+              >
+                <json-preview
+                  :value="tableRows[virtualRow.index - 1] as any"
+                  show-copy-button
+                  class="tw:py-[0.375rem]"
+                  mode="expanded"
+                  :index="calculateActualIndex(virtualRow.index - 1)"
+                  :highlight-query="highlightQuery"
+                  :hide-view-related="hideViewRelatedButton"
+                  :hide-field-options="hideExpandFieldOptions"
+                @copy="copyLogToClipboard"
+                  @add-field-to-table="addFieldToTable"
+                  @add-search-term="addSearchTerm"
+                  @view-trace="
+                    viewTrace(formattedRows[virtualRow.index - 1]?.original)
+                  "
+                  @show-correlation="
+                    showCorrelation(
+                      formattedRows[virtualRow.index - 1]?.original,
+                    )
+                  "
+                  :streamName="jsonpreviewStreamName"
+                  @send-to-ai-chat="sendToAiChat"
+                />
+              </td>
+              <template v-else>
+                <td
+                  v-for="(cell, cellIndex) in formattedRows[
+                    virtualRow.index
+                  ].getVisibleCells()"
+                  :key="cell.id"
+                  :data-test="
+                    'o2-table-column-' +
+                    virtualRow.index +
+                    '-' +
+                    cell.column.columnDef.id
+                  "
+                  class="tw:py-none tw:px-2 tw:items-center tw:justify-start tw:relative table-cell copy-cell-td"
                   :class="[
+                    ...tableCellClass,
+                    { 'tw:pl-2': cellIndex === 0 },
                     (cell.column.columnDef.meta as any)?.align === 'center'
                       ? 'tw:justify-center! tw:text-center!'
                       : '',
                     (cell.column.columnDef.meta as any)?.align === 'right'
                       ? 'tw:justify-end! tw:text-right!'
                       : '',
+                    (cell.column.columnDef.meta as any)?.cellClass ?? '',
+                    {
+                      'sticky-column': (cell.column.columnDef.meta as any)
+                        ?.sticky,
+                    },
+                    {
+                      'pivot-total-col':
+                        stickyColTotals &&
+                        (cell.column.columnDef.meta as any)?._isTotalColumn,
+                    },
+                    isPivotMergeNoBorder(
+                      cell.row.original,
+                      (cell.column.columnDef.meta as any)?._col,
+                    )
+                      ? 'pivot-no-border'
+                      : '',
                   ]"
+                  :style="[
+                    {
+                      width:
+                        cell.column.columnDef.id !== 'source' ||
+                        cell.column.columnDef.enableResizing
+                          ? `calc(var(--col-${sanitizeCssId(cell.column.columnDef.id)}-size) * 1px)`
+                          : wrap
+                            ? width - 260 - 12 + 'px'
+                            : 'auto',
+                      height: wrap
+                        ? 'stretch'
+                        : rowHeight != null
+                          ? (rowHeight ?? 28) + 'px'
+                          : undefined,
+                    },
+                    getDashboardCellStyle(cell),
+                    getStickyColumnStyle(
+                      (cell.column.columnDef.meta as any)?._col,
+                    ) as any,
+                    getStickyTotalColumnStyle(
+                      (cell.column.columnDef.meta as any)?._col,
+                    ) as any,
+                  ]"
+                  @mouseover="handleCellMouseOver(cell)"
+                  @mouseleave="handleCellMouseLeave()"
                 >
-                  <q-btn
-                    v-if="enableRowExpand && cellIndex == 0"
-                    :icon="
-                      expandedRowIndices.has(virtualRow.index)
-                        ? 'expand_more'
-                        : 'chevron_right'
-                    "
-                    dense
-                    size="xs"
-                    flat
-                    class="q-mr-xs"
-                    data-test="table-row-expand-menu"
-                    @click.capture.stop="handleExpandRow(virtualRow.index)"
-                  ></q-btn>
-                  <slot
-                    name="cell-actions"
-                    :row="cell.row.original"
-                    :column="cell.column"
-                    :active="
-                      activeCellActionId === `${cell.id}_${cell.column.id}`
-                    "
-                  />
-                  <!-- If column.meta.slot is set, delegate to the named cell slot -->
-                  <slot
-                    v-if="(cell.column.columnDef.meta as any)?.slot"
-                    :name="`cell-${cell.column.id}`"
-                    :item="cell.row.original"
-                    :cell="cell"
-                  />
-                  <!-- Otherwise render the default cell content inline -->
-                  <template v-else>
-                    <span
-                      v-if="
-                        processedResults[
-                          `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
-                        ]
+                  <div
+                    class="tw:h-full tw:w-full tw:flex tw:items-center"
+                    :class="[
+                      (cell.column.columnDef.meta as any)?.align === 'center'
+                        ? 'tw:justify-center! tw:text-center!'
+                        : '',
+                      (cell.column.columnDef.meta as any)?.align === 'right'
+                        ? 'tw:justify-end! tw:text-right!'
+                        : '',
+                    ]"
+                  >
+                    <q-btn
+                      v-if="enableRowExpand && cellIndex == 0"
+                      :icon="
+                        expandedRowIndices.has(virtualRow.index)
+                          ? 'expand_more'
+                          : 'chevron_right'
                       "
-                      :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
-                      :class="store.state.theme === 'dark' ? 'dark' : ''"
-                      v-html="
-                        processedResults[
-                          `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
-                        ]
+                      dense
+                      size="xs"
+                      flat
+                      class="q-mr-xs"
+                      data-test="table-row-expand-menu"
+                      @click.capture.stop="handleExpandRow(virtualRow.index)"
+                    ></q-btn>
+                    <slot
+                      name="cell-actions"
+                      :row="cell.row.original"
+                      :column="cell.column"
+                      :active="
+                        activeCellActionId === `${cell.id}_${cell.column.id}`
                       "
                     />
-                    <span
-                      :style="{
-                        width:
-                          cell.column.columnDef.id !== 'source' ||
-                          cell.column.columnDef.enableResizing
-                            ? `calc((var(--col-${sanitizeCssId(cell.column.columnDef.id)}-size) * 1px) - 0.5rem)`
-                            : wrap
-                              ? width - 260 - 12 + 'px'
-                              : 'auto',
-                      }"
-                      :class="[
-                        !props.wrap
-                          ? 'tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap'
-                          : '',
-                        props.wrap ? 'tw:break-words' : '',
-                      ]"
-                      v-else
-                    >
-                      {{ cell.renderValue() }}
-                    </span>
-                    <O2AIContextAddBtn
-                      v-if="
-                        enableAiContextButton &&
-                        cell.column.columnDef.id ===
-                          store.state.zoConfig.timestamp_column
-                      "
-                      class="tw:absolute tw:top-[14px] tw:left-[18px] tw:transform tw:invisible tw:-translate-y-1/2 ai-btn"
-                      @send-to-ai-chat="
-                        sendToAiChat(JSON.stringify(cell.row.original), true)
-                      "
+                    <!-- If column.meta.slot is set, delegate to the named cell slot -->
+                    <slot
+                      v-if="(cell.column.columnDef.meta as any)?.slot"
+                      :name="`cell-${cell.column.id}`"
+                      :item="cell.row.original"
+                      :cell="cell"
                     />
-                  </template>
-                </div>
-              </td>
-            </template>
+                    <!-- Otherwise render the default cell content inline -->
+                    <template v-else>
+                      <!-- Pivot merge: skip content for hidden (merged) cells -->
+                      <template
+                        v-if="
+                          !isPivotMergeHidden(
+                            cell.row.original,
+                            (cell.column.columnDef.meta as any)?._col,
+                          )
+                        "
+                      >
+                        <!-- Dashboard: copy button LEFT (right-aligned columns) -->
+                        <q-btn
+                          v-if="
+                            enableCellCopy &&
+                            (cell.column.columnDef.meta as any)?.align ===
+                              'right' &&
+                            shouldShowCopyButton(cell.getValue())
+                          "
+                          :icon="
+                            isCellCopied(virtualRow.index, cell.column.id)
+                              ? 'check'
+                              : 'content_copy'
+                          "
+                          dense
+                          size="xs"
+                          no-caps
+                          flat
+                          class="copy-btn q-mr-xs"
+                          @click.stop="
+                            copyCellContent(
+                              cell.getValue(),
+                              virtualRow.index,
+                              cell.column.id,
+                            )
+                          "
+                        />
+                        <!-- Dashboard: JSON field inline renderer -->
+                        <JsonFieldRenderer
+                          v-if="
+                            (cell.column.columnDef.meta as any)?.showFieldAsJson
+                          "
+                          :value="cell.getValue()"
+                        />
+                        <!-- Logs: FTS-highlighted text -->
+                        <span
+                          v-else-if="
+                            processedResults[
+                              `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
+                            ]
+                          "
+                          :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
+                          :class="store.state.theme === 'dark' ? 'dark' : ''"
+                          v-html="
+                            processedResults[
+                              `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
+                            ]
+                          "
+                        />
+                        <!-- Default value (dashboard: format fn; logs: renderValue) -->
+                        <span
+                          :style="{
+                            width:
+                              cell.column.columnDef.id !== 'source' ||
+                              cell.column.columnDef.enableResizing
+                                ? `calc((var(--col-${sanitizeCssId(cell.column.columnDef.id)}-size) * 1px) - 0.5rem)`
+                                : wrap
+                                  ? width - 260 - 12 + 'px'
+                                  : 'auto',
+                          }"
+                          :class="[
+                            !props.wrap
+                              ? 'tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap'
+                              : '',
+                            props.wrap ? 'tw:break-words' : '',
+                          ]"
+                          v-else
+                        >
+                          {{ getDashboardCellValue(cell) }}
+                        </span>
+                        <!-- Logs: AI context button -->
+                        <O2AIContextAddBtn
+                          v-if="
+                            enableAiContextButton &&
+                            cell.column.columnDef.id ===
+                              store.state.zoConfig.timestamp_column
+                          "
+                          class="tw:absolute tw:top-[14px] tw:left-[18px] tw:transform tw:invisible tw:-translate-y-1/2 ai-btn"
+                          @send-to-ai-chat="
+                            sendToAiChat(
+                              JSON.stringify(cell.row.original),
+                              true,
+                            )
+                          "
+                        />
+                        <!-- Dashboard: copy button RIGHT (left/center-aligned) -->
+                        <q-btn
+                          v-if="
+                            enableCellCopy &&
+                            (cell.column.columnDef.meta as any)?.align !==
+                              'right' &&
+                            shouldShowCopyButton(cell.getValue())
+                          "
+                          :icon="
+                            isCellCopied(virtualRow.index, cell.column.id)
+                              ? 'check'
+                              : 'content_copy'
+                          "
+                          dense
+                          size="xs"
+                          no-caps
+                          flat
+                          class="copy-btn q-ml-xs"
+                          @click.stop="
+                            copyCellContent(
+                              cell.getValue(),
+                              virtualRow.index,
+                              cell.column.id,
+                            )
+                          "
+                        />
+                      </template>
+                    </template>
+                  </div>
+                </td>
+              </template>
+            </tr>
+          </template>
+          <!-- Empty slot: shown when rows is empty and not loading -->
+          <tr v-if="!loading && tableRows.length === 0" class="tw:w-full">
+            <td :colspan="columnOrder.length">
+              <slot name="empty" />
+            </td>
           </tr>
-        </template>
-        <!-- Empty slot: shown when rows is empty and not loading -->
-        <tr v-if="!loading && tableRows.length === 0" class="tw:w-full">
-          <td :colspan="columnOrder.length">
-            <slot name="empty" />
-          </td>
-        </tr>
-      </tbody>
-    </table>
+        </tbody>
+
+        <!-- ── Dashboard: sticky grand-total row ──────────────────────────────── -->
+        <tfoot
+          v-if="stickyTotalRow"
+          style="position: sticky; bottom: 0; z-index: 10"
+        >
+          <tr class="pivot-total-row pivot-sticky-total-row">
+            <td
+              v-for="col in data?.columns || []"
+              :key="'ft_' + col.name"
+              class="tw:px-2"
+              :class="[
+                col.align === 'right'
+                  ? 'tw:text-right'
+                  : col.align === 'center'
+                    ? 'tw:text-center'
+                    : 'tw:text-left',
+                { 'sticky-column': col.sticky },
+                { 'pivot-total-col': stickyColTotals && col._isTotalColumn },
+              ]"
+              :style="
+                [
+                  getStickyTotalColumnStyle(col),
+                  getStickyColumnStyle(col),
+                ] as any
+              "
+            >
+              {{
+                stickyTotalRow[col.field] === undefined ||
+                stickyTotalRow[col.field] === null
+                  ? ""
+                  : col.format
+                    ? col.format(stickyTotalRow[col.field], stickyTotalRow)
+                    : stickyTotalRow[col.field]
+              }}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <!-- end scroll container -->
+
+    <!-- ── Dashboard: bottom slot (custom footer) or default pagination ──── -->
+    <!-- Lives OUTSIDE the scroll container so it's always visible -->
+    <template v-if="$slots.bottom">
+      <slot
+        name="bottom"
+        :setRowsPerPage="
+          (val: number) => {
+            localRowsPerPage = val;
+            currentPage = 1;
+          }
+        "
+        :paginationOptions="paginationOptions"
+        :totalRows="tableRows.length"
+        :pagination="{ rowsPerPage: localRowsPerPage, page: currentPage }"
+        :pagesNumber="
+          localRowsPerPage === 0
+            ? 1
+            : Math.ceil(tableRows.length / localRowsPerPage) || 1
+        "
+        :isFirstPage="currentPage === 1"
+        :isLastPage="
+          currentPage >=
+          (localRowsPerPage === 0
+            ? 1
+            : Math.ceil(tableRows.length / localRowsPerPage) || 1)
+        "
+        :firstPage="() => (currentPage = 1)"
+        :prevPage="() => (currentPage = Math.max(1, currentPage - 1))"
+        :nextPage="
+          () => {
+            const pages =
+              localRowsPerPage === 0
+                ? 1
+                : Math.ceil(tableRows.length / localRowsPerPage) || 1;
+            currentPage = Math.min(pages, currentPage + 1);
+          }
+        "
+        :lastPage="
+          () => {
+            currentPage =
+              localRowsPerPage === 0
+                ? 1
+                : Math.ceil(tableRows.length / localRowsPerPage) || 1;
+          }
+        "
+      />
+    </template>
+    <!-- Show pagination controls (or just the row count) for all dashboard tables -->
+    <div
+      v-else-if="showPagination || !!data"
+      class="row items-center full-width"
+    >
+      <q-space />
+      <TablePaginationControls
+        :show-pagination="showPagination"
+        :pagination="{ rowsPerPage: localRowsPerPage, page: currentPage }"
+        :pagination-options="paginationOptions"
+        :total-rows="tableRows.length"
+        :pages-number="
+          localRowsPerPage === 0
+            ? 1
+            : Math.ceil(tableRows.length / localRowsPerPage) || 1
+        "
+        :is-first-page="currentPage === 1"
+        :is-last-page="
+          currentPage >=
+          (localRowsPerPage === 0
+            ? 1
+            : Math.ceil(tableRows.length / localRowsPerPage) || 1)
+        "
+        @update:rows-per-page="
+          (val: number) => {
+            localRowsPerPage = val;
+            currentPage = 1;
+          }
+        "
+        @first-page="currentPage = 1"
+        @prev-page="currentPage = Math.max(1, currentPage - 1)"
+        @next-page="
+          currentPage = Math.min(
+            localRowsPerPage === 0
+              ? 1
+              : Math.ceil(tableRows.length / localRowsPerPage) || 1,
+            currentPage + 1,
+          )
+        "
+        @last-page="
+          currentPage =
+            localRowsPerPage === 0
+              ? 1
+              : Math.ceil(tableRows.length / localRowsPerPage) || 1
+        "
+      />
+    </div>
   </div>
 </template>
 
@@ -535,11 +1033,23 @@ import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
-import { debounce } from "quasar";
+import { debounce, copyToClipboard, exportFile } from "quasar";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
+// ── Dashboard additions ──────────────────────────────────────────────────────
+import { useStickyColumns } from "@/composables/useStickyColumns";
+import useNotifications from "@/composables/useNotifications";
+import { getColorForTable } from "@/utils/dashboard/colorPalette";
+import { findFirstValidMappedValue } from "@/utils/dashboard/panelValidation";
+import {
+  TABLE_ROWS_PER_PAGE_DEFAULT_VALUE,
+  PIVOT_TABLE_TOTAL_COLUMN_WIDTH,
+  PIVOT_TABLE_ROW_KEY_SEPARATOR,
+} from "@/utils/dashboard/constants";
+import JsonFieldRenderer from "@/components/dashboards/panels/JsonFieldRenderer.vue";
+import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 
 export interface StreamField {
   name: string;
@@ -549,11 +1059,11 @@ export interface StreamField {
 const props = defineProps({
   rows: {
     type: Array,
-    required: true,
+    default: () => [],
   },
   columns: {
     type: Array,
-    required: true,
+    default: () => [],
   },
   wrap: {
     type: Boolean,
@@ -666,6 +1176,45 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  // ── Dashboard / TableRenderer parity props ───────────────────────────────
+  /** Full dashboard data object (rows + Quasar-format columns + pivot config).
+   *  When provided, dashboard features are enabled (pivot, sticky cols, etc.).
+   *  `rows` and `columns` props are derived from this when set. */
+  data: {
+    type: Object as PropType<
+      | {
+          rows?: any[];
+          columns?: any[];
+          pivotHeaderLevels?: any[];
+          pivotRowColumns?: any[];
+          stickyTotalRow?: any;
+          stickyRowTotals?: boolean;
+          stickyColTotals?: boolean;
+        }
+      | undefined
+    >,
+    default: undefined,
+  },
+  /** Value-mapping config for per-cell background coloring (dashboard). */
+  valueMapping: {
+    type: Array,
+    default: () => [],
+  },
+  /** Show per-cell copy-to-clipboard button on hover. Default: false */
+  enableCellCopy: {
+    type: Boolean,
+    default: false,
+  },
+  /** Enable paginated mode (turns off virtual scroll). Default: false */
+  showPagination: {
+    type: Boolean,
+    default: false,
+  },
+  /** Rows per page when `showPagination` is true. */
+  rowsPerPage: {
+    type: Number,
+    default: TABLE_ROWS_PER_PAGE_DEFAULT_VALUE,
+  },
 });
 
 const { t } = useI18n();
@@ -693,6 +1242,12 @@ const sanitizeCssId = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, "_");
 const store = useStore();
 const { isFTSColumn } = useTextHighlighter();
 const { processedResults, processHitsInChunks } = useLogsHighlighter();
+
+// ── Dashboard: sticky columns composable ─────────────────────────────────────
+// useStickyColumns reads props.data?.columns (Quasar-format) — works because we
+// added the `data` prop above.
+const { getStickyColumnStyle, tableId } = useStickyColumns(props, store);
+const { showErrorNotification, showPositiveNotification } = useNotifications();
 
 const getSortingHandler = (e: Event, fn: any) => {
   return fn(e);
@@ -729,9 +1284,395 @@ const tableRowSize = ref(0);
 
 const columnOrder = ref<any>([]);
 
-const tableRows = ref([...props.rows]);
+const tableRows = ref<any[]>([...(props.data?.rows ?? props.rows)]);
 
-const selectedStreamFtsKeys: ComputedRef<string[] | []> = computed(() => {
+// ── Dashboard: convert Quasar column defs → TanStack ColumnDef[] ─────────────
+const dashboardColumns = computed<ColumnDef<unknown, any>[] | null>(() => {
+  if (!props.data?.columns) return null;
+  return props.data.columns.map((col: any) => ({
+    id: col.name,
+    header: col.label,
+    ...(typeof col.field === "function"
+      ? { accessorFn: col.field }
+      : { accessorKey: col.field ?? col.name }),
+    ...(col.sort ? { sortingFn: col.sort } : {}),
+    meta: {
+      align: col.align,
+      format: col.format,
+      sticky: col.sticky,
+      colorMode: col.colorMode,
+      showFieldAsJson: col.showFieldAsJson,
+      _isRowField: col._isRowField,
+      _isTotalColumn: col._isTotalColumn,
+      _totalColRightIndex: col._totalColRightIndex,
+      _col: col, // reference to original Quasar column for style helpers
+    },
+  }));
+});
+
+// ── Dashboard: pivot helpers ─────────────────────────────────────────────────
+const pivotHeaderLevels = computed(() => props.data?.pivotHeaderLevels || []);
+const pivotRowColumns = computed(() =>
+  (props.data?.columns || []).filter((c: any) => c._isRowField),
+);
+const stickyRowTotals = computed(() => !!props.data?.stickyRowTotals);
+const stickyColTotals = computed(() => !!props.data?.stickyColTotals);
+const stickyTotalRow = computed(() => props.data?.stickyTotalRow || null);
+const isPivotMode = computed(() => pivotHeaderLevels.value.length > 0);
+
+// Pivot sort state (managed manually — TanStack sort is disabled for pivot).
+const pivotSortState = ref<{ sortBy: string; descending: boolean }>({
+  sortBy: "",
+  descending: false,
+});
+const handlePivotSort = (field: string) => {
+  if (pivotSortState.value.sortBy === field) {
+    pivotSortState.value = {
+      ...pivotSortState.value,
+      descending: !pivotSortState.value.descending,
+    };
+  } else {
+    pivotSortState.value = { sortBy: field, descending: false };
+  }
+};
+
+// Re-sort pivot rows whenever sort state changes.
+watch(
+  () => pivotSortState.value,
+  () => {
+    if (!props.data) return;
+    const rows = (props.data.rows || []).filter((r: any) => !r.__isTotalRow);
+    const { sortBy, descending } = pivotSortState.value;
+    if (!sortBy) {
+      tableRows.value = [...rows];
+      return;
+    }
+    const col = (props.data.columns || []).find((c: any) => c.name === sortBy);
+    tableRows.value = [...rows].sort((a: any, b: any) => {
+      const va = a[sortBy];
+      const vb = b[sortBy];
+      let result: number;
+      if (col?.sort) result = col.sort(va, vb, a, b);
+      else if (typeof va === "number" && typeof vb === "number")
+        result = va - vb;
+      else result = String(va ?? "").localeCompare(String(vb ?? ""));
+      return descending ? -result : result;
+    });
+  },
+  { deep: true },
+);
+
+// Also sync tableRows when data.rows changes externally (dashboard re-render).
+watch(
+  () => props.data?.rows,
+  (newRows) => {
+    if (!newRows) return;
+    const rows = newRows.filter((r: any) => !r.__isTotalRow);
+    const { sortBy, descending } = pivotSortState.value;
+    if (!sortBy) {
+      tableRows.value = [...rows];
+      return;
+    }
+    const col = (props.data?.columns || []).find((c: any) => c.name === sortBy);
+    tableRows.value = [...rows].sort((a: any, b: any) => {
+      const va = a[sortBy];
+      const vb = b[sortBy];
+      let result: number;
+      if (col?.sort) result = col.sort(va, vb, a, b);
+      else if (typeof va === "number" && typeof vb === "number")
+        result = va - vb;
+      else result = String(va ?? "").localeCompare(String(vb ?? ""));
+      return descending ? -result : result;
+    });
+    // Also sync column order for dashboard.
+    if (props.data?.columns) {
+      columnOrder.value = props.data.columns.map((c: any) => c.name);
+    }
+  },
+  { deep: true },
+);
+
+// Sync column order when dashboard columns change.
+watch(
+  () => props.data?.columns,
+  (cols) => {
+    if (cols) columnOrder.value = cols.map((c: any) => c.name);
+  },
+  { immediate: true },
+);
+
+// ── Dashboard: pivot merge map ───────────────────────────────────────────────
+const pivotMergeMap = computed(() => {
+  const map = new Map<
+    string,
+    Record<string, { hideContent: boolean; hideBorder: boolean }>
+  >();
+  const rowCols = pivotRowColumns.value;
+  if (rowCols.length === 0) return map;
+  const rows = tableRows.value.filter((r: any) => !r.__isTotalRow);
+  if (rows.length === 0) return map;
+
+  const getRowKey = (row: any) =>
+    rowCols
+      .map((c: any) => String(row[c.name] ?? ""))
+      .join(PIVOT_TABLE_ROW_KEY_SEPARATOR);
+
+  for (let colIdx = 0; colIdx < rowCols.length; colIdx++) {
+    const col = rowCols[colIdx];
+    let groupStart = 0;
+    for (let i = 0; i <= rows.length; i++) {
+      let sameGroup = i < rows.length;
+      if (sameGroup) {
+        for (let p = 0; p <= colIdx; p++) {
+          if (rows[i][rowCols[p].name] !== rows[groupStart][rowCols[p].name]) {
+            sameGroup = false;
+            break;
+          }
+        }
+      }
+      if (!sameGroup) {
+        const size = i - groupStart;
+        if (size > 1) {
+          for (let r = groupStart; r < i; r++) {
+            const key = getRowKey(rows[r]);
+            if (!map.has(key)) map.set(key, {});
+            map.get(key)![col.name] = {
+              hideContent: r !== groupStart,
+              hideBorder: r < i - 1,
+            };
+          }
+        }
+        groupStart = i;
+      }
+    }
+  }
+  return map;
+});
+
+const pivotRowKey = (row: any) =>
+  pivotRowColumns.value
+    .map((c: any) => String(row[c.name] ?? ""))
+    .join(PIVOT_TABLE_ROW_KEY_SEPARATOR);
+
+const isPivotMergeHidden = (row: any, col: any): boolean => {
+  if (!col?._isRowField) return false;
+  return (
+    pivotMergeMap.value.get(pivotRowKey(row))?.[col.name]?.hideContent === true
+  );
+};
+const isPivotMergeNoBorder = (row: any, col: any): boolean => {
+  if (!col?._isRowField) return false;
+  return (
+    pivotMergeMap.value.get(pivotRowKey(row))?.[col.name]?.hideBorder === true
+  );
+};
+
+// ── Dashboard: sticky total columns ─────────────────────────────────────────
+const getStickyTotalColumnStyle = (col: any) => {
+  if (!stickyColTotals.value || !col?._isTotalColumn) return {};
+  const rightOffset =
+    (col._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
+  return {
+    position: "sticky",
+    right: `${rightOffset}px`,
+    "z-index": 2,
+    width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    "min-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    "max-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
+    "box-shadow": "-2px 0 4px rgba(0, 0, 0, 0.1)",
+    "white-space": "normal",
+    "word-break": "break-word",
+  };
+};
+
+const getStickyTotalHeaderForPivot = (cell: any) => {
+  if (!stickyColTotals.value) return {};
+  const rightOffset =
+    (cell._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
+  const width = cell.colspan
+    ? cell.colspan * PIVOT_TABLE_TOTAL_COLUMN_WIDTH
+    : PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
+  return {
+    position: "sticky",
+    right: `${rightOffset}px`,
+    "z-index": 3,
+    width: `${width}px`,
+    "min-width": `${width}px`,
+    "max-width": `${width}px`,
+    "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
+    "box-shadow": "-2px 0 4px rgba(0, 0, 0, 0.1)",
+    "white-space": "normal",
+    "word-break": "break-word",
+  };
+};
+
+// ── Dashboard: cell coloring ─────────────────────────────────────────────────
+const isDashboardColor = (hex: string): boolean => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return false;
+  const r = parseInt(result[1], 16);
+  const g = parseInt(result[2], 16);
+  const b = parseInt(result[3], 16);
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
+};
+
+const getDashboardCellStyle = (cell: any): string => {
+  if (!props.data) return "";
+  const col = (cell.column.columnDef.meta as any)?._col;
+  const value = cell.getValue();
+  // 1) Auto color mode — stable palette per distinct string value.
+  if (col?.colorMode === "auto") {
+    const palette = getColorForTable;
+    const key = String(value);
+    const cacheKey = `__autoColorMap_${col.field ?? col.name}`;
+    if (!col[cacheKey]) col[cacheKey] = new Map<string, string>();
+    const map: Map<string, string> = col[cacheKey];
+    if (!map.has(key)) map.set(key, palette[map.size % palette.length]);
+    const hex = map.get(key) as string;
+    return `background-color: ${hex}; color: ${isDashboardColor(hex) ? "#ffffff" : "#000000"}`;
+  }
+  // 2) Value-mapping color.
+  const found = findFirstValidMappedValue(value, props.valueMapping, "color");
+  if (found?.color) {
+    const hex = found.color;
+    if (!/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(hex)) return "";
+    return `background-color: ${hex}; color: ${isDashboardColor(hex) ? "#ffffff" : "#000000"}`;
+  }
+  return "";
+};
+
+const getDashboardCellValue = (cell: any): any => {
+  const value = cell.getValue();
+  if (value === "undefined" || value === null || value === undefined) return "";
+  const format = (cell.column.columnDef.meta as any)?.format;
+  return format ? format(value, cell.row.original) : value;
+};
+
+// ── Dashboard: cell copy ─────────────────────────────────────────────────────
+const copiedCells = ref(new Map<string, boolean>());
+
+const isCellCopied = (rowIndex: number, colName: string) =>
+  copiedCells.value.has(`${rowIndex}_${colName}`);
+
+const shouldShowCopyButton = (value: any) => {
+  if (value === null || value === undefined || value === "undefined")
+    return false;
+  return String(value).trim() !== "";
+};
+
+const copyCellContent = (value: any, rowIndex: number, colName: string) => {
+  if (value === null || value === undefined) return;
+  copyToClipboard(String(value))
+    .then(() => {
+      const key = `${rowIndex}_${colName}`;
+      copiedCells.value.set(key, true);
+      setTimeout(() => copiedCells.value.delete(key), 3000);
+    })
+    .catch(() => {});
+};
+
+// ── Dashboard: pagination ────────────────────────────────────────────────────
+const currentPage = ref(1);
+const localRowsPerPage = ref(
+  props.showPagination
+    ? props.rowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE
+    : 0,
+);
+
+watch(
+  () => [props.showPagination, props.rowsPerPage] as const,
+  ([newShow, newRpp]) => {
+    localRowsPerPage.value = newShow
+      ? newRpp || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE
+      : 0;
+    currentPage.value = 1;
+  },
+);
+
+const paginationOptions = computed(() => {
+  if (!props.showPagination) return [0];
+  const base = [10, 20, 50, 100, 250, 500, 1000];
+  const configured = props.rowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE;
+  const set = new Set(base);
+  if (configured > 0) set.add(configured);
+  const sorted = Array.from(set).sort((a, b) => a - b);
+  sorted.push(0);
+  return sorted;
+});
+
+// pagedRows is defined after formattedRows below — see declaration near virtualizer.
+
+// ── Dashboard: CSV / JSON export ─────────────────────────────────────────────
+const wrapCsvValue = (val: any, formatFn?: any, row?: any): string => {
+  let formatted = formatFn !== undefined ? formatFn(val, row) : val;
+  formatted =
+    formatted === undefined || formatted === null ? "" : String(formatted);
+  return `"${formatted.split('"').join('""')}"`;
+};
+
+const downloadCsv = (title?: string) => {
+  const cols = props.data?.columns || [];
+  const rows = [
+    ...(table?.getRowModel().rows.map((r: any) => r.original) || []),
+    ...(stickyTotalRow.value ? [stickyTotalRow.value] : []),
+  ];
+  const content = [
+    cols.map((col: any) => wrapCsvValue(col.label)).join(","),
+    ...rows.map((row: any) =>
+      cols
+        .map((col: any) =>
+          wrapCsvValue(
+            typeof col.field === "function"
+              ? col.field(row)
+              : row[col.field ?? col.name],
+            col.format,
+            row,
+          ),
+        )
+        .join(","),
+    ),
+  ].join("\r\n");
+  const status = exportFile(
+    `${title ?? "table-export"}.csv`,
+    content,
+    "text/csv",
+  );
+  if (status === true)
+    showPositiveNotification("Table downloaded as a CSV file", {
+      timeout: 2000,
+    });
+  else showErrorNotification("Browser denied file download...");
+};
+
+const downloadJson = (title?: string) => {
+  try {
+    const rows = [
+      ...(table?.getRowModel().rows.map((r: any) => r.original) || []),
+      ...(stickyTotalRow.value ? [stickyTotalRow.value] : []),
+    ];
+    const content = JSON.stringify(
+      { columns: props.data?.columns, rows },
+      null,
+      2,
+    );
+    const status = exportFile(
+      `${title ?? "table-export"}.json`,
+      content,
+      "application/json",
+    );
+    if (status === true)
+      showPositiveNotification("Table downloaded as a JSON file", {
+        timeout: 2000,
+      });
+    else showErrorNotification("Browser denied file download...");
+  } catch (error) {
+    console.error("Error downloading JSON:", error);
+    showErrorNotification("Failed to download data as JSON");
+  }
+};
+
+const selectedStreamFtsKeys: ComputedRef<StreamField[]> = computed(() => {
   return props.selectedStreamFtsKeys || [];
 });
 
@@ -766,7 +1707,7 @@ watch(
         true,
         props.highlightQuery,
         100,
-        selectedStreamFtsKeys.value,
+        selectedStreamFtsKeys.value as unknown as string[],
       );
     }
 
@@ -796,7 +1737,7 @@ watch(
         false,
         props.highlightQuery,
         100,
-        selectedStreamFtsKeys.value,
+        selectedStreamFtsKeys.value as unknown as string[],
       );
     }
 
@@ -820,7 +1761,11 @@ let table: any = useVueTable({
     return tableRows.value || [];
   },
   get columns() {
-    return props.columns as ColumnDef<unknown, any>[];
+    // Dashboard: use converted TanStack columns; Logs: use columns prop as-is.
+    return (dashboardColumns.value ?? props.columns) as ColumnDef<
+      unknown,
+      any
+    >[];
   },
   state: {
     get sorting() {
@@ -831,7 +1776,10 @@ let table: any = useVueTable({
     },
   },
   onSortingChange: setSorting,
-  enableSorting: true,
+  // Disable TanStack client sort for pivot — rows are pre-sorted manually.
+  get enableSorting() {
+    return !isPivotMode.value;
+  },
   getCoreRowModel: getCoreRowModel(),
   getSortedRowModel: getSortedRowModel(),
   defaultColumn: {
@@ -927,6 +1875,14 @@ const formattedRows = computed(() => {
   return table?.getRowModel().rows;
 });
 
+/** Rows for current page when showPagination=true (dashboard). */
+const pagedRows = computed(() => {
+  const all = formattedRows.value ?? [];
+  if (!props.showPagination || localRowsPerPage.value === 0) return all;
+  const start = (currentPage.value - 1) * localRowsPerPage.value;
+  return all.slice(start, start + localRowsPerPage.value);
+});
+
 const isResizingHeader = ref(false);
 
 const headerGroups = computed(() => table?.getHeaderGroups()[0]);
@@ -969,7 +1925,7 @@ const rowVirtualizerOptions = computed(() => {
       const isExpandedRow = formattedRows.value[index]?.original?.isExpandedRow;
       return isExpandedRow
         ? expandedRowHeights.value[index] || 300 // Default expanded height
-        : props.rowHeight; // Fixed collapsed height
+        : (props.rowHeight ?? 28); // Default collapsed height
     },
     overscan: 100,
     measureElement:
@@ -987,7 +1943,7 @@ const rowVirtualizerOptions = computed(() => {
                 expandedRowHeights.value[index] = height;
                 return height;
               }
-              return props.rowHeight; // Fixed height for collapsed rows
+              return props.rowHeight ?? 28; // Default height for collapsed rows
             }
           : undefined,
   };
@@ -1170,11 +2126,11 @@ const calculateVirtualIndex = (index: number): number => {
   return virtualIndex;
 };
 
-const handleDataRowClick = (row: any, index: number) => {
+const handleDataRowClick = (row: any, index: number, event?: MouseEvent) => {
   const actualIndex = calculateActualIndex(index);
 
   if (actualIndex !== -1) {
-    emits("click:dataRow", row, actualIndex);
+    emits("click:dataRow", row, actualIndex, event);
   }
 };
 
@@ -1262,6 +2218,13 @@ defineExpose({
   store,
   selectedStreamFtsKeys,
   processedResults,
+  // Dashboard / TableRenderer parity
+  downloadCsv,
+  downloadJson,
+  /** @deprecated use downloadCsv */
+  downloadTableAsCSV: downloadCsv,
+  /** @deprecated use downloadJson */
+  downloadTableAsJSON: downloadJson,
 });
 </script>
 <style>
@@ -1270,12 +2233,84 @@ defineExpose({
 <style scoped lang="scss">
 @import "@/styles/logs/tenstack-table.scss";
 
+// Outer wrapper for the table (used for sticky-column CSS scoping via data-sticky-id)
+.my-sticky-virtscroll-table {
+  overflow: hidden;
+}
+
 // Add explicit hover styles for log rows
 .table-row-hover {
   transition: background-color 0.15s ease-in-out;
 
   &:hover {
     background-color: var(--o2-hover-gray) !important;
+  }
+}
+
+// ── Dashboard / pivot table styles ──────────────────────────────────────────
+
+// Pivot multi-level header cells
+.pivot-group-header {
+  text-align: center;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.pivot-value-header {
+  text-align: center;
+}
+
+// Column separator between pivot sections
+.pivot-section-border {
+  border-left: 2px solid rgba(0, 0, 0, 0.2) !important;
+}
+
+// Right-sticky total column body cells
+.pivot-total-col {
+  font-weight: 600;
+}
+
+// Cells hidden by pivot row merging (duplicates suppressed)
+.pivot-no-border {
+  border-bottom: none !important;
+  color: transparent !important;
+}
+
+// Left-sticky columns
+.sticky-column {
+  background-color: inherit;
+}
+
+// Sticky total row at bottom
+.pivot-sticky-total-row {
+  font-weight: bold;
+
+  td {
+    background-color: var(--q-color-grey-2, #f5f5f5);
+  }
+}
+
+// Sort icon shown in pivot header clicks
+.pivot-sort-icon {
+  font-size: 0.8rem;
+  opacity: 0.5;
+  vertical-align: middle;
+
+  &.pivot-sort-active {
+    opacity: 1;
+    color: var(--q-primary);
+  }
+}
+
+// Copy button — only visible on cell hover
+.copy-cell-td {
+  .copy-btn {
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  &:hover .copy-btn {
+    opacity: 1;
   }
 }
 </style>
