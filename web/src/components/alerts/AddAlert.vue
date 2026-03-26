@@ -653,7 +653,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     round
                     size="xs"
                     :icon="showAnomalyPreview ? 'expand_less' : 'expand_more'"
-                    @click.stop
+                    @click.stop="showAnomalyPreview = !showAnomalyPreview"
                   />
                 </div>
                 <div v-show="showAnomalyPreview" style="flex: 1; overflow: hidden; min-height: 0">
@@ -687,7 +687,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     round
                     size="xs"
                     :icon="showAnomalySummary ? 'expand_less' : 'expand_more'"
-                    @click.stop
+                    @click.stop="showAnomalySummary = !showAnomalySummary"
                   />
                 </div>
                 <div
