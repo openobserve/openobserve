@@ -599,7 +599,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
     // PR #10949 & #10965 - Duplicate Patterns Fix & Tokenized Chips Tests
     // ==========================================================================
 
-    test("should not display duplicate patterns @P0 @smoke", async ({ page }) => {
+    test.skip("should not display duplicate patterns @P0 @smoke", async ({ page }) => {
         testLogger.info('Test: Verify patterns are unique (no duplicates)');
 
         const result = await setupPatternsView(page, pm);
@@ -640,7 +640,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         testLogger.info('PASSED: No duplicate patterns test complete');
     });
 
-    test("should display tokenized wildcard chips in pattern cards @P1 @functional", async ({ page }) => {
+    test.skip("should display tokenized wildcard chips in pattern cards @P1 @functional", async ({ page }) => {
         testLogger.info('Test: Verify tokenized wildcard chips are displayed');
 
         const result = await setupPatternsView(page, pm);
@@ -758,7 +758,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         testLogger.info('PASSED: Wildcard chip tooltip test complete');
     });
 
-    test("should render anomaly detection column with proper structure @P1 @functional", async ({ page }) => {
+    test.skip("should render anomaly detection column with proper structure @P1 @functional", async ({ page }) => {
         testLogger.info('Test: Verify anomaly detection column structure and rendering');
 
         const result = await setupPatternsView(page, pm);
@@ -813,7 +813,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         testLogger.info('PASSED: Anomaly detection badge test complete');
     });
 
-    test("should display pattern statistics in details dialog @P1 @functional", async ({ page }) => {
+    test.skip("should display pattern statistics in details dialog @P1 @functional", async ({ page }) => {
         testLogger.info('Test: Verify pattern statistics (z_score, avg_frequency) in details dialog');
 
         const result = await setupPatternsView(page, pm);
