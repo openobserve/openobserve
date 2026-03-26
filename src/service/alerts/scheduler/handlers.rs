@@ -1538,7 +1538,7 @@ async fn handle_derived_stream_triggers(
     if !pipeline.enabled {
         // Pipeline not enabled, check again next week
         let msg = format!(
-            "Pipeline associated with trigger not enabled: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
+            "Pipeline associated with trigger not enabled: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 7 days."
         );
         // update trigger, check on next week
         new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
