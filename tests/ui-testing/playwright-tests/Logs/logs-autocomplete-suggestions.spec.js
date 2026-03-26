@@ -1158,6 +1158,7 @@ test.describe("Autocomplete Value Suggestions - Cold Start & TTL", () => {
         );
 
         testLogger.info(`Cold start has SQL keywords: ${hasKeywords}`);
+        expect(hasKeywords, 'Cold start should show SQL keywords, not value suggestions').toBe(true);
         testLogger.info('Cold start test completed with suggestions');
 
         testLogger.info('Cold start test completed');
