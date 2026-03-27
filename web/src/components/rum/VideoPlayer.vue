@@ -543,9 +543,16 @@ const goto = (timeOffset: number, play: boolean = false) => {
 
 const skipTo = (skipTo: string) => {
   const seconds = 10;
-  if (skipTo === "forward")
-    goto(playerState.value.actualTime + seconds * 1000, false);
-  else goto(playerState.value.actualTime - seconds * 1000, false);
+  if (skipTo === "forward") {
+    const newTime = Math.min(
+      playerState.value.actualTime + seconds * 1000,
+      playerState.value.totalTime,
+    );
+    goto(newTime, false);
+  } else {
+    const newTime = Math.max(playerState.value.actualTime - seconds * 1000, 0);
+    goto(newTime, false);
+  }
 };
 
 const initializeWorker = () => {
