@@ -704,69 +704,71 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         expect(cardCount).toBeGreaterThan(0);
 
         // Find wildcard chips - they have class 'wildcard-chip' in PatternCard.vue
+        // Tooltips only appear when tok.sampleValues.length > 0 (see PatternCard.vue:48)
         const wildcardChips = page.locator('.wildcard-chip');
         const chipCount = await wildcardChips.count();
         testLogger.info(`Found ${chipCount} wildcard chips on page`);
 
-        if (chipCount > 0) {
-            // Get the first visible chip
-            const firstChip = wildcardChips.first();
-            const chipVisible = await firstChip.isVisible().catch(() => false);
-            testLogger.info(`First wildcard chip visible: ${chipVisible}`);
+        // ASSERTION: Must have wildcard chips to test
+        expect(chipCount).toBeGreaterThan(0);
 
-            if (chipVisible) {
-                const chipText = await firstChip.textContent();
-                testLogger.info(`Chip text: ${chipText}`);
+        // Try hovering over multiple chips to find one with a tooltip
+        // Tooltips only appear when pattern has sampleValues (data-dependent)
+        let tooltipFound = false;
+        let tooltipContent = '';
+        const chipsToTry = Math.min(chipCount, 5);
 
-                // Hover over the chip - Quasar tooltip has 300ms delay
-                await firstChip.hover();
-                testLogger.info('Hovering over wildcard chip...');
+        for (let i = 0; i < chipsToTry && !tooltipFound; i++) {
+            const chip = wildcardChips.nth(i);
+            const isVisible = await chip.isVisible().catch(() => false);
 
-                // Wait for Quasar tooltip (delay is 300ms + render time)
-                await page.waitForTimeout(500);
+            if (!isVisible) continue;
 
-                // Quasar tooltips use .q-tooltip class
-                const tooltip = page.locator('.q-tooltip');
-                const tooltipVisible = await tooltip.isVisible().catch(() => false);
-                testLogger.info(`Tooltip visible after hover: ${tooltipVisible}`);
+            const chipText = await chip.textContent().catch(() => '');
+            testLogger.info(`Trying chip ${i}: ${chipText}`);
 
-                if (tooltipVisible) {
-                    const tooltipText = await tooltip.innerText();
-                    testLogger.info(`Tooltip content: ${tooltipText.substring(0, 150)}`);
+            // Hover over the chip
+            await chip.hover();
 
-                    // ASSERTION: Tooltip should have sample values content
-                    expect(tooltipText.length).toBeGreaterThan(0);
-                    testLogger.info('✅ Wildcard chip tooltip with sample values verified');
-                } else {
-                    // Tooltip may not appear if sampleValues is empty for this wildcard
-                    // This is acceptable - verify chip renders correctly
-                    testLogger.info('Tooltip not visible - chip may not have sample values');
-                    expect(chipText.length).toBeGreaterThan(0);
-                    testLogger.info('✅ Wildcard chip renders correctly (no sample values for tooltip)');
-                }
+            // Wait for Quasar tooltip (delay is 300ms + render time)
+            await page.waitForTimeout(500);
 
-                await page.screenshot({ path: 'playwright-results/pattern-wildcard-tooltip.png', fullPage: true });
+            // Check if tooltip appeared
+            const tooltip = page.locator('.q-tooltip');
+            const tooltipVisible = await tooltip.isVisible().catch(() => false);
+
+            if (tooltipVisible) {
+                tooltipFound = true;
+                tooltipContent = await tooltip.innerText().catch(() => '');
+                testLogger.info(`✅ Tooltip found on chip ${i}: ${tooltipContent.substring(0, 100)}`);
+
+                // ASSERTION: Tooltip content must not be empty
+                expect(tooltipContent.length).toBeGreaterThan(0);
+                break;
             }
+
+            // Move mouse away to reset for next chip
+            await page.mouse.move(0, 0);
+            await page.waitForTimeout(100);
+        }
+
+        await page.screenshot({ path: 'playwright-results/pattern-wildcard-tooltip.png', fullPage: true });
+
+        // If no tooltip found on any chip, this is data-dependent (no sampleValues)
+        // The test should still verify chips render correctly
+        if (tooltipFound) {
+            testLogger.info('✅ Wildcard chip tooltip with sample values verified');
         } else {
-            // No wildcard chips rendered - verify wildcards exist in pattern text
-            testLogger.info('No wildcard chip elements found, checking pattern text...');
-            let patternsWithWildcards = 0;
+            // No tooltips found - verify this is due to missing sampleValues, not broken feature
+            // PatternCard.vue only shows tooltip when tok.sampleValues.length > 0
+            testLogger.warn('⚠️ No tooltips found on any wildcard chip - pattern data may not include sampleValues');
+            testLogger.info('This is data-dependent: tooltips only appear when sampleValues are populated');
 
-            for (let i = 0; i < Math.min(cardCount, 5); i++) {
-                const patternText = await pm.logsPage.getPatternCardTemplateText(i);
-                const hasWildcards = patternText.includes('<:') || patternText.includes('<*>');
-
-                if (hasWildcards) {
-                    patternsWithWildcards++;
-                    testLogger.info(`Pattern ${i} has wildcards: ${patternText.substring(0, 60)}...`);
-                }
-            }
-
-            testLogger.info(`Patterns with wildcards (text-based): ${patternsWithWildcards} out of ${Math.min(cardCount, 5)} checked`);
-
-            // ASSERTION: At least one pattern should have wildcards
-            expect(patternsWithWildcards).toBeGreaterThan(0);
-            testLogger.info('✅ Wildcard tokenization verified in pattern text');
+            // ASSERTION: At minimum, chips must render with proper text
+            const firstChipText = await wildcardChips.first().textContent().catch(() => '');
+            expect(firstChipText.length).toBeGreaterThan(0);
+            expect(firstChipText).toMatch(/<[*:]|<\*/); // Must contain wildcard marker
+            testLogger.info('✅ Wildcard chips render correctly (no sampleValues in data for tooltips)');
         }
 
         testLogger.info('PASSED: Wildcard chip tooltip test complete');
