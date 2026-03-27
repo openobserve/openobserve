@@ -303,6 +303,7 @@ export const usePanelSQLExecutor = (ctx: {
         seconds: 0,
         periodAsStr: "",
       },
+      tabName: it.tabName,
     };
     state.metadata.queries[panelQueryIndex] = metadata;
 
@@ -501,6 +502,7 @@ export const usePanelSQLExecutor = (ctx: {
             variables: [...(metadata1 || []), ...(metadata2 || [])],
             timeRangeGap: timeRangeGap,
             panelQueryIndex: panelQueryIndex,
+            tabName: it.tabName,
           });
         }
       } else {
@@ -549,6 +551,7 @@ export const usePanelSQLExecutor = (ctx: {
             periodAsStr: "",
           },
           panelQueryIndex: panelQueryIndex,
+          tabName: it.tabName,
         });
       }
     }

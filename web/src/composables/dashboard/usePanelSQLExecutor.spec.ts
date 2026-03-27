@@ -381,6 +381,58 @@ describe("usePanelSQLExecutor", () => {
       expect(state.metadata.queries).toHaveLength(2);
       expect(state.resultMetaData).toHaveLength(2);
     });
+
+    it("sets tabName from query definition into metadata for single query", async () => {
+      const panelSchema = makePanelSchema([
+        {
+          query: "SELECT * FROM logs",
+          tabName: "My Logs",
+          vrlFunctionQuery: "",
+          fields: { stream: "logs", stream_type: "logs", x: [{ alias: "ts" }] },
+          config: { time_shift: [] },
+        },
+      ]);
+
+      const { ctx, state } = makeCtx({ panelSchema });
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      expect(state.metadata.queries[0].tabName).toBe("My Logs");
+    });
+
+    it("sets tabName from each query into metadata for multi-query", async () => {
+      const panelSchema = makePanelSchema([
+        {
+          query: "SELECT * FROM logs",
+          tabName: "Ziox",
+          vrlFunctionQuery: "",
+          fields: { stream: "logs", stream_type: "logs", x: [{ alias: "ts" }] },
+          config: { time_shift: [] },
+        },
+        {
+          query: "SELECT * FROM metrics",
+          tabName: "Monitoring",
+          vrlFunctionQuery: "",
+          fields: { stream: "metrics", stream_type: "logs", x: [{ alias: "ts" }] },
+          config: { time_shift: [] },
+        },
+      ]);
+
+      const { ctx, state } = makeCtx({ panelSchema });
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      expect(state.metadata.queries[0].tabName).toBe("Ziox");
+      expect(state.metadata.queries[1].tabName).toBe("Monitoring");
+    });
+
+    it("sets tabName as undefined when not defined in query", async () => {
+      const { ctx, state } = makeCtx();
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      expect(state.metadata.queries[0].tabName).toBeUndefined();
+    });
   });
 
   describe("getRegionClusterParams integration", () => {

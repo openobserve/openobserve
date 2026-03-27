@@ -47,7 +47,7 @@
            
               <span
                 class="tw:text-sm tw:font-bold tw:rounded-md">
-                Query {{ index + 1 }}
+                {{ query.tabName || ('Query ' + (index + 1)) }}
               </span>
               <span
                 class="tw:bg-[var(--o2-body-primary-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-[var(--o2-text-secondary)] tw:text-[10px] tw:font-bold tw:px-2 tw:py-0.5 tw:rounded-md">
