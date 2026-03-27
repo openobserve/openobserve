@@ -106,10 +106,10 @@ pub fn validate_all_function_args(dashboard: &Value, errors: &mut Vec<super::Val
                             "latitude",
                             "longitude",
                         ] {
-                            if let Some(field) = fields.get(*key) {
-                                if !field.is_null() {
-                                    all_fields.push(field);
-                                }
+                            if let Some(field) = fields.get(*key)
+                                && !field.is_null()
+                            {
+                                all_fields.push(field);
                             }
                         }
 
@@ -200,8 +200,8 @@ fn validate_function(
     let variable_arg_position: i64 = if let Some(ref val) = selected_fn.allow_add_arg_at {
         if val == "n" {
             0
-        } else if val.starts_with("n-") {
-            let offset: i64 = val[2..].parse().unwrap_or(0);
+        } else if let Some(stripped) = val.strip_prefix("n-") {
+            let offset: i64 = stripped.parse().unwrap_or(0);
             args_def.len() as i64 - offset
         } else {
             -1
