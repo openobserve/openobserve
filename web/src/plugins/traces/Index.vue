@@ -1430,7 +1430,7 @@ function restoreUrlQueryParams() {
     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
   }
 
-  if (queryParams.tab) {
+  if (["service-graph", "traces", "spans"].includes(queryParams.tab)) {
     searchObj.meta.searchMode = queryParams.tab;
   }
 
