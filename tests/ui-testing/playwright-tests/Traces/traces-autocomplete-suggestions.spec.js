@@ -11,6 +11,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const MonacoEditorHelper = require('../utils/MonacoEditorHelper.js');
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -56,17 +57,21 @@ async function getIndexedDBRecords(page) {
     });
 }
 
+/**
+ * Get MonacoEditorHelper instance for traces
+ */
+function getMonacoHelper(page) {
+    return new MonacoEditorHelper(page);
+}
+
 async function waitForSuggestionsWidget(page, timeout = 5000) {
-    const suggestWidget = page.locator('.monaco-editor .suggest-widget');
-    await suggestWidget.waitFor({ state: 'visible', timeout });
-    return suggestWidget;
+    const monacoHelper = getMonacoHelper(page);
+    return await monacoHelper.waitForSuggestions(timeout);
 }
 
 async function getSuggestionLabels(page) {
-    const suggestionRows = page.locator('.monaco-editor .suggest-widget .monaco-list-row');
-    await suggestionRows.first().waitFor({ state: 'visible', timeout: 5000 });
-    const labels = await suggestionRows.locator('.label-name, .monaco-icon-label-container').allTextContents();
-    return labels.map(l => l.trim()).filter(l => l.length > 0);
+    const monacoHelper = getMonacoHelper(page);
+    return await monacoHelper.getSuggestionLabels();
 }
 
 /**
@@ -109,7 +114,7 @@ async function tryExpandField(page, pm) {
                 await page.waitForTimeout(2000);
             } else {
                 testLogger.info(`No values API response captured for field: ${fieldName}`);
-                await page.waitForTimeout(3000);
+                await page.waitForTimeout(2000);
             }
 
             return { fieldName, success: true };
@@ -119,10 +124,12 @@ async function tryExpandField(page, pm) {
     // Strategy 2: Click on field expansion headers in the traces field list
     // Traces uses q-expansion-item with class 'field-expansion-item'
     // The clickable header has class 'field-expansion-header'
-    // Using the correct selector: log-search-index-list-fields-table (same as logs)
-    const fieldsTable = page.locator('[data-test="log-search-index-list-fields-table"]');
+    // Using page object selector for the fields table
+    const fieldsTableSelector = pm.tracesPage.fieldsTable || '[data-test="log-search-index-list-fields-table"]';
+    const fieldsTable = page.locator(fieldsTableSelector);
     if (await fieldsTable.isVisible({ timeout: 5000 }).catch(() => false)) {
         // Look for field expansion items directly on the page (they're inside the table)
+        // Note: .field-expansion-item is a Quasar component class, not a data-test selector
         const fieldHeaders = page.locator('.field-expansion-item .field-expansion-header');
         const headerCount = await fieldHeaders.count();
         testLogger.info(`Found ${headerCount} field expansion headers in traces field list`);
@@ -207,7 +214,7 @@ test.describe("Traces Autocomplete Value Suggestions", () => {
     });
 
     test("should capture field values to IndexedDB when expanding a field in traces sidebar", {
-        tag: ['@autosuggestions', '@traces', '@indexeddb']
+        tag: ['@all', '@autosuggestions', '@traces', '@indexeddb']
     }, async ({ page }) => {
         testLogger.info('Testing traces field expansion capture');
 
@@ -253,7 +260,7 @@ test.describe("Traces Autocomplete Value Suggestions", () => {
         }
 
         testLogger.info(`Successfully expanded field: ${expandResult.fieldName}`);
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(2000);
 
         // Check IndexedDB for traces records
         const records = await getIndexedDBRecords(page);
@@ -275,7 +282,7 @@ test.describe("Traces Autocomplete Value Suggestions", () => {
     });
 
     test("should show value suggestions in traces query editor", {
-        tag: ['@autosuggestions', '@traces', '@autocomplete']
+        tag: ['@all', '@autosuggestions', '@traces', '@autocomplete']
     }, async ({ page }) => {
         testLogger.info('Testing traces autocomplete suggestions');
 
@@ -300,7 +307,7 @@ test.describe("Traces Autocomplete Value Suggestions", () => {
 
         if (expandResult.success && expandResult.fieldName !== 'unknown') {
             fieldToQuery = expandResult.fieldName;
-            await page.waitForTimeout(3000);
+            await page.waitForTimeout(2000);
             testLogger.info(`Expanded field for value capture: ${fieldToQuery}`);
         }
 
@@ -322,7 +329,7 @@ test.describe("Traces Autocomplete Value Suggestions", () => {
     });
 
     test("should isolate traces values from logs values", {
-        tag: ['@autosuggestions', '@traces', '@isolation']
+        tag: ['@all', '@autosuggestions', '@traces', '@isolation']
     }, async ({ page }) => {
         testLogger.info('Testing traces vs logs isolation');
 
@@ -336,7 +343,7 @@ test.describe("Traces Autocomplete Value Suggestions", () => {
             const expandResult = await tryExpandField(page, pm);
             if (expandResult.success) {
                 testLogger.info(`Expanded field for isolation test: ${expandResult.fieldName}`);
-                await page.waitForTimeout(3000);
+                await page.waitForTimeout(2000);
             }
         }
 
