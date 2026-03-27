@@ -59,7 +59,7 @@ pub fn validate(json: &Value) -> Vec<super::ValidationError> {
 /// Maps raw jsonschema errors to user-friendly messages using errorMessages.json.
 fn map_error_message(path: &str, keyword: &str, raw_message: &str, dashboard: &Value) -> String {
     if let Some(info) = extract_panel_info(path, dashboard) {
-        let field = path.split('/').last().unwrap_or("");
+        let field = path.split('/').next_back().unwrap_or("");
 
         let error_key = if keyword.contains("MinItems") {
             format!("{}:minItems", field)
@@ -75,16 +75,15 @@ fn map_error_message(path: &str, keyword: &str, raw_message: &str, dashboard: &V
             String::new()
         };
 
-        if !error_key.is_empty() {
-            if let Some(msg) = ERROR_MESSAGES
+        if !error_key.is_empty()
+            && let Some(msg) = ERROR_MESSAGES
                 .get("chartErrors")
                 .and_then(|c| c.get(&info.chart_type))
                 .and_then(|m| m.get(&error_key))
                 .and_then(|v| v.get("dashboard"))
                 .and_then(|v| v.as_str())
-            {
-                return msg.to_string();
-            }
+        {
+            return msg.to_string();
         }
 
         if keyword.contains("Enum") && path.ends_with("/type") {
@@ -92,10 +91,11 @@ fn map_error_message(path: &str, keyword: &str, raw_message: &str, dashboard: &V
         }
     }
 
-    if path.is_empty() || path == "/" {
-        if keyword.contains("Required") && raw_message.contains("title") {
-            return "Dashboard title is required".to_string();
-        }
+    if (path.is_empty() || path == "/")
+        && keyword.contains("Required")
+        && raw_message.contains("title")
+    {
+        return "Dashboard title is required".to_string();
     }
 
     if keyword.contains("MinItems") && path.ends_with("/tabs") {
