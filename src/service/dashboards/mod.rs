@@ -650,20 +650,24 @@ fn compute_panel_layout(
         };
     }
 
+    let default_layout = v8::Layout::default();
     let mut max_i: i64 = 0;
     let mut max_y: i64 = 0;
     let mut last_panel: Option<&v8::Panel> = None;
 
     for panel in panels {
-        if panel.layout.i > max_i {
-            max_i = panel.layout.i;
+        let layout = panel.layout.as_ref().unwrap_or(&default_layout);
+        if layout.i > max_i {
+            max_i = layout.i;
         }
-        if panel.layout.y > max_y || (panel.layout.y == max_y && last_panel.is_none()) {
-            max_y = panel.layout.y;
+        if layout.y > max_y || (layout.y == max_y && last_panel.is_none()) {
+            max_y = layout.y;
             last_panel = Some(panel);
-        } else if panel.layout.y == max_y
-            && last_panel
-                .is_some_and(|lp| panel.layout.x + panel.layout.w > lp.layout.x + lp.layout.w)
+        } else if layout.y == max_y
+            && last_panel.is_some_and(|lp| {
+                let lp_layout = lp.layout.as_ref().unwrap_or(&default_layout);
+                layout.x + layout.w > lp_layout.x + lp_layout.w
+            })
         {
             last_panel = Some(panel);
         }
@@ -673,11 +677,12 @@ fn compute_panel_layout(
 
     // Try to place to the right of the last panel
     if let Some(lp) = last_panel {
-        let remaining = 192 - (lp.layout.x + lp.layout.w);
+        let lp_layout = lp.layout.as_ref().unwrap_or(&default_layout);
+        let remaining = 192 - (lp_layout.x + lp_layout.w);
         if remaining >= w {
             return v8::Layout {
-                x: lp.layout.x + lp.layout.w,
-                y: lp.layout.y,
+                x: lp_layout.x + lp_layout.w,
+                y: lp_layout.y,
                 w,
                 h,
                 i: new_i,
@@ -688,7 +693,10 @@ fn compute_panel_layout(
     // Place below all existing panels
     let max_bottom = panels
         .iter()
-        .map(|p| p.layout.y + p.layout.h)
+        .map(|p| {
+            let layout = p.layout.as_ref().unwrap_or(&default_layout);
+            layout.y + layout.h
+        })
         .max()
         .unwrap_or(0);
 
@@ -714,7 +722,9 @@ pub async fn add_panel_to_dashboard(
     tab_id: Option<&str>,
     mut panel: v8::Panel,
 ) -> Result<(v8::Panel, String, String), DashboardError> {
-    let (_folder, mut dashboard) = get_folder_and_dashboard(org_id, dashboard_id).await?;
+    let mut dashboard = table::dashboards::get_from_folder(org_id, folder_id, dashboard_id)
+        .await?
+        .ok_or(DashboardError::DashboardNotFound)?;
     let v8_dash = dashboard
         .v8
         .as_mut()
@@ -748,23 +758,22 @@ pub async fn add_panel_to_dashboard(
         ));
     }
 
-    // Auto-compute layout if caller didn't set explicit position
-    if panel.layout.x == 0 && panel.layout.y == 0 {
-        let override_w = if panel.layout.w > 0 {
-            Some(panel.layout.w)
-        } else {
-            None
-        };
-        let override_h = if panel.layout.h > 0 {
-            Some(panel.layout.h)
-        } else {
-            None
-        };
-        panel.layout = compute_panel_layout(&tab.panels, override_w, override_h);
-    } else if panel.layout.i == 0 {
-        // Even with explicit position, ensure i is set
-        let max_i = tab.panels.iter().map(|p| p.layout.i).max().unwrap_or(0);
-        panel.layout.i = max_i + 1;
+    // Auto-compute layout if caller didn't provide one
+    match &mut panel.layout {
+        None => {
+            panel.layout = Some(compute_panel_layout(&tab.panels, None, None));
+        }
+        Some(layout) if layout.i == 0 => {
+            // Explicit position but missing i — assign next available
+            let max_i = tab
+                .panels
+                .iter()
+                .map(|p| p.layout.as_ref().map_or(0, |l| l.i))
+                .max()
+                .unwrap_or(0);
+            layout.i = max_i + 1;
+        }
+        Some(_) => {}
     }
 
     tab.panels.push(panel.clone());
@@ -797,7 +806,9 @@ pub async fn update_panel_in_dashboard(
     tab_id: Option<&str>,
     mut panel: v8::Panel,
 ) -> Result<(v8::Panel, String, String), DashboardError> {
-    let (_folder, mut dashboard) = get_folder_and_dashboard(org_id, dashboard_id).await?;
+    let mut dashboard = table::dashboards::get_from_folder(org_id, folder_id, dashboard_id)
+        .await?
+        .ok_or(DashboardError::DashboardNotFound)?;
     let v8_dash = dashboard
         .v8
         .as_mut()
@@ -825,15 +836,9 @@ pub async fn update_panel_in_dashboard(
         .position(|p| p.id == panel_id)
         .ok_or_else(|| DashboardError::PanelNotFound(panel_id.to_string()))?;
 
-    // Preserve existing layout if incoming layout is all zeros
-    let existing_layout = &tab.panels[idx].layout;
-    if panel.layout.x == 0
-        && panel.layout.y == 0
-        && panel.layout.w == 0
-        && panel.layout.h == 0
-        && panel.layout.i == 0
-    {
-        panel.layout = existing_layout.clone();
+    // Preserve existing layout if incoming panel has no layout
+    if panel.layout.is_none() {
+        panel.layout = tab.panels[idx].layout.clone();
     }
 
     // URL param is authoritative for panel ID
@@ -868,7 +873,9 @@ pub async fn delete_panel_from_dashboard(
     hash: &str,
     tab_id: Option<&str>,
 ) -> Result<(String, String), DashboardError> {
-    let (_folder, mut dashboard) = get_folder_and_dashboard(org_id, dashboard_id).await?;
+    let mut dashboard = table::dashboards::get_from_folder(org_id, folder_id, dashboard_id)
+        .await?
+        .ok_or(DashboardError::DashboardNotFound)?;
     let v8_dash = dashboard
         .v8
         .as_mut()

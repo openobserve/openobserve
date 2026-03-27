@@ -1895,12 +1895,19 @@ export default defineComponent({
                       const dashboardEventType = getDashboardEventType(resolvedToolName);
                       if (dashboardEventType) {
                         const dashboardId = callArgs.dashboard_id || callArgs.args?.dashboard_id || callArgs.request_body?.dashboard_id;
-                        const folderId = callArgs.folder || callArgs.args?.folder || callArgs.request_body?.folder;
-                        emitDashboardEvent({
-                          type: dashboardEventType,
-                          dashboardId,
-                          folderId,
-                        });
+                        if (dashboardId) {
+                          const folderId = callArgs.folder || callArgs.args?.folder || callArgs.request_body?.folder;
+                          emitDashboardEvent({
+                            type: dashboardEventType,
+                            dashboardId,
+                            folderId,
+                          });
+                        } else {
+                          console.warn(
+                            `[O2AIChat] Could not extract dashboardId from call_args for tool "${resolvedToolName}". Skipping dashboard event.`,
+                            callArgs
+                          );
+                        }
                       }
                     }
 
