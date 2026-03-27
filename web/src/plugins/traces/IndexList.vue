@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- <div
       class="tw:w-full tw:h-[1px] tw:bg-[var(--o2-border-color)] tw:mb-[0.375rem]"
     ></div> -->
-    <div class="index-table">
+    <div class="index-table tw:h-[calc(100%-2.725rem)]!">
       <q-table
         data-test="log-search-index-list-fields-table"
         :visible-columns="['name']"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         hide-header
         hide-bottom
         :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-        class="tw:w-full tw:h-[calc(100vh-13.175rem)]"
+        class="tw:w-full tw:h-full"
         id="tracesFieldList"
       >
         <template #body-cell-name="props">
