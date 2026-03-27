@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         searchObj.meta.searchMode !== 'service-graph' &&
         searchObj.meta.showQuery
       "
-      class="row"
+      class="row tw:h-[calc(100%-3.1rem)]!"
     >
       <div
         class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mx-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full!"
