@@ -15,7 +15,117 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="step-alert-setup" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+  <!-- INLINE MODE: horizontal layout for V3 top bar -->
+  <div v-if="inline" class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap">
+    <q-form ref="step1Form" @submit.prevent class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap">
+      <!-- Alert Name -->
+      <q-input
+        data-test="add-alert-name-input"
+        v-model="formData.name"
+        :placeholder="t('alerts.name') + ' *'"
+        dense
+        borderless
+        v-bind:readonly="beingUpdated"
+        v-bind:disable="beingUpdated"
+        :rules="[
+          (val: any) =>
+            !!val
+              ? isValidResourceName(val) ||
+                `Characters like :, ?, /, #, and spaces are not allowed.`
+              : t('common.nameRequired'),
+        ]"
+        tabindex="0"
+        hide-bottom-space
+        class="alert-inline-input"
+        style="min-width: 160px; max-width: 220px;"
+      />
+
+      <!-- Alert Type -->
+      <div class="tw:flex tw:items-center tw:gap-2">
+        <q-radio
+          data-test="add-alert-scheduled-alert-radio"
+          v-bind:readonly="beingUpdated"
+          v-bind:disable="beingUpdated"
+          v-model="formData.is_real_time"
+          val="false"
+          dense
+          :label="t('alerts.scheduled')"
+          class="q-ml-none o2-radio-button"
+        />
+        <q-radio
+          data-test="add-alert-realtime-alert-radio"
+          v-bind:readonly="beingUpdated"
+          v-bind:disable="beingUpdated"
+          v-model="formData.is_real_time"
+          val="true"
+          dense
+          :label="t('alerts.realTime')"
+          class="q-ml-none o2-radio-button"
+        />
+      </div>
+
+      <q-separator vertical style="height: 24px;" />
+
+      <!-- Stream Type -->
+      <q-select
+        ref="streamTypeFieldRef"
+        data-test="add-alert-stream-type-select-dropdown"
+        v-model="formData.stream_type"
+        :options="streamTypes"
+        :placeholder="t('alerts.streamType') + ' *'"
+        :popup-content-style="{ textTransform: 'lowercase' }"
+        class="no-case alert-inline-input"
+        dense
+        borderless
+        hide-bottom-space
+        v-bind:readonly="beingUpdated"
+        v-bind:disable="beingUpdated"
+        @update:model-value="updateStreams()"
+        :rules="[(val: any) => !!val || 'Field is required!']"
+        style="min-width: 120px; max-width: 160px;"
+      />
+
+      <!-- Stream Name -->
+      <q-select
+        ref="streamFieldRef"
+        data-test="add-alert-stream-name-select-dropdown"
+        v-model="formData.stream_name"
+        :options="filteredStreams"
+        :placeholder="t('alerts.stream_name') + ' *'"
+        :loading="isFetchingStreams"
+        color="input-border"
+        class="no-case alert-inline-input"
+        dense
+        use-input
+        borderless
+        hide-selected
+        hide-bottom-space
+        fill-input
+        :input-debounce="400"
+        v-bind:readonly="beingUpdated"
+        v-bind:disable="beingUpdated"
+        @filter="filterStreams"
+        @update:model-value="handleStreamNameChange"
+        behavior="menu"
+        :rules="[(val: any) => !!val || 'Field is required!']"
+        style="min-width: 160px; max-width: 220px;"
+      />
+
+      <q-separator vertical style="height: 24px;" />
+
+      <!-- Folder -->
+      <SelectFolderDropDown
+        :disableDropdown="beingUpdated"
+        :type="'alerts'"
+        :style="'height: 32px;'"
+        @folder-selected="updateActiveFolderId"
+        :activeFolderId="activeFolderId"
+      />
+    </q-form>
+  </div>
+
+  <!-- STANDARD MODE: vertical layout for stepper -->
+  <div v-else class="step-alert-setup" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
     <div class="step-content card-container tw:px-3 tw:py-4">
       <q-form ref="step1Form" @submit.prevent>
         <!-- Alert Name -->
@@ -193,6 +303,10 @@ export default defineComponent({
       type: Object as PropType<any>,
       default: null,
     },
+    inline: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["update:streams", "filter:streams", "update:stream-name", "update:active-folder-id"],
   setup(props, { emit }) {
@@ -244,6 +358,17 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.alert-inline-input {
+  :deep(.q-field__control) {
+    height: 32px;
+    min-height: 32px;
+  }
+  :deep(.q-field__native) {
+    padding: 0 8px;
+    font-size: 13px;
+  }
+}
+
 .step-alert-setup {
   width: 100%;
   margin: 0 auto;
