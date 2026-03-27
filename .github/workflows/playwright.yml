@@ -157,6 +157,7 @@ jobs:
                 "logsqueries.cte.spec.js",
                 "logsqueries.matchall.spec.js",
                 "searchpartition.spec.js",
+                "logs-autocomplete-suggestions.spec.js",
               ]
           - testfolder: "Alerts"
             browser: "chrome"
@@ -262,6 +263,7 @@ jobs:
                 "traceDetails.spec.js",
                 "traceAdvancedFiltering.spec.js",
                 "tracesAnalyzeDimensions.spec.js",
+                "traces-autocomplete-suggestions.spec.js",
               ]
 
           - testfolder: "RegressionSet"
