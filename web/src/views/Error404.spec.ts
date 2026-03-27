@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,15 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect } from "vitest";
-import { mount } from "@vue/test-utils";
-import Error404 from "./Error404.vue";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { mount, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createRouter, createWebHistory } from "vue-router";
+import i18n from "@/locales";
+import Error404 from "./Error404.vue";
 
 installQuasar();
 
 describe("Error404", () => {
+  let wrapper: VueWrapper;
+
   const router = createRouter({
     history: createWebHistory(),
     routes: [
@@ -29,57 +32,44 @@ describe("Error404", () => {
     ],
   });
 
-  it("should render the Error404 component", () => {
-    const wrapper = mount(Error404, {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    wrapper = mount(Error404, {
       global: {
-        plugins: [router],
+        plugins: [router, i18n],
       },
     });
+  });
 
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  it("should render the Error404 component", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
   it("should display 404 text", () => {
-    const wrapper = mount(Error404, {
-      global: {
-        plugins: [router],
-      },
-    });
-
     expect(wrapper.text()).toContain("404");
   });
 
-  it("should display 'Oops. Nothing here...' message", () => {
-    const wrapper = mount(Error404, {
-      global: {
-        plugins: [router],
-      },
-    });
-
-    expect(wrapper.text()).toContain("Oops. Nothing here...");
+  it("should display 'Page not found' message", () => {
+    expect(wrapper.text()).toContain("Page not found");
   });
 
-  it("should have a 'Go Home' button", () => {
-    const wrapper = mount(Error404, {
-      global: {
-        plugins: [router],
-      },
-    });
-
-    const button = wrapper.findComponent({ name: "QBtn" });
+  it("should have a 'Go home' button", () => {
+    const button = wrapper.find('[data-test="error-404-go-home-btn"]');
     expect(button.exists()).toBe(true);
-    expect(button.text()).toContain("Go Home");
+    expect(button.text()).toContain("Go home");
   });
 
   it("should have correct styling classes", () => {
-    const wrapper = mount(Error404, {
-      global: {
-        plugins: [router],
-      },
-    });
+    const page = wrapper.find(".error-404-page");
+    expect(page.exists()).toBe(true);
 
-    const container = wrapper.find("div");
-    expect(container.classes()).toContain("fullscreen");
-    expect(container.classes()).toContain("bg-blue");
+    const content = wrapper.find(".error-404-content");
+    expect(content.exists()).toBe(true);
   });
 });

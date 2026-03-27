@@ -21,45 +21,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="step-content card-container tw:px-3 tw:py-4">
       <q-form ref="formRef" @submit.prevent>
-        <!-- Query Mode toggle -->
-        <div class="flex items-start alert-settings-row">
-          <div
-            class="tw:font-semibold flex items-center"
-            style="width: 190px; height: 36px"
-          >
-            {{ t("alerts.queryMode") }}
-          </div>
-          <div>
-            <div class="tw:flex frequency-toggle-group">
-              <q-btn
-                label="Filters"
-                :outline="config.query_mode !== 'filters'"
-                :unelevated="config.query_mode === 'filters'"
-                :color="config.query_mode === 'filters' ? 'primary' : 'grey-7'"
-                no-caps
-                size="sm"
-                class="tw:px-4 frequency-toggle-btn frequency-toggle-left"
-                :class="config.query_mode === 'filters' ? 'active' : 'inactive'"
-                data-test="anomaly-query-mode-filters"
-                @click="config.query_mode = 'filters'"
-              />
-              <q-btn
-                label="Custom SQL"
-                :outline="config.query_mode !== 'custom_sql'"
-                :unelevated="config.query_mode === 'custom_sql'"
-                :color="
-                  config.query_mode === 'custom_sql' ? 'primary' : 'grey-7'
-                "
-                no-caps
-                size="sm"
-                class="tw:px-4 frequency-toggle-btn frequency-toggle-right"
-                :class="
-                  config.query_mode === 'custom_sql' ? 'active' : 'inactive'
-                "
-                data-test="anomaly-query-mode-sql"
-                @click="config.query_mode = 'custom_sql'"
-              />
-            </div>
+        <!-- Query Mode Tabs -->
+        <div class="tw:mb-4 tw:flex tw:items-center tw:justify-between">
+          <div class="flex items-center app-tabs-container tw:h-[36px] tw:w-fit">
+            <AppTabs
+              data-test="anomaly-query-tabs"
+              :tabs="queryTabOptions"
+              class="tabs-selection-container"
+              :active-tab="config.query_mode === 'custom_sql' ? 'custom_sql' : 'filters'"
+              @update:active-tab="config.query_mode = $event"
+            />
           </div>
         </div>
 
@@ -150,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:font-semibold flex items-center"
             style="width: 190px; height: 36px"
           >
-            Custom SQL <span class="text-negative tw:ml-1">*</span>
+            SQL <span class="text-negative tw:ml-1">*</span>
           </div>
           <div style="width: calc(100% - 190px)">
             <div
@@ -713,12 +684,13 @@ import {
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
 import QueryEditor from "@/components/QueryEditor.vue";
+import AppTabs from "@/components/common/AppTabs.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 
 export default defineComponent({
   name: "AnomalyDetectionConfig",
 
-  components: { QueryEditor, PanelSchemaRenderer },
+  components: { QueryEditor, AppTabs, PanelSchemaRenderer },
 
   props: {
     config: {
@@ -731,6 +703,11 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const formRef = ref<any>(null);
+
+    const queryTabOptions = [
+      { label: "Builder", value: "filters" },
+      { label: "SQL", value: "custom_sql" },
+    ];
 
     const filterOperators = ANOMALY_FILTER_OPERATORS;
     const detectionFunctions = [
@@ -1187,6 +1164,7 @@ export default defineComponent({
       t,
       store,
       formRef,
+      queryTabOptions,
       filterOperators,
       operatorNeedsValue,
       detectionFunctions,
