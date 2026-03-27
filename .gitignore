@@ -46,12 +46,6 @@ tests/ui-testing/playwright-tests/utils/auth/user.json
 tests/playwright_mcp/
 /tests/ui-testing/metrics-ingestion
 
-# Sourcemap test utilities (manual use only, not for automated tests)
-tests/sourcemaps.zip
-tests/ui-testing/fixtures/stacktraces.json
-tests/api-testing/tests/ingest_rum_errors.py
-tests/api-testing/tests/ingest_rum_performance.py
-
 # CI-copied Claude configs (runtime only, not committed)
 CLAUDE.md
 .claude/commands/
