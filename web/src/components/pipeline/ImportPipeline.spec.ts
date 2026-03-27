@@ -835,8 +835,9 @@ describe("ImportPipeline.vue", () => {
   // -----------------------------------------------------------------------
 
   describe("validateRemoteDestination", () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       wrapper = createWrapper();
+      await flushPromises();
       wrapper.vm.pipelineDestinations = ["valid-dest", "other-dest"];
     });
 
