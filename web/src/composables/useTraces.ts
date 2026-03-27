@@ -88,7 +88,7 @@ const defaultObject = {
     >(),
     showErrorOnly: false,
     queryEditorPlaceholderFlag: true,
-    searchMode: "spans" as "traces" | "spans",
+    searchMode: "spans" as "traces" | "spans" | "service-graph",
   },
   data: {
     query: "",

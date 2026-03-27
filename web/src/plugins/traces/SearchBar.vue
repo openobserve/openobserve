@@ -18,45 +18,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="search-bar-component tw:h-full" id="searchBarComponent">
     <div class="row tw:m-0! tw:p-[0.375rem]">
       <div class="float-right col flex items-center">
-        <!-- Tab Toggle Buttons -->
+        <!-- Unified View Toggle: Service Graph / Traces / Spans -->
         <div
-          v-if="config.isEnterprise == 'true'"
           class="button-group logs-visualize-toggle element-box-shadow tw:mr-[0.375rem]"
         >
           <div class="row">
-            <div>
+            <div v-if="config.isEnterprise == 'true'">
               <q-btn
-                data-test="traces-search-toggle"
-                :class="activeTab === 'search' ? 'selected' : ''"
-                @click="$emit('update:activeTab', 'search')"
+                data-test="traces-service-graph-toggle"
+                :class="
+                  searchObj.meta.searchMode === 'service-graph'
+                    ? 'selected'
+                    : ''
+                "
+                @click="$emit('update:searchMode', 'service-graph')"
                 no-caps
                 size="sm"
-                icon="search"
-                class="button button-left tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm tw:h-[1.94rem]!"
+                class="button button-left tw:w-[6.1rem]! tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!"
               >
-                <q-tooltip>
-                  {{ t("common.search") }}
-                </q-tooltip>
+                Service Graph
+                <q-tooltip>Service Graph</q-tooltip>
               </q-btn>
             </div>
             <div>
               <q-btn
-                data-test="traces-service-graph-toggle"
-                :class="activeTab === 'service-graph' ? 'selected' : ''"
-                @click="$emit('update:activeTab', 'service-graph')"
+                data-test="traces-search-mode-traces-btn"
+                :class="[
+                  'button tw:w-[5.5rem]! tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
+                  config.isEnterprise == 'true'
+                    ? 'button-center tw:rounded-none!'
+                    : 'button-left tw:rounded-r-none!',
+                  searchObj.meta.searchMode === 'traces' ? 'selected' : '',
+                ]"
+                @click="$emit('update:searchMode', 'traces')"
                 no-caps
                 size="sm"
-                icon="hub"
-                class="button button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[1.94rem]!"
               >
-                <q-tooltip> Service Graph </q-tooltip>
+                Traces
+                <q-tooltip>Traces</q-tooltip>
+              </q-btn>
+            </div>
+            <div>
+              <q-btn
+                data-test="traces-search-mode-spans-btn"
+                :class="[
+                  'button button-right tw:w-[5.5rem]! tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
+                  searchObj.meta.searchMode === 'spans' ? 'selected' : '',
+                ]"
+                @click="$emit('update:searchMode', 'spans')"
+                no-caps
+                size="sm"
+              >
+                Spans
+                <q-tooltip>Spans</q-tooltip>
               </q-btn>
             </div>
           </div>
         </div>
 
-        <!-- Show search controls only when on Search tab -->
-        <template v-if="activeTab === 'search'">
+        <!-- Show search controls only when not on Service Graph -->
+        <template v-if="searchObj.meta.searchMode !== 'service-graph'">
           <div
             class="q-pr-xs tw:mr-[0.375rem] tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem]"
           >
@@ -126,48 +147,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :sqlmode="searchObj.meta.sqlMode"
             class="tw:border! tw:border-[var(--o2-border-color)]! tw:h-[2rem]! tw:w-[2.25rem]!"
           />
-          <!-- Search Mode Toggle: Traces / Spans -->
-          <template v-if="activeTab === 'search'">
-            <div
-              class="button-group logs-visualize-toggle element-box-shadow tw:mr-[0.375rem] tw:ml-[0.625rem]"
-            >
-              <div class="row">
-                <div>
-                  <q-btn
-                    data-test="traces-search-mode-traces-btn"
-                    :class="
-                      searchObj.meta.searchMode === 'traces' ? 'selected' : ''
-                    "
-                    @click="$emit('update:searchMode', 'traces')"
-                    no-caps
-                    size="sm"
-                    class="button tw:w-[3.85rem]! button-left tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!"
-                  >
-                    Traces
-                    <q-tooltip>Search by Traces</q-tooltip>
-                  </q-btn>
-                </div>
-                <div>
-                  <q-btn
-                    data-test="traces-search-mode-spans-btn"
-                    :class="
-                      searchObj.meta.searchMode === 'spans' ? 'selected' : ''
-                    "
-                    @click="$emit('update:searchMode', 'spans')"
-                    no-caps
-                    size="sm"
-                    class="button tw:w-[3.85rem]! button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!"
-                  >
-                    Spans
-                    <q-tooltip>Search by Spans</q-tooltip>
-                  </q-btn>
-                </div>
-              </div>
-            </div>
-          </template>
         </template>
       </div>
-      <div v-if="activeTab === 'search'" class="float-right col-auto">
+      <div
+        v-if="searchObj.meta.searchMode !== 'service-graph'"
+        class="float-right col-auto"
+      >
         <div class="float-left tw:mr-[0.375rem]">
           <date-time
             ref="dateTimeRef"
@@ -231,8 +216,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      v-if="activeTab === 'search' && searchObj.meta.showQuery"
-      class="row tw:h-[calc(100%-3.2rem)]!"
+      v-if="
+        searchObj.meta.searchMode !== 'service-graph' &&
+        searchObj.meta.showQuery
+      "
+      class="row"
     >
       <div
         class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mx-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full!"
@@ -304,7 +292,6 @@ export default defineComponent({
   },
   emits: [
     "searchdata",
-    "update:activeTab",
     "cancel-query",
     "update:searchMode",
     "error-only-toggled",
@@ -322,10 +309,6 @@ export default defineComponent({
     isLoading: {
       type: Boolean,
       default: false,
-    },
-    activeTab: {
-      type: String,
-      default: "search",
     },
   },
   methods: {

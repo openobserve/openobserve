@@ -306,7 +306,9 @@ const SanitizedHtmlRenderer = defineAsyncComponent(
 const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
 
 const store = useStore();
-const activeTab = ref("search");
+const activeTab = computed(() =>
+  searchObj.meta.searchMode === "service-graph" ? "service-graph" : "search",
+);
 const router = useRouter();
 const $q = useQuasar();
 const { t } = useI18n();
@@ -1357,7 +1359,7 @@ onBeforeMount(async () => {
   // Restore active tab from URL query params
   const queryParams = router.currentRoute.value.query;
   if (queryParams.tab === "service-graph" && config.isEnterprise == "true") {
-    activeTab.value = "service-graph";
+    searchObj.meta.searchMode = "service-graph";
   }
   await importSqlParser();
   if (!searchObj.loading) {
@@ -1428,11 +1430,8 @@ function restoreUrlQueryParams() {
     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
   }
 
-  if (
-    queryParams.search_mode === "spans" ||
-    queryParams.search_mode === "traces"
-  ) {
-    searchObj.meta.searchMode = queryParams.search_mode as "traces" | "spans";
+  if (queryParams.tab) {
+    searchObj.meta.searchMode = queryParams.tab;
   }
 
   if (
@@ -1525,9 +1524,10 @@ const onErrorOnlyToggled = (value: boolean) => {
   }
 };
 
-// Handler for Search Mode toggle (Traces / Spans)
-const onSearchModeChange = (mode: "traces" | "spans") => {
+// Handler for Search Mode toggle (Service Graph / Traces / Spans)
+const onSearchModeChange = (mode: "traces" | "spans" | "service-graph") => {
   searchObj.meta.searchMode = mode;
+  if (mode === "service-graph") return;
   searchObj.data.resultGrid.currentPage = 0;
   searchObj.data.queryResults = {
     hits: [],
@@ -1822,7 +1822,7 @@ watch(moveSplitter, () => {
 // Handler for service graph view traces event
 const handleServiceGraphViewTraces = (data: any) => {
   // Switch to search tab
-  activeTab.value = "search";
+  searchObj.meta.searchMode = "traces";
 
   // Set the selected stream in dropdown
   if (data.stream) {
@@ -1865,15 +1865,14 @@ const handleServiceGraphViewTraces = (data: any) => {
 // });
 
 // Watch for active tab changes and update URL
-watch(activeTab, (newTab) => {
-  const query = { ...router.currentRoute.value.query };
-  if (newTab === "service-graph") {
-    query.tab = "service-graph";
-  } else {
-    delete query.tab;
-  }
-  router.replace({ query });
-});
+watch(
+  () => searchObj.meta.searchMode,
+  (mode) => {
+    const query = { ...router.currentRoute.value.query };
+    query.tab = mode;
+    router.replace({ query });
+  },
+);
 </script>
 
 <style lang="scss" scoped></style>
