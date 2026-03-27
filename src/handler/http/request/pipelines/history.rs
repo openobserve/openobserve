@@ -446,7 +446,7 @@ pub async fn get_pipeline_history(
         "SELECT _timestamp, org, key, status, is_realtime, is_silenced, \
          start_time, end_time, retries, \
          delay_in_secs, evaluation_took_in_secs, \
-         source_node, query_took \
+         source_node, query_took, error \
          FROM \"{TRIGGERS_STREAM}\" \
          WHERE {where_clause} \
          ORDER BY {sort_column} {sort_order} LIMIT {size} OFFSET {from}"
