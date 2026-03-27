@@ -46,7 +46,8 @@
             class="tw:p-2 tw:gap-3 tw:bg-[var(--o2-body-primary-bg)] tw:border-b tw:border-[var(--o2-border-color)] tw:flex tw:items-start tw:justify-start">
            
               <span
-                class="tw:text-sm tw:font-bold tw:rounded-md">
+                class="tw:text-sm tw:font-bold tw:rounded-md tw:capitalize"
+                :data-test="`query-inspector-query-name-${index}`">
                 {{ query.tabName || ('Query ' + (index + 1)) }}
               </span>
               <span
