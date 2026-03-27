@@ -53,8 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="card-container tw:overflow-hidden tw:mt-[0.625rem] tw:duration-300 tw:ease-in"
       :class="
         searchObj.meta.showHistogram
-          ? 'tw:h-[calc(100%-16.8rem)]!'
-          : 'tw:h-[calc(100%-3.25rem)]!'
+          ? 'tw:h-[calc(100%-16.7rem)]!'
+          : 'tw:h-[calc(100%-3.15rem)]!'
       "
     >
       <TracesSearchResultList
@@ -148,9 +148,11 @@ export default defineComponent({
       if (searchObj.meta.searchMode === "spans") {
         // start_time / end_time are nanoseconds in raw span rows — convert to µs
         const spanStart = Math.floor((props.start_time || 0) / 1000);
-        const spanEnd = Math.ceil((props.end_time || props.start_time || 0) / 1000);
-        from = spanStart - 60_000_000;       // -1 min in µs
-        to = spanEnd + 3_600_000_000;        // +1 hr in µs
+        const spanEnd = Math.ceil(
+          (props.end_time || props.start_time || 0) / 1000,
+        );
+        from = spanStart - 60_000_000; // -1 min in µs
+        to = spanEnd + 3_600_000_000; // +1 hr in µs
       } else {
         from = props.trace_start_time - 10000000;
         to = props.trace_end_time + 10000000;
