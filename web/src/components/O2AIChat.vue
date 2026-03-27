@@ -732,15 +732,18 @@
                   </template>
                 </template>
                 <!-- Feedback buttons for assistant messages -->
-                <div v-if="message.role === 'assistant' && message.content && message.content.trim() !== ''" class="feedback-buttons">
+                <div v-if="message.role === 'assistant' && message.content && message.content.trim() !== ''" class="feedback-buttons" :class="{ 'feedback-active': message.feedback }">
                   <q-btn
                     flat
                     dense
                     round
                     size="xs"
+                    :disable="message.feedback === 'thumbs_up'"
+                    :class="{ 'feedback-selected': message.feedback === 'thumbs_up' }"
+                    data-test="o2-ai-chat-thumbs-up-btn"
                     @click="likeCodeBlock(index)"
                   >
-                    <q-icon :name="outlinedThumbUpOffAlt" size="14px" />
+                    <q-icon :name="message.feedback === 'thumbs_up' ? matThumbUpAlt : outlinedThumbUpOffAlt" size="14px" />
                     <q-tooltip>Helpful</q-tooltip>
                   </q-btn>
                   <q-btn
@@ -748,9 +751,12 @@
                     dense
                     round
                     size="xs"
+                    :disable="message.feedback === 'thumbs_down'"
+                    :class="{ 'feedback-selected': message.feedback === 'thumbs_down' }"
+                    data-test="o2-ai-chat-thumbs-down-btn"
                     @click="dislikeCodeBlock(index)"
                   >
-                    <q-icon :name="outlinedThumbDownOffAlt" size="14px" />
+                    <q-icon :name="message.feedback === 'thumbs_down' ? matThumbDownAlt : outlinedThumbDownOffAlt" size="14px" />
                     <q-tooltip>Not helpful</q-tooltip>
                   </q-btn>
                 </div>
@@ -984,6 +990,7 @@ import { useQuasar } from 'quasar';
 import { useStore } from 'vuex';
 import useAiChat from '@/composables/useAiChat';
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
+import { matThumbUpAlt, matThumbDownAlt } from '@quasar/extras/material-icons';
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock, ImageAttachment, MAX_IMAGE_SIZE_BYTES, ALLOWED_IMAGE_TYPES } from '@/types/chat';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
@@ -3081,12 +3088,13 @@ export default defineComponent({
         const chat = await dbLoadChat(chatId);
 
         if (chat) {
-          // Ensure messages are properly formatted (including contentBlocks and images)
+          // Ensure messages are properly formatted (including contentBlocks, images, and feedback)
           const formattedMessages = chat.messages.map((msg: any) => ({
             role: msg.role,
             content: msg.content,
             ...(msg.contentBlocks ? { contentBlocks: msg.contentBlocks } : {}),
-            ...(msg.images ? { images: msg.images } : {})
+            ...(msg.images ? { images: msg.images } : {}),
+            ...(msg.feedback ? { feedback: msg.feedback } : {})
           }));
 
           chatMessages.value = formattedMessages;
@@ -4354,6 +4362,8 @@ export default defineComponent({
     };
 
     const likeCodeBlock = async (messageIndex: number) => {
+      const message = chatMessages.value[messageIndex];
+      if (!message || message.feedback === 'thumbs_up') return;
       const orgId = store.state.selectedOrganization?.identifier;
       if (!orgId) return;
       // Each user+assistant pair = 1 query turn, so queryIndex = floor(index / 2)
@@ -4366,11 +4376,15 @@ export default defineComponent({
         lastTraceId.value || undefined,
       );
       if (success) {
+        message.feedback = 'thumbs_up';
+        await saveToHistory();
         $q.notify({ type: 'positive', message: 'Thanks for your feedback!', timeout: 1500 });
       }
     };
 
     const dislikeCodeBlock = async (messageIndex: number) => {
+      const message = chatMessages.value[messageIndex];
+      if (!message || message.feedback === 'thumbs_down') return;
       const orgId = store.state.selectedOrganization?.identifier;
       if (!orgId) return;
       const queryIndex = Math.floor(messageIndex / 2);
@@ -4382,6 +4396,8 @@ export default defineComponent({
         lastTraceId.value || undefined,
       );
       if (success) {
+        message.feedback = 'thumbs_down';
+        await saveToHistory();
         $q.notify({ type: 'positive', message: 'Thanks for your feedback!', timeout: 1500 });
       }
     };
@@ -4452,6 +4468,8 @@ export default defineComponent({
       store,
       outlinedThumbUpOffAlt,
       outlinedThumbDownOffAlt,
+      matThumbUpAlt,
+      matThumbDownAlt,
       likeCodeBlock,
       dislikeCodeBlock,
       currentChatTimestamp,
@@ -4859,8 +4877,13 @@ export default defineComponent({
       opacity: 0.5;
       transition: opacity 0.2s;
 
-      &:hover {
+      &:hover,
+      &.feedback-active {
         opacity: 1;
+      }
+
+      .feedback-selected {
+        color: var(--o2-primary-color);
       }
     }
 
