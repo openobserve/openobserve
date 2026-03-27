@@ -118,7 +118,8 @@
     "copySuccess": "In die Zwischenablage kopiert",
     "copyError": "Fehler beim Kopieren in die Zwischenablage",
     "goBack": "Geh zurück",
-    "stopGenerating": "Generieren beenden"
+    "stopGenerating": "Generieren beenden",
+    "redirectingHome": "In {Countdown} Sekunden wird zur Startseite weitergeleitet..."
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",

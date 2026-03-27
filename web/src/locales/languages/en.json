@@ -62,6 +62,7 @@
     "attributes": "Attributes",
     "events": "Events",
     "goHome": "Go home",
+    "redirectingHome": "Redirecting to home in {countdown} seconds...",
     "name": "Name",
     "add": "Add",
     "selectAll": "Select All",

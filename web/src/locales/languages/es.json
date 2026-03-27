@@ -118,7 +118,8 @@
     "copySuccess": "Copiado al portapapeles",
     "copyError": "No se pudo copiar al portapapeles",
     "goBack": "Regresar",
-    "stopGenerating": "Deja de generar"
+    "stopGenerating": "Deja de generar",
+    "redirectingHome": "Redirigiendo a casa en {countdown} segundos..."
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",

@@ -118,7 +118,8 @@
     "copySuccess": "Gekopieerd naar klembord",
     "copyError": "Kopiëren naar klembord is mislukt",
     "goBack": "Ga terug",
-    "stopGenerating": "Stop met genereren"
+    "stopGenerating": "Stop met genereren",
+    "redirectingHome": "Doorverwijzen naar huis in {countdown} seconden..."
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",

@@ -118,7 +118,8 @@
     "copySuccess": "Copié dans le presse-papiers",
     "copyError": "Impossible de copier dans le presse-papiers",
     "goBack": "Retourner",
-    "stopGenerating": "Arrêtez de générer"
+    "stopGenerating": "Arrêtez de générer",
+    "redirectingHome": "Redirection vers la page d'accueil dans {compte à rebours} secondes..."
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",
