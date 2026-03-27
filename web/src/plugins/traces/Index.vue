@@ -25,7 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-splitter
         class="traces-horizontal-splitter full-height"
         v-model="splitterModel"
+        :disable="activeTab === 'service-graph'"
         horizontal
+        :before-class="
+          activeTab === 'service-graph' ? 'tw:max-h-[3.54rem]!' : ''
+        "
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
