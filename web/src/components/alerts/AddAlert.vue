@@ -1202,7 +1202,7 @@ export default defineComponent({
 
 .alert-v3-label {
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -1343,7 +1343,7 @@ export default defineComponent({
 .alert-v3-splitter-btn-expanded,
 .alert-v3-splitter-btn-collapsed {
   min-height: 3.5em !important;
-  min-width: 1rem !important;
+  min-width: 0.8rem !important;
   position: absolute !important;
   top: 20px !important;
   left: 80% !important;
