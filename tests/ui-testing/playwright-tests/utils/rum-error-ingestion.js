@@ -146,6 +146,7 @@ function generateRumErrors(count) {
     errors.push({
       date: now - ((i + 1) * 60000), // Spread errors 1 min apart
       type: 'error',
+      error_id: `error-${template.type.toLowerCase()}-${String(i + 1).padStart(3, '0')}`, // Unique error ID
       error: {
         message: template.message,
         type: template.type,

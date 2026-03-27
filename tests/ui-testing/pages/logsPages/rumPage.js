@@ -16,7 +16,7 @@ export class RumPage {
         this.errorViewerContainer = '.error-viewer-container';
         this.errorStacksSection = '.error-stacks';
 
-        // Store first error ID from query response
+        // Store first error data from query response
         this.firstErrorId = null;
         this.firstErrorTimestamp = null;
     }
@@ -79,12 +79,12 @@ export class RumPage {
         // Click run query
         await this.page.locator(this.runQueryButton).click();
 
-        // Try to extract first error ID from response
+        // Try to extract first error ID and timestamp from response
         const response = await responsePromise;
         if (response) {
             try {
                 const data = await response.json();
-                // The response contains hits with error data
+                // The response contains hits with aggregated error data
                 if (data.hits && data.hits.length > 0) {
                     const firstHit = data.hits[0];
                     this.firstErrorId = firstHit.latest_error_id;
@@ -114,23 +114,23 @@ export class RumPage {
         await this.page.waitForSelector(`${this.appTableContainer} .q-tr.cursor-pointer`, { state: 'visible', timeout: 10000 });
 
         // Workaround: Playwright clicks don't trigger Vue @click handlers (known Vue 3 + Playwright limitation)
-        // Navigate to error detail by constructing URL from available data
-        if (!this.firstErrorId) {
-            throw new Error('No error ID available - make sure clickRunQuery was called first');
+        // Navigate to error detail by constructing URL from captured API response data
+        if (!this.firstErrorId || !this.firstErrorTimestamp) {
+            throw new Error('No error data available - make sure clickRunQuery was called first and captured error ID');
         }
 
         const currentUrl = this.page.url();
         const url = new URL(currentUrl);
         const org = url.searchParams.get('org_identifier') || process.env.ORGNAME || 'default';
 
-        // Use the actual error ID captured from the API response
-        // This navigates to error detail view to validate the UI works
+        // Navigate to error detail view using error ID and timestamp
+        // Route pattern: /web/rum/errors/view/:id?timestamp=<timestamp>&org_identifier=<org>
         await this.page.goto(
-            `${process.env.ZO_BASE_URL}/web/rum/errors/view/${this.firstErrorId}?org_identifier=${org}`
+            `${process.env.ZO_BASE_URL}/web/rum/errors/view/${this.firstErrorId}?timestamp=${this.firstErrorTimestamp}&org_identifier=${org}`
         );
 
         // Wait for page to load
-        await this.page.waitForTimeout(3000);
+        await this.page.waitForTimeout(2000);
     }
 
     async expectErrorDetailViewLoaded() {
