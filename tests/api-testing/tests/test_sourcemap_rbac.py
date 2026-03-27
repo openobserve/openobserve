@@ -5,27 +5,27 @@ Tests for Role-Based Access Control on sourcemap APIs.
 
 Test Coverage:
 - Viewer role permissions (read-only: can list, cannot upload/delete)
-- Editor role permissions (write access: can upload, cannot delete)
+- Editor role permissions (write access: can upload, list, delete)
 - Admin role permissions (full access: can upload, list, delete)
 
-Expected RBAC Behavior (based on OpenFGA ownership model):
+Expected RBAC Behavior (Role-Based):
 - Viewer: Read-only access (list, translate stacktrace)
-- Editor: Write access (upload, list) but cannot delete
+- Editor: Full write access (upload, list, delete)
 - Admin/Root: Full access (upload, list, delete)
 
 Prerequisites:
 - OpenObserve ENTERPRISE build running on ZO_BASE_URL
 - Root user credentials for user creation
-- Sourcemaps uploaded (from test_sourcemap_api.py)
+- OpenFGA enabled for RBAC enforcement
 
 Note:
 - Tests marked with @pytest.mark.skip for OSS CI (enterprise-only feature)
 - Tests must run serially due to shared module-scoped fixture
+- Uses session-based authentication (matches enterprise RBAC test pattern)
 """
 
 import pytest
 import logging
-import base64
 import requests
 
 # Mark all tests in this module to run serially and skip in OSS (enterprise-only feature)
@@ -82,12 +82,18 @@ def setup_rbac_users(create_session, base_url, org_id):
             else:
                 logger.warning(f"⚠️ User creation returned {response.status_code}: {response.text}")
 
+            # Create authenticated session via login endpoint
+            user_session = create_user_session(email, password, url)
+            if not user_session:
+                logger.error(f"Failed to create session for {email}")
+                raise Exception(f"Login failed for {email}")
+
             # Store user info
             test_users[role] = {
                 'email': email,
                 'password': password,
                 'role': role,
-                'session': create_user_session(email, password, url)
+                'session': user_session
             }
 
         except Exception as e:
@@ -119,11 +125,29 @@ def setup_rbac_users(create_session, base_url, org_id):
 
 
 def create_user_session(email, password, base_url):
-    """Create a requests session with user credentials."""
-    s = requests.Session()
-    basic_auth = base64.b64encode(f"{email}:{password}".encode()).decode()
-    s.headers.update({"Authorization": f"Basic {basic_auth}"})
-    return s
+    """
+    Create authenticated session via /auth/login endpoint.
+
+    This matches the enterprise RBAC test pattern, ensuring proper
+    OpenFGA permission setup through the login flow.
+    """
+    user_session = requests.Session()
+    login_url = f"{base_url}auth/login"
+    login_data = {"name": email, "password": password}
+
+    try:
+        login_resp = user_session.post(login_url, json=login_data, timeout=30)
+
+        if login_resp.status_code != 200:
+            logger.error(f"Login failed for {email}: {login_resp.status_code} - {login_resp.text}")
+            return None
+
+        logger.info(f"Successfully logged in as {email}")
+        return user_session  # Returns session with cookies from login
+
+    except requests.RequestException as e:
+        logger.error(f"Network error during login for {email}: {str(e)}")
+        return None
 
 
 @pytest.fixture(scope="module")
@@ -175,7 +199,7 @@ def test_p1_viewer_cannot_upload_sourcemaps(base_url, org_id, test_sourcemaps_zi
     logger.info("✅ Viewer correctly denied upload access")
 
 
-def test_p1_viewer_can_list_sourcemaps(create_session, base_url, org_id):
+def test_p1_viewer_can_list_sourcemaps(base_url, org_id):
     """
     P1 - FUNCTIONAL TEST
     Viewer role CAN list sourcemaps (read-only access).
@@ -184,7 +208,6 @@ def test_p1_viewer_can_list_sourcemaps(create_session, base_url, org_id):
     """
     assert 'viewer' in test_users, "Viewer user was not created - RBAC setup failed"
 
-    # Try to list as viewer
     viewer_session = test_users['viewer']['session']
 
     response = viewer_session.get(
@@ -260,13 +283,16 @@ def test_p1_editor_can_upload_sourcemaps(base_url, org_id, test_sourcemaps_zip):
         f"Editor should be able to upload sourcemaps. Got {response.status_code}: {response.text}"
     logger.info("✅ Editor correctly allowed upload access")
 
-    # Cleanup: Delete what we just uploaded
+    # Cleanup: Delete what we just uploaded (editors have full write access)
     delete_response = editor_session.delete(
         f"{base_url}api/{org_id}/sourcemaps",
         params={'service': data['service'], 'env': data['env'], 'version': data['version']}
     )
-    # Note: Delete may fail (403) if editors can't delete - that's tested separately
-    logger.info(f"Cleanup delete response: {delete_response.status_code}")
+
+    if delete_response.status_code == 200:
+        logger.info("✅ Editor cleanup successful")
+    else:
+        logger.warning(f"⚠️ Editor cleanup returned {delete_response.status_code}: {delete_response.text}")
 
 
 # ==============================================================================
