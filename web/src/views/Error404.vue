@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,57 +15,162 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="fullscreen bg-blue text-white text-center q-pa-md flex flex-center"
-  >
-    <div>
-      <div style="font-size: 30vh">404</div>
-
-      <div class="text-h2" style="opacity: 0.4">Oops. Nothing here...</div>
-
-      <div class="q-mt-md" style="opacity: 0.7">
-        Redirecting to home in {{ countdown }} second{{ countdown !== 1 ? 's' : '' }}...
+  <q-page class="error-404-page">
+    <div class="error-404-content">
+      <div class="error-404-illustration">
+        <svg
+          width="200"
+          height="200"
+          viewBox="0 0 200 200"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <circle cx="100" cy="100" r="90" class="error-404-circle" />
+          <text
+            x="100"
+            y="115"
+            text-anchor="middle"
+            class="error-404-number"
+          >
+            404
+          </text>
+        </svg>
       </div>
 
-      <q-btn
-        class="q-mt-xl"
-        color="white"
-        text-color="blue"
-        unelevated
-        to="/"
-        label="Go Home"
-        no-caps
-      />
+      <h1 class="error-404-title">Page not found</h1>
+
+      <p class="error-404-description">
+        The page you're looking for doesn't exist or has been moved.
+      </p>
+
+      <div class="error-404-actions">
+        <q-btn
+          data-test="error-404-go-home-btn"
+          unelevated
+          no-caps
+          color="primary"
+          :label="t('common.goHome')"
+          to="/"
+          class="error-404-home-btn"
+        />
+        <q-btn
+          data-test="error-404-go-back-btn"
+          flat
+          no-caps
+          color="primary"
+          :label="t('common.goBack')"
+          class="error-404-back-btn"
+          @click="goBack"
+        />
+      </div>
+
+      <p class="error-404-redirect">
+        {{ t('common.redirectingHome', { countdown }) }}
+      </p>
     </div>
-  </div>
+  </q-page>
 </template>
 
-<script lang="ts">
-import { defineComponent, ref, onMounted, onUnmounted } from "vue";
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 
-export default defineComponent({
-  name: "Error404",
-  setup() {
-    const router = useRouter();
-    const countdown = ref(10);
-    let timer: ReturnType<typeof setInterval>;
+const { t } = useI18n();
+const router = useRouter();
+const countdown = ref(10);
+let timer: ReturnType<typeof setInterval>;
 
-    onMounted(() => {
-      timer = setInterval(() => {
-        countdown.value--;
-        if (countdown.value <= 0) {
-          clearInterval(timer);
-          router.push("/");
-        }
-      }, 1000);
-    });
+const goBack = () => {
+  if (window.history.length > 1) {
+    router.back();
+  } else {
+    router.push("/");
+  }
+};
 
-    onUnmounted(() => {
+onMounted(() => {
+  timer = setInterval(() => {
+    countdown.value--;
+    if (countdown.value <= 0) {
       clearInterval(timer);
-    });
+      router.push("/");
+    }
+  }, 1000);
+});
 
-    return { countdown };
-  },
+onUnmounted(() => {
+  clearInterval(timer);
 });
 </script>
+
+<style lang="scss" scoped>
+.error-404-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: inherit;
+  background: var(--o2-primary-background);
+}
+
+.error-404-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 28rem;
+  padding: 2rem;
+}
+
+.error-404-illustration {
+  margin-bottom: 2rem;
+}
+
+.error-404-circle {
+  fill: none;
+  stroke: var(--o2-border);
+  stroke-width: 2;
+}
+
+.error-404-number {
+  font-size: 3.5rem;
+  font-weight: 700;
+  fill: var(--o2-primary-color);
+  font-family: inherit;
+}
+
+.error-404-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--o2-text-primary);
+  margin: 0 0 0.75rem;
+}
+
+.error-404-description {
+  font-size: 0.9375rem;
+  color: var(--o2-text-secondary);
+  margin: 0 0 2rem;
+  line-height: 1.5;
+}
+
+.error-404-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.error-404-home-btn {
+  padding: 0.5rem 1.5rem;
+}
+
+.error-404-back-btn {
+  padding: 0.5rem 1.5rem;
+}
+
+.error-404-redirect {
+  font-size: 0.8125rem;
+  color: var(--o2-text-secondary);
+  opacity: 0.7;
+  margin: 0;
+}
+</style>
