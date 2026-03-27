@@ -265,12 +265,13 @@ export default defineComponent({
 
     .q-icon {
       font-size: 20px;
-      width: 28px;
+      width: 20px;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-right: 8px;
-      margin-left: 3px;
+      margin-right: 0px;
+      margin-left: 0px;
+      height: auto;
     }
   }
 

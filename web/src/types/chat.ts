@@ -7,8 +7,8 @@ export interface ToolCall {
 
 // Navigation action for UI navigation
 export interface NavigationAction {
-  resource_type: string;  // Generic - not enum limited (logs, metrics, traces, dashboard, alert, pipeline, etc.)
-  action: 'load_query' | 'navigate_direct';
+  resource_type: string; // Generic - not enum limited (logs, metrics, traces, dashboard, alert, pipeline, etc.)
+  action: "load_query" | "navigate_direct";
   label: string;
   target: {
     // For load_query action
@@ -32,7 +32,7 @@ export interface NavigationAction {
 
 // Content block for interleaved display (tool calls and text in order)
 export interface ContentBlock {
-  type: 'tool_call' | 'text' | 'error' | 'navigation';
+  type: "tool_call" | "text" | "error" | "navigation";
   // For tool_call type:
   tool?: string;
   message?: string;
@@ -42,38 +42,39 @@ export interface ContentBlock {
   text?: string;
   // Confirmation state (from confirmation_required events):
   pendingConfirmation?: boolean; // true = yellow waiting state with inline confirm/cancel buttons
-  confirmationMessage?: string;  // message to display in confirmation state
+  confirmationMessage?: string; // message to display in confirmation state
   confirmationArgs?: Record<string, any>; // tool arguments to display for user review
   // Tool result data (from tool_result events):
-  success?: boolean;           // true = green check, false = red error, undefined = legacy (treated as success)
-  resultMessage?: string;      // message from tool_result event
+  success?: boolean; // true = green check, false = red error, undefined = legacy (treated as success)
+  resultMessage?: string; // message from tool_result event
   summary?: Record<string, any>; // summary from successful results (count, took, etc.)
   // Error data (from tool_result failures or stream-level error events):
-  errorType?: string;          // error classification
-  suggestion?: string;         // remediation hint
+  errorType?: string; // error classification
+  suggestion?: string; // remediation hint
   details?: Record<string, any>; // error details
-  recoverable?: boolean;       // for stream-level errors
+  recoverable?: boolean; // for stream-level errors
   // Navigation action (from navigation_action events):
   navigationAction?: NavigationAction; // Optional navigation button for tool calls
 }
 
 // Image attachment for multimodal chat
 export interface ImageAttachment {
-  data: string;        // Base64-encoded image data
-  mimeType: 'image/png' | 'image/jpeg';
+  data: string; // Base64-encoded image data
+  mimeType: "image/png" | "image/jpeg";
   filename: string;
-  size: number;        // Original file size in bytes (for display)
+  size: number; // Original file size in bytes (for display)
 }
 
 // Constants for image validation
 export const MAX_IMAGE_SIZE_BYTES = 2 * 1024 * 1024; // 2MB
-export const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg'] as const;
+export const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg"] as const;
 
 export interface ChatMessage {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string; // Final/complete content for backward compat
   contentBlocks?: ContentBlock[]; // Sequential blocks for interleaved display
   images?: ImageAttachment[]; // Optional images for multimodal messages
+  feedback?: "thumbs_up" | "thumbs_down"; // User feedback vote for assistant messages
 }
 
 export interface ChatHistoryEntry {
@@ -83,4 +84,4 @@ export interface ChatHistoryEntry {
   messages: ChatMessage[];
   sessionId?: string; // UUID v7 for tracking all API calls in this chat session
   userOrgKey?: string; // SHA-256 hash of "email:orgIdentifier" for per-user/org isolation
-} 
+}

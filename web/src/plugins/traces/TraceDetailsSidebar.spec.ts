@@ -360,14 +360,7 @@ describe("TraceDetailsSidebar", async () => {
       const tabs = wrapper.findAll('[data-test="trace-details-sidebar-tabs"]');
       expect(tabs.length).toBeGreaterThan(0);
 
-      const tabNames = [
-        "tags",
-        "process",
-        "events",
-        "exceptions",
-        "links",
-        "attributes",
-      ];
+      const tabNames = ["attributes", "events", "exceptions", "links"];
       tabNames.forEach((tabName) => {
         const tab = wrapper.find(
           `[data-test="trace-details-sidebar-tabs-${tabName}"]`,
@@ -376,74 +369,67 @@ describe("TraceDetailsSidebar", async () => {
       });
     });
 
-    it("should switch to tags tab by default", () => {
-      expect(wrapper.vm.activeTab).toBe("tags");
+    it("should switch to attributes tab by default", () => {
+      expect(wrapper.vm.activeTab).toBe("attributes");
     });
 
     it("should switch tabs when clicked", async () => {
-      const processTab = wrapper.find(
-        '[data-test="trace-details-sidebar-tabs-process"]',
+      const eventsTab = wrapper.find(
+        '[data-test="trace-details-sidebar-tabs-events"]',
       );
-      await processTab.trigger("click");
+      await eventsTab.trigger("click");
 
-      expect(wrapper.vm.activeTab).toBe("process");
+      expect(wrapper.vm.activeTab).toBe("events");
     });
   });
 
-  describe("Tags tab", () => {
-    it("should display tags in table format", () => {
-      const tagsTable = wrapper.find(
-        '[data-test="schema-log-stream-field-mapping-table"]',
+  describe("Attributes tab content", () => {
+    it("should display attributes table", () => {
+      const attributesTable = wrapper.find(
+        '[data-test="trace-details-sidebar-attributes-table"]',
       );
-      expect(tagsTable.exists()).toBe(true);
+      expect(attributesTable.exists()).toBe(true);
     });
 
-    it("should display HTTP method tag", () => {
-      const tagsTable = wrapper.find(
-        '[data-test="schema-log-stream-field-mapping-table"]',
+    it("should display HTTP method in attributes", () => {
+      const attributesTable = wrapper.find(
+        '[data-test="trace-details-sidebar-attributes-table"]',
       );
-      expect(tagsTable.exists()).toBe(true);
-      expect(tagsTable.text()).toContain("GET");
+      expect(attributesTable.exists()).toBe(true);
+      expect(attributesTable.text()).toContain("GET");
     });
 
-    it("should display HTTP status code tag", () => {
-      const tagsTable = wrapper.find(
-        '[data-test="schema-log-stream-field-mapping-table"]',
+    it("should display HTTP status code in attributes", () => {
+      const attributesTable = wrapper.find(
+        '[data-test="trace-details-sidebar-attributes-table"]',
       );
-      expect(tagsTable.exists()).toBe(true);
-      expect(tagsTable.text()).toContain("200");
+      expect(attributesTable.exists()).toBe(true);
+      expect(attributesTable.text()).toContain("200");
     });
   });
 
-  describe("Process tab", () => {
-    beforeEach(async () => {
-      const processTab = wrapper.find(
-        '[data-test="trace-details-sidebar-tabs-process"]',
+  describe("Service information in Attributes tab", () => {
+    it("should display service information", () => {
+      const attributesTable = wrapper.find(
+        '[data-test="trace-details-sidebar-attributes-table"]',
       );
-      await processTab.trigger("click");
+      expect(attributesTable.exists()).toBe(true);
     });
 
-    it("should display process information", () => {
-      const processTable = wrapper.find(
-        '[data-test="trace-details-sidebar-process-table"]',
+    it("should display service name in attributes", () => {
+      const attributesTable = wrapper.find(
+        '[data-test="trace-details-sidebar-attributes-table"]',
       );
-      expect(processTable.exists()).toBe(true);
+      expect(attributesTable.exists()).toBe(true);
+      expect(attributesTable.text()).toContain("alertmanager");
     });
 
-    it("should display service name in process", () => {
-      const processTable = wrapper.find(
-        '[data-test="trace-details-sidebar-process-table"]',
+    it("should display service instance in attributes", () => {
+      const attributesTable = wrapper.find(
+        '[data-test="trace-details-sidebar-attributes-table"]',
       );
-      expect(processTable.exists()).toBe(true);
-      expect(processTable.text()).toContain("alertmanager");
-    });
-
-    it("should display service instance in process", () => {
-      const processTable = wrapper.find(
-        '[data-test="trace-details-sidebar-process-table"]',
-      );
-      expect(processTable.exists()).toBe(true);
-      expect(processTable.text()).toContain("dev2-openobserve-alertmanager-1");
+      expect(attributesTable.exists()).toBe(true);
+      expect(attributesTable.text()).toContain("dev2-openobserve-alertmanager-1");
     });
   });
 
@@ -804,41 +790,36 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   describe("Search highlighting", () => {
-    it("should highlight search terms in tags", async () => {
+    it("should highlight search terms in attributes", async () => {
       await wrapper.setProps({
         searchQuery: "GET",
       });
 
       await flushPromises();
 
-      // Tags table doesn't use highlightSearch, just verify search query is set
+      // Verify search query is set
       expect(wrapper.vm.searchQuery).toBe("GET");
-      // Verify the tags table contains the search term
-      const tagsTable = wrapper.find(
-        '[data-test="schema-log-stream-field-mapping-table"]',
+      // Attributes tab is default — verify it contains the search term
+      const attributesTable = wrapper.find(
+        '[data-test="trace-details-sidebar-attributes-table"]',
       );
-      expect(tagsTable.text()).toContain("GET");
+      expect(attributesTable.text()).toContain("GET");
     });
 
-    it("should highlight search terms in process information", async () => {
+    it("should highlight search terms in service information", async () => {
       await wrapper.setProps({
         searchQuery: "alertmanager",
       });
 
       await flushPromises();
 
-      const processTab = wrapper.find(
-        '[data-test="trace-details-sidebar-tabs-process"]',
-      );
-      await processTab.trigger("click");
-
-      // Process table doesn't use highlightSearch, just verify search query is set
+      // Verify search query is set
       expect(wrapper.vm.searchQuery).toBe("alertmanager");
-      // Verify the process table contains the search term
-      const processTable = wrapper.find(
-        '[data-test="trace-details-sidebar-process-table"]',
+      // Attributes tab is default — verify it contains the search term
+      const attributesTable = wrapper.find(
+        '[data-test="trace-details-sidebar-attributes-table"]',
       );
-      expect(processTable.text()).toContain("alertmanager");
+      expect(attributesTable.text()).toContain("alertmanager");
     });
   });
 
