@@ -615,24 +615,24 @@ async fn put(
     dashboard.set_title(title);
 
     // Validate v8 dashboards against shared JSON Schema + native rules
-    if dashboard.version == 8 {
-        if let Ok(json_value) = serde_json::to_value(&dashboard) {
-            // Extract the inner v8 data for validation
-            if let Some(v8_json) = json_value.get("v8") {
-                let validation_errors =
-                    config::meta::dashboards::validation::validate_dashboard(v8_json);
-                if !validation_errors.is_empty() {
-                    let error_messages: Vec<String> = validation_errors
-                        .iter()
-                        .map(|e| e.message.clone())
-                        .collect();
-                    log::warn!(
-                        "Dashboard validation errors for {}: {:?}",
-                        dashboard_id,
-                        error_messages
-                    );
-                    return Err(DashboardError::PutValidationFailed(error_messages));
-                }
+    if dashboard.version == 8
+        && let Ok(json_value) = serde_json::to_value(&dashboard)
+    {
+        // Extract the inner v8 data for validation
+        if let Some(v8_json) = json_value.get("v8") {
+            let validation_errors =
+                config::meta::dashboards::validation::validate_dashboard(v8_json);
+            if !validation_errors.is_empty() {
+                let error_messages: Vec<String> = validation_errors
+                    .iter()
+                    .map(|e| e.message.clone())
+                    .collect();
+                log::warn!(
+                    "Dashboard validation errors for {}: {:?}",
+                    dashboard_id,
+                    error_messages
+                );
+                return Err(DashboardError::PutValidationFailed(error_messages));
             }
         }
     }
