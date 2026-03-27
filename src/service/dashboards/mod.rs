@@ -758,10 +758,20 @@ pub async fn add_panel_to_dashboard(
         ));
     }
 
-    // Auto-compute layout if caller didn't provide one
+    // Auto-compute layout if caller didn't provide one (or provided all zeros)
     match &mut panel.layout {
         None => {
             panel.layout = Some(compute_panel_layout(&tab.panels, None, None));
+        }
+        Some(layout) if layout.x == 0 && layout.y == 0 && layout.w == 0 && layout.h == 0 => {
+            // All-zero layout means the caller wants auto-placement
+            panel.layout = Some(compute_panel_layout(&tab.panels, None, None));
+        }
+        Some(layout) if layout.x == 0 && layout.y == 0 => {
+            // Position is (0,0) — auto-compute, but respect explicit w/h
+            let override_w = if layout.w > 0 { Some(layout.w) } else { None };
+            let override_h = if layout.h > 0 { Some(layout.h) } else { None };
+            panel.layout = Some(compute_panel_layout(&tab.panels, override_w, override_h));
         }
         Some(layout) if layout.i == 0 => {
             // Explicit position but missing i — assign next available
