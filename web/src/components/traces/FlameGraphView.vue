@@ -147,7 +147,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 // Emits
 const emit = defineEmits<{
-  "span-selected": [spanId: string];
+  "span-selected": [spanId: string, boolean];
 }>();
 
 // Composables
@@ -470,7 +470,7 @@ const handleChartMouseMove = (event: any) => {
 // Handle click events from ChartRenderer
 const handleChartClick = (params: any) => {
   if (params.data && params.data.spanData) {
-    emit("span-selected", params.data.spanData.span_id);
+    emit("span-selected", params.data.spanData.span_id, true);
   }
 };
 </script>
