@@ -237,6 +237,7 @@
                 :visible="showSidePanel"
                 :stream-filter="streamFilter"
                 @close="handleCloseSidePanel"
+                @view-traces="$emit('view-traces', $event)"
               />
 
               <!-- Service Graph Edge Side Panel -->
@@ -331,7 +332,7 @@ export default defineComponent({
     ServiceGraphSidePanel,
     ServiceGraphEdgeSidePanel,
   },
-  emits: [],
+  emits: ["view-traces"],
   setup(props, { emit }) {
     const store = useStore();
     const $q = useQuasar();

@@ -1842,7 +1842,11 @@ const handleServiceGraphViewTraces = (data: any) => {
   // Set the filter query (just the WHERE condition, no SELECT or ORDER BY)
   if (data.serviceName) {
     const escapedServiceName = escapeSingleQuotes(data.serviceName);
-    const filterQuery = `service_name = '${escapedServiceName}'`;
+    let filterQuery = `service_name = '${escapedServiceName}'`;
+    if (data.operationName) {
+      const escapedOpName = escapeSingleQuotes(data.operationName);
+      filterQuery += ` AND operation_name = '${escapedOpName}'`;
+    }
     searchObj.data.editorValue = filterQuery;
     searchObj.data.query = filterQuery;
     searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
