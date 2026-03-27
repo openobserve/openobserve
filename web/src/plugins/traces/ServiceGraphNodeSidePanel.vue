@@ -163,6 +163,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
+        <!-- RED Charts Section -->
+        <div
+          v-if="streamFilter !== 'all' && panelSchemas.length"
+          class="panel-section red-charts-section tw:flex"
+          data-test="service-graph-side-panel-red-charts"
+        >
+          <div
+            v-for="panel in panelSchemas"
+            :key="panel.id"
+            class="red-chart-panel tw:w-[33%] tw:h-[8rem]"
+            :data-test="`service-graph-side-panel-chart-${panel.title?.toLowerCase()}`"
+          >
+            <PanelSchemaRenderer
+              :panelSchema="panel"
+              :selectedTimeObj="selectedTimeObj"
+              :variablesData="{}"
+              :viewOnly="true"
+              :allowAlertCreation="false"
+              searchType="dashboards"
+            />
+            <q-separator vertical />
+          </div>
+        </div>
+
         <!-- Recent Operations Section -->
         <div
           v-if="streamFilter !== 'all'"
@@ -446,15 +470,22 @@ import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import { correlate as correlateStreams } from "@/services/service_streams";
 import { escapeSingleQuotes } from "@/utils/zincutils";
+import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
+import metrics from "./metrics/metrics.json";
 
 const TelemetryCorrelationDashboard = defineAsyncComponent(
   () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
+);
+
+const PanelSchemaRenderer = defineAsyncComponent(
+  () => import("@/components/dashboards/PanelSchemaRenderer.vue"),
 );
 
 export default defineComponent({
   name: "ServiceGraphNodeSidePanel",
   components: {
     TelemetryCorrelationDashboard,
+    PanelSchemaRenderer,
   },
   props: {
     selectedNode: {
@@ -482,6 +513,69 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const $q = useQuasar();
+
+    // RED Charts State
+    const panelSchemas = ref<any[]>([]);
+    const selectedTimeObj = ref({
+      start_time: new Date(props.timeRange.startTime),
+      end_time: new Date(props.timeRange.endTime),
+    });
+
+    // Returns the escaped service name value for use in SQL WHERE clauses
+    const buildServiceName = (): string => {
+      if (!props.selectedNode) return "";
+      const name =
+        props.selectedNode.name ||
+        props.selectedNode.label ||
+        props.selectedNode.id;
+      return escapeSingleQuotes(name);
+    };
+
+    const loadDashboard = () => {
+      if (!props.selectedNode || props.streamFilter === "all") {
+        panelSchemas.value = [];
+        return;
+      }
+
+      const serviceName = buildServiceName();
+      const streamName = props.streamFilter;
+
+      selectedTimeObj.value = {
+        start_time: new Date(props.timeRange.startTime),
+        end_time: new Date(props.timeRange.endTime),
+      };
+
+      const convertedDashboard = convertDashboardSchemaVersion(
+        deepCopy(metrics),
+      );
+      const serviceFilter = `service_name = '${serviceName}'`;
+
+      const panels = convertedDashboard.tabs[0].panels.map((panel: any) => {
+        let whereClause: string;
+
+        if (panel.title === "Errors") {
+          whereClause = `WHERE span_status = 'ERROR' AND ${serviceFilter}`;
+        } else {
+          whereClause = `WHERE ${serviceFilter}`;
+        }
+
+        let query = panel.queries[0].query
+          .replace("[STREAM_NAME]", `"${streamName}"`)
+          .replace("[WHERE_CLAUSE]", whereClause);
+
+        // Use count(*) instead of approx_distinct(trace_id)
+        query = query
+          .replace(
+            /approx_distinct\(trace_id\)\s+filter\s*\(where\s+span_status\s*=\s*'ERROR'\)/gi,
+            "count(*) FILTER (WHERE span_status = 'ERROR')",
+          )
+          .replace(/approx_distinct\(trace_id\)/gi, "count(*)");
+
+        return { ...panel, queries: [{ ...panel.queries[0], query }] };
+      });
+
+      panelSchemas.value = panels;
+    };
 
     // Metrics Correlation State
     const showTelemetryDialog = ref(false);
@@ -558,6 +652,25 @@ export default defineComponent({
         correlationData.value = null;
         correlationError.value = null;
       },
+    );
+
+    // Reload RED charts when node, time range, stream, or visibility changes
+    watch(
+      () =>
+        [
+          props.selectedNode?.id,
+          props.timeRange,
+          props.streamFilter,
+          props.visible,
+        ] as const,
+      ([, , , visible]) => {
+        if (visible && props.selectedNode) {
+          loadDashboard();
+        } else if (!visible) {
+          panelSchemas.value = [];
+        }
+      },
+      { immediate: true, deep: true },
     );
 
     // Recent Operations State
@@ -745,16 +858,6 @@ export default defineComponent({
         minute: "2-digit",
         second: "2-digit",
       });
-    };
-
-    // Returns the escaped service name value for use in SQL WHERE clauses
-    const buildServiceName = (): string => {
-      if (!props.selectedNode) return "";
-      const name =
-        props.selectedNode.name ||
-        props.selectedNode.label ||
-        props.selectedNode.id;
-      return escapeSingleQuotes(name);
     };
 
     // Computed: Operations sections — derived from aggregated or spans data
@@ -1029,6 +1132,10 @@ export default defineComponent({
       getLatencyClass,
       handleClose,
       handleShowTelemetry,
+      // RED Charts
+      panelSchemas,
+      selectedTimeObj,
+      loadDashboard,
       // Telemetry Correlation
       showTelemetryDialog,
       correlationLoading,
@@ -1867,6 +1974,16 @@ export default defineComponent({
 
 .error-state {
   color: var(--q-negative);
+}
+
+.red-charts-section {
+  :deep(.card-container) {
+    box-shadow: none;
+
+    :first-child {
+      padding: 0 0.0625rem !important;
+    }
+  }
 }
 </style>
 
