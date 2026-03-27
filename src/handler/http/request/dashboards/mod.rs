@@ -78,9 +78,10 @@ impl From<DashboardError> for Response {
             DashboardError::ListPermittedDashboardsError(err) => MetaHttpResponse::forbidden(err),
             DashboardError::UserNotFound => MetaHttpResponse::unauthorized("User not found"),
             DashboardError::PermissionDenied => MetaHttpResponse::forbidden("Permission denied"),
-            DashboardError::PutValidationFailed(errors) => MetaHttpResponse::bad_request(
-                format!("Dashboard validation failed: {}", errors.join("; ")),
-            ),
+            DashboardError::PutValidationFailed(errors) => MetaHttpResponse::bad_request(format!(
+                "Dashboard validation failed: {}",
+                errors.join("; ")
+            )),
         }
     }
 }

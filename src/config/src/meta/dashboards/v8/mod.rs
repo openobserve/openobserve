@@ -1056,7 +1056,8 @@ pub struct Trellis {
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 pub enum MapSymbolSize {
     #[default]
-    /// Intentional space in wire format — matches frontend literal `"by Value"` (see convertGeoMapData.ts)
+    /// Intentional space in wire format — matches frontend literal `"by Value"` (see
+    /// convertGeoMapData.ts)
     #[serde(rename = "by Value")]
     ByValue,
     #[serde(rename = "fixed")]

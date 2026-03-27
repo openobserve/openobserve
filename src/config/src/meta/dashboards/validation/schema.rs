@@ -57,12 +57,7 @@ pub fn validate(json: &Value) -> Vec<super::ValidationError> {
 }
 
 /// Maps raw jsonschema errors to user-friendly messages using errorMessages.json.
-fn map_error_message(
-    path: &str,
-    keyword: &str,
-    raw_message: &str,
-    dashboard: &Value,
-) -> String {
+fn map_error_message(path: &str, keyword: &str, raw_message: &str, dashboard: &Value) -> String {
     if let Some(info) = extract_panel_info(path, dashboard) {
         let field = path.split('/').last().unwrap_or("");
 

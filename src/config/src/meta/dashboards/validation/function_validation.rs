@@ -46,16 +46,12 @@ pub struct ArgType {
 
 /// Load functionValidation.json once at startup — same file used by FE.
 static FUNCTION_DEFS: Lazy<Vec<FunctionDef>> = Lazy::new(|| {
-    let json_str =
-        include_str!("../../../../../../schemas/functions/functionValidation.json");
+    let json_str = include_str!("../../../../../../schemas/functions/functionValidation.json");
     serde_json::from_str(json_str).expect("Invalid functionValidation.json")
 });
 
 /// Validates function args for all panels in the dashboard.
-pub fn validate_all_function_args(
-    dashboard: &Value,
-    errors: &mut Vec<super::ValidationError>,
-) {
+pub fn validate_all_function_args(dashboard: &Value, errors: &mut Vec<super::ValidationError>) {
     let tabs = match dashboard.get("tabs").and_then(|t| t.as_array()) {
         Some(tabs) => tabs,
         None => return,
@@ -70,8 +66,10 @@ pub fn validate_all_function_args(
                     continue;
                 }
 
-                let query_type =
-                    panel.get("queryType").and_then(|q| q.as_str()).unwrap_or("");
+                let query_type = panel
+                    .get("queryType")
+                    .and_then(|q| q.as_str())
+                    .unwrap_or("");
                 if query_type == "promql" || query_type == "promql-builder" {
                     continue;
                 }
@@ -169,12 +167,14 @@ fn validate_function(
 
     // Find function definition
     let func_name = func_config.get("functionName");
-    let selected_fn = FUNCTION_DEFS.iter().find(|fd| match (&fd.function_name, func_name) {
-        (None, None) => true,
-        (None, Some(Value::Null)) => true,
-        (Some(name), Some(Value::String(s))) => name == s,
-        _ => false,
-    });
+    let selected_fn = FUNCTION_DEFS
+        .iter()
+        .find(|fd| match (&fd.function_name, func_name) {
+            (None, None) => true,
+            (None, Some(Value::Null)) => true,
+            (Some(name), Some(Value::String(s))) => name == s,
+            _ => false,
+        });
 
     let selected_fn = match selected_fn {
         Some(f) => f,
@@ -214,12 +214,11 @@ fn validate_function(
     if let Some(min_def) = args_def.iter().find(|d| d.min.is_some()) {
         let min = min_def.min.unwrap_or(0);
         let min_position = args_def.iter().position(|d| d.min.is_some()).unwrap_or(0);
-        let relevant_count =
-            if has_variable_args && variable_arg_position <= min_position as i64 {
-                args.len() as i64 - variable_arg_position + 1
-            } else {
-                args.len() as i64
-            };
+        let relevant_count = if has_variable_args && variable_arg_position <= min_position as i64 {
+            args.len() as i64 - variable_arg_position + 1
+        } else {
+            args.len() as i64
+        };
         if (relevant_count as usize) < min {
             errors.push(super::ValidationError {
                 path: String::new(),
