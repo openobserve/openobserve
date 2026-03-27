@@ -181,7 +181,7 @@ async function getSuggestionLabels(page, pm) {
 /**
  * Check if suggestions widget contains a specific value
  */
-async function suggestionContainsValue(page, pm, pm, value) {
+async function suggestionContainsValue(page, pm, value) {
     const { monacoHelper } = getMonacoHelper(page, pm);
     return await monacoHelper.suggestionsContain(value);
 }
@@ -189,7 +189,7 @@ async function suggestionContainsValue(page, pm, pm, value) {
 /**
  * Select a suggestion from Monaco autocomplete widget by text
  */
-async function selectSuggestion(page, pm, pm, text) {
+async function selectSuggestion(page, pm, text) {
     const { monacoHelper } = getMonacoHelper(page, pm);
     await monacoHelper.selectSuggestion(text);
 }
