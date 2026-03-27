@@ -422,7 +422,30 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     dedup: false,
     advanced: false,
   });
-  const chartCollapsed = ref(false);
+  // Splitter state for left (config tabs) / right (preview & summary) layout
+  const splitterModel = ref(65); // 65% left, 35% right
+  const lastSplitterPosition = ref(65);
+  const rightPanelCollapsed = ref(false);
+
+  const toggleRightPanel = () => {
+    if (rightPanelCollapsed.value) {
+      // Expand: restore last position
+      splitterModel.value = lastSplitterPosition.value || 65;
+      rightPanelCollapsed.value = false;
+    } else {
+      // Collapse: save position and go to 100%
+      lastSplitterPosition.value = splitterModel.value;
+      splitterModel.value = 100;
+      rightPanelCollapsed.value = true;
+    }
+    nextTick(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+  };
+
+  const onSplitterUpdate = () => {
+    window.dispatchEvent(new Event('resize'));
+  };
 
   // ── Computed Properties ─────────────────────────────────────────────────
 
@@ -2664,7 +2687,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     // V3 tab state
     activeTab,
     tabErrors,
-    chartCollapsed,
+    splitterModel,
+    rightPanelCollapsed,
+    toggleRightPanel,
+    onSplitterUpdate,
     thresholdMarkLine,
 
     // Computed

@@ -196,215 +196,243 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- TIER 2: Preview & Summary -->
-      <div
-        class="card-container tw:mx-[0.625rem] tw:mb-2 tw:overflow-hidden tw:transition-all tw:duration-300"
-        :style="{ height: chartCollapsed ? '40px' : '260px' }"
+      <!-- Main content: Splitter with Config (left) and Preview & Summary (right) -->
+      <q-splitter
+        v-model="splitterModel"
+        :limits="[40, 100]"
+        class="alert-v3-splitter tw:mx-[0.625rem]"
+        style="flex: 1; min-height: 0;"
+        @update:model-value="onSplitterUpdate"
       >
-        <div
-          class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:h-[40px] tw:cursor-pointer tw:select-none tw:border-b tw:shrink-0"
-          :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'"
-          @click="chartCollapsed = !chartCollapsed"
-        >
-          <span class="tw:text-sm tw:font-medium">{{ t("alerts.preview") || "Preview" }} &amp; Summary</span>
-          <q-icon :name="chartCollapsed ? 'expand_more' : 'expand_less'" size="20px" />
-        </div>
-        <div v-show="!chartCollapsed" class="tw:flex tw:h-[calc(100%-40px)]">
-          <!-- Preview (60%) -->
-          <div class="alert-v3-chart" style="width: 60%; height: 100%;">
-            <preview-alert
-              ref="previewAlertRef"
-              style="height: 100%;"
-              :formData="formData"
-              :query="previewQuery"
-              :selectedTab="formData.query_condition.type || 'custom'"
-              :isAggregationEnabled="isAggregationEnabled"
-              :isUsingBackendSql="isUsingBackendSql"
-              :isEditorOpen="isEditorOpen"
-            />
-          </div>
-          <!-- Divider -->
-          <div
-            class="tw:w-px tw:self-stretch tw:my-2"
-            :class="store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-200'"
-          ></div>
-          <!-- Summary (40%) -->
-          <div style="width: 40%; height: 100%; overflow: auto;">
-            <alert-summary
-              style="height: 100%;"
-              :formData="formData"
-              :destinations="destinations"
-              :previewQuery="previewQuery"
-              :generatedSqlQuery="generatedSqlQuery"
-            />
-          </div>
-        </div>
-      </div>
+        <!-- LEFT: Configuration Tabs + Footer -->
+        <template #before>
+          <div class="tw:flex tw:flex-col tw:h-full">
+            <!-- Tab Headers -->
+            <div class="alert-v3-tabs card-container" style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
+              <div class="tw:flex tw:border-b tw:shrink-0" :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'">
+                <div
+                  v-for="tab in [
+                    { key: 'condition', label: t('alerts.steps.conditions'), required: true },
+                    { key: 'rules', label: t('alerts.steps.alertSettings'), required: true },
+                    { key: 'compare', label: t('alerts.steps.compareWithPast'), show: formData.is_real_time === 'false' },
+                    { key: 'dedup', label: t('alerts.steps.deduplication'), show: formData.is_real_time === 'false' },
+                    { key: 'advanced', label: t('alerts.steps.advanced') },
+                  ].filter(t => t.show !== false)"
+                  :key="tab.key"
+                  class="tw:px-4 tw:py-2.5 tw:cursor-pointer tw:text-sm tw:font-medium tw:relative tw:select-none tw:transition-colors"
+                  :class="[
+                    activeTab === tab.key
+                      ? (store.state.theme === 'dark' ? 'tw:text-blue-400 tw:border-b-2 tw:border-blue-400' : 'tw:text-blue-600 tw:border-b-2 tw:border-blue-600')
+                      : (store.state.theme === 'dark' ? 'tw:text-gray-400 hover:tw:text-gray-200' : 'tw:text-gray-500 hover:tw:text-gray-800'),
+                  ]"
+                  @click="activeTab = tab.key"
+                >
+                  {{ tab.label }}{{ tab.required ? ' *' : '' }}
+                  <span
+                    v-if="tabErrors[tab.key]"
+                    class="tw:absolute tw:top-1.5 tw:right-1 tw:w-2 tw:h-2 tw:rounded-full tw:bg-red-500"
+                  />
+                </div>
+              </div>
 
-      <!-- TIER 3: Configuration Tabs -->
-      <div class="alert-v3-tabs card-container tw:mx-[0.625rem]" style="flex: 1; min-height: 250px; display: flex; flex-direction: column;">
-        <!-- Tab Headers -->
-        <div class="tw:flex tw:border-b tw:shrink-0" :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'">
-          <div
-            v-for="tab in [
-              { key: 'condition', label: t('alerts.steps.conditions'), required: true },
-              { key: 'rules', label: t('alerts.steps.alertSettings'), required: true },
-              { key: 'compare', label: t('alerts.steps.compareWithPast'), show: formData.is_real_time === 'false' },
-              { key: 'dedup', label: t('alerts.steps.deduplication'), show: formData.is_real_time === 'false' },
-              { key: 'advanced', label: t('alerts.steps.advanced') },
-            ].filter(t => t.show !== false)"
-            :key="tab.key"
-            class="tw:px-4 tw:py-2.5 tw:cursor-pointer tw:text-sm tw:font-medium tw:relative tw:select-none tw:transition-colors"
-            :class="[
-              activeTab === tab.key
-                ? (store.state.theme === 'dark' ? 'tw:text-blue-400 tw:border-b-2 tw:border-blue-400' : 'tw:text-blue-600 tw:border-b-2 tw:border-blue-600')
-                : (store.state.theme === 'dark' ? 'tw:text-gray-400 hover:tw:text-gray-200' : 'tw:text-gray-500 hover:tw:text-gray-800'),
-            ]"
-            @click="activeTab = tab.key"
-          >
-            {{ tab.label }}{{ tab.required ? ' *' : '' }}
-            <!-- Error indicator dot -->
-            <span
-              v-if="tabErrors[tab.key]"
-              class="tw:absolute tw:top-1.5 tw:right-1 tw:w-2 tw:h-2 tw:rounded-full tw:bg-red-500"
-            />
-          </div>
-        </div>
+              <!-- Tab Content -->
+              <q-form ref="addAlertForm" class="tw:flex-1 tw:overflow-auto" @submit="onSubmit">
+                <!-- Condition Tab -->
+                <div v-show="activeTab === 'condition'" class="tw:p-3">
+                  <QueryConfig
+                    ref="step2Ref"
+                    :tab="formData.query_condition.type || 'custom'"
+                    :multiTimeRange="formData.query_condition.multi_time_range"
+                    :columns="filteredColumns"
+                    :streamFieldsMap="streamFieldsMap"
+                    :generatedSqlQuery="generatedSqlQuery"
+                    :inputData="formData.query_condition"
+                    :streamType="formData.stream_type"
+                    :isRealTime="formData.is_real_time"
+                    :sqlQuery="formData.query_condition.sql"
+                    :promqlQuery="formData.query_condition.promql"
+                    :vrlFunction="decodedVrlFunction"
+                    :streamName="formData.stream_name"
+                    :sqlQueryErrorMsg="sqlQueryErrorMsg"
+                    :isAggregationEnabled="isAggregationEnabled"
+                    :promqlCondition="formData.query_condition.promql_condition"
+                    @update:tab="updateTab"
+                    @update-group="updateGroup"
+                    @remove-group="removeConditionGroup"
+                    @input:update="onInputUpdate"
+                    @update:sqlQuery="(value) => (formData.query_condition.sql = value)"
+                    @update:promqlQuery="(value) => (formData.query_condition.promql = value)"
+                    @update:vrlFunction="(value) => (formData.query_condition.vrl_function = value)"
+                    @validate-sql="validateSqlQuery"
+                    @clear-multi-windows="clearMultiWindows"
+                    @editor-closed="handleEditorClosed"
+                    @editor-state-changed="handleEditorStateChanged"
+                    @update:isAggregationEnabled="(value) => (isAggregationEnabled = value)"
+                    @update:aggregation="(value) => (formData.query_condition.aggregation = value)"
+                    @update:promqlCondition="(val) => (formData.query_condition.promql_condition = val)"
+                  />
+                </div>
 
-        <!-- Tab Content -->
-        <q-form ref="addAlertForm" class="tw:flex-1 tw:overflow-auto" @submit="onSubmit">
-          <!-- Condition Tab -->
-          <div v-show="activeTab === 'condition'" class="tw:p-3">
-            <QueryConfig
-              ref="step2Ref"
-              :tab="formData.query_condition.type || 'custom'"
-              :multiTimeRange="formData.query_condition.multi_time_range"
-              :columns="filteredColumns"
-              :streamFieldsMap="streamFieldsMap"
-              :generatedSqlQuery="generatedSqlQuery"
-              :inputData="formData.query_condition"
-              :streamType="formData.stream_type"
-              :isRealTime="formData.is_real_time"
-              :sqlQuery="formData.query_condition.sql"
-              :promqlQuery="formData.query_condition.promql"
-              :vrlFunction="decodedVrlFunction"
-              :streamName="formData.stream_name"
-              :sqlQueryErrorMsg="sqlQueryErrorMsg"
-              :isAggregationEnabled="isAggregationEnabled"
-              :promqlCondition="formData.query_condition.promql_condition"
-              @update:tab="updateTab"
-              @update-group="updateGroup"
-              @remove-group="removeConditionGroup"
-              @input:update="onInputUpdate"
-              @update:sqlQuery="(value) => (formData.query_condition.sql = value)"
-              @update:promqlQuery="(value) => (formData.query_condition.promql = value)"
-              @update:vrlFunction="(value) => (formData.query_condition.vrl_function = value)"
-              @validate-sql="validateSqlQuery"
-              @clear-multi-windows="clearMultiWindows"
-              @editor-closed="handleEditorClosed"
-              @editor-state-changed="handleEditorStateChanged"
-              @update:isAggregationEnabled="(value) => (isAggregationEnabled = value)"
-              @update:aggregation="(value) => (formData.query_condition.aggregation = value)"
-              @update:promqlCondition="(val) => (formData.query_condition.promql_condition = val)"
-            />
-          </div>
+                <!-- Rules & Routing Tab -->
+                <div v-show="activeTab === 'rules'" class="tw:p-3">
+                  <AlertSettings
+                    ref="step4Ref"
+                    :formData="formData"
+                    :isRealTime="formData.is_real_time"
+                    :columns="filteredColumns"
+                    :isAggregationEnabled="isAggregationEnabled"
+                    :destinations="formData.destinations"
+                    :formattedDestinations="getFormattedDestinations"
+                    :template="formData.template"
+                    :templates="templates"
+                    @update:trigger="(val) => (formData.trigger_condition = val)"
+                    @update:aggregation="(val) => (formData.query_condition.aggregation = val)"
+                    @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
+                    @update:promqlCondition="(val) => (formData.query_condition.promql_condition = val)"
+                    @update:destinations="updateDestinations"
+                    @update:template="(val) => (formData.template = val)"
+                    @refresh:destinations="refreshDestinations"
+                    @refresh:templates="refreshTemplates"
+                  />
+                </div>
 
-          <!-- Rules & Routing Tab -->
-          <div v-show="activeTab === 'rules'" class="tw:p-3">
-            <AlertSettings
-              ref="step4Ref"
-              :formData="formData"
-              :isRealTime="formData.is_real_time"
-              :columns="filteredColumns"
-              :isAggregationEnabled="isAggregationEnabled"
-              :destinations="formData.destinations"
-              :formattedDestinations="getFormattedDestinations"
-              :template="formData.template"
-              :templates="templates"
-              @update:trigger="(val) => (formData.trigger_condition = val)"
-              @update:aggregation="(val) => (formData.query_condition.aggregation = val)"
-              @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
-              @update:promqlCondition="(val) => (formData.query_condition.promql_condition = val)"
-              @update:destinations="updateDestinations"
-              @update:template="(val) => (formData.template = val)"
-              @refresh:destinations="refreshDestinations"
-              @refresh:templates="refreshTemplates"
-            />
-          </div>
+                <!-- Compare with Past Tab (Scheduled only) -->
+                <div v-show="activeTab === 'compare'" class="tw:p-3">
+                  <CompareWithPast
+                    ref="step3Ref"
+                    :multiTimeRange="formData.query_condition.multi_time_range"
+                    :period="formData.trigger_condition.period"
+                    :frequency="formData.trigger_condition.frequency"
+                    :frequencyType="formData.trigger_condition.frequency_type"
+                    :cron="formData.trigger_condition.cron"
+                    :selectedTab="formData.query_condition.type || 'custom'"
+                    @update:multiTimeRange="(val) => (formData.query_condition.multi_time_range = val)"
+                    @goToSqlEditor="handleGoToSqlEditor"
+                  />
+                </div>
 
-          <!-- Compare with Past Tab (Scheduled only) -->
-          <div v-show="activeTab === 'compare'" class="tw:p-3">
-            <CompareWithPast
-              ref="step3Ref"
-              :multiTimeRange="formData.query_condition.multi_time_range"
-              :period="formData.trigger_condition.period"
-              :frequency="formData.trigger_condition.frequency"
-              :frequencyType="formData.trigger_condition.frequency_type"
-              :cron="formData.trigger_condition.cron"
-              :selectedTab="formData.query_condition.type || 'custom'"
-              @update:multiTimeRange="(val) => (formData.query_condition.multi_time_range = val)"
-              @goToSqlEditor="handleGoToSqlEditor"
-            />
-          </div>
+                <!-- Deduplication Tab (Scheduled only) -->
+                <div v-show="activeTab === 'dedup'" class="tw:p-3">
+                  <Deduplication
+                    :deduplication="formData.deduplication"
+                    :columns="filteredColumns"
+                    @update:deduplication="(val) => (formData.deduplication = val)"
+                  />
+                </div>
 
-          <!-- Deduplication Tab (Scheduled only) -->
-          <div v-show="activeTab === 'dedup'" class="tw:p-3">
-            <Deduplication
-              :deduplication="formData.deduplication"
-              :columns="filteredColumns"
-              @update:deduplication="(val) => (formData.deduplication = val)"
-            />
-          </div>
+                <!-- Advanced Tab -->
+                <div v-show="activeTab === 'advanced'" class="tw:p-3">
+                  <Advanced
+                    :contextAttributes="formData.context_attributes"
+                    :description="formData.description"
+                    :rowTemplate="formData.row_template"
+                    :rowTemplateType="formData.row_template_type"
+                    @update:contextAttributes="(val) => (formData.context_attributes = val)"
+                    @update:description="(val) => (formData.description = val)"
+                    @update:rowTemplate="(val) => (formData.row_template = val)"
+                    @update:rowTemplateType="(val) => (formData.row_template_type = val)"
+                  />
+                </div>
+              </q-form>
+            </div>
 
-          <!-- Advanced Tab -->
-          <div v-show="activeTab === 'advanced'" class="tw:p-3">
-            <Advanced
-              :contextAttributes="formData.context_attributes"
-              :description="formData.description"
-              :rowTemplate="formData.row_template"
-              :rowTemplateType="formData.row_template_type"
-              @update:contextAttributes="(val) => (formData.context_attributes = val)"
-              @update:description="(val) => (formData.description = val)"
-              @update:rowTemplate="(val) => (formData.row_template = val)"
-              @update:rowTemplateType="(val) => (formData.row_template_type = val)"
-            />
+            <!-- Footer: Cancel / Save -->
+            <div
+              class="flex q-px-md tw:py-3 card-container tw:justify-end tw:mt-2 tw:shrink-0"
+              style="position: sticky; bottom: 0px; z-index: 2"
+            >
+              <div class="tw:flex tw:items-center tw:gap-2 tw:mx-2">
+                <q-btn
+                  data-test="add-alert-cancel-btn"
+                  class="o2-secondary-button tw:h-[36px]"
+                  :label="t('alerts.cancel')"
+                  no-caps
+                  flat
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'o2-secondary-button-dark'
+                      : 'o2-secondary-button-light'
+                  "
+                  @click="$emit('cancel:hideform')"
+                />
+                <q-btn
+                  data-test="add-alert-submit-btn"
+                  class="o2-primary-button no-border tw:h-[36px]"
+                  :label="t('alerts.save')"
+                  no-caps
+                  flat
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'o2-primary-button-dark'
+                      : 'o2-primary-button-light'
+                  "
+                  @click="handleSave"
+                />
+              </div>
+            </div>
           </div>
-        </q-form>
-      </div>
-      <!-- Footer: Cancel / Save -->
-      <div
-        class="flex q-px-md tw:py-3 tw:mx-[0.625rem] card-container tw:justify-end tw:mt-2 tw:shrink-0"
-        style="position: sticky; bottom: 0px; z-index: 2"
-      >
-        <div class="tw:flex tw:items-center tw:gap-2 tw:mx-2">
+        </template>
+
+        <!-- Separator: Collapse/Expand button -->
+        <template #separator>
           <q-btn
-            data-test="add-alert-cancel-btn"
-            class="o2-secondary-button tw:h-[36px]"
-            :label="t('alerts.cancel')"
-            no-caps
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            @click="$emit('cancel:hideform')"
+            :icon="rightPanelCollapsed ? 'chevron_left' : 'chevron_right'"
+            :title="rightPanelCollapsed ? 'Show Preview & Summary' : 'Hide Preview & Summary'"
+            :class="rightPanelCollapsed ? 'alert-v3-splitter-btn-collapsed' : 'alert-v3-splitter-btn-expanded'"
+            color="primary"
+            size="sm"
+            dense
+            round
+            @click="toggleRightPanel"
           />
-          <q-btn
-            data-test="add-alert-submit-btn"
-            class="o2-primary-button no-border tw:h-[36px]"
-            :label="t('alerts.save')"
-            no-caps
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            @click="handleSave"
-          />
-        </div>
-      </div>
+        </template>
+
+        <!-- RIGHT: Preview & Summary -->
+        <template #after>
+          <div v-show="!rightPanelCollapsed" class="tw:flex tw:flex-col tw:h-full tw:pl-1">
+            <!-- Preview -->
+            <div class="alert-v3-chart card-container tw:mb-2" style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
+              <div
+                class="tw:flex tw:items-center tw:px-3 tw:h-[36px] tw:shrink-0 tw:border-b"
+                :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'"
+              >
+                <span class="tw:text-sm tw:font-medium">{{ t("alerts.preview") || "Preview" }}</span>
+              </div>
+              <div style="flex: 1; min-height: 0;">
+                <preview-alert
+                  ref="previewAlertRef"
+                  style="height: 100%;"
+                  :formData="formData"
+                  :query="previewQuery"
+                  :selectedTab="formData.query_condition.type || 'custom'"
+                  :isAggregationEnabled="isAggregationEnabled"
+                  :isUsingBackendSql="isUsingBackendSql"
+                  :isEditorOpen="isEditorOpen"
+                />
+              </div>
+            </div>
+
+            <!-- Summary -->
+            <div class="card-container" style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
+              <div
+                class="tw:flex tw:items-center tw:px-3 tw:h-[36px] tw:shrink-0 tw:border-b"
+                :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'"
+              >
+                <span class="tw:text-sm tw:font-medium">Summary</span>
+              </div>
+              <div style="flex: 1; min-height: 0; overflow: auto;">
+                <alert-summary
+                  style="height: 100%;"
+                  :formData="formData"
+                  :destinations="destinations"
+                  :previewQuery="previewQuery"
+                  :generatedSqlQuery="generatedSqlQuery"
+                />
+              </div>
+            </div>
+          </div>
+        </template>
+      </q-splitter>
       </div><!-- end flex column wrapper -->
     </template>
 
@@ -1296,6 +1324,32 @@ export default defineComponent({
   min-width: 28px !important;
   padding: 0 !important;
   flex-shrink: 0;
+}
+
+// Splitter styles
+.alert-v3-splitter {
+  :deep(.q-splitter__before),
+  :deep(.q-splitter__after) {
+    transition: none !important;
+  }
+
+  :deep(.q-splitter__separator) {
+    background: transparent !important;
+    width: 4px !important;
+    z-index: 10;
+  }
+}
+
+.alert-v3-splitter-btn-expanded,
+.alert-v3-splitter-btn-collapsed {
+  min-height: 3.5em !important;
+  min-width: 1rem !important;
+  position: absolute !important;
+  top: 20px !important;
+  left: 80% !important;
+  transform: translateX(-50%);
+  z-index: 100 !important;
+  border-radius: 0.325rem;
 }
 
 .alert-condition {
