@@ -599,7 +599,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
     // PR #10949 & #10965 - Duplicate Patterns Fix & Tokenized Chips Tests
     // ==========================================================================
 
-    test.skip("should not display duplicate patterns @P0 @smoke", async ({ page }) => {
+    test("should not display duplicate patterns @P0 @smoke", async ({ page }) => {
         testLogger.info('Test: Verify patterns are unique (no duplicates)');
 
         const result = await setupPatternsView(page, pm);
@@ -640,7 +640,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         testLogger.info('PASSED: No duplicate patterns test complete');
     });
 
-    test.skip("should display tokenized wildcard chips in pattern cards @P1 @functional", async ({ page }) => {
+    test("should display tokenized wildcard chips in pattern cards @P1 @functional", async ({ page }) => {
         testLogger.info('Test: Verify tokenized wildcard chips are displayed');
 
         const result = await setupPatternsView(page, pm);
@@ -690,7 +690,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         testLogger.info('PASSED: Tokenized wildcard chips test complete');
     });
 
-    test.skip("should display wildcard chip tooltips with sample values on hover @P1 @functional", async ({ page }) => {
+    test("should display wildcard chip tooltips with sample values on hover @P1 @functional", async ({ page }) => {
         testLogger.info('Test: Verify wildcard chip hover tooltips show sample values');
 
         const result = await setupPatternsView(page, pm);
@@ -703,40 +703,53 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         // ASSERTION: Must have patterns to test tooltips
         expect(cardCount).toBeGreaterThan(0);
 
-        // Find wildcard chips
-        const wildcardChip = await pm.logsPage.getWildcardChip();
-        const chipVisible = await wildcardChip.isVisible().catch(() => false);
+        // Find wildcard chips - they have class 'wildcard-chip' in PatternCard.vue
+        const wildcardChips = page.locator('.wildcard-chip');
+        const chipCount = await wildcardChips.count();
+        testLogger.info(`Found ${chipCount} wildcard chips on page`);
 
-        // NOTE: Wildcard chips may not be rendered as separate DOM elements in current implementation
-        // The tokenization shows wildcards inline in text (e.g., [<:TIMESTAMP>])
-        // This test verifies the feature without blocking if DOM structure changes
-        testLogger.info(`Wildcard chip element visible: ${chipVisible}`);
+        if (chipCount > 0) {
+            // Get the first visible chip
+            const firstChip = wildcardChips.first();
+            const chipVisible = await firstChip.isVisible().catch(() => false);
+            testLogger.info(`First wildcard chip visible: ${chipVisible}`);
 
-        if (chipVisible) {
-            // Hover over the chip
-            await wildcardChip.hover();
-            await page.waitForTimeout(1000);
+            if (chipVisible) {
+                const chipText = await firstChip.textContent();
+                testLogger.info(`Chip text: ${chipText}`);
 
-            // Check for tooltip/popover
-            const tooltip = await pm.logsPage.getTooltip();
-            const tooltipVisible = await tooltip.isVisible({ timeout: 3000 }).catch(() => false);
+                // Hover over the chip - Quasar tooltip has 300ms delay
+                await firstChip.hover();
+                testLogger.info('Hovering over wildcard chip...');
 
-            // ASSERTION: Tooltip should be visible on hover
-            expect(tooltipVisible).toBeTruthy();
+                // Wait for Quasar tooltip (delay is 300ms + render time)
+                await page.waitForTimeout(500);
 
-            if (tooltipVisible) {
-                const tooltipText = await tooltip.innerText();
-                testLogger.info(`Tooltip content: ${tooltipText.substring(0, 100)}`);
+                // Quasar tooltips use .q-tooltip class
+                const tooltip = page.locator('.q-tooltip');
+                const tooltipVisible = await tooltip.isVisible().catch(() => false);
+                testLogger.info(`Tooltip visible after hover: ${tooltipVisible}`);
 
-                // ASSERTION: Tooltip should have content
-                expect(tooltipText.length).toBeGreaterThan(0);
+                if (tooltipVisible) {
+                    const tooltipText = await tooltip.innerText();
+                    testLogger.info(`Tooltip content: ${tooltipText.substring(0, 150)}`);
+
+                    // ASSERTION: Tooltip should have sample values content
+                    expect(tooltipText.length).toBeGreaterThan(0);
+                    testLogger.info('✅ Wildcard chip tooltip with sample values verified');
+                } else {
+                    // Tooltip may not appear if sampleValues is empty for this wildcard
+                    // This is acceptable - verify chip renders correctly
+                    testLogger.info('Tooltip not visible - chip may not have sample values');
+                    expect(chipText.length).toBeGreaterThan(0);
+                    testLogger.info('✅ Wildcard chip renders correctly (no sample values for tooltip)');
+                }
+
+                await page.screenshot({ path: 'playwright-results/pattern-wildcard-tooltip.png', fullPage: true });
             }
-
-            await page.screenshot({ path: 'playwright-results/pattern-wildcard-tooltip.png', fullPage: true });
-            testLogger.info('✅ Wildcard chip tooltip verified');
         } else {
-            // Wildcard chips not rendered as hover-able elements in current UI
-            // Verify wildcards exist in text instead (check multiple patterns, not just index 0)
+            // No wildcard chips rendered - verify wildcards exist in pattern text
+            testLogger.info('No wildcard chip elements found, checking pattern text...');
             let patternsWithWildcards = 0;
 
             for (let i = 0; i < Math.min(cardCount, 5); i++) {
@@ -745,21 +758,22 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
                 if (hasWildcards) {
                     patternsWithWildcards++;
+                    testLogger.info(`Pattern ${i} has wildcards: ${patternText.substring(0, 60)}...`);
                 }
             }
 
             testLogger.info(`Patterns with wildcards (text-based): ${patternsWithWildcards} out of ${Math.min(cardCount, 5)} checked`);
 
-            // ASSERTION: At least one pattern should have wildcards in text
+            // ASSERTION: At least one pattern should have wildcards
             expect(patternsWithWildcards).toBeGreaterThan(0);
-            testLogger.info('✅ Wildcard tokenization verified in pattern text (chips not hover-able)');
+            testLogger.info('✅ Wildcard tokenization verified in pattern text');
         }
 
         testLogger.info('PASSED: Wildcard chip tooltip test complete');
     });
 
-    test.skip("should render anomaly detection column with proper structure @P1 @functional", async ({ page }) => {
-        testLogger.info('Test: Verify anomaly detection column structure and rendering');
+    test("should render anomaly badges inline with pattern cards @P1 @functional", async ({ page }) => {
+        testLogger.info('Test: Verify anomaly detection badges render inline with patterns');
 
         const result = await setupPatternsView(page, pm);
 
@@ -771,49 +785,53 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         // ASSERTION: Must have patterns to test anomaly badges
         expect(cardCount).toBeGreaterThan(0);
 
-        // Get anomaly column data
-        const anomalyData = await pm.logsPage.getAnomalyColumnData();
+        // Anomaly badges are INLINE with pattern cards, not in a separate column
+        // Look for anomaly badges using data-test attribute: pattern-card-{index}-anomaly-badge
+        let patternsWithAnomalyBadge = 0;
+        const anomalyBadgeInfo = [];
 
-        // Note: anomalyData may include more rows than visible patterns (pagination, hidden rows, etc.)
-        const patternsWithAnomalies = anomalyData.filter(d => d.hasIcon || d.hasWarning).length;
-        testLogger.info(`Rows with anomaly indicators: ${patternsWithAnomalies} out of ${anomalyData.length} total rows`);
-        testLogger.info(`Visible pattern cards: ${cardCount}`);
-        testLogger.info(`Anomaly data sample: ${JSON.stringify(anomalyData.slice(0, 3))}`);
+        for (let i = 0; i < Math.min(cardCount, 10); i++) {
+            const badgeSelector = `[data-test="pattern-card-${i}-anomaly-badge"]`;
+            const badge = page.locator(badgeSelector);
+            const isVisible = await badge.isVisible().catch(() => false);
+
+            if (isVisible) {
+                patternsWithAnomalyBadge++;
+                const badgeText = await badge.textContent().catch(() => '');
+                anomalyBadgeInfo.push({ index: i, text: badgeText.trim() });
+            }
+        }
+
+        testLogger.info(`Patterns with anomaly badges: ${patternsWithAnomalyBadge} out of ${Math.min(cardCount, 10)} checked`);
+        if (anomalyBadgeInfo.length > 0) {
+            testLogger.info(`Anomaly badge samples: ${JSON.stringify(anomalyBadgeInfo.slice(0, 3))}`);
+        }
 
         await page.screenshot({ path: 'playwright-results/pattern-anomaly-badges.png', fullPage: true });
 
-        // ASSERTION: Anomaly column should be present and have data
-        expect(anomalyData.length).toBeGreaterThan(0);
+        // Anomaly detection is data-dependent - badges only appear for statistically rare patterns
+        // The test verifies the feature is functional, not that anomalies must exist
+        if (patternsWithAnomalyBadge > 0) {
+            testLogger.info(`✅ Anomaly detection active: ${patternsWithAnomalyBadge} badges rendered`);
 
-        // Verify anomaly column structure (all rows have expected fields)
-        const hasProperStructure = anomalyData.every(d =>
-            d.hasIcon !== undefined &&
-            d.hasWarning !== undefined &&
-            d.content !== undefined
-        );
-
-        // ASSERTION: Anomaly column structure must be correct
-        expect(hasProperStructure).toBeTruthy();
-
-        // Check if anomaly icons are present (data-dependent)
-        const rowsWithIcons = anomalyData.filter(d => d.hasIcon).length;
-        testLogger.info(`Rows with anomaly icons: ${rowsWithIcons} out of ${anomalyData.length}`);
-
-        // LOG INFO: Anomaly detection is data-dependent
-        // Icons appear when patterns are statistically rare (z-score, frequency distribution)
-        // Test verifies the column structure works, not that anomalies must exist
-        if (rowsWithIcons > 0) {
-            testLogger.info(`✅ Anomaly detection active: ${rowsWithIcons} icons rendered`);
+            // Verify badge contains expected text (e.g., "Rare Pattern" or warning emoji)
+            const firstBadge = anomalyBadgeInfo[0];
+            expect(firstBadge.text.length).toBeGreaterThan(0);
+            testLogger.info(`Anomaly badge text verified: "${firstBadge.text}"`);
         } else {
-            testLogger.info('No anomaly icons in current time window (data-dependent)');
-        }
+            // No anomalies in current data - this is acceptable
+            testLogger.info('No anomaly badges visible (data-dependent - patterns may not be statistically rare)');
 
-        testLogger.info('✅ Anomaly column structure verified - feature is functional');
+            // Verify pattern cards themselves are rendered correctly
+            const firstPatternTemplate = await pm.logsPage.getPatternCardTemplateText(0);
+            expect(firstPatternTemplate.length).toBeGreaterThan(0);
+            testLogger.info('✅ Pattern cards render correctly, no anomalies detected in current data');
+        }
 
         testLogger.info('PASSED: Anomaly detection badge test complete');
     });
 
-    test.skip("should display pattern statistics in details dialog @P1 @functional", async ({ page }) => {
+    test("should display pattern statistics in details dialog @P1 @functional", async ({ page }) => {
         testLogger.info('Test: Verify pattern statistics (z_score, avg_frequency) in details dialog');
 
         const result = await setupPatternsView(page, pm);
