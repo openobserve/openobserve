@@ -318,9 +318,17 @@ def test_data(create_session, base_url, org_id):
 
     # Make the request to create dashboard
     payload_dashboard = {
-        "description": "pydashboards", 
+        "version": 8,
+        "description": "pydashboards",
         "title": "pytestdashboard",
         "owner": ZO_ROOT_USER_EMAIL,
+        "tabs": [
+            {
+                "tabId": "default",
+                "name": "Default",
+                "panels": []
+            }
+        ]
     }
     resp_create_dashboard = session.post(
         f"{base_url}api/{org_id}/dashboards", json=payload_dashboard

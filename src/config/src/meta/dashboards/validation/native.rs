@@ -143,8 +143,10 @@ fn validate_table_fields(dashboard: &Value, errors: &mut Vec<super::ValidationEr
                     .unwrap_or(0);
 
                 if x_len + y_len == 0 {
-                    let panel_id =
-                        panel.get("id").and_then(|i| i.as_str()).unwrap_or("unknown");
+                    let panel_id = panel
+                        .get("id")
+                        .and_then(|i| i.as_str())
+                        .unwrap_or("unknown");
                     errors.push(super::ValidationError {
                         path: String::new(),
                         message: format!(
@@ -198,10 +200,7 @@ fn validate_filter_conditions(dashboard: &Value, errors: &mut Vec<super::Validat
     }
 }
 
-fn validate_conditions_recursive(
-    conditions: &[Value],
-    errors: &mut Vec<super::ValidationError>,
-) {
+fn validate_conditions_recursive(conditions: &[Value], errors: &mut Vec<super::ValidationError>) {
     for condition in conditions {
         let filter_type = condition
             .get("filterType")
