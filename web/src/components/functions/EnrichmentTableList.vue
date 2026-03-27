@@ -1064,4 +1064,10 @@ export default defineComponent({
 }
 
 /* No custom styles needed - using Quasar components */
+
+.app-tabs-container .o2-tab {
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+  min-width: auto !important;
+}
 </style>
