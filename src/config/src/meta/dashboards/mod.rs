@@ -112,7 +112,6 @@ impl Dashboard {
 pub mod reports;
 pub mod usage_report;
 pub mod v1;
-pub mod validation;
 pub mod v2;
 pub mod v3;
 pub mod v4;
@@ -120,6 +119,7 @@ pub mod v5;
 pub mod v6;
 pub mod v7;
 pub mod v8;
+pub mod validation;
 
 pub fn datetime_now() -> DateTime<FixedOffset> {
     Utc::now().with_timezone(&FixedOffset::east_opt(0).expect(
