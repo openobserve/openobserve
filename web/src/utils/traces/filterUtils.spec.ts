@@ -284,7 +284,7 @@ describe("applyFilterTerm", () => {
       expect(result).toBe("duration>=200 AND duration<=800");
     });
 
-    it.only("should append when field name cannot be extracted from filter", () => {
+    it("should append when field name cannot be extracted from filter", () => {
       // Expression with no recognisable operator — getFieldFromExpression returns null
       // replaceExistingFieldCondition is skipped; append path is taken.
       const result = applyFilterTerm("some_value", "env='prod'");
@@ -320,7 +320,7 @@ describe("applyFilterTerm", () => {
       expect(result).toBe("select * from spans |  status='error'");
     });
 
-    it("should set parts[1] to null when field not found — null is coerced to empty string by join", () => {
+    it("should not set parts[1] to null when field not found — null is coerced to empty string by join", () => {
       // parts[1] = " env='prod'"; replaceExistingFieldCondition for "status" returns null.
       // Line 86: replaced (null) !== parts[1] (" env='prod'") → true → parts[1] = null
       // join("| "): ["select * from spans ", null].join("| ") = "select * from spans | "
@@ -328,17 +328,17 @@ describe("applyFilterTerm", () => {
         "status='error'",
         "select * from spans | env='prod'",
       );
-      expect(result).toBe("select * from spans | ");
+      expect(result).toBe("select * from spans |  env='prod' and status='error'");
     });
 
-    it("should set parts[1] to null in a piped null-normalised query when field not found", () => {
+    it("should not set parts[1] to null in a piped null-normalised query when field not found", () => {
       // Same null-coercion behaviour as above; filter becomes "error_code is null"
       // but "env" field condition does not match "error_code" → replaced is null → parts[1] = null
       const result = applyFilterTerm(
         "error_code='null'",
         "select * from spans | env='prod'",
       );
-      expect(result).toBe("select * from spans | ");
+      expect(result).toBe("select * from spans |  env='prod' and error_code is null");
     });
 
     it("should replace existing multi-value group on the right side and preserve leading space", () => {
