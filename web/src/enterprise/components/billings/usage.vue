@@ -355,7 +355,7 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
       const aiIcon = computed(() =>
         store.state.theme === "dark"
           ? getImageURL("images/common/ai_icon_dark.svg")
-          : getImageURL("images/common/ai_icon.svg")
+          : getImageURL("images/common/ai_icon_gradient.svg")
       );
       //this is the example data that needs to be used to get the chart in usage page 
       //we just need to have the data in the format of the dataModel

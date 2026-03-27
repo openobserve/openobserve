@@ -132,6 +132,15 @@ export async function setupAreaPanelWithConfig(page, pm, dashboardName, panelNam
 }
 
 /**
+ * Table chart panel — config sidebar NOT opened.
+ * Use when the test does not need config panel interaction.
+ */
+export async function setupTablePanel(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPanel(page, pm, dashboardName, { chartType: "table", panelName });
+  testLogger.info("Table panel ready", { dashboardName, panelName });
+}
+
+/**
  * Table chart panel — config sidebar opened and ready.
  */
 export async function setupTablePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {

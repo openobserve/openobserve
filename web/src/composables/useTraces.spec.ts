@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
 
 // ---------------------------------------------------------------------------
@@ -59,26 +59,56 @@ vi.mock("quasar", () => ({
   useQuasar: vi.fn(() => ({ notify: mockNotify })),
 }));
 
+// useLocalTraceFilterField behaves like a ref: called with no args it returns the
+// current value; called with an arg it writes the new value.  We simulate that
+// contract so tests can inspect what was written.
+// vi.hoisted() ensures these declarations are available when vi.mock() factories run.
+const { localTraceFilterStore, mockUseLocalTraceFilterField } = vi.hoisted(
+  () => {
+    const localTraceFilterStore = { value: {} as Record<string, any> };
+    const mockUseLocalTraceFilterField = vi.fn((newVal?: any) => {
+      if (newVal !== undefined) {
+        localTraceFilterStore.value = newVal;
+      }
+      return localTraceFilterStore;
+    });
+    return { localTraceFilterStore, mockUseLocalTraceFilterField };
+  },
+);
+
 vi.mock("@/utils/zincutils", () => ({
   b64EncodeStandard: vi.fn((s: string) => `b64std:${s}`),
   b64EncodeUnicode: vi.fn((s: string) => `b64uni:${s}`),
-  useLocalTraceFilterField: vi.fn(() => ({ value: {} })),
+  useLocalTraceFilterField: mockUseLocalTraceFilterField,
 }));
 
 vi.mock("@/utils/traces/traceColors", () => ({
   getSpanColorHex: vi.fn((index: number) => `#color-${index}`),
 }));
 
-import useTraces from "./useTraces";
+import useTraces, { DEFAULT_TRACE_COLUMNS } from "./useTraces";
 
 // ---------------------------------------------------------------------------
 
 describe("useTraces", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset the in-memory localStorage simulation
+    localTraceFilterStore.value = {};
+    // Re-wire the mock after clearAllMocks so it still has the implementation
+    mockUseLocalTraceFilterField.mockImplementation((newVal?: any) => {
+      if (newVal !== undefined) {
+        localTraceFilterStore.value = newVal;
+      }
+      return localTraceFilterStore;
+    });
     // Reset shared singleton state before each test
     const { resetSearchObj } = useTraces();
     resetSearchObj();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
   });
 
   // -------------------------------------------------------------------------
@@ -91,6 +121,7 @@ describe("useTraces", () => {
       expect(inst).toHaveProperty("searchObj");
       expect(inst).toHaveProperty("resetSearchObj");
       expect(inst).toHaveProperty("updatedLocalLogFilterField");
+      expect(inst).toHaveProperty("loadLocalLogFilterField");
       expect(inst).toHaveProperty("getUrlQueryParams");
       expect(inst).toHaveProperty("copyTracesUrl");
       expect(inst).toHaveProperty("buildQueryDetails");
@@ -713,6 +744,310 @@ describe("useTraces", () => {
       expect(item.llm_usage_details_output).toBe(200);
       expect(item.llm_usage_details_total).toBe(300);
       expect(item.llm_cost_details_total).toBe(0.05);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // DEFAULT_TRACE_COLUMNS — named export
+  // -------------------------------------------------------------------------
+  describe("DEFAULT_TRACE_COLUMNS", () => {
+    it("has exactly the keys 'traces' and 'spans'", () => {
+      expect(Object.keys(DEFAULT_TRACE_COLUMNS).sort()).toEqual(
+        ["spans", "traces"].sort(),
+      );
+    });
+
+    it("traces columns is a non-empty array of strings", () => {
+      expect(Array.isArray(DEFAULT_TRACE_COLUMNS.traces)).toBe(true);
+      expect(DEFAULT_TRACE_COLUMNS.traces.length).toBeGreaterThan(0);
+      DEFAULT_TRACE_COLUMNS.traces.forEach((col) =>
+        expect(typeof col).toBe("string"),
+      );
+    });
+
+    it("spans columns is a non-empty array of strings", () => {
+      expect(Array.isArray(DEFAULT_TRACE_COLUMNS.spans)).toBe(true);
+      expect(DEFAULT_TRACE_COLUMNS.spans.length).toBeGreaterThan(0);
+      DEFAULT_TRACE_COLUMNS.spans.forEach((col) =>
+        expect(typeof col).toBe("string"),
+      );
+    });
+
+    it("traces columns contains the expected fields", () => {
+      expect(DEFAULT_TRACE_COLUMNS.traces).toEqual([
+        "service_name",
+        "operation_name",
+        "duration",
+        "spans",
+        "status",
+        "service_latency",
+      ]);
+    });
+
+    it("spans columns contains the expected fields", () => {
+      expect(DEFAULT_TRACE_COLUMNS.spans).toEqual([
+        "service_name",
+        "operation_name",
+        "duration",
+        "status",
+        "status_code",
+        "method",
+      ]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // updatedLocalLogFilterField — persists selected fields under nested key
+  // -------------------------------------------------------------------------
+  describe("updatedLocalLogFilterField", () => {
+    it("should store selectedFields under all[key][searchMode] for traces mode", () => {
+      const { searchObj, updatedLocalLogFilterField, resetSearchObj } =
+        useTraces();
+      resetSearchObj();
+      searchObj.organizationIdentifier = "org1";
+      searchObj.data.stream.selectedStream = { label: "s", value: "my-stream" };
+      searchObj.data.stream.selectedFields = ["service_name", "duration"];
+
+      updatedLocalLogFilterField("traces");
+
+      const saved = localTraceFilterStore.value["org1_my-stream"];
+      expect(saved).toBeDefined();
+      expect(saved.traces).toEqual(["service_name", "duration"]);
+    });
+
+    it("should store selectedFields under all[key][searchMode] for spans mode", () => {
+      const { searchObj, updatedLocalLogFilterField, resetSearchObj } =
+        useTraces();
+      resetSearchObj();
+      searchObj.organizationIdentifier = "org1";
+      searchObj.data.stream.selectedStream = { label: "s", value: "my-stream" };
+      searchObj.data.stream.selectedFields = ["operation_name", "status"];
+
+      updatedLocalLogFilterField("spans");
+
+      const saved = localTraceFilterStore.value["org1_my-stream"];
+      expect(saved).toBeDefined();
+      expect(saved.spans).toEqual(["operation_name", "status"]);
+    });
+
+    it("should default searchMode to traces when no argument is provided", () => {
+      const { searchObj, updatedLocalLogFilterField, resetSearchObj } =
+        useTraces();
+      resetSearchObj();
+      searchObj.organizationIdentifier = "orgX";
+      searchObj.data.stream.selectedStream = {
+        label: "stream",
+        value: "stream-val",
+      };
+      searchObj.data.stream.selectedFields = ["duration"];
+
+      updatedLocalLogFilterField();
+
+      const saved = localTraceFilterStore.value["orgX_stream-val"];
+      expect(saved.traces).toEqual(["duration"]);
+    });
+
+    it("should preserve existing sibling mode data when updating one mode", () => {
+      const { searchObj, updatedLocalLogFilterField, resetSearchObj } =
+        useTraces();
+      resetSearchObj();
+      searchObj.organizationIdentifier = "org2";
+      searchObj.data.stream.selectedStream = { label: "s", value: "stream2" };
+
+      // Write spans first
+      searchObj.data.stream.selectedFields = ["method"];
+      updatedLocalLogFilterField("spans");
+
+      // Then write traces — spans entry must survive
+      searchObj.data.stream.selectedFields = ["service_name", "status"];
+      updatedLocalLogFilterField("traces");
+
+      const saved = localTraceFilterStore.value["org2_stream2"];
+      expect(saved.spans).toEqual(["method"]);
+      expect(saved.traces).toEqual(["service_name", "status"]);
+    });
+
+    it("should use 'default' as org identifier when organizationIdentifier is empty", () => {
+      const { searchObj, updatedLocalLogFilterField, resetSearchObj } =
+        useTraces();
+      resetSearchObj();
+      searchObj.organizationIdentifier = "";
+      searchObj.data.stream.selectedStream = {
+        label: "s",
+        value: "stream-val",
+      };
+      searchObj.data.stream.selectedFields = ["duration"];
+
+      updatedLocalLogFilterField("traces");
+
+      expect(
+        localTraceFilterStore.value["default_stream-val"],
+      ).toBeDefined();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // loadLocalLogFilterField — restores selectedFields or falls back to defaults
+  // -------------------------------------------------------------------------
+  describe("loadLocalLogFilterField", () => {
+    it("should load saved traces fields from localStorage when they exist", () => {
+      const { searchObj, loadLocalLogFilterField, resetSearchObj } =
+        useTraces();
+      resetSearchObj();
+      searchObj.organizationIdentifier = "org1";
+      searchObj.data.stream.selectedStream = {
+        label: "s",
+        value: "my-stream",
+      };
+
+      // Pre-populate the store
+      localTraceFilterStore.value["org1_my-stream"] = {
+        traces: ["service_name", "spans"],
+      };
+
+      loadLocalLogFilterField("traces");
+
+      expect(searchObj.data.stream.selectedFields).toEqual([
+        "service_name",
+        "spans",
+      ]);
+    });
+
+    it("should load saved spans fields from localStorage when they exist", () => {
+      const { searchObj, loadLocalLogFilterField, resetSearchObj } =
+        useTraces();
+      resetSearchObj();
+      searchObj.organizationIdentifier = "org1";
+      searchObj.data.stream.selectedStream = {
+        label: "s",
+        value: "my-stream",
+      };
+
+      localTraceFilterStore.value["org1_my-stream"] = {
+        spans: ["operation_name", "method"],
+      };
+
+      loadLocalLogFilterField("spans");
+
+      expect(searchObj.data.stream.selectedFields).toEqual([
+        "operation_name",
+        "method",
+      ]);
+    });
+
+    it("should fall back to DEFAULT_TRACE_COLUMNS.traces when no saved data exists", () => {
+      const { searchObj, loadLocalLogFilterField, resetSearchObj } =
+        useTraces();
+      resetSearchObj();
+      searchObj.organizationIdentifier = "org-new";
+      searchObj.data.stream.selectedStream = {
+        label: "s",
+        value: "unknown-stream",
+      };
+
+      // Store is empty — no entry for this key
+      loadLocalLogFilterField("traces");
+
+      expect(searchObj.data.stream.selectedFields).toEqual([
+        ...DEFAULT_TRACE_COLUMNS.traces,
+      ]);
+    });
+
+    it("should fall back to DEFAULT_TRACE_COLUMNS.spans when no saved data exists for spans mode", () => {
+      const { searchObj, loadLocalLogFilterField, resetSearchObj } =
+        useTraces();
+      resetSearchObj();
+      searchObj.organizationIdentifier = "org-new";
+      searchObj.data.stream.selectedStream = {
+        label: "s",
+        value: "unknown-stream",
+      };
+
+      loadLocalLogFilterField("spans");
+
+      expect(searchObj.data.stream.selectedFields).toEqual([
+        ...DEFAULT_TRACE_COLUMNS.spans,
+      ]);
+    });
+
+    it("should fall back to defaults when the saved entry exists but the mode array is empty", () => {
+      const { searchObj, loadLocalLogFilterField, resetSearchObj } =
+        useTraces();
+      resetSearchObj();
+      searchObj.organizationIdentifier = "org1";
+      searchObj.data.stream.selectedStream = {
+        label: "s",
+        value: "my-stream",
+      };
+
+      // Key exists but mode array is empty
+      localTraceFilterStore.value["org1_my-stream"] = { traces: [] };
+
+      loadLocalLogFilterField("traces");
+
+      expect(searchObj.data.stream.selectedFields).toEqual([
+        ...DEFAULT_TRACE_COLUMNS.traces,
+      ]);
+    });
+
+    it("should default to traces mode when no argument is provided", () => {
+      const { searchObj, loadLocalLogFilterField, resetSearchObj } =
+        useTraces();
+      resetSearchObj();
+      searchObj.organizationIdentifier = "org1";
+      searchObj.data.stream.selectedStream = {
+        label: "s",
+        value: "my-stream",
+      };
+
+      localTraceFilterStore.value["org1_my-stream"] = {
+        traces: ["service_name"],
+      };
+
+      loadLocalLogFilterField();
+
+      expect(searchObj.data.stream.selectedFields).toEqual(["service_name"]);
+    });
+
+    it("should use 'default' as org identifier when organizationIdentifier is empty", () => {
+      const { searchObj, loadLocalLogFilterField, resetSearchObj } =
+        useTraces();
+      resetSearchObj();
+      searchObj.organizationIdentifier = "";
+      searchObj.data.stream.selectedStream = {
+        label: "s",
+        value: "stream-val",
+      };
+
+      localTraceFilterStore.value["default_stream-val"] = {
+        traces: ["duration", "status"],
+      };
+
+      loadLocalLogFilterField("traces");
+
+      expect(searchObj.data.stream.selectedFields).toEqual([
+        "duration",
+        "status",
+      ]);
+    });
+
+    it("should return a copy of the defaults so mutations do not affect DEFAULT_TRACE_COLUMNS", () => {
+      const { searchObj, loadLocalLogFilterField, resetSearchObj } =
+        useTraces();
+      resetSearchObj();
+      searchObj.organizationIdentifier = "org-copy";
+      searchObj.data.stream.selectedStream = {
+        label: "s",
+        value: "copy-stream",
+      };
+
+      loadLocalLogFilterField("traces");
+
+      // Mutate the loaded value
+      searchObj.data.stream.selectedFields.push("extra_field");
+
+      // The original constant must be unchanged
+      expect(DEFAULT_TRACE_COLUMNS.traces).not.toContain("extra_field");
     });
   });
 });

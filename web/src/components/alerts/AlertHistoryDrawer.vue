@@ -16,94 +16,108 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    style="width: 50vw"
+    style="width: 55vw"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
-    <!-- Header -->
-    <div
-      class="drawer-header"
-      :class="
-        store.state.theme === 'dark'
-          ? 'drawer-header-dark'
-          : 'drawer-header-light'
-      "
-    >
-      <div class="tw:flex tw:items-center tw:justify-between tw:w-full">
-        <!-- Left: Title -->
-        <div
-          class="tw:flex tw:items-center tw:gap-2 tw:min-w-0"
-          data-test="alert-details-title"
-        >
-          <q-icon
-            name="history"
-            size="18px"
-            :color="store.state.theme === 'dark' ? 'blue-4' : 'primary'"
-          />
-          <!-- Alert Name -->
-          <span
-            :class="[
-              'tw:font-semibold tw:text-[15px] tw:truncate tw:max-w-[220px] tw:inline-block',
-            ]"
+    <!-- Header — matches Stream Detail (schema.vue) layout -->
+    <q-card-section class="q-ma-none">
+      <div class="row items-center no-wrap">
+        <div class="col">
+          <div
+            class="tw:text-[18px] tw:flex tw:items-center"
+            data-test="alert-details-title"
           >
-            {{ alertDetails?.name ?? t("alert_list.alert_history") }}
-            <q-tooltip
-              v-if="alertDetails?.name && alertDetails.name.length > 28"
-              class="tw:text-xs"
+            {{ t("alert_list.alert_history") }}
+            <!-- Alert Name Badge -->
+            <span
+              v-if="alertDetails"
+              :class="[
+                'tw:font-bold tw:mr-2 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:max-w-xs tw:truncate tw:inline-block',
+                store.state.theme === 'dark'
+                  ? 'tw:text-blue-400 tw:bg-blue-900/50'
+                  : 'tw:text-blue-600 tw:bg-blue-50',
+              ]"
+              data-test="alert-history-name-badge"
             >
               {{ alertDetails.name }}
-            </q-tooltip>
-          </span>
-          <!-- Alert Type Chip -->
-          <q-chip
-            v-if="alertDetails && !isAnomaly"
-            dense
-            size="sm"
-            :icon="alertDetails.is_real_time ? 'bolt' : 'schedule'"
-            :label="alertDetails.is_real_time ? 'Real-time' : 'Scheduled'"
-            :color="alertDetails.is_real_time ? 'orange-2' : 'grey-2'"
-            :text-color="alertDetails.is_real_time ? 'orange-9' : 'grey-8'"
-            class="tw:shrink-0"
-          />
-          <q-chip
-            v-if="alertDetails && isAnomaly"
-            dense
-            size="sm"
-            icon="query_stats"
-            label="Anomaly"
-            color="blue-1"
-            text-color="blue-8"
-            class="tw:shrink-0"
-          />
-          <!-- Tab toggle -->
-          <div
-            class="tab-toggle tw:shrink-0"
-            :class="
-              store.state.theme === 'dark'
-                ? 'tab-toggle-dark'
-                : 'tab-toggle-light'
-            "
-          >
-            <button
-              class="tab-toggle-btn"
-              :class="activeTab === 'history' ? 'tab-toggle-btn-active' : ''"
-              @click="activeTab = 'history'"
+              <q-tooltip
+                v-if="alertDetails.name && alertDetails.name.length > 35"
+                class="tw:text-xs"
+              >
+                {{ alertDetails.name }}
+              </q-tooltip>
+            </span>
+            <!-- Alert Type Badge -->
+            <div
+              v-if="alertDetails"
+              :class="[
+                'tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:border',
+                store.state.theme === 'dark'
+                  ? 'tw:bg-gray-800/50 tw:border-gray-600'
+                  : 'tw:bg-gray-50 tw:border-gray-200',
+              ]"
             >
-              <q-icon name="history" size="14px" />
-              History
-            </button>
-            <button
-              class="tab-toggle-btn"
-              :class="activeTab === 'condition' ? 'tab-toggle-btn-active' : ''"
-              @click="activeTab = 'condition'"
+              <q-icon
+                :name="
+                  isAnomaly
+                    ? 'query_stats'
+                    : alertDetails.is_real_time
+                      ? 'bolt'
+                      : 'schedule'
+                "
+                size="14px"
+                class="tw:opacity-70"
+              />
+              <span
+                :class="[
+                  'tw:text-xs tw:font-semibold',
+                  store.state.theme === 'dark'
+                    ? 'tw:text-gray-200'
+                    : 'tw:text-gray-800',
+                ]"
+              >
+                {{
+                  isAnomaly
+                    ? "Anomaly Detection"
+                    : alertDetails.is_real_time
+                      ? "Real-time"
+                      : "Scheduled"
+                }}
+              </span>
+            </div>
+            <!-- Tab toggle -->
+            <div
+              class="tab-toggle tw:shrink-0 tw:ml-4"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tab-toggle-dark'
+                  : 'tab-toggle-light'
+              "
             >
-              <q-icon name="code" size="14px" />
-              Condition
-            </button>
+              <button
+                class="tab-toggle-btn"
+                :class="activeTab === 'history' ? 'tab-toggle-btn-active' : ''"
+                @click="activeTab = 'history'"
+                data-test="alert-history-tab-history"
+              >
+                <q-icon name="history" size="14px" />
+                History
+              </button>
+              <button
+                class="tab-toggle-btn"
+                :class="
+                  activeTab === 'condition' ? 'tab-toggle-btn-active' : ''
+                "
+                @click="activeTab = 'condition'"
+                data-test="alert-history-tab-condition"
+              >
+                <q-icon name="code" size="14px" />
+                Condition
+              </button>
+            </div>
           </div>
         </div>
-
-        <!-- Right: Actions -->
-        <div class="tw:flex tw:items-center tw:gap-2 tw:shrink-0">
+        <div class="col-auto tw:flex tw:items-center tw:gap-1">
           <DateTime
             :style="activeTab !== 'history' ? 'visibility: hidden' : ''"
             ref="dateTimeRef"
@@ -118,22 +132,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
           />
           <q-btn
-            data-test="alert-details-close-btn"
             v-close-popup="true"
-            flat
             round
-            dense
-            size="sm"
-            icon="close"
+            flat
+            icon="cancel"
+            data-test="alert-details-close-btn"
           />
         </div>
       </div>
-    </div>
+    </q-card-section>
+    <q-separator />
 
     <!-- Content -->
     <div
       class="tw:flex tw:flex-col"
-      style="height: calc(100vh - 57px); overflow: hidden"
+      style="height: calc(100vh - 60px); overflow: hidden"
       v-if="alertDetails"
     >
       <!-- Tab Panels -->
@@ -255,33 +268,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                       </template>
                       <template v-else-if="col.name === 'status'">
-                        <div class="tw:flex tw:items-center tw:gap-1.5">
-                          <span
-                            class="status-dot"
-                            :class="getStatusDotClass(props.row.status)"
-                          />
-                          <span
-                            class="tw:text-[13px] tw:font-medium"
-                            :class="getStatusTextClass(props.row.status)"
-                          >
-                            {{ formatStatus(props.row.status) }}
-                          </span>
-                          <q-icon
+                        <q-chip
+                          dense
+                          size="sm"
+                          :icon="getStatusChipIcon(props.row.status)"
+                          :label="formatStatus(props.row.status)"
+                          :color="getStatusChipColor(props.row.status)"
+                          :text-color="getStatusChipTextColor(props.row.status)"
+                          class="tw:cursor-default"
+                          data-test="alert-history-status-chip"
+                        >
+                          <q-tooltip
                             v-if="props.row.error"
-                            name="visibility"
-                            size="14px"
-                            class="tw:cursor-pointer tw:text-red-400"
+                            max-width="300px"
+                            class="tw:text-xs tw:break-words"
                           >
-                            <q-tooltip max-width="300px" class="tw:text-xs tw:break-words">
-                              {{ props.row.error }}
-                            </q-tooltip>
-                          </q-icon>
-                        </div>
+                            {{ props.row.error }}
+                          </q-tooltip>
+                        </q-chip>
                       </template>
                       <template v-else-if="col.name === 'timestamp'">
-                        <span class="tw:text-[13px] tw:tabular-nums">{{
+                        <span class="tw:text-[13px]">{{
                           formatTimestamp(props.row.timestamp)
                         }}</span>
+                        <q-tooltip class="tw:text-xs">
+                          {{ formatTimestampFull(props.row.timestamp) }}
+                        </q-tooltip>
                       </template>
                       <template v-else-if="col.name === 'evaluation_time'">
                         <span class="tw:text-[13px] tw:tabular-nums">
@@ -303,8 +315,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                       </template>
                       <template v-else-if="col.name === 'anomaly_count'">
-                        <span class="tw:text-[13px] tw:tabular-nums" :class="props.row.anomaly_count > 0 ? 'tw:text-red-500 tw:font-medium' : ''">
-                          {{ props.row.anomaly_count != null ? props.row.anomaly_count : "—" }}
+                        <span
+                          class="tw:text-[13px] tw:tabular-nums"
+                          :class="
+                            props.row.anomaly_count > 0
+                              ? 'tw:text-red-500 tw:font-medium'
+                              : ''
+                          "
+                        >
+                          {{
+                            props.row.anomaly_count != null
+                              ? props.row.anomaly_count
+                              : "—"
+                          }}
                         </span>
                       </template>
                     </q-td>
@@ -343,173 +366,132 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Anomaly detection condition view — mirrors the alert SQL code block -->
             <template v-if="isAnomaly">
-            <div
-              class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'code-block-dark'
-                  : 'code-block-light'
-              "
-            >
               <div
-                class="code-block-header tw:shrink-0"
+                class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'code-block-header-dark'
-                    : 'code-block-header-light'
+                    ? 'code-block-dark'
+                    : 'code-block-light'
                 "
               >
-                <div class="tw:flex tw:items-center tw:gap-1.5">
-                  <span
-                    class="tw:text-[11px] tw:font-medium"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'tw:text-gray-400'
-                        : 'tw:text-gray-500'
-                    "
-                  >
-                    SQL
-                  </span>
-                </div>
-                <q-btn
-                  v-if="anomalySql"
-                  @click="copyToClipboard(anomalySql, 'SQL')"
-                  flat
-                  dense
-                  size="xs"
-                  icon="content_copy"
-                  :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
-                  data-test="anomaly-details-copy-sql-btn"
+                <div
+                  class="code-block-header tw:shrink-0"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'code-block-header-dark'
+                      : 'code-block-header-light'
+                  "
                 >
-                  <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
-                </q-btn>
+                  <div class="tw:flex tw:items-center tw:gap-1.5">
+                    <span
+                      class="tw:text-[11px] tw:font-medium"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'tw:text-gray-400'
+                          : 'tw:text-gray-500'
+                      "
+                    >
+                      SQL
+                    </span>
+                  </div>
+                  <q-btn
+                    v-if="anomalySql"
+                    @click="copyToClipboard(anomalySql, 'SQL')"
+                    flat
+                    dense
+                    size="xs"
+                    icon="content_copy"
+                    :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
+                    data-test="anomaly-details-copy-sql-btn"
+                  >
+                    <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
+                  </q-btn>
+                </div>
+                <pre
+                  class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
+                  >{{ anomalySql || t("alerts.alertDetails.noCondition") }}</pre
+                >
               </div>
-              <pre
-                class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
-                >{{ anomalySql || t("alerts.alertDetails.noCondition") }}</pre
-              >
-            </div>
             </template>
 
             <!-- Regular alert condition view -->
             <template v-else>
-              <!-- Outer flex column — condition area + VRL area split 50/50 when VRL present -->
-              <div class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:gap-2">
-
-                <!-- ── Condition area (main + optional PromQL) ── -->
+              <div
+                class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'code-block-dark'
+                    : 'code-block-light'
+                "
+              >
+                <!-- Code block header bar — stays fixed -->
                 <div
-                  class="tw:flex tw:flex-col tw:overflow-hidden tw:gap-2"
-                  :class="hasVRL ? 'tw:flex-1 tw:min-h-0' : 'tw:flex-1'"
+                  class="code-block-header tw:shrink-0"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'code-block-header-dark'
+                      : 'code-block-header-light'
+                  "
                 >
-                  <!-- Main condition block -->
-                  <div
-                    class="code-block tw:flex tw:flex-col tw:overflow-hidden"
-                    :class="[
-                      store.state.theme === 'dark' ? 'code-block-dark' : 'code-block-light',
-                      showSeparatePromQL ? 'tw:flex-1 tw:min-h-0' : 'tw:flex-1',
-                    ]"
-                  >
-                    <div
-                      class="code-block-header tw:shrink-0"
-                      :class="store.state.theme === 'dark' ? 'code-block-header-dark' : 'code-block-header-light'"
-                    >
-                      <span
-                        class="tw:text-[11px] tw:font-medium"
-                        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
-                      >
-                        {{
-                          alertDetails.type === "sql"
-                            ? "SQL"
-                            : alertDetails.type === "promql"
-                              ? "PromQL"
-                              : "Conditions"
-                        }}
-                      </span>
-                      <q-btn
-                        v-if="alertDetails.conditions && alertDetails.conditions !== '' && alertDetails.conditions !== '--'"
-                        @click="copyToClipboard(
-                          alertDetails.conditions,
-                          alertDetails.type === 'sql'
-                            ? t('alerts.alertDetails.sqlQuery')
-                            : alertDetails.type === 'promql'
-                              ? t('alerts.alertDetails.promqlQuery')
-                              : t('alerts.alertDetails.conditions'),
-                        )"
-                        flat dense size="xs" icon="content_copy"
-                        :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
-                        data-test="alert-details-copy-conditions-btn"
-                      >
-                        <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
-                      </q-btn>
-                    </div>
-                    <pre
-                      class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
-                    >{{
-                      alertDetails.conditions !== "" && alertDetails.conditions !== "--"
-                        ? alertDetails.type === "sql" || alertDetails.type === "promql"
-                          ? alertDetails.conditions
-                          : alertDetails.conditions.length !== 2
-                            ? `if ${alertDetails.conditions}`
-                            : t("alerts.alertDetails.noCondition")
-                        : t("alerts.alertDetails.noCondition")
-                    }}</pre>
-                  </div>
-
-                  <!-- Separate PromQL block (only when rawCondition has promql and type isn't promql) -->
-                  <div
-                    v-if="showSeparatePromQL"
-                    class="code-block tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden"
-                    :class="store.state.theme === 'dark' ? 'code-block-dark' : 'code-block-light'"
-                  >
-                    <div
-                      class="code-block-header tw:shrink-0"
-                      :class="store.state.theme === 'dark' ? 'code-block-header-dark' : 'code-block-header-light'"
-                    >
-                      <span
-                        class="tw:text-[11px] tw:font-medium"
-                        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
-                      >PromQL</span>
-                      <q-btn
-                        @click="copyToClipboard(rawPromQL!, t('alerts.alertDetails.promqlQuery'))"
-                        flat dense size="xs" icon="content_copy"
-                        :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
-                      >
-                        <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
-                      </q-btn>
-                    </div>
-                    <pre
-                      class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
-                    >{{ rawPromQL }}</pre>
-                  </div>
-                </div>
-
-                <!-- ── VRL block (only when hasVRL) — takes equal half ── -->
-                <div
-                  v-if="hasVRL"
-                  class="code-block tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden"
-                  :class="store.state.theme === 'dark' ? 'code-block-dark' : 'code-block-light'"
-                >
-                  <div
-                    class="code-block-header tw:shrink-0"
-                    :class="store.state.theme === 'dark' ? 'code-block-header-dark' : 'code-block-header-light'"
-                  >
+                  <div class="tw:flex tw:items-center tw:gap-1.5">
                     <span
                       class="tw:text-[11px] tw:font-medium"
-                      :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
-                    >VRL Function</span>
-                    <q-btn
-                      @click="copyToClipboard(rawVRL!, 'VRL Function')"
-                      flat dense size="xs" icon="content_copy"
-                      :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'tw:text-gray-400'
+                          : 'tw:text-gray-500'
+                      "
                     >
-                      <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
-                    </q-btn>
+                      {{
+                        alertDetails.type === "sql"
+                          ? "SQL"
+                          : alertDetails.type === "promql"
+                            ? "PromQL"
+                            : "Conditions"
+                      }}
+                    </span>
                   </div>
-                  <pre
-                    class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
-                  >{{ rawVRL }}</pre>
+                  <q-btn
+                    v-if="
+                      alertDetails.conditions &&
+                      alertDetails.conditions !== '' &&
+                      alertDetails.conditions !== '--'
+                    "
+                    @click="
+                      copyToClipboard(
+                        alertDetails.conditions,
+                        alertDetails.type === 'sql'
+                          ? t('alerts.alertDetails.sqlQuery')
+                          : alertDetails.type === 'promql'
+                            ? t('alerts.alertDetails.promqlQuery')
+                            : t('alerts.alertDetails.conditions'),
+                      )
+                    "
+                    flat
+                    dense
+                    size="xs"
+                    icon="content_copy"
+                    :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
+                    data-test="alert-details-copy-conditions-btn"
+                  >
+                    <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
+                  </q-btn>
                 </div>
-
+                <!-- Code content — scrolls internally -->
+                <pre
+                  class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
+                  >{{
+                    alertDetails.conditions !== "" &&
+                    alertDetails.conditions !== "--"
+                      ? alertDetails.type === "sql" ||
+                        alertDetails.type === "promql"
+                        ? alertDetails.conditions
+                        : alertDetails.conditions.length !== 2
+                          ? `if ${alertDetails.conditions}`
+                          : t("alerts.alertDetails.noCondition")
+                      : t("alerts.alertDetails.noCondition")
+                  }}</pre
+                >
               </div>
             </template>
 
@@ -554,7 +536,6 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import { buildAnomalyPreviewSql } from "@/utils/alerts/anomalySqlBuilder";
-import { b64DecodeUnicode } from "@/utils/zincutils";
 import type { Ref } from "vue";
 
 // Composables
@@ -572,25 +553,6 @@ interface Props {
 const props = defineProps<Props>();
 
 const isAnomaly = computed(() => props.alertType === "anomaly_detection");
-
-// PromQL from rawCondition (shown separately only when the alert type isn't already promql)
-const rawPromQL = computed(() => {
-  const rc = props.alertDetails?.rawCondition;
-  if (!rc?.promql) return null;
-  if (props.alertDetails?.type === "promql") return null; // already shown as main condition
-  return rc.promql;
-});
-
-// VRL function (URL-safe base64-decoded, matches b64EncodeUnicode encoding used on save)
-const rawVRL = computed(() => {
-  const encoded = props.alertDetails?.rawCondition?.vrl_function;
-  if (!encoded) return null;
-  return b64DecodeUnicode(encoded) ?? null;
-});
-
-const hasVRL = computed(() => !!rawVRL.value);
-const showSeparatePromQL = computed(() => !!rawPromQL.value);
-
 
 // Full config fetched from the dedicated anomaly detection endpoint.
 // The list API only returns summary fields; we need this for the Condition tab.
@@ -769,49 +731,10 @@ const anomalyHistoryColumns = [
 ];
 
 const historyTableColumns = computed(() =>
-  isAnomaly.value ? anomalyHistoryColumns : alertHistoryColumns
+  isAnomaly.value ? anomalyHistoryColumns : alertHistoryColumns,
 );
 
 // Helper Functions
-const getStatusDotClass = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case "firing":
-    case "error":
-    case "anomaly":
-      return "status-dot-error";
-    case "ok":
-    case "success":
-    case "normal":
-      return "status-dot-success";
-    case "skipped":
-      return "status-dot-warning";
-    case "pending":
-      return "status-dot-info";
-    default:
-      return "status-dot-default";
-  }
-};
-
-const getStatusTextClass = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case "firing":
-    case "error":
-    case "anomaly":
-      return "tw:text-red-500";
-    case "ok":
-    case "success":
-    case "normal":
-      return "tw:text-green-600";
-    case "skipped":
-      return "tw:text-amber-600";
-    case "pending":
-      return "tw:text-blue-500";
-    default:
-      return store.state.theme === "dark"
-        ? "tw:text-gray-400"
-        : "tw:text-gray-500";
-  }
-};
 
 const getRowClass = (status: string) => {
   if (store.state.theme === "dark") {
@@ -840,9 +763,86 @@ const formatStatus = (status: string) => {
   return status.charAt(0).toUpperCase() + status.slice(1);
 };
 
+const getStatusChipIcon = (status: string) => {
+  switch (status?.toLowerCase()) {
+    case "firing":
+    case "error":
+    case "anomaly":
+      return "error_outline";
+    case "ok":
+    case "success":
+    case "normal":
+      return "check_circle_outline";
+    case "skipped":
+      return "block";
+    case "pending":
+      return "schedule";
+    default:
+      return "help_outline";
+  }
+};
+
+const getStatusChipColor = (status: string) => {
+  switch (status?.toLowerCase()) {
+    case "firing":
+    case "error":
+    case "anomaly":
+      return "red-1";
+    case "ok":
+    case "success":
+    case "normal":
+      return "green-1";
+    case "skipped":
+      return "amber-1";
+    case "pending":
+      return "blue-1";
+    default:
+      return "grey-3";
+  }
+};
+
+const getStatusChipTextColor = (status: string) => {
+  switch (status?.toLowerCase()) {
+    case "firing":
+    case "error":
+    case "anomaly":
+      return "red-9";
+    case "ok":
+    case "success":
+    case "normal":
+      return "green-9";
+    case "skipped":
+      return "amber-9";
+    case "pending":
+      return "blue-9";
+    default:
+      return "grey-8";
+  }
+};
+
 const formatTimestamp = (timestamp: number) => {
   if (!timestamp) return "N/A";
-  return date.formatDate(timestamp / 1000, "YYYY-MM-DD HH:mm:ss");
+  const now = Date.now() * 1000; // microseconds
+  const diff = now - timestamp;
+
+  if (diff < 3600000000) {
+    const minutes = Math.floor(diff / 60000000);
+    return `${minutes} min ago`;
+  }
+  if (diff < 86400000000) {
+    const hours = Math.floor(diff / 3600000000);
+    return `${hours}h ago`;
+  }
+  if (diff < 604800000000) {
+    const days = Math.floor(diff / 86400000000);
+    return `${days}d ago`;
+  }
+  return date.formatDate(timestamp / 1000, "MMM DD, HH:mm");
+};
+
+const formatTimestampFull = (timestamp: number) => {
+  if (!timestamp) return "N/A";
+  return date.formatDate(timestamp / 1000, "MMM DD, YYYY HH:mm:ss");
 };
 
 // Main Functions
@@ -939,7 +939,6 @@ const copyToClipboard = (text: string, type: string) => {
 watch(
   () => props.alertId,
   async (newVal) => {
-
     if (newVal) {
       pagination.value.page = 1;
       currentPage.value = 1;
@@ -971,26 +970,11 @@ watch(
 </script>
 
 <style lang="scss" scoped>
-/* ── Header ── */
-.drawer-header {
-  display: flex;
-  align-items: center;
-  padding: 10px 14px;
-  border-bottom: 1px solid;
-}
-.drawer-header-light {
-  border-color: #e5e7eb;
-  background: #fff;
-}
-.drawer-header-dark {
-  border-color: #374151;
-  background: #1f2937;
-}
-
 /* ── Tab toggle (header) ── */
 .tab-toggle {
   display: flex;
   align-items: center;
+  height: 1.625rem; /* 26px — same as chips */
   border-radius: 6px;
   border: 1px solid;
   overflow: hidden;
@@ -1007,7 +991,8 @@ watch(
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 16px;
+  padding: 0 12px;
+  height: 100%;
   font-size: 12px;
   font-weight: 500;
   border: none;
@@ -1016,6 +1001,9 @@ watch(
   white-space: nowrap;
   color: inherit;
   line-height: 1;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 .tab-toggle-btn + .tab-toggle-btn {
   border-left: 1px solid;
@@ -1067,34 +1055,6 @@ watch(
   white-space: pre-wrap;
   overflow-x: auto;
   font-size: 13px;
-}
-
-/* ── Status Dot ── */
-.status-dot {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.status-dot-error {
-  background: #ef4444;
-  box-shadow: 0 0 0 2px #fecaca;
-}
-.status-dot-success {
-  background: #22c55e;
-  box-shadow: 0 0 0 2px #bbf7d0;
-}
-.status-dot-warning {
-  background: #f59e0b;
-  box-shadow: 0 0 0 2px #fde68a;
-}
-.status-dot-info {
-  background: #3b82f6;
-  box-shadow: 0 0 0 2px #bfdbfe;
-}
-.status-dot-default {
-  background: #9ca3af;
 }
 
 /* ── Row tints ── */

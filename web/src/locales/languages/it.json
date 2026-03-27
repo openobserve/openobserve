@@ -350,6 +350,7 @@
     "selectStreamForAI": "Seleziona prima uno stream per utilizzare l'IA",
     "collapseFields": "Comprimi campi",
     "openFields": "Campi aperti",
+    "createAlertFromPattern": "Crea un avviso da questo modello",
     "aiBarSuccessPlaceholder": "Cosa vorresti fare dopo?",
     "nlpModeDisabledForVisualization": "La modalità Natural Language non può essere disabilitata durante la visualizzazione con più stream",
     "patternDetailsTitle": "Dettagli del motivo",
@@ -2182,6 +2183,8 @@
     "resultsIncludeAllWindows": "I risultati includono tutte le aggiunte multi-finestra",
     "runQueryForOutput": "Fai clic su Esegui query per vedere l'output",
     "applyVRLForOutput": "Fai clic su Applica VRL per vedere l'output combinato",
+    "importedFromPattern": "Avviso precompilato dal modello di registro",
+    "importedFromAnomalyPattern": "Avviso precompilato da un modello di registro anomalo: rivedi le impostazioni di urgenza",
     "anomalyDetection": "Rilevamento di anomalie",
     "newAnomalyDetection": "Nuovo rilevamento delle anomalie",
     "editAnomalyDetection": "Modifica il rilevamento delle anomalie",
@@ -2206,7 +2209,7 @@
     "anomalyStatus": {
       "waiting": "Aspettando",
       "training": "Allenamento",
-      "active": "Attivo",
+      "ready": "Pronto",
       "failed": "Fallito",
       "disabled": "Disabili"
     },

@@ -350,6 +350,7 @@
     "selectStreamForAI": "Selecciona primero una transmisión para usar la IA",
     "collapseFields": "Campos colapsados",
     "openFields": "Campos abiertos",
+    "createAlertFromPattern": "Crear alerta a partir de este patrón",
     "aiBarSuccessPlaceholder": "¿Qué le gustaría hacer a continuación?",
     "nlpModeDisabledForVisualization": "El modo de lenguaje natural no se puede deshabilitar durante la visualización con varias transmisiones",
     "patternDetailsTitle": "Detalles del patrón",
@@ -2182,6 +2183,8 @@
     "resultsIncludeAllWindows": "Los resultados incluyen todas las adiciones de ventanas múltiples",
     "runQueryForOutput": "Haga clic en Ejecutar consulta para ver el resultado",
     "applyVRLForOutput": "Haga clic en Aplicar VRL para ver la salida combinada",
+    "importedFromPattern": "Alerta rellenada previamente a partir del patrón de registro",
+    "importedFromAnomalyPattern": "Alerta rellenada previamente a partir de un patrón de registro anómalo: revise la configuración de urgencia",
     "anomalyDetection": "Detección de anomalías",
     "newAnomalyDetection": "Detección de nuevas anomalías",
     "editAnomalyDetection": "Editar detección de anomalías",
@@ -2206,7 +2209,7 @@
     "anomalyStatus": {
       "waiting": "Esperando",
       "training": "Entrenamiento",
-      "active": "Activo",
+      "ready": "Listo",
       "failed": "Falló",
       "disabled": "Discapacitado"
     },

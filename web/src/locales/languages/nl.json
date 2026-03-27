@@ -350,6 +350,7 @@
     "selectStreamForAI": "Selecteer eerst een stream om AI te gebruiken",
     "collapseFields": "Velden samenvouwen",
     "openFields": "Open velden",
+    "createAlertFromPattern": "Creëer een waarschuwing op basis van dit patroon",
     "aiBarSuccessPlaceholder": "Wat zou je hierna willen doen?",
     "nlpModeDisabledForVisualization": "De modus Natural Language kan niet worden uitgeschakeld tijdens visualisatie met meerdere streams",
     "patternDetailsTitle": "Details van het patroon",
@@ -2182,6 +2183,8 @@
     "resultsIncludeAllWindows": "De resultaten omvatten alle toevoegingen met meerdere vensters",
     "runQueryForOutput": "Klik op Query uitvoeren om de uitvoer te zien",
     "applyVRLForOutput": "Klik op VRL toepassen om de gecombineerde uitvoer te zien",
+    "importedFromPattern": "Waarschuwing vooraf ingevuld op basis van logpatroon",
+    "importedFromAnomalyPattern": "Waarschuwing vooraf ingevuld op basis van een abnormaal logpatroon — bekijk de urgentie-instellingen",
     "anomalyDetection": "Detectie van afwijkingen",
     "newAnomalyDetection": "Nieuwe detectie van afwijkingen",
     "editAnomalyDetection": "Anomaliedetectie bewerken",
@@ -2206,7 +2209,7 @@
     "anomalyStatus": {
       "waiting": "Wachtend",
       "training": "Opleiding",
-      "active": "Actief",
+      "ready": "Klaar",
       "failed": "Mislukt",
       "disabled": "Uitgeschakeld"
     },
