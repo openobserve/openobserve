@@ -112,7 +112,6 @@ impl Dashboard {
 pub mod reports;
 pub mod usage_report;
 pub mod v1;
-pub mod validation;
 pub mod v2;
 pub mod v3;
 pub mod v4;
