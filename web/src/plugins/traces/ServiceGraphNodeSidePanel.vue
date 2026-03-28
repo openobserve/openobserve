@@ -67,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="panel-content">
         <!-- Metrics Section -->
         <div
+          v-if="false"
           class="panel-section metrics-section"
           data-test="service-graph-side-panel-metrics"
         >
@@ -175,6 +176,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="red-chart-panel tw:w-[33%] tw:h-[8rem]"
             :data-test="`service-graph-side-panel-chart-${panel.title?.toLowerCase()}`"
           >
+            <span
+              class="tw:pt-[0.625rem] tw:pl-[0.325rem] tw:text-[var(--o2-text-1)]!"
+              >{{ panel.title }}</span
+            >
             <PanelSchemaRenderer
               :panelSchema="panel"
               :selectedTimeObj="selectedTimeObj"
@@ -183,17 +188,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :allowAlertCreation="false"
               searchType="dashboards"
             />
-            <q-separator vertical />
           </div>
         </div>
 
         <!-- Recent Operations Section -->
         <div
           v-if="streamFilter !== 'all'"
-          class="panel-section"
+          class="panel-section tw:pt-[1.5rem]!"
           data-test="service-graph-side-panel-recent-operations"
         >
-          <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
+          <!-- <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
             <div class="section-title">Recent Operations</div>
             <q-btn-toggle
               v-model="operationsViewMode"
@@ -221,8 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 },
               ]"
             />
-          </div>
-
+          </div> -->
           <!-- Loading State -->
           <div
             v-if="loadingOperations"
@@ -236,14 +239,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-else>
             <!-- Error Operations -->
             <div
-              class="tw:mb-3"
+              class="tw:mb-3 tw:p-[0.365rem] tw:rounded tw:border-1 tw:border-[var(--o2-border-color)]"
               data-test="service-graph-side-panel-error-operations-list"
             >
               <div
-                class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:font-semibold tw:mb-1"
-                style="color: var(--o2-text-secondary)"
+                class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:font-semibold tw:mb-1 tw:text-[var(--o2-text-1)]!"
               >
-                <q-icon name="error_outline" size="12px" />
+                <q-icon
+                  name="error_outline"
+                  size="12px"
+                  class="tw:text-[var(--q-negative)]"
+                />
                 Error Operations
               </div>
               <div
@@ -262,17 +268,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="navigateToTraces(op.name)"
                 >
                   <span
-                    class="tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:mr-2"
-                    style="color: var(--o2-text-primary)"
+                    class="tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:mr-2 tw:text-[0.8rem] tw:text-[var(--o2-text-4)]! tw:tracking-[0.02rem]!"
                   >
                     {{ op.name }}
                     <q-tooltip>{{ op.name }}</q-tooltip>
                   </span>
                   <div class="tw:flex tw:items-center tw:gap-1 tw:shrink-0">
-                    <span
-                      class="tw:font-semibold"
-                      style="color: var(--q-negative)"
-                    >
+                    <span class="tw:font-semibold tw:text-[var(--q-negative)]">
                       {{ op.valueDisplay }}
                     </span>
                     <q-icon
@@ -287,14 +289,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- P99 Latency -->
             <div
-              class="tw:mb-3"
+              class="tw:mb-3 tw:p-[0.365rem] tw:rounded tw:border-1 tw:border-[var(--o2-border-color)]"
               data-test="service-graph-side-panel-p99-operations-list"
             >
               <div
-                class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:font-semibold tw:mb-1"
-                style="color: var(--o2-text-secondary)"
+                class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:font-semibold tw:mb-1 tw:text-[var(--o2-text-1)]!"
               >
-                <q-icon name="speed" size="12px" />
+                <q-icon
+                  name="speed"
+                  size="12px"
+                  class="tw:text-[var(--q-warning)]"
+                />
                 P99 Latency
               </div>
               <div
@@ -313,17 +318,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="navigateToTraces(op.name)"
                 >
                   <span
-                    class="tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:mr-2"
-                    style="color: var(--o2-text-primary)"
+                    class="tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:mr-2 tw:text-[0.8rem] tw:text-[var(--o2-text-4)]! tw:tracking-[0.02rem]!"
                   >
                     {{ op.name }}
                     <q-tooltip>{{ op.name }}</q-tooltip>
                   </span>
                   <div class="tw:flex tw:items-center tw:gap-1 tw:shrink-0">
-                    <span
-                      class="tw:font-semibold"
-                      style="color: var(--q-warning)"
-                    >
+                    <span class="tw:font-semibold tw:text-[var(--q-warning)]">
                       {{ op.valueDisplay }}
                     </span>
                     <q-icon
@@ -338,14 +339,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- P95 Latency -->
             <div
-              class="tw:mb-3"
+              class="tw:mb-3 tw:p-[0.365rem] tw:rounded tw:border-1 tw:border-[var(--o2-border-color)]"
               data-test="service-graph-side-panel-p95-operations-list"
             >
               <div
-                class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:font-semibold tw:mb-1"
-                style="color: var(--o2-text-secondary)"
+                class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:font-semibold tw:mb-1 tw:text-[var(--o2-text-1)]!"
               >
-                <q-icon name="speed" size="12px" />
+                <q-icon
+                  name="speed"
+                  size="12px"
+                  class="tw:text-[var(--q-warning)]"
+                />
                 P95 Latency
               </div>
               <div
@@ -364,65 +368,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="navigateToTraces(op.name)"
                 >
                   <span
-                    class="tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:mr-2"
-                    style="color: var(--o2-text-primary)"
+                    class="tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:mr-2 tw:text-[0.8rem] tw:text-[var(--o2-text-4)]! tw:tracking-[0.02rem]!"
                   >
                     {{ op.name }}
                     <q-tooltip>{{ op.name }}</q-tooltip>
                   </span>
                   <div class="tw:flex tw:items-center tw:gap-1 tw:shrink-0">
-                    <span
-                      class="tw:font-semibold"
-                      style="color: var(--q-warning)"
-                    >
-                      {{ op.valueDisplay }}
-                    </span>
-                    <q-icon
-                      name="open_in_new"
-                      size="10px"
-                      class="operation-link-icon"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- P50 Latency -->
-            <div data-test="service-graph-side-panel-p50-operations-list">
-              <div
-                class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:font-semibold tw:mb-1"
-                style="color: var(--o2-text-secondary)"
-              >
-                <q-icon name="speed" size="12px" />
-                P50 Latency
-              </div>
-              <div
-                v-if="p50OperationsList.length === 0"
-                class="tw:text-xs tw:italic tw:px-2"
-                style="color: var(--o2-text-secondary)"
-              >
-                No data
-              </div>
-              <div v-else>
-                <div
-                  v-for="op in p50OperationsList"
-                  :key="op.name + '-p50'"
-                  class="operation-row tw:flex tw:items-center tw:justify-between tw:py-1 tw:px-2 tw:rounded tw:text-xs tw:cursor-pointer"
-                  data-test="service-graph-side-panel-operation-item"
-                  @click="navigateToTraces(op.name)"
-                >
-                  <span
-                    class="tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:mr-2"
-                    style="color: var(--o2-text-primary)"
-                  >
-                    {{ op.name }}
-                    <q-tooltip>{{ op.name }}</q-tooltip>
-                  </span>
-                  <div class="tw:flex tw:items-center tw:gap-1 tw:shrink-0">
-                    <span
-                      class="tw:font-semibold"
-                      style="color: var(--q-positive)"
-                    >
+                    <span class="tw:font-semibold tw:text-[var(--q-warning)]">
                       {{ op.valueDisplay }}
                     </span>
                     <q-icon
@@ -1391,7 +1343,7 @@ export default defineComponent({
   overflow-y: auto;
   overflow-x: hidden;
   background: #0f1419;
-  padding: 0px 12px 8px 12px;
+  padding: 0.625rem;
 
   &::-webkit-scrollbar {
     width: 8px;
