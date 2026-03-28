@@ -23,6 +23,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="button-group logs-visualize-toggle element-box-shadow tw:mr-[0.375rem]"
         >
           <div class="row">
+            <div>
+              <q-btn
+                data-test="traces-search-mode-spans-btn"
+                :class="[
+                  'button button-left tw:w-[5.5rem]! tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
+                  searchObj.meta.searchMode === 'spans' ? 'selected' : '',
+                ]"
+                @click="$emit('update:searchMode', 'spans')"
+                no-caps
+                size="sm"
+              >
+                Spans
+                <q-tooltip>Spans</q-tooltip>
+              </q-btn>
+            </div>
+            <div>
+              <q-btn
+                data-test="traces-search-mode-traces-btn"
+                :class="[
+                  'button tw:w-[5.5rem]! tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
+                  config.isEnterprise == 'true'
+                    ? 'button-center tw:rounded-none!'
+                    : 'button-right tw:rounded-l-none!',
+                  searchObj.meta.searchMode === 'traces' ? 'selected' : '',
+                ]"
+                @click="$emit('update:searchMode', 'traces')"
+                no-caps
+                size="sm"
+              >
+                Traces
+                <q-tooltip>Traces</q-tooltip>
+              </q-btn>
+            </div>
             <div v-if="config.isEnterprise == 'true'">
               <q-btn
                 data-test="traces-service-graph-toggle"
@@ -34,43 +67,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="$emit('update:searchMode', 'service-graph')"
                 no-caps
                 size="sm"
-                class="button button-left tw:w-[6.1rem]! tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!"
+                class="button button-right tw:w-[6.1rem]! tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!"
               >
                 Service Graph
                 <q-tooltip>Service Graph</q-tooltip>
-              </q-btn>
-            </div>
-            <div>
-              <q-btn
-                data-test="traces-search-mode-traces-btn"
-                :class="[
-                  'button tw:w-[5.5rem]! tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
-                  config.isEnterprise == 'true'
-                    ? 'button-center tw:rounded-none!'
-                    : 'button-left tw:rounded-r-none!',
-                  searchObj.meta.searchMode === 'traces' ? 'selected' : '',
-                ]"
-                @click="$emit('update:searchMode', 'traces')"
-                no-caps
-                size="sm"
-              >
-                Traces
-                <q-tooltip>Traces</q-tooltip>
-              </q-btn>
-            </div>
-            <div>
-              <q-btn
-                data-test="traces-search-mode-spans-btn"
-                :class="[
-                  'button button-right tw:w-[5.5rem]! tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
-                  searchObj.meta.searchMode === 'spans' ? 'selected' : '',
-                ]"
-                @click="$emit('update:searchMode', 'spans')"
-                no-caps
-                size="sm"
-              >
-                Spans
-                <q-tooltip>Spans</q-tooltip>
               </q-btn>
             </div>
           </div>
