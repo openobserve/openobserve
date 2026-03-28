@@ -997,8 +997,10 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import RichTextInput, { ReferenceChip } from '@/components/RichTextInput.vue';
 import O2AIConfirmDialog from '@/components/O2AIConfirmDialog.vue';
 import { useChatHistory } from '@/composables/useChatHistory';
+import { useAiDashboardEvents, getDashboardEventType } from '@/composables/useAiDashboardEvents';
 
 const { fetchAiChat, submitFeedback } = useAiChat();
+const { emit: emitDashboardEvent } = useAiDashboardEvents();
 
 // Register VRL as a JavaScript alias (type assertion)
 hljs.registerLanguage('vrl', () => hljs.getLanguage('javascript') as any);
@@ -1107,18 +1109,20 @@ export default defineComponent({
     // Tool confirmation state (from AI agent — confirmation-required actions, inline in chat)
     const pendingConfirmation = ref<{ tool: string; args: Record<string, any>; message: string; navAction?: NavigationAction } | null>(null);
 
+
+
     // Auto navigation state - per chat ID
     // Stores chat ID -> boolean mapping for auto navigation preference
     const autoNavigationPreferences = ref<Map<number, boolean>>(new Map());
 
     // Pending auto navigation preference for new chats (before chat ID is created)
-    const pendingAutoNavigation = ref(false);
+    const pendingAutoNavigation = ref(true);
 
-    // Current chat's auto navigation state
+    // Current chat's auto navigation state (defaults to true)
     const isAutoNavigationEnabled = computed({
       get: () => {
         if (!currentChatId.value) return pendingAutoNavigation.value;
-        return autoNavigationPreferences.value.get(currentChatId.value) ?? false;
+        return autoNavigationPreferences.value.get(currentChatId.value) ?? true;
       },
       set: (value: boolean) => {
         if (currentChatId.value) {
@@ -1709,6 +1713,7 @@ export default defineComponent({
                       tool: data.tool,
                       message: activeToolCall.value?.message || data.message,
                       context: activeToolCall.value?.context || {},
+                      call_id: data.call_id || activeToolCall.value?.call_id || undefined,
                       pendingConfirmation: true,
                       confirmationMessage: data.message,
                       confirmationArgs: data.args || {},
@@ -1881,6 +1886,29 @@ export default defineComponent({
                         data.call_args,
                         data
                       );
+                    }
+
+                    // Emit dashboard event for successful dashboard-mutating tools
+                    if (data.success !== false) {
+                      const resolvedToolName = data.tool && data.tool !== 'tools_call' ? data.tool : '';
+                      const callArgs = data.call_args || {};
+                      const dashboardEventType = getDashboardEventType(resolvedToolName);
+                      if (dashboardEventType) {
+                        const dashboardId = callArgs.dashboard_id || callArgs.args?.dashboard_id || callArgs.request_body?.dashboard_id;
+                        if (dashboardId) {
+                          const folderId = callArgs.folder || callArgs.args?.folder || callArgs.request_body?.folder;
+                          emitDashboardEvent({
+                            type: dashboardEventType,
+                            dashboardId,
+                            folderId,
+                          });
+                        } else {
+                          console.warn(
+                            `[O2AIChat] Could not extract dashboardId from call_args for tool "${resolvedToolName}". Skipping dashboard event.`,
+                            callArgs
+                          );
+                        }
+                      }
                     }
 
                     // Match by call_id if available, fall back to tool name
