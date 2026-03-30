@@ -452,6 +452,69 @@ pub async fn update_role(
 }
 
 #[cfg(feature = "enterprise")]
+/// UpdateRoleDeprecated
+///
+/// This handler exists to provide a helpful error message for clients that still
+/// use the old POST method for updating roles. The correct method is PUT.
+/// This endpoint will be removed in a future version.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/roles/{role_id}",
+    context_path = "/api",
+    tag = "Roles",
+    operation_id = "UpdateRolesDeprecated",
+    summary = "Update role permissions (deprecated — use PUT)",
+    description = "**Deprecated**: This endpoint previously used POST but the correct HTTP method is PUT. \
+                   Please migrate to `PUT /{org_id}/roles/{role_id}`. \
+                   This endpoint will be removed in a future release.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("role_id" = String, Path, description = "Role Id"),
+    ),
+    responses(
+        (status = 410, description = "Gone - endpoint deprecated, use PUT instead", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn update_role_deprecated(Path(_path): Path<(String, String)>) -> Response {
+    MetaHttpResponse::gone(
+        "This endpoint (POST /{org_id}/roles/{role_id}) has been deprecated. \
+         Please use PUT /{org_id}/roles/{role_id} instead.",
+    )
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    post,
+    path = "/{org_id}/roles/{role_id}",
+    context_path = "/api",
+    tag = "Roles",
+    operation_id = "UpdateRolesDeprecated",
+    summary = "Update role permissions (deprecated - use PUT)",
+    description = "**Deprecated**: This endpoint previously used POST but the correct HTTP method is PUT. \
+                   Please migrate to `PUT /{org_id}/roles/{role_id}`. \
+                   This endpoint will be removed in a future release.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("role_id" = String, Path, description = "Role Id"),
+    ),
+    responses(
+        (status = 410, description = "Gone - endpoint deprecated, use PUT instead", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn update_role_deprecated(Path(_path): Path<(String, String)>) -> Response {
+    MetaHttpResponse::gone(
+        "This endpoint (POST /{org_id}/roles/{role_id}) has been deprecated. \
+         Please use PUT /{org_id}/roles/{role_id} instead.",
+    )
+}
+
+#[cfg(feature = "enterprise")]
 /// GetResourcePermission
 #[utoipa::path(
     get,
@@ -1698,5 +1761,92 @@ mod tests {
         assert_eq!(request.remove_users, Some(remove_users));
         assert!(request.add_roles.is_none());
         assert!(request.remove_roles.is_none());
+    }
+
+    // ── update_role_deprecated ──────────────────────────────────────────────
+    // The old POST /{org_id}/roles/{role_id} endpoint was removed in favour of
+    // PUT.  The deprecated handler is registered on the POST method so that
+    // clients still using POST receive a clear 410 Gone response instead of a
+    // silent 405 Method Not Allowed.
+    //
+    // Both the enterprise and OSS builds compile a version of this handler;
+    // both must return 410 Gone regardless of the org/role values provided.
+
+    #[tokio::test]
+    async fn test_update_role_deprecated_returns_gone() {
+        // enterprise build
+        #[cfg(feature = "enterprise")]
+        {
+            let resp = update_role_deprecated(Path((
+                "test_org".to_string(),
+                "test_role".to_string(),
+            )))
+            .await;
+            assert_eq!(extract_status_code(&resp), StatusCode::GONE);
+        }
+
+        // OSS build
+        #[cfg(not(feature = "enterprise"))]
+        {
+            let resp = update_role_deprecated(Path((
+                "test_org".to_string(),
+                "test_role".to_string(),
+            )))
+            .await;
+            assert_eq!(extract_status_code(&resp), StatusCode::GONE);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_role_deprecated_response_body_contains_deprecation_message() {
+        // The response body must tell callers to switch to PUT so they are not
+        // left guessing why their request was rejected.
+        #[cfg(feature = "enterprise")]
+        {
+            let resp = update_role_deprecated(Path((
+                "test_org".to_string(),
+                "test_role".to_string(),
+            )))
+            .await;
+            assert_eq!(extract_status_code(&resp), StatusCode::GONE);
+            let body =
+                axum::body::to_bytes(resp.into_body(), usize::MAX)
+                    .await
+                    .expect("Failed to read response body");
+            let body_str = String::from_utf8(body.to_vec())
+                .expect("Response body is not valid UTF-8");
+            assert!(
+                body_str.contains("deprecated"),
+                "Expected body to mention 'deprecated', got: {body_str}"
+            );
+            assert!(
+                body_str.contains("PUT"),
+                "Expected body to mention 'PUT' method, got: {body_str}"
+            );
+        }
+
+        #[cfg(not(feature = "enterprise"))]
+        {
+            let resp = update_role_deprecated(Path((
+                "test_org".to_string(),
+                "test_role".to_string(),
+            )))
+            .await;
+            assert_eq!(extract_status_code(&resp), StatusCode::GONE);
+            let body =
+                axum::body::to_bytes(resp.into_body(), usize::MAX)
+                    .await
+                    .expect("Failed to read response body");
+            let body_str = String::from_utf8(body.to_vec())
+                .expect("Response body is not valid UTF-8");
+            assert!(
+                body_str.contains("deprecated"),
+                "Expected body to mention 'deprecated', got: {body_str}"
+            );
+            assert!(
+                body_str.contains("PUT"),
+                "Expected body to mention 'PUT' method, got: {body_str}"
+            );
+        }
     }
 }
