@@ -735,16 +735,17 @@ test.describe("dashboard UI testcases", () => {
       timeout: 10000,
     });
 
+    // TanStack table (dashboard mode) renders rows directly in tbody with class dashboard-data-row
     const dataRows = page.locator(
-      '[data-test="dashboard-panel-table"] tbody.q-virtual-scroll__content tr.cursor-pointer'
+      '[data-test="dashboard-panel-table"] tbody tr.dashboard-data-row'
     );
     await dataRows.first().waitFor({ state: "visible", timeout: 15000 });
 
     expect(await dataRows.count()).toBeGreaterThan(0);
-    await expect(dataRows.first().locator("td.q-td").first()).not.toHaveText(
+    await expect(dataRows.first().locator("td").first()).not.toHaveText(
       ""
     );
-    await expect(dataRows.first().locator("td.q-td").nth(1)).not.toHaveText("");
+    await expect(dataRows.first().locator("td").nth(1)).not.toHaveText("");
     await expect(page.locator('[data-test="no-data"]')).not.toBeVisible();
 
     // Save panel and cleanup

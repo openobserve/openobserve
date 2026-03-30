@@ -1,16 +1,16 @@
 /**
  * Shared helper functions for dashboard table chart E2E tests.
- * Works with Quasar q-table using virtual scroll.
+ * Works with TanStack table (TenstackTable.vue) in dashboard mode.
  */
 
-// Selectors for Quasar q-table with virtual scroll
+// Selectors for TanStack table in dashboard mode
 export const TABLE_SELECTOR = '[data-test="dashboard-panel-table"]';
 export const TABLE_HEADER_SELECTOR = `${TABLE_SELECTOR} thead tr th`;
-// Quasar virtual scroll renders data rows inside .q-virtual-scroll__content, NOT in tbody
-export const TABLE_DATA_ROW_SELECTOR = `${TABLE_SELECTOR} .q-virtual-scroll__content tr`;
+// TanStack table renders dashboard data rows directly in tbody with class dashboard-data-row
+export const TABLE_DATA_ROW_SELECTOR = `${TABLE_SELECTOR} tbody tr.dashboard-data-row`;
 
 /**
- * Extract header texts from the Quasar q-table via $$eval.
+ * Extract header texts from the TanStack table thead via $$eval.
  * Strips sort icons (arrow_upward/arrow_downward) and copy button text.
  *
  * @param {import('@playwright/test').Page} page
@@ -31,7 +31,7 @@ export async function getTableHeaders(page) {
 
 /**
  * Get the text content of a specific table cell.
- * Quasar virtual-scroll q-table renders data in .q-virtual-scroll__content.
+ * TanStack table (dashboard mode) renders data rows directly in tbody with class dashboard-data-row.
  * Each cell: <td class="copy-cell-td"><div>text<button class="copy-btn">...</button></div></td>
  *
  * @param {import('@playwright/test').Page} page
@@ -43,10 +43,11 @@ export async function getTableCellText(page, rowIndex, colIndex) {
   return page.$eval(
     TABLE_SELECTOR,
     (table, { ri, ci }) => {
-      const virtualContent = table.querySelector(".q-virtual-scroll__content");
-      if (!virtualContent) return "";
-      const rows = virtualContent.querySelectorAll("tr");
-      const row = rows[ri];
+      // TanStack dashboard mode: rows are directly in tbody with class dashboard-data-row
+      const rows = Array.from(table.querySelectorAll("tbody tr.dashboard-data-row"));
+      // Fall back to any tbody tr if dashboard-data-row class is not present
+      const allRows = rows.length > 0 ? rows : Array.from(table.querySelectorAll("tbody tr")).filter((r) => r.querySelectorAll("td").length > 1);
+      const row = allRows[ri];
       if (!row) return "";
       const cell = row.querySelectorAll("td")[ci];
       if (!cell) return "";
