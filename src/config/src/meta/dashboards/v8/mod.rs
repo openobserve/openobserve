@@ -161,7 +161,8 @@ pub struct Panel {
     #[serde(default)]
     pub query_type: QueryType,
     pub queries: Vec<Query>,
-    pub layout: Layout,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout: Option<Layout>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub html_content: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

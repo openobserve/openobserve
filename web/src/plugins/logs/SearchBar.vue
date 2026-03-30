@@ -878,7 +878,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item>
               <q-separator v-if="config.isEnterprise == 'true'" />
               <q-item
-                v-if="config.isEnterprise == 'true' && config.isCloud == 'false'"
+                v-if="config.isEnterprise == 'true' && config.isCloud == 'false' && store.state.zoConfig.search_inspector_enabled"
                 data-test="search-inspect-btn"
                 class="q-pa-sm saved-view-item"
                 clickable

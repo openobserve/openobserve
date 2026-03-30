@@ -165,6 +165,31 @@ pub struct MoveDashboardsRequestBody {
     pub dst_folder_id: String,
 }
 
+/// Request body for AddPanel and UpdatePanel endpoints.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PanelRequestBody {
+    pub panel: v8::Panel,
+    pub tab_id: Option<String>,
+}
+
+/// Response body for AddPanel and UpdatePanel endpoints.
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PanelResponseBody {
+    pub panel: v8::Panel,
+    pub hash: String,
+    pub tab_id: String,
+}
+
+/// Response body for DeletePanel endpoint.
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DeletePanelResponseBody {
+    pub hash: String,
+    pub panel_id: String,
+}
+
 impl From<DashboardRequestBody> for MetaDashboard {
     fn from(value: DashboardRequestBody) -> Self {
         match value {
