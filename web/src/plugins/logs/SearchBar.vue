@@ -2868,60 +2868,15 @@ export default defineComponent({
       { immediate: true, deep: true },
     );
 
-    // Watch SQL mode toggle - turn off NLP mode when SQL mode is enabled
-    watch(
-      () => searchObj.meta.sqlMode,
-      (newSqlMode, oldSqlMode) => {
-        // Only act when SQL mode is turned ON (not when turning off)
-        if (newSqlMode === true && oldSqlMode === false) {
-          console.log(
-            "[NL2Q-Handler] SQL mode enabled, turning off NLP mode (mutually exclusive)",
-          );
-          searchObj.meta.nlpMode = false;
-          // Reset flags when switching to SQL mode
-          hasInteractedWithAI.value = false;
-          isNaturalLanguageDetected.value = false;
-        }
-      },
-    );
-
-    // Watch NLP mode toggle - turn off SQL mode when NLP mode is enabled
-    // Also prevent auto-detection from immediately turning it back off
+    // Watch NLP mode toggle - AI mode is independent of SQL mode
     watch(
       () => searchObj.meta.nlpMode,
       (newNlpMode, oldNlpMode) => {
         if (newNlpMode === true && oldNlpMode === false) {
-          // NLP mode turned ON
-          console.log(
-            "[NL2Q-Handler] NLP mode manually enabled, turning off SQL mode (mutually exclusive)",
-          );
-          searchObj.meta.sqlMode = false;
-          // Reset detection flag when manually switching to NLP mode
+          // NLP mode turned ON - reset detection flag
           isNaturalLanguageDetected.value = false;
-
-          // CRITICAL: User manually toggled NLP mode ON
-          // We need to prevent the next auto-detection from turning it back OFF
-          // The existing text in editor might be SQL, which would trigger auto-detection
-          // and emit nlpModeDetected:false, turning NLP mode back OFF
-          // So we don't emit auto-detection events when nlpMode prop is already true
         } else if (newNlpMode === false && oldNlpMode === true) {
-          // NLP mode turned OFF - default to SQL mode
-          console.log(
-            "[NL2Q-Handler] NLP mode disabled, switching to SQL mode",
-          );
-
-          // CRITICAL: Preserve the current editor content (e.g., AI-generated SQL)
-          // Sync editorValue → query BEFORE enabling sqlMode, so the fullSQLMode
-          // watcher in Index.vue doesn't rebuild the query from stale data.
-          const currentEditorValue = searchObj.data.editorValue || "";
-          if (currentEditorValue.trim()) {
-            searchObj.data.query = currentEditorValue;
-          }
-
-          // Set manual trigger flag so the fullSQLMode watcher skips setQuery()
-          searchObj.meta.sqlModeManualTrigger = true;
-          searchObj.meta.sqlMode = true;
-          // Reset flags
+          // NLP mode turned OFF - reset flags
           isNaturalLanguageDetected.value = false;
           hasInteractedWithAI.value = false;
         }
