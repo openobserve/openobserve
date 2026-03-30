@@ -88,8 +88,7 @@ pub fn client_tls_config() -> Result<rustls::ClientConfig, anyhow::Error> {
                     })?,
                 );
                 let cert_chain = certs(cert_file);
-                cert_store
-                    .add_parsable_certificates(cert_chain.try_collect::<_, Vec<_>, _>()?);
+                cert_store.add_parsable_certificates(cert_chain.try_collect::<_, Vec<_>, _>()?);
             }
             cert_store
         }
