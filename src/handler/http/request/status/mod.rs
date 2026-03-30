@@ -193,6 +193,7 @@ struct ConfigResponse<'a> {
     fqn_priority_dimensions: Vec<String>,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
+    search_inspector_enabled: bool,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -435,6 +436,7 @@ pub async fn zo_config() -> impl IntoResponse {
         ),
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
+        search_inspector_enabled: cfg.common.search_inspector_enabled,
     })
 }
 

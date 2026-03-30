@@ -84,7 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchObj.data?.queryResults?.hits?.length > 0 &&
               searchObj.data.lastSearchTraceId &&
               config.isEnterprise == 'true' &&
-              config.isCloud == 'false'
+              config.isCloud == 'false' &&
+              store.state.zoConfig.search_inspector_enabled
             "
             outline
             no-caps
