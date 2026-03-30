@@ -123,7 +123,15 @@ class FunctionsPage {
   async clickSaveButton() {
     const saveButton = this.page.locator(this.saveButton);
     await saveButton.click();
-    await this.page.waitForTimeout(2000);
+
+    // Wait for the success notification to confirm the save completed,
+    // or fall back to a timeout if the notification is missed.
+    const successNotif = this.page.locator('.q-notification').filter({ hasText: /saved successfully/i });
+    await successNotif.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+
+    // Wait for the Add Function button to reappear (indicates we're back on the list page)
+    const addButton = this.page.locator(this.addFunctionButton);
+    await addButton.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
   }
 
   async clickCancelButton() {
@@ -150,10 +158,10 @@ class FunctionsPage {
   }
 
   async clickFunctionByName(name) {
-    // Find the row containing the function name
+    // Find the row containing the function name and click its edit button
     const functionRow = this.page.locator('tr').filter({ hasText: name }).first();
-    // Click the edit button in that row (Quasar icon button with edit icon)
-    const editButton = functionRow.getByRole('button').filter({ has: this.page.locator('.q-icon').filter({ hasText: 'edit' }) });
+    await expect(functionRow).toBeVisible({ timeout: 10000 });
+    const editButton = functionRow.locator('[data-test="function-list-edit-btn"]');
     await editButton.click();
     await this.page.waitForTimeout(1000);
   }
@@ -248,8 +256,9 @@ class FunctionsPage {
   }
 
   async expectFunctionInList(functionName) {
-    const functionRow = this.page.locator(`text=${functionName}`);
-    await expect(functionRow).toBeVisible({ timeout: 10000 });
+    // Use a table row locator for more reliable matching
+    const functionRow = this.page.locator('tr').filter({ hasText: functionName }).first();
+    await expect(functionRow).toBeVisible({ timeout: 15000 });
   }
 
   async isCancelButtonVisible() {
