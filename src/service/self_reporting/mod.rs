@@ -207,6 +207,10 @@ pub async fn report_request_usage_stats(
     }
 }
 
+pub fn report_usage(usage: Vec<UsageData>) {
+    tokio::spawn(publish_usage(usage));
+}
+
 async fn publish_usage(usages: Vec<UsageData>) {
     #[cfg(not(feature = "enterprise"))]
     {
