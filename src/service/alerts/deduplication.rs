@@ -36,7 +36,7 @@ pub fn calculate_fingerprint(
     result_row: &Map<String, Value>,
     config: &DeduplicationConfig,
     org_config: Option<&GlobalDeduplicationConfig>,
-    semantic_groups: &[config::meta::correlation::SemanticFieldGroup],
+    semantic_groups: &[config::meta::correlation::FieldAlias],
 ) -> String {
     o2_enterprise::enterprise::alerts::dedup::calculate_fingerprint(
         alert,
@@ -197,7 +197,7 @@ async fn apply_deduplication_impl(
     result_rows: Vec<Map<String, Value>>,
     dedup_config: &DeduplicationConfig,
     org_config: Option<&GlobalDeduplicationConfig>,
-    semantic_groups: &[config::meta::correlation::SemanticFieldGroup],
+    semantic_groups: &[config::meta::correlation::FieldAlias],
 ) -> Result<Vec<Map<String, Value>>, sea_orm::DbErr> {
     let now = o2_enterprise::enterprise::alerts::dedup::current_timestamp_micros();
     let alert_id = alert.get_unique_key();

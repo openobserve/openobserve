@@ -188,9 +188,6 @@ struct ConfigResponse<'a> {
     incidents_enabled: bool,
     service_streams_enabled: bool,
     anomaly_detection_enabled: bool,
-    /// Available FQN priority dimensions from O2_FQN_PRIORITY_DIMENSIONS env var
-    /// Used by UI to populate the FQN priority dimension selector
-    fqn_priority_dimensions: Vec<String>,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
@@ -428,12 +425,6 @@ pub async fn zo_config() -> impl IntoResponse {
         incidents_enabled,
         service_streams_enabled,
         anomaly_detection_enabled,
-        fqn_priority_dimensions: enterprise_value!(
-            vec![],
-            o2_enterprise::enterprise::common::config::get_config()
-                .service_streams
-                .get_fqn_priority_dimensions()
-        ),
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled: cfg.common.search_inspector_enabled,
