@@ -821,9 +821,11 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/streams/{stream_name}/patterns/extract", post(patterns::extract_patterns))
 
             // Service streams
+            .route("/{org_id}/service_streams", get(service_streams::list_services))
             .route("/{org_id}/service_streams/_analytics", get(service_streams::get_dimension_analytics))
             .route("/{org_id}/service_streams/_correlate", post(service_streams::correlate_streams))
-            .route("/{org_id}/service_streams/_grouped", get(service_streams::get_services_grouped));
+            .route("/{org_id}/service_streams/config/identity", get(service_streams::get_identity_config).put(service_streams::save_identity_config))
+            .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services));
     }
 
     #[cfg(feature = "cloud")]
