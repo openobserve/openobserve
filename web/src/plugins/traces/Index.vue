@@ -1876,7 +1876,7 @@ watch(
   () => searchObj.meta.searchMode,
   (mode) => {
     const query = { ...router.currentRoute.value.query };
-    if (mode !== "traces") {
+    if (mode !== "spans") {
       query.tab = mode;
     } else {
       delete query.tab;
