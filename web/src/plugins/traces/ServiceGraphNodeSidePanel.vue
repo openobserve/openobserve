@@ -166,28 +166,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- RED Charts Section -->
         <div
-          v-if="streamFilter !== 'all' && panelSchemas.length"
+          v-if="streamFilter !== 'all' && dashboardData"
           class="panel-section red-charts-section tw:flex"
           data-test="service-graph-side-panel-red-charts"
         >
-          <div
-            v-for="panel in panelSchemas"
-            :key="panel.id"
-            class="red-chart-panel tw:w-[33%] tw:h-[8rem]"
-            :data-test="`service-graph-side-panel-chart-${panel.title?.toLowerCase()}`"
-          >
-            <span
-              class="tw:pt-[0.625rem] tw:pl-[0.325rem] tw:text-[var(--o2-text-1)]!"
-              >{{ panel.title }}</span
-            >
-            <PanelSchemaRenderer
-              :panelSchema="panel"
-              :selectedTimeObj="selectedTimeObj"
-              :variablesData="{}"
-              :viewOnly="true"
-              :allowAlertCreation="false"
-              searchType="dashboards"
-            />
+          <div class="charts-wrapper tw:py-0! tw:min-h-[13.5rem] tw:w-full">
+            <div class="charts-container tw:w-full">
+              <RenderDashboardCharts
+                ref="dashboardChartsRef"
+                :viewOnly="true"
+                :dashboardData="dashboardData || {}"
+                :currentTimeObj="currentTimeObj"
+                :allowAlertCreation="false"
+                searchType="dashboards"
+              />
+            </div>
           </div>
         </div>
 
@@ -280,15 +273,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >{{ item.p99 }}</span
                   >
                 </template>
-                <template #cell-actions="{ row, column, active }">
+                <template #cell-actions="{ row, active }">
                   <q-btn
-                    v-if="active && column.id === 'operation'"
+                    v-if="active"
                     flat
                     dense
-                    round
-                    icon="open_in_new"
+                    icon="search"
                     size="xs"
-                    class="tw:ml-1"
+                    class="tw:ml-1 tw:p-[0.12rem]! tw:rounded! tw:absolute! tw:right-2! tw:text-[var(--o2-text-1)]! tw:bg-[var(--o2-card-bg-solid)]!"
                     data-test="service-graph-side-panel-view-traces-btn"
                     @click.stop="navigateToTraces(row._name)"
                   >
@@ -348,8 +340,8 @@ const TelemetryCorrelationDashboard = defineAsyncComponent(
   () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
 );
 
-const PanelSchemaRenderer = defineAsyncComponent(
-  () => import("@/components/dashboards/PanelSchemaRenderer.vue"),
+const RenderDashboardCharts = defineAsyncComponent(
+  () => import("@/views/dashboards/RenderDashboardCharts.vue"),
 );
 
 const TenstackTable = defineAsyncComponent(
@@ -360,8 +352,8 @@ export default defineComponent({
   name: "ServiceGraphNodeSidePanel",
   components: {
     TelemetryCorrelationDashboard,
-    PanelSchemaRenderer,
     TenstackTable,
+    RenderDashboardCharts,
   },
   props: {
     selectedNode: {
@@ -391,10 +383,17 @@ export default defineComponent({
     const $q = useQuasar();
 
     // RED Charts State
-    const panelSchemas = ref<any[]>([]);
+    const dashboardData = ref<any>({});
     const selectedTimeObj = ref({
       start_time: new Date(props.timeRange.startTime),
       end_time: new Date(props.timeRange.endTime),
+    });
+
+    const currentTimeObj = ref({
+      __global: {
+        start_time: new Date(props.timeRange.startTime),
+        end_time: new Date(props.timeRange.endTime),
+      },
     });
 
     // Returns the escaped service name value for use in SQL WHERE clauses
@@ -409,7 +408,7 @@ export default defineComponent({
 
     const loadDashboard = () => {
       if (!props.selectedNode || props.streamFilter === "all") {
-        panelSchemas.value = [];
+        dashboardData.value = {};
         return;
       }
 
@@ -421,12 +420,19 @@ export default defineComponent({
         end_time: new Date(props.timeRange.endTime),
       };
 
+      currentTimeObj.value = {
+        __global: {
+          start_time: new Date(props.timeRange.startTime),
+          end_time: new Date(props.timeRange.endTime),
+        },
+      };
+
       const convertedDashboard = convertDashboardSchemaVersion(
         deepCopy(metrics),
       );
       const serviceFilter = `service_name = '${serviceName}'`;
 
-      const panels = convertedDashboard.tabs[0].panels.map((panel: any) => {
+      convertedDashboard.tabs[0].panels.forEach((panel: any, index) => {
         let whereClause: string;
 
         if (panel.title === "Errors") {
@@ -447,10 +453,10 @@ export default defineComponent({
           )
           .replace(/approx_distinct\(trace_id\)/gi, "count(*)");
 
-        return { ...panel, queries: [{ ...panel.queries[0], query }] };
+        convertedDashboard.tabs[0].panels[index]["queries"][0].query = query;
       });
 
-      panelSchemas.value = panels;
+      dashboardData.value = convertedDashboard;
     };
 
     // Metrics Correlation State
@@ -543,7 +549,7 @@ export default defineComponent({
         if (visible && props.selectedNode) {
           loadDashboard();
         } else if (!visible) {
-          panelSchemas.value = [];
+          dashboardData.value = {};
         }
       },
       { immediate: true, deep: true },
@@ -1008,8 +1014,9 @@ export default defineComponent({
       handleClose,
       handleShowTelemetry,
       // RED Charts
-      panelSchemas,
+      dashboardData,
       selectedTimeObj,
+      currentTimeObj,
       loadDashboard,
       // Telemetry Correlation
       showTelemetryDialog,
