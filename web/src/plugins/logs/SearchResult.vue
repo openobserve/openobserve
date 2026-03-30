@@ -84,7 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchObj.data?.queryResults?.hits?.length > 0 &&
               searchObj.data.lastSearchTraceId &&
               config.isEnterprise == 'true' &&
-              config.isCloud == 'false'
+              config.isCloud == 'false' &&
+              store.state.zoConfig.search_inspector_enabled
             "
             outline
             no-caps
@@ -1071,9 +1072,8 @@ export default defineComponent({
         // Always set correlation props, even if metrics array is empty
         // This prevents re-fetching when switching between tabs
         //
-        // Use logStreams[0].filters as matchedDimensions — these contain
-        // the correct field names for the log stream (e.g., k8s_namespace_name)
-        // instead of semantic IDs (k8s-namespace). Same fix as 9127b6172.
+        // v2: backend returns per-stream actual field names in StreamInfo.filters
+        // Use log stream filters as matchedDimensions (actual field names for source stream)
         const logFilters =
           result.correlationData.related_streams.logs?.[0]?.filters || {};
         const actualMatchedDimensions =

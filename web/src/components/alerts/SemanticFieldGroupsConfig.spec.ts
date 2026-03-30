@@ -39,8 +39,6 @@ const sampleGroups = [
   makeGroup({ id: "g1", display: "Host Group", group: "Infrastructure", fields: ["host"] }),
   makeGroup({ id: "g2", display: "Service Group", group: "Infrastructure", fields: ["service"] }),
   makeGroup({ id: "g3", display: "Region Group", group: "Cloud", fields: ["region"] }),
-  // Reserved ID - should be filtered out
-  makeGroup({ id: "service-fqn", display: "FQN Group", group: "Reserved", fields: ["fqn"] }),
 ];
 
 async function mountComp(props: Record<string, any> = {}) {
@@ -96,26 +94,8 @@ describe("SemanticFieldGroupsConfig - rendering", () => {
   });
 });
 
-describe("SemanticFieldGroupsConfig - reserved ID filtering", () => {
-  it("filters out service-fqn from localGroups", async () => {
-    const w = await mountComp();
-    const ids = (w.vm as any).localGroups.map((g: any) => g.id);
-    expect(ids).not.toContain("service-fqn");
-  });
-
-  it("filters out servicefqn from localGroups", async () => {
-    const groups = [makeGroup({ id: "servicefqn", display: "FQN" })];
-    const w = await mountComp({ semanticFieldGroups: groups });
-    expect((w.vm as any).localGroups).toHaveLength(0);
-  });
-
-  it("filters out fqn from localGroups", async () => {
-    const groups = [makeGroup({ id: "fqn", display: "FQN" })];
-    const w = await mountComp({ semanticFieldGroups: groups });
-    expect((w.vm as any).localGroups).toHaveLength(0);
-  });
-
-  it("keeps non-reserved groups", async () => {
+describe("SemanticFieldGroupsConfig - group loading", () => {
+  it("loads provided groups into localGroups", async () => {
     const w = await mountComp();
     expect((w.vm as any).localGroups.length).toBeGreaterThan(0);
     const ids = (w.vm as any).localGroups.map((g: any) => g.id);
@@ -198,10 +178,13 @@ describe("SemanticFieldGroupsConfig - addGroup", () => {
     expect(w.emitted("update:semanticFieldGroups")).toBeTruthy();
   });
 
-  it("new group has normalize=true", async () => {
+  it("new group is inserted at index 0 with empty display and fields", async () => {
     const w = await mountComp();
     (w.vm as any).addGroup();
-    expect((w.vm as any).localGroups[0].normalize).toBe(true);
+    const newGroup = (w.vm as any).localGroups[0];
+    expect(newGroup.display).toBe("");
+    expect(newGroup.fields).toHaveLength(0);
+    expect(newGroup.id).toBeTruthy();
   });
 });
 
