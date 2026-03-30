@@ -1761,14 +1761,11 @@ async fn handle_derived_stream_triggers(
     }
 
     if !pipeline.enabled {
-        // Pipeline not enabled, check again in 5 mins
+        // Pipeline not enabled, check again in 7 days
         let msg = format!(
-            "Pipeline associated with trigger not enabled: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
+            "Pipeline associated with trigger not enabled: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 7 days."
         );
-        new_trigger.next_run_at += Duration::try_minutes(5)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
+        new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
         let trigger_data_stream = TriggerData {
             _timestamp: now_micros(),
             org: new_trigger.org.clone(),
