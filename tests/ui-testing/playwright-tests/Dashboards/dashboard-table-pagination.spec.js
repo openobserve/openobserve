@@ -925,7 +925,7 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
 
     // Focus on the editor
     await page.locator('[data-test="dashboard-panel-query-editor"]').getByRole('code').click();
-    await page.locator('[data-test="dashboard-panel-query-editor"]').locator('.ime-text-area').fill(
+    await page.locator('[data-test="dashboard-panel-query-editor"]').locator('.inputarea').fill(
       'SELECT kubernetes_container_name, count(*) as count FROM "e2e_automate" GROUP BY kubernetes_container_name'
     );
 
