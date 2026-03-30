@@ -55,7 +55,13 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create time annotations", "category": "dashboards"}))
+        ("x-o2-mcp" = json!({
+            "description": "Create time annotations",
+            "category": "dashboards",
+            "arg_transforms": {
+                "annotations": "request_body.timed_annotations"
+            }
+        }))
     )
 )]
 pub async fn create_annotations(

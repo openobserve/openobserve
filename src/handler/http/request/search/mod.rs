@@ -225,7 +225,16 @@ async fn can_use_distinct_stream(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Search data with SQL query, you can use `match_all('something')` to search with full text search, also you can use `str_match(field, 'something')` to search in a specific field; start_time, end_time can't be zero, need to valid micro timestamp. Note: in summary mode, response is stripped to hits/total/took/columns/scan_size/function_error and hits are capped at 100. Use LIMIT in your SQL or request detail='full' if you need more.", "category": "search"}))
+        ("x-o2-mcp" = json!({
+            "description": "Search data with SQL query, you can use `match_all('something')` to search with full text search, also you can use `str_match(field, 'something')` to search in a specific field; start_time, end_time can't be zero, need to valid micro timestamp. Note: in summary mode, response is stripped to hits/total/took/columns/scan_size/function_error and hits are capped at 100. Use LIMIT in your SQL or request detail='full' if you need more.",
+            "category": "search",
+            "arg_transforms": {
+                "sql": "request_body.query.sql",
+                "start_time": "request_body.query.start_time",
+                "end_time": "request_body.query.end_time",
+                "query": "request_body.query.sql"
+            }
+        }))
     )
 )]
 pub async fn search(
@@ -562,7 +571,15 @@ pub async fn search(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Search logs around a timestamp. Note: in summary mode, hits are capped at 100 and only hits/total/took/columns/scan_size/function_error are returned.", "category": "search"}))
+        ("x-o2-mcp" = json!({
+            "description": "Search logs around a timestamp. Note: in summary mode, hits are capped at 100 and only hits/total/took/columns/scan_size/function_error are returned.",
+            "category": "search",
+            "arg_transforms": {
+                "stream": "stream_name",
+                "timestamp": "key",
+                "limit": "size"
+            }
+        }))
     )
 )]
 pub async fn around_v1(
@@ -788,7 +805,15 @@ pub async fn around_v2(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get distinct values for a field", "category": "search"}))
+        ("x-o2-mcp" = json!({
+            "description": "Get distinct values for a field",
+            "category": "search",
+            "arg_transforms": {
+                "stream": "stream_name",
+                "field": "fields",
+                "limit": "size"
+            }
+        }))
     )
 )]
 pub async fn values(

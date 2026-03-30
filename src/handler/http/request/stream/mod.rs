@@ -73,7 +73,14 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get stream schema", "category": "streams"}))
+        ("x-o2-mcp" = json!({
+            "description": "Get stream schema",
+            "category": "streams",
+            "arg_transforms": {
+                "stream": "stream_name",
+                "stream_type": "type"
+            }
+        }))
     )
 )]
 pub async fn schema(
