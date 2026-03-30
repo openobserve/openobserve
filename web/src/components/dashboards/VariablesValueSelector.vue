@@ -696,12 +696,13 @@ export default defineComponent({
 
       const varLookup = resolvedVarLookup.value;
 
-      // Replace all variable references ($variableName) with their resolved values.
+      // Replace all variable references ($variableName and {{variableName}}) with their resolved values.
       // Using replace callback avoids regex exec loop risks and handles
       // special replacement patterns ($1, $&, etc.) safely.
       return value.replace(
-        /\$([a-zA-Z0-9_-]+)/g,
-        (fullMatch, varName) => {
+        /(?:\$([a-zA-Z0-9_-]+))|(?:\{\{([a-zA-Z0-9_-]+)(?::[a-zA-Z]+)?\}\})/g,
+        (fullMatch, dollarVarName, mustacheVarName) => {
+          const varName = dollarVarName || mustacheVarName;
           if (varName in varLookup) {
             let varValue = varLookup[varName];
 
@@ -2022,7 +2023,11 @@ export default defineComponent({
               .map((value: any) => `'${escapeSingleQuotes(value)}'`)
               .join(", ");
 
-            // Create regex patterns to replace all occurrences
+            // Mustache patterns: {{variable}} and {{variable:format}}
+            const mustachePattern = new RegExp(`\\{\\{${escapedVarName}(?::[a-zA-Z]+)?\\}\\}`, 'g');
+            queryContext = queryContext.replace(mustachePattern, arrayValues);
+
+            // Dollar-sign patterns (existing)
             // Pattern 1: Unquoted placeholder like IN($variable) -> IN('val1', 'val2')
             const unquotedPattern = new RegExp(`\\$${escapedVarName}(?!')`, 'g');
             // Pattern 2: Quoted placeholder like '$variable' -> 'val1', 'val2'
@@ -2041,6 +2046,12 @@ export default defineComponent({
           } else if (variable.value !== null && variable.value !== undefined) {
             // Replace single values with regex to replace all occurrences
             const replacedValue = escapeSingleQuotes(variable.value);
+
+            // Mustache pattern
+            const mustachePattern = new RegExp(`\\{\\{${escapedVarName}(?::[a-zA-Z]+)?\\}\\}`, 'g');
+            queryContext = queryContext.replace(mustachePattern, replacedValue);
+
+            // Dollar-sign pattern (existing)
             const pattern = new RegExp(`\\$${escapedVarName}`, 'g');
             queryContext = queryContext.replace(
               pattern,

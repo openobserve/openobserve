@@ -271,6 +271,13 @@ export const processVariableContent = (
         : variable.value;
 
     const placeholders = [
+      // Mustache forms
+      "{{" + variable.name + "}}",
+      "{{" + variable.name + ":csv}}",
+      "{{" + variable.name + ":pipe}}",
+      "{{" + variable.name + ":doublequote}}",
+      "{{" + variable.name + ":singlequote}}",
+      // Dollar-sign forms (existing)
       "${" + variable.name + "}",
       "${" + variable.name + ":csv}",
       "${" + variable.name + ":pipe}",
