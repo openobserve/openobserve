@@ -1876,7 +1876,11 @@ watch(
   () => searchObj.meta.searchMode,
   (mode) => {
     const query = { ...router.currentRoute.value.query };
-    query.tab = mode;
+    if (mode !== "traces") {
+      query.tab = mode;
+    } else {
+      delete query.tab;
+    }
     router.replace({ query });
   },
 );
