@@ -1081,9 +1081,6 @@ export function usePanelDrilldown({
           if (drilldownData.data.passAllVariables) {
             // get current query params
             oldParams = { ...route.query };
-            console.log("[DRILLDOWN DEBUG] oldParams copied from route.query:", JSON.parse(JSON.stringify(oldParams)));
-          } else {
-             console.log("[DRILLDOWN DEBUG] passAllVariables is false, oldParams starts empty");
           }
 
           drilldownData.data.variables.forEach((variable: any) => {
@@ -1091,7 +1088,6 @@ export function usePanelDrilldown({
               const newKey = "var-" + replacePlaceholders(variable.name, drilldownVariables);
               const newValue = replacePlaceholders(variable.value, drilldownVariables);
               oldParams[newKey] = newValue;
-              console.log("[DRILLDOWN DEBUG] Setting explicit drilldown variable:", newKey, "=", newValue);
             }
           });
 
@@ -1103,9 +1099,6 @@ export function usePanelDrilldown({
               tab: tabId,
           };
 
-          console.log("[DRILLDOWN DEBUG] Before router.push. Current route.query:", JSON.parse(JSON.stringify(route.query)));
-          console.log("[DRILLDOWN DEBUG] newQueryParams to push:", JSON.parse(JSON.stringify(newQueryParams)));
-
           // ======= [START] default variable values
           const initialVariableValues: any = {};
           Object.keys(newQueryParams).forEach((key) => {
@@ -1114,8 +1107,6 @@ export function usePanelDrilldown({
               initialVariableValues[newKey] = newQueryParams[key];
             }
           });
-
-          console.log("[DRILLDOWN DEBUG] Constructed initialVariableValues to emit:", JSON.parse(JSON.stringify(initialVariableValues)));
           // ======= [END] default variable values
 
           // FIX: Emit BEFORE `router.push` so that the event has time to bubble up
@@ -1128,8 +1119,6 @@ export function usePanelDrilldown({
             path: "/dashboards/view",
             query: newQueryParams,
           });
-
-          console.log("[DRILLDOWN DEBUG] After router.push. Current route.query is now:", JSON.parse(JSON.stringify(route.query)));
         }
       }
     }

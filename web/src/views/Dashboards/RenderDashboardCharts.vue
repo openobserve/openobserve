@@ -1181,7 +1181,6 @@ export default defineComponent({
      * @param args - Any arguments (not used with variables manager)
      */
     const updateInitialVariableValues = async (...args: any) => {
-      console.log("[DRILLDOWN DEBUG] updateInitialVariableValues called with args:", JSON.parse(JSON.stringify(args)));
       // if view panel is open then close it
       showViewPanel.value = false;
 
@@ -1190,7 +1189,6 @@ export default defineComponent({
 
       // FIX: Update selectedTabId if it's in the query
       if (queryToLoad.tab && queryToLoad.tab !== selectedTabId.value) {
-              console.log("[DRILLDOWN DEBUG] Updating selectedTabId to:", queryToLoad.tab);
               selectedTabId.value = queryToLoad.tab;
       }
 
@@ -1211,7 +1209,6 @@ export default defineComponent({
       // without requiring the user to click on refresh to load the panel/whole dashboard
       // Use committed state to match panel expectations
       const allGlobalVars = variablesManager.committedVariablesData.global;
-      console.log("[DRILLDOWN DEBUG] current committed global variables:", JSON.parse(JSON.stringify(allGlobalVars)));
       currentVariablesDataRef.value = {
         __global: JSON.parse(
           JSON.stringify({
