@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use config::{RwAHashMap, get_config, meta::cluster::NodeInfo};
-use once_cell::sync::Lazy;
 use proto::cluster_rpc::{
     self, cluster_info_service_client::ClusterInfoServiceClient, metrics_client::MetricsClient,
     node_service_client::NodeServiceClient, search_client::SearchClient,

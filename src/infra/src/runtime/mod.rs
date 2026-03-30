@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use config::get_config;
-use once_cell::sync::Lazy;
 use tokio::runtime::Runtime;
 
 pub static DATAFUSION_RUNTIME: Lazy<Arc<Runtime>> = Lazy::new(|| {

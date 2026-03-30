@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::ops::Range;
+use std::{ops::Range, sync::LazyLock as Lazy};
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -24,7 +24,6 @@ use object_store::{
     ObjectMeta, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, coalesce_ranges,
     path::Path,
 };
-use once_cell::sync::Lazy;
 
 use crate::{
     cache::file_data,

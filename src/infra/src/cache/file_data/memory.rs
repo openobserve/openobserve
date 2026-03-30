@@ -16,6 +16,7 @@
 use std::{
     cmp::{max, min},
     ops::Range,
+    sync::LazyLock as Lazy,
 };
 
 use bytes::Bytes;
@@ -28,7 +29,6 @@ use config::{
 };
 use futures::StreamExt;
 use object_store::{GetOptions, GetResult, GetResultPayload, ObjectMeta};
-use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
 use super::CacheStrategy;

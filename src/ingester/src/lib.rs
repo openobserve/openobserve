@@ -23,7 +23,11 @@ mod stream;
 mod wal;
 mod writer;
 
-use std::{fs::create_dir_all, path::PathBuf, sync::Arc};
+use std::{
+    fs::create_dir_all,
+    path::PathBuf,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use arrow_schema::Schema;
 use config::RwAHashMap;
@@ -32,7 +36,6 @@ pub use immutable::{
     check_persist_done, get_immutables_cache_stats, get_processing_tables_cache_stats,
     read_from_immutable,
 };
-use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::{Mutex, mpsc};
 pub use wal::collect_wal_parquet_metrics;

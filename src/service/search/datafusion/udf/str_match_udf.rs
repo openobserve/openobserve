@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{any::Any, sync::Arc};
+use std::{
+    any::Any,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use datafusion::{
     arrow::{
@@ -28,7 +31,6 @@ use datafusion::{
     scalar::ScalarValue,
     sql::sqlparser::parser::ParserError,
 };
-use once_cell::sync::Lazy;
 
 /// Implementation of str_match
 pub(crate) static STR_MATCH_UDF: Lazy<ScalarUDF> =

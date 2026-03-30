@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fmt::Debug, ops::Range, sync::Arc};
+use std::{
+    fmt::Debug,
+    ops::Range,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use async_trait::async_trait;
 use bytes::{Bytes, buf::Buf};
@@ -25,7 +29,6 @@ use object_store::{
     GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, PutMultipartOptions,
     PutOptions, PutPayload, PutResult, Result, WriteMultipart, path::Path,
 };
-use once_cell::sync::Lazy;
 use parquet::file::metadata::{FooterTail, ParquetMetaDataReader};
 
 pub mod accounts;

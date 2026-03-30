@@ -17,7 +17,7 @@ use std::{
     collections::HashMap,
     hash::Hash,
     sync::{
-        Arc,
+        Arc, LazyLock as Lazy,
         atomic::{AtomicBool, Ordering},
     },
 };
@@ -29,7 +29,6 @@ use config::{
     utils::{json, schema_ext::SchemaExt, time::now_micros},
 };
 use infra::schema::get_partition_time_level;
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
 use crate::{
