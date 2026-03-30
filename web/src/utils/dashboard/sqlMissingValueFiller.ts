@@ -140,24 +140,45 @@ export const fillMissingValues = (
       toZonedTime(binnedDate, "UTC"),
       "yyyy-MM-dd'T'HH:mm:ss",
     );
+    // Also add a phantom point one interval before the first real data point.
+    // This ensures ECharts calculates bar bandwidth as `interval` (e.g. 30s)
+    // instead of the full gap between user-start anchor and first real data
+    // (~days on the first streaming chunk). Without this, ECharts uses the
+    // large gap as bar width and extends the visual axis far beyond min/max.
+    const nearAnchorTime = new Date(
+      binnedFillStart.getTime() - interval * 1000,
+    );
+    const nearAnchorFormattedTime = format(
+      toZonedTime(nearAnchorTime, "UTC"),
+      "yyyy-MM-dd'T'HH:mm:ss",
+    );
+    const anchorTimes = [anchorFormattedTime];
+    // Only add the near-anchor if it's strictly between user start and first data
+    if (nearAnchorTime > binnedDate) {
+      anchorTimes.push(nearAnchorFormattedTime);
+    }
     if (!hasBreakdown) {
-      const anchorEntry: any = { [timeKey]: anchorFormattedTime };
-      keys.forEach((key) => {
-        if (key !== timeKey) anchorEntry[key] = noValueConfigOption;
-      });
-      filledData.push(anchorEntry);
-    } else {
-      uniqueXAxisValues.forEach((uniqueValue: any) => {
-        const anchorEntry: any = {
-          [timeKey]: anchorFormattedTime,
-          [uniqueKey]: uniqueValue,
-        };
+      anchorTimes.forEach((t) => {
+        const anchorEntry: any = { [timeKey]: t };
         keys.forEach((key) => {
-          if (key !== timeKey && key !== uniqueKey) {
-            anchorEntry[key] = noValueConfigOption;
-          }
+          if (key !== timeKey) anchorEntry[key] = noValueConfigOption;
         });
         filledData.push(anchorEntry);
+      });
+    } else {
+      anchorTimes.forEach((t) => {
+        uniqueXAxisValues.forEach((uniqueValue: any) => {
+          const anchorEntry: any = {
+            [timeKey]: t,
+            [uniqueKey]: uniqueValue,
+          };
+          keys.forEach((key) => {
+            if (key !== timeKey && key !== uniqueKey) {
+              anchorEntry[key] = noValueConfigOption;
+            }
+          });
+          filledData.push(anchorEntry);
+        });
       });
     }
   }
