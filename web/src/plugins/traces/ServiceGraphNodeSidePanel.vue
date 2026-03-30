@@ -237,154 +237,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <template v-else>
-            <!-- Error Operations -->
             <div
-              class="tw:mb-3 tw:p-[0.365rem] tw:rounded tw:border-1 tw:border-[var(--o2-border-color)]"
-              data-test="service-graph-side-panel-error-operations-list"
+              v-if="recentOperations.length === 0"
+              class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+              style="color: var(--o2-text-secondary)"
             >
-              <div
-                class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:font-semibold tw:mb-1 tw:text-[var(--o2-text-1)]!"
-              >
-                <q-icon
-                  name="error_outline"
-                  size="12px"
-                  class="tw:text-[var(--q-negative)]"
-                />
-                Error Operations
-              </div>
-              <div
-                v-if="errorOperationsList.length === 0"
-                class="tw:text-xs tw:italic tw:px-2"
-                style="color: var(--o2-text-secondary)"
-              >
-                No errors found
-              </div>
-              <div v-else>
-                <div
-                  v-for="op in errorOperationsList"
-                  :key="op.name + '-error'"
-                  class="operation-row tw:flex tw:items-center tw:justify-between tw:py-1 tw:px-2 tw:rounded tw:text-xs tw:cursor-pointer"
-                  data-test="service-graph-side-panel-operation-item"
-                  @click="navigateToTraces(op.name)"
-                >
-                  <span
-                    class="tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:mr-2 tw:text-[0.8rem] tw:text-[var(--o2-text-4)]! tw:tracking-[0.02rem]!"
-                  >
-                    {{ op.name }}
-                    <q-tooltip>{{ op.name }}</q-tooltip>
-                  </span>
-                  <div class="tw:flex tw:items-center tw:gap-1 tw:shrink-0">
-                    <span class="tw:font-semibold tw:text-[var(--q-negative)]">
-                      {{ op.valueDisplay }}
-                    </span>
-                    <q-icon
-                      name="open_in_new"
-                      size="10px"
-                      class="operation-link-icon"
-                    />
-                  </div>
-                </div>
-              </div>
+              No operations found
             </div>
-
-            <!-- P99 Latency -->
             <div
-              class="tw:mb-3 tw:p-[0.365rem] tw:rounded tw:border-1 tw:border-[var(--o2-border-color)]"
-              data-test="service-graph-side-panel-p99-operations-list"
+              v-else
+              class="tw:max-h-[20rem] tw:overflow-hidden"
+              data-test="service-graph-side-panel-operations-table"
             >
-              <div
-                class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:font-semibold tw:mb-1 tw:text-[var(--o2-text-1)]!"
+              <TenstackTable
+                :columns="operationsTableColumns"
+                :rows="operationsTableRows"
+                :loading="false"
+                :default-columns="false"
+                :enable-column-reorder="false"
+                :enable-row-expand="false"
+                :enable-text-highlight="false"
+                :enable-status-bar="false"
+                :enable-ai-context-button="false"
+                :row-height="28"
+                @click:data-row="(row: any) => navigateToTraces(row._name)"
               >
-                <q-icon
-                  name="speed"
-                  size="12px"
-                  class="tw:text-[var(--q-warning)]"
-                />
-                P99 Latency
-              </div>
-              <div
-                v-if="p99OperationsList.length === 0"
-                class="tw:text-xs tw:italic tw:px-2"
-                style="color: var(--o2-text-secondary)"
-              >
-                No data
-              </div>
-              <div v-else>
-                <div
-                  v-for="op in p99OperationsList"
-                  :key="op.name + '-p99'"
-                  class="operation-row tw:flex tw:items-center tw:justify-between tw:py-1 tw:px-2 tw:rounded tw:text-xs tw:cursor-pointer"
-                  data-test="service-graph-side-panel-operation-item"
-                  @click="navigateToTraces(op.name)"
-                >
+                <template #cell-errors="{ item }">
                   <span
-                    class="tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:mr-2 tw:text-[0.8rem] tw:text-[var(--o2-text-4)]! tw:tracking-[0.02rem]!"
+                    :class="
+                      item.errors > 0
+                        ? 'tw:text-[var(--q-negative)] tw:font-semibold'
+                        : ''
+                    "
+                    >{{ item.errors }}</span
                   >
-                    {{ op.name }}
-                    <q-tooltip>{{ op.name }}</q-tooltip>
-                  </span>
-                  <div class="tw:flex tw:items-center tw:gap-1 tw:shrink-0">
-                    <span class="tw:font-semibold tw:text-[var(--q-warning)]">
-                      {{ op.valueDisplay }}
-                    </span>
-                    <q-icon
-                      name="open_in_new"
-                      size="10px"
-                      class="operation-link-icon"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- P95 Latency -->
-            <div
-              class="tw:mb-3 tw:p-[0.365rem] tw:rounded tw:border-1 tw:border-[var(--o2-border-color)]"
-              data-test="service-graph-side-panel-p95-operations-list"
-            >
-              <div
-                class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:font-semibold tw:mb-1 tw:text-[var(--o2-text-1)]!"
-              >
-                <q-icon
-                  name="speed"
-                  size="12px"
-                  class="tw:text-[var(--q-warning)]"
-                />
-                P95 Latency
-              </div>
-              <div
-                v-if="p95OperationsList.length === 0"
-                class="tw:text-xs tw:italic tw:px-2"
-                style="color: var(--o2-text-secondary)"
-              >
-                No data
-              </div>
-              <div v-else>
-                <div
-                  v-for="op in p95OperationsList"
-                  :key="op.name + '-p95'"
-                  class="operation-row tw:flex tw:items-center tw:justify-between tw:py-1 tw:px-2 tw:rounded tw:text-xs tw:cursor-pointer"
-                  data-test="service-graph-side-panel-operation-item"
-                  @click="navigateToTraces(op.name)"
-                >
+                </template>
+                <template #cell-p99="{ item }">
                   <span
-                    class="tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:mr-2 tw:text-[0.8rem] tw:text-[var(--o2-text-4)]! tw:tracking-[0.02rem]!"
+                    :class="
+                      item.p99 !== 'N/A' ? 'tw:text-[var(--q-warning)]' : ''
+                    "
+                    >{{ item.p99 }}</span
                   >
-                    {{ op.name }}
-                    <q-tooltip>{{ op.name }}</q-tooltip>
-                  </span>
-                  <div class="tw:flex tw:items-center tw:gap-1 tw:shrink-0">
-                    <span class="tw:font-semibold tw:text-[var(--q-warning)]">
-                      {{ op.valueDisplay }}
-                    </span>
-                    <q-icon
-                      name="open_in_new"
-                      size="10px"
-                      class="operation-link-icon"
-                    />
+                </template>
+                <template #cell-actions="{ row, column, active }">
+                  <q-btn
+                    v-if="active && column.id === 'operation'"
+                    flat
+                    dense
+                    round
+                    icon="open_in_new"
+                    size="xs"
+                    class="tw:ml-1"
+                    data-test="service-graph-side-panel-view-traces-btn"
+                    @click.stop="navigateToTraces(row._name)"
+                  >
+                    <q-tooltip>View in Traces</q-tooltip>
+                  </q-btn>
+                </template>
+                <template #empty>
+                  <div
+                    class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                    style="color: var(--o2-text-secondary)"
+                  >
+                    No operations found
                   </div>
-                </div>
-              </div>
+                </template>
+              </TenstackTable>
             </div>
           </template>
         </div>
@@ -433,11 +352,16 @@ const PanelSchemaRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/PanelSchemaRenderer.vue"),
 );
 
+const TenstackTable = defineAsyncComponent(
+  () => import("@/components/TenstackTable.vue"),
+);
+
 export default defineComponent({
   name: "ServiceGraphNodeSidePanel",
   components: {
     TelemetryCorrelationDashboard,
     PanelSchemaRenderer,
+    TenstackTable,
   },
   props: {
     selectedNode: {
@@ -812,70 +736,68 @@ export default defineComponent({
       });
     };
 
-    // Computed: Operations sections — derived from aggregated or spans data
-    const errorOperationsList = computed(() => {
-      if (operationsViewMode.value === "aggregated") {
-        return [...recentOperations.value]
-          .sort((a, b) => b.errorCount - a.errorCount)
-          .slice(0, 5)
-          .map((op) => ({
-            name: op.name,
-            valueDisplay: `${op.errorCount} error${op.errorCount !== 1 ? "s" : ""}`,
-          }));
-      }
-      return recentSpanData.value.errorSpans.map((s) => ({
-        name: s.name,
-        valueDisplay: s.timestampDisplay,
-      }));
-    });
+    // Computed: Operations table columns
+    const operationsTableColumns = computed(() => [
+      {
+        id: "operation",
+        accessorKey: "operation",
+        header: "OPERATION",
+        size: 220,
+        meta: { slot: false },
+      },
+      {
+        id: "requests",
+        accessorKey: "requests",
+        header: "REQUESTS",
+        size: 100,
+      },
+      {
+        id: "errors",
+        accessorKey: "errors",
+        header: "ERRORS",
+        size: 80,
+        meta: { slot: true },
+      },
+      {
+        id: "p99",
+        accessorKey: "p99",
+        header: "P99",
+        size: 80,
+        meta: { slot: true },
+      },
+      {
+        id: "p95",
+        accessorKey: "p95",
+        header: "P95",
+        size: 80,
+      },
+      {
+        id: "p75",
+        accessorKey: "p75",
+        header: "P75",
+        size: 80,
+      },
+      {
+        id: "p50",
+        accessorKey: "p50",
+        header: "P50",
+        size: 80,
+      },
+    ]);
 
-    const p99OperationsList = computed(() => {
-      if (operationsViewMode.value === "aggregated") {
-        return [...recentOperations.value]
-          .sort((a, b) => b.p99Latency - a.p99Latency)
-          .slice(0, 5)
-          .map((op) => ({
-            name: op.name,
-            valueDisplay: formatOperationLatency(op.p99Latency),
-          }));
-      }
-      return recentSpanData.value.slowSpans.slice(0, 5).map((s) => ({
-        name: s.name,
-        valueDisplay: formatOperationLatency(s.duration),
-      }));
-    });
-
-    const p95OperationsList = computed(() => {
-      if (operationsViewMode.value === "aggregated") {
-        return [...recentOperations.value]
-          .sort((a, b) => b.p95Latency - a.p95Latency)
-          .slice(0, 5)
-          .map((op) => ({
-            name: op.name,
-            valueDisplay: formatOperationLatency(op.p95Latency),
-          }));
-      }
-      return recentSpanData.value.slowSpans.slice(5, 10).map((s) => ({
-        name: s.name,
-        valueDisplay: formatOperationLatency(s.duration),
-      }));
-    });
-
-    const p50OperationsList = computed(() => {
-      if (operationsViewMode.value === "aggregated") {
-        return [...recentOperations.value]
-          .sort((a, b) => b.p50Latency - a.p50Latency)
-          .slice(0, 5)
-          .map((op) => ({
-            name: op.name,
-            valueDisplay: formatOperationLatency(op.p50Latency),
-          }));
-      }
-      return recentSpanData.value.slowSpans.slice(10, 15).map((s) => ({
-        name: s.name,
-        valueDisplay: formatOperationLatency(s.duration),
-      }));
-    });
+    // Computed: Operations table rows
+    const operationsTableRows = computed(() =>
+      recentOperations.value.map((op) => ({
+        operation: op.name,
+        requests: formatNumber(op.requestCount),
+        errors: op.errorCount,
+        p99: formatOperationLatency(op.p99Latency),
+        p95: formatOperationLatency(op.p95Latency),
+        p75: formatOperationLatency(op.p75Latency),
+        p50: formatOperationLatency(op.p50Latency),
+        _name: op.name,
+      })),
+    );
 
     // Fetch aggregated operations (grouped by operation_name with percentiles)
     const fetchAggregatedOperations = async () => {
@@ -888,7 +810,7 @@ export default defineComponent({
       try {
         const serviceName = buildServiceName();
         const streamName = props.streamFilter || "default";
-        const sql = `SELECT operation_name, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.50) as p50_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${streamName}" WHERE service_name = '${serviceName}' GROUP BY operation_name`;
+        const sql = `SELECT operation_name, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.50) as p50_latency, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${streamName}" WHERE service_name = '${serviceName}' GROUP BY operation_name`;
 
         const response = await searchService.search({
           org_identifier: store.state.selectedOrganization.identifier,
@@ -910,6 +832,7 @@ export default defineComponent({
             requestCount: op.request_count || 0,
             errorCount: op.error_count || 0,
             p50Latency: op.p50_latency || 0,
+            p75Latency: op.p75_latency || 0,
             p95Latency: op.p95_latency || 0,
             p99Latency: op.p99_latency || 0,
           }));
@@ -1094,12 +1017,10 @@ export default defineComponent({
       correlationData,
       telemetryTimeRange,
       // Recent Operations
-      operationsViewMode,
       loadingOperations,
-      errorOperationsList,
-      p99OperationsList,
-      p95OperationsList,
-      p50OperationsList,
+      recentOperations,
+      operationsTableColumns,
+      operationsTableRows,
       navigateToTraces,
     };
   },
