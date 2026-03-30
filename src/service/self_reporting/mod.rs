@@ -203,8 +203,12 @@ pub async fn report_request_usage_stats(
         peak_memory_usage: stats.peak_memory_usage,
     });
     if !usage.is_empty() {
-        publish_usage(usage).await;
+        report_usage(usage);
     }
+}
+
+pub fn report_usage(usage: Vec<UsageData>) {
+    tokio::spawn(publish_usage(usage));
 }
 
 async fn publish_usage(usages: Vec<UsageData>) {
