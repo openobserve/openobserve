@@ -884,15 +884,15 @@ export class MetricsBuilderPage {
 
         // Get header texts
         const headers = [];
-        const thElements = table.locator('thead th, .q-table__top th');
+        const thElements = table.locator('thead th');
         const headerCount = await thElements.count().catch(() => 0);
         for (let i = 0; i < headerCount; i++) {
             const text = await thElements.nth(i).textContent().catch(() => '');
             if (text.trim()) headers.push(text.trim());
         }
 
-        // Count data rows (tbody tr or virtual scroll rows)
-        const rows = table.locator('tbody tr, .q-virtual-scroll__content tr');
+        // Count data rows (TanStack dashboard mode uses dashboard-data-row class)
+        const rows = table.locator('tbody tr.dashboard-data-row, tbody tr');
         const rowCount = await rows.count().catch(() => 0);
 
         return { visible, rowCount, headers };

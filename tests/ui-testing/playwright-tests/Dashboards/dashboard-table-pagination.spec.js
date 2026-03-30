@@ -1155,7 +1155,8 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     await tablePanel.waitFor({ state: "visible", timeout: 15000 });
 
     // Wait for table rows - if first attempt returns no data, re-apply to retry the query
-    const tableRows = tablePanel.locator('tbody tr, .q-table__grid-content .q-card');
+    // TanStack table (dashboard mode) renders rows directly in tbody with class dashboard-data-row
+    const tableRows = tablePanel.locator('tbody tr.dashboard-data-row');
     let hasRows = await tableRows.first().waitFor({ state: "visible", timeout: 15000 }).then(() => true).catch(() => false);
 
     if (!hasRows) {
