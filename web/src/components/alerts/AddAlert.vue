@@ -637,23 +637,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- SQL Preview -->
               <div
-                class="preview-box card-container"
-                style="
-                  flex: 1;
-                  min-height: 150px;
-                  overflow: hidden;
-                  display: flex;
-                  flex-direction: column;
-                "
+                class="collapsible-section card-container preview-alert-container-light"
+                :style="anomalyPreviewSectionStyle"
               >
                 <div
-                  class="preview-header tw:flex tw:items-center tw:px-3 tw:py-2"
+                  class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
+                  @click="showAnomalyPreview = !showAnomalyPreview"
                 >
-                  <span class="preview-title tw:text-sm tw:font-semibold">{{
-                    t("alerts.sqlPreview")
+                  <span class="tw:text-sm tw:font-semibold">{{
+                    t("alerts.preview")
                   }}</span>
+                  <q-btn
+                    flat
+                    dense
+                    round
+                    size="xs"
+                    :icon="showAnomalyPreview ? 'expand_less' : 'expand_more'"
+                    @click.stop="showAnomalyPreview = !showAnomalyPreview"
+                  />
                 </div>
-                <div style="flex: 1; overflow: hidden; min-height: 0">
+                <div v-show="showAnomalyPreview" style="flex: 1; overflow: hidden; min-height: 0">
                   <QueryEditor
                     editor-id="anomaly-sql-preview"
                     language="sql"
@@ -668,7 +671,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Summary -->
               <div
-                class="collapsible-section card-container"
+                class="collapsible-section card-container preview-alert-container-light"
                 :style="anomalySummarySectionStyle"
               >
                 <div
@@ -684,7 +687,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     round
                     size="xs"
                     :icon="showAnomalySummary ? 'expand_less' : 'expand_more'"
-                    @click.stop
+                    @click.stop="showAnomalySummary = !showAnomalySummary"
                   />
                 </div>
                 <div
@@ -1039,6 +1042,7 @@ export default defineComponent({
     // ── Anomaly Detection state ─────────────────────────────────────────────
     const anomalyConfig = ref(defaultAnomalyConfig());
     const anomalyStep2Ref = ref<any>(null);
+    const showAnomalyPreview = ref(true);
     const showAnomalySummary = ref(true);
     const anomalyEditMode = ref(false);
     const anomalyRetraining = ref(false);
@@ -1136,6 +1140,11 @@ export default defineComponent({
       ]
         .filter(Boolean)
         .join("\n");
+    });
+
+    const anomalyPreviewSectionStyle = computed(() => {
+      if (!showAnomalyPreview.value) return { flex: "0 0 auto" };
+      return { flex: "1", minHeight: "150px", overflow: "hidden", display: "flex", flexDirection: "column" };
     });
 
     const anomalySummarySectionStyle = computed(() => {
@@ -3325,6 +3334,8 @@ export default defineComponent({
       anomalyConfig,
       anomalyStep2Ref,
       anomalyPreviewSql,
+      showAnomalyPreview,
+      anomalyPreviewSectionStyle,
       showAnomalySummary,
       anomalySummarySectionStyle,
       saveAnomalyDetection,
@@ -3832,6 +3843,20 @@ export default defineComponent({
   resize: both;
 }
 
+.collapsible-section {
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+  overflow: hidden;
+
+  .section-header {
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
+    transition: all 0.2s ease;
+    border-radius: 0.375rem 0.375rem 0 0;
+  }
+}
+
 .alert-condition {
   .__column,
   .__value {
@@ -4075,5 +4100,13 @@ export default defineComponent({
   color: #757575;
   border-left: 3px solid #bdbdbd;
   padding-left: 12px !important;
+}
+</style>
+<style scoped lang="scss">
+.preview-alert-container{
+  border: 1px solid rgb(39, 39, 39) !important;
+}
+.preview-alert-container-light{
+  border: 1px solid #e6e6e6 !important;
 }
 </style>

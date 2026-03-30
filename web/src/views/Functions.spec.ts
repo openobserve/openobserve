@@ -119,6 +119,8 @@ describe('Functions.vue', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Set window width above compact breakpoint (1440px) so isCompactSidebar is false
+    Object.defineProperty(window, 'innerWidth', { value: 1920, writable: true });
   });
 
   afterEach(() => {

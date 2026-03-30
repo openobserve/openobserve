@@ -118,7 +118,8 @@
     "copySuccess": "Copié dans le presse-papiers",
     "copyError": "Impossible de copier dans le presse-papiers",
     "goBack": "Retourner",
-    "stopGenerating": "Arrêtez de générer"
+    "stopGenerating": "Arrêtez de générer",
+    "redirectingHome": "Redirection vers la page d'accueil dans {compte à rebours} secondes..."
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",
@@ -2753,7 +2754,26 @@
     "spansTitle": "S'ÉTEND",
     "spansFound": "Spans trouvées",
     "errorTraces": "Traces d'erreurs",
-    "errorSpans": "Error Spans"
+    "errorSpans": "Error Spans",
+    "applyPendingFilters": "Appliquer les filtres en attente et les traces de recherche",
+    "backToTraces": "Retour à Traces",
+    "loadingTrace": "Chargement en cours...",
+    "traceId": "ID de trace",
+    "copyTraceId": "Copier l'ID de trace",
+    "viewFilters": "Afficher les filtres",
+    "reviewAndApplyFilters": "Vérifiez et appliquez des filtres à Traces",
+    "spansLabel": "couvre",
+    "errorsLabel": "erreurs",
+    "previousMatch": "Match précédent",
+    "nextMatch": "Prochain match",
+    "searchInSpans": "Rechercher dans les spans",
+    "spansTableView": "Afficher le tableau des étendues",
+    "comingSoon": "Prochainement...",
+    "fetchingTrace": "À la recherche de ta trace.",
+    "traceFilters": "Filtres de traçage",
+    "showTraces": "Afficher les traces",
+    "applyAndSearch": "Postulez et recherchez",
+    "addToTable": "Ajouter au tableau"
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",

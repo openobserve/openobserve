@@ -118,7 +118,8 @@
     "retry": "リトライ",
     "set": "+ セット",
     "goBack": "戻る",
-    "stopGenerating": "生成を停止"
+    "stopGenerating": "生成を停止",
+    "redirectingHome": "{countdown} 秒後にホームにリダイレクト中..."
   },
   "search": {
     "metrics": "メトリクス",
@@ -2774,7 +2775,26 @@
     "spansTitle": "スパン",
     "spansFound": "スパンが見つかりました",
     "errorTraces": "エラートレース",
-    "errorSpans": "エラースパン"
+    "errorSpans": "エラースパン",
+    "applyPendingFilters": "保留中のフィルターの適用とトレースの検索",
+    "backToTraces": "トレースに戻る",
+    "loadingTrace": "読み込み中...",
+    "traceId": "トレース ID",
+    "copyTraceId": "トレース ID をコピー",
+    "viewFilters": "フィルターを表示",
+    "reviewAndApplyFilters": "フィルターを確認してトレースに適用する",
+    "spansLabel": "スパン",
+    "errorsLabel": "エラー",
+    "previousMatch": "前の試合",
+    "nextMatch": "次の試合",
+    "searchInSpans": "スパンで検索",
+    "spansTableView": "スパンテーブルビュー",
+    "comingSoon": "近日公開予定...",
+    "fetchingTrace": "トレースを取得しています。",
+    "traceFilters": "トレースフィルター",
+    "showTraces": "トレースを表示",
+    "applyAndSearch": "応募と検索",
+    "addToTable": "テーブルに追加"
   },
   "actions": {
     "testAction": "アクションをテスト",

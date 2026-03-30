@@ -252,6 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :allowAlertCreation="pageType === 'metrics'"
                         :width="6"
                         :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
+                        :regionClusterParams="props.regionClusterParams"
                         :showLegendsButton="true"
                         :searchType="searchType"
                         :searchResponse="props.searchResponse"
@@ -553,6 +554,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :variablesData="resolvedVariablesData"
                         :width="6"
                         :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
+                        :regionClusterParams="props.regionClusterParams"
                         :showLegendsButton="true"
                         :searchType="searchType"
                         :searchResponse="props.searchResponse"
@@ -712,6 +714,7 @@ const props = withDefaults(defineProps<PanelEditorProps>(), {
   searchResponse: undefined,
   isUiHistogram: false,
   shouldRefreshWithoutCache: false,
+  regionClusterParams: undefined,
   selectedDateTime: undefined,
   variablesData: undefined,
   dashboardData: undefined,

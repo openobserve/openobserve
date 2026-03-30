@@ -469,7 +469,7 @@ describe("FlameGraphView", () => {
       });
 
       expect(wrapper.emitted("span-selected")).toBeTruthy();
-      expect(wrapper.emitted("span-selected")[0]).toEqual(["span-1"]);
+      expect(wrapper.emitted("span-selected")[0]).toEqual(["span-1", true]);
     });
 
     it("should not emit event when clicking without span data", async () => {

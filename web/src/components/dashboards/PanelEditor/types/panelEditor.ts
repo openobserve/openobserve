@@ -254,6 +254,11 @@ export interface PanelEditorProps {
    */
   shouldRefreshWithoutCache?: boolean;
 
+  /**
+   * Region and cluster params for super cluster queries.
+   */
+  regionClusterParams?: Record<string, any>;
+
   // ---- DateTime (passed from parent's DateTimePicker) ----
   /**
    * Selected date time from parent's DateTimePicker.

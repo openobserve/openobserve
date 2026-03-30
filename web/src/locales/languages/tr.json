@@ -118,7 +118,8 @@
     "copySuccess": "Panoya kopyalandı",
     "copyError": "Panoya kopyalanamadı",
     "goBack": "Geri Dön",
-    "stopGenerating": "Oluşturmayı bırak"
+    "stopGenerating": "Oluşturmayı bırak",
+    "redirectingHome": "{geri sayım} saniye içinde eve yönlendiriliyor..."
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -2753,7 +2754,26 @@
     "spansTitle": "YAYILIMLAR",
     "spansFound": "Bulunan Açıklıklar",
     "errorTraces": "Hata İzleri",
-    "errorSpans": "Hata Aralıkları"
+    "errorSpans": "Hata Aralıkları",
+    "applyPendingFilters": "Bekleyen filtreleri ve Arama İzlerini uygulayın",
+    "backToTraces": "Traces sayfasına geri dön",
+    "loadingTrace": "Yükleniyor...",
+    "traceId": "İzleme Kimliği",
+    "copyTraceId": "İzleme Kimliğini Kopyala",
+    "viewFilters": "Filtreleri görüntüle",
+    "reviewAndApplyFilters": "İzlere filtreleri gözden geçirin ve uygulayın",
+    "spansLabel": "açıklıklar",
+    "errorsLabel": "hatalar",
+    "previousMatch": "Önceki maç",
+    "nextMatch": "Sonraki maç",
+    "searchInSpans": "Aralıklarda ara",
+    "spansTableView": "Yayılma Tablosu Görünümü",
+    "comingSoon": "Yakında...",
+    "fetchingTrace": "İzini getiriyorum.",
+    "traceFilters": "İzleme Filtreleri",
+    "showTraces": "İzleri Göster",
+    "applyAndSearch": "Uygula ve Ara",
+    "addToTable": "Tabloya ekle"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
