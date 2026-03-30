@@ -629,6 +629,8 @@ import { filter, forIn } from "lodash-es";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import { useLoading } from "@/composables/useLoading";
 import { useReo } from "@/services/reodotdev_analytics";
+import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
+import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -686,6 +688,27 @@ export default defineComponent({
 
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
+
+    // Listen for AI assistant dashboard mutations to auto-refresh the list
+    const { on: onDashboardEvent, off: offDashboardEvent } = useAiDashboardEvents();
+    const handleAiDashboardEvent = async (event: AiDashboardEvent) => {
+      const folderId = event.folderId || activeFolderId.value;
+      if (folderId) {
+        // Clear cached data so getAllDashboardsByFolderId re-fetches from API
+        store.dispatch("setAllDashboardList", {
+          ...store.state.organizationData.allDashboardList,
+          [folderId]: undefined,
+        });
+        const response = await getAllDashboardsByFolderId(store, folderId);
+        dashboardList.value = response || [];
+      }
+    };
+    onMounted(() => {
+      onDashboardEvent(handleAiDashboardEvent);
+    });
+    onUnmounted(() => {
+      offDashboardEvent(handleAiDashboardEvent);
+    });
 
     let currentSearchAbortController = null;
     const columns = computed(() => {

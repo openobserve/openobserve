@@ -601,7 +601,7 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(
         wrapper
-          .find('[data-test="traces-search-result-not-found-text"]')
+          .find('[data-test="traces-search-not-started-text"]')
           .exists(),
       ).toBe(true);
     });
@@ -717,7 +717,7 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(
         wrapper
-          .find('[data-test="traces-search-result-not-found-text"]')
+          .find('[data-test="traces-search-error-text"]')
           .exists(),
       ).toBe(true);
     });
@@ -1128,6 +1128,100 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(dispatchEventSpy).toHaveBeenCalledWith(expect.any(Event));
+    });
+  });
+
+  describe("Horizontal Splitter Layout", () => {
+    it("should render the outer horizontal splitter with the correct class", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      expect(
+        wrapper.find(".traces-horizontal-splitter").exists(),
+      ).toBe(true);
+    });
+
+    it("should initialize splitterModel with a default value of 15", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      expect(wrapper.vm.splitterModel).toBe(15);
+    });
+
+    it("should render the second-level container with full-height class", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      expect(wrapper.find("#tracesSecondLevel").classes()).toContain(
+        "full-height",
+      );
+    });
+
+    it("should render search-bar inside the outer horizontal splitter", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": { template: '<div data-test="logs-search-bar" />' },
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      const horizontalSplitter = wrapper.find(".traces-horizontal-splitter");
+      expect(horizontalSplitter.exists()).toBe(true);
+      expect(
+        horizontalSplitter.find('[data-test="logs-search-bar"]').exists(),
+      ).toBe(true);
     });
   });
 
