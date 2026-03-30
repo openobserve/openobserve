@@ -604,4 +604,52 @@ test.describe("Multi-SQL Query Support", () => {
       await cleanupTestDashboard(page, pm, dashboardName);
     }
   );
+
+  test(
+    "renamed query tab names are reflected in the query inspector",
+    { tag: ["@multiSQL", "@P1"] },
+    async ({ page }) => {
+      const pm = new PageManager(page);
+      const msql = pm.dashboardMultiSQL;
+      const dashboardName = generateDashboardName();
+
+      await buildPanel(page, pm, dashboardName, {
+        chartType: "bar",
+        yField: "kubernetes_container_hash",
+      });
+      await addAndConfigureSecondQuery(pm);
+
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+      // Rename Q1 tab
+      await msql.switchToQueryTab(0);
+      await msql.queryTabLabel(0).dblclick({ force: true });
+      await msql.queryTabNameInput(0).waitFor({ state: "visible", timeout: 5000 });
+      await msql.queryTabNameInput(0).fill("Production");
+      await msql.queryTabNameInput(0).press("Enter");
+      await page.waitForTimeout(300);
+
+      // Rename Q2 tab
+      await msql.switchToQueryTab(1);
+      await msql.queryTabLabel(1).dblclick({ force: true });
+      await msql.queryTabNameInput(1).waitFor({ state: "visible", timeout: 5000 });
+      await msql.queryTabNameInput(1).fill("Staging");
+      await msql.queryTabNameInput(1).press("Enter");
+      await page.waitForTimeout(300);
+
+      // Apply to propagate the renamed tab names to metaData
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+      // Open inspector and verify renamed names appear as query headings
+      await msql.openQueryInspector();
+      await expect(msql.queryInspectorQueryName(0)).toContainText("Production");
+      await expect(msql.queryInspectorQueryName(1)).toContainText("Staging");
+      await msql.closeQueryInspector();
+
+      await msql.applyAndSave(pm);
+      await cleanupTestDashboard(page, pm, dashboardName);
+    }
+  );
 });

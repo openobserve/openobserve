@@ -64,6 +64,11 @@ export default class DashboardMultiSQL {
     return this.page.locator(`.q-field--disabled:has([data-test="dashboard-trellis-chart"])`);
   }
 
+  /** Locator for the query name label shown inside the query inspector at given index */
+  queryInspectorQueryName(index) {
+    return this.page.locator(`[data-test="query-inspector-query-name-${index}"]`);
+  }
+
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
