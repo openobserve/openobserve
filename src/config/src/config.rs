@@ -715,10 +715,11 @@ pub struct Http {
     pub tls_min_version: String,
     #[env_config(
         name = "ZO_HTTP_TLS_ROOT_CERTIFICATES",
+        parse,
         default = "webpki",
         help = "this value must use webpki or native. it means use standard root certificates from webpki-roots or native-roots as a rustls certificate store"
     )]
-    pub tls_root_certificates: String,
+    pub tls_root_certificates: TlsRootCertificates,
     #[env_config(
         name = "ZO_HTTP_ACCESS_LOG_FORMAT",
         default = "",
@@ -759,10 +760,43 @@ pub struct Grpc {
     pub tls_key_path: String,
     #[env_config(
         name = "ZO_GRPC_TLS_ROOT_CERTIFICATES",
+        parse,
         default = "webpki",
         help = "this value can be set to webpki or native. Using webpki means client will trust a preset CA bundle. Using native means client will trust the certificates in OS trust store"
     )]
-    pub tls_root_certificates: String,
+    pub tls_root_certificates: TlsRootCertificates,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum TlsRootCertificates {
+    #[default]
+    Webpki,
+    Native,
+}
+
+impl std::fmt::Display for TlsRootCertificates {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Webpki => write!(f, "webpki"),
+            Self::Native => write!(f, "native"),
+        }
+    }
+}
+
+impl std::str::FromStr for TlsRootCertificates {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "webpki" => Ok(Self::Webpki),
+            "native" => Ok(Self::Native),
+            _ => Err(anyhow::anyhow!(
+                "Invalid tls_root_certificates value: '{}'. Must be 'webpki' or 'native'",
+                s
+            )),
+        }
+    }
 }
 
 #[derive(Serialize, PartialEq, Default)]

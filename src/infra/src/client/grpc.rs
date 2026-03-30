@@ -78,12 +78,18 @@ pub async fn create_channel(grpc_addr: &str) -> Result<Channel, tonic::Status> {
     })?;
     if cfg.grpc.tls_enabled {
         let mut tls = ClientTlsConfig::new().domain_name(&cfg.grpc.tls_cert_domain);
-        if &cfg.grpc.tls_root_certificates == "native" {
-            tls = tls.with_native_roots();
-        } else {
-            let pem = std::fs::read_to_string(&cfg.grpc.tls_cert_path)?;
-            let cert = Certificate::from_pem(pem);
-            tls = tls.with_webpki_roots().ca_certificates([cert]);
+        match cfg.grpc.tls_root_certificates {
+            config::TlsRootCertificates::Native => {
+                tls = tls.with_native_roots();
+            }
+            config::TlsRootCertificates::Webpki => {
+                tls = tls.with_webpki_roots();
+                if !cfg.grpc.tls_cert_path.is_empty() {
+                    let pem = std::fs::read_to_string(&cfg.grpc.tls_cert_path)?;
+                    let cert = Certificate::from_pem(pem);
+                    tls = tls.ca_certificates([cert]);
+                }
+            }
         }
         channel = channel.tls_config(tls).map_err(|err| {
             log::error!("gRPC node: {}, tls err: {:?}", &grpc_addr, err);
