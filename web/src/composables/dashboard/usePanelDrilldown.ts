@@ -1076,45 +1076,60 @@ export function usePanelDrilldown({
 
           window.open(currentUrl, "_blank");
         } else {
-          let oldParams: any = [];
+          let oldParams: any = {};
           // if pass all variables is true
           if (drilldownData.data.passAllVariables) {
             // get current query params
-            oldParams = route.query;
+            oldParams = { ...route.query };
+            console.log("[DRILLDOWN DEBUG] oldParams copied from route.query:", JSON.parse(JSON.stringify(oldParams)));
+          } else {
+             console.log("[DRILLDOWN DEBUG] passAllVariables is false, oldParams starts empty");
           }
 
           drilldownData.data.variables.forEach((variable: any) => {
             if (variable?.name?.trim() && variable?.value?.trim()) {
-              oldParams[
-                "var-" + replacePlaceholders(variable.name, drilldownVariables)
-              ] = replacePlaceholders(variable.value, drilldownVariables);
+              const newKey = "var-" + replacePlaceholders(variable.name, drilldownVariables);
+              const newValue = replacePlaceholders(variable.value, drilldownVariables);
+              oldParams[newKey] = newValue;
+              console.log("[DRILLDOWN DEBUG] Setting explicit drilldown variable:", newKey, "=", newValue);
             }
           });
 
-          // make changes in router
-          await router.push({
-            path: "/dashboards/view",
-            query: {
+          const newQueryParams = {
               ...oldParams,
               org_identifier: store.state.selectedOrganization.identifier,
               dashboard: dashboardData.dashboardId,
               folder: folderId,
               tab: tabId,
-            },
-          });
+          };
+
+          console.log("[DRILLDOWN DEBUG] Before router.push. Current route.query:", JSON.parse(JSON.stringify(route.query)));
+          console.log("[DRILLDOWN DEBUG] newQueryParams to push:", JSON.parse(JSON.stringify(newQueryParams)));
 
           // ======= [START] default variable values
-
           const initialVariableValues: any = {};
-          Object.keys(route.query).forEach((key) => {
+          Object.keys(newQueryParams).forEach((key) => {
             if (key.startsWith("var-")) {
               const newKey = key.slice(4);
-              initialVariableValues[newKey] = route.query[key];
+              initialVariableValues[newKey] = newQueryParams[key];
             }
           });
+
+          console.log("[DRILLDOWN DEBUG] Constructed initialVariableValues to emit:", JSON.parse(JSON.stringify(initialVariableValues)));
           // ======= [END] default variable values
 
-          emit("update:initialVariableValues", initialVariableValues);
+          // FIX: Emit BEFORE `router.push` so that the event has time to bubble up
+          // to the parent before the component potentially unmounts.
+          // ALSO: Pass newQueryParams as second arg as planned.
+          emit("update:initialVariableValues", initialVariableValues, newQueryParams);
+
+          // make changes in router
+          await router.push({
+            path: "/dashboards/view",
+            query: newQueryParams,
+          });
+
+          console.log("[DRILLDOWN DEBUG] After router.push. Current route.query is now:", JSON.parse(JSON.stringify(route.query)));
         }
       }
     }
