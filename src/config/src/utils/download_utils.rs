@@ -17,8 +17,12 @@ use std::{cmp::min, path::Path};
 
 use futures::stream::StreamExt;
 use reqwest::Client;
-use sha256::try_digest;
-use tokio::{fs::File, io::AsyncWriteExt};
+use tokio::{
+    fs::{File, read},
+    io::AsyncWriteExt,
+};
+
+use crate::utils::hash::sha256_digest;
 
 pub async fn download_file(client: &Client, url: &str, path: &str) -> Result<(), String> {
     // Reqwest setup
@@ -60,7 +64,10 @@ pub async fn is_digest_different(
         let response = reqwest::get(remote_sha256sum_path).await?;
         response.text().await?
     };
-    let local_file_sha = try_digest(Path::new(local_file_path)).unwrap_or_default();
+    let local_file_sha = read(Path::new(local_file_path))
+        .await
+        .map(sha256_digest)
+        .unwrap_or_default();
     Ok(remote_file_sha.trim() != local_file_sha.trim())
 }
 

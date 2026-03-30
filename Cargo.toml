@@ -153,7 +153,6 @@ sea-orm.workspace = true
 segment.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-sha256.workspace = true
 snafu.workspace = true
 snap.workspace = true
 sqlparser.workspace = true
@@ -421,7 +420,7 @@ segment = "~0.2.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["arbitrary_precision"] }
 sha1 = "0.10.6"
-sha256 = "1.6"
+sha2 = "0.10"
 snafu = "0.9"
 snap = "1"
 sqlx = { version = "0.8.6", features = [

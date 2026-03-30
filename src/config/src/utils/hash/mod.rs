@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version, password_hash::SaltString};
+use sha2::{Digest, Sha256};
 
 pub mod cityhash;
 pub mod fnv;
@@ -22,6 +23,10 @@ pub mod murmur3;
 
 pub trait Sum64 {
     fn sum64(&mut self, key: &str) -> u64;
+}
+
+pub fn sha256_digest(input: impl AsRef<[u8]>) -> String {
+    hex::encode(Sha256::digest(input.as_ref()))
 }
 
 pub fn get_passcode_hash(pass: &str, salt: &str) -> String {
@@ -40,6 +45,15 @@ pub fn get_passcode_hash(pass: &str, salt: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_sha256_digest() {
+        let digest = sha256_digest("hello world");
+        assert_eq!(
+            digest,
+            "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+        );
+    }
 
     #[test]
     fn test_get_passcode_hash_basic_properties() {
