@@ -103,19 +103,41 @@ class FunctionsPage {
   }
 
   async enterFunctionCode(code) {
-    // Focus the actual textarea inside the Monaco editor (not the container div).
-    // On headless Linux, clicking the wrapper div doesn't transfer focus to Monaco's
-    // internal textarea, so keyboard.type() sends keystrokes to nothing.
-    const textarea = this.page.locator(`${this.functionEditor} textarea`);
-    await textarea.focus();
-    await this.page.waitForTimeout(300);
+    // Set Monaco editor content programmatically to avoid keyboard/auto-completion
+    // issues in headless CI. Same pattern used in pipelinesEP.js.
+    await this.page.locator(this.functionEditor).waitFor({ state: 'visible' });
+    await this.page.waitForTimeout(500);
 
-    // Clear existing content and type new code
-    const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
-    await this.page.keyboard.press(selectAll);
-    await this.page.keyboard.press('Backspace');
-    await this.page.waitForTimeout(200);
-    await this.page.keyboard.type(code);
+    const success = await this.page.evaluate((args) => {
+      const [selector, value] = args;
+      // Try finding Monaco editor instance via the DOM element
+      const editorElements = document.querySelectorAll(`${selector} .monaco-editor`);
+      const editorElement = editorElements[editorElements.length - 1];
+      if (editorElement && editorElement.__vscode_monaco_editor__) {
+        editorElement.__vscode_monaco_editor__.setValue(value);
+        return true;
+      }
+      // Fallback: try via monaco global API
+      const editors = window.monaco?.editor?.getEditors?.();
+      if (editors && editors.length > 0) {
+        editors[editors.length - 1].setValue(value);
+        return true;
+      }
+      return false;
+    }, [this.functionEditor, code]);
+
+    if (!success) {
+      // Fallback to keyboard typing if programmatic approach fails
+      const textarea = this.page.locator(`${this.functionEditor} textarea`);
+      await textarea.focus();
+      await this.page.waitForTimeout(300);
+      const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+      await this.page.keyboard.press(selectAll);
+      await this.page.keyboard.press('Backspace');
+      await this.page.waitForTimeout(200);
+      await this.page.keyboard.type(code);
+    }
+
     // Wait longer than the Monaco editor's 500ms debounce so formData syncs via v-model
     await this.page.waitForTimeout(1000);
   }
@@ -184,18 +206,38 @@ class FunctionsPage {
   // ==================== Test Function Methods ====================
 
   async enterTestEvent(eventJson) {
-    // Focus the actual textarea inside the Monaco editor (not the container div).
-    // Using .focus() ensures keyboard shortcuts work correctly in Monaco.
-    const textarea = this.page.locator(`${this.testEventsEditor} textarea`);
-    await textarea.focus();
-    await this.page.waitForTimeout(300);
+    // Set Monaco editor content programmatically to avoid keyboard issues in headless CI.
+    await this.page.locator(this.testEventsEditor).waitFor({ state: 'visible' });
+    await this.page.waitForTimeout(500);
 
-    // Select all existing content, delete it, then type new content
-    const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
-    await this.page.keyboard.press(selectAll);
-    await this.page.keyboard.press('Backspace');
-    await this.page.waitForTimeout(200);
-    await this.page.keyboard.type(eventJson);
+    const success = await this.page.evaluate((args) => {
+      const [selector, value] = args;
+      const editorElements = document.querySelectorAll(`${selector} .monaco-editor`);
+      const editorElement = editorElements[editorElements.length - 1];
+      if (editorElement && editorElement.__vscode_monaco_editor__) {
+        editorElement.__vscode_monaco_editor__.setValue(value);
+        return true;
+      }
+      const editors = window.monaco?.editor?.getEditors?.();
+      if (editors && editors.length > 0) {
+        editors[editors.length - 1].setValue(value);
+        return true;
+      }
+      return false;
+    }, [this.testEventsEditor, eventJson]);
+
+    if (!success) {
+      // Fallback to keyboard typing
+      const textarea = this.page.locator(`${this.testEventsEditor} textarea`);
+      await textarea.focus();
+      await this.page.waitForTimeout(300);
+      const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+      await this.page.keyboard.press(selectAll);
+      await this.page.keyboard.press('Backspace');
+      await this.page.waitForTimeout(200);
+      await this.page.keyboard.type(eventJson);
+    }
+
     // Wait for Monaco editor v-model debounce to sync
     await this.page.waitForTimeout(600);
   }
