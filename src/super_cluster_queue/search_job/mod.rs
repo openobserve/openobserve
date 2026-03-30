@@ -19,13 +19,19 @@ pub mod search_jobs;
 
 use config::utils::json;
 use infra::{
+    coordinator::get_coordinator,
     errors::{Error, Result},
-    table::search_job::{
-        search_job_partitions::PartitionJobOperator, search_job_results::JobResultOperator,
-        search_jobs::JobOperator,
+    table::{
+        search_job::{
+            search_job_partitions::PartitionJobOperator, search_job_results::JobResultOperator,
+            search_jobs::JobOperator,
+        },
+        source_maps::SourceMap,
     },
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
+
+use crate::service::db::sourcemaps::SOURCEMAP_PREFIX;
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
@@ -40,6 +46,73 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
         MessageType::SearchJobResult => {
             let operator: JobResultOperator = json::from_slice(&msg.value.unwrap())?;
             search_job_results::process(operator).await?;
+        }
+        // sourcemap messages also come on the same queue
+        MessageType::SourceMapPut => {
+            let entry: SourceMap = json::from_slice(&msg.value.unwrap())?;
+            let org_id = entry.org.clone();
+            let smap = entry.source_map_file_name.clone();
+            match infra::table::source_maps::add_many(vec![entry.clone()]).await {
+                Ok(_) => {}
+                Err(infra::errors::Error::DbError(infra::errors::DbError::UniqueViolation)) => {
+                    log::error!("sourcemap file already exists in this cluster : {org_id}/{smap}");
+                }
+                Err(e) => {
+                    log::error!("error while saving sourcemap to db {org_id}/{smap} : {e}");
+                }
+            }
+            let cluster_coordinator = get_coordinator().await;
+            cluster_coordinator
+                .put(
+                    SOURCEMAP_PREFIX,
+                    serde_json::to_vec(&entry)?.into(),
+                    true,
+                    None,
+                )
+                .await?;
+        }
+        MessageType::SourceMapDelete => {
+            let (org_id, service, env, version): (
+                String,
+                Option<String>,
+                Option<String>,
+                Option<String>,
+            ) = json::from_slice(&msg.value.unwrap())?;
+
+            match infra::table::source_maps::delete_group(
+                &org_id,
+                service.clone(),
+                env.clone(),
+                version.clone(),
+            )
+            .await
+            {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!(
+                        "error while deleting sourceamp for {}/{}/{}/{} : {e}",
+                        org_id,
+                        service.as_deref().unwrap_or(""),
+                        env.as_deref().unwrap_or(""),
+                        version.as_deref().unwrap_or("")
+                    );
+                }
+            }
+
+            let cluster_coordinator = get_coordinator().await;
+            cluster_coordinator
+                .delete(
+                    &format!(
+                        "{SOURCEMAP_PREFIX}{org_id}/{}/{}/{}",
+                        service.as_deref().unwrap_or(""),
+                        env.as_deref().unwrap_or(""),
+                        version.as_deref().unwrap_or("")
+                    ),
+                    false,
+                    true,
+                    None,
+                )
+                .await?;
         }
         _ => {
             log::error!(

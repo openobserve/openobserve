@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           round
           size="xs"
           :icon="expandState.preview ? 'expand_less' : 'expand_more'"
-          @click.stop
+          @click.stop="togglePreview"
           class="expand-toggle-btn"
         />
       </div>
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           round
           size="xs"
           :icon="expandState.summary ? 'expand_less' : 'expand_more'"
-          @click.stop
+          @click.stop="toggleSummary"
           class="expand-toggle-btn"
         />
       </div>

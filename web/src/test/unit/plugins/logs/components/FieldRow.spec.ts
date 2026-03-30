@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import FieldRow from "@/plugins/logs/components/FieldRow.vue";
+import FieldRow from "@/components/common/FieldRow.vue";
 import { Quasar } from "quasar";
 
 vi.mock("vuex", () => ({

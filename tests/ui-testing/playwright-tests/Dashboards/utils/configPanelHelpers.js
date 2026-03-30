@@ -132,12 +132,39 @@ export async function setupAreaPanelWithConfig(page, pm, dashboardName, panelNam
 }
 
 /**
+ * Table chart panel — config sidebar NOT opened.
+ * Use when the test does not need config panel interaction.
+ */
+export async function setupTablePanel(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPanel(page, pm, dashboardName, { chartType: "table", panelName });
+  testLogger.info("Table panel ready", { dashboardName, panelName });
+}
+
+/**
  * Table chart panel — config sidebar opened and ready.
  */
 export async function setupTablePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
   await buildPanel(page, pm, dashboardName, { chartType: "table", panelName });
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("Table panel with config ready", { dashboardName, panelName });
+}
+
+/**
+ * Pie chart panel (SQL builder) — config sidebar opened and ready.
+ */
+export async function setupPiePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPanel(page, pm, dashboardName, { chartType: "pie", panelName });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Pie panel with config ready", { dashboardName, panelName });
+}
+
+/**
+ * Donut chart panel (SQL builder) — config sidebar opened and ready.
+ */
+export async function setupDonutPanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPanel(page, pm, dashboardName, { chartType: "donut", panelName });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Donut panel with config ready", { dashboardName, panelName });
 }
 
 /**

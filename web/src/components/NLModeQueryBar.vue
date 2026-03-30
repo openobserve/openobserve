@@ -229,7 +229,7 @@ const aiStatusText = ref('');
 const nlpIcon = computed(() => {
   return store.state.theme === 'dark'
     ? getImageURL('images/common/ai_icon_dark.svg')
-    : getImageURL('images/common/ai_icon.svg');
+    : getImageURL('images/common/ai_icon_gradient.svg');
 });
 
 // Computed: Is in AI mode?
@@ -456,20 +456,20 @@ defineExpose({
 
 /* AI Generate Button Styling (matches O2 AI Assistant - purple gradient) */
 .o2-ai-generate-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
   color: white !important;
   border: none !important;
   font-size: 0.6875rem !important; /* 11px */
   font-weight: 600 !important;
   line-height: 1rem !important; /* 16px */
   transition: all 0.3s ease !important;
-  box-shadow: 0 0.25rem 0.9375rem 0 rgba(102, 126, 234, 0.3) !important; /* 0 4px 15px */
+  box-shadow: 0 0.25rem 0.9375rem 0 rgba(139, 92, 246, 0.3) !important; /* 0 4px 15px */
   padding: 0 0.75rem !important; /* 0 12px */
   width: 92px !important; /* Fixed width to prevent layout shift */
 }
 
 .o2-ai-generate-button:hover {
-  box-shadow: 0 0.375rem 1.25rem 0 rgba(102, 126, 234, 0.5) !important; /* 0 6px 20px */
+  box-shadow: 0 0.375rem 1.25rem 0 rgba(139, 92, 246, 0.5) !important; /* 0 6px 20px */
   transform: translateY(-1px);
 }
 
@@ -484,7 +484,7 @@ defineExpose({
 
 /* AI Input Bar Styling (matches logs page) */
 .ai-input-bar {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(236, 72, 153, 0.05) 100%);
   border-bottom: 1px solid var(--o2-border-color);
 }
 

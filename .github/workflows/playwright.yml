@@ -53,7 +53,7 @@ jobs:
   build_binary:
     name: build_binary
     runs-on:
-      labels: ubicloud-standard-16
+      labels: ubicloud-standard-30
 
     steps:
       - name: Remove unused tools
@@ -157,6 +157,7 @@ jobs:
                 "logsqueries.cte.spec.js",
                 "logsqueries.matchall.spec.js",
                 "searchpartition.spec.js",
+                "logs-autocomplete-suggestions.spec.js",
               ]
           - testfolder: "Alerts"
             browser: "chrome"
@@ -209,6 +210,8 @@ jobs:
                 "visualize-vrl.spec.js",
                 "dashboard-create-alert.spec.js",
                 "dashboard-sankey.spec.js",
+                "dashboard-pie-donut.spec.js",
+                "dashboard-table-chart.spec.js",
               ]
           - testfolder: "Dashboards-Streaming"
             browser: "chrome"
@@ -260,6 +263,7 @@ jobs:
                 "traceDetails.spec.js",
                 "traceAdvancedFiltering.spec.js",
                 "tracesAnalyzeDimensions.spec.js",
+                "traces-autocomplete-suggestions.spec.js",
               ]
 
           - testfolder: "RegressionSet"

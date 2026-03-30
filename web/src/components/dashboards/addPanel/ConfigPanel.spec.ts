@@ -2419,4 +2419,247 @@ describe("ConfigPanel", () => {
       });
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // PR #10917 — Config Panel Search & Section Expand/Collapse
+  // ---------------------------------------------------------------------------
+
+  describe("Search Bar Rendering", () => {
+    it("should render the config-search-wrapper for non-custom_chart panels", () => {
+      wrapper = createWrapper();
+      expect(wrapper.find(".config-search-wrapper").exists()).toBe(true);
+    });
+
+    it("should NOT render config-search-wrapper for custom_chart panel type", () => {
+      const customChartData = {
+        ...mockDashboardPanelData,
+        data: { ...mockDashboardPanelData.data, type: "custom_chart" },
+      };
+      wrapper = createWrapper({ dashboardPanelData: customChartData });
+      expect(wrapper.find(".config-search-wrapper").exists()).toBe(false);
+    });
+
+    it("should render the expand/collapse toggle button", () => {
+      wrapper = createWrapper();
+      // The toggle-all button appears inside config-search-wrapper
+      const btn = wrapper.find(".config-search-wrapper .q-btn");
+      expect(btn.exists()).toBe(true);
+    });
+  });
+
+  describe("searchQuery state", () => {
+    it("should initialize searchQuery as empty string", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.searchQuery).toBe("");
+    });
+
+    it("should update searchQuery when set directly", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.searchQuery = "legend";
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.searchQuery).toBe("legend");
+    });
+  });
+
+  describe("expandedSections state", () => {
+    it("should initialize expandedSections with all sections true", () => {
+      wrapper = createWrapper();
+      const sections = wrapper.vm.expandedSections;
+      expect(typeof sections).toBe("object");
+      for (const val of Object.values(sections)) {
+        expect(val).toBe(true);
+      }
+    });
+
+    it("should have an entry for every expected section", () => {
+      wrapper = createWrapper();
+      const expectedSections = [
+        "general", "geographic", "legend", "data", "axis",
+        "labels", "lineStyle", "table", "valueTransformations",
+        "fieldOverrides", "map", "gauge", "layout", "colors",
+        "drilldown", "comparison", "markLines", "background",
+      ];
+      for (const s of expectedSections) {
+        expect(wrapper.vm.expandedSections).toHaveProperty(s);
+      }
+    });
+  });
+
+  describe("isExpanded()", () => {
+    it("returns true for sections that start expanded", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.isExpanded("general")).toBe(true);
+    });
+
+    it("returns false after a section is collapsed via expandedSections", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.expandedSections.general = false;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.isExpanded("general")).toBe(false);
+    });
+  });
+
+  describe("allSectionsExpanded computed", () => {
+    it("is true when all sections are expanded", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.allSectionsExpanded).toBe(true);
+    });
+
+    it("is false when at least one section is collapsed", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.expandedSections.general = false;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.allSectionsExpanded).toBe(false);
+    });
+  });
+
+  describe("toggleAllSections()", () => {
+    it("collapses all sections when all are currently expanded", async () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.allSectionsExpanded).toBe(true);
+
+      wrapper.vm.toggleAllSections();
+      await wrapper.vm.$nextTick();
+
+      for (const val of Object.values(wrapper.vm.expandedSections)) {
+        expect(val).toBe(false);
+      }
+    });
+
+    it("expands all sections when any section is collapsed", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.expandedSections.general = false;
+      wrapper.vm.expandedSections.legend = false;
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.toggleAllSections();
+      await wrapper.vm.$nextTick();
+
+      for (const val of Object.values(wrapper.vm.expandedSections)) {
+        expect(val).toBe(true);
+      }
+    });
+
+    it("toggles back to expanded after two calls when starting expanded", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.toggleAllSections(); // collapse all
+      await wrapper.vm.$nextTick();
+      wrapper.vm.toggleAllSections(); // expand all
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.allSectionsExpanded).toBe(true);
+    });
+  });
+
+  describe("isSectionVisible()", () => {
+    it("returns a boolean for known section IDs", () => {
+      wrapper = createWrapper();
+      const result = wrapper.vm.isSectionVisible("general");
+      expect(typeof result).toBe("boolean");
+    });
+
+    it("returns false for unknown section IDs", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.isSectionVisible("nonexistent" as any)).toBe(false);
+    });
+
+    it("general section is visible for a standard panel type", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.isSectionVisible("general")).toBe(true);
+    });
+  });
+
+  describe("isConfigOptionVisible()", () => {
+    it("returns a boolean", () => {
+      wrapper = createWrapper();
+      const result = wrapper.vm.isConfigOptionVisible("general", "description");
+      expect(typeof result).toBe("boolean");
+    });
+
+    it("description option is visible when no search query", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.isConfigOptionVisible("general", "description")).toBe(true);
+    });
+
+    it("returns false for unknown sectionId + optionId combinations", () => {
+      wrapper = createWrapper();
+      expect(
+        wrapper.vm.isConfigOptionVisible("nonexistent" as any, "nonexistent"),
+      ).toBe(false);
+    });
+
+    it("returns false when search query does not match the option label", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.searchQuery = "zzznomatch";
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.isConfigOptionVisible("general", "description")).toBe(false);
+    });
+
+    it("returns true when search query matches the option label", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.searchQuery = "descript";
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.isConfigOptionVisible("general", "description")).toBe(true);
+    });
+  });
+
+  describe("anySectionVisible computed", () => {
+    it("is true when no search query (all sections visible by default)", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.anySectionVisible).toBe(true);
+    });
+
+    it("is false when search query matches nothing", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.searchQuery = "zzznomatch_xyz_abc";
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.anySectionVisible).toBe(false);
+    });
+
+    it("is true when search query matches at least one option", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.searchQuery = "description";
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.anySectionVisible).toBe(true);
+    });
+  });
+
+  describe("No results empty state", () => {
+    it("is not shown when no search query", () => {
+      wrapper = createWrapper();
+      expect(wrapper.find(".config-no-results").exists()).toBe(false);
+    });
+
+    it("is shown when search query matches nothing", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.searchQuery = "zzznomatch_xyz_abc";
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(".config-no-results").exists()).toBe(true);
+    });
+
+    it("displays the search query text in the empty state message", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.searchQuery = "zzznomatch_xyz_abc";
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(".config-no-results").text()).toContain("zzznomatch_xyz_abc");
+    });
+
+    it("is hidden again when search is cleared", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.searchQuery = "zzznomatch_xyz_abc";
+      await wrapper.vm.$nextTick();
+      wrapper.vm.searchQuery = "";
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(".config-no-results").exists()).toBe(false);
+    });
+  });
+
+  describe("Section expansion items render", () => {
+    it("renders q-expansion-item for general section", () => {
+      wrapper = createWrapper();
+      // The general section expansion item uses isSectionVisible('general') via v-show
+      const expansionItems = wrapper.findAllComponents({ name: "QExpansionItem" });
+      expect(expansionItems.length).toBeGreaterThan(0);
+    });
+  });
 });

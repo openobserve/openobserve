@@ -732,15 +732,18 @@
                   </template>
                 </template>
                 <!-- Feedback buttons for assistant messages -->
-                <div v-if="message.role === 'assistant' && message.content && message.content.trim() !== ''" class="feedback-buttons">
+                <div v-if="message.role === 'assistant' && message.content && message.content.trim() !== ''" class="feedback-buttons" :class="{ 'feedback-active': message.feedback }">
                   <q-btn
                     flat
                     dense
                     round
                     size="xs"
+                    :disable="message.feedback === 'thumbs_up'"
+                    :class="{ 'feedback-selected': message.feedback === 'thumbs_up' }"
+                    data-test="o2-ai-chat-thumbs-up-btn"
                     @click="likeCodeBlock(index)"
                   >
-                    <q-icon :name="outlinedThumbUpOffAlt" size="14px" />
+                    <q-icon :name="message.feedback === 'thumbs_up' ? matThumbUpAlt : outlinedThumbUpOffAlt" size="14px" />
                     <q-tooltip>Helpful</q-tooltip>
                   </q-btn>
                   <q-btn
@@ -748,9 +751,12 @@
                     dense
                     round
                     size="xs"
+                    :disable="message.feedback === 'thumbs_down'"
+                    :class="{ 'feedback-selected': message.feedback === 'thumbs_down' }"
+                    data-test="o2-ai-chat-thumbs-down-btn"
                     @click="dislikeCodeBlock(index)"
                   >
-                    <q-icon :name="outlinedThumbDownOffAlt" size="14px" />
+                    <q-icon :name="message.feedback === 'thumbs_down' ? matThumbDownAlt : outlinedThumbDownOffAlt" size="14px" />
                     <q-tooltip>Not helpful</q-tooltip>
                   </q-btn>
                 </div>
@@ -984,14 +990,17 @@ import { useQuasar } from 'quasar';
 import { useStore } from 'vuex';
 import useAiChat from '@/composables/useAiChat';
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
+import { matThumbUpAlt, matThumbDownAlt } from '@quasar/extras/material-icons';
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock, ImageAttachment, MAX_IMAGE_SIZE_BYTES, ALLOWED_IMAGE_TYPES } from '@/types/chat';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import RichTextInput, { ReferenceChip } from '@/components/RichTextInput.vue';
 import O2AIConfirmDialog from '@/components/O2AIConfirmDialog.vue';
 import { useChatHistory } from '@/composables/useChatHistory';
+import { useAiDashboardEvents, getDashboardEventType } from '@/composables/useAiDashboardEvents';
 
 const { fetchAiChat, submitFeedback } = useAiChat();
+const { emit: emitDashboardEvent } = useAiDashboardEvents();
 
 // Register VRL as a JavaScript alias (type assertion)
 hljs.registerLanguage('vrl', () => hljs.getLanguage('javascript') as any);
@@ -1100,18 +1109,20 @@ export default defineComponent({
     // Tool confirmation state (from AI agent — confirmation-required actions, inline in chat)
     const pendingConfirmation = ref<{ tool: string; args: Record<string, any>; message: string; navAction?: NavigationAction } | null>(null);
 
+
+
     // Auto navigation state - per chat ID
     // Stores chat ID -> boolean mapping for auto navigation preference
     const autoNavigationPreferences = ref<Map<number, boolean>>(new Map());
 
     // Pending auto navigation preference for new chats (before chat ID is created)
-    const pendingAutoNavigation = ref(false);
+    const pendingAutoNavigation = ref(true);
 
-    // Current chat's auto navigation state
+    // Current chat's auto navigation state (defaults to true)
     const isAutoNavigationEnabled = computed({
       get: () => {
         if (!currentChatId.value) return pendingAutoNavigation.value;
-        return autoNavigationPreferences.value.get(currentChatId.value) ?? false;
+        return autoNavigationPreferences.value.get(currentChatId.value) ?? true;
       },
       set: (value: boolean) => {
         if (currentChatId.value) {
@@ -1702,6 +1713,7 @@ export default defineComponent({
                       tool: data.tool,
                       message: activeToolCall.value?.message || data.message,
                       context: activeToolCall.value?.context || {},
+                      call_id: data.call_id || activeToolCall.value?.call_id || undefined,
                       pendingConfirmation: true,
                       confirmationMessage: data.message,
                       confirmationArgs: data.args || {},
@@ -1874,6 +1886,29 @@ export default defineComponent({
                         data.call_args,
                         data
                       );
+                    }
+
+                    // Emit dashboard event for successful dashboard-mutating tools
+                    if (data.success !== false) {
+                      const resolvedToolName = data.tool && data.tool !== 'tools_call' ? data.tool : '';
+                      const callArgs = data.call_args || {};
+                      const dashboardEventType = getDashboardEventType(resolvedToolName);
+                      if (dashboardEventType) {
+                        const dashboardId = callArgs.dashboard_id || callArgs.args?.dashboard_id || callArgs.request_body?.dashboard_id;
+                        if (dashboardId) {
+                          const folderId = callArgs.folder || callArgs.args?.folder || callArgs.request_body?.folder;
+                          emitDashboardEvent({
+                            type: dashboardEventType,
+                            dashboardId,
+                            folderId,
+                          });
+                        } else {
+                          console.warn(
+                            `[O2AIChat] Could not extract dashboardId from call_args for tool "${resolvedToolName}". Skipping dashboard event.`,
+                            callArgs
+                          );
+                        }
+                      }
                     }
 
                     // Match by call_id if available, fall back to tool name
@@ -3081,12 +3116,13 @@ export default defineComponent({
         const chat = await dbLoadChat(chatId);
 
         if (chat) {
-          // Ensure messages are properly formatted (including contentBlocks and images)
+          // Ensure messages are properly formatted (including contentBlocks, images, and feedback)
           const formattedMessages = chat.messages.map((msg: any) => ({
             role: msg.role,
             content: msg.content,
             ...(msg.contentBlocks ? { contentBlocks: msg.contentBlocks } : {}),
-            ...(msg.images ? { images: msg.images } : {})
+            ...(msg.images ? { images: msg.images } : {}),
+            ...(msg.feedback ? { feedback: msg.feedback } : {})
           }));
 
           chatMessages.value = formattedMessages;
@@ -4354,6 +4390,8 @@ export default defineComponent({
     };
 
     const likeCodeBlock = async (messageIndex: number) => {
+      const message = chatMessages.value[messageIndex];
+      if (!message || message.feedback === 'thumbs_up') return;
       const orgId = store.state.selectedOrganization?.identifier;
       if (!orgId) return;
       // Each user+assistant pair = 1 query turn, so queryIndex = floor(index / 2)
@@ -4366,11 +4404,15 @@ export default defineComponent({
         lastTraceId.value || undefined,
       );
       if (success) {
+        message.feedback = 'thumbs_up';
+        await saveToHistory();
         $q.notify({ type: 'positive', message: 'Thanks for your feedback!', timeout: 1500 });
       }
     };
 
     const dislikeCodeBlock = async (messageIndex: number) => {
+      const message = chatMessages.value[messageIndex];
+      if (!message || message.feedback === 'thumbs_down') return;
       const orgId = store.state.selectedOrganization?.identifier;
       if (!orgId) return;
       const queryIndex = Math.floor(messageIndex / 2);
@@ -4382,6 +4424,8 @@ export default defineComponent({
         lastTraceId.value || undefined,
       );
       if (success) {
+        message.feedback = 'thumbs_down';
+        await saveToHistory();
         $q.notify({ type: 'positive', message: 'Thanks for your feedback!', timeout: 1500 });
       }
     };
@@ -4452,6 +4496,8 @@ export default defineComponent({
       store,
       outlinedThumbUpOffAlt,
       outlinedThumbDownOffAlt,
+      matThumbUpAlt,
+      matThumbDownAlt,
       likeCodeBlock,
       dislikeCodeBlock,
       currentChatTimestamp,
@@ -4747,7 +4793,7 @@ export default defineComponent({
 
       &:focus-within {
         border: 1px solid transparent;
-        box-shadow: 0 0 0 2px #667eea;
+        box-shadow: 0 0 0 2px #8B5CF6;
       }
     }
 
@@ -4859,8 +4905,13 @@ export default defineComponent({
       opacity: 0.5;
       transition: opacity 0.2s;
 
-      &:hover {
+      &:hover,
+      &.feedback-active {
         opacity: 1;
+      }
+
+      .feedback-selected {
+        color: var(--o2-primary-color);
       }
     }
 
@@ -5102,7 +5153,7 @@ export default defineComponent({
 
 // Avatar styling for user messages
 .light-user-avatar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
   color: white;
 }
 
@@ -5113,19 +5164,19 @@ export default defineComponent({
 
 // Send button gradient styling
 .send-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
   transition: all 0.3s ease !important;
-  box-shadow: 0 4px 15px 0 rgba(102, 126, 234, 0.3) !important;
-  
+  box-shadow: 0 4px 15px 0 rgba(139, 92, 246, 0.3) !important;
+
   &:hover:not(.disabled):not([disabled]):not(:disabled) {
-    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%) !important;
-    box-shadow: 0 6px 20px 0 rgba(102, 126, 234, 0.4) !important;
+    background: linear-gradient(135deg, #7C3AED 0%, #DB2777 100%) !important;
+    box-shadow: 0 6px 20px 0 rgba(139, 92, 246, 0.4) !important;
     transform: translateY(-1px) !important;
   }
-  
+
   &:active:not(.disabled):not([disabled]):not(:disabled) {
     transform: translateY(0) !important;
-    box-shadow: 0 2px 10px 0 rgba(102, 126, 234, 0.3) !important;
+    box-shadow: 0 2px 10px 0 rgba(139, 92, 246, 0.3) !important;
   }
 
 }
@@ -5353,8 +5404,8 @@ export default defineComponent({
   }
   
   body.body--dark & {
-    border: 2px solid #667eea !important;
-    color: #667eea !important;
+    border: 2px solid #8B5CF6 !important;
+    color: #8B5CF6 !important;
     background: rgba(30, 30, 30, 0.9) !important;
   }
   
@@ -5518,12 +5569,12 @@ export default defineComponent({
     font-weight: 500;
 
     .light-mode & {
-      background: rgba(102, 126, 234, 0.1);
-      color: #667eea;
+      background: rgba(139, 92, 246, 0.1);
+      color: #8B5CF6;
     }
 
     .dark-mode & {
-      background: rgba(102, 126, 234, 0.2);
+      background: rgba(139, 92, 246, 0.2);
       color: #a0aec0;
     }
   }

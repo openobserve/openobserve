@@ -282,6 +282,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_universal_(src|dest)_\d+$/,     // Test 9: Universal condition test streams
         /^e2e_4level_(src|dest)_\d+$/,        // Test 10: 4-level nested test streams
         /^stream\d{13}$/,                     // stream1765164273471, etc. (timestamp-based test streams)
+        /^e2e_http_patterns$/,                // Pattern tests stream (searchPatterns.spec.js)
         /^e2e_stream_(a|b)_\d+$/,             // Regression test streams (e2e_stream_a_*, e2e_stream_b_*)
         /^join_[a-z0-9]+_(requests|users|sessions)$/,  // Dashboard joins test streams (join_<testId>_requests, etc.)
         /^join_[a-z0-9]+_[a-z0-9]+_(requests|users|sessions)$/,  // Dashboard joins test streams with extra segment (join_<id1>_<id2>_requests, etc.)

@@ -622,6 +622,8 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/dashboards/bulk", delete(dashboards::delete_dashboard_bulk))
         .route("/{org_id}/folders/dashboards/{dashboard_id}", put(dashboards::move_dashboard))
         .route("/{org_id}/dashboards/move", patch(dashboards::move_dashboards))
+        .route("/{org_id}/dashboards/{dashboard_id}/panels", post(dashboards::add_panel))
+        .route("/{org_id}/dashboards/{dashboard_id}/panels/{panel_id}", put(dashboards::update_panel).delete(dashboards::delete_panel))
 
         // Reports
         .route("/{org_id}/reports", get(dashboards::reports::list_reports).post(dashboards::reports::create_report))
@@ -745,7 +747,12 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/service_accounts/{email_id}", get(service_accounts::get_api_token).put(service_accounts::update).delete(service_accounts::delete))
 
         // MCP
-        .route("/{org_id}/mcp", get(mcp::handle_mcp_get).post(mcp::handle_mcp_post));
+        .route("/{org_id}/mcp", get(mcp::handle_mcp_get).post(mcp::handle_mcp_post))
+
+        // sourcemaps
+        .route("/{org_id}/sourcemaps",get(sourcemaps::list).post(sourcemaps::upload_maps).delete(sourcemaps::delete))
+        .route("/{org_id}/sourcemaps/values",get(sourcemaps::list_values))
+        .route("/{org_id}/sourcemaps/stacktrace",post(sourcemaps::translate_stacktrace));
 
     #[cfg(feature = "enterprise")]
     {

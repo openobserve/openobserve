@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="search-bar-component" id="searchBarComponent">
+  <div class="search-bar-component tw:h-full" id="searchBarComponent">
     <div class="row tw:m-0! tw:p-[0.375rem]">
       <div class="float-right col flex items-center">
         <!-- Tab Toggle Buttons -->
@@ -230,9 +230,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-    <div v-if="activeTab === 'search' && searchObj.meta.showQuery" class="row">
+    <div
+      v-if="activeTab === 'search' && searchObj.meta.showQuery"
+      class="row tw:h-[calc(100%-3.2rem)]!"
+    >
       <div
-        class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mx-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden"
+        class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mx-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full!"
       >
         <code-query-editor
           ref="queryEditorRef"
@@ -284,100 +287,10 @@ import config from "@/aws-exports";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import useStreams from "@/composables/useStreams";
 import { getImageURL } from "@/utils/zincutils";
-
-/**
- * Extracts the field name from a filter expression such as `field='val'`,
- * `field!='val'`, `(field='x' OR field='y')`, etc.
- */
-const getFieldFromExpression = (expression: string): string | null => {
-  const cleaned = expression.trim().replace(/^\(\s*/, "");
-  const match =
-    cleaned.match(/^"[^"]+"\."?(\w+)"?\s*(?:=|!=|is)/i) ||
-    cleaned.match(/^(\w+)\s*(?:=|!=|>=|<=|>|<|is)/i);
-  return match ? match[1] : null;
-};
-
-/**
- * Tries to replace an existing condition for `fieldName` in `queryStr` with
- * `newExpression`. Returns the modified string if found, or null if not found.
- * Handles both parenthesized multi-value groups and single conditions.
- */
-const replaceExistingFieldCondition = (
-  queryStr: string,
-  fieldName: string,
-  newExpression: string,
-): string | null => {
-  const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
-  const opPat = `(?:=|!=|>=|<=|>|<|is(?:\\s+not)?)`;
-  const condPat = `(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
-
-  // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
-  const multiRegex = new RegExp(
-    `\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`,
-    "gi",
-  );
-  if (multiRegex.test(queryStr)) {
-    return queryStr.replace(multiRegex, newExpression);
-  }
-
-  // Try range condition: field >= val AND field <= val (e.g. duration filters)
-  const rangeRegex = new RegExp(
-    `${condPat}\\s+(?:and|AND)\\s+${condPat}`,
-    "gi",
-  );
-  if (rangeRegex.test(queryStr)) {
-    return queryStr.replace(rangeRegex, newExpression);
-  }
-
-  // Try single condition
-  const singleRegex = new RegExp(condPat, "gi");
-  if (singleRegex.test(queryStr)) {
-    return queryStr.replace(singleRegex, newExpression);
-  }
-
-  return null;
-};
-
-/**
- * Applies a single filter term to a base editor value using replace-or-append logic.
- * Returns the new editor value.
- */
-const applyFilterTerm = (filterTerm: string, baseValue: string): string => {
-  let filter = filterTerm;
-
-  const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
-  if (isFilterValueNull) {
-    filter = filter
-      .replace(/=|!=/, (match) => {
-        return match === "=" ? " is " : " is not ";
-      })
-      .replace(/'null'/, "null");
-  }
-
-  const parts = baseValue.split("|");
-  if (parts.length > 1) {
-    if (parts[1].trim() !== "") {
-      const fieldName = getFieldFromExpression(filter);
-      const replaced = fieldName
-        ? replaceExistingFieldCondition(parts[1], fieldName, filter)
-        : null;
-      parts[1] = replaced !== null ? replaced : parts[1] + " and " + filter;
-    } else {
-      parts[1] = filter;
-    }
-    return parts.join("| ");
-  } else {
-    const fieldName = getFieldFromExpression(filter);
-    const replaced = fieldName
-      ? replaceExistingFieldCondition(parts[0] as string, fieldName, filter)
-      : null;
-    if (replaced !== null) return replaced;
-    return (parts[0] as string) !== ""
-      ? (parts[0] as string) + " and " + filter
-      : filter;
-  }
-};
+import {
+  applyFilterTerm,
+  replaceExistingFieldCondition,
+} from "@/utils/traces/filterUtils";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -496,6 +409,14 @@ export default defineComponent({
       autoCompleteData.value.fieldValues = props.fieldValues;
       autoCompleteData.value.popup.open =
         queryEditorRef.value.triggerAutoComplete;
+      // [NEW] Set stream context so getSuggestions can read stored values from
+      // IndexedDB. Traces field expansion already writes to IDB via
+      // captureFromValuesApi (useFieldValuesStream) with stream_type="traces",
+      // so values are already being captured — this just enables the read side.
+      autoCompleteData.value.org = store.state.selectedOrganization.identifier;
+      autoCompleteData.value.streamType = "traces";
+      autoCompleteData.value.streamName =
+        searchObj.data.stream.selectedStream.value ?? "";
       getSuggestions();
     };
 
@@ -874,10 +795,6 @@ export default defineComponent({
   }
   .fields_autocomplete {
     max-height: 250px;
-  }
-  .monaco-editor {
-    width: 100% !important;
-    height: 40px !important;
   }
 
   .search-button {
