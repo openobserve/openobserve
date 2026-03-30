@@ -78,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     round
                     flat
                     :title="t('function.updateTitle')"
+                    data-test="function-list-edit-btn"
                     @click="showAddUpdateFn(props)"
                   >
                 </q-btn>
