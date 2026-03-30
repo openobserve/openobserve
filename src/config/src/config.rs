@@ -757,6 +757,12 @@ pub struct Grpc {
     pub tls_cert_path: String,
     #[env_config(name = "ZO_GRPC_TLS_KEY_PATH", default = "")]
     pub tls_key_path: String,
+    #[env_config(
+        name = "ZO_GRPC_TLS_ROOT_CERTIFICATES",
+        default = "webpki",
+        help = "this value can be set to webpki or native. Using webpki means client will trust a preset CA bundle. Using native means client will trust the certificates in OS trust store"
+    )]
+    pub tls_root_certificates: String,
 }
 
 #[derive(Serialize, PartialEq, Default)]
