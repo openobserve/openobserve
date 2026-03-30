@@ -295,6 +295,7 @@ import useStreams from "@/composables/useStreams";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
+import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isLLMTrace } from "@/utils/llmUtils";
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
@@ -1430,8 +1431,15 @@ function restoreUrlQueryParams() {
     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
   }
 
-  if (["service-graph", "traces", "spans"].includes(queryParams.tab)) {
-    searchObj.meta.searchMode = queryParams.tab;
+  const tab =
+    typeof queryParams.tab === "string" ? queryParams.tab : undefined;
+  if (
+    tab !== undefined &&
+    (["service-graph", "traces", "spans"] as const).includes(
+      tab as "service-graph" | "traces" | "spans",
+    )
+  ) {
+    searchObj.meta.searchMode = tab as TraceSearchMode;
   }
 
   if (
