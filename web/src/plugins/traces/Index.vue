@@ -1357,11 +1357,6 @@ function runQueryIfRequested() {
 onBeforeMount(async () => {
   setupContextProvider();
   restoreUrlQueryParams();
-  // Restore active tab from URL query params
-  const queryParams = router.currentRoute.value.query;
-  if (queryParams.tab === "service-graph" && config.isEnterprise == "true") {
-    searchObj.meta.searchMode = "service-graph";
-  }
   await importSqlParser();
   if (!searchObj.loading) {
     await loadPageData();
@@ -1431,8 +1426,7 @@ function restoreUrlQueryParams() {
     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
   }
 
-  const tab =
-    typeof queryParams.tab === "string" ? queryParams.tab : undefined;
+  const tab = typeof queryParams.tab === "string" ? queryParams.tab : undefined;
   if (
     tab !== undefined &&
     (["service-graph", "traces", "spans"] as const).includes(
