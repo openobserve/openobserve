@@ -40,7 +40,7 @@ pub(crate) async fn process_msg(msg: ServiceStreamsMessage) -> Result<()> {
                 record.service_name
             );
             let org_id = record.org_id.clone();
-            service_streams::put(&org_id, record).await?;
+            service_streams::put(&org_id, *record).await?;
             infra::coordinator::service_streams::emit_put_event(&org_id).await?;
         }
         ServiceStreamsMessage::Delete {
