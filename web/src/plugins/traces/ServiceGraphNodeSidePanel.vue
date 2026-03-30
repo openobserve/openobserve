@@ -65,109 +65,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Content Scrollable Area -->
       <div class="panel-content">
-        <!-- Metrics Section -->
-        <div
-          v-if="false"
-          class="panel-section metrics-section"
-          data-test="service-graph-side-panel-metrics"
-        >
-          <!-- Request Rate Card (Full Width - Combined Metrics) -->
-          <div
-            class="metric-card metric-card-full"
-            data-test="service-graph-side-panel-request-rate"
-          >
-            <div class="metric-single-line">
-              <div class="metric-total">
-                <span class="total-label">Requests:</span>
-                <span class="total-value">{{
-                  serviceMetrics.requestRateValue
-                }}</span>
-                <span class="total-unit">/min</span>
-              </div>
-              <div class="metric-divider"></div>
-              <div class="metric-inline incoming">
-                <q-icon name="arrow_forward" size="12px" />
-                <span class="inline-value">{{
-                  formatNumber(serviceMetrics.incomingRequests)
-                }}</span>
-                <q-tooltip
-                  >Incoming Requests (requests coming into this
-                  service)</q-tooltip
-                >
-              </div>
-              <div class="metric-divider"></div>
-              <div class="metric-inline outgoing">
-                <span class="inline-value">{{
-                  formatNumber(serviceMetrics.outgoingRequests)
-                }}</span>
-                <q-icon name="arrow_forward" size="12px" />
-                <q-tooltip
-                  >Outgoing Requests (requests going out from this
-                  service)</q-tooltip
-                >
-              </div>
-            </div>
-
-            <!-- Horizontal Divider -->
-            <div class="metric-horizontal-divider"></div>
-
-            <!-- Error Rate and Latency Percentiles (Bottom Rows) -->
-            <div class="metric-bottom-row">
-              <div
-                class="metric-inline-item error-rate-card"
-                :class="getErrorRateClass()"
-                data-test="service-graph-side-panel-error-rate"
-              >
-                <q-icon name="error_outline" size="14px" />
-                <span class="metric-label">Error Rate:</span>
-                <span class="metric-value">{{ serviceMetrics.errorRate }}</span>
-              </div>
-              <div class="metric-row-divider"></div>
-              <div
-                class="metric-inline-item latency-card"
-                :class="getLatencyClass(serviceMetrics.p95Latency)"
-                data-test="service-graph-side-panel-p95-latency"
-              >
-                <q-icon name="speed" size="14px" />
-                <span class="metric-label">P95 Latency:</span>
-                <span class="metric-value">{{
-                  serviceMetrics.p95Latency
-                }}</span>
-              </div>
-            </div>
-            <div class="metric-horizontal-divider"></div>
-            <div class="metric-bottom-row">
-              <div
-                class="metric-inline-item latency-card"
-                :class="getLatencyClass(serviceMetrics.p50Latency)"
-                data-test="service-graph-side-panel-p50-latency"
-              >
-                <q-icon name="speed" size="14px" />
-                <span class="metric-label">P50:</span>
-                <span class="metric-value">{{
-                  serviceMetrics.p50Latency
-                }}</span>
-              </div>
-              <div class="metric-row-divider"></div>
-              <div
-                class="metric-inline-item latency-card"
-                :class="getLatencyClass(serviceMetrics.p99Latency)"
-                data-test="service-graph-side-panel-p99-latency"
-              >
-                <q-icon name="speed" size="14px" />
-                <span class="metric-label">P99:</span>
-                <span class="metric-value">{{
-                  serviceMetrics.p99Latency
-                }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- RED Charts Section -->
         <div
           v-if="streamFilter !== 'all' && dashboardData"
-          class="panel-section red-charts-section tw:flex"
+          class="panel-section red-charts-section tw:flex tw:mb-0!"
           data-test="service-graph-side-panel-red-charts"
         >
           <div class="charts-wrapper tw:py-0! tw:min-h-[13.5rem] tw:w-full">
@@ -184,121 +85,331 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Recent Operations Section -->
-        <div
-          v-if="streamFilter !== 'all'"
-          class="panel-section tw:pt-[1.5rem]!"
-          data-test="service-graph-side-panel-recent-operations"
-        >
-          <!-- <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
-            <div class="section-title">Recent Operations</div>
-            <q-btn-toggle
-              v-model="operationsViewMode"
-              no-caps
-              toggle-color="primary"
-              text-color="primary"
-              bordered
-              class="tw:rounded!"
-              :options="[
-                {
-                  value: 'trends',
-                  label: 'Trends',
-                  attrs: {
-                    class:
-                      'tw:px-[0.5rem]! tw:py-[0.1rem]! tw:min-h-auto! tw:text-[0.7rem]! tw:tracking-[0.03rem]',
-                  },
-                },
-                {
-                  value: 'spans',
-                  label: 'Spans',
-                  attrs: {
-                    class:
-                      'tw:px-[0.5rem]! tw:min-h-auto! tw:py-[0.1rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]',
-                  },
-                },
-              ]"
-            />
-          </div> -->
-          <!-- Loading State -->
-          <div
-            v-if="loadingOperations"
-            class="tw:flex tw:items-center tw:gap-2 tw:py-3 tw:text-sm"
-            style="color: var(--o2-text-secondary)"
+        <q-separator class="tw:mb-[0.675rem]!" />
+        <!-- Tabs: Operations / Nodes / Pods -->
+        <template v-if="streamFilter !== 'all'">
+          <q-tabs
+            v-model="activeTab"
+            dense
+            inline-label
+            align="left"
+            class="text-bold q-mx-sm tw:mb-[0.375rem]"
+            data-test="service-graph-node-panel-tabs"
           >
-            <q-spinner color="primary" size="sm" />
-            <span>Loading operations...</span>
-          </div>
-
-          <template v-else>
-            <div
-              v-if="recentOperations.length === 0"
-              class="tw:text-xs tw:italic tw:py-2 tw:text-center"
-              style="color: var(--o2-text-secondary)"
+            <q-tab
+              name="operations"
+              label="Operations"
+              style="text-transform: capitalize"
+              data-test="service-graph-node-panel-tab-operations"
+            />
+            <q-tab
+              name="nodes"
+              label="Nodes"
+              style="text-transform: capitalize"
+              data-test="service-graph-node-panel-tab-nodes"
+            />
+            <q-tab
+              name="pods"
+              label="Pods"
+              style="text-transform: capitalize"
+              data-test="service-graph-node-panel-tab-pods"
+            />
+          </q-tabs>
+          <q-tab-panels v-model="activeTab" animated>
+            <!-- Operations Tab -->
+            <q-tab-panel
+              name="operations"
+              class="tw:p-0! panel-section tw:mb-0!"
+              data-test="service-graph-side-panel-recent-operations"
             >
-              No operations found
-            </div>
-            <div
-              v-else
-              class="tw:max-h-[20rem] tw:overflow-hidden"
-              data-test="service-graph-side-panel-operations-table"
-            >
-              <TenstackTable
-                :columns="operationsTableColumns"
-                :rows="operationsTableRows"
-                :loading="false"
-                :default-columns="false"
-                :enable-column-reorder="false"
-                :enable-row-expand="false"
-                :enable-text-highlight="false"
-                :enable-status-bar="false"
-                :enable-ai-context-button="false"
-                :row-height="28"
-                @click:data-row="(row: any) => navigateToTraces(row._name)"
+              <!-- Loading State -->
+              <div
+                v-if="loadingOperations"
+                class="tw:flex tw:items-center tw:gap-2 tw:py-3 tw:text-sm"
+                style="color: var(--o2-text-secondary)"
               >
-                <template #cell-errors="{ item }">
-                  <span
-                    :class="
-                      item.errors > 0
-                        ? 'tw:text-[var(--q-negative)] tw:font-semibold'
-                        : ''
-                    "
-                    >{{ item.errors }}</span
+                <q-spinner color="primary" size="sm" />
+                <span>Loading operations...</span>
+              </div>
+
+              <template v-else>
+                <div
+                  v-if="recentOperations.length === 0"
+                  class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                  style="color: var(--o2-text-secondary)"
+                >
+                  No operations found
+                </div>
+                <div
+                  v-else
+                  class="tw:max-h-[20rem] tw:overflow-hidden"
+                  data-test="service-graph-side-panel-operations-table"
+                >
+                  <TenstackTable
+                    :columns="operationsTableColumns"
+                    :rows="operationsTableRows"
+                    :loading="false"
+                    :default-columns="false"
+                    :enable-column-reorder="false"
+                    :enable-row-expand="false"
+                    :enable-text-highlight="false"
+                    :enable-status-bar="false"
+                    :enable-ai-context-button="false"
+                    :row-height="28"
+                    @click:data-row="(row: any) => navigateToTraces(row._name)"
                   >
-                </template>
-                <template #cell-p99="{ item }">
-                  <span
-                    :class="
-                      item.p99 !== 'N/A' ? 'tw:text-[var(--q-warning)]' : ''
-                    "
-                    >{{ item.p99 }}</span
+                    <template #cell-errors="{ item }">
+                      <span
+                        :class="
+                          item.errors > 0
+                            ? 'tw:text-[var(--q-negative)] tw:font-semibold'
+                            : ''
+                        "
+                        >{{ item.errors }}</span
+                      >
+                    </template>
+                    <template #cell-p99="{ item }">
+                      <span
+                        :class="
+                          item.p99 !== 'N/A'
+                            ? 'tw:text-[var(--o2-latency-p99)]'
+                            : ''
+                        "
+                        >{{ item.p99 }}</span
+                      >
+                    </template>
+                    <template #cell-p95="{ item }">
+                      <span
+                        :class="
+                          item.p95 !== 'N/A'
+                            ? 'tw:text-[var(--o2-latency-p95)]'
+                            : ''
+                        "
+                        >{{ item.p95 }}</span
+                      >
+                    </template>
+                    <template #cell-p75="{ item }">
+                      <span
+                        :class="
+                          item.p75 !== 'N/A'
+                            ? 'tw:text-[var(--o2-latency-p75)]'
+                            : ''
+                        "
+                        >{{ item.p75 }}</span
+                      >
+                    </template>
+                    <template #cell-actions="{ row, active }">
+                      <q-btn
+                        v-if="active"
+                        flat
+                        dense
+                        icon="search"
+                        size="xs"
+                        class="tw:ml-1 tw:p-[0.12rem]! tw:rounded! tw:absolute! tw:right-2! tw:text-[var(--o2-text-1)]! tw:bg-[var(--o2-card-bg-solid)]!"
+                        data-test="service-graph-side-panel-view-traces-btn"
+                        @click.stop="navigateToTraces(row._name)"
+                      >
+                        <q-tooltip>View in Traces</q-tooltip>
+                      </q-btn>
+                    </template>
+                    <template #empty>
+                      <div
+                        class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                        style="color: var(--o2-text-secondary)"
+                      >
+                        No operations found
+                      </div>
+                    </template>
+                  </TenstackTable>
+                </div>
+              </template>
+            </q-tab-panel>
+
+            <!-- Nodes Tab -->
+            <q-tab-panel
+              name="nodes"
+              class="tw:p-0! panel-section"
+              data-test="service-graph-side-panel-nodes"
+            >
+              <div
+                v-if="loadingNodes"
+                class="tw:flex tw:items-center tw:gap-2 tw:py-3 tw:text-sm"
+                style="color: var(--o2-text-secondary)"
+              >
+                <q-spinner color="primary" size="sm" />
+                <span>Loading nodes...</span>
+              </div>
+              <template v-else>
+                <div
+                  v-if="recentNodes.length === 0"
+                  class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                  style="color: var(--o2-text-secondary)"
+                >
+                  No node data found
+                </div>
+                <div
+                  v-else
+                  class="tw:max-h-[20rem] tw:overflow-hidden"
+                  data-test="service-graph-side-panel-nodes-table"
+                >
+                  <TenstackTable
+                    :columns="nodesTableColumns"
+                    :rows="nodesTableRows"
+                    :loading="false"
+                    :default-columns="false"
+                    :enable-column-reorder="false"
+                    :enable-row-expand="false"
+                    :enable-text-highlight="false"
+                    :enable-status-bar="false"
+                    :enable-ai-context-button="false"
+                    :row-height="28"
                   >
-                </template>
-                <template #cell-actions="{ row, active }">
-                  <q-btn
-                    v-if="active"
-                    flat
-                    dense
-                    icon="search"
-                    size="xs"
-                    class="tw:ml-1 tw:p-[0.12rem]! tw:rounded! tw:absolute! tw:right-2! tw:text-[var(--o2-text-1)]! tw:bg-[var(--o2-card-bg-solid)]!"
-                    data-test="service-graph-side-panel-view-traces-btn"
-                    @click.stop="navigateToTraces(row._name)"
+                    <template #cell-errors="{ item }">
+                      <span
+                        :class="
+                          item.errors > 0
+                            ? 'tw:text-[var(--q-negative)] tw:font-semibold'
+                            : ''
+                        "
+                        >{{ item.errors }}</span
+                      >
+                    </template>
+                    <template #cell-p99="{ item }">
+                      <span
+                        :class="
+                          item.p99 !== 'N/A'
+                            ? 'tw:text-[var(--o2-latency-p99)]'
+                            : ''
+                        "
+                        >{{ item.p99 }}</span
+                      >
+                    </template>
+                    <template #cell-p95="{ item }">
+                      <span
+                        :class="
+                          item.p95 !== 'N/A'
+                            ? 'tw:text-[var(--o2-latency-p95)]'
+                            : ''
+                        "
+                        >{{ item.p95 }}</span
+                      >
+                    </template>
+                    <template #cell-p75="{ item }">
+                      <span
+                        :class="
+                          item.p75 !== 'N/A'
+                            ? 'tw:text-[var(--o2-latency-p75)]'
+                            : ''
+                        "
+                        >{{ item.p75 }}</span
+                      >
+                    </template>
+                    <template #empty>
+                      <div
+                        class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                        style="color: var(--o2-text-secondary)"
+                      >
+                        No node data found
+                      </div>
+                    </template>
+                  </TenstackTable>
+                </div>
+              </template>
+            </q-tab-panel>
+
+            <!-- Pods Tab -->
+            <q-tab-panel
+              name="pods"
+              class="tw:p-0! panel-section"
+              data-test="service-graph-side-panel-pods"
+            >
+              <div
+                v-if="loadingPods"
+                class="tw:flex tw:items-center tw:gap-2 tw:py-3 tw:text-sm"
+                style="color: var(--o2-text-secondary)"
+              >
+                <q-spinner color="primary" size="sm" />
+                <span>Loading pods...</span>
+              </div>
+              <template v-else>
+                <div
+                  v-if="recentPods.length === 0"
+                  class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                  style="color: var(--o2-text-secondary)"
+                >
+                  No pod data found
+                </div>
+                <div
+                  v-else
+                  class="tw:max-h-[20rem] tw:overflow-hidden"
+                  data-test="service-graph-side-panel-pods-table"
+                >
+                  <TenstackTable
+                    :columns="podsTableColumns"
+                    :rows="podsTableRows"
+                    :loading="false"
+                    :default-columns="false"
+                    :enable-column-reorder="false"
+                    :enable-row-expand="false"
+                    :enable-text-highlight="false"
+                    :enable-status-bar="false"
+                    :enable-ai-context-button="false"
+                    :row-height="28"
                   >
-                    <q-tooltip>View in Traces</q-tooltip>
-                  </q-btn>
-                </template>
-                <template #empty>
-                  <div
-                    class="tw:text-xs tw:italic tw:py-2 tw:text-center"
-                    style="color: var(--o2-text-secondary)"
-                  >
-                    No operations found
-                  </div>
-                </template>
-              </TenstackTable>
-            </div>
-          </template>
-        </div>
+                    <template #cell-errors="{ item }">
+                      <span
+                        :class="
+                          item.errors > 0
+                            ? 'tw:text-[var(--q-negative)] tw:font-semibold'
+                            : ''
+                        "
+                        >{{ item.errors }}</span
+                      >
+                    </template>
+                    <template #cell-p99="{ item }">
+                      <span
+                        :class="
+                          item.p99 !== 'N/A'
+                            ? 'tw:text-[var(--o2-latency-p99)]'
+                            : ''
+                        "
+                        >{{ item.p99 }}</span
+                      >
+                    </template>
+                    <template #cell-p95="{ item }">
+                      <span
+                        :class="
+                          item.p95 !== 'N/A'
+                            ? 'tw:text-[var(--o2-latency-p95)]'
+                            : ''
+                        "
+                        >{{ item.p95 }}</span
+                      >
+                    </template>
+                    <template #cell-p75="{ item }">
+                      <span
+                        :class="
+                          item.p75 !== 'N/A'
+                            ? 'tw:text-[var(--o2-latency-p75)]'
+                            : ''
+                        "
+                        >{{ item.p75 }}</span
+                      >
+                    </template>
+                    <template #empty>
+                      <div
+                        class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                        style="color: var(--o2-text-secondary)"
+                      >
+                        No pod data found
+                      </div>
+                    </template>
+                  </TenstackTable>
+                </div>
+              </template>
+            </q-tab-panel>
+          </q-tab-panels>
+        </template>
       </div>
     </div>
   </transition>
@@ -341,7 +452,7 @@ const TelemetryCorrelationDashboard = defineAsyncComponent(
 );
 
 const RenderDashboardCharts = defineAsyncComponent(
-  () => import("@/views/dashboards/RenderDashboardCharts.vue"),
+  () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
 );
 
 const TenstackTable = defineAsyncComponent(
@@ -555,6 +666,9 @@ export default defineComponent({
       { immediate: true, deep: true },
     );
 
+    // Active tab state
+    const activeTab = ref<"operations" | "nodes" | "pods">("operations");
+
     // Recent Operations State
     const operationsViewMode = ref<"aggregated" | "spans">("aggregated");
     const recentOperations = ref<any[]>([]);
@@ -563,6 +677,14 @@ export default defineComponent({
       slowSpans: [],
     });
     const loadingOperations = ref(false);
+
+    // Nodes State
+    const recentNodes = ref<any[]>([]);
+    const loadingNodes = ref(false);
+
+    // Pods State
+    const recentPods = ref<any[]>([]);
+    const loadingPods = ref(false);
 
     // Computed: Service Metrics
     const serviceMetrics = computed(() => {
@@ -776,18 +898,21 @@ export default defineComponent({
         accessorKey: "p95",
         header: "P95",
         size: 80,
+        meta: { slot: true },
       },
       {
         id: "p75",
         accessorKey: "p75",
         header: "P75",
         size: 80,
+        meta: { slot: true },
       },
       {
         id: "p50",
         accessorKey: "p50",
         header: "P50",
         size: 80,
+        meta: { slot: true },
       },
     ]);
 
@@ -944,6 +1069,259 @@ export default defineComponent({
       { immediate: true },
     );
 
+    // Fetch nodes grouped by service_k8s_node_name
+    const fetchNodes = async () => {
+      if (!props.selectedNode || !props.visible || props.streamFilter === "all")
+        return;
+
+      loadingNodes.value = true;
+      recentNodes.value = [];
+
+      try {
+        const serviceName = buildServiceName();
+        const streamName = props.streamFilter || "default";
+        const sql = `SELECT service_k8s_node_name as node_name, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.50) as p50_latency, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${streamName}" WHERE service_name = '${serviceName}' AND service_k8s_node_name IS NOT NULL GROUP BY service_k8s_node_name ORDER BY request_count DESC`;
+
+        const response = await searchService.search({
+          org_identifier: store.state.selectedOrganization.identifier,
+          query: {
+            query: {
+              sql,
+              start_time: props.timeRange.startTime,
+              end_time: props.timeRange.endTime,
+              from: 0,
+              size: 100,
+            },
+          },
+          page_type: "traces",
+        });
+
+        if (response.data && response.data.hits) {
+          recentNodes.value = response.data.hits.map((n: any) => ({
+            name: n.node_name || "unknown",
+            requestCount: n.request_count || 0,
+            errorCount: n.error_count || 0,
+            p50Latency: n.p50_latency || 0,
+            p75Latency: n.p75_latency || 0,
+            p95Latency: n.p95_latency || 0,
+            p99Latency: n.p99_latency || 0,
+          }));
+        }
+      } catch (error) {
+        console.error("Failed to fetch nodes:", error);
+        recentNodes.value = [];
+      } finally {
+        loadingNodes.value = false;
+      }
+    };
+
+    // Fetch pods grouped by service_k8s_pod_name
+    const fetchPods = async () => {
+      if (!props.selectedNode || !props.visible || props.streamFilter === "all")
+        return;
+
+      loadingPods.value = true;
+      recentPods.value = [];
+
+      try {
+        const serviceName = buildServiceName();
+        const streamName = props.streamFilter || "default";
+        const sql = `SELECT service_k8s_pod_name as pod_name, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.50) as p50_latency, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${streamName}" WHERE service_name = '${serviceName}' AND service_k8s_pod_name IS NOT NULL GROUP BY service_k8s_pod_name ORDER BY request_count DESC`;
+
+        const response = await searchService.search({
+          org_identifier: store.state.selectedOrganization.identifier,
+          query: {
+            query: {
+              sql,
+              start_time: props.timeRange.startTime,
+              end_time: props.timeRange.endTime,
+              from: 0,
+              size: 100,
+            },
+          },
+          page_type: "traces",
+        });
+
+        if (response.data && response.data.hits) {
+          recentPods.value = response.data.hits.map((p: any) => ({
+            name: p.pod_name || "unknown",
+            requestCount: p.request_count || 0,
+            errorCount: p.error_count || 0,
+            p50Latency: p.p50_latency || 0,
+            p75Latency: p.p75_latency || 0,
+            p95Latency: p.p95_latency || 0,
+            p99Latency: p.p99_latency || 0,
+          }));
+        }
+      } catch (error) {
+        console.error("Failed to fetch pods:", error);
+        recentPods.value = [];
+      } finally {
+        loadingPods.value = false;
+      }
+    };
+
+    // Computed: Nodes table columns
+    const nodesTableColumns = computed(() => [
+      {
+        id: "node",
+        accessorKey: "node",
+        header: "NODE",
+        size: 220,
+        meta: { slot: false },
+      },
+      {
+        id: "requests",
+        accessorKey: "requests",
+        header: "REQUESTS",
+        size: 100,
+      },
+      {
+        id: "errors",
+        accessorKey: "errors",
+        header: "ERRORS",
+        size: 80,
+        meta: { slot: true },
+      },
+      {
+        id: "p99",
+        accessorKey: "p99",
+        header: "P99",
+        size: 80,
+        meta: { slot: true },
+      },
+      {
+        id: "p95",
+        accessorKey: "p95",
+        header: "P95",
+        size: 80,
+        meta: { slot: true },
+      },
+      {
+        id: "p75",
+        accessorKey: "p75",
+        header: "P75",
+        size: 80,
+        meta: { slot: true },
+      },
+      {
+        id: "p50",
+        accessorKey: "p50",
+        header: "P50",
+        size: 80,
+        meta: { slot: true },
+      },
+    ]);
+
+    // Computed: Nodes table rows
+    const nodesTableRows = computed(() =>
+      recentNodes.value.map((n) => ({
+        node: n.name,
+        requests: formatNumber(n.requestCount),
+        errors: n.errorCount,
+        p99: formatOperationLatency(n.p99Latency),
+        p95: formatOperationLatency(n.p95Latency),
+        p75: formatOperationLatency(n.p75Latency),
+        p50: formatOperationLatency(n.p50Latency),
+      })),
+    );
+
+    // Computed: Pods table columns
+    const podsTableColumns = computed(() => [
+      {
+        id: "pod",
+        accessorKey: "pod",
+        header: "POD",
+        size: 220,
+        meta: { slot: false },
+      },
+      {
+        id: "requests",
+        accessorKey: "requests",
+        header: "REQUESTS",
+        size: 100,
+      },
+      {
+        id: "errors",
+        accessorKey: "errors",
+        header: "ERRORS",
+        size: 80,
+        meta: { slot: true },
+      },
+      {
+        id: "p99",
+        accessorKey: "p99",
+        header: "P99",
+        size: 80,
+        meta: { slot: true },
+      },
+      {
+        id: "p95",
+        accessorKey: "p95",
+        header: "P95",
+        size: 80,
+        meta: { slot: true },
+      },
+      {
+        id: "p75",
+        accessorKey: "p75",
+        header: "P75",
+        size: 80,
+        meta: { slot: true },
+      },
+      {
+        id: "p50",
+        accessorKey: "p50",
+        header: "P50",
+        size: 80,
+        meta: { slot: true },
+      },
+    ]);
+
+    // Computed: Pods table rows
+    const podsTableRows = computed(() =>
+      recentPods.value.map((p) => ({
+        pod: p.name,
+        requests: formatNumber(p.requestCount),
+        errors: p.errorCount,
+        p99: formatOperationLatency(p.p99Latency),
+        p95: formatOperationLatency(p.p95Latency),
+        p75: formatOperationLatency(p.p75Latency),
+        p50: formatOperationLatency(p.p50Latency),
+      })),
+    );
+
+    // Lazy-fetch nodes/pods when their tab is activated
+    watch(
+      () => [
+        props.visible,
+        props.selectedNode?.id,
+        props.streamFilter,
+        activeTab.value,
+      ],
+      () => {
+        if (
+          !props.visible ||
+          !props.selectedNode ||
+          props.streamFilter === "all"
+        )
+          return;
+        if (activeTab.value === "nodes" && !recentNodes.value.length)
+          fetchNodes();
+        if (activeTab.value === "pods" && !recentPods.value.length) fetchPods();
+      },
+    );
+
+    // Reset nodes/pods data and go back to operations tab when node or stream changes
+    watch(
+      () => [props.selectedNode?.id, props.streamFilter],
+      () => {
+        recentNodes.value = [];
+        recentPods.value = [];
+        activeTab.value = "operations";
+      },
+    );
+
     // Navigate to traces explore page filtered by this service + operation
     const navigateToTraces = (operationName: string) => {
       emit("view-traces", {
@@ -1023,12 +1401,24 @@ export default defineComponent({
       correlationLoading,
       correlationData,
       telemetryTimeRange,
+      // Tabs
+      activeTab,
       // Recent Operations
       loadingOperations,
       recentOperations,
       operationsTableColumns,
       operationsTableRows,
       navigateToTraces,
+      // Nodes
+      loadingNodes,
+      recentNodes,
+      nodesTableColumns,
+      nodesTableRows,
+      // Pods
+      loadingPods,
+      recentPods,
+      podsTableColumns,
+      podsTableRows,
     };
   },
 });
