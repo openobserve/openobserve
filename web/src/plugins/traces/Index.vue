@@ -1439,6 +1439,7 @@ function restoreUrlQueryParams() {
       tab as "service-graph" | "traces" | "spans",
     )
   ) {
+    if (tab === "service-graph" && config.isEnterprise !== "true") return;
     searchObj.meta.searchMode = tab as TraceSearchMode;
   }
 
