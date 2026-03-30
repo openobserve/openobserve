@@ -16,7 +16,6 @@
 use std::{
     io::BufReader,
     net::{Ipv4Addr, Ipv6Addr},
-    sync::Arc,
 };
 
 use itertools::Itertools;
@@ -61,7 +60,7 @@ pub fn http_tls_config() -> Result<rustls::ServerConfig, anyhow::Error> {
     Ok(tls_config)
 }
 
-pub fn client_tls_config() -> Result<Arc<rustls::ClientConfig>, anyhow::Error> {
+pub fn client_tls_config() -> Result<rustls::ClientConfig, anyhow::Error> {
     let cfg = config::get_config();
     let cert_store = if cfg.http.tls_root_certificates.as_str().to_lowercase() == "native" {
         // Load native system certificates
@@ -98,7 +97,7 @@ pub fn client_tls_config() -> Result<Arc<rustls::ClientConfig>, anyhow::Error> {
     let protos = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
     config.alpn_protocols = protos;
 
-    Ok(Arc::new(config))
+    Ok(config)
 }
 
 pub fn reqwest_client_tls_config() -> Result<reqwest::Client, anyhow::Error> {
