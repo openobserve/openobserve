@@ -18,7 +18,7 @@ import { useStore } from "vuex";
 import serviceStreamsApi from "@/services/service_streams";
 import type {
   ServiceMetadata,
-  SemanticFieldGroup,
+  FieldAlias,
   CorrelationResponse,
   StreamInfo,
 } from "@/services/service_streams";
@@ -31,7 +31,7 @@ import {
 
 // Global cache for semantic groups (shared across all instances)
 // Key: org_identifier, Value: semantic groups
-const semanticGroupsGlobalCache = new Map<string, SemanticFieldGroup[]>();
+const semanticGroupsGlobalCache = new Map<string, FieldAlias[]>();
 const isLoadingSemanticGroupsGlobal = new Map<string, boolean>();
 
 /**
@@ -50,7 +50,7 @@ export function useServiceCorrelation() {
    * Load semantic field groups (once per organization per session)
    * Uses a global cache to avoid redundant API calls across all composable instances
    */
-  async function loadSemanticGroups(): Promise<SemanticFieldGroup[]> {
+  async function loadSemanticGroups(): Promise<FieldAlias[]> {
     const org = orgIdentifier.value;
 
     // Check global cache first

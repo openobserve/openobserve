@@ -51,11 +51,11 @@ installQuasar({ plugins: [Dialog, Notify] });
 const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
   id: overrides.id || "incident-1",
   org_id: overrides.org_id || "org-1",
-  correlation_key: overrides.correlation_key || "key-1",
+  key_type: overrides.key_type || "key-1",
   status: overrides.status || "open",
   severity: overrides.severity || "P1",
   title: overrides.title || "Test Incident",
-  stable_dimensions: overrides.stable_dimensions || { service: "test-service" },
+  group_values: overrides.group_values || { service: "test-service" },
   alert_count: overrides.alert_count !== undefined ? overrides.alert_count : 5,
   first_alert_at: overrides.first_alert_at || 1700000000000000,
   last_alert_at: overrides.last_alert_at || 1700000000000000,
@@ -530,7 +530,7 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(contextData).toHaveProperty("alert_count");
       expect(contextData).toHaveProperty("first_alert_at");
       expect(contextData).toHaveProperty("last_alert_at");
-      expect(contextData).toHaveProperty("stable_dimensions");
+      expect(contextData).toHaveProperty("group_values");
       expect(contextData).toHaveProperty("topology_context");
       expect(contextData).toHaveProperty("triggers");
       expect(contextData).toHaveProperty("rca_analysis");
@@ -826,7 +826,7 @@ describe("IncidentDetailDrawer.vue", () => {
 
     it("should handle empty dimensions", async () => {
       (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", stable_dimensions: {} }),
+        data: createIncidentWithAlerts({ id: "test-123", group_values: {} }),
       });
 
       wrapper = await createWrapper({}, {}, "test-123");
@@ -834,7 +834,7 @@ describe("IncidentDetailDrawer.vue", () => {
       await nextTick();
       await flushPromises();
 
-      expect(wrapper.vm.incidentDetails.stable_dimensions).toEqual({});
+      expect(wrapper.vm.incidentDetails.group_values).toEqual({});
     });
 
     it("should handle resolved incident with timestamp", async () => {
