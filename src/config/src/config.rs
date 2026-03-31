@@ -1227,6 +1227,12 @@ pub struct Common {
         help = "Enable to show symbol in dashboard"
     )]
     pub dashboard_show_symbol_enabled: bool,
+    #[env_config(
+        name = "ZO_DASHBOARD_SHOW_FIELD_AS_JSON_ENABLED",
+        default = false,
+        help = "Enable to show field as JSON in dashboard table"
+    )]
+    pub dashboard_show_field_as_json_enabled: bool,
     #[env_config(name = "ZO_INGEST_DEFAULT_HEC_STREAM", default = "")]
     pub default_hec_stream: String,
     #[env_config(
