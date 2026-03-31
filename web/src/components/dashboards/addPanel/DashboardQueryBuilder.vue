@@ -821,7 +821,9 @@ export default defineComponent({
           field.showFieldAsJson === undefined ||
           field.showFieldAsJson === null
         ) {
-          field.showFieldAsJson = false;
+          field.showFieldAsJson =
+            store?.state?.zoConfig?.dashboard_show_field_as_json_enabled ??
+            false;
         }
       };
 

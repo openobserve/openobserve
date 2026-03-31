@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="json-field-renderer">
+  <div :class="['json-field-renderer', { 'json-structured': isValidJSON }]">
     <div v-if="parsedData === null || parsedData === undefined">
       {{ value }}
     </div>
@@ -66,9 +66,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <span class="json-brace">}</span>
     </div>
-    <!-- Primitive value -->
+    <!-- Primitive value: only apply JSON coloring if the value was valid JSON -->
     <div v-else>
-      <span :style="{ color: getValueColor(parsedData) }">{{ formatValue(parsedData) }}</span>
+      <span :style="isValidJSON ? { color: getValueColor(parsedData) } : {}">{{ formatValue(parsedData) }}</span>
     </div>
   </div>
 </template>
@@ -85,16 +85,30 @@ const props = defineProps<Props>();
 const store = useStore();
 
 // Parse the value if it's a string, otherwise use as-is
-const parsedData = computed(() => {
+// Also tracks whether JSON parsing succeeded so we don't color plain strings as JSON
+const parseResult = computed(() => {
   if (typeof props.value === "string") {
     try {
-      return JSON.parse(props.value);
+      const parsed = JSON.parse(props.value);
+      // Only treat as JSON if the parsed result is an object or array.
+      // Bare primitives ("42", "true", "null") are valid JSON but should
+      // not be colored -> they're just plain field values stored as strings.
+      const isStructuredJSON =
+        parsed !== null &&
+        (typeof parsed === "object" || Array.isArray(parsed));
+      return { data: parsed, isJSON: isStructuredJSON };
     } catch (e) {
-      return props.value;
+      return { data: props.value, isJSON: false };
     }
   }
-  return props.value;
+  return { data: props.value, isJSON: false };
 });
+
+const parsedData = computed(() => parseResult.value.data);
+
+// True when the original string was valid JSON (or value was not a string).
+// Used to avoid coloring plain non-JSON strings (e.g. timestamps) like JSON values.
+const isValidJSON = computed(() => parseResult.value.isJSON);
 
 // Check if theme is dark - memoized
 const isDarkTheme = computed(() => store.state.theme === "dark");
@@ -202,7 +216,7 @@ const isLastDefinedEntry = (obj: any, currentKey: string): boolean => {
 </script>
 
 <style lang="scss" scoped>
-.json-field-renderer {
+.json-structured {
   font-family: monospace;
   font-size: 12px;
   line-height: 1.5;
