@@ -1847,6 +1847,20 @@ const handleServiceGraphViewTraces = (data: any) => {
       const escapedOpName = escapeSingleQuotes(data.operationName);
       filterQuery += ` AND operation_name = '${escapedOpName}'`;
     }
+    if (data.nodeName) {
+      const escapedNodeName = escapeSingleQuotes(data.nodeName);
+      filterQuery += ` AND service_k8s_node_name = '${escapedNodeName}'`;
+    }
+    if (data.podName) {
+      const escapedPodName = escapeSingleQuotes(data.podName);
+      filterQuery += ` AND service_k8s_pod_name = '${escapedPodName}'`;
+    }
+    if (data.errorsOnly) {
+      filterQuery += ` AND span_status = 'ERROR'`;
+    }
+    if (data.minDurationMicros && data.minDurationMicros > 0) {
+      filterQuery += ` AND duration >= ${data.minDurationMicros}`;
+    }
     searchObj.data.editorValue = filterQuery;
     searchObj.data.query = filterQuery;
     searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode

@@ -630,7 +630,7 @@ const props = defineProps({
    *  When set, all rows use this fixed height and dynamic measurement is disabled. */
   rowHeight: {
     type: Number as PropType<number | undefined>,
-    default: undefined,
+    default: 22,
   },
   // ── Feature flags (all default true → current logs behavior unchanged) ──
   /** Show VueDraggable column reorder in header. Default: true */
@@ -988,7 +988,9 @@ const rowVirtualizer = useVirtualizer(rowVirtualizerOptions);
 
 const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
 
-const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
+const totalSize = computed(
+  () => rowVirtualizer.value.getTotalSize() + props.rowHeight,
+);
 
 const setExpandedRows = () => {
   props.expandedRows.forEach((index: any) => {

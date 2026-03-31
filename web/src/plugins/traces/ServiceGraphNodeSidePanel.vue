@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="panel-section red-charts-section tw:flex tw:mb-0!"
           data-test="service-graph-side-panel-red-charts"
         >
-          <div class="charts-wrapper tw:py-0! tw:min-h-[13.5rem] tw:w-full">
+          <div class="charts-wrapper tw:py-0! tw:min-h-[10.875rem] tw:w-full">
             <div class="charts-container tw:w-full">
               <RenderDashboardCharts
                 ref="dashboardChartsRef"
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <q-separator class="tw:mb-[0.675rem]!" />
+        <q-separator class="tw:my-[1rem]!" />
         <!-- Tabs: Operations / Nodes / Pods -->
         <template v-if="streamFilter !== 'all'">
           <q-tabs
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-else
-                  class="tw:max-h-[20rem] tw:overflow-hidden"
+                  class="tw:max-h-full tw:overflow-hidden tw:rounded"
                   data-test="service-graph-side-panel-operations-table"
                 >
                   <TenstackTable
@@ -156,7 +156,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :enable-status-bar="false"
                     :enable-ai-context-button="false"
                     :row-height="28"
-                    @click:data-row="(row: any) => navigateToTraces(row._name)"
+                    @click:data-row="
+                      (row: any) =>
+                        navigateToTraces({ operationName: row._name })
+                    "
                   >
                     <template #cell-errors="{ item }">
                       <span
@@ -198,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >{{ item.p75 }}</span
                       >
                     </template>
-                    <template #cell-actions="{ row, active }">
+                    <template #cell-actions="{ row, column, active }">
                       <q-btn
                         v-if="active"
                         flat
@@ -207,7 +210,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="xs"
                         class="tw:ml-1 tw:p-[0.12rem]! tw:rounded! tw:absolute! tw:right-2! tw:text-[var(--o2-text-1)]! tw:bg-[var(--o2-card-bg-solid)]!"
                         data-test="service-graph-side-panel-view-traces-btn"
-                        @click.stop="navigateToTraces(row._name)"
+                        @click.stop="
+                          navigateToTraces({
+                            operationName: row._name,
+                            errorsOnly: column.id === 'errors',
+                            minDurationMicros:
+                              column.id === 'p99'
+                                ? row._p99
+                                : column.id === 'p95'
+                                  ? row._p95
+                                  : column.id === 'p75'
+                                    ? row._p75
+                                    : undefined,
+                          })
+                        "
                       >
                         <q-tooltip>View in Traces</q-tooltip>
                       </q-btn>
@@ -249,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-else
-                  class="tw:max-h-[20rem] tw:overflow-hidden"
+                  class="tw:max-h-[20rem] tw:overflow-hidden tw:rounded"
                   data-test="service-graph-side-panel-nodes-table"
                 >
                   <TenstackTable
@@ -263,7 +279,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :enable-status-bar="false"
                     :enable-ai-context-button="false"
                     :row-height="28"
+                    @click:data-row="
+                      (row: any) => navigateToTraces({ nodeName: row._name })
+                    "
                   >
+                    <template #cell-actions="{ row, column, active }">
+                      <q-btn
+                        v-if="active"
+                        flat
+                        dense
+                        icon="search"
+                        size="xs"
+                        class="tw:ml-1 tw:p-[0.12rem]! tw:rounded! tw:absolute! tw:right-2! tw:text-[var(--o2-text-1)]! tw:bg-[var(--o2-card-bg-solid)]!"
+                        data-test="service-graph-side-panel-nodes-view-traces-btn"
+                        @click.stop="
+                          navigateToTraces({
+                            nodeName: row._name,
+                            errorsOnly: column.id === 'errors',
+                            minDurationMicros:
+                              column.id === 'p99'
+                                ? row._p99
+                                : column.id === 'p95'
+                                  ? row._p95
+                                  : column.id === 'p75'
+                                    ? row._p75
+                                    : undefined,
+                          })
+                        "
+                      >
+                        <q-tooltip>View in Traces</q-tooltip>
+                      </q-btn>
+                    </template>
                     <template #cell-errors="{ item }">
                       <span
                         :class="
@@ -341,7 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-else
-                  class="tw:max-h-[20rem] tw:overflow-hidden"
+                  class="tw:max-h-[20rem] tw:overflow-hidden tw:rounded"
                   data-test="service-graph-side-panel-pods-table"
                 >
                   <TenstackTable
@@ -355,7 +401,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :enable-status-bar="false"
                     :enable-ai-context-button="false"
                     :row-height="28"
+                    @click:data-row="
+                      (row: any) => navigateToTraces({ podName: row._name })
+                    "
                   >
+                    <template #cell-actions="{ row, column, active }">
+                      <q-btn
+                        v-if="active"
+                        flat
+                        dense
+                        icon="search"
+                        size="xs"
+                        class="tw:ml-1 tw:p-[0.12rem]! tw:rounded! tw:absolute! tw:right-2! tw:text-[var(--o2-text-1)]! tw:bg-[var(--o2-card-bg-solid)]!"
+                        data-test="service-graph-side-panel-pods-view-traces-btn"
+                        @click.stop="
+                          navigateToTraces({
+                            podName: row._name,
+                            errorsOnly: column.id === 'errors',
+                            minDurationMicros:
+                              column.id === 'p99'
+                                ? row._p99
+                                : column.id === 'p95'
+                                  ? row._p95
+                                  : column.id === 'p75'
+                                    ? row._p75
+                                    : undefined,
+                          })
+                        "
+                      >
+                        <q-tooltip>View in Traces</q-tooltip>
+                      </q-btn>
+                    </template>
                     <template #cell-errors="{ item }">
                       <span
                         :class="
@@ -551,6 +627,8 @@ export default defineComponent({
         } else {
           whereClause = `WHERE ${serviceFilter}`;
         }
+
+        panel.layout.h = 10;
 
         let query = panel.queries[0].query
           .replace("[STREAM_NAME]", `"${streamName}"`)
@@ -864,25 +942,28 @@ export default defineComponent({
       });
     };
 
-    // Computed: Operations table columns
-    const operationsTableColumns = computed(() => [
+    // Generic helper: builds table columns with a dynamic first (entity) column
+    const buildEntityTableColumns = (
+      entityId: string,
+      entityHeader: string,
+    ) => [
       {
-        id: "operation",
-        accessorKey: "operation",
-        header: "OPERATION",
+        id: entityId,
+        accessorKey: entityId,
+        header: entityHeader,
         size: 220,
         meta: { slot: false },
       },
       {
         id: "requests",
         accessorKey: "requests",
-        header: "REQUESTS",
+        header: "Requests",
         size: 100,
       },
       {
         id: "errors",
         accessorKey: "errors",
-        header: "ERRORS",
+        header: "Errors",
         size: 80,
         meta: { slot: true },
       },
@@ -907,14 +988,12 @@ export default defineComponent({
         size: 80,
         meta: { slot: true },
       },
-      {
-        id: "p50",
-        accessorKey: "p50",
-        header: "P50",
-        size: 80,
-        meta: { slot: true },
-      },
-    ]);
+    ];
+
+    // Computed: Operations table columns
+    const operationsTableColumns = computed(() =>
+      buildEntityTableColumns("operation", "Operation"),
+    );
 
     // Computed: Operations table rows
     const operationsTableRows = computed(() =>
@@ -927,6 +1006,9 @@ export default defineComponent({
         p75: formatOperationLatency(op.p75Latency),
         p50: formatOperationLatency(op.p50Latency),
         _name: op.name,
+        _p99: op.p99Latency,
+        _p95: op.p95Latency,
+        _p75: op.p75Latency,
       })),
     );
 
@@ -1162,56 +1244,9 @@ export default defineComponent({
     };
 
     // Computed: Nodes table columns
-    const nodesTableColumns = computed(() => [
-      {
-        id: "node",
-        accessorKey: "node",
-        header: "NODE",
-        size: 220,
-        meta: { slot: false },
-      },
-      {
-        id: "requests",
-        accessorKey: "requests",
-        header: "REQUESTS",
-        size: 100,
-      },
-      {
-        id: "errors",
-        accessorKey: "errors",
-        header: "ERRORS",
-        size: 80,
-        meta: { slot: true },
-      },
-      {
-        id: "p99",
-        accessorKey: "p99",
-        header: "P99",
-        size: 80,
-        meta: { slot: true },
-      },
-      {
-        id: "p95",
-        accessorKey: "p95",
-        header: "P95",
-        size: 80,
-        meta: { slot: true },
-      },
-      {
-        id: "p75",
-        accessorKey: "p75",
-        header: "P75",
-        size: 80,
-        meta: { slot: true },
-      },
-      {
-        id: "p50",
-        accessorKey: "p50",
-        header: "P50",
-        size: 80,
-        meta: { slot: true },
-      },
-    ]);
+    const nodesTableColumns = computed(() =>
+      buildEntityTableColumns("node", "Node"),
+    );
 
     // Computed: Nodes table rows
     const nodesTableRows = computed(() =>
@@ -1223,60 +1258,17 @@ export default defineComponent({
         p95: formatOperationLatency(n.p95Latency),
         p75: formatOperationLatency(n.p75Latency),
         p50: formatOperationLatency(n.p50Latency),
+        _name: n.name,
+        _p99: n.p99Latency,
+        _p95: n.p95Latency,
+        _p75: n.p75Latency,
       })),
     );
 
     // Computed: Pods table columns
-    const podsTableColumns = computed(() => [
-      {
-        id: "pod",
-        accessorKey: "pod",
-        header: "POD",
-        size: 220,
-        meta: { slot: false },
-      },
-      {
-        id: "requests",
-        accessorKey: "requests",
-        header: "REQUESTS",
-        size: 100,
-      },
-      {
-        id: "errors",
-        accessorKey: "errors",
-        header: "ERRORS",
-        size: 80,
-        meta: { slot: true },
-      },
-      {
-        id: "p99",
-        accessorKey: "p99",
-        header: "P99",
-        size: 80,
-        meta: { slot: true },
-      },
-      {
-        id: "p95",
-        accessorKey: "p95",
-        header: "P95",
-        size: 80,
-        meta: { slot: true },
-      },
-      {
-        id: "p75",
-        accessorKey: "p75",
-        header: "P75",
-        size: 80,
-        meta: { slot: true },
-      },
-      {
-        id: "p50",
-        accessorKey: "p50",
-        header: "P50",
-        size: 80,
-        meta: { slot: true },
-      },
-    ]);
+    const podsTableColumns = computed(() =>
+      buildEntityTableColumns("pod", "Pod"),
+    );
 
     // Computed: Pods table rows
     const podsTableRows = computed(() =>
@@ -1288,6 +1280,10 @@ export default defineComponent({
         p95: formatOperationLatency(p.p95Latency),
         p75: formatOperationLatency(p.p75Latency),
         p50: formatOperationLatency(p.p50Latency),
+        _name: p.name,
+        _p99: p.p99Latency,
+        _p95: p.p95Latency,
+        _p75: p.p75Latency,
       })),
     );
 
@@ -1322,15 +1318,25 @@ export default defineComponent({
       },
     );
 
-    // Navigate to traces explore page filtered by this service + operation
-    const navigateToTraces = (operationName: string) => {
+    // Navigate to traces explore page with contextual filters
+    const navigateToTraces = (params: {
+      operationName?: string;
+      nodeName?: string;
+      podName?: string;
+      errorsOnly?: boolean;
+      minDurationMicros?: number;
+    }) => {
       emit("view-traces", {
         stream: props.streamFilter,
         serviceName:
           props.selectedNode?.name ||
           props.selectedNode?.label ||
           props.selectedNode?.id,
-        operationName,
+        operationName: params.operationName,
+        nodeName: params.nodeName,
+        podName: params.podName,
+        errorsOnly: params.errorsOnly,
+        minDurationMicros: params.minDurationMicros,
         timeRange: props.timeRange,
       });
     };
