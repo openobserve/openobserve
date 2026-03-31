@@ -240,14 +240,6 @@
                 @view-traces="$emit('view-traces', $event)"
               />
 
-              <!-- Service Graph Edge Side Panel -->
-              <ServiceGraphEdgeSidePanel
-                v-if="selectedEdge"
-                :selected-edge="selectedEdge"
-                :visible="showEdgeSidePanel"
-                @close="handleCloseEdgeSidePanel"
-              />
-
             </div>
           </div>
         </q-card-section>
@@ -305,7 +297,6 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import DateTime from "@/components/DateTime.vue";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
-import ServiceGraphEdgeSidePanel from "./ServiceGraphEdgeSidePanel.vue";
 import {
   convertServiceGraphToTree,
   convertServiceGraphToNetwork,
@@ -330,7 +321,6 @@ export default defineComponent({
     ChartRenderer,
     DateTime,
     ServiceGraphSidePanel,
-    ServiceGraphEdgeSidePanel,
   },
   emits: ["view-traces"],
   setup(props, { emit }) {
@@ -348,10 +338,6 @@ export default defineComponent({
     // Node side panel state
     const selectedNode = ref<any>(null);
     const showSidePanel = ref(false);
-
-    // Edge side panel state
-    const selectedEdge = ref<any>(null);
-    const showEdgeSidePanel = ref(false);
 
     // Persist visualization type in localStorage
     const storedVisualizationType = localStorage.getItem(
@@ -927,42 +913,8 @@ export default defineComponent({
         hideTooltip();
       };
 
-      // Tree mode: click on an edge opens the edge side panel
-      const onZrClick = (e: any) => {
-        if (!edgesGroupEl || bezierEdges.length === 0) return;
-        if (!edgesGroupEl.transformCoordToLocal) return;
-
-        const [mx, my] = edgesGroupEl.transformCoordToLocal(e.offsetX, e.offsetY);
-        const [ox] = edgesGroupEl.transformCoordToLocal(0, 0);
-        const [ox1] = edgesGroupEl.transformCoordToLocal(1, 0);
-        const pxToLayout = Math.abs(ox1 - ox) || 1;
-        const hitThreshold = HIT_PIXELS * pxToLayout;
-        const nodeRadius = 42 * pxToLayout;
-
-        // Ignore clicks near nodes (those are handled by ECharts)
-        for (const np of nodePositions) {
-          if (Math.hypot(np.x - mx, np.y - my) < nodeRadius) return;
-        }
-
-        let bestDist = Infinity;
-        let bestIdx = -1;
-        for (let i = 0; i < bezierEdges.length; i++) {
-          const d = pointToBezierDistance(mx, my, bezierEdges[i].shape);
-          if (d < bestDist) { bestDist = d; bestIdx = i; }
-        }
-
-        if (bestIdx >= 0 && bestDist < hitThreshold) {
-          const { parentName, childName } = bezierEdges[bestIdx];
-          const edgeData = graphData.value.edges.find(
-            (ed: any) => ed.from === parentName && ed.to === childName
-          );
-          if (edgeData) openEdgePanel(edgeData);
-        }
-      };
-
       zr.on('mousemove', onMouseMove);
       zr.on('globalout', onGlobalOut);
-      zr.on('click', onZrClick);
 
       // Graph mode: ECharts fires mouseover/mouseout for graph series edges.
       // These share the same showEdgeTooltip/hideTooltip as tree mode.
@@ -1008,7 +960,6 @@ export default defineComponent({
       return () => {
         zr.off('mousemove', onMouseMove);
         zr.off('globalout', onGlobalOut);
-        zr.off('click', onZrClick);
         chart.off('mouseover', onEChartsEdgeMouseover);
         chart.off('mouseout', onEChartsEdgeMouseout);
         chart.off('mouseover', onNodeMouseover);
@@ -1423,36 +1374,9 @@ export default defineComponent({
     };
 
     // Side Panel Handlers
-    const openEdgePanel = (edgeData: any) => {
-      // Close node panel
-      showSidePanel.value = false;
-      selectedNode.value = null;
-
-      if (selectedEdge.value?.from === edgeData.from && selectedEdge.value?.to === edgeData.to) {
-        // Toggle: clicking same edge closes it
-        showEdgeSidePanel.value = false;
-        selectedEdge.value = null;
-      } else {
-        selectedEdge.value = edgeData;
-        showEdgeSidePanel.value = true;
-      }
-    };
-
     const handleNodeClick = (params: any) => {
-      // Check if it's an edge click (for graph visualization)
-      if (params.dataType === 'edge' && params.data) {
-        const edgeData = graphData.value.edges.find(
-          (e: any) => e.from === params.data.source && e.to === params.data.target
-        );
-        if (edgeData) openEdgePanel(edgeData);
-        return;
-      }
       // Check if it's a node click (for graph visualization)
-      else if (params.dataType === 'node' && params.data) {
-        // Close edge panel when opening node panel
-        showEdgeSidePanel.value = false;
-        selectedEdge.value = null;
-
+      if (params.dataType === 'node' && params.data) {
         // Check if clicking the same node - if so, close the panel
         if (selectedNode.value && selectedNode.value.id === params.data.id) {
           showSidePanel.value = false;
@@ -1494,13 +1418,6 @@ export default defineComponent({
       }, 300);
     };
 
-    const handleCloseEdgeSidePanel = () => {
-      showEdgeSidePanel.value = false;
-      setTimeout(() => {
-        selectedEdge.value = null;
-      }, 300);
-    };
-
     onMounted(async () => {
       await loadTraceStreams();
       loadServiceGraph();
@@ -1539,10 +1456,6 @@ export default defineComponent({
       showSidePanel,
       handleNodeClick,
       handleCloseSidePanel,
-      // Edge side panel
-      selectedEdge,
-      showEdgeSidePanel,
-      handleCloseEdgeSidePanel,
     };
   },
 });
