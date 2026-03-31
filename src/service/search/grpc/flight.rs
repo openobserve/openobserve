@@ -34,7 +34,7 @@ use config::{
 use datafusion::{
     common::TableReference,
     physical_optimizer::{
-        PhysicalOptimizerRule, filter_pushdown::FilterPushdown,
+        PhysicalOptimizerRule, filter_pushdown::FilterPushdown, limit_pushdown::LimitPushdown,
         projection_pushdown::ProjectionPushdown,
     },
 };
@@ -488,6 +488,13 @@ pub async fn search(
         .optimize(physical_plan, ctx.state().config_options())
         .map_err(|e| {
             log::error!("[trace_id {trace_id}] flight->search: pushdown filter error: {e}");
+            e
+        })?;
+    let limit_pushdown = LimitPushdown::new();
+    physical_plan = limit_pushdown
+        .optimize(physical_plan, ctx.state().config_options())
+        .map_err(|e| {
+            log::error!("[trace_id {trace_id}] flight->search: limit pushdown error: {e}");
             e
         })?;
     let projection_pushdown = ProjectionPushdown::new();

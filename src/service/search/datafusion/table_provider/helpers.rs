@@ -26,7 +26,7 @@ use datafusion::{
     physical_plan::{
         ExecutionPlan, PhysicalExpr,
         expressions::{BinaryExpr, CastExpr, Column, Literal},
-        filter::FilterExec,
+        filter::FilterExecBuilder,
         projection::ProjectionExec,
     },
     scalar::ScalarValue,
@@ -196,7 +196,8 @@ pub fn apply_combined_filter(
     let combined_expr = conjunction(filter_exprs);
 
     Ok(Arc::new(
-        FilterExec::try_new(combined_expr, exec_plan)?
-            .with_projection(filter_projection.cloned())?,
+        FilterExecBuilder::new(combined_expr, exec_plan)
+            .apply_projection(filter_projection.cloned())?
+            .build()?,
     ))
 }
