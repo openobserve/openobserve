@@ -386,6 +386,31 @@ impl Search for Searcher {
         Err(Status::unimplemented("Not Supported"))
     }
 
+    async fn get_sourcemap_file(
+        &self,
+        req: Request<GetSourcemapFileRequest>,
+    ) -> Result<Response<GetSourcemapFileResponse>, Status> {
+        let req = req.into_inner();
+        log::info!(
+            "got get request for sourcemap file : {}/{} at {}",
+            req.org_id,
+            req.original_name,
+            req.path
+        );
+
+        let res = infra::storage::get_bytes("", &req.path)
+            .await
+            .map_err(|e| {
+                Status::internal(format!(
+                    "failed to get sourcemap for {}/{} at path {}: {e}",
+                    req.org_id, req.original_name, req.path
+                ))
+            })?;
+        Ok(Response::new(GetSourcemapFileResponse {
+            file_data: res.to_vec(),
+        }))
+    }
+
     // --- Slot-based admission RPCs ---
 
     #[cfg(feature = "enterprise")]
@@ -459,30 +484,5 @@ impl Search for Searcher {
         _req: Request<proto::cluster_rpc::ReleaseQueryRequest>,
     ) -> Result<Response<proto::cluster_rpc::ReleaseQueryResponse>, Status> {
         Err(Status::unimplemented("Not Supported"))
-   }
-
-    async fn get_sourcemap_file(
-        &self,
-        req: Request<GetSourcemapFileRequest>,
-    ) -> Result<Response<GetSourcemapFileResponse>, Status> {
-        let req = req.into_inner();
-        log::info!(
-            "got get request for sourcemap file : {}/{} at {}",
-            req.org_id,
-            req.original_name,
-            req.path
-        );
-
-        let res = infra::storage::get_bytes("", &req.path)
-            .await
-            .map_err(|e| {
-                Status::internal(format!(
-                    "failed to get sourcemap for {}/{} at path {}: {e}",
-                    req.org_id, req.original_name, req.path
-                ))
-            })?;
-        Ok(Response::new(GetSourcemapFileResponse {
-            file_data: res.to_vec(),
-        }))
     }
 }
