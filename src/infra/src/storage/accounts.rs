@@ -17,7 +17,7 @@ use std::ops::Range;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{get_config, is_local_disk_storage, utils::hash::Sum64};
+use config::{get_config, is_local_disk_storage, metrics, utils::hash::Sum64};
 use futures::stream::BoxStream;
 use hashbrown::{HashMap, HashSet};
 use object_store::{
@@ -330,7 +330,27 @@ impl ObjectStoreExt for StorageClientFactory {
     }
 
     async fn delete(&self, account: &str, location: &Path) -> Result<()> {
-        self.get_client_by_name(account).delete(location).await
+        let mut result: Result<()> = Ok(());
+        for _ in 0..3 {
+            result = self.get_client_by_name(account).delete(location).await;
+            if result.is_ok() {
+                let file = location.to_string();
+                let columns = file.split('/').collect::<Vec<&str>>();
+                if columns.len() > 2 && columns[0] == "files" {
+                    let storage_type = if is_local_disk_storage() {
+                        "local"
+                    } else {
+                        "remote"
+                    };
+                    metrics::STORAGE_WRITE_REQUESTS
+                        .with_label_values(&[columns[1], columns[2], storage_type])
+                        .inc();
+                }
+                break;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+        result
     }
 
     fn delete_stream(
