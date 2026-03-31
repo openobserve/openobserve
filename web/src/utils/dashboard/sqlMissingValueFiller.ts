@@ -153,18 +153,18 @@ export const fillMissingValues = (
     );
     const anchorTimes = [anchorFormattedTime];
 
-    // Also insert a phantom point one interval before the first real data point
-    // when data is sparse (< 3 unique time slots). This gives ECharts a 30s
-    // consecutive gap adjacent to real data so it sizes bars correctly instead
-    // of using the huge gap from user-start to first chunk (~hours/days).
+    // Also insert a phantom point one interval after the user's selected start
+    // time when data is sparse (< 3 unique time slots). This gives ECharts a
+    // known 30s consecutive gap at the left edge of the axis so it sizes bars
+    // correctly instead of using the huge gap from user-start to first chunk
+    // (~hours/days). Only added when it falls strictly before the first real
+    // data point (binnedFillStart), otherwise it would overlap real data.
     // Once there are >= 3 real time slots ECharts can derive the interval from
     // the data itself and the phantom is no longer needed.
     if (uniqueTimeSlotCount < 3) {
-      const nearAnchorTime = new Date(
-        binnedFillStart.getTime() - interval * 1000,
-      );
-      // Only add the near-anchor if it's strictly between user start and first data
-      if (nearAnchorTime > binnedDate) {
+      const nearAnchorTime = new Date(binnedDate.getTime() + interval * 1000);
+      // Only add the near-anchor if it's strictly before the first real data
+      if (nearAnchorTime < binnedFillStart) {
         const nearAnchorFormattedTime = format(
           toZonedTime(nearAnchorTime, "UTC"),
           "yyyy-MM-dd'T'HH:mm:ss",
