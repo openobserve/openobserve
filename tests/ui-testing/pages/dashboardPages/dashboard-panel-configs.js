@@ -67,10 +67,24 @@ export default class DashboardPanelConfigs {
       '[data-test="dashboard-config-table_dynamic_columns"]'
     );
     this.valueMapping = page.locator(
-      '[data-test="dashboard-addpanel-config-drilldown-add-btn"]'
+      '[data-test="dashboard-addpanel-config-value-mapping-add-btn"]'
     );
     this.overrideConfig = page.locator(
       '[data-test="dashboard-addpanel-config-override-config-add-btn"]'
+    );
+
+    // Pivot table locators
+    this.pivotRowTotals = page.locator(
+      '[data-test="dashboard-config-pivot-row-totals"]'
+    );
+    this.pivotColTotals = page.locator(
+      '[data-test="dashboard-config-pivot-col-totals"]'
+    );
+    this.pivotStickyColTotals = page.locator(
+      '[data-test="dashboard-config-pivot-sticky-col-totals"]'
+    );
+    this.pivotStickyRowTotals = page.locator(
+      '[data-test="dashboard-config-pivot-sticky-row-totals"]'
     );
 
     //Metric Text
@@ -360,8 +374,7 @@ export default class DashboardPanelConfigs {
    * @param {boolean} [options.setColor] - Whether to initialize the color (clicks "Set color")
    */
   async configureValueMapping({ value = "test_value", text = "Mapped!", setColor = true } = {}) {
-    // ValueMapping.vue shares data-test with Drilldown.vue — use last()
-    const valueMappingBtn = this.page.locator('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').last();
+    const valueMappingBtn = this.page.locator('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
     await this.scrollSidebarToElement(valueMappingBtn);
     await valueMappingBtn.click();
 
@@ -388,7 +401,7 @@ export default class DashboardPanelConfigs {
    * Open value mapping popup and return the popup locator (for external assertions).
    */
   async openValueMappingPopup() {
-    const valueMappingBtn = this.page.locator('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').last();
+    const valueMappingBtn = this.page.locator('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
     await this.scrollSidebarToElement(valueMappingBtn);
     await valueMappingBtn.click();
     const popup = this.page.locator('[data-test="dashboard-value-mapping-popup"]');
@@ -811,6 +824,53 @@ export default class DashboardPanelConfigs {
     const seriesName = await this.selectColorBySeriesOption(rowIndex, { optionIndex, matchText });
     await this.setColorForSeriesRow(rowIndex, color);
     return seriesName;
+  }
+
+  // ========== Pivot Table Configs ==========
+
+  /**
+   * Toggle show row totals for pivot table
+   */
+  async togglePivotRowTotals() {
+    await this.pivotRowTotals.waitFor({ state: "visible" });
+    await this.pivotRowTotals.click();
+  }
+
+  /**
+   * Toggle show column totals for pivot table
+   */
+  async togglePivotColTotals() {
+    await this.pivotColTotals.waitFor({ state: "visible" });
+    await this.pivotColTotals.click();
+  }
+
+  /**
+   * Toggle sticky column totals for pivot table
+   * (only visible when row totals is enabled)
+   */
+  async togglePivotStickyColTotals() {
+    await this.pivotStickyColTotals.waitFor({ state: "visible" });
+    await this.pivotStickyColTotals.click();
+  }
+
+  /**
+   * Toggle sticky row totals for pivot table
+   * (only visible when column totals is enabled)
+   */
+  async togglePivotStickyRowTotals() {
+    await this.pivotStickyRowTotals.waitFor({ state: "visible" });
+    await this.pivotStickyRowTotals.click();
+  }
+
+  /**
+   * Get the checked state of a toggle by data-test selector
+   * @param {import('@playwright/test').Locator} toggleLocator
+   * @returns {Promise<boolean>}
+   */
+  async getToggleState(toggleLocator) {
+    await toggleLocator.waitFor({ state: "visible", timeout: 10000 });
+    const ariaChecked = await toggleLocator.getAttribute("aria-checked");
+    return ariaChecked === "true";
   }
 
 }

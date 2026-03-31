@@ -114,8 +114,7 @@ describe("PatternCard", () => {
         '[data-test="pattern-card-0-anomaly-badge"]',
       );
       expect(anomalyBadge.exists()).toBe(true);
-      // The badge now shows only the warning icon, not the text
-      expect(anomalyBadge.text()).toContain("⚠️");
+      expect(anomalyBadge.text()).toContain("Rare Pattern");
     });
 
     it("should not display anomaly badge when pattern is not an anomaly", () => {
@@ -125,11 +124,6 @@ describe("PatternCard", () => {
       expect(anomalyBadge.exists()).toBe(false);
     });
 
-    it("should display -- indicator for non-anomaly patterns", () => {
-      const noAnomaly = wrapper.find('[data-test="pattern-card-0-no-anomaly"]');
-      expect(noAnomaly.exists()).toBe(true);
-      expect(noAnomaly.text()).toBe("--");
-    });
   });
 
   describe("Pattern Actions", () => {
@@ -191,6 +185,32 @@ describe("PatternCard", () => {
       // Card click should not be emitted when button is clicked
       expect(wrapper.emitted("click")).toBeFalsy();
     });
+
+    it("should display create alert button", () => {
+      const createAlertBtn = wrapper.find(
+        '[data-test="pattern-card-0-create-alert-btn"]',
+      );
+      expect(createAlertBtn.exists()).toBe(true);
+    });
+
+    it("should emit create-alert event when create alert button is clicked", async () => {
+      const createAlertBtn = wrapper.find(
+        '[data-test="pattern-card-0-create-alert-btn"]',
+      );
+      await createAlertBtn.trigger("click");
+
+      expect(wrapper.emitted("create-alert")).toBeTruthy();
+      expect(wrapper.emitted("create-alert")![0]).toEqual([mockPattern]);
+    });
+
+    it("should not trigger card click when create alert button is clicked", async () => {
+      const createAlertBtn = wrapper.find(
+        '[data-test="pattern-card-0-create-alert-btn"]',
+      );
+      await createAlertBtn.trigger("click");
+
+      expect(wrapper.emitted("click")).toBeFalsy();
+    });
   });
 
   describe("Multiple Patterns", () => {
@@ -233,65 +253,27 @@ describe("PatternCard", () => {
     });
   });
 
-  describe("Anomaly Column", () => {
-    it("should display warning icon for anomaly patterns", async () => {
-      await wrapper.setProps({
-        pattern: { ...mockPattern, is_anomaly: true },
-        index: mockIndex,
-      });
-
-      const anomalyBadge = wrapper.find(
-        '[data-test="pattern-card-0-anomaly-badge"]',
-      );
-      expect(anomalyBadge.exists()).toBe(true);
-      expect(anomalyBadge.text()).toContain("⚠️");
-    });
-
-    it("should display -- for non-anomaly patterns", () => {
-      const noAnomaly = wrapper.find('[data-test="pattern-card-0-no-anomaly"]');
-      expect(noAnomaly.exists()).toBe(true);
-      expect(noAnomaly.text()).toBe("--");
-    });
-
-    it("should have tooltip for anomaly patterns", async () => {
-      await wrapper.setProps({
-        pattern: { ...mockPattern, is_anomaly: true },
-        index: mockIndex,
-      });
-
-      const anomalyBadge = wrapper.find(
-        '[data-test="pattern-card-0-anomaly-badge"]',
-      );
-      expect(anomalyBadge.exists()).toBe(true);
-      // Verify q-tooltip exists inside anomaly badge
-      const tooltip = anomalyBadge.find(".q-tooltip");
-      // Tooltip component may not be rendered in test environment
-      // but we can verify the component structure is correct
-      expect(anomalyBadge.exists()).toBe(true);
-    });
-  });
-
-  // --- New tests added to cover Mar 2 changes ---
-
   describe("wrap prop", () => {
-    it("should apply tw:truncate class on template when wrap is false (default)", () => {
+    it("should apply tw:flex-nowrap class on template when wrap is false (default)", () => {
       const template = wrapper.find('[data-test="pattern-card-0-template"]');
-      expect(template.classes()).toContain("tw:truncate");
-      expect(template.classes()).not.toContain("tw:break-all");
+      expect(template.classes()).toContain("tw:flex-nowrap");
+      expect(template.classes()).toContain("tw:overflow-hidden");
+      expect(template.classes()).not.toContain("tw:flex-wrap");
     });
 
-    it("should apply tw:break-all class on template when wrap is true", async () => {
+    it("should apply tw:flex-wrap and tw:break-all class on template when wrap is true", async () => {
       await wrapper.setProps({ wrap: true });
       const template = wrapper.find('[data-test="pattern-card-0-template"]');
+      expect(template.classes()).toContain("tw:flex-wrap");
       expect(template.classes()).toContain("tw:break-all");
-      expect(template.classes()).not.toContain("tw:truncate");
+      expect(template.classes()).not.toContain("tw:flex-nowrap");
     });
 
-    it("should revert to tw:truncate when wrap is toggled back to false", async () => {
+    it("should revert to tw:flex-nowrap when wrap is toggled back to false", async () => {
       await wrapper.setProps({ wrap: true });
       await wrapper.setProps({ wrap: false });
       const template = wrapper.find('[data-test="pattern-card-0-template"]');
-      expect(template.classes()).toContain("tw:truncate");
+      expect(template.classes()).toContain("tw:flex-nowrap");
     });
   });
 

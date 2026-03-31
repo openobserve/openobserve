@@ -483,6 +483,50 @@ pub async fn search(
         )
     );
 
+    physical_plan = apply_pushdowns_and_tantivy(
+        &trace_id,
+        &ctx,
+        physical_plan,
+        &mut scan_stats,
+        query_params.clone(),
+        tantivy_file_list,
+        index_condition,
+        idx_optimize_rule,
+    )?;
+
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] flight->search: generated physical plan, took: {} ms",
+                start.elapsed().as_millis()
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
+                .node_name(LOCAL_NODE.name.clone())
+                .component("flight:do_get::search generated physical plan".to_string())
+                .search_role("follower".to_string())
+                .duration(start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
+
+    Ok((ctx, physical_plan, scan_stats))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_pushdowns_and_tantivy(
+    trace_id: &str,
+    ctx: &SessionContext,
+    mut physical_plan: Arc<dyn ExecutionPlan>,
+    scan_stats: &mut ScanStats,
+    query_params: Arc<QueryParams>,
+    tantivy_file_list: Vec<FileKey>,
+    index_condition: Option<IndexCondition>,
+    idx_optimize_rule: Option<IndexOptimizeMode>,
+) -> Result<Arc<dyn ExecutionPlan>, Error> {
+    let cfg = get_config();
+
     let pushdown_filter = FilterPushdown::new();
     physical_plan = pushdown_filter
         .optimize(physical_plan, ctx.state().config_options())
@@ -538,24 +582,7 @@ pub async fn search(
         );
     }
 
-    log::info!(
-        "{}",
-        search_inspector_fields(
-            format!(
-                "[trace_id {trace_id}] flight->search: generated physical plan, took: {} ms",
-                start.elapsed().as_millis()
-            ),
-            SearchInspectorFieldsBuilder::new()
-                .trace_id(trace_id.to_string())
-                .node_name(LOCAL_NODE.name.clone())
-                .component("flight:do_get::search generated physical plan".to_string())
-                .search_role("follower".to_string())
-                .duration(start.elapsed().as_millis() as usize)
-                .build()
-        )
-    );
-
-    Ok((ctx, physical_plan, scan_stats))
+    Ok(physical_plan)
 }
 
 #[allow(clippy::too_many_arguments)]

@@ -13,13 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   convertTraceData,
   convertTimelineData,
   convertTraceServiceMapData,
   convertServiceGraphToTree,
   convertServiceGraphToNetwork,
+  getServiceIconDataUrl,
 } from "./convertTraceData";
 
 describe("convertTraceData", () => {
@@ -654,5 +655,63 @@ describe('convertServiceGraphToNetwork', () => {
     expect(result.options.series[0].data[0].x).toBeDefined();
     expect(result.options.series[0].data[0].y).toBeDefined();
   });
+  });
+
+  describe("getServiceIconDataUrl", () => {
+    function decodeDataUrl(dataUrl: string): string {
+      const b64 = dataUrl.replace("data:image/svg+xml;base64,", "");
+      return atob(b64);
+    }
+
+    it("should return a data URL string", () => {
+      const result = getServiceIconDataUrl("my-service", false, "#ff0000");
+      expect(result.startsWith("data:image/svg+xml;base64,")).toBe(true);
+    });
+
+    it("should produce different output for dark vs light mode", () => {
+      const light = getServiceIconDataUrl("my-service", false, "#aaaaaa");
+      const dark = getServiceIconDataUrl("my-service", true, "#aaaaaa");
+      expect(light).not.toBe(dark);
+    });
+
+    it("should embed the borderColor in the SVG", () => {
+      const result = getServiceIconDataUrl("svc", false, "#abcdef");
+      const svg = decodeDataUrl(result);
+      expect(svg).toContain('stroke="#abcdef"');
+    });
+
+    it("should use light background color in light mode", () => {
+      const result = getServiceIconDataUrl("svc", false, "#000000");
+      const svg = decodeDataUrl(result);
+      expect(svg).toContain('fill="#ffffff"');
+    });
+
+    it("should use dark background color in dark mode", () => {
+      const result = getServiceIconDataUrl("svc", true, "#000000");
+      const svg = decodeDataUrl(result);
+      expect(svg).toContain('fill="#1a1f2e"');
+    });
+
+    it("should normalize hyphens to spaces before matching", () => {
+      const hyphen = getServiceIconDataUrl("load-generator", false, "#000000");
+      const space = getServiceIconDataUrl("load generator", false, "#000000");
+      expect(hyphen).toBe(space);
+    });
+
+    it("should normalize underscores to spaces before matching", () => {
+      const underscore = getServiceIconDataUrl("load_generator", false, "#000000");
+      const space = getServiceIconDataUrl("load generator", false, "#000000");
+      expect(underscore).toBe(space);
+    });
+
+    it("should handle empty string name without throwing", () => {
+      const result = getServiceIconDataUrl("", false, "#000000");
+      expect(result.startsWith("data:image/svg+xml;base64,")).toBe(true);
+    });
+
+    it("should handle undefined-like name without throwing", () => {
+      const result = getServiceIconDataUrl(null as any, false, "#000000");
+      expect(result.startsWith("data:image/svg+xml;base64,")).toBe(true);
+    });
   });
 });

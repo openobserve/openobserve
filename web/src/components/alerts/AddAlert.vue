@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="pipeline-json-edit-btn"
             @click="openJsonEditor"
           >
-            <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
+            <q-tooltip>{{ t("alerts.editJson") }}</q-tooltip>
           </q-btn>
         </div>
       </div>
@@ -516,7 +516,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-step
               v-if="isAnomalyMode"
               :name="2"
-              :title="t('alerts.anomalyDetectionConfig')"
+              :title="t('alerts.anomalyDetectionConfig') + ' *'"
               caption=""
               icon="manage_search"
               :done="wizardStep > 2"
@@ -552,7 +552,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-step
               v-if="isAnomalyMode"
               :name="3"
-              :title="t('alerts.alerting')"
+              :title="t('alerts.alerting') + (anomalyConfig.alert_enabled ? ' *' : '')"
               caption=""
               icon="notifications"
               :done="false"
@@ -637,23 +637,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- SQL Preview -->
               <div
-                class="preview-box card-container"
-                style="
-                  flex: 1;
-                  min-height: 150px;
-                  overflow: hidden;
-                  display: flex;
-                  flex-direction: column;
-                "
+                class="collapsible-section card-container preview-alert-container-light"
+                :style="anomalyPreviewSectionStyle"
               >
                 <div
-                  class="preview-header tw:flex tw:items-center tw:px-3 tw:py-2"
+                  class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
+                  @click="showAnomalyPreview = !showAnomalyPreview"
                 >
-                  <span class="preview-title tw:text-sm tw:font-semibold">{{
-                    t("alerts.sqlPreview")
+                  <span class="tw:text-sm tw:font-semibold">{{
+                    t("alerts.preview")
                   }}</span>
+                  <q-btn
+                    flat
+                    dense
+                    round
+                    size="xs"
+                    :icon="showAnomalyPreview ? 'expand_less' : 'expand_more'"
+                    @click.stop="showAnomalyPreview = !showAnomalyPreview"
+                  />
                 </div>
-                <div style="flex: 1; overflow: hidden; min-height: 0">
+                <div v-show="showAnomalyPreview" style="flex: 1; overflow: hidden; min-height: 0">
                   <QueryEditor
                     editor-id="anomaly-sql-preview"
                     language="sql"
@@ -668,7 +671,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Summary -->
               <div
-                class="collapsible-section card-container"
+                class="collapsible-section card-container preview-alert-container-light"
                 :style="anomalySummarySectionStyle"
               >
                 <div
@@ -684,7 +687,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     round
                     size="xs"
                     :icon="showAnomalySummary ? 'expand_less' : 'expand_more'"
-                    @click.stop
+                    @click.stop="showAnomalySummary = !showAnomalySummary"
                   />
                 </div>
                 <div
@@ -759,7 +762,7 @@ style="height: 36px" />
           <q-btn
             data-test="add-alert-submit-btn"
             class="o2-primary-button no-border tw:h-[36px]"
-            :label="isAnomalyMode ? t('alerts.saveAndTrain') : t('alerts.save')"
+            :label="isAnomalyMode && !anomalyEditMode ? t('alerts.saveAndTrain') : t('alerts.save')"
             no-caps
             flat
             :loading="anomalySaving"
@@ -867,6 +870,7 @@ import AnomalyDetectionConfig from "@/components/anomaly_detection/steps/Anomaly
 import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlerting.vue";
 import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
 import anomalyDetectionService from "@/services/anomaly_detection";
+import searchService from "@/services/search";
 import QueryEditor from "@/components/QueryEditor.vue";
 import { buildAnomalyFilterExpression, operatorNeedsValue } from "@/utils/alerts/anomalyFilterOperators";
 import {
@@ -943,7 +947,7 @@ const defaultAnomalyConfig = () => ({
   description: "",
   stream_type: "logs",
   stream_name: "",
-  query_mode: "filters" as const,
+  query_mode: "filters" as "filters" | "custom_sql",
   filters: [] as any[],
   custom_sql: "",
   detection_function: "count",
@@ -958,7 +962,7 @@ const defaultAnomalyConfig = () => ({
   retrain_interval_days: 7,
   threshold: 97,
   alert_enabled: true,
-  alert_destination_id: undefined as string | undefined,
+  alert_destination_ids: [] as string[],
   folder_id: "default",
   status: undefined as string | undefined,
   is_trained: false,
@@ -1038,6 +1042,7 @@ export default defineComponent({
     // ── Anomaly Detection state ─────────────────────────────────────────────
     const anomalyConfig = ref(defaultAnomalyConfig());
     const anomalyStep2Ref = ref<any>(null);
+    const showAnomalyPreview = ref(true);
     const showAnomalySummary = ref(true);
     const anomalyEditMode = ref(false);
     const anomalyRetraining = ref(false);
@@ -1135,6 +1140,11 @@ export default defineComponent({
       ]
         .filter(Boolean)
         .join("\n");
+    });
+
+    const anomalyPreviewSectionStyle = computed(() => {
+      if (!showAnomalyPreview.value) return { flex: "0 0 auto" };
+      return { flex: "1", minHeight: "150px", overflow: "hidden", display: "flex", flexDirection: "column" };
     });
 
     const anomalySummarySectionStyle = computed(() => {
@@ -1382,9 +1392,25 @@ export default defineComponent({
             : parseSeconds(
                 sched.value * (sched.unit === "h" ? 3600 : 60),
               );
+          // Normalize destinations: API may return alert_destinations (array), alert_destination_ids, or alert_destination_id
+          const rawDestIds = data.alert_destinations ?? data.alert_destination_ids ?? data.alert_destination_id;
+          const destIds: string[] = Array.isArray(rawDestIds)
+            ? rawDestIds
+            : rawDestIds
+              ? [rawDestIds]
+              : [];
+          // Parse "avg(field)" → fn="avg", field="field"
+          const rawFn: string = data.detection_function || "count";
+          const fnMatch = rawFn.match(/^(\w+)\(([^)]*)\)$/);
+          const parsedFn = fnMatch ? fnMatch[1] : rawFn;
+          const parsedField =
+            data.detection_function_field ||
+            (fnMatch && fnMatch[2] !== "*" ? fnMatch[2] : "");
           anomalyConfig.value = {
             ...defaultAnomalyConfig(),
             ...data,
+            detection_function: parsedFn,
+            detection_function_field: parsedField,
             threshold: data.threshold ?? data.percentile ?? 97,
             filters: data.filters ?? [],
             histogram_interval_value: histInterval.value,
@@ -1393,6 +1419,7 @@ export default defineComponent({
             schedule_interval_unit: sched.unit,
             detection_window_value: win.value,
             detection_window_unit: win.unit,
+            alert_destination_ids: destIds,
           };
           formData.value.is_real_time = "anomaly";
           formData.value.name = data.name;
@@ -2688,6 +2715,128 @@ export default defineComponent({
       }
     };
 
+
+    const loadPatternDataIfPresent = async () => {
+      const route = router.currentRoute.value;
+
+      if (route.query.fromPattern === "true") {
+        try {
+          const raw = sessionStorage.getItem("patternData");
+          if (!raw) return;
+          const patternData = JSON.parse(raw);
+
+          const isAnomaly = !!patternData.isAnomaly;
+
+          // --- Stream & Query ---
+          if (patternData.streamName) {
+            formData.value.stream_type = patternData.streamType || "logs";
+            await updateStreams(false);
+            formData.value.stream_name = patternData.streamName;
+          }
+
+          formData.value.query_condition.type = "sql";
+          if (patternData.sqlQuery) {
+            formData.value.query_condition.sql = patternData.sqlQuery;
+          }
+
+          // --- Alert Name ---
+          formData.value.name =
+            patternData.alertName ||
+            `Alert_${patternData.streamName || "pattern"}`;
+
+          // --- Trigger Conditions (anomaly-aware) ---
+          const period = patternData.periodMinutes || 15;
+          // Frequency should be shorter than period so we don't miss events
+          const frequency = Math.max(1, Math.min(period, Math.floor(period / 2)));
+
+          formData.value.trigger_condition.period = period;
+          formData.value.trigger_condition.frequency = frequency;
+          formData.value.trigger_condition.frequency_type = "minutes";
+          formData.value.trigger_condition.operator = ">=";
+
+          if (isAnomaly) {
+            // Anomalies are urgent: alert on any occurrence, shorter silence
+            formData.value.trigger_condition.threshold = 1;
+            formData.value.trigger_condition.silence = 10;
+            formData.value.creates_incident = true;
+          } else {
+            // Normal patterns: scale threshold with frequency to avoid noise
+            const freq = patternData.patternFrequency || 0;
+            if (freq > 1000) {
+              formData.value.trigger_condition.threshold = Math.round(freq * 0.5);
+            } else if (freq > 100) {
+              formData.value.trigger_condition.threshold = Math.round(freq * 0.25);
+            } else {
+              formData.value.trigger_condition.threshold = 1;
+            }
+            formData.value.trigger_condition.silence = 30;
+          }
+
+          // Scheduled alert works best for pattern monitoring
+          formData.value.is_real_time = "false";
+
+          // --- Description ---
+          const descParts = [
+            `Auto-created from log pattern detection.`,
+            `Pattern: ${patternData.patternTemplate || "N/A"}`,
+            `Stream: ${patternData.streamName || "N/A"}`,
+          ];
+          if (patternData.patternFrequency) {
+            descParts.push(
+              `Matched ${patternData.patternFrequency.toLocaleString()} logs` +
+                (patternData.patternPercentage
+                  ? ` (${patternData.patternPercentage.toFixed(2)}% of analyzed logs)`
+                  : ""),
+            );
+          }
+          if (isAnomaly) {
+            descParts.push("⚠ This pattern was flagged as an anomaly.");
+          }
+          formData.value.description = descParts.join("\n");
+
+          // --- Context Attributes (pattern metadata for notification templates) ---
+          formData.value.context_attributes = [
+            {
+              id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-1`,
+              key: "source_pattern_template",
+              value: patternData.patternTemplate || "",
+            },
+            {
+              id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-2`,
+              key: "source_pattern_id",
+              value: patternData.patternId || "",
+            },
+            {
+              id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-3`,
+              key: "pattern_frequency",
+              value: String(patternData.patternFrequency || 0),
+            },
+            {
+              id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-4`,
+              key: "pattern_is_anomaly",
+              value: String(isAnomaly),
+            },
+          ];
+
+          q.notify({
+            type: "positive",
+            message: isAnomaly
+              ? t("alerts.importedFromAnomalyPattern")
+              : t("alerts.importedFromPattern"),
+            timeout: 3000,
+          });
+
+          await nextTick();
+          sessionStorage.removeItem("patternData");
+          if (previewAlertRef.value?.refreshData) {
+            previewAlertRef.value.refreshData();
+          }
+        } catch (error) {
+          console.error("Error loading pattern data:", error);
+        }
+      }
+    };
+
     const openJsonEditor = () => {
       showJsonEditorDialog.value = true;
     };
@@ -2715,6 +2864,7 @@ export default defineComponent({
         q,
         store,
         streams,
+        getStreams,
         getParser,
         buildQueryPayload,
         prepareAndSaveAlert: prepareAndSaveAlertFunction,
@@ -2919,7 +3069,13 @@ export default defineComponent({
     // Allow saving after completing all required steps
     const canSaveAlert = computed(() => {
       if (formData.value.is_real_time === "anomaly") {
-        // Anomaly: allow save from any step (save button always enabled)
+        // Block save when notifications are enabled but no destination is selected
+        if (
+          anomalyConfig.value.alert_enabled &&
+          anomalyConfig.value.alert_destination_ids.length === 0
+        ) {
+          return false;
+        }
         return true;
       }
       // Required steps: 1 (Alert Setup), 2 (Conditions), 4 (Alert Settings)
@@ -2931,34 +3087,96 @@ export default defineComponent({
     const anomalySaving = ref(false);
 
     const saveAnomalyDetection = async () => {
+      // Validate step 2 (detection config) before saving
+      if (anomalyStep2Ref.value) {
+        const step2Valid = await anomalyStep2Ref.value.validate();
+        if (!step2Valid) {
+          wizardStep.value = 2;
+          return;
+        }
+      }
+
+      // Validate step 3 (alerting) - destination required when notifications enabled
+      if (
+        anomalyConfig.value.alert_enabled &&
+        anomalyConfig.value.alert_destination_ids.length === 0
+      ) {
+        wizardStep.value = 3;
+        return;
+      }
+
       anomalySaving.value = true;
+      const orgId = store.state.selectedOrganization.identifier;
+      const c = anomalyConfig.value;
+
+      // Validate custom SQL against the search API before saving
+      if (c.query_mode === "custom_sql") {
+        if (!c.custom_sql?.trim()) {
+          q.notify({
+            type: "negative",
+            message: "Custom SQL is required in custom SQL mode.",
+          });
+          wizardStep.value = 2;
+          anomalySaving.value = false;
+          return;
+        }
+        try {
+          await searchService.search({
+            org_identifier: orgId,
+            query: {
+              query: {
+                sql: c.custom_sql,
+                start_time: (Date.now() - 3600000) * 1000,
+                end_time: Date.now() * 1000,
+                from: 0,
+                size: 1,
+              },
+            },
+            page_type: c.stream_type,
+          });
+        } catch (sqlErr: any) {
+          const msg =
+            sqlErr?.response?.data?.message || "Invalid SQL query";
+          q.notify({
+            type: "negative",
+            message: `SQL validation error: ${msg}`,
+          });
+          wizardStep.value = 2;
+          anomalySaving.value = false;
+          return;
+        }
+      }
+
       try {
-        const orgId = store.state.selectedOrganization.identifier;
-        const c = anomalyConfig.value;
         const payload: any = {
+          alert_type: "anomaly_detection",
           name: c.name,
           description: c.description || undefined,
           stream_name: c.stream_name,
           stream_type: c.stream_type,
-          query_mode: c.query_mode,
-          filters: c.query_mode === "filters" ? c.filters : undefined,
-          custom_sql: c.query_mode === "custom_sql" ? c.custom_sql : undefined,
-          detection_function: c.detection_function,
-          detection_function_field:
-            c.detection_function !== "count"
-              ? c.detection_function_field || undefined
-              : undefined,
-          histogram_interval: anomalyHistogramInterval.value,
-          schedule_interval: anomalyScheduleInterval.value,
-          detection_window_seconds: anomalyDetectionWindowSeconds.value,
-          training_window_days: c.training_window_days,
-          retrain_interval_days: c.retrain_interval_days,
-          percentile: c.threshold,
-          alert_enabled: c.alert_enabled,
-          alert_destination_id: c.alert_enabled
-            ? c.alert_destination_id
-            : undefined,
+          enabled: c.enabled ?? true,
           folder_id: (activeFolderId.value as string) || "default",
+          alert_destinations:
+            c.alert_enabled && c.alert_destination_ids?.length
+              ? c.alert_destination_ids
+              : [],
+          anomaly_config: {
+            query_mode: c.query_mode,
+            filters: c.query_mode === "filters" ? (c.filters ?? []) : null,
+            custom_sql: c.query_mode === "custom_sql" ? c.custom_sql : null,
+            detection_function: c.detection_function || "count(*)",
+            detection_function_field:
+              c.query_mode === "filters" && c.detection_function !== "count"
+                ? c.detection_function_field || undefined
+                : undefined,
+            histogram_interval: anomalyHistogramInterval.value,
+            schedule_interval: anomalyScheduleInterval.value,
+            detection_window_seconds: anomalyDetectionWindowSeconds.value,
+            training_window_days: c.training_window_days,
+            retrain_interval_days: c.retrain_interval_days,
+            threshold: c.threshold,
+            alert_enabled: c.alert_enabled,
+          },
         };
 
         const routeAnomalyId = router.currentRoute.value.params
@@ -2979,14 +3197,7 @@ export default defineComponent({
           });
         }
 
-        emit("update:list");
-        router.push({
-          name: "alertList",
-          query: {
-            org_identifier: orgId,
-            tab: "anomalyDetection",
-          },
-        });
+        emit("update:list", (activeFolderId.value as string) || "default");
       } catch (err: any) {
         q.notify({
           type: "negative",
@@ -3094,6 +3305,7 @@ export default defineComponent({
       generateSqlQuery: generateSqlQueryLocal,
       track,
       loadPanelDataIfPresent,
+      loadPatternDataIfPresent,
       isLoadingPanelData,
       focusManager,
       streamFieldRef,
@@ -3122,6 +3334,8 @@ export default defineComponent({
       anomalyConfig,
       anomalyStep2Ref,
       anomalyPreviewSql,
+      showAnomalyPreview,
+      anomalyPreviewSectionStyle,
       showAnomalySummary,
       anomalySummarySectionStyle,
       saveAnomalyDetection,
@@ -3139,10 +3353,11 @@ export default defineComponent({
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...cloneDeep(this.modelValue) };
 
-    // Check if this is from a dashboard panel - if so, don't set default query type
+    // Check if this is from a dashboard panel or log pattern - if so, don't set default query type
     const route = this.router.currentRoute.value;
     const isFromPanel =
       route.query.fromPanel === "true" && route.query.panelData;
+    const isFromPattern = route.query.fromPattern === "true";
 
     if (!this.isUpdated) {
       this.formData.is_real_time = this.alertType === "realTime" ? true : false;
@@ -3155,16 +3370,29 @@ export default defineComponent({
       await this.loadPanelDataIfPresent(); // Load panel data and set correct type
     }
 
+    // If from pattern, load pattern data BEFORE initializing child components
+    if (isFromPattern) {
+      this.formData.query_condition.type = ""; // Temporarily set to empty
+      await this.loadPatternDataIfPresent(); // Load pattern data and set correct type
+    }
+
     // Set default frequency to min_auto_refresh_interval
-    if (this.store.state?.zoConfig?.min_auto_refresh_interval)
-      this.formData.trigger_condition.frequency = Math.ceil(
-        this.store.state?.zoConfig?.min_auto_refresh_interval / 60 || 10,
-      );
+    // Skip when coming from a pattern or panel — those loaders set their own frequency
+    if (!isFromPattern && !isFromPanel) {
+      if (this.store.state?.zoConfig?.min_auto_refresh_interval)
+        this.formData.trigger_condition.frequency = Math.ceil(
+          this.store.state?.zoConfig?.min_auto_refresh_interval / 60 || 10,
+        );
+    }
 
     this.beingUpdated = this.isUpdated;
-    this.updateStreams(false)?.then(() => {
-      this.updateEditorContent(this.formData.stream_name);
-    });
+    // Skip when coming from a pattern — loadPatternDataIfPresent already called updateStreams
+    // and a second call would overwrite the pattern-derived SQL query
+    if (!isFromPattern) {
+      this.updateStreams(false)?.then(() => {
+        this.updateEditorContent(this.formData.stream_name);
+      });
+    }
     if (
       this.modelValue &&
       this.modelValue.name != undefined &&
@@ -3615,6 +3843,20 @@ export default defineComponent({
   resize: both;
 }
 
+.collapsible-section {
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+  overflow: hidden;
+
+  .section-header {
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
+    transition: all 0.2s ease;
+    border-radius: 0.375rem 0.375rem 0 0;
+  }
+}
+
 .alert-condition {
   .__column,
   .__value {
@@ -3858,5 +4100,13 @@ export default defineComponent({
   color: #757575;
   border-left: 3px solid #bdbdbd;
   padding-left: 12px !important;
+}
+</style>
+<style scoped lang="scss">
+.preview-alert-container{
+  border: 1px solid rgb(39, 39, 39) !important;
+}
+.preview-alert-container-light{
+  border: 1px solid #e6e6e6 !important;
 }
 </style>

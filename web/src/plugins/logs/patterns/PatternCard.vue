@@ -22,23 +22,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Pattern Column -->
     <div class="tw:flex-1 tw:min-w-0 tw:px-2">
+      <!-- Template rendered as tokenized chips so wildcards are visually distinct -->
       <div
-        class="pattern-template-text"
+        class="pattern-template-text tw:flex tw:items-baseline tw:gap-x-[2px] tw:gap-y-[1px]"
         :class="[
-          wrap ? 'tw:break-all' : 'tw:truncate',
-          store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'
+          store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8',
+          wrap
+            ? 'tw:flex-wrap tw:break-all'
+            : 'tw:flex-nowrap tw:overflow-hidden',
         ]"
         :data-test="`pattern-card-${index}-template`"
         :title="pattern.template"
       >
-        <LogsHighLighting
-          :data="pattern.template"
-          :show-braces="false"
-          :show-quotes="false"
-          :query-string="''"
-          :simple-mode="false"
-        />
+        <template v-for="(tok, i) in templateTokens" :key="i">
+          <span v-if="tok.kind === 'text'" class="tw:whitespace-pre">{{ tok.value }}</span>
+          <q-chip
+            v-else
+            dense
+            size="xs"
+            class="wildcard-chip q-my-none q-mx-none"
+            :class="wildcardChipColor(tok.value)"
+          >
+            {{ tok.value }}
+            <q-tooltip
+              v-if="tok.sampleValues.length > 0"
+              anchor="bottom middle"
+              self="top middle"
+              :delay="300"
+              class="wildcard-tooltip"
+            >
+              <div class="tw:font-mono tw:text-xs">
+                <div class="tw:font-semibold tw:mb-1">{{ t("search.wildcardSampleValues") }}</div>
+                <div
+                  v-for="(val, vi) in tok.sampleValues.slice(0, 10)"
+                  :key="vi"
+                  class="tw:truncate tw:max-w-[20rem]"
+                >
+                  {{ val }}
+                </div>
+              </div>
+            </q-tooltip>
+          </q-chip>
+        </template>
       </div>
+
+      <!-- Anomaly badge with explanation tooltip -->
+      <span
+        v-if="pattern.is_anomaly"
+        class="text-negative text-weight-bold tw:text-[0.625rem] tw:cursor-help"
+        :data-test="`pattern-card-${index}-anomaly-badge`"
+      >
+        ⚠️ {{ t("search.anomalyLabel") }}
+        <q-tooltip anchor="bottom middle" self="top middle" class="anomaly-tooltip">
+          <div class="tw:text-xs tw:max-w-[22rem]">{{ anomalyExplanationText }}</div>
+        </q-tooltip>
+      </span>
     </div>
 
     <!-- Occurrence Column -->
@@ -60,27 +98,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
     </div>
 
-    <!-- Anomaly Column -->
-    <div class="tw:w-16 tw:flex-shrink-0 tw:px-2 tw:text-center">
-      <span
-        v-if="pattern.is_anomaly"
-        class="text-negative text-weight-bold tw:text-[1rem]"
-        :data-test="`pattern-card-${index}-anomaly-badge`"
-      >
-        ⚠️
-        <q-tooltip :delay="500">{{ t("search.anomalyDetected") }}</q-tooltip>
-      </span>
-      <span
-        v-else
-        class="text-grey-6 tw:text-[0.75rem]"
-        :data-test="`pattern-card-${index}-no-anomaly`"
-      >
-        --
-      </span>
-    </div>
-
     <!-- Actions Column -->
-    <div class="tw:w-20 tw:flex-shrink-0 tw:px-2 tw:flex tw:items-center">
+    <div class="tw:w-24 tw:flex-shrink-0 tw:px-2 tw:flex tw:items-center">
       <q-btn
         size="6px"
         @click.stop="$emit('include', pattern)"
@@ -121,18 +140,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}</q-tooltip>
         </q-icon>
       </q-btn>
+      <q-btn
+        size="6px"
+        class="cursor-pointer pattern-details-btn"
+        color="warning"
+        round
+        :data-test="`pattern-card-${index}-create-alert-btn`"
+        @click.stop="$emit('create-alert', pattern)"
+      >
+        <q-icon name="add_alert" style="height: 8px; width: 8px">
+          <q-tooltip>{{ t("search.createAlertFromPattern") }}</q-tooltip>
+        </q-icon>
+      </q-btn>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
-import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
+import {
+  tokenizeTemplate,
+  wildcardChipColor,
+  anomalyExplanation,
+} from "@/composables/useLogs/useTemplateTokenizer";
 
-defineProps<{
+const props = defineProps<{
   pattern: any;
   index: number;
   wrap?: boolean;
@@ -142,10 +178,17 @@ defineEmits<{
   (e: "click", pattern: any, index: number): void;
   (e: "include", pattern: any): void;
   (e: "exclude", pattern: any): void;
+  (e: "create-alert", pattern: any): void;
 }>();
 
 const store = useStore();
 const { t } = useI18n();
+
+const templateTokens = computed(() =>
+  tokenizeTemplate(props.pattern.template ?? "", props.pattern.wildcard_values ?? []),
+);
+
+const anomalyExplanationText = computed(() => anomalyExplanation(props.pattern, t));
 </script>
 
 <style scoped lang="scss">
@@ -170,5 +213,15 @@ const { t } = useI18n();
 @import "@/assets/styles/log-highlighting.css";
 .pattern-details-btn > span.q-btn__content {
   display: block !important;
+}
+.wildcard-chip {
+  font-family: monospace;
+  font-size: 10px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 3px;
+  line-height: 16px;
+  // Prevent chips from inheriting the truncate overflow of the parent row
+  flex-shrink: 0;
 }
 </style>

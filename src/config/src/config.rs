@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 34;
+pub const DB_SCHEMA_VERSION: u64 = 36;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -73,6 +73,11 @@ pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024; // this can't be change, it will cause segment matching error
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
+pub const SOURCEMAP_ZIP_MAX_SIZE: usize = 1024 * 1024 * 100; // 100 MB
+// max file size for individual sourcemap. We temp cache these in mem,
+// so it will affect spikes in mem at resolving stacktrace
+pub const SOURCEMAP_FILE_MAX_SIZE: u64 = 1024 * 1024 * 5; // 5 MB
+pub const SOURCEMAP_MEM_CACHE_SIZE: usize = 10000;
 
 #[inline]
 pub fn get_batch_size() -> usize {
@@ -710,10 +715,11 @@ pub struct Http {
     pub tls_min_version: String,
     #[env_config(
         name = "ZO_HTTP_TLS_ROOT_CERTIFICATES",
+        parse,
         default = "webpki",
         help = "this value must use webpki or native. it means use standard root certificates from webpki-roots or native-roots as a rustls certificate store"
     )]
-    pub tls_root_certificates: String,
+    pub tls_root_certificates: TlsRootCertificates,
     #[env_config(
         name = "ZO_HTTP_ACCESS_LOG_FORMAT",
         default = "",
@@ -752,6 +758,45 @@ pub struct Grpc {
     pub tls_cert_path: String,
     #[env_config(name = "ZO_GRPC_TLS_KEY_PATH", default = "")]
     pub tls_key_path: String,
+    #[env_config(
+        name = "ZO_GRPC_TLS_ROOT_CERTIFICATES",
+        parse,
+        default = "webpki",
+        help = "this value can be set to webpki or native. Using webpki means client will trust a preset CA bundle. Using native means client will trust the certificates in OS trust store"
+    )]
+    pub tls_root_certificates: TlsRootCertificates,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum TlsRootCertificates {
+    #[default]
+    Webpki,
+    Native,
+}
+
+impl std::fmt::Display for TlsRootCertificates {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Webpki => write!(f, "webpki"),
+            Self::Native => write!(f, "native"),
+        }
+    }
+}
+
+impl std::str::FromStr for TlsRootCertificates {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "webpki" => Ok(Self::Webpki),
+            "native" => Ok(Self::Native),
+            _ => Err(anyhow::anyhow!(
+                "Invalid tls_root_certificates value: '{}'. Must be 'webpki' or 'native'",
+                s
+            )),
+        }
+    }
 }
 
 #[derive(Serialize, PartialEq, Default)]
@@ -860,11 +905,11 @@ pub struct Common {
     #[env_config(name = "ZO_FEATURE_INGESTER_NONE_COMPRESSION", default = false)]
     pub feature_ingester_none_compression: bool,
     #[env_config(
-        name = "ZO_FEATURE_FIELD_VALUES_FOR_FST",
+        name = "ZO_FEATURE_SHOW_FTS_FIELD_VALUES",
         default = false,
-        help = "Show field values dropdown for full text search (FST) fields in the logs page field list"
+        help = "Show field values dropdown for full text search fields in the logs page field list"
     )]
-    pub field_values_for_fst: bool,
+    pub show_fts_field_values: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
     pub feature_fulltext_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_INDEX_EXTRA_FIELDS", default = "")]

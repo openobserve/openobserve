@@ -18,6 +18,7 @@ import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Notify } from "quasar";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
+import DateTime from "@/components/DateTime.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -101,7 +102,11 @@ describe("AlertHistoryDrawer.vue", () => {
   });
 
   afterEach(() => {
-    wrapper?.unmount();
+    try {
+      wrapper?.unmount();
+    } catch {
+      // Quasar teleported components can throw during unmount in jsdom
+    }
   });
 
   const mountComponent = async (
@@ -130,9 +135,6 @@ describe("AlertHistoryDrawer.vue", () => {
       await mountComponent();
       expect(
         wrapper.find('[data-test="alert-details-title"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="alert-details-edit-btn"]').exists(),
       ).toBe(true);
       expect(
         wrapper.find('[data-test="alert-details-close-btn"]').exists(),
@@ -165,11 +167,7 @@ describe("AlertHistoryDrawer.vue", () => {
 
     it("should display scheduled chip for non-realtime alerts", async () => {
       await mountComponent();
-      const chips = wrapper.findAllComponents({ name: "QChip" });
-      const scheduledChip = chips.find(
-        (chip) => chip.props("label") === "Scheduled",
-      );
-      expect(scheduledChip).toBeTruthy();
+      expect(wrapper.text()).toContain("Scheduled");
     });
 
     it("should display real-time chip for realtime alerts", async () => {
@@ -177,11 +175,7 @@ describe("AlertHistoryDrawer.vue", () => {
         alertDetails: { ...mockAlertDetails, is_real_time: true },
         alertId: "alert-123",
       });
-      const chips = wrapper.findAllComponents({ name: "QChip" });
-      const realtimeChip = chips.find(
-        (chip) => chip.props("label") === "Real-time",
-      );
-      expect(realtimeChip).toBeTruthy();
+      expect(wrapper.text()).toContain("Real-time");
     });
   });
 
@@ -348,7 +342,7 @@ describe("AlertHistoryDrawer.vue", () => {
         data: mockHistoryData,
       } as any);
 
-      const dateTimeComponent = wrapper.findComponent({ name: "DateTime" });
+      const dateTimeComponent = wrapper.findComponent(DateTime);
       await dateTimeComponent.vm.$emit("on:date-change", {
         startTime: 1699800000000000,
         endTime: 1699900000000000,
@@ -367,7 +361,7 @@ describe("AlertHistoryDrawer.vue", () => {
         data: mockHistoryData,
       } as any);
 
-      const dateTimeComponent = wrapper.findComponent({ name: "DateTime" });
+      const dateTimeComponent = wrapper.findComponent(DateTime);
       await dateTimeComponent.vm.$emit("on:date-change", {
         startTime: 1699800000000000,
         endTime: 1699900000000000,
@@ -383,7 +377,7 @@ describe("AlertHistoryDrawer.vue", () => {
       vm.pagination.page = 3;
       vm.currentPage = 3;
 
-      const dateTimeComponent = wrapper.findComponent({ name: "DateTime" });
+      const dateTimeComponent = wrapper.findComponent(DateTime);
       await dateTimeComponent.vm.$emit("on:date-change", {
         startTime: 1699800000000000,
         endTime: 1699900000000000,
@@ -397,11 +391,12 @@ describe("AlertHistoryDrawer.vue", () => {
   });
 
   describe("Pagination", () => {
-    it("should have pagination component", async () => {
+    it("should have pagination data initialized", async () => {
       await mountComponent();
-      expect(
-        wrapper.findComponent({ name: "QTablePagination" }).exists(),
-      ).toBe(true);
+      const vm = wrapper.vm as any;
+      expect(vm.pagination).toBeDefined();
+      expect(vm.pagination.rowsPerPage).toBe(50);
+      expect(vm.pagination.page).toBe(1);
     });
 
     it("should call getHistory when table requests data", async () => {
@@ -438,18 +433,6 @@ describe("AlertHistoryDrawer.vue", () => {
   });
 
   describe("Actions", () => {
-    it("should emit edit event when edit button is clicked", async () => {
-      await mountComponent();
-
-      const editBtn = wrapper.find(
-        '[data-test="alert-details-edit-btn"]',
-      );
-      await editBtn.trigger("click");
-
-      expect(wrapper.emitted("edit")).toBeTruthy();
-      expect(wrapper.emitted("edit")![0]).toEqual([mockAlertDetails]);
-    });
-
     it("should not crash when alertDetails is null", async () => {
       await mountComponent({
         alertDetails: null,
@@ -530,27 +513,27 @@ describe("AlertHistoryDrawer.vue", () => {
       expect(vm.formatStatus(null)).toBe("Unknown");
     });
 
-    it("getStatusDotClass should return correct classes", async () => {
+    it("getStatusChipColor should return correct colors", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      expect(vm.getStatusDotClass("firing")).toBe("status-dot-error");
-      expect(vm.getStatusDotClass("error")).toBe("status-dot-error");
-      expect(vm.getStatusDotClass("ok")).toBe("status-dot-success");
-      expect(vm.getStatusDotClass("success")).toBe("status-dot-success");
-      expect(vm.getStatusDotClass("skipped")).toBe("status-dot-warning");
-      expect(vm.getStatusDotClass("pending")).toBe("status-dot-info");
-      expect(vm.getStatusDotClass("unknown")).toBe("status-dot-default");
+      expect(vm.getStatusChipColor("firing")).toBe("red-1");
+      expect(vm.getStatusChipColor("error")).toBe("red-1");
+      expect(vm.getStatusChipColor("ok")).toBe("green-1");
+      expect(vm.getStatusChipColor("success")).toBe("green-1");
+      expect(vm.getStatusChipColor("skipped")).toBe("amber-1");
+      expect(vm.getStatusChipColor("pending")).toBe("blue-1");
+      expect(vm.getStatusChipColor("unknown")).toBe("grey-3");
     });
 
-    it("getStatusTextClass should return correct classes", async () => {
+    it("getStatusChipTextColor should return correct text colors", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      expect(vm.getStatusTextClass("firing")).toBe("tw:text-red-500");
-      expect(vm.getStatusTextClass("error")).toBe("tw:text-red-500");
-      expect(vm.getStatusTextClass("ok")).toBe("tw:text-green-600");
-      expect(vm.getStatusTextClass("success")).toBe("tw:text-green-600");
-      expect(vm.getStatusTextClass("skipped")).toBe("tw:text-amber-600");
-      expect(vm.getStatusTextClass("pending")).toBe("tw:text-blue-500");
+      expect(vm.getStatusChipTextColor("firing")).toBe("red-9");
+      expect(vm.getStatusChipTextColor("error")).toBe("red-9");
+      expect(vm.getStatusChipTextColor("ok")).toBe("green-9");
+      expect(vm.getStatusChipTextColor("success")).toBe("green-9");
+      expect(vm.getStatusChipTextColor("skipped")).toBe("amber-9");
+      expect(vm.getStatusChipTextColor("pending")).toBe("blue-9");
     });
 
     it("getRowClass should return error class for error/firing status", async () => {
@@ -570,42 +553,28 @@ describe("AlertHistoryDrawer.vue", () => {
       expect(vm.formatTimestamp(null)).toBe("N/A");
     });
 
-    it("formatTimestamp should format recent timestamps as relative", async () => {
+    it("formatTimestamp should format recent timestamps as relative minutes", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
       // 5 minutes ago in microseconds
       const fiveMinAgo = (Date.now() - 5 * 60 * 1000) * 1000;
-      expect(vm.formatTimestamp(fiveMinAgo)).toMatch(/\d+ min ago/);
+      expect(vm.formatTimestamp(fiveMinAgo)).toBe("5 min ago");
     });
 
-    it("formatTimestamp should format hours-old timestamps", async () => {
+    it("formatTimestamp should format hours-old timestamps as relative hours", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
       // 3 hours ago in microseconds
       const threeHoursAgo = (Date.now() - 3 * 3600 * 1000) * 1000;
-      expect(vm.formatTimestamp(threeHoursAgo)).toMatch(/\d+h ago/);
+      expect(vm.formatTimestamp(threeHoursAgo)).toBe("3h ago");
     });
 
-    it("formatTimestamp should format days-old timestamps", async () => {
+    it("formatTimestamp should format days-old timestamps as relative days", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
       // 3 days ago in microseconds
       const threeDaysAgo = (Date.now() - 3 * 86400 * 1000) * 1000;
-      expect(vm.formatTimestamp(threeDaysAgo)).toMatch(/\d+d ago/);
-    });
-
-    it("formatTimestampFull should return N/A for falsy timestamps", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.formatTimestampFull(0)).toBe("N/A");
-      expect(vm.formatTimestampFull(null)).toBe("N/A");
-    });
-
-    it("formatTimestampFull should return full date string", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      const result = vm.formatTimestampFull(1699900000000000);
-      expect(result).toMatch(/\w+ \d{2}, \d{4} \d{2}:\d{2}:\d{2}/);
+      expect(vm.formatTimestamp(threeDaysAgo)).toBe("3d ago");
     });
   });
 

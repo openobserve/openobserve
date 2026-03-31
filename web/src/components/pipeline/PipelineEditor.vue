@@ -844,9 +844,9 @@ const validatePipeline = () => {
 
   // If trying to use enrichment_tables with stream input, return false
   if (
-    inputNode.data?.node_type === "stream" &&
-    outputNode.data?.node_type === "stream" &&
-    outputNode.data?.stream_type === "enrichment_tables"
+    inputNode?.data?.node_type === "stream" &&
+    outputNode?.data?.node_type === "stream" &&
+    outputNode?.data?.stream_type === "enrichment_tables"
   ) {
     q.notify({
       message: t("pipeline.enrichmentTablesScheduledOnly"),

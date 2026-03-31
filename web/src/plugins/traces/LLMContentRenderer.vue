@@ -743,3 +743,33 @@ export default {
   }
 }
 </style>
+
+<style lang="scss">
+/* Unscoped — needed because innerHTML-injected nodes don't get the scoped attribute */
+.llm-content-renderer .messages-view .message-item .message-content {
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-weight: 600;
+    margin: 10px 0 6px 0;
+    line-height: 1.4;
+  }
+
+  h1 {
+    font-size: 1.15rem;
+  }
+
+  h2 {
+    font-size: 1.05rem;
+  }
+
+  h3 {
+    font-size: 0.95rem;
+  }
+
+  h4 {
+    font-size: 0.875rem;
+  }
+}
+</style>

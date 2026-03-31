@@ -650,6 +650,18 @@ export default defineComponent({
       );
       editorObj.onDidFocusEditorWidget(() => {
         emit("focus");
+
+        // added hack to handle case where ctrl+enter / cmd+enter stops working after 
+        // user click on the result row and open sidebase or opensidebar from schedule search
+        // This is because the editor loses focus and the context key "ctrlenter" is not active anymore, so we need to re-add the command on focus
+        editorObj.addCommand(
+          monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+          function () {
+            // Emit run-query event when Ctrl/Cmd+Enter is pressed
+            emit("run-query");
+          },
+          "ctrlenter",
+        );
       });
 
       editorObj.onDidBlurEditorWidget(() => {
@@ -876,7 +888,14 @@ export default defineComponent({
     };
 
     const triggerAutoComplete = async (value: string) => {
-      disableSuggestionPopup();
+      // Close any currently-open suggestion popup before retriggering.
+      // Monaco's model.trigger() calls cancel() internally, but if a natural
+      // popup is already in "Showing" state (e.g. opened by typing quote after
+      // an operator, or from word-based suggest while typing NOT LIKE), the
+      // widget may not refresh its item list. hideSuggestWidget transitions
+      // state to Idle cleanly (no "user dismissed" flag) so the following
+      // triggerSuggest always opens a fresh popup with the latest keywords.
+      editorObj.trigger(value, "hideSuggestWidget", {});
       await nextTick();
       editorObj.trigger(value, "editor.action.triggerSuggest", {});
     };
@@ -1012,7 +1031,7 @@ export default defineComponent({
     const aiIcon = computed(() => {
       return store.state.theme === "dark"
         ? getImageURL("images/common/ai_icon_dark.svg")
-        : getImageURL("images/common/ai_icon.svg");
+        : getImageURL("images/common/ai_icon_gradient.svg");
     });
 
     // Toggle NLP mode
@@ -1118,22 +1137,22 @@ export default defineComponent({
   bottom: 0.5rem;
   right: 0.5rem;
   z-index: 100;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
   color: white !important;
-  box-shadow: 0 0.25rem 0.9375rem 0 rgba(102, 126, 234, 0.3) !important;
+  box-shadow: 0 0.25rem 0.9375rem 0 rgba(139, 92, 246, 0.3) !important;
   transition: all 0.3s ease !important;
   border: none !important;
 }
 
 .generate-sql-button:hover:not(.disabled):not([disabled]):not(:disabled) {
-  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%) !important;
-  box-shadow: 0 0.375rem 1.25rem 0 rgba(102, 126, 234, 0.4) !important;
+  background: linear-gradient(135deg, #7C3AED 0%, #DB2777 100%) !important;
+  box-shadow: 0 0.375rem 1.25rem 0 rgba(139, 92, 246, 0.4) !important;
   transform: translateY(-0.0625rem) !important;
 }
 
 .generate-sql-button:active:not(.disabled):not([disabled]):not(:disabled) {
   transform: translateY(0) !important;
-  box-shadow: 0 0.125rem 0.625rem 0 rgba(102, 126, 234, 0.3) !important;
+  box-shadow: 0 0.125rem 0.625rem 0 rgba(139, 92, 246, 0.3) !important;
 }
 
 /* Fade transition for button appearance */
@@ -1158,7 +1177,7 @@ export default defineComponent({
   max-height: 31.25rem;
   background: var(--o2-card-bg);
   border-radius: 0.5rem; /* 8px - matches O2 message border-radius */
-  border: 2px solid #667eea; /* O2 AI Assistant purple border */
+  border: 2px solid #8B5CF6; /* O2 AI Assistant purple border */
   padding: 0.75rem; /* 12px - matches O2 message padding */
   z-index: 99;
   overflow: hidden;
@@ -1166,12 +1185,12 @@ export default defineComponent({
 
 /* Light mode shadow - matches O2 AI Assistant with purple glow */
 .light-mode .streaming-preview-card {
-  box-shadow: 0 0.25rem 1rem 0 rgba(102, 126, 234, 0.2);
+  box-shadow: 0 0.25rem 1rem 0 rgba(139, 92, 246, 0.2);
 }
 
 /* Dark mode shadow - matches O2 AI Assistant with purple glow */
 .dark-mode .streaming-preview-card {
-  box-shadow: 0 0.25rem 1rem 0 rgba(102, 126, 234, 0.3);
+  box-shadow: 0 0.25rem 1rem 0 rgba(139, 92, 246, 0.3);
 }
 
 /* Streaming preview content - O2 AI Assistant text-block style */
@@ -1294,6 +1313,7 @@ export default defineComponent({
 <style lang="scss">
 .logs-query-editor {
   flex: 1;
+  min-height: 0;
   .monaco-editor,
   .monaco-editor .monaco-editor {
     padding: 0px 0px 0px 0px !important;

@@ -505,7 +505,7 @@ describe("usePanelFields", () => {
       expect(panelData.data.queries[0].fields.y).toHaveLength(1);
     });
 
-    it("merges breakdown fields into x for table chart type", () => {
+    it("keeps breakdown fields separate from x for table chart type (pivot table mode)", () => {
       // Must set panel type to "table" so isAddXAxisNotAllowed returns false
       panelData.data.type = "table";
       fields = usePanelFields({ dashboardPanelData: panelData, store });
@@ -518,10 +518,11 @@ describe("usePanelFields", () => {
         },
         "table",
       );
-      // table: breakdown merged into x, all get added
+      // table: x fields go into x, breakdown fields stay in breakdown (for pivot table mode)
       const xNames = panelData.data.queries[0].fields.x.map((f: any) => f.label);
+      const breakdownNames = panelData.data.queries[0].fields.breakdown.map((f: any) => f.label);
       expect(xNames).toContain("Col1");
-      expect(xNames).toContain("Col2");
+      expect(breakdownNames).toContain("Col2");
     });
   });
 

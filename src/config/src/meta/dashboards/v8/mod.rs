@@ -108,7 +108,8 @@ pub struct Panel {
     #[serde(default)]
     pub query_type: String,
     pub queries: Vec<Query>,
-    pub layout: Layout,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout: Option<Layout>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub html_content: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -442,6 +443,14 @@ pub struct PanelConfig {
     table_pagination: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     table_pagination_rows_per_page: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_pivot_show_row_totals: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_pivot_show_col_totals: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_pivot_sticky_row_totals: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_pivot_sticky_col_totals: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     panel_time_enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]

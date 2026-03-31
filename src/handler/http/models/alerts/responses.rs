@@ -13,12 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::{alerts::alert as meta_alerts, folder as meta_folders, triggers::Trigger};
+use std::str::FromStr;
+
+use config::{
+    meta::{alerts::alert as meta_alerts, folder as meta_folders, triggers::Trigger},
+    utils::time::parse_interval_to_minutes,
+};
 use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
-use super::{Alert, QueryCondition, TriggerCondition};
+use super::{Alert, FrequencyType, QueryCondition, TriggerCondition};
 
 /// HTTP response body for `GetAlert` endpoint.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -31,6 +36,10 @@ pub struct ListAlertsResponseBody {
 }
 
 /// An item in the list returned by the `ListAlerts` endpoint.
+///
+/// For `scheduled` and `realtime` alert types, `condition` and
+/// `trigger_condition` are always present. For `anomaly_detection` items they
+/// are absent; use `last_trained_at` and `status` instead.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ListAlertsResponseBodyItem {
     #[schema(value_type = String)]
@@ -40,12 +49,27 @@ pub struct ListAlertsResponseBodyItem {
     pub name: String,
     pub owner: Option<String>,
     pub description: Option<String>,
-    pub condition: QueryCondition,
-    pub trigger_condition: TriggerCondition,
+    /// Discriminator: "scheduled" | "realtime" | "anomaly_detection"
+    pub alert_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub condition: Option<QueryCondition>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trigger_condition: Option<TriggerCondition>,
     pub enabled: bool,
     pub last_triggered_at: Option<i64>,
     pub last_satisfied_at: Option<i64>,
     pub is_real_time: bool,
+    /// Timestamp (µs) when the anomaly model was last successfully trained.
+    /// Only present for `anomaly_detection` items.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_trained_at: Option<i64>,
+    /// Scheduler status string. Only present for `anomaly_detection` items.
+    /// Values: "waiting" | "ready" | "training" | "failed" | "disabled"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    /// Last error message from training or detection. Only present for `anomaly_detection` items.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_error: Option<String>,
 }
 
 /// HTTP response body for `EnableAlert` endpoint.
@@ -91,6 +115,11 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             alert.get_last_triggered_at(trigger.as_ref()),
             alert.get_last_satisfied_at(trigger.as_ref()),
         );
+        let alert_type = if alert.is_real_time {
+            "realtime".to_string()
+        } else {
+            "scheduled".to_string()
+        };
         Ok(Self {
             alert_id: alert.id.ok_or(())?,
             folder_id: folder.folder_id,
@@ -98,15 +127,93 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             name: alert.name,
             owner: alert.owner,
             description: Some(alert.description).filter(|d| !d.is_empty()),
-            condition: alert.query_condition.into(),
-            trigger_condition: alert.trigger_condition.into(),
+            alert_type,
+            condition: Some(alert.query_condition.into()),
+            trigger_condition: Some(alert.trigger_condition.into()),
             enabled: alert.enabled,
             last_triggered_at,
             last_satisfied_at,
             is_real_time: alert.is_real_time,
+            last_trained_at: None,
+            status: None,
+            last_error: None,
         })
     }
 }
+
+/// Converts a `serde_json::Value` returned by `anomaly_detection::list_configs`
+/// into a `ListAlertsResponseBodyItem`. Returns `None` if required fields are
+/// missing or the anomaly_id cannot be parsed as a KSUID.
+pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsResponseBodyItem> {
+    let anomaly_id_str = v.get("anomaly_id")?.as_str()?;
+    let alert_id = Ksuid::from_str(anomaly_id_str).ok()?;
+
+    let folder_id = v
+        .get("folder_id")
+        .and_then(|f| f.as_str())
+        .filter(|s| !s.is_empty())
+        .unwrap_or("default")
+        .to_string();
+
+    // list_configs runs model_to_api_json which already converts the integer
+    // status column to a string label ("waiting", "active", etc.).  Read it
+    // directly as a string; the old as_i64() path always returned None here.
+    let status = v.get("status").and_then(|s| s.as_str()).map(String::from);
+
+    // Build trigger_condition so the UI can display "Look back window" and "Check every".
+    // period  = detection_window_seconds / 60  (look-back window in minutes)
+    // frequency = schedule_interval parsed to minutes (e.g. "5m" → 5, "1h" → 60)
+    let period_minutes = v
+        .get("detection_window_seconds")
+        .and_then(|s| s.as_i64())
+        .map(|s| s / 60)
+        .unwrap_or(0);
+    let frequency_minutes = v
+        .get("schedule_interval")
+        .and_then(|s| s.as_str())
+        .map(parse_interval_to_minutes)
+        .unwrap_or(0);
+    let trigger_condition = Some(TriggerCondition {
+        period_minutes,
+        frequency_minutes,
+        frequency_type: FrequencyType::Minutes,
+        ..Default::default()
+    });
+
+    let folder_name = v
+        .get("folder_name")
+        .and_then(|n| n.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    Some(ListAlertsResponseBodyItem {
+        alert_id,
+        folder_id,
+        folder_name,
+        name: v.get("name")?.as_str()?.to_string(),
+        owner: v.get("owner").and_then(|o| o.as_str()).map(String::from),
+        description: v
+            .get("description")
+            .and_then(|d| d.as_str())
+            .filter(|d| !d.is_empty())
+            .map(String::from),
+        alert_type: "anomaly_detection".to_string(),
+        condition: None,
+        trigger_condition,
+        enabled: v.get("enabled").and_then(|e| e.as_bool()).unwrap_or(false),
+        last_triggered_at: v.get("last_detection_run").and_then(|t| t.as_i64()),
+        last_satisfied_at: v.get("last_anomaly_detected_at").and_then(|t| t.as_i64()),
+        is_real_time: false,
+        last_trained_at: v.get("training_completed_at").and_then(|t| t.as_i64()),
+        status,
+        last_error: v
+            .get("last_error")
+            .and_then(|e| e.as_str())
+            .filter(|s| !s.is_empty())
+            .map(String::from),
+    })
+}
+
 #[derive(Default, Serialize, ToSchema)]
 pub struct AlertBulkEnableResponse {
     #[schema(value_type = Vec<String>)]

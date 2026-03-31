@@ -18,6 +18,7 @@ service Search {
     rpc GetResult(GetResultRequest) returns (GetResultResponse) {}
     rpc DeleteResult(DeleteResultRequest) returns (DeleteResultResponse) {}
     rpc GetTable(GetTableRequest) returns (GetTableResponse) {}
+    rpc GetSourcemapFile(GetSourcemapFileRequest) returns (GetSourcemapFileResponse) {}
 }
 
 message QueryStatusRequest {}
@@ -149,4 +150,14 @@ message GetTableRequest {
 
 message GetTableResponse {
     bytes            data = 1;
+}
+
+message GetSourcemapFileRequest {
+    string          org_id = 1;
+    string   original_name = 2;
+    string            path = 3;
+}
+
+message GetSourcemapFileResponse {
+    bytes   file_data = 1;
 }

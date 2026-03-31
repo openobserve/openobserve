@@ -18,7 +18,6 @@ import serviceStreams, {
   getSemanticGroups,
   correlate,
   getDimensionAnalytics,
-  getGroupedServices,
 } from "@/services/service_streams"
 import http from "@/services/http"
 
@@ -76,10 +75,6 @@ describe("service_streams service", () => {
       expect(typeof serviceStreams.getDimensionAnalytics).toBe("function")
     })
 
-    it("default export includes getGroupedServices", () => {
-      expect(typeof serviceStreams.getGroupedServices).toBe("function")
-    })
-
     it("also exports getSemanticGroups as a named export", () => {
       expect(typeof getSemanticGroups).toBe("function")
     })
@@ -90,10 +85,6 @@ describe("service_streams service", () => {
 
     it("also exports getDimensionAnalytics as a named export", () => {
       expect(typeof getDimensionAnalytics).toBe("function")
-    })
-
-    it("also exports getGroupedServices as a named export", () => {
-      expect(typeof getGroupedServices).toBe("function")
     })
   })
 
@@ -240,48 +231,6 @@ describe("service_streams service", () => {
   })
 
   // -------------------------------------------------------------------------
-  describe("getGroupedServices", () => {
-    it("calls GET /api/{org}/service_streams/_grouped", () => {
-      getGroupedServices(ORG)
-
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${ORG}/service_streams/_grouped`
-      )
-    })
-
-    it("calls GET exactly once", () => {
-      getGroupedServices(ORG)
-
-      expect(mockHttpInstance.get).toHaveBeenCalledTimes(1)
-    })
-
-    it("returns the promise from http().get", () => {
-      const expected = Promise.resolve({
-        data: { groups: [], total_fqns: 0, total_services: 0 },
-      })
-      mockHttpInstance.get.mockReturnValue(expected)
-
-      const result = getGroupedServices(ORG)
-
-      expect(result).toBe(expected)
-    })
-
-    it("propagates rejection from http().get", async () => {
-      mockHttpInstance.get.mockRejectedValue(new Error("unauthorized"))
-
-      await expect(getGroupedServices(ORG)).rejects.toThrow("unauthorized")
-    })
-
-    it("works when called via the default export", () => {
-      serviceStreams.getGroupedServices(ORG)
-
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${ORG}/service_streams/_grouped`
-      )
-    })
-  })
-
-  // -------------------------------------------------------------------------
   describe("org_identifier scoping", () => {
     it("getSemanticGroups uses the provided org in the URL", () => {
       getSemanticGroups("acme-corp")
@@ -310,14 +259,6 @@ describe("service_streams service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/acme-corp/service_streams/_analytics"
-      )
-    })
-
-    it("getGroupedServices uses the provided org in the URL", () => {
-      getGroupedServices("acme-corp")
-
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/acme-corp/service_streams/_grouped"
       )
     })
   })

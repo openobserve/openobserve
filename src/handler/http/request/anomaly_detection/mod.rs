@@ -23,7 +23,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    handler::http::extractors::Headers,
     service::anomaly_detection as anomaly_service,
 };
 
@@ -47,7 +48,7 @@ use crate::{
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
 pub async fn list_configs(Path(org_id): Path<String>) -> Response {
-    match anomaly_service::list_configs(&org_id).await {
+    match anomaly_service::list_configs(&org_id, None, None).await {
         Ok(configs) => MetaHttpResponse::json(configs),
         Err(e) => {
             tracing::error!("Failed to list anomaly configs: {}", e);
@@ -118,11 +119,22 @@ pub async fn get_config(Path((org_id, anomaly_id)): Path<(String, String)>) -> R
         content_type = "application/json",
     ),
 )]
+/// Falls back to `fallback` when `owner` is absent or empty.
+fn resolve_owner(owner: Option<String>, fallback: &str) -> Option<String> {
+    if owner.as_deref().unwrap_or("").is_empty() {
+        Some(fallback.to_string())
+    } else {
+        owner
+    }
+}
+
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
 pub async fn create_config(
     Path(org_id): Path<String>,
-    Json(req): Json<CreateAnomalyConfigRequest>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(mut req): Json<CreateAnomalyConfigRequest>,
 ) -> Response {
+    req.owner = resolve_owner(req.owner, &user_email.user_id);
     match anomaly_service::create_config(&org_id, req).await {
         Ok(config) => MetaHttpResponse::json(config),
         Err(e) => {
@@ -166,8 +178,17 @@ pub async fn create_config(
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
 pub async fn update_config(
     Path((org_id, anomaly_id)): Path<(String, String)>,
-    Json(req): Json<UpdateAnomalyConfigRequest>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(mut req): Json<UpdateAnomalyConfigRequest>,
 ) -> Response {
+    // Sanitize empty owner string: treat "" same as omitted on create — fall back to requester.
+    req.owner = req.owner.map(|o| {
+        if o.is_empty() {
+            user_email.user_id.clone()
+        } else {
+            o
+        }
+    });
     match anomaly_service::update_config(&org_id, &anomaly_id, req).await {
         Ok(config) => MetaHttpResponse::json(config),
         Err(e) if e.to_string().contains("not found") => {
@@ -376,7 +397,12 @@ pub struct CreateAnomalyConfigRequest {
     pub query_mode: String,  // "filters" or "custom_sql"
     pub filters: Option<serde_json::Value>,
     pub custom_sql: Option<String>,
-    pub detection_function: String, // "count(*)", "avg(field)", etc.
+    /// Aggregate function name: "count", "avg", "sum", "min", "max", "p50", "p95", "p99".
+    /// For backwards compatibility, also accepts the combined form "avg(field)".
+    pub detection_function: String,
+    /// Field to aggregate (required for avg/sum/min/max/pXX, ignored for count).
+    /// Combined with `detection_function` into "avg(field)" before saving.
+    pub detection_function_field: Option<String>,
     /// SQL histogram bucket size, e.g. "5m", "1h".
     pub histogram_interval: String,
     /// How often the detection job fires, e.g. "1h", "30m".
@@ -397,15 +423,25 @@ pub struct CreateAnomalyConfigRequest {
     pub rcf_tree_size: Option<i32>,
     pub rcf_shingle_size: Option<i32>,
     pub alert_enabled: Option<bool>,
-    pub alert_destination_id: Option<String>,
+    #[serde(default)]
+    pub alert_destinations: Vec<String>,
     pub enabled: Option<bool>,
+    /// Folder to place this config in. Resolved to the org default folder if absent.
+    pub folder_id: Option<String>,
+    /// Owner username. Defaults to the requesting user if absent.
+    pub owner: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct UpdateAnomalyConfigRequest {
     pub name: Option<String>,
     pub description: Option<String>,
+    pub query_mode: Option<String>,
+    pub filters: Option<serde_json::Value>,
+    pub custom_sql: Option<String>,
     pub detection_function: Option<String>,
+    /// Field to aggregate (required for avg/sum/min/max/pXX).
+    pub detection_function_field: Option<String>,
     /// SQL histogram bucket size. Changing this requires retraining.
     pub histogram_interval: Option<String>,
     /// How often the detection job fires.
@@ -420,8 +456,10 @@ pub struct UpdateAnomalyConfigRequest {
     /// How often to retrain the model (in days). `0` means never retrain automatically.
     pub retrain_interval_days: Option<i32>,
     pub alert_enabled: Option<bool>,
-    pub alert_destination_id: Option<String>,
+    pub alert_destinations: Option<Vec<String>>,
     pub enabled: Option<bool>,
+    pub folder_id: Option<String>,
+    pub owner: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -477,4 +515,30 @@ pub struct DetectionHistoryItem {
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct DeleteResponse {
     pub message: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_owner;
+
+    #[test]
+    fn test_owner_fallback_when_absent() {
+        let result = resolve_owner(None, "fallback@example.com");
+        assert_eq!(result, Some("fallback@example.com".to_string()));
+    }
+
+    #[test]
+    fn test_owner_fallback_when_empty_string() {
+        let result = resolve_owner(Some("".to_string()), "fallback@example.com");
+        assert_eq!(result, Some("fallback@example.com".to_string()));
+    }
+
+    #[test]
+    fn test_owner_preserved_when_set() {
+        let result = resolve_owner(
+            Some("custom@example.com".to_string()),
+            "fallback@example.com",
+        );
+        assert_eq!(result, Some("custom@example.com".to_string()));
+    }
 }

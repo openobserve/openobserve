@@ -152,8 +152,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                         let curr_usages = curr_usages.clone();
                         for usage_data in curr_usages {
                             if let Err(e) = super::queues::USAGE_QUEUE
-                                .enqueue(ReportingData::Usage(Box::new(usage_data)))
-                                .await
+                                .try_enqueue(ReportingData::Usage(Box::new(usage_data)))
                             {
                                 log::error!(
                                     "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
@@ -170,8 +169,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                     let curr_usages = curr_usages.clone();
                     for usage_data in curr_usages {
                         if let Err(e) = super::queues::USAGE_QUEUE
-                            .enqueue(ReportingData::Usage(Box::new(usage_data)))
-                            .await
+                            .try_enqueue(ReportingData::Usage(Box::new(usage_data)))
                         {
                             log::error!(
                                 "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
@@ -866,6 +864,84 @@ mod tests {
 
         // Other events should be aggregated like Ingestion events
         ingest_usages(usages).await;
+    }
+
+    /// Verifies that usage data ingested via ingest_reporting_data() uses
+    /// IngestionRequest::Usage (not JSON), which prevents circular reporting.
+    ///
+    /// The anti-circular mechanism:
+    /// 1. ingest_reporting_data() creates IngestionRequest::Usage(bytes)
+    /// 2. IngestionRequest::Usage.should_report_usage() returns false
+    /// 3. In ingest(), this means fn_num = None
+    /// 4. write_logs_by_stream() skips report_request_usage_stats() when fn_num is None
+    ///
+    /// If this test breaks, usage events would generate more usage events in an infinite loop.
+    #[test]
+    fn test_self_reporting_ingestion_prevents_circular_usage_reporting() {
+        // Simulate what ingest_reporting_data() does: serialize usage data and create the request
+        let usage = create_test_usage_data(
+            UsageEvent::Ingestion,
+            "test-org",
+            "test-stream",
+            "test@example.com",
+            10.0,
+            100,
+            1.0,
+        );
+
+        let report_data: Vec<json::Value> = vec![json::to_value(&usage).unwrap()];
+        let bytes = bytes::Bytes::from(json::to_string(&report_data).unwrap());
+
+        // This is the critical line: ingest_reporting_data creates Usage, NOT JSON
+        let req = ingestion::IngestionRequest::Usage(bytes);
+        assert!(
+            !req.should_report_usage(),
+            "Usage ingestion request must not trigger usage reporting (circular reporting prevention)"
+        );
+
+        // Verify the user type is SystemJob(SelfReporting)
+        let user = IngestUser::SystemJob(SystemJobType::SelfReporting);
+        assert_eq!(
+            user.to_email(),
+            "self_reporting@system.local",
+            "Self-reporting ingestion must use the SelfReporting system job identity"
+        );
+    }
+
+    /// Verifies that self-org usage reporting (when enabled) also goes through
+    /// IngestionRequest::Usage to prevent circular reporting in the org's own stream.
+    #[test]
+    fn test_self_org_usage_reporting_prevents_circular_reporting() {
+        // When usage_report_to_own_org is enabled, usage data is also sent to
+        // each org's own "usage" stream via ingest_reporting_data().
+        // This test ensures that path also uses IngestionRequest::Usage.
+        let usage = create_test_usage_data(
+            UsageEvent::Ingestion,
+            "my-org",
+            "my-stream",
+            "user@example.com",
+            5.0,
+            50,
+            0.5,
+        );
+
+        let report_data: Vec<json::Value> = vec![json::to_value(&usage).unwrap()];
+        let bytes = bytes::Bytes::from(json::to_string(&report_data).unwrap());
+
+        // Both the _meta org ingestion and per-org ingestion use the same
+        // ingest_reporting_data() which creates IngestionRequest::Usage
+        let req = ingestion::IngestionRequest::Usage(bytes);
+        assert!(
+            !req.should_report_usage(),
+            "Per-org usage ingestion must not trigger usage reporting (circular reporting prevention)"
+        );
+
+        // Verify fn_num will be None, preventing report_request_usage_stats() call
+        let fn_num: Option<usize> = req.should_report_usage().then_some(0);
+        assert!(
+            fn_num.is_none(),
+            "fn_num must be None for usage ingestion to prevent circular reporting in self-org streams"
+        );
     }
 
     #[test]

@@ -65,7 +65,7 @@ const store = useStore();
 const getBtnLogo = computed(() => {
     return store.state.theme === 'dark'
     ? getImageURL('images/common/ai_icon_dark.svg')
-    : getImageURL('images/common/ai_icon.svg')
+    : getImageURL('images/common/ai_icon_gradient.svg')
 })
 //this function is responsible for sending the event / button is clicked to the parent component
 const sendToAiChat = () => {

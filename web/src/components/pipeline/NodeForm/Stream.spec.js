@@ -1,590 +1,852 @@
-import { sanitizeStreamName } from '../utils/pipelineCommonValidation'
-import PipelineEditor from '../PipelineEditor.vue'
+// Copyright 2023 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount } from "@vue/test-utils";
-import useDnD from '@/plugins/pipelines/useDnD'
+import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { nextTick, ref } from "vue";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
 import store from "@/test/unit/helpers/store";
-import { installQuasar } from "@/test/unit/helpers";
-import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
-import { ref } from 'vue';
-import Stream from './Stream.vue'
+import Stream from "./Stream.vue";
+import useDnD from "@/plugins/pipelines/useDnD";
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
-const mockAddNode = vi.fn();
-// Mock the useDnD composable
-vi.mock('@/plugins/pipelines/useDnD', () => ({
+installQuasar({ plugins: [Dialog, Notify] });
+
+// ---------------------------------------------------------------------------
+// Module mocks
+// ---------------------------------------------------------------------------
+const mockAddNode            = vi.fn();
+const mockDeletePipelineNode = vi.fn();
+const mockCheckIfDefaultDestinationNode = vi.fn().mockReturnValue(false);
+
+vi.mock("@/plugins/pipelines/useDnD", () => ({
   default: vi.fn(),
-  useDnD: () => ({
-    addNode: mockAddNode
-  })
 }));
 
-vi.mock('@/composables/useStreams', () => ({
+vi.mock("@/composables/useStreams", () => ({
   default: () => ({
-    search: vi.fn(),
-    getStreams: vi.fn().mockResolvedValue({ 
+    getStreams: vi.fn().mockResolvedValue({
       list: [
-        { name: "test_stream1", stream_type: "logs" },
-        { name: "test_stream2", stream_type: "logs" }
-      ]
-    })
-  })
+        { name: "logs_stream_1", stream_type: "logs"    },
+        { name: "logs_stream_2", stream_type: "logs"    },
+        { name: "metrics_stream", stream_type: "metrics" },
+      ],
+    }),
+  }),
 }));
 
-vi.mock('@/composables/usePipelines', () => ({
+vi.mock("@/composables/usePipelines", () => ({
   default: () => ({
     getUsedStreamsList: vi.fn().mockResolvedValue([]),
-    getPipelineDestinations: vi.fn().mockResolvedValue([])
-  })
+    getPipelineDestinations: vi.fn().mockResolvedValue([]),
+  }),
 }));
 
-vi.mock('@/services/jstransform', () => ({
-  default: {
-    list: vi.fn().mockResolvedValue({ data: { list: [] } })
-  }
+vi.mock("@/utils/pipelines/constants", () => ({
+  defaultDestinationNodeWarningMessage:
+    "Removing the default destination node stops data from being ingested.",
 }));
 
-vi.mock('@/services/pipelines', () => ({
-  default: {
-    getPipelines: vi.fn().mockResolvedValue({ data: { list: [] } }),
-    createPipeline: vi.fn().mockResolvedValue({}),
-    updatePipeline: vi.fn().mockResolvedValue({})
-  }
-}));
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+let mockPipelineObj = {};
 
+function makePipelineObj(overrides = {}) {
+  return {
+    isEditNode: false,
+    currentSelectedNodeID: "stream-node-1",
+    currentSelectedNodeData: {
+      data: { stream_type: "logs" },
+      io_type: "input",
+      type: "input",
+    },
+    userSelectedNode: {},
+    userClickedNode: {},
+    ...overrides,
+  };
+}
+
+function createWrapper(pipelineObjOverrides = {}) {
+  mockPipelineObj = makePipelineObj(pipelineObjOverrides);
+
+  vi.mocked(useDnD).mockImplementation(() => ({
+    pipelineObj: mockPipelineObj,
+    addNode: mockAddNode,
+    deletePipelineNode: mockDeletePipelineNode,
+    checkIfDefaultDestinationNode: mockCheckIfDefaultDestinationNode,
+  }));
+
+  return mount(Stream, {
+    global: {
+      plugins: [i18n, store],
+      stubs: {
+        AddStream:     true,
+        ConfirmDialog: true,
+      },
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 describe("Stream Component", () => {
-    let wrapper;
-    let mockPipelineObj;
-    let mockStore;
-  
-    beforeEach(() => {
-      // Setup mock store
-      mockStore = {
-        state: {
-          theme: 'light',
-          selectedOrganization: {
-            identifier: "test-org"
-          }
-        }
-      };
-  
-  
-  
-      // Setup mock pipeline object
-      mockPipelineObj = {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // -------------------------------------------------------------------------
+  describe("Component Initialization", () => {
+    it("mounts successfully", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("renders outer section with data-test attribute", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      expect(
+        wrapper.find('[data-test="add-stream-input-stream-routing-section"]').exists()
+      ).toBe(true);
+    });
+
+    it("initializes createNewStream as false", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.vm.createNewStream).toBe(false);
+    });
+
+    it("initializes isUpdating as false", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.vm.isUpdating).toBe(false);
+    });
+
+    it("initializes isFetchingStreams as false after fetch", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.vm.isFetchingStreams).toBe(false);
+    });
+
+    it("initializes stream_type from pipelineObj node data", async () => {
+      const wrapper = createWrapper({
         currentSelectedNodeData: {
-          data: {},
-          io_type: 'input',
-          type: 'input'
+          data: { stream_type: "metrics" },
+          io_type: "input",
+          type: "input",
         },
-        userSelectedNode: {},
-        isEditNode: false
-      };
-  
-      // Mock useDnD composable
-      vi.mocked(useDnD).mockImplementation(() => ({
-        pipelineObj: mockPipelineObj,
-        addNode: vi.fn(),
-        deletePipelineNode: vi.fn()
-      }));
-  
-      // Mount component
-      wrapper = mount(Stream, {
-        global: {
-          plugins: [i18n],
-          provide: { 
-            store: mockStore,
-          }
-        }
       });
-  
+      await flushPromises();
+      expect(wrapper.vm.stream_type).toBe("metrics");
+    });
+
+    it("defaults stream_type to 'logs' when not in node data", async () => {
+      const wrapper = createWrapper({
+        currentSelectedNodeData: { data: {}, io_type: "input", type: "input" },
+      });
+      await flushPromises();
+      expect(wrapper.vm.stream_type).toBe("logs");
+    });
+
+    it("clears userSelectedNode on mount", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      expect(mockPipelineObj.userSelectedNode).toEqual({});
+    });
+
+    it("all required functions are exposed", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const fns = [
+        "sanitizeStreamName", "sanitizeStaticPart", "getStreamList", "updateStreams",
+        "handleDynamicStreamName", "saveDynamicStream", "getLogStream",
+        "openCancelDialog", "openDeleteDialog", "deleteNode", "saveStream",
+        "filterStreams", "filterColumns",
+      ];
+      fns.forEach((fn) => expect(typeof wrapper.vm[fn]).toBe("function"));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("filteredStreamTypes computed", () => {
+    it("returns only 3 types for input node", async () => {
+      const wrapper = createWrapper({
+        currentSelectedNodeData: {
+          data: { stream_type: "logs" },
+          io_type: "input",
+          type: "input",
+        },
+      });
+      await flushPromises();
+      wrapper.vm.selectedNodeType = "input";
+      await nextTick();
+      expect(wrapper.vm.filteredStreamTypes).toEqual(["logs", "metrics", "traces"]);
+    });
+
+    it("returns 4 types including enrichment_tables for output node", async () => {
+      const wrapper = createWrapper({
+        currentSelectedNodeData: {
+          data: { stream_type: "logs" },
+          io_type: "output",
+          type: "output",
+        },
+      });
+      await flushPromises();
+      wrapper.vm.selectedNodeType = "output";
+      await nextTick();
+      expect(wrapper.vm.filteredStreamTypes).toEqual([
+        "logs", "metrics", "traces", "enrichment_tables",
+      ]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("sanitizeStreamName", () => {
+    const cases = [
+      { input: "test_stream",         expected: "test_stream"          },
+      { input: "test-stream",         expected: "test_stream"          },
+      { input: "test@stream",         expected: "test_stream"          },
+      { input: "test{field}stream",   expected: "test{field}stream"    },
+      { input: "test{field}@stream",  expected: "test{field}_stream"   },
+      { input: "abc123",              expected: "abc123"               },
+      { input: "CamelCase",           expected: "CamelCase"            },
+    ];
+
+    cases.forEach(({ input, expected }) => {
+      it(`sanitizes "${input}" → "${expected}"`, async () => {
+        const wrapper = createWrapper();
+        await flushPromises();
+        expect(wrapper.vm.sanitizeStreamName(input)).toBe(expected);
+      });
+    });
+
+    it("returns empty string and notifies when input exceeds 100 chars", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
       const notifyMock = vi.fn();
       wrapper.vm.$q.notify = notifyMock;
-  
-    });
-
-    afterEach(() => {
-      if (wrapper) {
-        wrapper.unmount();
-      }
-      // Clear any pending timers to prevent "document is not defined" errors
-      vi.clearAllTimers();
-      vi.restoreAllMocks();
-    });
-  
-    describe("Stream Name Sanitization", () => {
-  
-      it("should sanitize stream name correctly", async () => {
-        const testCases = [
-          { input: "test-stream", expected: "test_stream" },
-          { input: "test@stream", expected: "test_stream" },
-          { input: "test{field}stream", expected: "test{field}stream" },
-          { input: "test{field}@stream", expected: "test{field}_stream" },
-          { input: "a".repeat(101), expected: "" } // Test length limit
-        ];
-  
-        testCases.forEach(({ input, expected }) => {
-          const result = wrapper.vm.sanitizeStreamName(input);
-          expect(result).toBe(expected);
-        });
-      });
-  
-      it("should show notification when stream name is too long", async () => {
-  
-        wrapper.vm.sanitizeStreamName("a".repeat(101));
-  
-        expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(expect.objectContaining({
+      const result = wrapper.vm.sanitizeStreamName("a".repeat(101));
+      expect(result).toBe("");
+      expect(notifyMock).toHaveBeenCalledWith(
+        expect.objectContaining({
           message: "Stream name should be less than 100 characters",
-          color: "negative"
-        }));
-      });
+          color: "negative",
+        })
+      );
     });
-  
-    describe("Dynamic Stream Name Handling", () => {
-      it("should handle dynamic stream name input correctly", async () => {
-        const testInput = "test-stream";
-        wrapper.vm.handleDynamicStreamName(testInput);
-  
-        expect(wrapper.vm.dynamic_stream_name.value).toEqual("test_stream")
-      });
-  
-      it("should save dynamic stream name correctly", async () => {
-        wrapper.vm.dynamic_stream_name.value = {
-          label: "test_stream",
-          value: "test_stream",
-          isDisable: false
-        };
-  
-        wrapper.vm.saveDynamicStream();
-  
-        expect(wrapper.vm.stream_name.value).toEqual({
-          label: "test_stream",
-          value: "test_stream",
-          isDisable: false
-        });
-      });
+
+    it("returns 100-char string without notification (exactly at limit)", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const notifyMock = vi.fn();
+      wrapper.vm.$q.notify = notifyMock;
+      const result = wrapper.vm.sanitizeStreamName("a".repeat(100));
+      expect(result).toHaveLength(100);
+      expect(notifyMock).not.toHaveBeenCalled();
     });
-  
-    describe("Stream Type Selection", () => {
-      it("should filter stream types based on node type", async () => {
-        // Test input node
-        wrapper.vm.selectedNodeType = "input";
-        expect(wrapper.vm.filteredStreamTypes).toEqual(["logs", "metrics", "traces"]);
-  
-        // Test output node
-        wrapper.vm.selectedNodeType = "output";
-        expect(wrapper.vm.filteredStreamTypes).toEqual(["logs", "metrics", "traces", "enrichment_tables"]);
-      });
-  
+
+    it("preserves multiple dynamic segments", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const result = wrapper.vm.sanitizeStreamName("pre-{field1}-mid-{field2}-suf");
+      // hyphens in static parts become underscores; dynamic parts preserved
+      expect(result).toContain("{field1}");
+      expect(result).toContain("{field2}");
+      expect(result).not.toContain("-{field1}");
     });
-  
-    describe("Stream List Management", () => {
-      it("should fetch stream list correctly", async () => {
-        // Call getStreamList
-        await wrapper.vm.getStreamList();
+  });
+
+  // -------------------------------------------------------------------------
+  describe("sanitizeStaticPart", () => {
+    const cases = [
+      { input: "abc",    expected: ["a", "b", "c"]             },
+      { input: "a@b#c",  expected: ["a", "_", "b", "_", "c"]   },
+      { input: "123",    expected: ["1", "2", "3"]             },
+      { input: "a-b",    expected: ["a", "_", "b"]             },
+      { input: "a_b",    expected: ["a", "_", "b"]             },
+      { input: "",       expected: []                          },
+    ];
+
+    cases.forEach(({ input, expected }) => {
+      it(`sanitizeStaticPart("${input}") → ${JSON.stringify(expected)}`, async () => {
+        const wrapper = createWrapper();
         await flushPromises();
-  
-        // Verify the streams object is populated correctly
-        expect(wrapper.vm.streams.logs).toHaveLength(2);
-        expect(wrapper.vm.streams.logs).toEqual([
-          { name: "test_stream1", stream_type: "logs", isDisable: false },
-          { name: "test_stream2", stream_type: "logs", isDisable: false }
-        ]);
-        expect(wrapper.vm.isFetchingStreams).toBe(false);
-      });
-  
-  
-      it("should mark streams as disabled for input nodes when already used", async () => {
-        // Setup used streams
-        wrapper.vm.usedStreams = ref([
-          { stream_name: "test_stream1", stream_type: "logs" }
-        ]);
-  
-        // Setup mock response
-        const mockStreamsList = [
-          { name: "test_stream1", stream_type: "logs" },
-          { name: "test_stream2", stream_type: "logs" }
-        ];
-  
-        // Mock getStreams function
-        const mockGetStreams = vi.fn().mockResolvedValue({
-          list: mockStreamsList
-        });
-  
-        // Setup pipeline object for input node
-        mockPipelineObj.currentSelectedNodeData = {
-          type: "input",
-          data: {
-            stream_type: "logs"
-          }
-        };
-  
-        // Set up the component with mocked getStreams
-        wrapper.vm.getStreams = mockGetStreams;
-  
-        // Call getStreamList
-        await wrapper.vm.getStreamList();
-  
-        // Verify streams are marked as disabled correctly
-        expect(wrapper.vm.streams.logs).toEqual([
-          { name: "test_stream1", stream_type: "logs", isDisable: false },
-          { name: "test_stream2", stream_type: "logs", isDisable: false }
-        ]);
-      });
-    });
-  
-    describe("Stream List Filtering", () => {
-      it("should filter streams correctly for input node type", async () => {
-        // Setup mock data
-        mockPipelineObj.currentSelectedNodeData = {
-          type: 'input',
-          data: {
-            stream_type: 'logs'
-          }
-        };
-  
-        // Setup streams data
-        wrapper.vm.streams = {
-          logs: [
-            { name: "test_stream1", stream_type: "logs", isDisable: true },
-            { name: "test_stream2", stream_type: "logs", isDisable: false },
-            { name: "other_stream", stream_type: "logs", isDisable: false }
-          ]
-        };
-  
-        const mockUpdate = vi.fn();
-        await wrapper.vm.filterStreams("test", mockUpdate);
-  
-        // Verify filtered results
-        expect(wrapper.vm.filteredStreams).toEqual([
-          { label: "test_stream1", value: "test_stream1", isDisable: true },
-          { label: "test_stream2", value: "test_stream2", isDisable: false }
-        ]);
-        expect(mockUpdate).toHaveBeenCalled();
-      });
-  
-      it("should filter streams correctly for non-input node type", async () => {
-        // Setup mock data for non-input node
-        mockPipelineObj.currentSelectedNodeData = {
-          type: 'output',
-          data: {
-            stream_type: 'logs'
-          }
-        };
-  
-        // Setup streams data
-        wrapper.vm.streams = {
-          logs: [
-            { name: "test_stream1", stream_type: "logs" },
-            { name: "test_stream2", stream_type: "logs" },
-            { name: "other_stream", stream_type: "logs" }
-          ]
-        };
-  
-        const mockUpdate = vi.fn();
-        await wrapper.vm.filterStreams("test", mockUpdate);
-  
-        // Verify filtered results - all streams should have isDisable: false
-        expect(wrapper.vm.filteredStreams).toEqual([
-          { label: "test_stream1", value: "test_stream1", isDisable: false },
-          { label: "test_stream2", value: "test_stream2", isDisable: false }
-        ]);
-        expect(mockUpdate).toHaveBeenCalled();
-      });
-  
-      it("should handle empty search value", async () => {
-        // Setup mock data
-        mockPipelineObj.currentSelectedNodeData = {
-          type: 'input',
-          data: {
-            stream_type: 'logs'
-          }
-        };
-  
-        // Setup streams data
-        wrapper.vm.streams = {
-          logs: [
-            { name: "test_stream1", stream_type: "logs", isDisable: false },
-            { name: "test_stream2", stream_type: "logs", isDisable: false }
-          ]
-        };
-  
-        const mockUpdate = vi.fn();
-        await wrapper.vm.filterStreams("", mockUpdate);
-  
-        // Verify all streams are returned
-        expect(wrapper.vm.filteredStreams).toEqual([
-          { label: "test_stream1", value: "test_stream1", isDisable: false },
-          { label: "test_stream2", value: "test_stream2", isDisable: false }
-        ]);
-        expect(mockUpdate).toHaveBeenCalled();
-      });
-    });
-  
-    describe("Form Validation and Submission", () => {
-      it("should validate stream name before saving", async () => {
-        // Test the saveStream function exists
-        expect(typeof wrapper.vm.saveStream).toBe('function');
-        
-        // Test validation logic by checking if function can be called
-        await wrapper.vm.saveStream();
-        
-        // The function should complete without errors
-        expect(true).toBe(true);
-      });
-
-      it("should save stream function exists and is callable", async () => {
-        expect(typeof wrapper.vm.saveStream).toBe('function');
-        
-        // Call the function to ensure it executes
-        try {
-          await wrapper.vm.saveStream();
-          expect(true).toBe(true);
-        } catch (error) {
-          // Function should handle errors gracefully
-          expect(error).toBeDefined();
-        }
-      });
-
-      it("should test stream type handling logic", () => {
-        // Test that the function can handle different stream types
-        expect(typeof wrapper.vm.saveStream).toBe('function');
-        expect(wrapper.vm.saveStream).toBeDefined();
-      });
-
-      it("should handle empty stream validation", async () => {
-        // Test function behavior with empty values
-        await wrapper.vm.saveStream();
-        
-        // Should complete execution
-        expect(true).toBe(true);
-      });
-  
-    });
-  
-    describe("Dialog Handling", () => {
-      it("should open cancel dialog correctly", async () => {
-        wrapper.vm.openCancelDialog();
-  
-        expect(wrapper.vm.dialog).toEqual(expect.objectContaining({
-          show: true,
-          title: "Discard Changes",
-          message: "Are you sure you want to cancel changes?"
-        }));
-      });
-  
-      it("should open delete dialog correctly", async () => {
-        wrapper.vm.openDeleteDialog();
-  
-        expect(wrapper.vm.dialog).toEqual(expect.objectContaining({
-          show: true,
-          title: "Delete Node",
-          message: "Are you sure you want to delete stream association?"
-        }));
-      });
-
-      it("should reset user selected objects in cancel dialog", async () => {
-        mockPipelineObj.userClickedNode = { id: 1 };
-        mockPipelineObj.userSelectedNode = { id: 2 };
-        
-        wrapper.vm.openCancelDialog();
-        
-        expect(mockPipelineObj.userClickedNode).toEqual({});
-        expect(mockPipelineObj.userSelectedNode).toEqual({});
-      });
-
-      it("should call delete node correctly", async () => {
-        mockPipelineObj.currentSelectedNodeID = "node123";
-        
-        wrapper.vm.deleteNode();
-        
-        // Verify that the deleteNode function completes and emits the event
-        expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-      });
-  
-    });
-
-    describe("Log Stream Handling", () => {
-      it("should have getLogStream function available", () => {
-        expect(typeof wrapper.vm.getLogStream).toBe('function');
-      });
-
-      it("should handle log stream data processing", async () => {
-        const streamData = {
-          name: "test-stream-name",
-          stream_type: "logs"
-        };
-
-        await wrapper.vm.getLogStream(streamData);
-
-        // Function should complete without errors
-        expect(true).toBe(true);
-      });
-
-      it("should handle new stream creation logic", async () => {
-        const streamData = {
-          name: "new-stream",
-          stream_type: "metrics"
-        };
-
-        await wrapper.vm.getLogStream(streamData);
-
-        // Verify function executed successfully
-        expect(typeof wrapper.vm.getLogStream).toBe('function');
-      });
-
-      it("should process stream names with hyphens", async () => {
-        const streamData = {
-          name: "test-stream-with-hyphens",
-          stream_type: "traces"
-        };
-
-        await wrapper.vm.getLogStream(streamData);
-
-        // Should complete processing
-        expect(true).toBe(true);
-      });
-    });
-
-    describe("Static Part Sanitization", () => {
-      it("should sanitize static parts correctly", () => {
-        const testCases = [
-          { input: "abc", expected: ["a", "b", "c"] },
-          { input: "a@b#c", expected: ["a", "_", "b", "_", "c"] },
-          { input: "123", expected: ["1", "2", "3"] },
-          { input: "a-b_c", expected: ["a", "_", "b", "_", "c"] },
-          { input: "", expected: [] }
-        ];
-
-        testCases.forEach(({ input, expected }) => {
-          const result = wrapper.vm.sanitizeStaticPart(input);
-          expect(result).toEqual(expected);
-        });
-      });
-    });
-
-    describe("Update Streams", () => {
-      it("should have updateStreams function that executes successfully", async () => {
-        expect(typeof wrapper.vm.updateStreams).toBe('function');
-        
-        // Test that the function can be called without errors
-        wrapper.vm.updateStreams();
-        
-        // Verify function completed
-        expect(true).toBe(true);
-      });
-    });
-
-    describe("Filter Columns", () => {
-      it("should filter columns correctly with empty value", () => {
-        const options = ["column1", "column2", "column3"];
-        const mockUpdate = vi.fn((callback) => callback());
-        
-        const result = wrapper.vm.filterColumns(options, "", mockUpdate);
-        
-        expect(mockUpdate).toHaveBeenCalled();
-        expect(result).toEqual(options);
-      });
-
-      it("should filter columns correctly with search value", () => {
-        const options = ["column1", "column2", "test_column"];
-        const mockUpdate = vi.fn((callback) => callback());
-        
-        wrapper.vm.filterColumns(options, "test", mockUpdate);
-        
-        expect(mockUpdate).toHaveBeenCalled();
-      });
-
-      it("should handle case-insensitive column filtering", () => {
-        const options = ["Column1", "COLUMN2", "test_COLUMN"];
-        const mockUpdate = vi.fn((callback) => callback());
-        
-        wrapper.vm.filterColumns(options, "COLUMN", mockUpdate);
-        
-        expect(mockUpdate).toHaveBeenCalled();
-      });
-    });
-
-    describe("Component Initialization", () => {
-      it("should initialize component with required functions", () => {
-        expect(typeof wrapper.vm.saveStream).toBe('function');
-        expect(typeof wrapper.vm.getLogStream).toBe('function');
-        expect(typeof wrapper.vm.sanitizeStreamName).toBe('function');
-        expect(typeof wrapper.vm.filterStreams).toBe('function');
-      });
-
-      it("should initialize dialog handling functions", () => {
-        expect(typeof wrapper.vm.openCancelDialog).toBe('function');
-        expect(typeof wrapper.vm.openDeleteDialog).toBe('function');
-        expect(typeof wrapper.vm.deleteNode).toBe('function');
-      });
-
-      it("should initialize stream management functions", () => {
-        expect(typeof wrapper.vm.getStreamList).toBe('function');
-        expect(typeof wrapper.vm.updateStreams).toBe('function');
-        expect(typeof wrapper.vm.handleDynamicStreamName).toBe('function');
-        expect(typeof wrapper.vm.saveDynamicStream).toBe('function');
-      });
-    });
-
-    describe("Function Availability", () => {
-      it("should have all required stream handling functions", () => {
-        expect(typeof wrapper.vm.getStreamList).toBe('function');
-        expect(typeof wrapper.vm.handleDynamicStreamName).toBe('function');
-        expect(typeof wrapper.vm.saveDynamicStream).toBe('function');
-      });
-
-      it("should have filtering functions available", () => {
-        expect(typeof wrapper.vm.filterStreams).toBe('function');
-        expect(typeof wrapper.vm.filterColumns).toBe('function');
-      });
-    });
-
-    describe("Function Execution", () => {
-      it("should execute getStreamList without errors", async () => {
-        await wrapper.vm.getStreamList();
-        expect(true).toBe(true);
-      });
-
-      it("should execute updateStreams without errors", () => {
-        wrapper.vm.updateStreams();
-        expect(true).toBe(true);
-      });
-
-      it("should execute dynamic stream name handling", () => {
-        wrapper.vm.handleDynamicStreamName("test-value");
-        expect(true).toBe(true);
-      });
-
-      it("should execute saveDynamicStream without errors", () => {
-        wrapper.vm.saveDynamicStream();
-        expect(true).toBe(true);
-      });
-    });
-
-    describe("Additional Function Coverage", () => {
-      it("should have sanitization functions available", () => {
-        expect(typeof wrapper.vm.sanitizeStreamName).toBe('function');
-        expect(typeof wrapper.vm.sanitizeStaticPart).toBe('function');
-      });
-
-      it("should execute filter functions with parameters", () => {
-        const options = ["test1", "test2"];
-        const mockUpdate = vi.fn();
-        
-        wrapper.vm.filterColumns(options, "test", mockUpdate);
-        expect(mockUpdate).toHaveBeenCalled();
-      });
-
-      it("should handle stream filtering with mock data", () => {
-        const mockUpdate = vi.fn();
-        wrapper.vm.filterStreams("test", mockUpdate);
-        expect(mockUpdate).toHaveBeenCalled();
+        expect(wrapper.vm.sanitizeStaticPart(input)).toEqual(expected);
       });
     });
   });
+
+  // -------------------------------------------------------------------------
+  describe("handleDynamicStreamName", () => {
+    it("replaces hyphens with underscores", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.handleDynamicStreamName("test-stream-name");
+      expect(wrapper.vm.dynamic_stream_name.value).toBe("test_stream_name");
+    });
+
+    it("leaves names without hyphens unchanged", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.handleDynamicStreamName("testStream");
+      expect(wrapper.vm.dynamic_stream_name.value).toBe("testStream");
+    });
+
+    it("sets both label and value in dynamic_stream_name", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.handleDynamicStreamName("my-stream");
+      expect(wrapper.vm.dynamic_stream_name.label).toBe("my_stream");
+      expect(wrapper.vm.dynamic_stream_name.value).toBe("my_stream");
+    });
+
+    it("sets isDisable to false", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.handleDynamicStreamName("any");
+      expect(wrapper.vm.dynamic_stream_name.isDisable).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("saveDynamicStream", () => {
+    it("copies object from dynamic_stream_name to stream_name", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.dynamic_stream_name = { label: "my_stream", value: "my_stream", isDisable: false };
+      wrapper.vm.saveDynamicStream();
+      await nextTick();
+      expect(wrapper.vm.stream_name).toEqual({
+        label: "my_stream",
+        value: "my_stream",
+        isDisable: false,
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("getLogStream", () => {
+    it("sets stream_name to sanitized name from stream data", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      await wrapper.vm.getLogStream({ name: "test-stream", stream_type: "logs" });
+      expect(wrapper.vm.stream_name.value).toBe("test_stream");
+    });
+
+    it("sets stream_type from stream data", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      await wrapper.vm.getLogStream({ name: "metricsStream", stream_type: "metrics" });
+      expect(wrapper.vm.stream_type).toBe("metrics");
+    });
+
+    it("turns off createNewStream after stream is added", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.createNewStream = true;
+      await wrapper.vm.getLogStream({ name: "new_stream", stream_type: "logs" });
+      expect(wrapper.vm.createNewStream).toBe(false);
+    });
+
+    it("does not crash when name has no hyphens", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      // Use the same stream_type as the initial to avoid the watch reset
+      await wrapper.vm.getLogStream({ name: "my_stream", stream_type: "logs" });
+      await flushPromises();
+      expect(wrapper.vm.stream_name.value).toBe("my_stream");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("getStreamList", () => {
+    it("populates streams.logs after fetch", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      await wrapper.vm.getStreamList();
+      await flushPromises();
+      expect(wrapper.vm.streams.logs).toBeDefined();
+      expect(wrapper.vm.streams.logs.length).toBeGreaterThan(0);
+    });
+
+    it("sets isFetchingStreams to false after fetch completes", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      await wrapper.vm.getStreamList();
+      await flushPromises();
+      expect(wrapper.vm.isFetchingStreams).toBe(false);
+    });
+
+    it("marks streams as disabled for input node when they appear in usedStreams", async () => {
+      const wrapper = createWrapper({
+        currentSelectedNodeData: {
+          data: { stream_type: "logs" },
+          io_type: "input",
+          type: "input",
+        },
+      });
+      await flushPromises();
+      // Set usedStreams to mark logs_stream_1 as used
+      wrapper.vm.usedStreams = [{ stream_name: "logs_stream_1", stream_type: "logs" }];
+      await wrapper.vm.getStreamList();
+      await flushPromises();
+      const stream = wrapper.vm.streams.logs?.find(
+        (s) => s.name === "logs_stream_1"
+      );
+      expect(stream?.isDisable).toBe(true);
+    });
+
+    it("does NOT mark streams as disabled for output node", async () => {
+      const wrapper = createWrapper({
+        currentSelectedNodeData: {
+          data: { stream_type: "logs" },
+          io_type: "output",
+          type: "output",
+        },
+      });
+      await flushPromises();
+      wrapper.vm.usedStreams = [{ stream_name: "logs_stream_1", stream_type: "logs" }];
+      await wrapper.vm.getStreamList();
+      await flushPromises();
+      // For output node the disable logic isn't applied; isDisable may be undefined
+      const stream = wrapper.vm.streams.logs?.find(
+        (s) => s.name === "logs_stream_1"
+      );
+      expect(stream?.isDisable).toBeFalsy();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("updateStreams", () => {
+    it("can be called without throwing", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      expect(() => wrapper.vm.updateStreams()).not.toThrow();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("filterStreams", () => {
+    it("filters by search term for input node type", async () => {
+      const wrapper = createWrapper({
+        currentSelectedNodeData: {
+          data: { stream_type: "logs" },
+          type: "input",
+          io_type: "input",
+        },
+      });
+      await flushPromises();
+      wrapper.vm.streams = {
+        logs: [
+          { name: "alpha_stream", stream_type: "logs", isDisable: false },
+          { name: "beta_stream",  stream_type: "logs", isDisable: true  },
+          { name: "gamma_other",  stream_type: "logs", isDisable: false },
+        ],
+      };
+      const mockUpdate = vi.fn();
+      wrapper.vm.filterStreams("stream", mockUpdate);
+      expect(wrapper.vm.filteredStreams).toHaveLength(2);
+      expect(mockUpdate).toHaveBeenCalled();
+    });
+
+    it("preserves isDisable flag for input node type", async () => {
+      const wrapper = createWrapper({
+        currentSelectedNodeData: {
+          data: { stream_type: "logs" },
+          type: "input",
+          io_type: "input",
+        },
+      });
+      await flushPromises();
+      wrapper.vm.streams = {
+        logs: [
+          { name: "used_stream", stream_type: "logs", isDisable: true },
+        ],
+      };
+      const mockUpdate = vi.fn();
+      wrapper.vm.filterStreams("used", mockUpdate);
+      expect(wrapper.vm.filteredStreams[0].isDisable).toBe(true);
+    });
+
+    it("sets isDisable to false for all streams on non-input node type", async () => {
+      const wrapper = createWrapper({
+        currentSelectedNodeData: {
+          data: { stream_type: "logs" },
+          type: "output",
+          io_type: "output",
+        },
+      });
+      await flushPromises();
+      wrapper.vm.streams = {
+        logs: [
+          { name: "stream_a", stream_type: "logs", isDisable: true },
+          { name: "stream_b", stream_type: "logs", isDisable: true },
+        ],
+      };
+      const mockUpdate = vi.fn();
+      wrapper.vm.filterStreams("stream", mockUpdate);
+      wrapper.vm.filteredStreams.forEach((s) => {
+        expect(s.isDisable).toBe(false);
+      });
+    });
+
+    it("returns all streams when search term is empty (input node)", async () => {
+      const wrapper = createWrapper({
+        currentSelectedNodeData: {
+          data: { stream_type: "logs" },
+          type: "input",
+          io_type: "input",
+        },
+      });
+      await flushPromises();
+      wrapper.vm.streams = {
+        logs: [
+          { name: "a_stream", stream_type: "logs", isDisable: false },
+          { name: "b_stream", stream_type: "logs", isDisable: false },
+        ],
+      };
+      const mockUpdate = vi.fn();
+      wrapper.vm.filterStreams("", mockUpdate);
+      expect(wrapper.vm.filteredStreams).toHaveLength(2);
+      expect(mockUpdate).toHaveBeenCalled();
+    });
+
+    it("is case-insensitive in search", async () => {
+      const wrapper = createWrapper({
+        currentSelectedNodeData: {
+          data: { stream_type: "logs" },
+          type: "input",
+          io_type: "input",
+        },
+      });
+      await flushPromises();
+      wrapper.vm.streams = {
+        logs: [
+          { name: "UPPER_STREAM", stream_type: "logs", isDisable: false },
+          { name: "lower_stream", stream_type: "logs", isDisable: false },
+        ],
+      };
+      const mockUpdate = vi.fn();
+      wrapper.vm.filterStreams("upper", mockUpdate);
+      expect(wrapper.vm.filteredStreams).toHaveLength(1);
+      expect(wrapper.vm.filteredStreams[0].label).toBe("UPPER_STREAM");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("filterColumns", () => {
+    it("returns all options when val is empty", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const opts = ["col1", "col2", "col3"];
+      const update = vi.fn((cb) => cb());
+      const result = wrapper.vm.filterColumns(opts, "", update);
+      expect(result).toEqual(opts);
+      expect(update).toHaveBeenCalled();
+    });
+
+    it("filters options by search term", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const opts = ["timestamp", "message", "level"];
+      let captured = [];
+      const update = vi.fn((cb) => { cb(); captured = wrapper.vm.filterColumns.toString(); });
+      wrapper.vm.filterColumns(opts, "time", update);
+      expect(update).toHaveBeenCalled();
+    });
+
+    it("is case-insensitive", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const opts = ["TIMESTAMP", "message"];
+      const update = vi.fn((cb) => cb());
+      const result = wrapper.vm.filterColumns(opts, "MESS", update);
+      // update is called; filtered result contains "message"
+      expect(update).toHaveBeenCalled();
+    });
+
+    it("returns empty array when no options match", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const opts = ["alpha", "beta"];
+      const update = vi.fn((cb) => cb());
+      const result = wrapper.vm.filterColumns(opts, "zzz", update);
+      expect(result).toEqual([]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("saveStream", () => {
+    it("notifies and does NOT call addNode when stream_name value is empty", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.stream_name = { label: "", value: "", isDisable: false };
+      const notifyMock = vi.fn();
+      wrapper.vm.$q.notify = notifyMock;
+      await wrapper.vm.saveStream();
+      expect(notifyMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "Please select Stream from the list",
+          color: "negative",
+        })
+      );
+      expect(mockAddNode).not.toHaveBeenCalled();
+    });
+
+    it("calls addNode with node_type 'stream' when stream_name is valid", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.stream_name  = { label: "my_stream", value: "my_stream", isDisable: false };
+      wrapper.vm.stream_type  = "logs";
+      await wrapper.vm.saveStream();
+      expect(mockAddNode).toHaveBeenCalledWith(
+        expect.objectContaining({ node_type: "stream" })
+      );
+    });
+
+    it("emits cancel:hideform after successful save", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.stream_name = { label: "my_stream", value: "my_stream", isDisable: false };
+      await wrapper.vm.saveStream();
+      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+    });
+
+    it("includes org_id in the addNode payload", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.stream_name = { label: "s", value: "s", isDisable: false };
+      await wrapper.vm.saveStream();
+      expect(mockAddNode).toHaveBeenCalledWith(
+        expect.objectContaining({ org_id: "default" })
+      );
+    });
+
+    it("includes meta.append_data for enrichment_tables stream type", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.stream_type = "enrichment_tables";
+      wrapper.vm.stream_name = { label: "enrich", value: "enrich", isDisable: false };
+      wrapper.vm.appendData  = true;
+      await wrapper.vm.saveStream();
+      expect(mockAddNode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          meta: { append_data: "true" },
+        })
+      );
+    });
+
+    it("does NOT include meta for logs stream type", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.stream_type = "logs";
+      wrapper.vm.stream_name = { label: "logs_s", value: "logs_s", isDisable: false };
+      await wrapper.vm.saveStream();
+      const payload = mockAddNode.mock.calls[0][0];
+      expect(payload.meta).toBeUndefined();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("openCancelDialog", () => {
+    it("shows dialog with correct title and message", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.openCancelDialog();
+      expect(wrapper.vm.dialog.show).toBe(true);
+      expect(wrapper.vm.dialog.title).toBe("Discard Changes");
+      expect(wrapper.vm.dialog.message).toBe("Are you sure you want to cancel changes?");
+    });
+
+    it("dialog okCallback emits cancel:hideform", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.openCancelDialog();
+      wrapper.vm.dialog.okCallback();
+      await nextTick();
+      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+    });
+
+    it("resets userClickedNode and userSelectedNode", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      mockPipelineObj.userClickedNode = { id: "x" };
+      mockPipelineObj.userSelectedNode = { id: "y" };
+      wrapper.vm.openCancelDialog();
+      expect(mockPipelineObj.userClickedNode).toEqual({});
+      expect(mockPipelineObj.userSelectedNode).toEqual({});
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("openDeleteDialog", () => {
+    it("shows dialog with correct title and message", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.openDeleteDialog();
+      expect(wrapper.vm.dialog.show).toBe(true);
+      expect(wrapper.vm.dialog.title).toBe("Delete Node");
+      expect(wrapper.vm.dialog.message).toBe(
+        "Are you sure you want to delete stream association?"
+      );
+    });
+
+    it("sets warningMessage when deleting a default destination node", async () => {
+      mockCheckIfDefaultDestinationNode.mockReturnValueOnce(true);
+      const wrapper = createWrapper({
+        currentSelectedNodeData: {
+          data: { node_type: "stream", stream_type: "logs" },
+          io_type: "output",
+          type: "output",
+        },
+      });
+      await flushPromises();
+      // Ensure the node has node_type property
+      mockPipelineObj.currentSelectedNodeData.data.node_type = "stream";
+      wrapper.vm.openDeleteDialog();
+      // warningMessage should be set to the constant
+      expect(wrapper.vm.dialog.warningMessage).toBeTruthy();
+    });
+
+    it("clears warningMessage when node is not default destination", async () => {
+      mockCheckIfDefaultDestinationNode.mockReturnValueOnce(false);
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.openDeleteDialog();
+      expect(wrapper.vm.dialog.warningMessage).toBe("");
+    });
+
+    it("dialog okCallback calls deletePipelineNode with current node ID", async () => {
+      const wrapper = createWrapper({ currentSelectedNodeID: "sn-42" });
+      await flushPromises();
+      wrapper.vm.openDeleteDialog();
+      wrapper.vm.dialog.okCallback();
+      await nextTick();
+      expect(mockDeletePipelineNode).toHaveBeenCalledWith("sn-42");
+    });
+
+    it("dialog okCallback emits cancel:hideform", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.openDeleteDialog();
+      wrapper.vm.dialog.okCallback();
+      await nextTick();
+      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("deleteNode", () => {
+    it("calls deletePipelineNode with currentSelectedNodeID", async () => {
+      const wrapper = createWrapper({ currentSelectedNodeID: "del-node" });
+      await flushPromises();
+      wrapper.vm.deleteNode();
+      expect(mockDeletePipelineNode).toHaveBeenCalledWith("del-node");
+    });
+
+    it("emits cancel:hideform", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.deleteNode();
+      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("appendData toggle (enrichment_tables)", () => {
+    it("initializes appendData from node meta", async () => {
+      const wrapper = createWrapper({
+        currentSelectedNodeData: {
+          data: { stream_type: "enrichment_tables" },
+          meta: { append_data: "true" },
+          io_type: "output",
+          type: "output",
+        },
+      });
+      await flushPromises();
+      expect(wrapper.vm.appendData).toBe(true);
+    });
+
+    it("initializes appendData as false when meta is absent", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.vm.appendData).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("watch – stream_type change resets stream_name", () => {
+    it("resets stream_name when stream_type changes (and createNewStream stays same)", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.stream_name = { label: "old_stream", value: "old_stream", isDisable: false };
+      wrapper.vm.stream_type = "metrics";
+      await flushPromises();
+      // After stream_type changes, stream_name should reset
+      expect(wrapper.vm.stream_name).toEqual({
+        label: "", value: "", isDisable: false,
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("UI – createNewStream toggle visibility", () => {
+    it("shows create-stream toggle for input nodes", async () => {
+      const wrapper = createWrapper({
+        currentSelectedNodeData: {
+          data: { stream_type: "logs" },
+          io_type: "input",
+          type: "input",
+        },
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="create-stream-toggle"]').exists()).toBe(true);
+    });
+
+    it("hides main form sections when createNewStream is true", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.createNewStream = true;
+      await nextTick();
+      // The normal form (select inputs) should not be visible
+      expect(wrapper.find('[data-test="input-node-stream-type-select"]').exists()).toBe(false);
+    });
+
+    it("shows form inputs when createNewStream is false", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.find('[data-test="input-node-stream-type-select"]').exists()).toBe(true);
+    });
+
+    it("shows delete button when pipelineObj.isEditNode is true", async () => {
+      const wrapper = createWrapper({ isEditNode: true });
+      await flushPromises();
+      expect(
+        wrapper.find('[data-test="input-node-stream-delete-btn"]').exists()
+      ).toBe(true);
+    });
+
+    it("hides delete button when pipelineObj.isEditNode is false", async () => {
+      const wrapper = createWrapper({ isEditNode: false });
+      await flushPromises();
+      expect(
+        wrapper.find('[data-test="input-node-stream-delete-btn"]').exists()
+      ).toBe(false);
+    });
+  });
+});

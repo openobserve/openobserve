@@ -328,7 +328,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("prom cluster leader cache failed");
 
-    // cache system settings (FQN priority, etc.)
     db::system_settings::cache()
         .await
         .expect("system settings cache failed");
@@ -396,16 +395,21 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(service_graph::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(incidents::run());
+    // Register anomaly detection callbacks on every node.  The HTTP handlers
+    // for /retrain and /trigger can land on any node (querier, ingester, etc.),
+    // not just the alert_manager, so all nodes need the callbacks available.
     #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_alert_manager() {
-        // Register the OSS search layer as the query executor for anomaly detection.
-        // Must happen before start_scheduler() so the training/detection jobs can
-        // call execute_anomaly_query() via the registered callback.
+    {
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_query_executor(
-            |org_id, sql, start, end, cfg_id| {
+            |org_id, sql, start, end, cfg_id, stream_type| {
                 Box::pin(async move {
                     crate::service::anomaly_detection::execute_anomaly_query(
-                        &org_id, &sql, start, end, &cfg_id,
+                        &org_id,
+                        &sql,
+                        start,
+                        end,
+                        &cfg_id,
+                        &stream_type,
                     )
                     .await
                 })
@@ -502,7 +506,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 })
             },
         );
+    }
 
+    // The scheduler and startup recovery only run on alert_manager nodes.
+    #[cfg(feature = "enterprise")]
+    if LOCAL_NODE.is_alert_manager() {
         // Ensure every enabled anomaly config has a live detection trigger after restart.
         // Handles: trigger row missing, or stuck in Processing from a previous crash.
         crate::service::anomaly_detection::recover_detection_triggers_on_startup().await;
@@ -524,9 +532,76 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(
         "service_streams_batch_processor",
-        get_enterprise_config().service_streams.batch_flush_interval_seconds,
+        get_enterprise_config().service_streams.batch_flush_interval_secs,
         {
             o2_enterprise::enterprise::service_streams::batch_processor::run_once().await;
+        },
+        pause_if: !get_enterprise_config().service_streams.enabled
+    );
+    #[cfg(feature = "enterprise")]
+    spawn_pausable_job!(
+        "service_streams_cleanup",
+        3600u64, // 1 hour
+        {
+            use config::metrics;
+
+            const STALE_AGE_US: i64 = 30 * 24 * 3600 * 1_000_000; // 30 days
+
+            // Leader election: smallest UUID ingester runs cleanup
+            let is_leader = match infra::cluster::get_cached_online_ingester_nodes().await {
+                Some(mut nodes) if !nodes.is_empty() => {
+                    nodes.sort_by(|a, b| a.uuid.cmp(&b.uuid));
+                    nodes[0].uuid == LOCAL_NODE.uuid
+                }
+                _ => true, // single-node fallback
+            };
+
+            if !is_leader {
+                continue;
+            }
+
+            let orgs = match infra::table::service_streams::list_distinct_orgs().await {
+                Ok(orgs) => orgs,
+                Err(e) => {
+                    log::error!("[service_streams_cleanup] Failed to list orgs: {e}");
+                    metrics::SERVICE_STREAMS_CLEANUP_RUNS
+                        .with_label_values(&["error"])
+                        .inc();
+                    continue;
+                }
+            };
+
+            let cutoff_us = chrono::Utc::now().timestamp_micros() - STALE_AGE_US;
+
+            for org_id in &orgs {
+                let start = std::time::Instant::now();
+                match infra::table::service_streams::delete_stale(org_id, cutoff_us).await {
+                    Ok(evicted) => {
+                        let duration = start.elapsed().as_secs_f64();
+                        metrics::SERVICE_STREAMS_CLEANUP_DURATION_SECONDS
+                            .with_label_values(&[org_id])
+                            .observe(duration);
+                        metrics::SERVICE_STREAMS_CLEANUP_RUNS
+                            .with_label_values(&["success"])
+                            .inc();
+                        if evicted > 0 {
+                            metrics::SERVICE_STREAMS_CLEANUP_ROWS_EVICTED
+                                .with_label_values(&[org_id])
+                                .inc_by(evicted);
+                            log::info!(
+                                "[service_streams_cleanup] org={} evicted={} duration={:.3}s",
+                                org_id, evicted, duration
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        metrics::SERVICE_STREAMS_CLEANUP_RUNS
+                            .with_label_values(&["error"])
+                            .inc();
+                        log::error!("[service_streams_cleanup] org={} error={e}", org_id);
+                    }
+                }
+            }
         },
         pause_if: !get_enterprise_config().service_streams.enabled
     );

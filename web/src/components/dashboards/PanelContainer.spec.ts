@@ -1419,4 +1419,70 @@ describe("PanelContainer", () => {
       expect(wrapper.vm.errorData).toBe("");
     });
   });
+
+  describe("simplifiedPanelView Prop", () => {
+    it("should hide drag indicator when simplifiedPanelView is true", () => {
+      wrapper = createWrapper({ simplifiedPanelView: true });
+
+      expect(wrapper.find('[data-test="dashboard-panel-drag"]').exists()).toBe(false);
+    });
+
+    it("should show drag indicator when simplifiedPanelView is false", () => {
+      wrapper = createWrapper({ simplifiedPanelView: false, viewOnly: false });
+
+      expect(wrapper.find('[data-test="dashboard-panel-drag"]').exists()).toBe(true);
+    });
+
+    it("should hide dropdown menu when simplifiedPanelView is true", () => {
+      wrapper = createWrapper({ simplifiedPanelView: true });
+
+      expect(wrapper.find('[data-test="dashboard-edit-panel-Test Panel-dropdown"]').exists()).toBe(false);
+    });
+
+    it("should show dropdown menu when simplifiedPanelView is false", () => {
+      wrapper = createWrapper({ simplifiedPanelView: false, viewOnly: false });
+
+      expect(wrapper.find('[data-test="dashboard-edit-panel-Test Panel-dropdown"]').exists()).toBe(true);
+    });
+
+    it("should show direct delete button when simplifiedPanelView is true and not viewOnly", () => {
+      wrapper = createWrapper({ simplifiedPanelView: true, viewOnly: false });
+
+      expect(wrapper.find(`[data-test="dashboard-delete-panel-${mockPanelData.title}-btn"]`).exists()).toBe(true);
+    });
+
+    it("should hide direct delete button when simplifiedPanelView is false", () => {
+      wrapper = createWrapper({ simplifiedPanelView: false, viewOnly: false });
+
+      expect(wrapper.find(`[data-test="dashboard-delete-panel-${mockPanelData.title}-btn"]`).exists()).toBe(false);
+    });
+
+    it("should hide direct delete button when viewOnly is true even if simplifiedPanelView is true", () => {
+      wrapper = createWrapper({ simplifiedPanelView: true, viewOnly: true });
+
+      expect(wrapper.find(`[data-test="dashboard-delete-panel-${mockPanelData.title}-btn"]`).exists()).toBe(false);
+    });
+
+    it("should hide refresh button when simplifiedPanelView is true", () => {
+      wrapper = createWrapper({ simplifiedPanelView: true, viewOnly: false });
+
+      expect(wrapper.find('[data-test="dashboard-panel-refresh-panel-btn"]').exists()).toBe(false);
+    });
+
+    it("should hide description info icon when simplifiedPanelView is true on hover", async () => {
+      wrapper = createWrapper({ simplifiedPanelView: true });
+
+      await wrapper.find('[data-test="dashboard-panel-container"]').trigger('mouseover');
+
+      expect(wrapper.find('[data-test="dashboard-panel-description-info"]').exists()).toBe(false);
+    });
+
+    it("should hide fullscreen button when simplifiedPanelView is true on hover", async () => {
+      wrapper = createWrapper({ simplifiedPanelView: true });
+
+      await wrapper.find('[data-test="dashboard-panel-container"]').trigger('mouseover');
+
+      expect(wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]').exists()).toBe(false);
+    });
+  });
 });

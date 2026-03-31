@@ -17,7 +17,7 @@ use axum::{extract::Request, middleware::Next, response::Response};
 #[cfg(feature = "cloud")]
 use {
     crate::service::organization, axum::http::StatusCode, axum::response::IntoResponse,
-    config::cluster::LOCAL_NODE, config::get_config,
+    config::cluster::LOCAL_NODE,
 };
 
 pub async fn blocked_orgs_middleware(request: Request, next: Next) -> Response {
@@ -28,11 +28,10 @@ pub async fn blocked_orgs_middleware(request: Request, next: Next) -> Response {
 
     #[cfg(feature = "cloud")]
     {
-        let prefix = format!("{}/api/", get_config().common.base_uri);
         let path = request
             .uri()
             .path()
-            .strip_prefix(&prefix)
+            .strip_prefix("/")
             .unwrap_or("")
             .split('?')
             .next()

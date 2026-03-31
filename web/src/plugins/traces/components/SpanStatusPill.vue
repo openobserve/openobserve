@@ -16,11 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 <template>
   <div
     data-test="span-row-status-pill"
-    class="tw:rounded-xl tw:py-[0.125rem] tw:px-[0.625rem] tw:inline-flex tw:items-center tw:w-fit"
-    :class="isError ? 'o2-status-pill--error' : isOk ? 'o2-status-pill--success' : 'o2-status-pill--unset'"
+    class="tw:rounded tw:px-[0.625rem] tw:inline-flex tw:items-center tw:w-fit"
+    :class="
+      isError
+        ? 'o2-status-pill--error'
+        : isOk
+          ? 'o2-status-pill--success'
+          : 'o2-status-pill--unset'
+    "
   >
     <span
-      class="q-mr-xs tw:inline-block tw:w-[0.4375rem] tw:h-[0.4375rem] tw:rounded-full tw:shrink-0 o2-status-pill__dot"
+      class="q-mr-xs tw:inline-block tw:w-[0.375rem] tw:h-[0.375rem] tw:rounded-full tw:shrink-0 o2-status-pill__dot"
     />
     <span
       class="tw:text-[0.7rem] tw:tracking-[0.03em] tw:leading-[1.0625rem] tw:uppercase tw:font-bold"
@@ -37,9 +43,7 @@ const props = defineProps<{
   status?: string;
 }>();
 
-const isError = computed(() =>
-  (props.status ?? "").toUpperCase() === "ERROR",
-);
+const isError = computed(() => (props.status ?? "").toUpperCase() === "ERROR");
 
 const isOk = computed(() => (props.status ?? "").toUpperCase() === "OK");
 

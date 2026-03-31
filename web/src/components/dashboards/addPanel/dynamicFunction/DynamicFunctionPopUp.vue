@@ -1,6 +1,12 @@
 <template>
-  <div class="tw:flex tw:gap-2">
-    <div style="width: 134px; padding-right: 12px; padding-top: 12px">
+  <div
+    :class="
+      !customQuery && !fields.isDerived
+        ? 'tw:flex tw:gap-2'
+        : 'tw:flex tw:flex-col tw:gap-2'
+    "
+  >
+    <div style="width: auto; padding-right: 12px; padding-top: 12px">
       <div class="text-label-bold tw:pb-3">Property</div>
       <div style="display: flex; flex-direction: column; gap: 14px">
         <div>
@@ -33,10 +39,10 @@
     </div>
 
     <div
-      v-if="!customQuery && !fields.isDerived"
-      style="width: calc(100% - 134px)"
+      :style="(!customQuery && !fields.isDerived) ? 'width: calc(100% - 134px)' : 'width: max-content;'"
     >
       <q-tabs
+        v-if="!customQuery && !fields.isDerived"
         v-model="fields.type"
         @update:modelValue="onFieldTypeChange"
         dense
@@ -57,9 +63,9 @@
         />
       </q-tabs>
 
-      <q-separator />
+      <q-separator v-if="!customQuery && !fields.isDerived" />
 
-      <q-tab-panels v-model="fields.type" animated>
+      <q-tab-panels v-if="!customQuery && !fields.isDerived" v-model="fields.type" animated>
         <q-tab-panel name="build" style="padding: 0px; padding-top: 8px">
           <div style="display: flex">
             <div style="width: calc(100% - 134px)">
@@ -84,7 +90,7 @@
         </q-tab-panel>
       </q-tab-panels>
 
-      <div class="tw:pt-2 tw:pr-3" v-if="allowAggregation">
+      <div class="tw:pt-2 tw:pr-3" v-if="!customQuery && !fields.isDerived && allowAggregation">
         <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
           <span class="tw:font-bold">Having</span>
 

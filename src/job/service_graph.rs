@@ -19,11 +19,6 @@ use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 pub async fn run() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     {
-        if !get_o2_config().service_graph.enabled {
-            log::info!("[SERVICE_GRAPH::JOB] Service graph is disabled");
-            return Ok(());
-        }
-
         // Service graph processor writes data via ingestion pipeline
         // and must run on ingester nodes only
         if !LOCAL_NODE.is_ingester() {

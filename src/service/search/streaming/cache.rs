@@ -426,6 +426,8 @@ async fn send_cached_responses(
         all_streams,
         stream_type,
         &mut cached.cached_response,
+        trace_id,
+        "cached_res",
     )
     .await?;
 

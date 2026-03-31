@@ -323,7 +323,7 @@ export default defineComponent({
     const statusColor = (row: any) => {
       if (!row.enabled) return "grey";
       switch (row.status) {
-        case "active":    return "positive";
+        case "ready":     return "positive";
         case "training":  return "info";
         case "failed":    return "negative";
         case "waiting":   return "grey";
@@ -342,7 +342,11 @@ export default defineComponent({
     };
 
     const formatSeconds = (secs: number) => {
-      if (secs >= 3600 && secs % 3600 === 0) return `${secs / 3600}h`;
+      if (secs >= 3600) {
+        const h = Math.floor(secs / 3600);
+        const m = Math.round((secs % 3600) / 60);
+        return m === 0 ? `${h} Hours` : `${h} Hours ${m} Mins`;
+      }
       return `${Math.round(secs / 60)} mins`;
     };
 
