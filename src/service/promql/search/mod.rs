@@ -21,7 +21,7 @@ use std::{
 use config::{
     get_config,
     meta::{
-        cluster::RoleGroup,
+        cluster::{Node, RoleGroup},
         promql::value::*,
         search::ScanStats,
         self_reporting::usage::{RequestStats, UsageType},
@@ -36,7 +36,6 @@ use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::{
     client::grpc::make_grpc_metrics_client,
-    cluster::get_cached_online_querier_nodes,
     errors::{Error, ErrorCodes, Result},
     runtime::DATAFUSION_RUNTIME,
 };
@@ -46,9 +45,7 @@ use tracing::{Instrument, info_span};
 use {
     crate::service::search::SEARCH_SERVER,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
-    o2_enterprise::enterprise::search::{
-        TaskStatus, WorkGroup, admission::node_selection::select_nodes,
-    },
+    o2_enterprise::enterprise::search::{TaskStatus, WorkGroup},
 };
 
 use crate::service::{
@@ -122,15 +119,14 @@ pub async fn search(
     let mut stop_watch = TookWatcher::new();
 
     // get querier nodes from cluster
-    let mut nodes = get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
-        .await
-        .unwrap();
-    // sort nodes by node_id this will improve hit cache ratio
-    nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
-    nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
-    nodes.sort_by_key(|x| x.id);
-    let mut nodes = nodes;
-    let querier_num = nodes.len();
+    let nodes = crate::service::search::cluster::flight::get_online_querier_nodes(
+        trace_id,
+        &req.org_id,
+        "metrics",
+        Some(RoleGroup::Interactive),
+    )
+    .await?;
+    let nodes: Vec<_> = nodes.into_iter().filter(|node| node.is_querier()).collect();
     if nodes.is_empty() {
         log::error!("no querier node online");
         return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
@@ -139,12 +135,10 @@ pub async fn search(
     }
 
     log::info!(
-        "[trace_id {trace_id}] promql->search: get nodes num: {}, querier num: {}",
+        "[trace_id {trace_id}] promql->search: get nodes num: {}",
         nodes.len(),
-        querier_num
     );
 
-    let start_queue_time = std::time::Instant::now();
     // Check work group (OSS uses dist_lock, Enterprise uses WorkGroup::Short)
     #[cfg(not(feature = "enterprise"))]
     let _lock = crate::service::search::work_group::check_work_group(
@@ -156,11 +150,6 @@ pub async fn search(
     )
     .await
     .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
-
-
-    // Compute stream_key once — used for both work group prediction and slot
-    // node selection so both see the same node set.
-    let stream_key = "metrics".to_string();
 
     // Enterprise: Always use Short workgroup for metrics queries
     #[cfg(feature = "enterprise")]
@@ -176,6 +165,9 @@ pub async fn search(
     .await
     .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
 
+    let took_wait = _lock.took_wait;
+    log::info!("[trace_id {trace_id}] promql->search: wait in queue took: {took_wait} ms");
+
     // Node-level slot admission for PromQL (enterprise)
     // Placed here alongside the work_group check so both admission stages are co-located.
     // The guard is held for the duration of search_in_cluster via the select! below.
@@ -183,28 +175,29 @@ pub async fn search(
     #[cfg(feature = "enterprise")]
     let _node_slot_guard = {
         let wg = &get_o2_config().work_group;
-        if wg.max_nodes_per_query > 0 { 
+        if wg.max_nodes_per_query > 0 {
+            let start_time = std::time::Instant::now();
             let elapsed_ms = stop_watch.total_millis();
             let remaining_ms = (timeout * 1000).saturating_sub(elapsed_ms);
-            Some(
+            let guard = Some(
                 o2_enterprise::enterprise::search::admission::acquire_node_slots(
                     trace_id,
                     &nodes,
-                    "short",
-                    wg.short_per_node_slots as u32,
-                    wg.slot_reserved_ttl_ms,
+                    &WorkGroup::Short,
                     remaining_ms,
                 )
                 .await
                 .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?,
-            )
+            );
+            let took_wait = start_time.elapsed().as_millis() as usize;
+            log::info!(
+                "[trace_id {trace_id}] promql->search: wait in node slot took: {took_wait} ms"
+            );
+            guard
         } else {
             None
         }
     };
-
-    let took_wait = start_queue_time.elapsed().as_millis() as usize;
-    log::info!("[trace_id {trace_id}] promql->search: wait in queue took: {took_wait} ms");
 
     #[cfg(feature = "enterprise")]
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();

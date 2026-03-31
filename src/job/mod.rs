@@ -393,11 +393,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // Initialize slot-based admission ledger on querier nodes
     #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_querier() {
+    if LOCAL_NODE.is_querier() && get_enterprise_config().work_group.max_nodes_per_query > 0 {
         admission::init_slot_ledger(cfg.limit.real_cpu_num as f64, cfg.limit.mem_total as f64);
-        if get_enterprise_config().work_group.max_nodes_per_query > 0 {
-            admission::ledger::spawn_ttl_cleanup_task(500);
-        }
+        admission::ledger::spawn_ttl_cleanup_task(500);
     }
 
     tokio::task::spawn(files::run());

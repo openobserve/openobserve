@@ -569,6 +569,7 @@ async fn get_cpu_and_mem_limit(
         && let Ok(wg) = WorkGroup::from_str(wg)
     {
         wg.get_resource(target_partitions, memory_size)
+            .await
             .map_err(|e| {
                 DataFusionError::Execution(format!("Failed to get dynamic resource: {e}"))
             })?

@@ -854,7 +854,7 @@ pub async fn search_partition(
     let cpu_cores = {
         let stream_key = sql.get_first_stream_key();
         let selected = o2_enterprise::enterprise::search::admission::node_selection::select_nodes(
-            &org_id,
+            org_id,
             &stream_key,
             nodes,
             role_group,

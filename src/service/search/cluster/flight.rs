@@ -144,11 +144,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
 
     // Compute stream_key once — used for both work group prediction and slot
     // node selection so both see the same node set.
-    let stream_key = sql
-        .stream_names
-        .first()
-        .map(|s| format!("{}/{}", s.get_stream_type(sql.stream_type), s.stream_name()))
-        .unwrap_or_default();
+    let stream_key = sql.get_first_stream_key();
 
     // 3. get nodes
     let is_local_mode = req.local_mode.unwrap_or_default();
@@ -223,12 +219,15 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         &file_id_list_vec,
     )
     .await?;
+    let took_wait = _lock.took_wait;
+    log::info!("[trace_id {trace_id}] flight->search: wait in queue took: {took_wait} ms");
 
-    let mut _took_wait = _lock.took_wait;
-    let work_group = _lock.work_group.unwrap_or(WorkGroup::Short);
+    let work_group_str = _lock.work_group_str.clone();
+    #[cfg(feature = "enterprise")]
+    let work_group = _lock.work_group.clone().unwrap_or(WorkGroup::Short);
 
     // add work_group
-    req.add_work_group(Some(work_group.to_string()));
+    req.add_work_group(Some(work_group_str));
 
     metrics::QUERY_PENDING_NUMS
         .with_label_values(&[&sql.org_id])
@@ -241,22 +240,22 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     //     Reuses stream_key so select_nodes picks the same node set as predict().
     #[cfg(feature = "enterprise")]
     let _node_slot_guard = {
-        let o2_cfg = get_o2_config();
-        if o2_cfg.work_group.max_nodes_per_query > 0 {
+        if get_o2_config().work_group.max_nodes_per_query > 0 {
+            let start_time = std::time::Instant::now();
             let elapsed_ms = took_watch.total_millis();
             let remaining_ms = (timeout * 1000).saturating_sub(elapsed_ms);
-            Some(admission::acquire_node_slots(trace_id, &nodes, &work_group, remaining_ms).await?)
+            let guard = Some(
+                admission::acquire_node_slots(trace_id, &nodes, &work_group, remaining_ms).await?,
+            );
+            let took_wait = start_time.elapsed().as_millis() as usize;
+            log::info!(
+                "[trace_id {trace_id}] flight->search: wait in node slot took: {took_wait} ms"
+            );
+            guard
         } else {
             None
         }
     };
-
-    // Accumulate slot admission wait into took_wait so callers see the full
-    // time the request spent waiting before execution started.
-    #[cfg(feature = "enterprise")]
-    {
-        _took_wait += took_watch.record_split("slot_admission_wait").as_millis() as usize;
-    }
 
     // 5. partition file list
     let partitioned_file_lists = partition_file_lists(file_id_list, &nodes, role_group).await?;
@@ -370,7 +369,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     Ok((
         data,
         scan_stats,
-        _took_wait,
+        took_wait,
         !partial_err.is_empty(),
         partial_err,
     ))
@@ -467,8 +466,8 @@ pub async fn run_datafusion(
 
 pub async fn get_online_querier_nodes(
     trace_id: &str,
-    org_id: &str,
-    stream_key: &str,
+    _org_id: &str,
+    _stream_key: &str,
     role_group: Option<RoleGroup>,
 ) -> Result<Vec<Node>> {
     // get nodes from cluster
@@ -492,7 +491,7 @@ pub async fn get_online_querier_nodes(
 
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
     if querier_num == 0 {
-        log::error!("no querier node online");
+        log::error!("[trace_id {trace_id}] flight->search: no querier node online");
         return Err(Error::Message("no querier node online".to_string()));
     }
 
@@ -503,7 +502,10 @@ pub async fn get_online_querier_nodes(
         nodes = o2_enterprise::enterprise::search::scheduler::filter_nodes_by_cpu(nodes);
         // filter nodes by slot admission
         nodes = o2_enterprise::enterprise::search::admission::node_selection::select_nodes(
-            org_id, stream_key, nodes, role_group,
+            _org_id,
+            _stream_key,
+            nodes,
+            role_group,
         )
         .await;
     }

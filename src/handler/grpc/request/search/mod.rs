@@ -420,7 +420,7 @@ impl Search for Searcher {
         req: Request<TryAcquireRequest>,
     ) -> Result<Response<TryAcquireResponse>, Status> {
         let r = req.into_inner();
-        match NODE_LEDGER.try_acquire(&r.trace_id, &r.group, r.slots, r.ttl_ms) {
+        match NODE_LEDGER.try_acquire(&r.trace_id, &r.work_group, r.slots, r.ttl_ms) {
             Ok(()) => Ok(Response::new(TryAcquireResponse {
                 success: true,
                 reason: String::new(),
