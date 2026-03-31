@@ -110,19 +110,21 @@
             class="graph-container tw:h-full tw:bg-[var(--o2-bg)]"
             style="position: relative"
           >
-            <div class="tw:absolute tw:left-[0.62rem]">
+            <div
+              class="tw:absolute tw:p-[0.325rem] tw:rounded tw:border tw:border-[var(--o2-border-color)]! tw:top-[0.62rem] tw:flex tw:flex-col tw:left-[0.62rem]"
+            >
               <div
                 data-test="sg-legend"
-                class="tw:w-fit tw:absolute tw:flex tw:flex-row tw:items-center tw:gap-4 tw:min-w-0 tw:h-[2.5rem]!"
+                class="tw:w-fit tw:flex tw:flex-col tw:items-center tw:gap-2 tw:min-w-0"
               >
                 <!-- Border Color -->
                 <div
-                  class="sg-legend-title tw:mb-0! tw:whitespace-nowrap tw:text-[var(--o2-text-1)]!"
+                  class="sg-legend-title tw:mb-0! tw:whitespace-nowrap tw:text-[var(--o2-text-4)]!"
                 >
                   Border Color
-                  <span class="sg-legend-subtitle">by Error Rate</span>
+                  <span class="sg-legend-subtitle">| Errors</span>
                 </div>
-                <div class="sg-legend-color-row tw:gap-4">
+                <div class="tw:flex! tw:flex-col tw:gap-2">
                   <div
                     class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
                   >
@@ -131,7 +133,9 @@
                       style="border-color: #52c41a"
                     ></div>
                     <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
-                      <div class="sg-legend-color-label tw:text-left">
+                      <div
+                        class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                      >
                         Healthy
                       </div>
                       <div class="sg-legend-color-value tw:text-left">
@@ -147,7 +151,9 @@
                       style="border-color: #faad14"
                     ></div>
                     <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
-                      <div class="sg-legend-color-label tw:text-left">
+                      <div
+                        class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                      >
                         Degraded
                       </div>
                       <div class="sg-legend-color-value tw:text-left">
@@ -163,7 +169,9 @@
                       style="border-color: #fa8c16"
                     ></div>
                     <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
-                      <div class="sg-legend-color-label tw:text-left">
+                      <div
+                        class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                      >
                         Warning
                       </div>
                       <div class="sg-legend-color-value tw:text-left">
@@ -179,7 +187,9 @@
                       style="border-color: #f5222d"
                     ></div>
                     <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
-                      <div class="sg-legend-color-label tw:text-left">
+                      <div
+                        class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                      >
                         Critical
                       </div>
                       <div class="sg-legend-color-value tw:text-left">
@@ -189,50 +199,49 @@
                   </div>
                 </div>
               </div>
+              <q-separator
+                v-if="visualizationType === 'graph'"
+                class="tw:my-[0.5rem]!"
+              />
               <div
+                v-if="visualizationType === 'graph'"
                 data-test="sg-node-size-info"
-                class="tw:absolute tw:top-[2.5rem] tw:flex tw:flex-row tw:items-center tw:gap-4 tw:min-w-0 tw:h-[3rem]!"
+                class="tw:flex tw:flex-row tw:items-center tw:gap-4 tw:min-w-0"
               >
                 <!-- Node Size — Graph View only (Tree View uses fixed sizes) -->
-                <template v-if="visualizationType === 'graph'">
-                  <div class="tw:flex tw:flex-row tw:items-center tw:gap-3">
+                <div class="tw:flex tw:flex-col tw:items-start tw:gap-2">
+                  <div
+                    class="sg-legend-title tw:mb-0! tw:whitespace-nowrap tw:text-[var(--o2-text-4)]!"
+                  >
+                    Node Size
+                    <span class="sg-legend-subtitle">| Requests</span>
+                  </div>
+                  <div class="sg-legend-row sg-legend-sizes tw:py-0!">
                     <div
-                      class="sg-legend-title tw:mb-0! tw:whitespace-nowrap tw:text-[var(--o2-text-1)]!"
+                      class="sg-legend-size-item tw:flex-row tw:items-center tw:gap-1.5"
                     >
-                      Node Size
-                      <span class="sg-legend-subtitle">by Request Volume</span>
+                      <div
+                        class="sg-legend-circle"
+                        style="width: 16px; height: 16px; border-color: #52c41a"
+                      ></div>
+                      <span class="sg-legend-label tw:text-[var(--o2-text-2)]!"
+                        >Low</span
+                      >
                     </div>
-                    <div class="sg-legend-row sg-legend-sizes tw:py-0">
+                    <div class="sg-legend-size-dots tw:mb-0">···</div>
+                    <div
+                      class="sg-legend-size-item tw:flex-row tw:items-center tw:gap-1.5"
+                    >
                       <div
-                        class="sg-legend-size-item tw:flex-row tw:items-center tw:gap-1.5"
+                        class="sg-legend-circle"
+                        style="width: 28px; height: 28px; border-color: #52c41a"
+                      ></div>
+                      <span class="sg-legend-label tw:text-[var(--o2-text-2)]!"
+                        >High</span
                       >
-                        <div
-                          class="sg-legend-circle"
-                          style="
-                            width: 16px;
-                            height: 16px;
-                            border-color: #52c41a;
-                          "
-                        ></div>
-                        <span class="sg-legend-label">Low</span>
-                      </div>
-                      <div class="sg-legend-size-dots tw:mb-0">···</div>
-                      <div
-                        class="sg-legend-size-item tw:flex-row tw:items-center tw:gap-1.5"
-                      >
-                        <div
-                          class="sg-legend-circle"
-                          style="
-                            width: 28px;
-                            height: 28px;
-                            border-color: #52c41a;
-                          "
-                        ></div>
-                        <span class="sg-legend-label">High</span>
-                      </div>
                     </div>
                   </div>
-                </template>
+                </div>
               </div>
             </div>
 
@@ -1708,7 +1717,7 @@ export default defineComponent({
 :global(.sg-legend-sizes) {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
   padding: 4px 0 6px;
 }
 
@@ -1721,7 +1730,7 @@ export default defineComponent({
 
 :global(.sg-legend-circle) {
   border-radius: 50%;
-  border-width: 3px;
+  border-width: 2px;
   border-style: solid;
   background: transparent;
   flex-shrink: 0;
@@ -1735,7 +1744,6 @@ export default defineComponent({
 
 :global(.sg-legend-label) {
   font-size: 11px;
-  opacity: 0.6;
 }
 
 :global(.sg-legend-color-row) {
@@ -1752,10 +1760,10 @@ export default defineComponent({
 }
 
 :global(.sg-legend-dot) {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  border-width: 3px;
+  border-width: 2px;
   border-style: solid;
   background: transparent;
 }
