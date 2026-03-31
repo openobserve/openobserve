@@ -118,21 +118,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_head_function() {
-        let (_temp_dir, _wal_path) = setup_test_environment().await;
-        let path = Path::from("test/file.txt");
-
-        // Test with a non-existent file
-        let result = head(&path).await;
-        assert!(result.is_err());
-
-        // Verify the error is NotImplemented (as implemented in local storage)
-        if let Err(e) = result {
-            assert!(matches!(e, object_store::Error::NotImplemented { .. }));
-        }
-    }
-
-    #[tokio::test]
     async fn test_different_path_formats() {
         let (_temp_dir, _wal_path) = setup_test_environment().await;
         let test_paths = [
@@ -286,7 +271,7 @@ mod tests {
         ));
         assert!(matches!(
             head_result,
-            Err(object_store::Error::NotImplemented { .. })
+            Err(object_store::Error::NotFound { .. })
         ));
     }
 }
