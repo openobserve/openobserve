@@ -90,7 +90,11 @@ pub async fn post_user(
     }
 
     #[cfg(feature = "enterprise")]
-    if usr_req.role.base_role != UserRole::Admin && !get_openfga_config().enabled {
+    if !matches!(
+        usr_req.role.base_role,
+        UserRole::Admin | UserRole::ServiceAccount
+    ) && !get_openfga_config().enabled
+    {
         return Ok(MetaHttpResponse::bad_request(
             "Non-admin roles require open-fga enabled",
         ));
