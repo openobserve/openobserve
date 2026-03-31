@@ -2669,9 +2669,7 @@ async fn handle_backfill_triggers(
                 key: job_id.clone(),
                 status: TriggerDataStatus::Failed,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
-                error: Some(
-                    "Pipeline is not scheduled. Deleting trigger job.".to_string(),
-                ),
+                error: Some("Pipeline is not scheduled. Deleting trigger job.".to_string()),
                 time_in_queue_ms: Some(
                     Duration::microseconds(now - trigger_start_time).num_milliseconds(),
                 ),
