@@ -159,8 +159,7 @@ impl FlightService for FlightServiceImpl {
             Err(e) => {
                 clear_session_data(&trace_id);
                 #[cfg(feature = "enterprise")]
-                o2_enterprise::enterprise::search::admission::ledger::NODE_LEDGER
-                    .release(&orig_trace_id);
+                o2_enterprise::enterprise::search::admission::ledger::release(&orig_trace_id);
                 log::error!(
                     "[trace_id {trace_id}] flight->search: do_get physical plan generate error: {e:?}",
                 );
@@ -218,8 +217,7 @@ impl FlightService for FlightServiceImpl {
         let stream = execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
             clear_session_data(&trace_id);
             #[cfg(feature = "enterprise")]
-            o2_enterprise::enterprise::search::admission::ledger::NODE_LEDGER
-                .release(&orig_trace_id);
+            o2_enterprise::enterprise::search::admission::ledger::release(&orig_trace_id);
             log::error!(
                 "[trace_id {trace_id}] flight->search: do_get physical plan execution error: {e:?}",
             );

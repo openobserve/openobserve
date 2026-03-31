@@ -106,6 +106,19 @@ impl Sql {
         Self::new_with_options(query, org_id, stream_type, search_event_type, false).await
     }
 
+    pub fn get_first_stream_key(&self) -> String {
+        self.stream_names
+            .first()
+            .map(|s| {
+                format!(
+                    "{}/{}",
+                    s.get_stream_type(self.stream_type),
+                    s.stream_name()
+                )
+            })
+            .unwrap_or_default()
+    }
+
     pub async fn new_with_options(
         query: &SearchQuery,
         org_id: &str,

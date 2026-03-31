@@ -290,8 +290,7 @@ impl Drop for FlightEncoderStream {
                 "[trace_id {trace_id}] flight->search: follow releasing slot for {}",
                 _orig_trace_id
             );
-            o2_enterprise::enterprise::search::admission::ledger::NODE_LEDGER
-                .release(_orig_trace_id);
+            o2_enterprise::enterprise::search::admission::ledger::release(_orig_trace_id);
         }
 
         // defer is only set for super cluster follower leader

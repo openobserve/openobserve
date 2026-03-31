@@ -33,9 +33,10 @@ use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    config::meta::search::ScanStats,
-    config::metrics,
-    o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup},
+    config::{meta::search::ScanStats, metrics},
+    o2_enterprise::enterprise::search::{
+        QueryManager, TaskStatus, WorkGroup, admission::ledger::NODE_LEDGER,
+    },
 };
 
 use crate::{handler::grpc::MetadataMap, service::search as SearchService};
@@ -419,8 +420,7 @@ impl Search for Searcher {
         req: Request<TryAcquireRequest>,
     ) -> Result<Response<TryAcquireResponse>, Status> {
         let r = req.into_inner();
-        let ledger = &o2_enterprise::enterprise::search::admission::ledger::NODE_LEDGER;
-        match ledger.try_acquire(&r.trace_id, &r.group, r.slots, r.ttl_ms) {
+        match NODE_LEDGER.try_acquire(&r.trace_id, &r.group, r.slots, r.ttl_ms) {
             Ok(()) => Ok(Response::new(TryAcquireResponse {
                 success: true,
                 reason: String::new(),
@@ -446,8 +446,7 @@ impl Search for Searcher {
         req: Request<StartQueryRequest>,
     ) -> Result<Response<StartQueryResponse>, Status> {
         let trace_id = req.into_inner().trace_id;
-        let ledger = &o2_enterprise::enterprise::search::admission::ledger::NODE_LEDGER;
-        match ledger.start(&trace_id) {
+        match NODE_LEDGER.start(&trace_id) {
             Ok(()) => Ok(Response::new(StartQueryResponse {
                 success: true,
                 reason: String::new(),
@@ -473,8 +472,7 @@ impl Search for Searcher {
         req: Request<ReleaseQueryRequest>,
     ) -> Result<Response<ReleaseQueryResponse>, Status> {
         let trace_id = req.into_inner().trace_id;
-        let ledger = &o2_enterprise::enterprise::search::admission::ledger::NODE_LEDGER;
-        ledger.release(&trace_id);
+        NODE_LEDGER.release(&trace_id);
         Ok(Response::new(ReleaseQueryResponse { success: true }))
     }
 

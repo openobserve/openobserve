@@ -44,8 +44,11 @@ use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::search::SEARCH_SERVER, o2_enterprise::enterprise::search::TaskStatus,
-    o2_enterprise::enterprise::search::WorkGroup,
+    crate::service::search::SEARCH_SERVER,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::search::{
+        TaskStatus, WorkGroup, admission::node_selection::select_nodes,
+    },
 };
 
 use crate::service::{
@@ -82,7 +85,7 @@ pub async fn search(
 ) -> Result<Value> {
     #[cfg(feature = "enterprise")]
     {
-        let sql = Some(req.query.clone());
+        let query = Some(req.query.clone());
         let start_time = Some(req.start);
         let end_time = Some(req.end);
 
@@ -95,7 +98,7 @@ pub async fn search(
                     Some(user_email.to_string()),
                     Some(org_id.to_string()),
                     Some(StreamType::Metrics.to_string()),
-                    sql,
+                    query,
                     start_time,
                     end_time,
                     None,
@@ -118,6 +121,29 @@ pub async fn search(
 
     let mut stop_watch = TookWatcher::new();
 
+    // get querier nodes from cluster
+    let mut nodes = get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
+        .await
+        .unwrap();
+    // sort nodes by node_id this will improve hit cache ratio
+    nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
+    nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
+    nodes.sort_by_key(|x| x.id);
+    let mut nodes = nodes;
+    let querier_num = nodes.len();
+    if nodes.is_empty() {
+        log::error!("no querier node online");
+        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+            "no querier node found".to_string(),
+        )));
+    }
+
+    log::info!(
+        "[trace_id {trace_id}] promql->search: get nodes num: {}, querier num: {}",
+        nodes.len(),
+        querier_num
+    );
+
     let start_queue_time = std::time::Instant::now();
     // Check work group (OSS uses dist_lock, Enterprise uses WorkGroup::Short)
     #[cfg(not(feature = "enterprise"))]
@@ -130,6 +156,11 @@ pub async fn search(
     )
     .await
     .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+
+
+    // Compute stream_key once — used for both work group prediction and slot
+    // node selection so both see the same node set.
+    let stream_key = "metrics".to_string();
 
     // Enterprise: Always use Short workgroup for metrics queries
     #[cfg(feature = "enterprise")]
@@ -145,20 +176,14 @@ pub async fn search(
     .await
     .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
 
-    // Node-level slot admission for PromQL (enterprise, O2_WORK_GROUP_SLOT_ENABLED=true).
+    // Node-level slot admission for PromQL (enterprise)
     // Placed here alongside the work_group check so both admission stages are co-located.
     // The guard is held for the duration of search_in_cluster via the select! below.
     // PromQL always runs as "short". Nodes are cached so the extra call is cheap.
     #[cfg(feature = "enterprise")]
     let _node_slot_guard = {
-        use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
         let wg = &get_o2_config().work_group;
-        if wg.slot_enabled {
-            let nodes = infra::cluster::get_cached_online_querier_nodes(Some(
-                config::meta::cluster::RoleGroup::Interactive,
-            ))
-            .await
-            .unwrap_or_default();
+        if wg.max_nodes_per_query > 0 { 
             let elapsed_ms = stop_watch.total_millis();
             let remaining_ms = (timeout * 1000).saturating_sub(elapsed_ms);
             Some(
@@ -199,8 +224,9 @@ pub async fn search(
 
     let trace_id_move = trace_id.to_string();
     let user_email_move = user_email.to_string();
-    let query_task = DATAFUSION_RUNTIME
-        .spawn(async move { search_in_cluster(&trace_id_move, req, &user_email_move).await });
+    let query_task = DATAFUSION_RUNTIME.spawn(async move {
+        search_in_cluster(&trace_id_move, req, &user_email_move, &nodes).await
+    });
     tokio::pin!(query_task);
 
     // run search in cluster
@@ -250,6 +276,7 @@ async fn search_in_cluster(
     trace_id: &str,
     req: cluster_rpc::MetricsQueryRequest,
     user_email: &str,
+    nodes: &[Node],
 ) -> Result<Value> {
     let start_ins = std::time::Instant::now();
     let started_at = now_micros();
@@ -265,6 +292,7 @@ async fn search_in_cluster(
         query_data: _,
         label_selector: _,
     } = req.query.as_ref().unwrap();
+    let nr_queriers = nodes.len() as i64;
 
     // cache enabled if result cache is enabled and use_cache is true and start != end
     let use_cache = cfg.common.result_cache_enabled && req.use_cache && start != end;
@@ -280,23 +308,6 @@ async fn search_in_cluster(
         step,
         query,
     );
-
-    // get querier nodes from cluster
-    let mut nodes = get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
-        .await
-        .unwrap();
-    // sort nodes by node_id this will improve hit cache ratio
-    nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
-    nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
-    nodes.sort_by_key(|x| x.id);
-    let nodes = nodes;
-    if nodes.is_empty() {
-        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-            "no querier node found".to_string(),
-        )));
-    }
-
-    let nr_queriers = nodes.len() as i64;
 
     // The number of resolution steps; see the diagram at
     // https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#range-queries

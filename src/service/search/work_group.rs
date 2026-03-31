@@ -32,9 +32,6 @@ use super::utils::AsyncDefer;
 /// Guard that automatically releases work group lock when dropped
 pub struct DeferredLock {
     pub took_wait: usize,
-    pub work_group_str: String,
-    #[cfg(feature = "enterprise")]
-    #[allow(dead_code)] // Available for external use/debugging
     pub work_group: Option<WorkGroup>,
     _guard: AsyncDefer,
 }
@@ -54,9 +51,9 @@ pub async fn check_work_group(
     caller: &str,
 ) -> Result<DeferredLock> {
     let cfg = get_config();
-    let work_group_str = "global".to_string();
+    let work_group = WorkGroup::Short;
 
-    let locker_key = format!("/search/cluster_queue/{work_group_str}");
+    let locker_key = format!("/search/cluster_queue/{}", work_group.to_string());
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
     } else {
@@ -86,7 +83,7 @@ pub async fn check_work_group(
 
     Ok(DeferredLock {
         took_wait,
-        work_group_str,
+        work_group: Some(work_group),
         _guard: guard,
     })
 }
@@ -108,10 +105,9 @@ pub async fn check_work_group(
     caller: &str,
 ) -> Result<DeferredLock> {
     let cfg = get_config();
-    let work_group_str = work_group.to_string();
 
     // Get distributed lock temporarily (for queue coordination)
-    let locker_key = format!("/search/cluster_queue/{work_group_str}");
+    let locker_key = format!("/search/cluster_queue/{}", work_group.to_string());
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
     } else {
@@ -194,7 +190,6 @@ pub async fn check_work_group(
 
     Ok(DeferredLock {
         took_wait,
-        work_group_str,
         work_group: Some(work_group),
         _guard: guard,
     })
@@ -353,7 +348,6 @@ pub async fn acquire_work_group_lock(
     caller: &str,
     nodes: &[Node],
     file_id_list_vec: &[&FileId],
-    stream_key: &str,
 ) -> Result<DeferredLock> {
     let is_background_task = req
         .search_event_type
@@ -363,8 +357,6 @@ pub async fn acquire_work_group_lock(
         .unwrap_or(false);
 
     let work_group = o2_enterprise::enterprise::search::work_group::predict(
-        &req.org_id,
-        stream_key,
         nodes,
         file_id_list_vec,
         is_background_task,

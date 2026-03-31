@@ -400,14 +400,14 @@ pub async fn trigger_incident_rca(
         common::config::get_config as get_o2_config,
     };
 
-    let o2_config = get_o2_config();
+    let o2_cfg = get_o2_config();
 
     // Check if RCA is enabled
-    if !o2_config.incidents.enabled || !o2_config.incidents.rca_enabled {
+    if !o2_cfg.incidents.enabled || !o2_cfg.incidents.rca_enabled {
         return MetaHttpResponse::bad_request("RCA is not enabled");
     }
 
-    if o2_config.ai.agent_url.is_empty() {
+    if o2_cfg.ai.agent_url.is_empty() {
         return axum::response::Response::builder()
             .status(axum::http::StatusCode::SERVICE_UNAVAILABLE)
             .header(axum::http::header::CONTENT_TYPE, "application/json")
@@ -419,7 +419,7 @@ pub async fn trigger_incident_rca(
 
     // In-flight guard
     {
-        let cooldown = o2_config.incidents.reanalysis_cooldown_minutes;
+        let cooldown = o2_cfg.incidents.reanalysis_cooldown_minutes;
         let events = infra::table::incident_events::get(&org_id, &incident_id)
             .await
             .unwrap_or_default();
@@ -481,7 +481,7 @@ pub async fn trigger_incident_rca(
     // Create RCA agent client
     let zo_config = config::get_config();
     let client = match RcaAgentClient::new(
-        &o2_config.ai.agent_url,
+        &o2_cfg.ai.agent_url,
         &zo_config.auth.root_user_email,
         &zo_config.auth.root_user_password,
     ) {

@@ -163,10 +163,10 @@ message GetSourcemapFileResponse {
 
 // Slot-based admission messages
 message TryAcquireRequest {
-    string trace_id = 1;
-    string    group = 2; // "short" | "long" | "background"
-    uint32    slots = 3;
-    uint64   ttl_ms = 4;
+    string   trace_id = 1;
+    string work_group = 2; // "short" | "long" | "background"
+    uint32      slots = 3;
+    uint64     ttl_ms = 4;
 }
 
 message TryAcquireResponse {

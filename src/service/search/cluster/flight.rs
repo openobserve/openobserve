@@ -48,6 +48,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use {
     crate::service::search::SEARCH_SERVER,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::search::{WorkGroup, admission},
 };
 
 use crate::{
@@ -141,6 +142,14 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         ..Default::default()
     };
 
+    // Compute stream_key once — used for both work group prediction and slot
+    // node selection so both see the same node set.
+    let stream_key = sql
+        .stream_names
+        .first()
+        .map(|s| format!("{}/{}", s.get_stream_type(sql.stream_type), s.stream_name()))
+        .unwrap_or_default();
+
     // 3. get nodes
     let is_local_mode = req.local_mode.unwrap_or_default();
     let role_group = if is_local_mode {
@@ -155,7 +164,8 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
             })
             .unwrap_or(Some(RoleGroup::Interactive))
     };
-    let mut nodes = get_online_querier_nodes(trace_id, role_group).await?;
+    let mut nodes =
+        get_online_querier_nodes(trace_id, &sql.org_id, &stream_key, role_group).await?;
 
     // local mode, only use local node as querier node
     if is_local_mode {
@@ -199,14 +209,6 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         )
     );
 
-    // Compute stream_key once — used for both work group prediction and slot
-    // node selection so both see the same node set.
-    let stream_key = sql
-        .stream_names
-        .first()
-        .map(|s| format!("{}/{}", s.get_stream_type(sql.stream_type), s.stream_name()))
-        .unwrap_or_default();
-
     // 4. Wait in DB search queue (org/user concurrency check)
     metrics::QUERY_PENDING_NUMS
         .with_label_values(&[&req.org_id])
@@ -219,15 +221,14 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         "logs",
         &nodes,
         &file_id_list_vec,
-        &stream_key,
     )
     .await?;
 
     let mut _took_wait = _lock.took_wait;
-    let work_group_str = _lock.work_group_str.clone();
+    let work_group = _lock.work_group.unwrap_or(WorkGroup::Short);
 
     // add work_group
-    req.add_work_group(Some(work_group_str.clone()));
+    req.add_work_group(Some(work_group.to_string()));
 
     metrics::QUERY_PENDING_NUMS
         .with_label_values(&[&sql.org_id])
@@ -240,33 +241,11 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     //     Reuses stream_key so select_nodes picks the same node set as predict().
     #[cfg(feature = "enterprise")]
     let _node_slot_guard = {
-        let wg = &get_o2_config().work_group;
-        if wg.slot_enabled {
-            let querier_nodes: Vec<_> = nodes.iter().filter(|n| n.is_querier()).cloned().collect();
-            let selected_nodes =
-                o2_enterprise::enterprise::search::admission::node_selection::select_nodes(
-                    &sql.org_id,
-                    &stream_key,
-                    querier_nodes,
-                );
-            let slots_per_node = match work_group_str.as_str() {
-                "long" => wg.long_per_node_slots as u32,
-                "background" => wg.background_per_node_slots as u32,
-                _ => wg.short_per_node_slots as u32,
-            };
+        let o2_cfg = get_o2_config();
+        if o2_cfg.work_group.max_nodes_per_query > 0 {
             let elapsed_ms = took_watch.total_millis();
             let remaining_ms = (timeout * 1000).saturating_sub(elapsed_ms);
-            Some(
-                o2_enterprise::enterprise::search::admission::acquire_node_slots(
-                    trace_id,
-                    &selected_nodes,
-                    &work_group_str,
-                    slots_per_node,
-                    wg.slot_reserved_ttl_ms,
-                    remaining_ms,
-                )
-                .await?,
-            )
+            Some(admission::acquire_node_slots(trace_id, &nodes, &work_group, remaining_ms).await?)
         } else {
             None
         }
@@ -488,6 +467,8 @@ pub async fn run_datafusion(
 
 pub async fn get_online_querier_nodes(
     trace_id: &str,
+    org_id: &str,
+    stream_key: &str,
     role_group: Option<RoleGroup>,
 ) -> Result<Vec<Node>> {
     // get nodes from cluster
@@ -518,7 +499,13 @@ pub async fn get_online_querier_nodes(
     // use enterprise scheduler to filter nodes
     #[cfg(feature = "enterprise")]
     {
+        // filter nodes by cpu
         nodes = o2_enterprise::enterprise::search::scheduler::filter_nodes_by_cpu(nodes);
+        // filter nodes by slot admission
+        nodes = o2_enterprise::enterprise::search::admission::node_selection::select_nodes(
+            org_id, stream_key, nodes, role_group,
+        )
+        .await;
     }
 
     Ok(nodes)

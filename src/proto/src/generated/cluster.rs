@@ -1172,7 +1172,7 @@ pub struct TryAcquireRequest {
     pub trace_id: ::prost::alloc::string::String,
     /// "short" | "long" | "background"
     #[prost(string, tag = "2")]
-    pub group: ::prost::alloc::string::String,
+    pub work_group: ::prost::alloc::string::String,
     #[prost(uint32, tag = "3")]
     pub slots: u32,
     #[prost(uint64, tag = "4")]

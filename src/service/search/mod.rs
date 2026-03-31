@@ -832,7 +832,12 @@ pub async fn search_partition(
         return Ok(response);
     };
 
-    let nodes = get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
+    let role_group = if is_http_req {
+        Some(RoleGroup::Interactive)
+    } else {
+        Some(RoleGroup::Background)
+    };
+    let nodes = get_cached_online_querier_nodes(role_group)
         .await
         .unwrap_or_default();
     if nodes.is_empty() {
@@ -847,16 +852,14 @@ pub async fn search_partition(
     // few partitions.
     #[cfg(feature = "enterprise")]
     let cpu_cores = {
-        let stream_key = sql
-            .stream_names
-            .first()
-            .map(|s| format!("{}/{}", s.get_stream_type(stream_type), s.stream_name()))
-            .unwrap_or_default();
+        let stream_key = sql.get_first_stream_key();
         let selected = o2_enterprise::enterprise::search::admission::node_selection::select_nodes(
-            org_id,
+            &org_id,
             &stream_key,
             nodes,
-        );
+            role_group,
+        )
+        .await;
         selected.iter().map(|n| n.cpu_num).sum::<u64>() as usize
     };
     #[cfg(not(feature = "enterprise"))]

@@ -2618,6 +2618,8 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.batch_size = 8192;
     }
     cfg.limit.batch_size = cfg.limit.batch_size.clamp(1024, 8192);
+    // clamp datafusion_min_partition_num to 1
+    cfg.limit.datafusion_min_partition_num = cfg.limit.datafusion_min_partition_num.max(1);
 
     Ok(())
 }
