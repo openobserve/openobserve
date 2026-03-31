@@ -1829,7 +1829,7 @@ watch(moveSplitter, () => {
 // Handler for service graph view traces event
 const handleServiceGraphViewTraces = (data: any) => {
   // Switch to search tab
-  searchObj.meta.searchMode = "traces";
+  searchObj.meta.searchMode = "spans";
 
   // Set the selected stream in dropdown
   if (data.stream) {
@@ -1860,6 +1860,9 @@ const handleServiceGraphViewTraces = (data: any) => {
     }
     if (data.minDurationMicros && data.minDurationMicros > 0) {
       filterQuery += ` AND duration >= ${data.minDurationMicros}`;
+    }
+    if (data.maxDurationMicros && data.maxDurationMicros > 0) {
+      filterQuery += ` AND duration <= ${data.maxDurationMicros}`;
     }
     searchObj.data.editorValue = filterQuery;
     searchObj.data.query = filterQuery;

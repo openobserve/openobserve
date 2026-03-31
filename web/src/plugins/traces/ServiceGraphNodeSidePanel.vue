@@ -68,9 +68,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- RED Charts Section -->
         <div
           v-if="streamFilter !== 'all' && dashboardData"
-          class="panel-section red-charts-section tw:flex tw:mb-0!"
+          class="panel-section red-charts-section tw:flex tw:flex-col tw:mb-0!"
           data-test="service-graph-side-panel-red-charts"
         >
+          <!-- DataZoom filter chips + View in Traces button -->
+          <div
+            v-if="filterChips.length"
+            class="tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-[0.3rem] tw:flex-wrap"
+            data-test="service-graph-side-panel-filter-chips"
+          >
+            <!-- Filter chip pills -->
+            <div
+              v-for="chip in filterChips"
+              :key="chip.key"
+              class="tw:inline-flex tw:items-center tw:gap-1 tw:rounded tw:border tw:border-[var(--o2-border)] tw:px-2 tw:py-[0.325rem] tw:text-[0.7rem] tw:leading-none tw:text-[var(--o2-text-primary)]"
+              :data-test="`service-graph-filter-chip-${chip.key}`"
+              :class="
+                chip.type === 'duration'
+                  ? 'tw:text-[var(--o2-latency-p95)]'
+                  : 'tw:text-[var(--o2-status-error-text)]'
+              "
+            >
+              <!-- Duration chip icon -->
+              <q-icon
+                v-if="chip.type === 'duration'"
+                name="schedule"
+                size="0.8rem"
+                class="tw:text-[var(--o2-latency-p95)]"
+              />
+              <!-- Error chip icon -->
+              <q-icon
+                v-else-if="chip.type === 'error'"
+                name="warning"
+                size="0.8rem"
+                class="tw:text-[var(--o2-status-error-text)]"
+              />
+              <span
+                :class="
+                  chip.type === 'duration'
+                    ? 'tw:text-[var(--o2-latency-p95)]'
+                    : 'tw:text-[var(--o2-status-error-text)]'
+                "
+                >{{ chip.label }}</span
+              >
+              <button
+                class="tw:ml-0.5 tw:flex tw:items-center tw:justify-center tw:rounded-full tw:text-[var(--o2-text-secondary)] tw:hover:text-[var(--o2-text-primary)] tw:cursor-pointer tw:border-none tw:bg-transparent tw:p-0"
+                :data-test="`service-graph-filter-chip-remove-${chip.key}`"
+                @click="removeLocalRangeFilter(chip.key)"
+              >
+                <q-icon name="close" size="0.65rem" />
+              </button>
+            </div>
+
+            <!-- Spacer -->
+            <div class="tw:flex-1" />
+
+            <!-- View in Traces button -->
+            <q-btn
+              class="view-logs-btn o2-primary-button tw:py-[0.25rem]! tw:px-[0.25rem]!"
+              dense
+              unelevated
+              no-caps
+              size="sm"
+              data-test="service-graph-side-panel-view-in-traces-btn"
+              @click="viewInTraces"
+            >
+              <q-icon name="search" size="0.8rem" class="tw:pr-[0.12rem]" />
+              View Traces
+            </q-btn>
+          </div>
           <div class="charts-wrapper tw:py-0! tw:min-h-[10.875rem] tw:w-full">
             <div class="charts-container tw:w-full">
               <RenderDashboardCharts
@@ -80,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :currentTimeObj="currentTimeObj"
                 :allowAlertCreation="false"
                 searchType="dashboards"
+                @updated:dataZoom="onDataZoom"
               />
             </div>
           </div>
@@ -519,7 +586,11 @@ import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import { correlate as correlateStreams } from "@/services/service_streams";
-import { escapeSingleQuotes, deepCopy } from "@/utils/zincutils";
+import {
+  escapeSingleQuotes,
+  deepCopy,
+  formatTimeWithSuffix,
+} from "@/utils/zincutils";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import metrics from "./metrics/metrics.json";
 
@@ -571,6 +642,22 @@ export default defineComponent({
 
     // RED Charts State
     const dashboardData = ref<any>({});
+
+    // Local datazoom filter map (keyed by panelId)
+    const localRangeFilters = ref<
+      Map<
+        string,
+        {
+          panelTitle: string;
+          start: number | null;
+          end: number | null;
+          timeStart: number | null;
+          timeEnd: number | null;
+        }
+      >
+    >(new Map());
+    // Reactivity trigger for Map changes (Vue 3 doesn't track Map.set() automatically)
+    const rangeFiltersVersion = ref(0);
     const selectedTimeObj = ref({
       start_time: new Date(props.timeRange.startTime),
       end_time: new Date(props.timeRange.endTime),
@@ -646,6 +733,105 @@ export default defineComponent({
       });
 
       dashboardData.value = convertedDashboard;
+    };
+
+    const createRangeFilter = (
+      data: any,
+      start: number | null = null,
+      end: number | null = null,
+      timeStart: number | null = null,
+      timeEnd: number | null = null,
+    ) => {
+      const panelId = data?.id;
+      const panelTitle = data?.title || "Chart";
+      if (
+        panelId &&
+        (panelTitle === "Duration" ||
+          panelTitle === "Rate" ||
+          panelTitle === "Errors")
+      ) {
+        localRangeFilters.value.set(panelId, {
+          panelTitle,
+          start: start != null ? Math.floor(start) : null,
+          end: end != null ? Math.floor(end) : null,
+          timeStart: timeStart != null ? Math.floor(timeStart) : null,
+          timeEnd: timeEnd != null ? Math.floor(timeEnd) : null,
+        });
+        rangeFiltersVersion.value++;
+      }
+    };
+
+    const onDataZoom = ({
+      start,
+      end,
+      start1,
+      end1,
+      data,
+    }: {
+      start: number;
+      end: number;
+      start1: number;
+      end1: number;
+      data: any;
+    }) => {
+      if (start && end) {
+        const panelTitle = data?.title;
+        if (panelTitle === "Rate" || panelTitle === "Errors") {
+          createRangeFilter(data, -1, -1, start * 1000, end * 1000);
+        } else {
+          createRangeFilter(data, start1, end1, start * 1000, end * 1000);
+        }
+        rangeFiltersVersion.value++;
+      }
+    };
+
+    const removeLocalRangeFilter = (panelId: string) => {
+      localRangeFilters.value.delete(panelId);
+      rangeFiltersVersion.value++;
+    };
+
+    const filterChips = computed(() => {
+      // Access rangeFiltersVersion to force reactivity when Map changes
+      rangeFiltersVersion.value;
+      const chips: {
+        key: string;
+        label: string;
+        type: "duration" | "error";
+      }[] = [];
+      localRangeFilters.value.forEach((f, key) => {
+        if (
+          f.panelTitle === "Duration" &&
+          f.start !== null &&
+          f.end !== null &&
+          f.start > 0 &&
+          f.end > 0
+        ) {
+          chips.push({
+            key,
+            type: "duration",
+            label: `Duration: ${formatTimeWithSuffix(f.start)} – ${formatTimeWithSuffix(f.end)}`,
+          });
+        } else if (f.panelTitle === "Errors") {
+          chips.push({ key, type: "error", label: "Status: Error" });
+        }
+      });
+      return chips;
+    });
+
+    const viewInTraces = () => {
+      let errorsOnly = false;
+      let minDurationMicros: number | undefined;
+      let maxDurationMicros: number | undefined;
+
+      localRangeFilters.value.forEach((f) => {
+        if (f.panelTitle === "Errors") errorsOnly = true;
+        if (f.panelTitle === "Duration" && f.start !== null && f.start > 0) {
+          minDurationMicros = f.start;
+          maxDurationMicros = f.end;
+        }
+      });
+
+      navigateToTraces({ errorsOnly, minDurationMicros, maxDurationMicros });
     };
 
     // Metrics Correlation State
@@ -1308,13 +1494,15 @@ export default defineComponent({
       },
     );
 
-    // Reset nodes/pods data and go back to operations tab when node or stream changes
+    // Reset nodes/pods data, local filters, and go back to operations tab when node or stream changes
     watch(
       () => [props.selectedNode?.id, props.streamFilter],
       () => {
         recentNodes.value = [];
         recentPods.value = [];
         activeTab.value = "operations";
+        localRangeFilters.value.clear();
+        rangeFiltersVersion.value++;
       },
     );
 
@@ -1337,6 +1525,7 @@ export default defineComponent({
         podName: params.podName,
         errorsOnly: params.errorsOnly,
         minDurationMicros: params.minDurationMicros,
+        maxDurationMicros: params.maxDurationMicros,
         timeRange: props.timeRange,
       });
     };
@@ -1402,6 +1591,11 @@ export default defineComponent({
       selectedTimeObj,
       currentTimeObj,
       loadDashboard,
+      // DataZoom filters
+      filterChips,
+      onDataZoom,
+      removeLocalRangeFilter,
+      viewInTraces,
       // Telemetry Correlation
       showTelemetryDialog,
       correlationLoading,
