@@ -23,6 +23,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
 import { getSpanColorHex } from "@/utils/traces/traceColors";
+import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 
 const defaultObject = {
   organizationIdentifier: "",
@@ -88,7 +89,7 @@ const defaultObject = {
     >(),
     showErrorOnly: false,
     queryEditorPlaceholderFlag: true,
-    searchMode: "spans" as "traces" | "spans",
+    searchMode: "spans" as TraceSearchMode,
   },
   data: {
     query: "",

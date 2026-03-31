@@ -6,6 +6,11 @@
 import { type Span, type EnrichedSpan, type SpanStatus } from './span.types';
 
 /**
+ * Search mode for the traces explorer
+ */
+export type TraceSearchMode = "traces" | "spans" | "service-graph";
+
+/**
  * Trace - Collection of spans representing a single request
  */
 export interface Trace {

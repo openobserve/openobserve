@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { reactive } from "vue";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
@@ -149,11 +150,15 @@ const mockSearchObj = {
     lastSplitterPosition: 20,
     splitterLimit: [0, 40],
   },
-  meta: {
+  // Only meta is reactive so the searchMode watcher fires without making
+  // the entire mock reactive (which would cause loadPageData side-effects
+  // to re-render DOM in unrelated tests).
+  meta: reactive({
     showFields: true,
     showQuery: true,
     showHistogram: true,
     sqlMode: false,
+    searchMode: "traces" as "traces" | "spans" | "service-graph",
     resultGrid: {
       rowsPerPage: 25,
     },
@@ -161,7 +166,7 @@ const mockSearchObj = {
     serviceColors: {},
     metricsRangeFilters: new Map(),
     showErrorOnly: false,
-  },
+  }),
   data: {
     query: "",
     editorValue: "",
@@ -318,6 +323,7 @@ describe("Index.vue (Main Traces Page)", () => {
     // Reset mock data
     mockSearchObj.loading = false;
     mockSearchObj.loadingStream = false;
+    mockSearchObj.meta.searchMode = "traces";
     mockSearchObj.data.stream.streamLists = [];
     mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
     mockSearchObj.data.queryResults = { hits: [] };
@@ -417,7 +423,6 @@ describe("Index.vue (Main Traces Page)", () => {
 
   describe("Tab Navigation", () => {
     it("should switch to service-graph tab on enterprise", async () => {
-
       routerCurrentRouteSpy.mockReturnValue({
         value: {
           query: { tab: "service-graph" },
@@ -443,10 +448,12 @@ describe("Index.vue (Main Traces Page)", () => {
 
       await flushPromises();
 
+      // onBeforeMount sets searchMode from URL; activeTab computed reflects it
+      expect(mockSearchObj.meta.searchMode).toBe("service-graph");
       expect(wrapper.vm.activeTab).toBe("service-graph");
     });
 
-    it("should update URL when tab changes", async () => {
+    it("should update URL with tab=service-graph when searchMode changes to service-graph", async () => {
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -463,12 +470,53 @@ describe("Index.vue (Main Traces Page)", () => {
       });
 
       await flushPromises();
+      routerReplaceSpy.mockClear();
 
-      // Change tab
-      wrapper.vm.activeTab = "service-graph";
+      // Emit update:searchMode from the search-bar stub to invoke onSearchModeChange,
+      // which mutates the reactive searchObj and triggers the watcher.
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "service-graph");
       await flushPromises();
 
-      expect(routerReplaceSpy).toHaveBeenCalled();
+      expect(routerReplaceSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({ tab: "service-graph" }),
+        }),
+      );
+    });
+
+    it("should update URL with tab=traces when searchMode changes to traces", async () => {
+      // Start in service-graph mode so switching to traces is an actual change
+      mockSearchObj.meta.searchMode = "service-graph";
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+      routerReplaceSpy.mockClear();
+
+      // Switching to traces sets tab=traces in URL
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "traces");
+      await flushPromises();
+
+      expect(routerReplaceSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({ tab: "traces" }),
+        }),
+      );
     });
   });
 
@@ -538,7 +586,6 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("should show no stream selected message when no stream is selected", async () => {
-      // Clear stream list
       mockSearchObj.data.stream.streamLists = [];
       mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
 
@@ -1030,7 +1077,10 @@ describe("Index.vue (Main Traces Page)", () => {
   });
 
   describe("Service Graph Integration", () => {
-    it("should switch to search tab when viewing traces from service graph", async () => {
+    it("should set searchMode to traces when viewing traces from service graph", async () => {
+      // Start in service-graph mode
+      mockSearchObj.meta.searchMode = "service-graph";
+
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -1048,9 +1098,6 @@ describe("Index.vue (Main Traces Page)", () => {
 
       await flushPromises();
 
-      wrapper.vm.activeTab = "service-graph";
-      await flushPromises();
-
       const serviceGraphData = {
         stream: "default",
         serviceName: "test-service",
@@ -1063,7 +1110,8 @@ describe("Index.vue (Main Traces Page)", () => {
       wrapper.vm.handleServiceGraphViewTraces(serviceGraphData);
       await flushPromises();
 
-      expect(wrapper.vm.activeTab).toBe("search");
+      // handleServiceGraphViewTraces now sets searchMode = "traces" (not activeTab)
+      expect(mockSearchObj.meta.searchMode).toBe("traces");
       expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
       expect(mockSearchObj.data.editorValue).toContain("test-service");
     });
