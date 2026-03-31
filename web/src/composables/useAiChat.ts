@@ -1,7 +1,7 @@
 import store from "@/stores";
 import { contextRegistry, createDefaultContextProvider } from "@/composables/contextProviders";
 import { generateTraceContext } from "@/utils/zincutils";
-import type { ImageAttachment } from "@/types/chat";
+import type { ImageAttachment } from "@/ts/interfaces/chat";
 
 let contextHandler : any;
 

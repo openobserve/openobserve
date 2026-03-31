@@ -127,7 +127,7 @@ import { useI18n } from 'vue-i18n';
 import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { useChatHistory } from '@/composables/useChatHistory';
-import type { ChatMessage } from '@/types/chat';
+import type { ChatMessage } from '@/ts/interfaces/chat';
 import config from '@/aws-exports';
 
 type Language = 'sql' | 'promql' | 'vrl' | 'javascript';

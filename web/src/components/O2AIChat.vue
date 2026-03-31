@@ -992,7 +992,7 @@ import useAiChat from '@/composables/useAiChat';
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
 import { matThumbUpAlt, matThumbDownAlt } from '@quasar/extras/material-icons';
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
-import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock, ImageAttachment, MAX_IMAGE_SIZE_BYTES, ALLOWED_IMAGE_TYPES } from '@/types/chat';
+import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock, ImageAttachment, MAX_IMAGE_SIZE_BYTES, ALLOWED_IMAGE_TYPES } from '@/ts/interfaces/chat';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import RichTextInput, { ReferenceChip } from '@/components/RichTextInput.vue';
 import O2AIConfirmDialog from '@/components/O2AIConfirmDialog.vue';
