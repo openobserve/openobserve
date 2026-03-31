@@ -30,10 +30,10 @@ export default class DashboardactionPage {
   // Save panel button
   async savePanel() {
     await this.panelSaveBtn.waitFor({ state: "visible" });
-    await this.panelSaveBtn.click();
-    
-    // Wait for save to complete
-    // await this.page.waitForLoadState("networkidle");
+    await Promise.all([
+      this.page.waitForURL(/\/dashboards\/view/, { timeout: 50000 }),
+      this.panelSaveBtn.click(),
+    ]);
   }
 
   //Apply dashboard button
