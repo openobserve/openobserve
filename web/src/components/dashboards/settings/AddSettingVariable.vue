@@ -1545,6 +1545,20 @@ export default defineComponent({
           return false;
         }
 
+        // When in AddPanel mode, check for duplicate variable names client-side
+        // (dashboard settings relies on the server returning a 409 for this)
+        if (props.isFromAddPanel && props.dashboardVariablesList) {
+          const isDuplicate = props.dashboardVariablesList.some(
+            (v: any) =>
+              v.name === variableData.name &&
+              v.name !== props.variableName,
+          );
+          if (isDuplicate) {
+            showErrorNotification(`Variable with same name already exists.`);
+            return false;
+          }
+        }
+
         // check if filter has cycle
         if (await isFilterHasCycle()) {
           // filter has cycle, so show error and return
