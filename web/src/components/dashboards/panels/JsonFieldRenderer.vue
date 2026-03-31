@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="json-field-renderer">
+  <div :class="['json-field-renderer', { 'json-structured': isValidJSON }]">
     <div v-if="parsedData === null || parsedData === undefined">
       {{ value }}
     </div>
@@ -216,7 +216,7 @@ const isLastDefinedEntry = (obj: any, currentKey: string): boolean => {
 </script>
 
 <style lang="scss" scoped>
-.json-field-renderer {
+.json-structured {
   font-family: monospace;
   font-size: 12px;
   line-height: 1.5;
