@@ -361,46 +361,6 @@ pub async fn invalidate_all_cache() {
     SYSTEM_SETTINGS.write().await.clear();
 }
 
-/// Get FQN priority dimensions for an organization
-///
-/// Resolution order:
-/// 1. Check settings v2 for org-level setting
-/// 2. Fall back to system defaults from O2_FQN_PRIORITY_DIMENSIONS env var
-///
-/// Returns empty vec for OSS builds if env var is not set.
-pub async fn get_fqn_priority_dimensions(org_id: &str) -> Vec<String> {
-    use config::meta::system_settings::keys::FQN_PRIORITY_DIMENSIONS;
-
-    // Try to get from settings v2 (org level)
-    if let Ok(Some(setting)) = get_resolved(Some(org_id), None, FQN_PRIORITY_DIMENSIONS).await
-        && let Ok(dims) = serde_json::from_value::<Vec<String>>(setting.setting_value)
-        && !dims.is_empty()
-    {
-        return dims;
-    }
-
-    // Fall back to system defaults
-    get_default_fqn_priority_dimensions()
-}
-
-/// Get the default FQN priority dimensions from config
-///
-/// For enterprise builds, uses O2_FQN_PRIORITY_DIMENSIONS env var.
-/// For OSS builds, returns empty vec.
-pub fn get_default_fqn_priority_dimensions() -> Vec<String> {
-    #[cfg(feature = "enterprise")]
-    {
-        use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-        get_o2_config()
-            .service_streams
-            .get_fqn_priority_dimensions()
-    }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        vec![]
-    }
-}
-
 /// Get semantic field groups for an organization
 ///
 /// Resolution order:
@@ -408,16 +368,12 @@ pub fn get_default_fqn_priority_dimensions() -> Vec<String> {
 /// 2. Fall back to enterprise defaults from JSON file
 ///
 /// Returns empty vec for OSS builds.
-pub async fn get_semantic_field_groups(
-    org_id: &str,
-) -> Vec<config::meta::correlation::SemanticFieldGroup> {
-    use config::meta::{
-        correlation::SemanticFieldGroup, system_settings::keys::SEMANTIC_FIELD_GROUPS,
-    };
+pub async fn get_semantic_field_groups(org_id: &str) -> Vec<config::meta::correlation::FieldAlias> {
+    use config::meta::{correlation::FieldAlias, system_settings::keys::SEMANTIC_FIELD_GROUPS};
 
     // Try to get from settings v2 (org level)
     if let Ok(Some(setting)) = get_resolved(Some(org_id), None, SEMANTIC_FIELD_GROUPS).await
-        && let Ok(groups) = serde_json::from_value::<Vec<SemanticFieldGroup>>(setting.setting_value)
+        && let Ok(groups) = serde_json::from_value::<Vec<FieldAlias>>(setting.setting_value)
         && !groups.is_empty()
     {
         return groups;
@@ -431,7 +387,7 @@ pub async fn get_semantic_field_groups(
 ///
 /// For enterprise builds, loads from enterprise JSON file.
 /// For OSS builds, returns empty vec.
-pub fn get_default_semantic_field_groups() -> Vec<config::meta::correlation::SemanticFieldGroup> {
+pub fn get_default_semantic_field_groups() -> Vec<config::meta::correlation::FieldAlias> {
     #[cfg(feature = "enterprise")]
     {
         o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file()
@@ -440,6 +396,35 @@ pub fn get_default_semantic_field_groups() -> Vec<config::meta::correlation::Sem
     {
         vec![]
     }
+}
+
+/// Load the service identity config for an org, applying env-default tracked_alias_ids
+/// when the stored config has an empty list (pre-migration records or first run).
+pub async fn get_service_identity_config(
+    org_id: &str,
+) -> config::meta::correlation::ServiceIdentityConfig {
+    use config::meta::{correlation::ServiceIdentityConfig, system_settings::SettingScope};
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
+    let mut config = match db::get(&SettingScope::Org, Some(org_id), None, "service_identity").await
+    {
+        Ok(Some(s)) => serde_json::from_value::<ServiceIdentityConfig>(s.setting_value)
+            .unwrap_or_else(|_| ServiceIdentityConfig::default_config()),
+        _ => ServiceIdentityConfig::default_config(),
+    };
+
+    // If tracked_alias_ids is empty (old stored config or default), populate from env default
+    #[cfg(feature = "enterprise")]
+    if config.tracked_alias_ids.is_empty() {
+        config.tracked_alias_ids = o2_enterprise::enterprise::common::config::get_config()
+            .service_streams
+            .tracked_alias_ids
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+    }
+
+    config
 }
 
 /// Get the updated_at timestamp for semantic_field_groups setting

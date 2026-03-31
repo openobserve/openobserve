@@ -112,7 +112,7 @@ import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import O2AIChat from "../O2AIChat.vue";
 import config from "@/aws-exports";
-import { ChatMessage, ChatHistoryEntry } from "@/types/chat";
+import { ChatMessage, ChatHistoryEntry } from "@/ts/interfaces/chat";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
 export default defineComponent({

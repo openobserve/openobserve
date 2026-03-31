@@ -250,7 +250,10 @@ describe("useTraces", () => {
       const { searchObj } = useTraces();
       expect(Array.isArray(searchObj.config.refreshTimes)).toBe(true);
       const firstRow = searchObj.config.refreshTimes[0];
-      expect(firstRow[0]).toMatchObject({ label: expect.any(String), value: expect.any(Number) });
+      expect(firstRow[0]).toMatchObject({
+        label: expect.any(String),
+        value: expect.any(Number),
+      });
     });
 
     it("meta.resultGrid default sortBy is start_time", () => {
@@ -275,6 +278,11 @@ describe("useTraces", () => {
     it("data.searchAround.size is 10", () => {
       const { searchObj } = useTraces();
       expect(searchObj.data.searchAround.size).toBe(10);
+    });
+
+    it("meta.searchMode defaults to traces", () => {
+      const { searchObj } = useTraces();
+      expect(searchObj.meta.searchMode).toBe("spans");
     });
   });
 
@@ -374,6 +382,14 @@ describe("useTraces", () => {
       const { searchObj, getUrlQueryParams, resetSearchObj } = useTraces();
       resetSearchObj();
       searchObj.meta.searchMode = "traces";
+      const params = getUrlQueryParams(false);
+      expect(params.search_mode).toBeUndefined();
+    });
+
+    it("does not include search_mode when searchMode is service-graph", () => {
+      const { searchObj, getUrlQueryParams, resetSearchObj } = useTraces();
+      resetSearchObj();
+      searchObj.meta.searchMode = "service-graph";
       const params = getUrlQueryParams(false);
       expect(params.search_mode).toBeUndefined();
     });
@@ -677,9 +693,7 @@ describe("useTraces", () => {
           start_time: 1_000_000,
           end_time: 2_000_000,
           duration: 500,
-          service_name: [
-            { service_name: "svc-a", count: 3, duration: 100 },
-          ],
+          service_name: [{ service_name: "svc-a", count: 3, duration: 100 }],
           spans: [3, 0],
           first_event: { service_name: "svc-a", operation_name: "GET" },
         },
@@ -701,7 +715,10 @@ describe("useTraces", () => {
           duration: 500,
           service_name: ["shared-service"],
           spans: [1, 0],
-          first_event: { service_name: "shared-service", operation_name: "GET" },
+          first_event: {
+            service_name: "shared-service",
+            operation_name: "GET",
+          },
         },
         {
           trace_id: "t2",
@@ -710,7 +727,10 @@ describe("useTraces", () => {
           duration: 500,
           service_name: ["shared-service"],
           spans: [1, 0],
-          first_event: { service_name: "shared-service", operation_name: "POST" },
+          first_event: {
+            service_name: "shared-service",
+            operation_name: "POST",
+          },
         },
       ];
 
@@ -880,9 +900,7 @@ describe("useTraces", () => {
 
       updatedLocalLogFilterField("traces");
 
-      expect(
-        localTraceFilterStore.value["default_stream-val"],
-      ).toBeDefined();
+      expect(localTraceFilterStore.value["default_stream-val"]).toBeDefined();
     });
   });
 

@@ -92,26 +92,13 @@ const mockSemanticGroups = [
     is_stable: false,
     is_scope: false,
   },
-  {
-    id: "service-fqn",
-    display: "Service FQN",
-    group: "Internal",
-    fields: ["service.fqn"],
-    normalize: false,
-    is_stable: true,
-    is_scope: false,
-  },
 ];
-
-const defaultFqnPriority = ["k8s-cluster", "k8s-deployment"];
 
 const mockStore = createStore({
   state: {
     selectedOrganization: { identifier: "test-org" },
     theme: "light",
-    zoConfig: {
-      fqn_priority_dimensions: defaultFqnPriority,
-    },
+    zoConfig: {},
   },
 });
 
@@ -126,15 +113,13 @@ const mockI18n = createI18n({
           howItWorksTitle: "How it works",
           serviceIdentityLabel: "Service Identity",
           howItWorksDescription: "...",
-          compoundFqnLabel: "Compound FQN",
-          compoundFqnDescription: "...",
           exampleLabel: "Example",
           exampleText: "Dimensions {dim1} and {dim2} produce {value}",
-          fqnPrioritySaved: "FQN priority saved",
           configSaveFailed: "Failed to save",
           fallbackGroup: "Fallback",
           otherGroup: "Other",
           emptyIdError: " has empty ID",
+          semanticMappingsSaved: "Semantic mappings saved",
         },
       },
       common: {
@@ -204,12 +189,6 @@ describe("ServiceIdentityConfig", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should call getSetting for fqn_priority_dimensions on mount", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      expect(settingsService.getSetting).toHaveBeenCalledWith("test-org", "fqn_priority_dimensions");
-    });
-
     it("should call getSetting for semantic_field_groups on mount", async () => {
       wrapper = mountComponent();
       await flushPromises();
@@ -227,32 +206,9 @@ describe("ServiceIdentityConfig", () => {
       await flushPromises();
       expect(wrapper.vm.loading).toBe(false);
     });
-
-    it("should use backend default fqn priority when settings not found", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      expect(wrapper.vm.localFqnPriority).toEqual(defaultFqnPriority);
-    });
   });
 
-  describe("settings v2 priority loading", () => {
-    it("should use fqn priority from settings v2 when available", async () => {
-      vi.mocked(settingsService.getSetting).mockImplementation(
-        (_orgId: string, key: string) => {
-          if (key === "fqn_priority_dimensions") {
-            return Promise.resolve({
-              data: { setting_value: ["service", "k8s-cluster"] },
-            } as any);
-          }
-          return Promise.reject(new Error("not found"));
-        },
-      );
-      wrapper = mountComponent();
-      await flushPromises();
-      // sortFqnPriorityByScopeFirst puts scope dims (k8s-cluster) before workload dims (service)
-      expect(wrapper.vm.localFqnPriority).toEqual(["k8s-cluster", "service"]);
-    });
-
+  describe("settings v2 semantic groups loading", () => {
     it("should use semantic groups from settings v2 when available", async () => {
       const customGroups = [mockSemanticGroups[0], mockSemanticGroups[1]];
       vi.mocked(settingsService.getSetting).mockImplementation(
@@ -273,201 +229,10 @@ describe("ServiceIdentityConfig", () => {
     });
   });
 
-  describe("availableSemanticGroups computed", () => {
-    it("should exclude reserved group IDs (service-fqn)", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      const available = wrapper.vm.availableSemanticGroups;
-      expect(available.find((g: any) => g.value === "service-fqn")).toBeUndefined();
-    });
-
-    it("should exclude dimensions already in localFqnPriority", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      // k8s-cluster and k8s-deployment are in defaultFqnPriority
-      const available = wrapper.vm.availableSemanticGroups;
-      expect(available.find((g: any) => g.value === "k8s-cluster")).toBeUndefined();
-      expect(available.find((g: any) => g.value === "k8s-deployment")).toBeUndefined();
-    });
-
-    it("should include dimensions not in priority list", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      const available = wrapper.vm.availableSemanticGroups;
-      // "service" is in mockSemanticGroups but not in defaultFqnPriority
-      expect(available.find((g: any) => g.value === "service")).toBeTruthy();
-    });
-  });
-
-  describe("filteredPriorityDimensions computed", () => {
-    it("should return all when no search query", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      wrapper.vm.prioritySearchQuery = "";
-      expect(wrapper.vm.filteredPriorityDimensions).toHaveLength(
-        wrapper.vm.localFqnPriority.length,
-      );
-    });
-
-    it("should filter by search query", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      wrapper.vm.prioritySearchQuery = "cluster";
-      const filtered = wrapper.vm.filteredPriorityDimensions;
-      expect(filtered.length).toBeLessThanOrEqual(wrapper.vm.localFqnPriority.length);
-    });
-  });
-
-  describe("filteredAvailableGroups computed", () => {
-    it("should return all available groups when no search", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      wrapper.vm.availableSearchQuery = "";
-      expect(wrapper.vm.filteredAvailableGroups).toHaveLength(
-        wrapper.vm.availableSemanticGroups.length,
-      );
-    });
-
-    it("should filter available groups by search query", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      wrapper.vm.availableSearchQuery = "service";
-      const filtered = wrapper.vm.filteredAvailableGroups;
-      expect(
-        filtered.every(
-          (g: any) =>
-            g.label.toLowerCase().includes("service") ||
-            g.value.toLowerCase().includes("service"),
-        ),
-      ).toBe(true);
-    });
-  });
-
-  describe("isDimensionScope", () => {
-    it("should return true for scope dimensions", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      // k8s-cluster has is_scope: true in mockSemanticGroups
-      expect(wrapper.vm.isDimensionScope("k8s-cluster")).toBe(true);
-    });
-
-    it("should return false for non-scope dimensions", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      // k8s-deployment has is_scope: false
-      expect(wrapper.vm.isDimensionScope("k8s-deployment")).toBe(false);
-    });
-
-    it("should return false for unknown dimension IDs", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      expect(wrapper.vm.isDimensionScope("unknown-dim")).toBe(false);
-    });
-  });
-
-  describe("togglePrioritySelection", () => {
-    it("should add dimension to selected when not selected", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      wrapper.vm.selectedPriorityDimensions = [];
-      wrapper.vm.togglePrioritySelection("k8s-cluster");
-      expect(wrapper.vm.selectedPriorityDimensions).toContain("k8s-cluster");
-    });
-
-    it("should remove dimension when already selected", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      wrapper.vm.selectedPriorityDimensions = ["k8s-cluster"];
-      wrapper.vm.togglePrioritySelection("k8s-cluster");
-      expect(wrapper.vm.selectedPriorityDimensions).not.toContain("k8s-cluster");
-    });
-  });
-
-  describe("saveFqnPriority", () => {
-    it("should call setOrgSetting with current localFqnPriority", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      await wrapper.vm.saveFqnPriority();
-      expect(settingsService.setOrgSetting).toHaveBeenCalledWith(
-        "test-org",
-        "fqn_priority_dimensions",
-        wrapper.vm.localFqnPriority,
-        "correlation",
-        expect.any(String),
-      );
-    });
-
-    it("should emit saved event on success", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      await wrapper.vm.saveFqnPriority();
-      expect(wrapper.emitted("saved")).toBeTruthy();
-    });
-
-    it("should set savingFqn to false after saving", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      await wrapper.vm.saveFqnPriority();
-      expect(wrapper.vm.savingFqn).toBe(false);
-    });
-
-    it("should handle save error without crashing", async () => {
-      vi.mocked(settingsService.setOrgSetting).mockRejectedValueOnce(
-        new Error("Save failed"),
-      );
-      wrapper = mountComponent();
-      await flushPromises();
-      await expect(wrapper.vm.saveFqnPriority()).resolves.not.toThrow();
-      expect(wrapper.vm.savingFqn).toBe(false);
-    });
-  });
-
-  describe("fqnFormula computed", () => {
-    it("should produce scopeDims and workloadDims from localFqnPriority", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      const formula = wrapper.vm.fqnFormula;
-      expect(formula).toHaveProperty("scopeDims");
-      expect(formula).toHaveProperty("workloadDims");
-      expect(formula).toHaveProperty("envPatterns");
-    });
-
-    it("should categorize k8s-cluster as scope dimension", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      const formula = wrapper.vm.fqnFormula;
-      expect(formula.scopeDims).toContain("k8s-cluster");
-    });
-
-    it("should categorize k8s-deployment as workload dimension", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      const formula = wrapper.vm.fqnFormula;
-      expect(formula.workloadDims).toContain("k8s-deployment");
-    });
-  });
-
   describe("initial state", () => {
-    it("should initialize fqnSectionExpanded to true", async () => {
-      wrapper = mountComponent();
-      expect(wrapper.vm.fqnSectionExpanded).toBe(true);
-    });
-
     it("should initialize semanticSectionExpanded to true", async () => {
       wrapper = mountComponent();
       expect(wrapper.vm.semanticSectionExpanded).toBe(true);
-    });
-
-    it("should initialize with empty search queries", async () => {
-      wrapper = mountComponent();
-      expect(wrapper.vm.prioritySearchQuery).toBe("");
-      expect(wrapper.vm.availableSearchQuery).toBe("");
-    });
-
-    it("should initialize with empty selected dimensions", async () => {
-      wrapper = mountComponent();
-      expect(wrapper.vm.selectedAvailableDimensions).toHaveLength(0);
-      expect(wrapper.vm.selectedPriorityDimensions).toHaveLength(0);
     });
   });
 });

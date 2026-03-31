@@ -137,8 +137,6 @@ impl std::str::FromStr for SettingCategory {
 
 /// Well-known setting keys
 pub mod keys {
-    /// FQN priority dimensions for service correlation
-    pub const FQN_PRIORITY_DIMENSIONS: &str = "fqn_priority_dimensions";
     /// Semantic field groups for dimension extraction
     pub const SEMANTIC_FIELD_GROUPS: &str = "semantic_field_groups";
     /// UI theme preference
