@@ -25,7 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-splitter
         class="traces-horizontal-splitter full-height"
         v-model="splitterModel"
+        :disable="activeTab === 'service-graph'"
         horizontal
+        :before-class="
+          activeTab === 'service-graph' ? 'tw:max-h-[3.54rem]!' : ''
+        "
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
@@ -295,6 +299,7 @@ import useStreams from "@/composables/useStreams";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
+import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isLLMTrace } from "@/utils/llmUtils";
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
@@ -306,7 +311,9 @@ const SanitizedHtmlRenderer = defineAsyncComponent(
 const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
 
 const store = useStore();
-const activeTab = ref("search");
+const activeTab = computed(() =>
+  searchObj.meta.searchMode === "service-graph" ? "service-graph" : "search",
+);
 const router = useRouter();
 const $q = useQuasar();
 const { t } = useI18n();
@@ -1354,11 +1361,6 @@ function runQueryIfRequested() {
 onBeforeMount(async () => {
   setupContextProvider();
   restoreUrlQueryParams();
-  // Restore active tab from URL query params
-  const queryParams = router.currentRoute.value.query;
-  if (queryParams.tab === "service-graph" && config.isEnterprise == "true") {
-    activeTab.value = "service-graph";
-  }
   await importSqlParser();
   if (!searchObj.loading) {
     await loadPageData();
@@ -1428,11 +1430,15 @@ function restoreUrlQueryParams() {
     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
   }
 
+  const tab = typeof queryParams.tab === "string" ? queryParams.tab : undefined;
   if (
-    queryParams.search_mode === "spans" ||
-    queryParams.search_mode === "traces"
+    tab !== undefined &&
+    (["service-graph", "traces", "spans"] as const).includes(
+      tab as "service-graph" | "traces" | "spans",
+    )
   ) {
-    searchObj.meta.searchMode = queryParams.search_mode as "traces" | "spans";
+    if (tab === "service-graph" && config.isEnterprise !== "true") return;
+    searchObj.meta.searchMode = tab as TraceSearchMode;
   }
 
   if (
@@ -1525,9 +1531,10 @@ const onErrorOnlyToggled = (value: boolean) => {
   }
 };
 
-// Handler for Search Mode toggle (Traces / Spans)
-const onSearchModeChange = (mode: "traces" | "spans") => {
+// Handler for Search Mode toggle (Service Graph / Traces / Spans)
+const onSearchModeChange = (mode: "traces" | "spans" | "service-graph") => {
   searchObj.meta.searchMode = mode;
+  if (mode === "service-graph") return;
   searchObj.data.resultGrid.currentPage = 0;
   searchObj.data.queryResults = {
     hits: [],
@@ -1822,7 +1829,7 @@ watch(moveSplitter, () => {
 // Handler for service graph view traces event
 const handleServiceGraphViewTraces = (data: any) => {
   // Switch to search tab
-  activeTab.value = "search";
+  searchObj.meta.searchMode = "traces";
 
   // Set the selected stream in dropdown
   if (data.stream) {
@@ -1865,15 +1872,18 @@ const handleServiceGraphViewTraces = (data: any) => {
 // });
 
 // Watch for active tab changes and update URL
-watch(activeTab, (newTab) => {
-  const query = { ...router.currentRoute.value.query };
-  if (newTab === "service-graph") {
-    query.tab = "service-graph";
-  } else {
-    delete query.tab;
-  }
-  router.replace({ query });
-});
+watch(
+  () => searchObj.meta.searchMode,
+  (mode) => {
+    const query = { ...router.currentRoute.value.query };
+    if (mode !== "spans") {
+      query.tab = mode;
+    } else {
+      delete query.tab;
+    }
+    router.replace({ query });
+  },
+);
 </script>
 
 <style lang="scss" scoped></style>
