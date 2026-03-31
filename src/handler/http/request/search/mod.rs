@@ -226,14 +226,38 @@ async fn can_use_distinct_stream(
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
         ("x-o2-mcp" = json!({
-            "description": "Search data with SQL query, you can use `match_all('something')` to search with full text search, also you can use `str_match(field, 'something')` to search in a specific field; start_time, end_time can't be zero, need to valid micro timestamp. Note: in summary mode, response is stripped to hits/total/took/columns/scan_size/function_error and hits are capped at 100. Use LIMIT in your SQL or request detail='full' if you need more.",
+            "description": "Search data with SQL query. IMPORTANT: 'type' parameter is REQUIRED — set to 'logs', 'metrics', or 'traces' to match the stream you are querying. Omitting it defaults to 'logs' which will fail for metrics/traces streams. You can use `match_all('something')` for full text search, `str_match(field, 'something')` for field search. start_time and end_time must be valid microsecond timestamps. In summary mode, response is stripped to hits/total/took/columns/scan_size/function_error and hits are capped at 100.",
             "category": "search",
             "arg_transforms": {
                 "sql": "request_body.query.sql",
                 "start_time": "request_body.query.start_time",
                 "end_time": "request_body.query.end_time",
-                "query": "request_body.query.sql"
-            }
+                "query": "request_body.query.sql",
+                "stream_type": "type"
+            },
+            "hidden_fields": [
+                "request_body.encoding",
+                "request_body.regions",
+                "request_body.clusters",
+                "request_body.timeout",
+                "request_body.use_cache",
+                "request_body.clear_cache",
+                "request_body.search_type",
+                "request_body.search_event_context",
+                "request_body.local_mode",
+                "request_body.query.quick_mode",
+                "request_body.query.query_type",
+                "request_body.query.track_total_hits",
+                "request_body.query.uses_zo_fn",
+                "request_body.query.query_fn",
+                "request_body.query.action_id",
+                "request_body.query.skip_wal",
+                "request_body.query.sampling_config",
+                "request_body.query.sampling_ratio",
+                "request_body.query.streaming_output",
+                "request_body.query.streaming_id",
+                "request_body.query.histogram_interval"
+            ]
         }))
     )
 )]
@@ -572,12 +596,13 @@ pub async fn search(
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
         ("x-o2-mcp" = json!({
-            "description": "Search logs around a timestamp. Note: in summary mode, hits are capped at 100 and only hits/total/took/columns/scan_size/function_error are returned.",
+            "description": "Search logs around a timestamp. IMPORTANT: set 'type' to 'logs', 'metrics', or 'traces' to match the stream — defaults to 'logs' if omitted. In summary mode, hits are capped at 100 and only hits/total/took/columns/scan_size/function_error are returned.",
             "category": "search",
             "arg_transforms": {
                 "stream": "stream_name",
                 "timestamp": "key",
-                "limit": "size"
+                "limit": "size",
+                "stream_type": "type"
             }
         }))
     )
@@ -806,12 +831,13 @@ pub async fn around_v2(
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
         ("x-o2-mcp" = json!({
-            "description": "Get distinct values for a field",
+            "description": "Get distinct values for a field. IMPORTANT: set 'type' to 'logs', 'metrics', or 'traces' to match the stream — defaults to 'logs' if omitted.",
             "category": "search",
             "arg_transforms": {
                 "stream": "stream_name",
                 "field": "fields",
-                "limit": "size"
+                "limit": "size",
+                "stream_type": "type"
             }
         }))
     )
@@ -1478,7 +1504,13 @@ async fn values_v1(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get search partitions then you can call _search api by partitions to give the result looks faster", "category": "search"}))
+        ("x-o2-mcp" = json!({
+            "description": "Get search partitions for faster parallel search. IMPORTANT: set 'type' to 'logs', 'metrics', or 'traces' to match the stream — defaults to 'logs' if omitted.",
+            "category": "search",
+            "arg_transforms": {
+                "stream_type": "type"
+            }
+        }))
     )
 )]
 pub async fn search_partition(

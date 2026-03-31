@@ -74,7 +74,7 @@ use crate::{
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "get"})),
         ("x-o2-mcp" = json!({
-            "description": "Get stream schema",
+            "description": "Get stream schema. IMPORTANT: 'type' is REQUIRED — set to 'logs', 'metrics', or 'traces' to match the stream.",
             "category": "streams",
             "arg_transforms": {
                 "stream": "stream_name",

@@ -68,7 +68,7 @@ fn mcp_only_in_enterprise() -> Response {
     ),
 )]
 pub async fn handle_mcp_post(
-    Path(_org_id): Path<String>,
+    Path(org_id): Path<String>,
     headers: HeaderMap,
     Json(mcp_request): Json<MCPRequest>,
 ) -> Response {
@@ -89,7 +89,8 @@ pub async fn handle_mcp_post(
 
     if wants_sse {
         // Return streaming SSE response (MCP Streamable HTTP spec)
-        let stream = match handle_mcp_request_stream(mcp_request, auth_token).await {
+        let stream =
+            match handle_mcp_request_stream(mcp_request, auth_token, Some(org_id.clone())).await {
             Ok(s) => s,
             Err(e) => {
                 return Response::builder()
@@ -112,7 +113,7 @@ pub async fn handle_mcp_post(
             .unwrap()
     } else {
         // Return single JSON response (fallback for simpler clients)
-        let response = match handle_mcp_request(mcp_request, auth_token).await {
+        let response = match handle_mcp_request(mcp_request, auth_token, Some(org_id)).await {
             Ok(r) => r,
             Err(e) => {
                 log::error!("MCP handle_mcp_request error: {e}");
@@ -157,7 +158,7 @@ pub async fn handle_mcp_post(
     ),
 )]
 pub async fn handle_mcp_get(
-    Path(_org_id): Path<String>,
+    Path(org_id): Path<String>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
@@ -197,7 +198,7 @@ pub async fn handle_mcp_get(
     };
 
     // Handle the request with streaming (returns SSE format)
-    let stream = match handle_mcp_request_stream(mcp_request, auth_token).await {
+    let stream = match handle_mcp_request_stream(mcp_request, auth_token, Some(org_id)).await {
         Ok(s) => s,
         Err(e) => {
             return Response::builder()
