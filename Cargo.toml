@@ -446,7 +446,7 @@ tokio-rustls = { version = "0.26", default-features = false, features = [
 ] }
 tokio-util = { version = "0.7", features = ["compat"] }
 tokio-stream = "0.1"
-tonic = { version = "0.14", features = ["gzip", "tls-webpki-roots"] }
+tonic = { version = "0.14", features = ["gzip", "tls-webpki-roots", "tls-native-roots"] }
 tonic-prost = "0.14"
 tracing = "0.1.44"
 tracing-appender = "0.2.4"
