@@ -443,7 +443,7 @@ import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import { correlate as correlateStreams } from "@/services/service_streams";
-import { escapeSingleQuotes } from "@/utils/zincutils";
+import { escapeSingleQuotes, deepCopy } from "@/utils/zincutils";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import metrics from "./metrics/metrics.json";
 
