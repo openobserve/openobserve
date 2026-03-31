@@ -31,8 +31,9 @@ pub async fn update() -> Result<(), anyhow::Error> {
             None,
         )
         .await?;
-
-    o2_enterprise::enterprise::license::update_license().await?;
+    // we do not manually trigger the update here, as the coordinator event handler
+    // does that for us, if we do it here, there is a chance of deadlock or very slow update
+    // due to lock contention
     Ok(())
 }
 
