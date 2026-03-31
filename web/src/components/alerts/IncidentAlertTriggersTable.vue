@@ -90,7 +90,7 @@ interface IncidentAlert {
   alert_id: string;
   alert_name: string;
   alert_fired_at: number;
-  correlation_reason: "service_discovery" | "scope_match" | "workload_match" | "alert_id";
+  correlation_reason: "service_discovery" | "primary_match" | "secondary_match" | "alert_id";
   created_at: number;
 }
 
@@ -162,9 +162,9 @@ export default defineComponent({
       switch (reason) {
         case "service_discovery":
           return "blue";
-        case "scope_match":
+        case "primary_match":
           return "purple";
-        case "workload_match":
+        case "secondary_match":
           return "orange";
         case "alert_id":
           return "grey";
@@ -177,10 +177,10 @@ export default defineComponent({
       switch (reason) {
         case "service_discovery":
           return t("alerts.incidents.correlationServiceDiscovery");
-        case "scope_match":
-          return t("alerts.incidents.correlationScopeMatch");
-        case "workload_match":
-          return t("alerts.incidents.correlationWorkloadMatch");
+        case "primary_match":
+          return t("alerts.incidents.correlationPrimaryMatch");
+        case "secondary_match":
+          return t("alerts.incidents.correlationSecondaryMatch");
         case "alert_id":
           return t("alerts.incidents.correlationAlertId");
         default:
@@ -192,10 +192,10 @@ export default defineComponent({
       switch (reason) {
         case "service_discovery":
           return t("alerts.incidents.correlationServiceDiscoveryTooltip");
-        case "scope_match":
-          return t("alerts.incidents.correlationScopeMatchTooltip");
-        case "workload_match":
-          return t("alerts.incidents.correlationWorkloadMatchTooltip");
+        case "primary_match":
+          return t("alerts.incidents.correlationPrimaryMatchTooltip");
+        case "secondary_match":
+          return t("alerts.incidents.correlationSecondaryMatchTooltip");
         case "alert_id":
           return t("alerts.incidents.correlationAlertIdTooltip");
         default:

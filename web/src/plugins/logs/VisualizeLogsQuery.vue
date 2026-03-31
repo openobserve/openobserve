@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :searchResponse="searchResponse"
       :isUiHistogram="is_ui_histogram"
       :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
+      :regionClusterParams="regionClusterParams"
       :allowedChartTypes="allowedChartTypes"
       @addToDashboard="addToDashboard"
       @chartApiError="handleChartApiError"
@@ -123,6 +124,16 @@ export default defineComponent({
 
     const { searchObj } = searchState();
     const { buildSearch } = useSearchStream();
+
+    const regionClusterParams = computed(() => {
+      if (store.state.zoConfig?.super_cluster_enabled) {
+        return {
+          regions: searchObj.meta.regions,
+          clusters: searchObj.meta.clusters,
+        };
+      }
+      return undefined;
+    });
 
     const {
       visualizeChartData,
@@ -308,6 +319,7 @@ export default defineComponent({
       handleChartTypeChange,
       panelEditorRef,
       allowedChartTypes,
+      regionClusterParams,
     };
   },
 });

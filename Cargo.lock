@@ -11169,6 +11169,7 @@ dependencies = [
  "hyper-util",
  "percent-encoding",
  "pin-project",
+ "rustls-native-certs 0.8.3",
  "socket2 0.6.2",
  "sync_wrapper",
  "tokio",

@@ -29,22 +29,6 @@ use crate::{
     errors::{self, DbError, Error},
 };
 
-/// Find an open incident by org and correlation key
-pub async fn find_open_by_correlation_key(
-    org_id: &str,
-    correlation_key: &str,
-) -> Result<Option<alert_incidents::Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
-    alert_incidents::Entity::find()
-        .filter(alert_incidents::Column::OrgId.eq(org_id))
-        .filter(alert_incidents::Column::CorrelationKey.eq(correlation_key))
-        .filter(alert_incidents::Column::Status.ne("resolved"))
-        .one(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
-}
-
 /// Get incident by ID
 pub async fn get(org_id: &str, id: &str) -> Result<Option<alert_incidents::Model>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
@@ -59,9 +43,9 @@ pub async fn get(org_id: &str, id: &str) -> Result<Option<alert_incidents::Model
 /// Create a new incident
 pub async fn create(
     org_id: &str,
-    correlation_key: &str,
     severity: &str,
-    stable_dimensions: serde_json::Value,
+    group_values: serde_json::Value,
+    key_type: &str,
     first_alert_at: i64,
     title: Option<String>,
 ) -> Result<alert_incidents::Model, errors::Error> {
@@ -72,10 +56,10 @@ pub async fn create(
     let model = alert_incidents::ActiveModel {
         id: Set(id),
         org_id: Set(org_id.to_string()),
-        correlation_key: Set(correlation_key.to_string()),
         status: Set("open".to_string()),
         severity: Set(severity.to_string()),
-        stable_dimensions: Set(stable_dimensions),
+        group_values: Set(group_values),
+        key_type: Set(key_type.to_string()),
         topology_context: Set(None),
         first_alert_at: Set(first_alert_at),
         last_alert_at: Set(first_alert_at),
@@ -257,10 +241,10 @@ pub async fn list(
         // Select all columns EXCEPT topology_context for performance
         .column(alert_incidents::Column::Id)
         .column(alert_incidents::Column::OrgId)
-        .column(alert_incidents::Column::CorrelationKey)
         .column(alert_incidents::Column::Status)
         .column(alert_incidents::Column::Severity)
-        .column(alert_incidents::Column::StableDimensions)
+        .column(alert_incidents::Column::GroupValues)
+        .column(alert_incidents::Column::KeyType)
         .column(alert_incidents::Column::FirstAlertAt)
         .column(alert_incidents::Column::LastAlertAt)
         .column(alert_incidents::Column::ResolvedAt)
@@ -437,18 +421,19 @@ pub async fn update_topology(
     Ok(())
 }
 
-/// Update incident metadata (alert_count, last_alert_at, optionally stable_dimensions)
+/// Update incident metadata (alert_count, last_alert_at, optionally group_values)
 ///
 /// Used when adding alerts to existing incidents to:
 /// - Increment alert counter
 /// - Update last alert timestamp
-/// - Optionally merge new dimensions (for dimension accumulation)
+/// - Optionally merge new group_values (for dimension accumulation on superset upgrade)
 pub async fn update_incident_metadata(
     org_id: &str,
     id: &str,
     alert_count: i32,
     last_alert_at: i64,
-    stable_dimensions: Option<serde_json::Value>,
+    group_values: Option<serde_json::Value>,
+    key_type: Option<&str>,
 ) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
@@ -463,9 +448,12 @@ pub async fn update_incident_metadata(
     active.last_alert_at = Set(last_alert_at);
     active.updated_at = Set(now);
 
-    // Only update dimensions if provided (when dimensions change)
-    if let Some(dims) = stable_dimensions {
-        active.stable_dimensions = Set(dims);
+    if let Some(gv) = group_values {
+        active.group_values = Set(gv);
+    }
+
+    if let Some(kt) = key_type {
+        active.key_type = Set(kt.to_string());
     }
 
     active
@@ -527,21 +515,21 @@ pub async fn find_open_incidents_filtered(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
-/// Upgrade incident correlation key and dimensions during hierarchical upgrade
+/// Upgrade incident group_values and key_type during hierarchical upgrade
 ///
-/// This function is called when an incident is upgraded from a weaker correlation key
-/// (e.g., alert_id or WORKLOAD) to a stronger one (e.g., SCOPE).
+/// This function is called when an incident is upgraded from a weaker key_type
+/// (e.g., AlertId or Secondary) to a stronger one (e.g., Primary).
 ///
 /// Atomically updates:
-/// - correlation_key: The new stronger key
-/// - stable_dimensions: Merged/refined dimensions
+/// - group_values: Merged/refined dimension values
+/// - key_type: The new stronger key type
 /// - alert_count: Current count (after alert was added)
 /// - last_alert_at: Latest alert timestamp
-pub async fn upgrade_incident_correlation(
+pub async fn upgrade_incident_group_values(
     org_id: &str,
     id: &str,
-    new_correlation_key: &str,
-    new_stable_dimensions: serde_json::Value,
+    new_group_values: serde_json::Value,
+    new_key_type: &str,
     alert_count: i32,
     last_alert_at: i64,
 ) -> Result<(), errors::Error> {
@@ -554,13 +542,8 @@ pub async fn upgrade_incident_correlation(
 
     let mut active: alert_incidents::ActiveModel = incident.into();
 
-    // Upgrade correlation key
-    active.correlation_key = Set(new_correlation_key.to_string());
-
-    // Upgrade dimensions
-    active.stable_dimensions = Set(new_stable_dimensions);
-
-    // Update metadata
+    active.group_values = Set(new_group_values);
+    active.key_type = Set(new_key_type.to_string());
     active.alert_count = Set(alert_count);
     active.last_alert_at = Set(last_alert_at);
     active.updated_at = Set(now);
@@ -571,9 +554,9 @@ pub async fn upgrade_incident_correlation(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
     log::info!(
-        "[DB::alert_incidents] Upgraded incident {} correlation_key to {}",
+        "[DB::alert_incidents] Upgraded incident {} key_type to {}",
         id,
-        new_correlation_key
+        new_key_type
     );
 
     Ok(())

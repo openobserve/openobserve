@@ -286,6 +286,7 @@ import {
   formatLargeNumber,
 } from "../../../utils/zincutils";
 import { useStore } from "vuex";
+import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 
 interface Props {
   hits: any[];
@@ -309,7 +310,7 @@ interface Props {
   /** Active sort direction */
   sortOrder?: "asc" | "desc";
   /** Current search mode */
-  searchMode?: "traces" | "spans";
+  searchMode?: TraceSearchMode;
 }
 
 const { t } = useI18n();

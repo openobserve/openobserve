@@ -312,7 +312,6 @@ function mountSearchBar(props: Record<string, unknown> = {}): VueWrapper {
     props: {
       fieldValues: {},
       isLoading: false,
-      activeTab: "search",
       ...props,
     },
     global: {
@@ -366,9 +365,9 @@ describe("SearchBar", () => {
       expect(wrapper.find(".button-group.logs-visualize-toggle").exists()).toBe(
         true,
       );
-      expect(wrapper.find('[data-test="traces-search-toggle"]').exists()).toBe(
-        true,
-      );
+      expect(
+        wrapper.find('[data-test="traces-search-mode-traces-btn"]').exists(),
+      ).toBe(true);
       expect(
         wrapper.find('[data-test="traces-service-graph-toggle"]').exists(),
       ).toBe(true);
@@ -376,20 +375,8 @@ describe("SearchBar", () => {
   });
 
   // -------------------------------------------------------------------------
-  describe("tab toggle emits (update:activeTab)", () => {
-    it("should emit update:activeTab with 'search' when the search button is clicked", async () => {
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      const searchBtn = wrapper.find('[data-test="traces-search-toggle"]');
-      expect(searchBtn.exists()).toBe(true);
-      await searchBtn.trigger("click");
-
-      expect(wrapper.emitted("update:activeTab")).toBeTruthy();
-      expect(wrapper.emitted("update:activeTab")![0]).toEqual(["search"]);
-    });
-
-    it("should emit update:activeTab with 'service-graph' when the service-graph button is clicked", async () => {
+  describe("search mode toggle emits (update:searchMode)", () => {
+    it("should emit update:searchMode with 'service-graph' when the service-graph button is clicked", async () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
@@ -397,17 +384,18 @@ describe("SearchBar", () => {
       expect(sgBtn.exists()).toBe(true);
       await sgBtn.trigger("click");
 
-      expect(wrapper.emitted("update:activeTab")).toBeTruthy();
-      expect(wrapper.emitted("update:activeTab")![0]).toEqual([
+      expect(wrapper.emitted("update:searchMode")).toBeTruthy();
+      expect(wrapper.emitted("update:searchMode")![0]).toEqual([
         "service-graph",
       ]);
     });
   });
 
   // -------------------------------------------------------------------------
-  describe("activeTab conditional rendering", () => {
-    it("should show search controls when activeTab is 'search'", async () => {
-      wrapper = mountSearchBar({ activeTab: "search" });
+  describe("searchMode conditional rendering", () => {
+    it("should show search controls when searchMode is 'traces'", async () => {
+      searchObjInstance.meta.searchMode = "traces";
+      wrapper = mountSearchBar();
       await flushPromises();
 
       expect(
@@ -425,8 +413,9 @@ describe("SearchBar", () => {
       ).toBe(true);
     });
 
-    it("should hide search controls when activeTab is 'service-graph'", async () => {
-      wrapper = mountSearchBar({ activeTab: "service-graph" });
+    it("should hide search controls when searchMode is 'service-graph'", async () => {
+      searchObjInstance.meta.searchMode = "service-graph";
+      wrapper = mountSearchBar();
       await flushPromises();
 
       expect(
@@ -444,16 +433,17 @@ describe("SearchBar", () => {
       ).toBe(false);
     });
 
-    it("should re-show controls when activeTab changes back to 'search'", async () => {
-      wrapper = mountSearchBar({ activeTab: "service-graph" });
+    it("should re-show controls when searchMode changes back to 'traces'", async () => {
+      searchObjInstance.meta.searchMode = "service-graph";
+      wrapper = mountSearchBar();
       await flushPromises();
 
       expect(
         wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists(),
       ).toBe(false);
 
-      await wrapper.setProps({ activeTab: "search" });
-      await flushPromises();
+      searchObjInstance.meta.searchMode = "traces";
+      await wrapper.vm.$nextTick();
 
       expect(
         wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists(),
@@ -1075,11 +1065,13 @@ describe("SearchBar", () => {
       expect(wrapper.findComponent({ name: "QTooltip" }).exists()).toBe(true);
     });
 
-    it("should have a tooltip inside the search tab toggle button", async () => {
+    it("should have a tooltip inside the Traces mode toggle button", async () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
-      const searchBtn = wrapper.find('[data-test="traces-search-toggle"]');
+      const searchBtn = wrapper.find(
+        '[data-test="traces-search-mode-traces-btn"]',
+      );
       expect(searchBtn.exists()).toBe(true);
       expect(wrapper.findComponent({ name: "QTooltip" }).exists()).toBe(true);
     });
