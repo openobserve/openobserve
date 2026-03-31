@@ -37,10 +37,11 @@ const _momentReady = import("moment-timezone").then((m) => {
 import { ref, watch, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 
 const props = defineProps<{
   item: Record<string, any>;
-  searchMode?: "traces" | "spans";
+  searchMode?: TraceSearchMode;
 }>();
 
 const store = useStore();

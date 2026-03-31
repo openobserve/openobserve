@@ -154,7 +154,7 @@
                         "
                       />
                       <q-btn
-                        v-if="config.isEnterprise == 'true' && config.isCloud == 'false'"
+                        v-if="config.isEnterprise == 'true' && config.isCloud == 'false' && store.state.zoConfig.search_inspector_enabled"
                         @click.stop="goToInspector(props.row)"
                         size="xs"
                         label="Inspect"

@@ -466,13 +466,12 @@ pub async fn trigger_incident_rca(
         };
 
     // Build RCA context — include previous analysis so the agent can build on it
-    let previous_analysis = incident
-        .incident
-        .topology_context
-        .as_ref()
-        .and_then(|t| t.suggested_root_cause.as_deref())
-        .filter(|s| !s.is_empty())
-        .map(|s| s.to_string());
+    let previous_analysis = infra::table::alert_incidents::get_topology(&org_id, &incident_id)
+        .await
+        .ok()
+        .flatten()
+        .and_then(|t| t.suggested_root_cause)
+        .filter(|s| !s.is_empty());
     let context = IncidentRcaContext {
         incident_id: incident.incident.id.clone(),
         org_id: incident.incident.org_id.clone(),
@@ -825,10 +824,8 @@ mod tests {
         let incident = config::meta::alerts::incidents::Incident {
             id: "test-id".to_string(),
             org_id: "default".to_string(),
-            correlation_key: "key123".to_string(),
             status: config::meta::alerts::incidents::IncidentStatus::Open,
             severity: config::meta::alerts::incidents::IncidentSeverity::P1,
-            stable_dimensions: std::collections::HashMap::new(),
             topology_context: None,
             first_alert_at: 1000,
             last_alert_at: 2000,
@@ -838,6 +835,8 @@ mod tests {
             assigned_to: None,
             created_at: 1000,
             updated_at: 2000,
+            group_values: serde_json::Value::Object(Default::default()),
+            key_type: config::meta::alerts::incidents::KeyType::default(),
         };
 
         let response = ListIncidentsResponse {

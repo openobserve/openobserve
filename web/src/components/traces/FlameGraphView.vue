@@ -125,7 +125,7 @@
 
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent } from "vue";
-import { type EnrichedSpan } from "@/types/traces/span.types";
+import { type EnrichedSpan } from "@/ts/interfaces/traces/span.types";
 import { formatDuration } from "@/composables/traces/useTraceProcessing";
 import useTraces from "@/composables/useTraces";
 import { escapeHtml } from "@/utils/html";
