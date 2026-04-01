@@ -98,7 +98,6 @@ mod m20260212_000001_widen_incident_correlation_key;
 mod m20260214_000001_create_incident_events_table;
 mod m20260227_000001_add_alert_creates_incident;
 mod m20260305_000001_create_trial_quota_usage_table;
-mod m20260305_000002_create_model_pricing_table;
 mod m20260310_000001_create_anomaly_detection_config_table;
 mod m20260310_000002_create_anomaly_detection_models_table;
 mod m20260317_000001_add_anomaly_detection_config_columns;
@@ -108,6 +107,8 @@ mod m20260318_000003_alter_alert_incidents_schema;
 mod m20260318_000004_add_set_id_to_service_streams;
 mod m20260318_000005_add_all_dimensions_to_service_streams;
 mod m20260326_000001_add_field_name_mapping_to_service_streams;
+mod m20260401_000001_create_model_pricing_table;
+mod m20260401_000002_add_source_to_model_pricing;
 
 pub struct Migrator;
 
@@ -204,6 +205,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260318_000004_add_set_id_to_service_streams::Migration),
             Box::new(m20260318_000005_add_all_dimensions_to_service_streams::Migration),
             Box::new(m20260326_000001_add_field_name_mapping_to_service_streams::Migration),
+            Box::new(m20260401_000001_create_model_pricing_table::Migration),
+            Box::new(m20260401_000002_add_source_to_model_pricing::Migration),
         ]
     }
 }
