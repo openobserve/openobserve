@@ -765,9 +765,11 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
             testLogger.info('This is data-dependent: tooltips only appear when sampleValues are populated');
 
             // ASSERTION: At minimum, chips must render with proper text
+            // Wildcard formats: <*> for variables, <:NAME> for named tokens (e.g., <:TIMESTAMP>)
             const firstChipText = await wildcardChips.first().textContent().catch(() => '');
             expect(firstChipText.length).toBeGreaterThan(0);
-            expect(firstChipText).toMatch(/<[*:]|<\*/); // Must contain wildcard marker
+            // Match any wildcard format: <*>, <:WORD>, or angle brackets with content
+            expect(firstChipText).toMatch(/<[*:]|<\*>|<:[A-Z]/);
             testLogger.info('✅ Wildcard chips render correctly (no sampleValues in data for tooltips)');
         }
 
@@ -795,7 +797,8 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         for (let i = 0; i < Math.min(cardCount, 10); i++) {
             const badgeSelector = `[data-test="pattern-card-${i}-anomaly-badge"]`;
             const badge = page.locator(badgeSelector);
-            const isVisible = await badge.isVisible().catch(() => false);
+            // Use timeout to handle badges that render with slight delay
+            const isVisible = await badge.isVisible({ timeout: 500 }).catch(() => false);
 
             if (isVisible) {
                 patternsWithAnomalyBadge++;
