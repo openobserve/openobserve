@@ -207,9 +207,7 @@ impl ObjectStore for Local {
     ) -> BoxStream<'static, Result<Path>> {
         let with_prefix = self.with_prefix;
         let formatted = locations
-            .map(move |result| {
-                result.map(|path| format_key(path.as_ref(), with_prefix).into())
-            })
+            .map(move |result| result.map(|path| format_key(path.as_ref(), with_prefix).into()))
             .boxed();
         self.client.delete_stream(formatted)
     }
