@@ -102,6 +102,7 @@ mod m20260305_000002_create_model_pricing_table;
 mod m20260310_000001_create_anomaly_detection_config_table;
 mod m20260310_000002_create_anomaly_detection_models_table;
 mod m20260317_000001_add_anomaly_detection_config_columns;
+
 pub struct Migrator;
 
 #[async_trait::async_trait]
