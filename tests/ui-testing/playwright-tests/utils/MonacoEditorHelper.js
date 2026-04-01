@@ -22,8 +22,8 @@ class MonacoEditorHelper {
             editor: '.monaco-editor',
             viewLines: '.monaco-editor .view-lines',
             inputArea: '.monaco-editor textarea.inputarea',
-            suggestWidget: '.monaco-editor .suggest-widget',
-            suggestionRows: '.monaco-editor .suggest-widget .monaco-list-row',
+            suggestWidget: '.monaco-editor .suggest-widget, .editor-widget.suggest-widget, .suggest-widget',
+            suggestionRows: '.monaco-editor .suggest-widget .monaco-list-row, .editor-widget.suggest-widget .monaco-list-row, .suggest-widget .monaco-list-row',
             suggestionLabel: '.label-name, .monaco-icon-label-container',
         };
     }
@@ -114,7 +114,22 @@ class MonacoEditorHelper {
      */
     async waitForSuggestions(timeout = 5000) {
         const suggestWidget = this.page.locator(this.selectors.suggestWidget);
-        await suggestWidget.waitFor({ state: 'visible', timeout });
+        const suggestionRows = this.page.locator(this.selectors.suggestionRows);
+
+        // Use a short initial wait before retrying. This is important because
+        // if Ctrl+Space was already pressed before calling this method (e.g. the
+        // test pressed it manually), it may have CLOSED the widget if suggestions
+        // were already showing from auto-trigger during typing. We detect that
+        // quickly and re-open via retry rather than waiting the full timeout.
+        const shortTimeout = Math.min(timeout, 2000);
+        try {
+            await suggestionRows.first().waitFor({ state: 'visible', timeout: shortTimeout });
+        } catch (error) {
+            // Retry once by retriggering suggestions (handles cold start, toggle-closed widget)
+            await this.triggerSuggestions();
+            await suggestionRows.first().waitFor({ state: 'visible', timeout });
+        }
+
         return suggestWidget;
     }
 
@@ -133,8 +148,9 @@ class MonacoEditorHelper {
      * @returns {Promise<string[]>}
      */
     async getSuggestionLabels(timeout = 5000) {
+        await this.waitForSuggestions(timeout);
+
         const suggestionRows = this.page.locator(this.selectors.suggestionRows);
-        await suggestionRows.first().waitFor({ state: 'visible', timeout });
 
         const labels = await suggestionRows
             .locator(this.selectors.suggestionLabel)
