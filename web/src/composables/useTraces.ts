@@ -383,16 +383,6 @@ const useTraces = () => {
   });
 
   /**
-   * Format raw trace hits from API into structured trace metadata
-   * Assigns service colors using hash-based consistent coloring from traceColors utility
-   * @param traces - Raw trace hits from the API
-   * @returns Formatted trace metadata array
-   */
-  /**
-   * Assign service colors for raw span hits (spans mode).
-   * Each span hit has service_name as a plain string.
-   */
-  /**
    * Assign service colors for raw hits from either traces or spans mode.
    * - Traces mode: service_name is an array of strings or objects with a service_name property.
    * - Spans mode: service_name is a plain string.
