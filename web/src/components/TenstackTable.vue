@@ -629,7 +629,7 @@ const props = defineProps({
   /** Fixed row height in px used by the virtualizer.
    *  When set, all rows use this fixed height and dynamic measurement is disabled. */
   rowHeight: {
-    type: Number as PropType<number | undefined>,
+    type: Number as PropType<number>,
     default: 22,
   },
   // ── Feature flags (all default true → current logs behavior unchanged) ──
