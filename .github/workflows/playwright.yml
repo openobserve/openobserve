@@ -91,7 +91,7 @@ jobs:
           NODE_OPTIONS: "--max-old-space-size=8192"
           VITE_COVERAGE: "true"
           COVERAGE: "true"
-        run: cd web && npm install && npm run build
+        run: cd web && npm ci && npm run build
 
       - name: Build and run binary
         run: cargo build --release --target x86_64-unknown-linux-gnu
