@@ -128,6 +128,7 @@ describe("useTraces", () => {
       expect(inst).toHaveProperty("navigateToLogs");
       expect(inst).toHaveProperty("tracesShareURL");
       expect(inst).toHaveProperty("formatTracesMetaData");
+      expect(inst).toHaveProperty("setServiceColors"); // [auto-generated]
     });
   });
 
@@ -1048,6 +1049,108 @@ describe("useTraces", () => {
 
       // The original constant must be unchanged
       expect(DEFAULT_TRACE_COLUMNS.traces).not.toContain("extra_field");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // setServiceColors
+  // -------------------------------------------------------------------------
+  describe("setServiceColors", () => {
+    it("empty array → no colors assigned", () => {
+      // [auto-generated]
+      const { setServiceColors, searchObj, resetSearchObj } = useTraces();
+      resetSearchObj();
+      searchObj.meta.serviceColors = {};
+
+      setServiceColors([]);
+
+      expect(Object.keys(searchObj.meta.serviceColors)).toHaveLength(0);
+    });
+
+    it("spans mode: string service_name → assigns color", () => {
+      // [auto-generated]
+      const { setServiceColors, searchObj, resetSearchObj } = useTraces();
+      resetSearchObj();
+      searchObj.meta.serviceColors = {};
+
+      setServiceColors([{ service_name: "frontend" }]);
+
+      expect(searchObj.meta.serviceColors["frontend"]).toBeDefined();
+    });
+
+    it("spans mode: hit with no service_name → no crash, no color assigned", () => {
+      // [auto-generated]
+      const { setServiceColors, searchObj, resetSearchObj } = useTraces();
+      resetSearchObj();
+      searchObj.meta.serviceColors = {};
+
+      expect(() => setServiceColors([{ operation_name: "GET" }])).not.toThrow();
+      expect(Object.keys(searchObj.meta.serviceColors)).toHaveLength(0);
+    });
+
+    it("traces mode: array service_name (strings) → assigns colors", () => {
+      // [auto-generated]
+      const { setServiceColors, searchObj, resetSearchObj } = useTraces();
+      resetSearchObj();
+      searchObj.meta.serviceColors = {};
+
+      setServiceColors([{ service_name: ["svc-a", "svc-b"] }]);
+
+      expect(searchObj.meta.serviceColors["svc-a"]).toBeDefined();
+      expect(searchObj.meta.serviceColors["svc-b"]).toBeDefined();
+    });
+
+    it("traces mode: array service_name (objects with service_name property) → assigns colors", () => {
+      // [auto-generated]
+      const { setServiceColors, searchObj, resetSearchObj } = useTraces();
+      resetSearchObj();
+      searchObj.meta.serviceColors = {};
+
+      setServiceColors([
+        {
+          service_name: [
+            { service_name: "obj-svc-a", count: 2, duration: 100 },
+            { service_name: "obj-svc-b", count: 1, duration: 50 },
+          ],
+        },
+      ]);
+
+      expect(searchObj.meta.serviceColors["obj-svc-a"]).toBeDefined();
+      expect(searchObj.meta.serviceColors["obj-svc-b"]).toBeDefined();
+    });
+
+    it("mixed: already-colored service not reassigned; new service gets next color index", () => {
+      // [auto-generated]
+      const { setServiceColors, searchObj, resetSearchObj } = useTraces();
+      resetSearchObj();
+      searchObj.meta.serviceColors = { "existing-svc": "#color-0" };
+
+      setServiceColors([
+        { service_name: "existing-svc" },
+        { service_name: "new-svc" },
+      ]);
+
+      // Existing color must remain unchanged
+      expect(searchObj.meta.serviceColors["existing-svc"]).toBe("#color-0");
+      // New service should be assigned the next color
+      expect(searchObj.meta.serviceColors["new-svc"]).toBeDefined();
+    });
+
+    it("color index starts from existing serviceColors count (not 0)", () => {
+      // [auto-generated]
+      const { setServiceColors, searchObj, resetSearchObj } = useTraces();
+      resetSearchObj();
+      // Pre-populate 2 colors so colorIndex starts at 2
+      searchObj.meta.serviceColors = {
+        "svc-1": "#color-0",
+        "svc-2": "#color-1",
+      };
+
+      setServiceColors([{ service_name: "svc-3" }]);
+
+      // getSpanColorHex is mocked as (index) => `#color-${index}`
+      // colorIndex = Object.keys(serviceColors).length = 2 before insertion
+      expect(searchObj.meta.serviceColors["svc-3"]).toBe("#color-2");
     });
   });
 });
