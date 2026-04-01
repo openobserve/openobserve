@@ -387,9 +387,39 @@ const useTraces = () => {
    * @param traces - Raw trace hits from the API
    * @returns Formatted trace metadata array
    */
+  /**
+   * Assign service colors for raw span hits (spans mode).
+   * Each span hit has service_name as a plain string.
+   */
+  /**
+   * Assign service colors for raw hits from either traces or spans mode.
+   * - Traces mode: service_name is an array of strings or objects with a service_name property.
+   * - Spans mode: service_name is a plain string.
+   */
+  const setServiceColors = (hits: any[]): void => {
+    let colorIndex = Object.keys(searchObj.meta.serviceColors).length;
+    hits.forEach((hit: any) => {
+      const serviceNames = Array.isArray(hit.service_name)
+        ? hit.service_name
+        : hit.service_name
+          ? [hit.service_name]
+          : [];
+      serviceNames.forEach((service: any) => {
+        const serviceName =
+          typeof service === "string" ? service : service.service_name;
+        if (serviceName && !searchObj.meta.serviceColors[serviceName]) {
+          searchObj.meta.serviceColors[serviceName] =
+            getSpanColorHex(colorIndex);
+          colorIndex += 1;
+        }
+      });
+    });
+  };
+
   const formatTracesMetaData = (traces: any[]): any[] => {
     if (!traces.length) return [];
-    let colorIndex = 0;
+
+    setServiceColors(traces);
 
     return traces.map((trace) => {
       const _trace = {
@@ -410,21 +440,11 @@ const useTraces = () => {
         llm_input: trace.llm_input || {},
       };
 
-      // Assign colors to services
+      // Build per-trace service span count and duration map
       if (trace.service_name && Array.isArray(trace.service_name)) {
-        trace.service_name.forEach((service: any, index: number) => {
+        trace.service_name.forEach((service: any) => {
           const serviceName =
             typeof service === "string" ? service : service.service_name;
-
-          if (!searchObj.meta.serviceColors[serviceName]) {
-            // Use hash-based color assignment for consistency
-            searchObj.meta.serviceColors[serviceName] =
-              getSpanColorHex(colorIndex);
-
-            colorIndex += 1;
-          }
-
-          // Track service span count and duration
           const serviceCount =
             typeof service === "string" ? 1 : service.count || 1;
           const serviceDuration =
@@ -451,6 +471,7 @@ const useTraces = () => {
     navigateToLogs,
     tracesShareURL,
     formatTracesMetaData,
+    setServiceColors,
   };
 };
 
