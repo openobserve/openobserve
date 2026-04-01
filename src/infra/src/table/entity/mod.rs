@@ -23,6 +23,7 @@ pub mod incident_events;
 pub mod kv_store;
 pub mod model_pricing;
 pub mod org_ai_toolsets;
+pub mod org_storage_providers;
 pub mod org_users;
 pub mod organizations;
 pub mod pipeline_last_errors;
