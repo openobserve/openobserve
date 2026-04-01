@@ -694,12 +694,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
 pub async fn init_deferred() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     {
-        o2_enterprise::enterprise::license::start_license_check(
-            crate::service::self_reporting::search::get_usage,
-            LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role(),
-        )
-        .await;
-        tokio::task::spawn(db::license::watch());
+        // only querier nodes watch license keys
+        if LOCAL_NODE.is_querier() {
+            o2_enterprise::enterprise::license::start_license_check(
+                crate::service::self_reporting::search::get_usage,
+                LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role(),
+            )
+            .await;
+            tokio::task::spawn(db::license::watch());
+        }
     }
 
     if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_alert_manager() {
