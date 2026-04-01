@@ -229,13 +229,6 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     // add work_group
     req.add_work_group(Some(work_group_str));
 
-    metrics::QUERY_PENDING_NUMS
-        .with_label_values(&[&sql.org_id])
-        .dec();
-    metrics::QUERY_RUNNING_NUMS
-        .with_label_values(&[&sql.org_id])
-        .inc();
-
     // 5a. Node-level slot admission (enterprise, O2_WORK_GROUP_SLOT_ENABLED=true).
     //     Reuses stream_key so select_nodes picks the same node set as predict().
     #[cfg(feature = "enterprise")]
@@ -256,6 +249,15 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
             None
         }
     };
+
+    // Move metric updates to here, after all admission stages complete.
+    // A request blocked on slot budget should not be counted as "running".
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&sql.org_id])
+        .dec();
+    metrics::QUERY_RUNNING_NUMS
+        .with_label_values(&[&sql.org_id])
+        .inc();
 
     // 5. partition file list
     let partitioned_file_lists = partition_file_lists(file_id_list, &nodes, role_group).await?;
@@ -625,9 +627,25 @@ pub(crate) async fn partition_file_by_hash(
         idx += 1;
     }
     let mut partitions = vec![Vec::new(); idx];
+    if idx == 0 {
+        return partitions;
+    }
+
+    // Build the allowed set from the selected querier nodes.  When all online
+    // queriers are selected this degrades to the normal global-ring behaviour.
+    // When only a subset is selected (e.g. max_nodes_per_query=3, strategy=org)
+    // the ring walk skips nodes outside the subset, so every file maps to one
+    // of the selected nodes without any fallback-to-0 imbalance.
+    let allowed: HashSet<String> = node_idx.keys().map(|s| s.to_string()).collect();
+
     for fk in file_id_list {
-        let node_name =
-            cluster::get_node_from_consistent_hash(&fk.id.to_string(), &Role::Querier, group).await;
+        let node_name = cluster::get_node_from_consistent_hash_within(
+            &fk.id.to_string(),
+            &Role::Querier,
+            group,
+            &allowed,
+        )
+        .await;
         let idx = match node_name {
             Some(node_name) => match node_idx.get(&node_name) {
                 Some(idx) => *idx,

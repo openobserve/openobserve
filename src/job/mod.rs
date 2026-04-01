@@ -17,9 +17,7 @@ use config::{cluster::LOCAL_NODE, spawn_pausable_job};
 use regex::Regex;
 #[cfg(feature = "enterprise")]
 use {
-    o2_enterprise::enterprise::{
-        common::config::get_config as get_enterprise_config, search::admission,
-    },
+    o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::admission},
     o2_openfga::config::get_config as get_openfga_config,
 };
 
@@ -146,6 +144,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     .expect("Email regex is valid");
 
     let cfg = config::get_config();
+
     // init root user
     if !db::user::root_user_exists().await {
         if cfg.auth.root_user_email.is_empty()
@@ -382,8 +381,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     config_watcher::run();
+
     #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_querier() && get_enterprise_config().ai.enabled {
+    if LOCAL_NODE.is_querier() && get_o2_config().ai.enabled {
         tokio::task::spawn(async move {
             o2_enterprise::enterprise::ai::agent::prompt::prompts::load_system_prompt()
                 .await
@@ -393,9 +393,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // Initialize slot-based admission ledger on querier nodes
     #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_querier() && get_enterprise_config().work_group.max_nodes_per_query > 0 {
+    if LOCAL_NODE.is_querier() && get_o2_config().work_group.max_nodes_per_query > 0 {
         admission::init_slot_ledger(cfg.limit.real_cpu_num as f64, cfg.limit.mem_total as f64);
-        admission::ledger::spawn_ttl_cleanup_task(500);
+        // Run the TTL sweep at ≤ 1/4 of the reservation TTL so that expired
+        // reservations are reaped promptly without spinning.
+        let sweep_ms = (get_o2_config().work_group.slot_reserved_ttl_ms / 4).max(100);
+        admission::ledger::spawn_ttl_cleanup_task(sweep_ms);
     }
 
     tokio::task::spawn(files::run());
@@ -543,11 +546,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(
         "service_streams_batch_processor",
-        get_enterprise_config().service_streams.batch_flush_interval_secs,
+        get_o2_config().service_streams.batch_flush_interval_secs,
         {
             o2_enterprise::enterprise::service_streams::batch_processor::run_once().await;
         },
-        pause_if: !get_enterprise_config().service_streams.enabled
+        pause_if: !get_o2_config().service_streams.enabled
     );
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(
@@ -614,7 +617,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 }
             }
         },
-        pause_if: !get_enterprise_config().service_streams.enabled
+        pause_if: !get_o2_config().service_streams.enabled
     );
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(pipeline::run());

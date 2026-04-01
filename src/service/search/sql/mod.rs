@@ -116,7 +116,11 @@ impl Sql {
                     s.stream_name()
                 )
             })
-            .unwrap_or_default()
+            // For multi-stream / cross-index queries there is no single stream
+            // name.  Fall back to the stream-type prefix so select_nodes always
+            // receives a non-empty, deterministic key (rather than "" which
+            // would silently select all nodes and defeat org/stream affinity).
+            .unwrap_or_else(|| format!("{}/", self.stream_type))
     }
 
     pub async fn new_with_options(

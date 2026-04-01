@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,12 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    ops::Bound,
-    sync::Arc,
-    time::Duration,
-};
+use std::{ops::Bound, sync::Arc, time::Duration};
 
 use config::{
     RwAHashMap, RwBTreeMap,
@@ -31,6 +26,7 @@ use config::{
         sysinfo::{NodeMetrics, get_node_metrics},
     },
 };
+use hashbrown::{HashMap, HashSet};
 use once_cell::sync::Lazy;
 
 use crate::{
@@ -126,6 +122,51 @@ pub async fn get_node_from_consistent_hash(
     None
 }
 
+/// Like [`get_node_from_consistent_hash`] but restricts the ring walk to nodes
+/// whose names are in `allowed`.
+///
+/// Use this when a query runs on a subset of all queriers (e.g.
+/// `max_nodes_per_query=3` with `strategy=org/stream`).  Walking the global
+/// ring but skipping nodes outside the allowed set preserves all consistent-
+/// hashing properties (minimal remapping on membership change, even
+/// distribution via vnodes) while confining dispatch to the selected subset.
+pub async fn get_node_from_consistent_hash_within(
+    key: &str,
+    role: &Role,
+    group: Option<RoleGroup>,
+    allowed: &HashSet<String>,
+) -> Option<String> {
+    let hash = config::utils::hash::gxhash::new().sum64(key);
+    let nodes = match role {
+        Role::Querier => match group {
+            Some(RoleGroup::Interactive) => QUERIER_INTERACTIVE_CONSISTENT_HASH.read().await,
+            Some(RoleGroup::Background) => QUERIER_BACKGROUND_CONSISTENT_HASH.read().await,
+            _ => QUERIER_INTERACTIVE_CONSISTENT_HASH.read().await,
+        },
+        Role::Compactor => COMPACTOR_CONSISTENT_HASH.read().await,
+        Role::FlattenCompactor => FLATTEN_COMPACTOR_CONSISTENT_HASH.read().await,
+        _ => return None,
+    };
+    if nodes.is_empty() {
+        return None;
+    }
+
+    // Walk clockwise from the hash position, stop at the first node in `allowed`.
+    let mut iter = nodes.lower_bound(Bound::Included(&hash));
+    while let Some((_, name)) = iter.next() {
+        if allowed.contains(name) {
+            return Some(name.clone());
+        }
+    }
+    // Wrap around to the beginning of the ring.
+    for (_, name) in nodes.iter() {
+        if allowed.contains(name) {
+            return Some(name.clone());
+        }
+    }
+    None
+}
+
 /// Returns up to `n` distinct node names starting from the position of `key`
 /// on the consistent hash ring, wrapping around if necessary.
 ///
@@ -155,6 +196,7 @@ pub async fn get_nodes_from_consistent_hash(
         return HashSet::new();
     }
 
+    // Start from the hash position and walk clockwise until we have `n` distinct nodes.
     let mut result = HashSet::with_capacity(n);
     let mut iter = nodes.lower_bound(Bound::Included(&hash));
     while let Some((_, name)) = iter.next() {
@@ -163,53 +205,14 @@ pub async fn get_nodes_from_consistent_hash(
             return result;
         }
     }
-
-    // we have't found enough, so we get data from the beginning of the hash ring
+    // Wrap around to the beginning of the ring.
     for (_, name) in nodes.iter() {
         result.insert(name.to_string());
         if result.len() >= n {
             break;
         }
     }
-
     result
-}
-
-pub async fn print_consistent_hash() -> HashMap<String, HashMap<String, Vec<u64>>> {
-    let mut map = HashMap::new();
-    let r = QUERIER_INTERACTIVE_CONSISTENT_HASH.read().await;
-    let mut node_map = HashMap::new();
-    for (k, v) in r.iter() {
-        let entry = node_map.entry(v.clone()).or_insert(Vec::new());
-        entry.push(*k);
-    }
-    drop(r);
-    map.insert("querier_interactive".to_string(), node_map);
-    let r = QUERIER_BACKGROUND_CONSISTENT_HASH.read().await;
-    let mut node_map = HashMap::new();
-    for (k, v) in r.iter() {
-        let entry = node_map.entry(v.clone()).or_insert(Vec::new());
-        entry.push(*k);
-    }
-    drop(r);
-    map.insert("querier_background".to_string(), node_map);
-    let r = COMPACTOR_CONSISTENT_HASH.read().await;
-    let mut node_map = HashMap::new();
-    for (k, v) in r.iter() {
-        let entry = node_map.entry(v.clone()).or_insert(Vec::new());
-        entry.push(*k);
-    }
-    drop(r);
-    map.insert("compactor".to_string(), node_map);
-    let r = FLATTEN_COMPACTOR_CONSISTENT_HASH.read().await;
-    let mut node_map = HashMap::new();
-    for (k, v) in r.iter() {
-        let entry = node_map.entry(v.clone()).or_insert(Vec::new());
-        entry.push(*k);
-    }
-    drop(r);
-    map.insert("flatten_compactor".to_string(), node_map);
-    map
 }
 
 pub async fn count_consistent_hash() -> HashMap<String, usize> {
@@ -765,13 +768,6 @@ mod tests {
                 Some(key.get(2).unwrap().to_string())
             );
         }
-
-        let ret = print_consistent_hash().await;
-        assert_eq!(ret.len(), 4);
-        assert_eq!(ret["querier_interactive"].len(), 10);
-        assert_eq!(ret["querier_background"].len(), 10);
-        assert_eq!(ret["compactor"].len(), 10);
-        assert_eq!(ret["flatten_compactor"].len(), 10);
     }
 
     #[tokio::test]

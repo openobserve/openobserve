@@ -259,6 +259,7 @@ impl Stream for FlightEncoderStream {
 impl Drop for FlightEncoderStream {
     fn drop(&mut self) {
         let trace_id = &self.trace_id;
+        let orig_trace_id = &self.orig_trace_id;
         let is_super = self.is_super;
         let took = self.start.elapsed().as_millis();
         log::info!(
@@ -283,14 +284,12 @@ impl Drop for FlightEncoderStream {
         // orig_trace_id is the base trace_id (no job suffix) that matches the
         // key stored in NODE_LEDGER by the Leader's TryAcquire call.
         // release() is idempotent, so it is safe even if already released.
-        let _orig_trace_id = &self.orig_trace_id;
         #[cfg(feature = "enterprise")]
-        if !_orig_trace_id.is_empty() {
+        if !orig_trace_id.is_empty() {
             log::info!(
-                "[trace_id {trace_id}] flight->search: follow releasing slot for {}",
-                _orig_trace_id
+                "[trace_id {trace_id}] flight->search: follow releasing slot, orig_trace_id: {orig_trace_id}",
             );
-            o2_enterprise::enterprise::search::admission::ledger::release(_orig_trace_id);
+            o2_enterprise::enterprise::search::admission::ledger::release(orig_trace_id);
         }
 
         // defer is only set for super cluster follower leader
@@ -298,7 +297,7 @@ impl Drop for FlightEncoderStream {
             drop(defer);
         } else {
             log::info!(
-                "[trace_id {trace_id}] flight->search: drop FlightEncoderStream, is_super: {is_super}",
+                "[trace_id {trace_id}] flight->search: drop FlightEncoderStream, is_super: {is_super}, orig_trace_id: {orig_trace_id}",
             );
             // clear session data
             clear_session_data(&self.trace_id);

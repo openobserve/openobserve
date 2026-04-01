@@ -1125,12 +1125,12 @@ pub struct QueryStatus {
     pub query: ::core::option::Option<Query>,
     #[prost(message, optional, tag = "9")]
     pub scan_stats: ::core::option::Option<ScanStats>,
-    #[prost(string, optional, tag = "10")]
-    pub work_group: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "11")]
     pub search_type: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(message, optional, tag = "12")]
     pub search_event_context: ::core::option::Option<SearchEventContext>,
+    #[prost(string, optional, tag = "13")]
+    pub work_group: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct Query {

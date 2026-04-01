@@ -132,9 +132,10 @@ message QueryStatus {
     optional string    stream_type = 7;
     optional Query           query = 8;
     optional ScanStats  scan_stats = 9;
-    optional string    work_group = 10;
+    reserved 10; // was WorkGroup enum (varint); now reserved to avoid rolling-upgrade wire-type clash
     optional string   search_type = 11;
     optional SearchEventContext search_event_context = 12;
+    optional string    work_group = 13;
 }
 
 message Query {
