@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-item-label>
                           {{ scope.opt.name }}
                           <span
-                            v-if="scope.opt.name?.startsWith('$')"
+                            v-if="scope.opt.name?.startsWith('$') || scope.opt.name?.startsWith('{{')"
                             class="text-grey-6 text-caption"
                           >
                             (variable)
@@ -363,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-item-label>
                         {{ scope.opt.name }}
                         <span
-                          v-if="scope.opt.name?.startsWith('$')"
+                          v-if="scope.opt.name?.startsWith('$') || scope.opt.name?.startsWith('{{')"
                           class="text-grey-6 text-caption"
                         >
                           (variable)
@@ -1312,7 +1312,7 @@ export default defineComponent({
               // if stream type and stream is exists
               if (variableData?.query_data?.stream) {
                 // Check if stream is a variable reference (contains $)
-                const isVariableReference = variableData.query_data.stream?.includes('$');
+                const isVariableReference = variableData.query_data.stream?.includes('$') || variableData.query_data.stream?.includes('{{');
 
                 if (isVariableReference) {
                   // Don't fetch schema for variable references - field list will be empty
@@ -1339,7 +1339,7 @@ export default defineComponent({
             }
           } catch (error: any) {
             // Check if the error is for a variable reference (should be suppressed)
-            const isVariableReference = variableData?.query_data?.stream?.includes('$');
+            const isVariableReference = variableData?.query_data?.stream?.includes('$') || variableData?.query_data?.stream?.includes('{{');
 
             if (!isVariableReference) {
               // Only show error if it's NOT a variable reference
@@ -1622,7 +1622,7 @@ export default defineComponent({
 
       try {
         // Check if stream is a variable reference FIRST (contains $)
-        const isVariableReference = variableData.query_data.stream?.includes('$');
+        const isVariableReference = variableData.query_data.stream?.includes('$') || variableData.query_data.stream?.includes('{{');
 
         if (isVariableReference) {
           // Don't reset field if it already has a value (editing mode)
@@ -1657,7 +1657,7 @@ export default defineComponent({
         }
       } catch (error: any) {
         // Only show error if it's not a variable reference
-        const isVariableReference = variableData.query_data.stream?.includes('$');
+        const isVariableReference = variableData.query_data.stream?.includes('$') || variableData.query_data.stream?.includes('{{');
 
         if (!isVariableReference) {
           showErrorNotification(error ?? "Failed to get stream fields", {
