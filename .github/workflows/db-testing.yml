@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - "*"
+  merge_group:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
