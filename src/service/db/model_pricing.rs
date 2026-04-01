@@ -349,12 +349,8 @@ fn select_tier<'a>(
         }
     }
 
-    // Fallback: first tier without a condition, or the very first tier.
-    definition
-        .tiers
-        .iter()
-        .find(|t| t.condition.is_none())
-        .or_else(|| definition.tiers.first())
+    // Fallback: first unconditional tier (validation guarantees at least one exists).
+    definition.tiers.iter().find(|t| t.condition.is_none())
 }
 
 // ── Startup: cache + watch ────────────────────────────────────────────────────

@@ -520,6 +520,9 @@ fn validate_definition(item: &ModelPricingDefinition) -> Result<(), String> {
     if item.tiers.is_empty() {
         return Err("At least one pricing tier is required".to_string());
     }
+    if item.tiers.iter().all(|t| t.condition.is_some()) {
+        return Err("At least one tier must have no condition (default fallback)".to_string());
+    }
     for tier in &item.tiers {
         if let Some(ref cond) = tier.condition {
             if cond.usage_key.trim().is_empty() {
