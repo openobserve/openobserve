@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     id="searchBarComponent"
   >
     <div class="row tw:m-0! tw:p-[0.375rem]! tw:items-start!">
-      <div class="float-right col flex">
+      <div class="float-right col flex tw:flex-wrap tw:items-center tw:gap-y-1">
         <div class="button-group logs-visualize-toggle element-box-shadow">
           <div class="row">
             <div>
@@ -111,7 +111,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-        <div class="toolbar-toggle-container element-box-shadow">
+        <div
+          v-if="!shouldMoveSqlToggleToMenu"
+          class="toolbar-toggle-container element-box-shadow"
+        >
           <q-toggle
             data-test="logs-search-bar-show-histogram-toggle-btn"
             v-model="searchObj.meta.showHistogram"
@@ -128,7 +131,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-tooltip>{{ t("search.showHistogramLabel") }}</q-tooltip>
           </q-toggle>
         </div>
-        <div class="toolbar-toggle-container element-box-shadow">
+        <div
+          v-if="!shouldMoveSqlToggleToMenu"
+          class="toolbar-toggle-container element-box-shadow"
+        >
           <q-toggle
             data-test="logs-search-bar-sql-mode-toggle-btn"
             v-model="searchObj.meta.sqlMode"
@@ -151,7 +157,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </q-toggle>
         </div>
-        <q-btn-group class="q-ml-xs q-pa-none element-box-shadow el-border">
+        <q-btn-group
+          v-if="!shouldMoveSavedViewToMenu"
+          class="q-ml-xs q-pa-none element-box-shadow el-border"
+        >
           <q-btn-dropdown
             data-test="logs-search-saved-views-btn"
             v-model="savedViewDropdownModel"
@@ -423,8 +432,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.savedViewsLabel") }}
           </q-tooltip>
         </q-btn-group>
-        <!-- reset filters button - directly on toolbar -->
+        <!-- reset filters button - directly on toolbar (hidden when moved to menu) -->
         <q-btn
+          v-if="!shouldMoveSavedViewToMenu"
           data-test="logs-search-bar-reset-filters-btn"
           class="group-menu-btn element-box-shadow q-ml-xs"
           no-caps
@@ -446,7 +456,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-menu>
             <q-list>
-              <!-- Quick Mode Toggle -->
+              <!-- Histogram Toggle -->
+              <q-item
+                v-if="shouldMoveSqlToggleToMenu"
+                clickable
+                @click="
+                  searchObj.meta.showHistogram = !searchObj.meta.showHistogram
+                "
+                data-test="logs-search-bar-menu-histogram-btn"
+                class="q-pa-sm saved-view-item"
+              >
+                <q-item-section>
+                  <q-item-label class="tw:flex tw:items-center">
+                    <div
+                      style="
+                        width: 28px;
+                        display: flex;
+                        align-items: center;
+                        margin-right: 12px;
+                      "
+                    >
+                      <q-toggle
+                        v-model="searchObj.meta.showHistogram"
+                        size="xs"
+                        flat
+                        class="o2-toggle-button-xs"
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'o2-toggle-button-xs-dark'
+                            : 'o2-toggle-button-xs-light'
+                        "
+                        @click.stop
+                      />
+                    </div>
+                    {{ t("search.showHistogramLabel") }}
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
+
+              <!-- SQL Mode Toggle (moved from toolbar at <= 1300px) -->
+              <q-item
+                v-if="shouldMoveSqlToggleToMenu"
+                clickable
+                @click="
+                  !isSqlModeDisabled &&
+                    (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)
+                "
+                data-test="logs-search-bar-menu-sql-mode-btn"
+                class="q-pa-sm saved-view-item"
+              >
+                <q-item-section>
+                  <q-item-label class="tw:flex tw:items-center">
+                    <div
+                      style="
+                        width: 28px;
+                        display: flex;
+                        align-items: center;
+                        margin-right: 12px;
+                      "
+                    >
+                      <q-toggle
+                        v-model="searchObj.meta.sqlMode"
+                        :disable="isSqlModeDisabled"
+                        size="xs"
+                        flat
+                        class="o2-toggle-button-xs"
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'o2-toggle-button-xs-dark'
+                            : 'o2-toggle-button-xs-light'
+                        "
+                        @click.stop
+                      />
+                    </div>
+                    {{ t("search.sqlModeLabel") }}
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
+
+              <!-- Quick Mode Toggle (always in menu) -->
               <q-item
                 clickable
                 @click="handleQuickMode"
@@ -483,10 +571,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <q-separator />
 
-              <!-- Syntax Guide -->
-              <q-item class="q-pa-sm saved-view-item">
+              <!-- === SAVED VIEWS GROUP (moved from toolbar at <= 1500px) === -->
+
+              <!-- List Saved Views -->
+              <q-item
+                v-if="shouldMoveSavedViewToMenu"
+                clickable
+                v-close-popup
+                @click="openSavedViewsList"
+                data-test="logs-search-bar-menu-list-saved-views-btn"
+                class="q-pa-sm saved-view-item"
+              >
                 <q-item-section>
-                  <q-item-label>
+                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
+                    <q-icon name="saved_search" size="xs" />
+                    {{ t("search.listSavedViews") }}
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
+
+              <!-- Create Saved View -->
+              <q-item
+                v-if="shouldMoveSavedViewToMenu"
+                clickable
+                v-close-popup
+                @click="fnSavedView"
+                data-test="logs-search-bar-menu-create-saved-view-btn"
+                class="q-pa-sm saved-view-item"
+              >
+                <q-item-section>
+                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
+                    <q-icon name="add_circle_outline" size="xs" />
+                    {{ t("search.createSavedView") }}
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
+
+              <q-separator v-if="shouldMoveSavedViewToMenu" />
+
+              <!-- === ACTIONS GROUP === -->
+
+              <!-- Reset Filters (moved from toolbar at <= 1500px) -->
+              <q-item
+                v-if="shouldMoveSavedViewToMenu"
+                clickable
+                v-close-popup
+                @click="resetFilters"
+                data-test="logs-search-bar-menu-reset-filters-btn"
+                class="q-pa-sm saved-view-item"
+              >
+                <q-item-section>
+                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
+                    <q-icon name="restart_alt" size="xs" />
+                    {{ t("search.resetFilters") }}
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
+
+              <q-separator v-if="shouldMoveSavedViewToMenu" />
+
+              <!-- Syntax Guide -->
+              <q-item class="q-pa-sm saved-view-item syntax-guide-menu-item">
+                <q-item-section>
+                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
                     <syntax-guide
                       data-test="logs-search-bar-sql-mode-toggle-btn"
                       :sqlmode="searchObj.meta.sqlMode"
@@ -503,18 +650,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="float-right col-auto">
         <transform-selector
-          v-if="isActionsEnabled"
+          v-if="isActionsEnabled && !shouldMoveShareToMenu"
           :function-options="functionOptions"
           @select:function="populateFunctionImplementation"
           @save:function="fnSavedFunctionDialog"
         />
         <function-selector
-          v-else
+          v-else-if="!isActionsEnabled && !shouldMoveShareToMenu"
           :function-options="functionOptions"
           @select:function="populateFunctionImplementation"
           @save:function="fnSavedFunctionDialog"
         />
         <share-button
+          v-if="!shouldMoveShareToMenu"
           data-test="logs-search-bar-share-link-btn"
           :url="shareURL"
           button-class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
@@ -529,6 +677,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-menu>
             <q-list>
+              <!-- Share Link (moved from toolbar at <= 1100px) -->
+              <q-item
+                v-if="shouldMoveShareToMenu"
+                clickable
+                v-close-popup
+                data-test="logs-search-bar-menu-share-link-btn"
+                class="q-pa-sm saved-view-item"
+              >
+                <q-item-section>
+                  <share-button
+                    :url="shareURL"
+                    button-class="tw:w-full"
+                    button-size="xs"
+                    :flat="true"
+                  />
+                </q-item-section>
+              </q-item>
+
+              <q-separator v-if="shouldMoveShareToMenu" />
+
               <q-item
                 data-test="search-history-item-btn"
                 class="q-pa-sm saved-view-item"
@@ -710,7 +878,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item>
               <q-separator v-if="config.isEnterprise == 'true'" />
               <q-item
-                v-if="config.isEnterprise == 'true' && config.isCloud == 'false'"
+                v-if="config.isEnterprise == 'true' && config.isCloud == 'false' && store.state.zoConfig.search_inspector_enabled"
                 data-test="search-inspect-btn"
                 class="q-pa-sm saved-view-item"
                 clickable
@@ -2584,6 +2752,24 @@ export default defineComponent({
 
     const hasInteractedWithAI = ref(false); // Track if user has used AI in non-NLP mode
     const isNaturalLanguageDetected = ref(false); // Track NL detection without switching modes
+
+    // Track window width for responsive toolbar layout
+    const windowWidth = ref(window.innerWidth);
+    const onWindowResize = () => {
+      windowWidth.value = window.innerWidth;
+    };
+
+    // Responsive breakpoints: progressively move items into menus
+    // <= 1440px: saved views + reset → left hamburger menu
+    // <= 1280px: also histogram + SQL toggles → left hamburger menu
+    // <= 1024px: also share + transform selector → right overflow menu
+    const shouldMoveSavedViewToMenu = computed(
+      () => windowWidth.value <= 1440,
+    );
+    const shouldMoveSqlToggleToMenu = computed(
+      () => windowWidth.value <= 1280,
+    );
+    const shouldMoveShareToMenu = computed(() => windowWidth.value <= 1100);
     const vrlEditorNlpMode = ref(false); // Track VRL editor's AI mode
 
     const confirmUpdate = ref(false);
@@ -2682,60 +2868,15 @@ export default defineComponent({
       { immediate: true, deep: true },
     );
 
-    // Watch SQL mode toggle - turn off NLP mode when SQL mode is enabled
-    watch(
-      () => searchObj.meta.sqlMode,
-      (newSqlMode, oldSqlMode) => {
-        // Only act when SQL mode is turned ON (not when turning off)
-        if (newSqlMode === true && oldSqlMode === false) {
-          console.log(
-            "[NL2Q-Handler] SQL mode enabled, turning off NLP mode (mutually exclusive)",
-          );
-          searchObj.meta.nlpMode = false;
-          // Reset flags when switching to SQL mode
-          hasInteractedWithAI.value = false;
-          isNaturalLanguageDetected.value = false;
-        }
-      },
-    );
-
-    // Watch NLP mode toggle - turn off SQL mode when NLP mode is enabled
-    // Also prevent auto-detection from immediately turning it back off
+    // Watch NLP mode toggle - AI mode is independent of SQL mode
     watch(
       () => searchObj.meta.nlpMode,
       (newNlpMode, oldNlpMode) => {
         if (newNlpMode === true && oldNlpMode === false) {
-          // NLP mode turned ON
-          console.log(
-            "[NL2Q-Handler] NLP mode manually enabled, turning off SQL mode (mutually exclusive)",
-          );
-          searchObj.meta.sqlMode = false;
-          // Reset detection flag when manually switching to NLP mode
+          // NLP mode turned ON - reset detection flag
           isNaturalLanguageDetected.value = false;
-
-          // CRITICAL: User manually toggled NLP mode ON
-          // We need to prevent the next auto-detection from turning it back OFF
-          // The existing text in editor might be SQL, which would trigger auto-detection
-          // and emit nlpModeDetected:false, turning NLP mode back OFF
-          // So we don't emit auto-detection events when nlpMode prop is already true
         } else if (newNlpMode === false && oldNlpMode === true) {
-          // NLP mode turned OFF - default to SQL mode
-          console.log(
-            "[NL2Q-Handler] NLP mode disabled, switching to SQL mode",
-          );
-
-          // CRITICAL: Preserve the current editor content (e.g., AI-generated SQL)
-          // Sync editorValue → query BEFORE enabling sqlMode, so the fullSQLMode
-          // watcher in Index.vue doesn't rebuild the query from stale data.
-          const currentEditorValue = searchObj.data.editorValue || "";
-          if (currentEditorValue.trim()) {
-            searchObj.data.query = currentEditorValue;
-          }
-
-          // Set manual trigger flag so the fullSQLMode watcher skips setQuery()
-          searchObj.meta.sqlModeManualTrigger = true;
-          searchObj.meta.sqlMode = true;
-          // Reset flags
+          // NLP mode turned OFF - reset flags
           isNaturalLanguageDetected.value = false;
           hasInteractedWithAI.value = false;
         }
@@ -3188,6 +3329,7 @@ export default defineComponent({
       updateEditorWidth();
 
       window.addEventListener("keydown", handleEscKey);
+      window.addEventListener("resize", onWindowResize);
     });
 
     onUnmounted(() => {
@@ -3195,6 +3337,7 @@ export default defineComponent({
         fnEditorRef?.value?.resetEditorLayout();
       });
       window.removeEventListener("keydown", handleEscKey);
+      window.removeEventListener("resize", onWindowResize);
     });
 
     onActivated(() => {
@@ -5181,6 +5324,9 @@ export default defineComponent({
       isNaturalLanguageDetected,
       isGeneratingSQL,
       vrlEditorNlpMode,
+      shouldMoveSavedViewToMenu,
+      shouldMoveSqlToggleToMenu,
+      shouldMoveShareToMenu,
     };
   },
   computed: {
@@ -5478,6 +5624,33 @@ export default defineComponent({
   :deep(.q-btn) {
     border: none !important;
     margin-left: 0 !important;
+
+    &:hover {
+      background-color: transparent !important;
+    }
+
+    &::before {
+      display: none !important;
+    }
+  }
+}
+
+.syntax-guide-menu-item {
+  :deep(.q-btn) {
+    padding: 0 !important;
+    min-height: unset !important;
+    border: none !important;
+    margin: 0 !important;
+    font-size: inherit !important;
+    font-weight: inherit !important;
+
+    .q-icon {
+      font-size: 1.25rem; // match q-icon size="xs" used by other items
+    }
+
+    .q-btn__content {
+      gap: 0.5rem; // match tw:gap-2
+    }
 
     &:hover {
       background-color: transparent !important;

@@ -169,7 +169,7 @@ const useManagementRoutes = () => {
 
         },
         {
-          path: "correlation_settings",
+          path: "correlation/:tab?",
           name: "correlationSettings",
           component: () => import("@/components/settings/CorrelationSettings.vue"),
           meta: {

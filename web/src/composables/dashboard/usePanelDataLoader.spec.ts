@@ -2956,4 +2956,176 @@ describe("usePanelDataLoader", () => {
       expect(loader.annotations.value).toBeDefined();
     });
   });
+
+  describe("getRegionClusterParams", () => {
+    it("should return regions and clusters when regionClusterParams has both", () => {
+      const regionClusterParams = ref({
+        regions: ["us-east-1", "eu-west-1"],
+        clusters: ["cluster-a", "cluster-b"],
+      });
+
+      const loader = usePanelDataLoader(
+        ref({
+          id: "test-region",
+          title: "Region Test",
+          queryType: "sql",
+          queries: [],
+        }),
+        ref({}),
+        ref({ values: [] }),
+        ref(null),
+        ref(false),
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null), // runId
+        ref(null), // tabId
+        ref(null), // tabName
+        ref(null), // searchResponse
+        ref(false), // is_ui_histogram
+        ref(null), // dashboardName
+        ref(null), // folderName
+        ref(false), // shouldRefreshWithoutCache
+        regionClusterParams,
+      );
+
+      expect(loader).toBeDefined();
+    });
+
+    it("should return empty object when regionClusterParams is undefined", () => {
+      const loader = usePanelDataLoader(
+        ref({
+          id: "test-no-region",
+          title: "No Region Test",
+          queryType: "sql",
+          queries: [],
+        }),
+        ref({}),
+        ref({ values: [] }),
+        ref(null),
+        ref(false),
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null), // runId
+        ref(null), // tabId
+        ref(null), // tabName
+        ref(null), // searchResponse
+        ref(false), // is_ui_histogram
+        ref(null), // dashboardName
+        ref(null), // folderName
+        ref(false), // shouldRefreshWithoutCache
+        undefined, // regionClusterParams not provided
+      );
+
+      expect(loader).toBeDefined();
+    });
+
+    it("should return regions and clusters when only regions is provided", () => {
+      const regionClusterParams = ref({
+        regions: ["us-west-2"],
+        clusters: undefined,
+      });
+
+      const loader = usePanelDataLoader(
+        ref({
+          id: "test-regions-only",
+          title: "Regions Only Test",
+          queryType: "sql",
+          queries: [],
+        }),
+        ref({}),
+        ref({ values: [] }),
+        ref(null),
+        ref(false),
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null), // runId
+        ref(null), // tabId
+        ref(null), // tabName
+        ref(null), // searchResponse
+        ref(false), // is_ui_histogram
+        ref(null), // dashboardName
+        ref(null), // folderName
+        ref(false), // shouldRefreshWithoutCache
+        regionClusterParams,
+      );
+
+      expect(loader).toBeDefined();
+    });
+
+    it("should return regions and clusters when only clusters is provided", () => {
+      const regionClusterParams = ref({
+        regions: undefined,
+        clusters: ["cluster-x"],
+      });
+
+      const loader = usePanelDataLoader(
+        ref({
+          id: "test-clusters-only",
+          title: "Clusters Only Test",
+          queryType: "sql",
+          queries: [],
+        }),
+        ref({}),
+        ref({ values: [] }),
+        ref(null),
+        ref(false),
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null), // runId
+        ref(null), // tabId
+        ref(null), // tabName
+        ref(null), // searchResponse
+        ref(false), // is_ui_histogram
+        ref(null), // dashboardName
+        ref(null), // folderName
+        ref(false), // shouldRefreshWithoutCache
+        regionClusterParams,
+      );
+
+      expect(loader).toBeDefined();
+    });
+
+    it("should return empty object when regionClusterParams has empty regions and clusters", () => {
+      const regionClusterParams = ref({
+        regions: [],
+        clusters: [],
+      });
+
+      const loader = usePanelDataLoader(
+        ref({
+          id: "test-empty-arrays",
+          title: "Empty Arrays Test",
+          queryType: "sql",
+          queries: [],
+        }),
+        ref({}),
+        ref({ values: [] }),
+        ref(null),
+        ref(false),
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null), // runId
+        ref(null), // tabId
+        ref(null), // tabName
+        ref(null), // searchResponse
+        ref(false), // is_ui_histogram
+        ref(null), // dashboardName
+        ref(null), // folderName
+        ref(false), // shouldRefreshWithoutCache
+        regionClusterParams,
+      );
+
+      expect(loader).toBeDefined();
+    });
+  });
 });

@@ -629,6 +629,8 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/dashboards/bulk", delete(dashboards::delete_dashboard_bulk))
         .route("/{org_id}/folders/dashboards/{dashboard_id}", put(dashboards::move_dashboard))
         .route("/{org_id}/dashboards/move", patch(dashboards::move_dashboards))
+        .route("/{org_id}/dashboards/{dashboard_id}/panels", post(dashboards::add_panel))
+        .route("/{org_id}/dashboards/{dashboard_id}/panels/{panel_id}", put(dashboards::update_panel).delete(dashboards::delete_panel))
 
         // Reports
         .route("/{org_id}/reports", get(dashboards::reports::list_reports).post(dashboards::reports::create_report))
@@ -826,9 +828,11 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/streams/{stream_name}/patterns/extract", post(patterns::extract_patterns))
 
             // Service streams
+            .route("/{org_id}/service_streams", get(service_streams::list_services))
             .route("/{org_id}/service_streams/_analytics", get(service_streams::get_dimension_analytics))
             .route("/{org_id}/service_streams/_correlate", post(service_streams::correlate_streams))
-            .route("/{org_id}/service_streams/_grouped", get(service_streams::get_services_grouped));
+            .route("/{org_id}/service_streams/config/identity", get(service_streams::get_identity_config).put(service_streams::save_identity_config))
+            .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services));
     }
 
     #[cfg(feature = "cloud")]
