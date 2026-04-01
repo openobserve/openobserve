@@ -33,17 +33,11 @@ class ServiceAccountPage:
         )
         assert response.status_code == 200, f"Failed to create service account: {response.content.decode()}"
 
-        print(f"Service account created successfully: {response.json()}")
+        response_data = response.json()
+        print(f"Service account created successfully: {response_data}")
 
-        response_get = session.get(
-            f"{base_url}api/{org_id}/service_accounts/{email_address}", 
-            headers=headers
-        )
-        assert response_get.status_code == 200, f"Failed to get service account: {response_get.content.decode()}"
-
-        print(f"Service account created successfully: {response_get.json()}")
-
-        token = response_get.json()['token']
+        # Token is returned in the create response
+        token = response_data['token']
 
         print(f"Token: {token}")
 
