@@ -548,4 +548,32 @@ describe("PromQLTableChart", () => {
       expect(filtered.length).toBe(1000); // 5000 / 5 series
     });
   });
+
+  describe("Drilldown Visual Cues", () => {
+    it("should pass hasDrilldown prop to TableRenderer", () => {
+      wrapper = createWrapper({ hasDrilldown: true });
+
+      const tableRenderer = wrapper.findComponent({ name: "TableRenderer" });
+      expect(tableRenderer.props("hasDrilldown")).toBe(true);
+    });
+
+    it("should default hasDrilldown to false", () => {
+      wrapper = createWrapper();
+
+      const tableRenderer = wrapper.findComponent({ name: "TableRenderer" });
+      expect(tableRenderer.props("hasDrilldown")).toBe(false);
+    });
+
+    it("should update TableRenderer when hasDrilldown changes", async () => {
+      wrapper = createWrapper({ hasDrilldown: false });
+
+      let tableRenderer = wrapper.findComponent({ name: "TableRenderer" });
+      expect(tableRenderer.props("hasDrilldown")).toBe(false);
+
+      await wrapper.setProps({ hasDrilldown: true });
+
+      tableRenderer = wrapper.findComponent({ name: "TableRenderer" });
+      expect(tableRenderer.props("hasDrilldown")).toBe(true);
+    });
+  });
 });
