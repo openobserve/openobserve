@@ -214,14 +214,20 @@ vi.mock("@/composables/useTraces", () => ({
     getUrlQueryParams: vi.fn(() => ({})),
     copyTracesUrl: vi.fn(),
     formatTracesMetaData: vi.fn((hits) => hits),
+    setServiceColors: mockSetServiceColors,
+    loadLocalLogFilterField: vi.fn(),
+    updatedLocalLogFilterField: vi.fn(),
   }),
 }));
 
 // Hoisted so vi.mock factory can reference them and tests can override per-call
-const { mockGetStreams, mockGetStream } = vi.hoisted(() => ({
-  mockGetStreams: vi.fn(),
-  mockGetStream: vi.fn(),
-}));
+const { mockGetStreams, mockGetStream, mockSetServiceColors } = vi.hoisted(
+  () => ({
+    mockGetStreams: vi.fn(),
+    mockGetStream: vi.fn(),
+    mockSetServiceColors: vi.fn(),
+  }),
+);
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
