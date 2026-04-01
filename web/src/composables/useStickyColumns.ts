@@ -23,7 +23,7 @@ export function useStickyColumns(props: any, store: any) {
 
   // Watch for columns changes to update sticky offsets
   watch(
-    () => props.data?.columns,
+    () => props.columns,
     (columns: any[]) => {
       const offsets: { [key: string]: number } = {};
       let cumulativeWidth = 0;
@@ -70,12 +70,12 @@ export function useStickyColumns(props: any, store: any) {
     styleElement = document.createElement("style");
     styleElement.setAttribute("data-sticky-styles", "true");
 
-    const columns = (props.data?.columns || []) as any[];
+    const columns = (props.columns || []) as any[];
     const bgColor = store.state.theme === "dark" ? "#1a1a1a" : "#fff";
     let css = "";
 
-    const stickyColTotals = !!props.data?.stickyColTotals;
-    const stickyRowTotals = !!props.data?.stickyRowTotals;
+    const stickyColTotals = !!props.stickyColTotals;
+    const stickyRowTotals = !!props.stickyRowTotals;
     const TOTAL_COL_WIDTH = 150;
 
     const scope = `.my-sticky-virtscroll-table[data-sticky-id="${tableId}"]`;

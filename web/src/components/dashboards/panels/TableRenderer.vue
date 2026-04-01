@@ -18,7 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="table-wrapper">
     <TenstackTable
       ref="tableRef"
-      :data="data"
+      :rows="data.rows || []"
+      :columns="data.columns || []"
+      :is-dashboard="true"
+      :pivot-header-levels="data.pivotHeaderLevels || []"
+      :sticky-total-row="data.stickyTotalRow || null"
+      :sticky-row-totals="!!data.stickyRowTotals"
+      :sticky-col-totals="!!data.stickyColTotals"
       :value-mapping="valueMapping"
       :wrap="wrapCells"
       :show-pagination="showPagination"
