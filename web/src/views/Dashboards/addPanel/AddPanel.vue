@@ -1633,8 +1633,6 @@ export default defineComponent({
      * Handles saving a variable - reloads dashboard to reflect the saved variable
      */
     const handleSaveVariable = async (payload: any) => {
-      isAddVariableOpen.value = false;
-
       const { variableData, isEdit, oldVariableName } = payload || {};
 
       // If payload is missing, return (should not happen)
@@ -1681,6 +1679,8 @@ export default defineComponent({
           variablesCreatedInSession.value.push(variableData.name);
         }
       }
+
+      isAddVariableOpen.value = false;
 
       // Update variablesWithCurrentPanel tracking
       const usesCurrentPanel =

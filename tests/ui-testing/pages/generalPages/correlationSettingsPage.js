@@ -20,11 +20,12 @@ export class CorrelationSettingsPage {
         this.pageSubtitle = '.general-page-subtitle';
 
         // Tab selectors (Quasar tabs - use role="tab" or .q-tab class)
-        // Note: Quasar tabs use name attribute: identity, services, alert-correlation
+        // Note: Quasar tabs use name attribute: services, discovery, alert-correlation, field-aliases
         this.tabsContainer = '.q-tabs';
-        this.serviceIdentityTabName = 'Service Identity';
-        this.discoveredServicesTabName = 'Discovered Services';
+        this.servicesTabName = 'Services';
+        this.serviceDiscoveryTabName = 'Configuration';
         this.alertCorrelationTabName = 'Alert Correlation';
+        this.fieldAliasesTabName = 'Field Aliases';
 
         // ==================== Service Identity Tab Selectors ====================
         this.serviceIdentityBackwardBtn = '[data-test="correlation-service-identity-backward-btn"]';
@@ -170,25 +171,27 @@ export class CorrelationSettingsPage {
 
     async expectAllTabsVisible() {
         // Use getByRole for tabs or filter by text
-        const serviceIdentityTab = this.page.getByRole('tab', { name: this.serviceIdentityTabName });
-        const discoveredServicesTab = this.page.getByRole('tab', { name: this.discoveredServicesTabName });
+        const servicesTab = this.page.getByRole('tab', { name: this.servicesTabName });
+        const serviceDiscoveryTab = this.page.getByRole('tab', { name: this.serviceDiscoveryTabName });
         const alertCorrelationTab = this.page.getByRole('tab', { name: this.alertCorrelationTabName });
+        const fieldAliasesTab = this.page.getByRole('tab', { name: this.fieldAliasesTabName });
 
-        await expect(serviceIdentityTab).toBeVisible({ timeout: 15000 });
-        await expect(discoveredServicesTab).toBeVisible();
+        await expect(servicesTab).toBeVisible({ timeout: 15000 });
+        await expect(serviceDiscoveryTab).toBeVisible();
         await expect(alertCorrelationTab).toBeVisible();
+        await expect(fieldAliasesTab).toBeVisible();
     }
 
     // ==================== Tab Switching ====================
 
-    async clickServiceIdentityTab() {
-        const tab = this.page.getByRole('tab', { name: this.serviceIdentityTabName });
+    async clickServiceDiscoveryTab() {
+        const tab = this.page.getByRole('tab', { name: this.serviceDiscoveryTabName });
         await tab.click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
-    async clickDiscoveredServicesTab() {
-        const tab = this.page.getByRole('tab', { name: this.discoveredServicesTabName });
+    async clickServicesTab() {
+        const tab = this.page.getByRole('tab', { name: this.servicesTabName });
         await tab.click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
@@ -209,13 +212,13 @@ export class CorrelationSettingsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
-    async expectServiceIdentityTabActive() {
-        const tab = this.page.getByRole('tab', { name: this.serviceIdentityTabName });
+    async expectServiceDiscoveryTabActive() {
+        const tab = this.page.getByRole('tab', { name: this.serviceDiscoveryTabName });
         await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 5000 });
     }
 
-    async expectDiscoveredServicesTabActive() {
-        const tab = this.page.getByRole('tab', { name: this.discoveredServicesTabName });
+    async expectServicesTabActive() {
+        const tab = this.page.getByRole('tab', { name: this.servicesTabName });
         await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 5000 });
     }
 
@@ -224,12 +227,40 @@ export class CorrelationSettingsPage {
         await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 5000 });
     }
 
-    // ==================== Service Identity Tab Actions ====================
+    async clickFieldAliasesTab() {
+        const tab = this.page.getByRole('tab', { name: this.fieldAliasesTabName });
+        await tab.click();
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    }
 
-    async expectServiceIdentityContentVisible() {
-        // Wait for the section to be visible by checking for buttons
+    async expectFieldAliasesTabActive() {
+        const tab = this.page.getByRole('tab', { name: this.fieldAliasesTabName });
+        await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 5000 });
+    }
+
+    // ==================== Tab Content Visibility Checks ====================
+
+    async expectServicesContentVisible() {
+        // Wait for the Services tab content to be visible
+        await expect(this.page.locator(this.refreshDiscoveredServicesBtn)).toBeVisible({ timeout: 15000 });
+    }
+
+    async expectServiceDiscoveryContentVisible() {
+        // Wait for the Configuration tab content to be visible (formerly Service Identity)
         await expect(this.page.locator(this.serviceIdentitySaveBtn)).toBeVisible({ timeout: 15000 });
     }
+
+    async expectFieldAliasesContentVisible() {
+        // Wait for the Field Aliases tab content to be visible
+        await expect(this.page.locator(this.importJsonBtn)).toBeVisible({ timeout: 15000 });
+    }
+
+    async expectAlertCorrelationContentVisible() {
+        // Wait for the Alert Correlation tab content to be visible
+        await expect(this.page.locator(this.dedupSettingsRefreshBtn)).toBeVisible({ timeout: 15000 });
+    }
+
+    // ==================== Service Discovery (Configuration) Tab Actions ====================
 
     async fillSearchAvailableDimensions(searchText) {
         const searchInput = this.page.locator(this.serviceIdentitySearchInput);
