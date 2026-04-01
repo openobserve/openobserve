@@ -81,7 +81,7 @@ pub async fn put(item: ModelPricingDefinition) -> Result<ModelPricingDefinition,
             if existing.name != item.name
                 && (get_by_org_and_name(client, &item.org_id, &item.name).await?).is_some()
             {
-                return Err(Error::Message(format!(
+                return Err(Error::DuplicateName(format!(
                     "A model pricing definition with name '{}' already exists in this organization",
                     item.name
                 )));

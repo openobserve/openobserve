@@ -18,7 +18,10 @@
 //! Syncs model pricing definitions from the configured GitHub source into the database
 //! under the `_openobserve` org. Runs on startup and periodically (every 6h by default).
 
-use std::sync::LazyLock;
+use std::sync::{
+    LazyLock,
+    atomic::{AtomicI64, Ordering},
+};
 
 use config::meta::model_pricing::{
     BUILT_IN_ORG, ModelPricingDefinition, PricingSource, PricingTierDefinition,
@@ -30,6 +33,15 @@ use crate::service::github::GitHubDataService;
 
 /// Shared GitHub data service instance (reused by the cron and the built-in endpoint).
 pub static GITHUB_SERVICE: LazyLock<GitHubDataService> = LazyLock::new(GitHubDataService::new);
+
+/// Timestamp (Unix seconds) of the last successful sync from GitHub. 0 means never synced.
+static LAST_SYNC_TIMESTAMP: AtomicI64 = AtomicI64::new(0);
+
+/// Returns the Unix timestamp (seconds) of the last successful built-in pricing sync.
+/// Returns 0 if no sync has completed yet.
+pub fn last_sync_timestamp() -> i64 {
+    LAST_SYNC_TIMESTAMP.load(Ordering::Relaxed)
+}
 
 /// A model pricing entry from the community/built-in GitHub JSON source.
 #[derive(Debug, Deserialize)]
@@ -141,6 +153,8 @@ pub async fn sync_built_in_from_github(force_refresh: bool) -> Result<SyncResult
     if let Err(e) = infra::coordinator::model_pricing::emit_put_event(&event_key).await {
         log::error!("[model_pricing_sync] failed to emit sync event: {e}");
     }
+
+    LAST_SYNC_TIMESTAMP.store(chrono::Utc::now().timestamp(), Ordering::Relaxed);
 
     log::info!(
         "[model_pricing_sync] sync complete: created={created}, updated={updated}, disabled={disabled}"

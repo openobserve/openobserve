@@ -85,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :loading="loading"
       row-key="id"
       v-model:pagination="pagination"
+      :sort-method="customSort"
       class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
       style="width: 100%; height: calc(100vh - 120px); overflow-y: auto;"
     >
@@ -159,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="col.name === 'select'">
               <q-checkbox
                 v-if="!isReadOnly(props.row)"
-                :model-value="selectedIds.has(props.row.id)"
+                :model-value="selectedIds.includes(props.row.id)"
                 size="sm"
                 class="o2-table-checkbox"
                 @update:model-value="toggleSelect(props.row.id)"
@@ -381,7 +382,7 @@ const resetConfirmDialog = () => {
 };
 const filterQuery = ref("");
 const showImportModelPricingPage = ref(false);
-const selectedIds = ref<Set<string>>(new Set());
+const selectedIds = ref<string[]>([]);
 
 const perPageOptions: any = [
   { label: "20", value: 20 },
@@ -402,7 +403,7 @@ const columns: any[] = [
   { name: "provider", label: "Provider", field: "provider", align: "left", style: "width: 120px" },
   { name: "match_pattern", label: "Pattern", field: "match_pattern", align: "left", style: "max-width: 300px; overflow: hidden;" },
   { name: "pricing", label: "Input / Output (per 1M)", field: "pricing", align: "left" },
-  { name: "actions", label: "Actions", field: "actions", align: "left", classes: "actions-column" },
+  { name: "actions", label: "Actions", field: "actions", align: "center", style: "width: 140px" },
 ];
 
 const pagination = ref({ rowsPerPage: 20 });
@@ -413,10 +414,10 @@ const resultTotal = computed(() => filteredModels.value.length);
 const selectableModels = computed(() =>
   filteredModels.value.filter((m: any) => !isReadOnly(m))
 );
-const selectedCount = computed(() => selectedIds.value.size);
+const selectedCount = computed(() => selectedIds.value.length);
 const allSelected = computed(() =>
   selectableModels.value.length > 0 &&
-  selectableModels.value.every((m: any) => selectedIds.value.has(m.id))
+  selectableModels.value.every((m: any) => selectedIds.value.includes(m.id))
 );
 const someSelected = computed(() =>
   selectedCount.value > 0 && !allSelected.value
@@ -424,20 +425,19 @@ const someSelected = computed(() =>
 
 function toggleSelectAll() {
   if (allSelected.value) {
-    selectedIds.value = new Set();
+    selectedIds.value = [];
   } else {
-    selectedIds.value = new Set(selectableModels.value.map((m: any) => m.id));
+    selectedIds.value = selectableModels.value.map((m: any) => m.id);
   }
 }
 
 function toggleSelect(id: string) {
-  const next = new Set(selectedIds.value);
-  if (next.has(id)) {
-    next.delete(id);
+  const idx = selectedIds.value.indexOf(id);
+  if (idx >= 0) {
+    selectedIds.value.splice(idx, 1);
   } else {
-    next.add(id);
+    selectedIds.value.push(id);
   }
-  selectedIds.value = next;
 }
 
 /** Get the source of a model: 'built_in', 'meta_org', or 'org'. */
@@ -504,6 +504,33 @@ const filteredModels = computed(() => {
 
   return sorted;
 });
+
+/** Sort within each section group so section banners stay in place. */
+function customSort(rows: any[], sortBy: string, descending: boolean) {
+  if (!sortBy) return rows;
+
+  const compare = (a: any, b: any) => {
+    const aVal = (a[sortBy] ?? '').toString().toLowerCase();
+    const bVal = (b[sortBy] ?? '').toString().toLowerCase();
+    const cmp = aVal.localeCompare(bVal);
+    return descending ? -cmp : cmp;
+  };
+
+  const orgRows = rows.filter((r: any) => getSource(r) === 'org' && r.org_id === orgIdentifier.value);
+  const metaRows = rows.filter((r: any) => getSource(r) === 'meta_org' || (getSource(r) === 'org' && r.org_id !== orgIdentifier.value));
+  const builtInRows = rows.filter((r: any) => getSource(r) === 'built_in');
+
+  orgRows.sort(compare);
+  metaRows.sort(compare);
+  builtInRows.sort(compare);
+
+  // Clear and re-apply section markers
+  [...orgRows, ...metaRows, ...builtInRows].forEach((r: any) => { r.__sectionStart = null; });
+  if (metaRows.length > 0) metaRows[0].__sectionStart = 'meta_org';
+  if (builtInRows.length > 0) builtInRows[0].__sectionStart = 'built_in';
+
+  return [...orgRows, ...metaRows, ...builtInRows];
+}
 
 function getDefaultTier(model: any) {
   return model.tiers?.[0];
@@ -627,7 +654,7 @@ function exportModel(model: any) {
 
 function exportSelected() {
   const selected = models.value.filter(
-    (m: any) => !isReadOnly(m) && selectedIds.value.has(m.id)
+    (m: any) => !isReadOnly(m) && selectedIds.value.includes(m.id)
   );
   if (selected.length === 0) {
     q.notify({ type: "warning", message: "No models selected to export" });
@@ -670,7 +697,7 @@ function confirmDeleteSelected() {
       }
       if (successCount > 0) {
         q.notify({ type: "positive", message: `Deleted ${successCount} model${successCount !== 1 ? "s" : ""}` });
-        selectedIds.value = new Set();
+        selectedIds.value = [];
         await fetchModels();
       }
     },

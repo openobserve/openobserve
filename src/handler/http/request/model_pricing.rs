@@ -421,6 +421,7 @@ pub async fn get_built_in(
     let search = query.search.to_lowercase();
     let models: Vec<BuiltInModelPricingEntry> = all_built_in
         .into_iter()
+        .filter(|m| m.enabled)
         .filter(|m| {
             search.is_empty()
                 || m.name.to_lowercase().contains(&search)
@@ -436,18 +437,19 @@ pub async fn get_built_in(
         })
         .collect();
 
+    let last_updated = crate::service::db::model_pricing_sync::last_sync_timestamp();
     MetaHttpResponse::json(BuiltInModelPricingResponse {
         models,
         source_url,
-        last_updated: chrono::Utc::now().timestamp(),
+        last_updated,
     })
 }
 
 /// Map errors from `model_pricing::set` to appropriate HTTP responses.
 /// Duplicate-name errors are returned as 400 Bad Request; everything else is 500.
 fn map_set_error(e: anyhow::Error) -> Response {
-    let msg = e.to_string();
-    if msg.contains("already exists") {
+    if let Some(infra::errors::Error::DuplicateName(msg)) = e.downcast_ref::<infra::errors::Error>()
+    {
         MetaHttpResponse::bad_request(msg)
     } else {
         MetaHttpResponse::internal_error(e)
