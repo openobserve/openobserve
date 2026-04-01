@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]"
             :style="{
               width: `calc(var(--header-${sanitizeCssId(header?.id)}-size) * 1px)`,
-              height: rowHeight + 'px',
+              height: rowHeight != null ? rowHeight + 'px' : undefined,
             }"
             :data-test="`o2-table-th-${header.id}`"
           >
@@ -397,7 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : wrap
                         ? width - 260 - 12 + 'px'
                         : 'auto',
-                  height: wrap ? 'stretch' : rowHeight + 'px',
+                  height: wrap ? 'stretch' : rowHeight != null ? rowHeight + 'px' : undefined,
                 }"
                 @mouseover="handleCellMouseOver(cell)"
                 @mouseleave="handleCellMouseLeave()"
@@ -989,7 +989,7 @@ const rowVirtualizer = useVirtualizer(rowVirtualizerOptions);
 const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
 
 const totalSize = computed(
-  () => rowVirtualizer.value.getTotalSize() + props.rowHeight,
+  () => rowVirtualizer.value.getTotalSize() + (props.rowHeight ?? 0),
 );
 
 const setExpandedRows = () => {
