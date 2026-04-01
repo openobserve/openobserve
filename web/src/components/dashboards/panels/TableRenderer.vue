@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         { 'no-position-absolute': store.state.printMode },
         { 'wrap-enabled': wrapCells },
         { 'pivot-sticky-totals': stickyRowTotals },
+        { 'drilldown-active': hasDrilldown },
       ]"
       :virtual-scroll="!showPagination"
       v-model:pagination="pagination"
@@ -285,6 +286,11 @@ export default defineComponent({
       required: false,
       type: Number,
       default: TABLE_ROWS_PER_PAGE_DEFAULT_VALUE,
+    },
+    hasDrilldown: {
+      required: false,
+      type: Boolean,
+      default: false,
     },
   },
   emits: ["row-click"],
@@ -867,6 +873,26 @@ export default defineComponent({
     overflow: hidden !important;
     max-height: 100% !important;
     page-break-inside: avoid;
+  }
+}
+
+// Drilldown visual cues: pointer cursor and hover highlight on data rows
+.drilldown-active {
+  :deep(.q-table tbody tr:not(.pivot-total-row)) {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.04);
+    }
+  }
+}
+
+.body--dark .drilldown-active {
+  :deep(.q-table tbody tr:not(.pivot-total-row)) {
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.07);
+    }
   }
 }
 </style>
