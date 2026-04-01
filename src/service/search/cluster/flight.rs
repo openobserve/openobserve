@@ -220,7 +220,6 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     )
     .await?;
     let took_wait = _lock.took_wait;
-    log::info!("[trace_id {trace_id}] flight->search: wait in queue took: {took_wait} ms");
 
     let work_group_str = _lock.work_group_str.clone();
     #[cfg(feature = "enterprise")]

@@ -169,8 +169,7 @@ pub async fn search(
     .await
     .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
 
-    let took_wait = _lock.took_wait;
-    log::info!("[trace_id {trace_id}] promql->search: wait in queue took: {took_wait} ms");
+    let _took_wait = _lock.took_wait;
 
     // Node-level slot admission for PromQL (enterprise)
     // Placed here alongside the work_group check so both admission stages are co-located.
