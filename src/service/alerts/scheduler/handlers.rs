@@ -2641,6 +2641,26 @@ async fn handle_backfill_triggers(
                     trace_id,
                 )
                 .await;
+                publish_triggers_usage(TriggerData {
+                    _timestamp: now,
+                    org: trigger.org.clone(),
+                    module: TriggerDataType::Backfill,
+                    key: job_id.clone(),
+                    status: TriggerDataStatus::Failed,
+                    scheduler_trace_id: Some(scheduler_trace_id.clone()),
+                    error: Some(format!("Failed to fetch pipeline: {e}. Retrying.")),
+                    time_in_queue_ms: Some(
+                        Duration::microseconds(now - trigger_start_time).num_milliseconds(),
+                    ),
+                    source_node: Some(LOCAL_NODE.name.clone()),
+                    retries: trigger.retries + 1,
+                    is_realtime: false,
+                    is_silenced: false,
+                    start_time: now,
+                    end_time: now,
+                    next_run_at: now,
+                    ..Default::default()
+                });
             }
             return Err(anyhow::anyhow!("Failed to fetch pipeline: {}", e));
         }
