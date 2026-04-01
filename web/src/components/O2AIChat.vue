@@ -2600,7 +2600,64 @@ export default defineComponent({
       }
     };
 
+    /**
+     * If a streaming request is in progress, abort it and save the current
+     * session state to IndexedDB so the partial response is preserved in history.
+     */
+    const abortAndSaveCurrentSession = () => {
+      if (!currentAbortController.value) return;
+
+      // Capture previous session state before clearing
+      const prevMessages = chatMessages.value.map((msg) => ({ ...msg }));
+      const prevSessionId = currentSessionId.value;
+      const prevChatId = currentChatId.value;
+      const prevTitle = aiGeneratedTitle.value || undefined;
+
+      // Abort the ongoing request — processStream will catch AbortError and exit
+      currentAbortController.value.abort();
+      currentAbortController.value = null;
+
+      // Clean up streaming/animation state
+      isLoading.value = false;
+      activeToolCall.value = null;
+      stopAnalyzingRotation();
+      if (typewriterAnimationId.value) {
+        cancelAnimationFrame(typewriterAnimationId.value);
+        typewriterAnimationId.value = null;
+      }
+
+      // Finalize partial assistant message in the snapshot
+      if (prevMessages.length > 0) {
+        const lastMessage = prevMessages[prevMessages.length - 1];
+        if (lastMessage.role === 'assistant') {
+          if (!lastMessage.content) {
+            prevMessages.pop();
+          } else {
+            if (lastMessage.contentBlocks) {
+              const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+              if (lastBlock && lastBlock.type === 'text') {
+                lastBlock.text = currentTextSegment.value;
+              }
+            }
+            lastMessage.content += '\n\n_[Response stopped]_';
+          }
+        }
+      }
+
+      // Reset streaming state
+      currentStreamingMessage.value = '';
+      currentTextSegment.value = '';
+      displayedStreamingContent.value = '';
+
+      // Save the previous session to IndexedDB (fire-and-forget)
+      if (prevMessages.length > 0 && prevSessionId) {
+        dbSaveToHistory(prevMessages, prevSessionId, prevTitle, prevChatId);
+      }
+    };
+
     const addNewChat = () => {
+      abortAndSaveCurrentSession();
+
       chatMessages.value = [];
       currentChatId.value = null;
       currentSessionId.value = null; // Will be generated on first save
@@ -3111,6 +3168,9 @@ export default defineComponent({
           addNewChat();
           return;
         }
+
+        // Abort any in-progress request and save the current session before switching
+        abortAndSaveCurrentSession();
 
         // Load chat using the composable
         const chat = await dbLoadChat(chatId);
