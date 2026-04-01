@@ -1145,6 +1145,11 @@ export default defineComponent({
     // AbortController for managing request cancellation - allows users to stop ongoing AI requests
     const currentAbortController = ref<AbortController | null>(null);
 
+    // Background streams: when the user switches sessions while streaming,
+    // the detached stream continues in background and saves to IndexedDB on completion.
+    const backgroundStreams = new Set<AbortController>();
+    const MAX_BACKGROUND_STREAMS = 3;
+
     // Typewriter animation state for LLM responses
     const displayedStreamingContent = ref('');
     const typewriterAnimationId = ref<number | null>(null);
@@ -1637,7 +1642,85 @@ export default defineComponent({
       const decoder = new TextDecoder();
       let buffer = '';
       let messageComplete = false;
-      
+
+      // --- Stream context: captured at call time ---
+      // When the user switches sessions mid-stream, chatMessages.value gets
+      // replaced with a new array. This captured reference keeps the stream
+      // writing to the ORIGINAL array so data isn't lost.
+      const msgs = chatMessages.value;
+      let ctxSessionId = currentSessionId.value;
+      let ctxChatId = currentChatId.value;
+      let ctxTitle: string | undefined = aiGeneratedTitle.value || undefined;
+
+      // Local streaming accumulators (synced to refs only when active)
+      let streamingMsg = currentStreamingMessage.value;
+      let textSegment = currentTextSegment.value;
+
+      const isActive = () => chatMessages.value === msgs;
+
+      const syncStreamingRefs = () => {
+        if (isActive()) {
+          currentStreamingMessage.value = streamingMsg;
+          currentTextSegment.value = textSegment;
+        }
+      };
+
+      // Context-aware save: uses captured metadata when detached
+      const saveCtx = async () => {
+        if (msgs.length === 0) return;
+        if (!ctxSessionId) {
+          ctxSessionId = getUUIDv7();
+          if (isActive()) currentSessionId.value = ctxSessionId;
+        }
+        const title = isActive() ? (aiGeneratedTitle.value || undefined) : ctxTitle;
+        const chatId = isActive() ? currentChatId.value : ctxChatId;
+        const resultId = await dbSaveToHistory(msgs, ctxSessionId, title, chatId);
+        if (!chatId && resultId) {
+          if (isActive()) {
+            currentChatId.value = resultId;
+            if (pendingAutoNavigation.value) {
+              autoNavigationPreferences.value.set(resultId, true);
+              saveAutoNavigationPreferences();
+            }
+          } else {
+            ctxChatId = resultId;
+          }
+        }
+      };
+
+      let lastSaveTime = lastStreamingSaveTime.value;
+      const throttledSaveCtx = async (force = false) => {
+        const now = Date.now();
+        if (force || (now - lastSaveTime >= STREAMING_SAVE_INTERVAL)) {
+          lastSaveTime = now;
+          if (isActive()) lastStreamingSaveTime.value = now;
+          await saveCtx();
+        }
+      };
+
+      // Local finalizeTextBlock: operates on captured msgs, not chatMessages.value
+      const localFinalizeTextBlock = () => {
+        if (textSegment) {
+          const lm = msgs[msgs.length - 1];
+          if (lm && lm.role === 'assistant' && lm.contentBlocks) {
+            const lb = lm.contentBlocks[lm.contentBlocks.length - 1];
+            if (lb && lb.type === 'text') {
+              lb.text = textSegment;
+            }
+          }
+        }
+        if (isActive()) {
+          if (typewriterAnimationId.value) {
+            cancelAnimationFrame(typewriterAnimationId.value);
+            typewriterAnimationId.value = null;
+          }
+          displayedStreamingContent.value = '';
+        }
+        textSegment = '';
+        syncStreamingRefs();
+      };
+      // --- End stream context ---
+
       try {
         while (true) {
           const { done, value } = await reader.read();
@@ -1665,14 +1748,36 @@ export default defineComponent({
 
                   // Handle title events - AI-generated chat title from first message
                   if (data && data.type === 'title') {
-                    aiGeneratedTitle.value = data.title;
-                    animateTitle(data.title);
+                    ctxTitle = data.title;
+                    if (isActive()) {
+                      aiGeneratedTitle.value = data.title;
+                      animateTitle(data.title);
+                    }
                     continue;
                   }
 
                   // Handle confirmation_required events - add inline confirmation block in chat
                   if (data && data.type === 'confirmation_required') {
-                    finalizeTextBlock();
+                    localFinalizeTextBlock();
+
+                    // When detached, auto-deny confirmations to unblock the stream
+                    if (!isActive()) {
+                      try {
+                        const orgId = store.state.selectedOrganization.identifier;
+                        await fetch(
+                          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
+                          {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({ approved: false }),
+                          }
+                        );
+                      } catch (error) {
+                        console.error('Error auto-denying confirmation for background stream:', error);
+                      }
+                      continue;
+                    }
 
                     // Check if this is a navigation action and auto navigation is enabled
                     if (data.tool === 'navigation_action' && isAutoNavigationEnabled.value) {
@@ -1680,7 +1785,7 @@ export default defineComponent({
                       try {
                         const orgId = store.state.selectedOrganization.identifier;
                         await fetch(
-                          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
+                          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
                           {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -1708,12 +1813,12 @@ export default defineComponent({
                     };
                     activeToolCall.value = null;
 
-                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === 'assistant') {
                       if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(confirmBlock);
                     } else {
-                      chatMessages.value.push({
+                      msgs.push({
                         role: 'assistant',
                         content: '',
                         contentBlocks: [...pendingToolCalls.value, confirmBlock],
@@ -1740,7 +1845,7 @@ export default defineComponent({
                         context: activeToolCall.value.context,
                         call_id: activeToolCall.value.call_id
                       };
-                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                      let lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.role === 'assistant') {
                         if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
@@ -1750,22 +1855,24 @@ export default defineComponent({
                     }
 
                     // Show active indicator (blue spinner box) - don't add to chat yet
-                    activeToolCall.value = {
-                      tool: data.tool,
-                      message: data.message,
-                      context: data.context || {},
-                      call_id: data.call_id || undefined
-                    };
+                    if (isActive()) {
+                      activeToolCall.value = {
+                        tool: data.tool,
+                        message: data.message,
+                        context: data.context || {},
+                        call_id: data.call_id || undefined
+                      };
+                    }
 
-                    finalizeTextBlock();
-                    await scrollToBottom();
+                    localFinalizeTextBlock();
+                    if (isActive()) await scrollToBottom();
                     continue;
                   }
 
                   // Handle error events - display error message to user
                   if (data && data.type === 'error') {
                     // Complete any active tool call first
-                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    let lastMessage = msgs[msgs.length - 1];
                     if (activeToolCall.value) {
                       const completedToolBlock: ContentBlock = {
                         type: 'tool_call',
@@ -1780,7 +1887,7 @@ export default defineComponent({
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
                       }
-                      activeToolCall.value = null;
+                      if (isActive()) activeToolCall.value = null;
                     }
 
                     // Format error message with suggestion if available
@@ -1794,9 +1901,9 @@ export default defineComponent({
                     }
 
                     // Get or create assistant message for error (reuse lastMessage)
-                    lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    lastMessage = msgs[msgs.length - 1];
                     if (!lastMessage || lastMessage.role !== 'assistant') {
-                      chatMessages.value.push({
+                      msgs.push({
                         role: 'assistant',
                         content: errorMessage,
                         contentBlocks: [...pendingToolCalls.value, { type: 'text', text: errorMessage }]
@@ -1818,11 +1925,12 @@ export default defineComponent({
                     }
 
                     // Reset streaming state
-                    currentTextSegment.value = '';
+                    textSegment = '';
+                    syncStreamingRefs();
 
                     // Save error message to history
-                    await saveToHistory();
-                    await scrollToBottom();
+                    await saveCtx();
+                    if (isActive()) await scrollToBottom();
 
                     // Stop processing further as error occurred
                     return;
@@ -1831,7 +1939,7 @@ export default defineComponent({
                   // Handle complete events - complete any active tool call
                   if (data && data.type === 'complete') {
                     // Capture trace_id for feedback correlation
-                    if (data.trace_id) {
+                    if (data.trace_id && isActive()) {
                       lastTraceId.value = data.trace_id;
                     }
                     if (activeToolCall.value) {
@@ -1842,14 +1950,14 @@ export default defineComponent({
                         context: activeToolCall.value.context,
                         call_id: activeToolCall.value.call_id
                       };
-                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                      let lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.role === 'assistant') {
                         if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
                       }
-                      activeToolCall.value = null;
+                      if (isActive()) activeToolCall.value = null;
                     }
                     continue;
                   }
@@ -1876,6 +1984,29 @@ export default defineComponent({
                       );
                     }
 
+                    // Emit dashboard event only when stream is active (foreground)
+                    if (data.success !== false && isActive()) {
+                      const resolvedToolName = data.tool && data.tool !== 'tools_call' ? data.tool : '';
+                      const callArgs = data.call_args || {};
+                      const dashboardEventType = getDashboardEventType(resolvedToolName);
+                      if (dashboardEventType) {
+                        const dashboardId = callArgs.dashboard_id || callArgs.args?.dashboard_id || callArgs.request_body?.dashboard_id;
+                        if (dashboardId) {
+                          const folderId = callArgs.folder || callArgs.args?.folder || callArgs.request_body?.folder;
+                          emitDashboardEvent({
+                            type: dashboardEventType,
+                            dashboardId,
+                            folderId,
+                          });
+                        } else {
+                          console.warn(
+                            `[O2AIChat] Could not extract dashboardId from call_args for tool "${resolvedToolName}". Skipping dashboard event.`,
+                            callArgs
+                          );
+                        }
+                      }
+                    }
+
                     // Match by call_id if available, fall back to tool name
                     const matchesActiveToolCall = activeToolCall.value && (
                       (data.call_id && activeToolCall.value.call_id === data.call_id) ||
@@ -1893,17 +2024,17 @@ export default defineComponent({
                         ...resultData,
                         ...(navigationAction && { navigationAction })
                       };
-                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                      let lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.role === 'assistant') {
                         if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
                       }
-                      activeToolCall.value = null;
+                      if (isActive()) activeToolCall.value = null;
                     } else {
                       // Tool was already completed — retroactively enrich the matching block
-                      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                      const lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.contentBlocks) {
                         for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
                           const block = lastMessage.contentBlocks[i];
@@ -1931,14 +2062,18 @@ export default defineComponent({
                         }
                       }
                     }
-                    await scrollToBottom();
+                    if (isActive()) await scrollToBottom();
                     continue;
                   }
 
                   // Handle navigation_action events - check auto navigation setting
                   // (clickable buttons on tool results are generated by frontend from tool_result data)
                   if (data && data.type === 'navigation_action') {
-                    finalizeTextBlock();
+                    localFinalizeTextBlock();
+
+                    // Skip navigation when stream is detached (background)
+                    if (!isActive()) continue;
+
                     const navAction: NavigationAction = {
                       resource_type: data.resource_type,
                       action: data.action,
@@ -1964,12 +2099,12 @@ export default defineComponent({
                       };
                       activeToolCall.value = null;
 
-                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                      let lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.role === 'assistant') {
                         if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(confirmBlock);
                       } else {
-                        chatMessages.value.push({
+                        msgs.push({
                           role: 'assistant',
                           content: '',
                           contentBlocks: [...pendingToolCalls.value, confirmBlock],
@@ -2007,14 +2142,14 @@ export default defineComponent({
                         errorType: data.error_type || undefined,
                         suggestion: data.suggestion || undefined,
                       };
-                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                      let lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.role === 'assistant') {
                         if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(failedToolBlock);
                       } else {
                         pendingToolCalls.value.push(failedToolBlock);
                       }
-                      activeToolCall.value = null;
+                      if (isActive()) activeToolCall.value = null;
                     }
 
                     // Add inline error block
@@ -2025,12 +2160,12 @@ export default defineComponent({
                       suggestion: data.suggestion || undefined,
                       recoverable: data.recoverable ?? undefined,
                     };
-                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === 'assistant') {
                       if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(errorBlock);
                     } else {
-                      chatMessages.value.push({
+                      msgs.push({
                         role: 'assistant',
                         content: '',
                         contentBlocks: [...pendingToolCalls.value, errorBlock]
@@ -2038,7 +2173,7 @@ export default defineComponent({
                       pendingToolCalls.value = [];
                     }
                     messageComplete = true;
-                    await scrollToBottom();
+                    if (isActive()) await scrollToBottom();
                     continue;
                   }
 
@@ -2053,14 +2188,14 @@ export default defineComponent({
                         context: activeToolCall.value.context,
                         call_id: activeToolCall.value.call_id
                       };
-                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                      let lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.role === 'assistant') {
                         if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
                       }
-                      activeToolCall.value = null;
+                      if (isActive()) activeToolCall.value = null;
                     }
 
                     // Format code blocks with proper line breaks
@@ -2069,42 +2204,42 @@ export default defineComponent({
                     content = content.replace(/([^`])\s*```/g, '$1\n```');
 
                     // Add newline separator if starting a new text segment after tool call
-                    if (currentStreamingMessage.value && currentTextSegment.value === '') {
-                      currentStreamingMessage.value += '\n\n';
+                    if (streamingMsg && textSegment === '') {
+                      streamingMsg += '\n\n';
                     }
                     // Add newline between consecutive message events if needed
-                    // (when current content doesn't end with newline and new content doesn't start with newline)
-                    else if (currentStreamingMessage.value &&
-                             !currentStreamingMessage.value.endsWith('\n') &&
+                    else if (streamingMsg &&
+                             !streamingMsg.endsWith('\n') &&
                              !content.startsWith('\n')) {
-                      currentStreamingMessage.value += '\n\n';
-                      currentTextSegment.value += '\n\n';
+                      streamingMsg += '\n\n';
+                      textSegment += '\n\n';
                     }
 
                     // Accumulate to both total content and current segment
-                    currentStreamingMessage.value += content;
-                    currentTextSegment.value += content;
+                    streamingMsg += content;
+                    textSegment += content;
+                    syncStreamingRefs();
 
                     // Start typewriter animation if not already running
-                    if (!typewriterAnimationId.value) {
+                    if (isActive() && !typewriterAnimationId.value) {
                       animateStreamingText();
                     }
 
                     // Get or create assistant message
-                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    let lastMessage = msgs[msgs.length - 1];
                     if (!lastMessage || lastMessage.role !== 'assistant') {
                       // Create new assistant message with pending tool calls + text
-                      chatMessages.value.push({
+                      msgs.push({
                         role: 'assistant',
-                        content: currentStreamingMessage.value,
-                        contentBlocks: [...pendingToolCalls.value, { type: 'text', text: currentTextSegment.value }]
+                        content: streamingMsg,
+                        contentBlocks: [...pendingToolCalls.value, { type: 'text', text: textSegment }]
                       });
                       pendingToolCalls.value = []; // Clear pending
                       // Save immediately when assistant message is first created to prevent data loss on reload
-                      await throttledStreamingSave(true);
+                      await throttledSaveCtx(true);
                     } else {
                       // Update existing assistant message's total content
-                      lastMessage.content = currentStreamingMessage.value;
+                      lastMessage.content = streamingMsg;
 
                       // Update or add text block in contentBlocks
                       if (!lastMessage.contentBlocks) {
@@ -2115,16 +2250,16 @@ export default defineComponent({
                       const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
                       if (lastBlock && lastBlock.type === 'text') {
                         // Append to existing text block (same segment)
-                        lastBlock.text = currentTextSegment.value;
+                        lastBlock.text = textSegment;
                       } else {
                         // Add new text block (after tool call - new segment)
-                        lastMessage.contentBlocks.push({ type: 'text', text: currentTextSegment.value });
+                        lastMessage.contentBlocks.push({ type: 'text', text: textSegment });
                       }
                       // Throttled save during streaming to preserve progress
-                      await throttledStreamingSave();
+                      await throttledSaveCtx();
                     }
                     messageComplete = true;
-                    await scrollToBottom();
+                    if (isActive()) await scrollToBottom();
                   }
                 } catch (jsonError) {
                   console.debug('JSON parse error:', jsonError, 'for line:', jsonStr);
@@ -2149,16 +2284,18 @@ export default defineComponent({
 
                 const data = JSON.parse(jsonStr);
 
-                // Handle title events - AI-generated chat title from first message
+                // Handle title events
                 if (data && data.type === 'title') {
-                  aiGeneratedTitle.value = data.title;
-                  animateTitle(data.title);
+                  ctxTitle = data.title;
+                  if (isActive()) {
+                    aiGeneratedTitle.value = data.title;
+                    animateTitle(data.title);
+                  }
                   continue;
                 }
 
-                // Handle tool_call events - show spinner, don't add to chat yet
+                // Handle tool_call events
                 if (data && data.type === 'tool_call') {
-                  // If there's already an active tool call, complete it first
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
                       type: 'tool_call',
@@ -2167,7 +2304,7 @@ export default defineComponent({
                       context: activeToolCall.value.context,
                       call_id: activeToolCall.value.call_id
                     };
-                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === 'assistant') {
                       if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
@@ -2176,22 +2313,22 @@ export default defineComponent({
                     }
                   }
 
-                  // Set new active tool call (shows spinner indicator)
-                  activeToolCall.value = {
-                    tool: data.tool,
-                    message: data.message,
-                    context: data.context || {},
-                    call_id: data.call_id || undefined
-                  };
+                  if (isActive()) {
+                    activeToolCall.value = {
+                      tool: data.tool,
+                      message: data.message,
+                      context: data.context || {},
+                      call_id: data.call_id || undefined
+                    };
+                  }
 
-                  finalizeTextBlock();
+                  localFinalizeTextBlock();
                   continue;
                 }
 
-                // Handle error events - display error message to user
+                // Handle error events
                 if (data && data.type === 'error') {
-                  // Complete any active tool call first
-                  let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                  let lastMessage = msgs[msgs.length - 1];
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
                       type: 'tool_call',
@@ -2206,11 +2343,9 @@ export default defineComponent({
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
                     }
-                    activeToolCall.value = null;
+                    if (isActive()) activeToolCall.value = null;
                   }
 
-                  // Format error message with suggestion if available
-                  // Handle case where error/message might be an object instead of string
                   const rawError = data.error ?? data.message ?? 'An unexpected error occurred';
                   const errorText = typeof rawError === 'string' ? rawError : JSON.stringify(rawError, null, 2);
 
@@ -2219,17 +2354,15 @@ export default defineComponent({
                     errorMessage += `\n\n${data.suggestion}`;
                   }
 
-                  // Get or create assistant message for error (reuse lastMessage)
-                  lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                  lastMessage = msgs[msgs.length - 1];
                   if (!lastMessage || lastMessage.role !== 'assistant') {
-                    chatMessages.value.push({
+                    msgs.push({
                       role: 'assistant',
                       content: errorMessage,
                       contentBlocks: [...pendingToolCalls.value, { type: 'text', text: errorMessage }]
                     });
                     pendingToolCalls.value = [];
                   } else {
-                    // Append error to existing message
                     if (lastMessage.content) {
                       lastMessage.content += '\n\n' + errorMessage;
                     } else {
@@ -2239,25 +2372,20 @@ export default defineComponent({
                       lastMessage.contentBlocks = [];
                     }
                     lastMessage.contentBlocks.push({ type: 'text', text: errorMessage });
-                    // Clear pending tool calls to avoid leaking into later messages
                     pendingToolCalls.value = [];
                   }
 
-                  // Reset streaming state
-                  currentTextSegment.value = '';
+                  textSegment = '';
+                  syncStreamingRefs();
 
-                  // Save error message to history
-                  await saveToHistory();
-                  await scrollToBottom();
-
-                  // Stop processing further as error occurred
+                  await saveCtx();
+                  if (isActive()) await scrollToBottom();
                   return;
                 }
 
-                // Handle complete events - complete any active tool call
+                // Handle complete events
                 if (data && data.type === 'complete') {
-                  // Capture trace_id for feedback correlation
-                  if (data.trace_id) {
+                  if (data.trace_id && isActive()) {
                     lastTraceId.value = data.trace_id;
                   }
                   if (activeToolCall.value) {
@@ -2268,19 +2396,19 @@ export default defineComponent({
                       context: activeToolCall.value.context,
                       call_id: activeToolCall.value.call_id
                     };
-                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === 'assistant') {
                       if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
                     }
-                    activeToolCall.value = null;
+                    if (isActive()) activeToolCall.value = null;
                   }
                   continue;
                 }
 
-                // Handle tool_result events - enrich tool call with result data
+                // Handle tool_result events
                 if (data && data.type === 'tool_result') {
                   const resultData = {
                     success: data.success !== false,
@@ -2292,7 +2420,6 @@ export default defineComponent({
                     response: data.response || undefined,
                   };
 
-                  // Match by call_id if available, fall back to tool name
                   const matchesActive = activeToolCall.value && (
                     (data.call_id && activeToolCall.value.call_id === data.call_id) ||
                     (!data.call_id && activeToolCall.value.tool === data.tool)
@@ -2307,16 +2434,16 @@ export default defineComponent({
                       call_id: activeToolCall.value!.call_id,
                       ...resultData
                     };
-                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === 'assistant') {
                       if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
                     }
-                    activeToolCall.value = null;
+                    if (isActive()) activeToolCall.value = null;
                   } else {
-                    const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    const lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.contentBlocks) {
                       for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
                         const block = lastMessage.contentBlocks[i];
@@ -2357,14 +2484,14 @@ export default defineComponent({
                       errorType: data.error_type || undefined,
                       suggestion: data.suggestion || undefined,
                     };
-                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === 'assistant') {
                       if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(failedToolBlock);
                     } else {
                       pendingToolCalls.value.push(failedToolBlock);
                     }
-                    activeToolCall.value = null;
+                    if (isActive()) activeToolCall.value = null;
                   }
 
                   const errorBlock: ContentBlock = {
@@ -2374,12 +2501,12 @@ export default defineComponent({
                     suggestion: data.suggestion || undefined,
                     recoverable: data.recoverable ?? undefined,
                   };
-                  let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                  let lastMessage = msgs[msgs.length - 1];
                   if (lastMessage && lastMessage.role === 'assistant') {
                     if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                     lastMessage.contentBlocks.push(errorBlock);
                   } else {
-                    chatMessages.value.push({
+                    msgs.push({
                       role: 'assistant',
                       content: '',
                       contentBlocks: [...pendingToolCalls.value, errorBlock]
@@ -2392,7 +2519,6 @@ export default defineComponent({
 
                 // Handle message content
                 if (data && typeof data.content === 'string') {
-                  // Complete any active tool call first (add green checkmark to chat)
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
                       type: 'tool_call',
@@ -2401,65 +2527,62 @@ export default defineComponent({
                       context: activeToolCall.value.context,
                       call_id: activeToolCall.value.call_id
                     };
-                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === 'assistant') {
                       if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
                     }
-                    activeToolCall.value = null;
+                    if (isActive()) activeToolCall.value = null;
                   }
 
                   let content = data.content;
                   content = content.replace(/```(\w*)\s*([^`])/g, '```$1\n$2');
                   content = content.replace(/([^`])\s*```/g, '$1\n```');
 
-                  // Add newline separator if starting a new text segment after tool call
-                  if (currentStreamingMessage.value && currentTextSegment.value === '') {
-                    currentStreamingMessage.value += '\n\n';
+                  if (streamingMsg && textSegment === '') {
+                    streamingMsg += '\n\n';
                   }
-                  // Add newline between consecutive message events if needed
-                  else if (currentStreamingMessage.value &&
-                           !currentStreamingMessage.value.endsWith('\n') &&
+                  else if (streamingMsg &&
+                           !streamingMsg.endsWith('\n') &&
                            !content.startsWith('\n')) {
-                    currentStreamingMessage.value += '\n\n';
-                    currentTextSegment.value += '\n\n';
+                    streamingMsg += '\n\n';
+                    textSegment += '\n\n';
                   }
 
-                  currentStreamingMessage.value += content;
-                  currentTextSegment.value += content;
+                  streamingMsg += content;
+                  textSegment += content;
+                  syncStreamingRefs();
 
-                  // Start typewriter animation if not already running
-                  if (!typewriterAnimationId.value) {
+                  if (isActive() && !typewriterAnimationId.value) {
                     animateStreamingText();
                   }
 
-                  let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                  let lastMessage = msgs[msgs.length - 1];
                   if (!lastMessage || lastMessage.role !== 'assistant') {
-                    chatMessages.value.push({
+                    msgs.push({
                       role: 'assistant',
-                      content: currentStreamingMessage.value,
-                      contentBlocks: [...pendingToolCalls.value, { type: 'text', text: currentTextSegment.value }]
+                      content: streamingMsg,
+                      contentBlocks: [...pendingToolCalls.value, { type: 'text', text: textSegment }]
                     });
                     pendingToolCalls.value = [];
-                    await throttledStreamingSave(true);
+                    await throttledSaveCtx(true);
                   } else {
-                    lastMessage.content = currentStreamingMessage.value;
+                    lastMessage.content = streamingMsg;
 
                     if (!lastMessage.contentBlocks) {
                       lastMessage.contentBlocks = [];
                     }
                     const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
                     if (lastBlock && lastBlock.type === 'text') {
-                      lastBlock.text = currentTextSegment.value;
+                      lastBlock.text = textSegment;
                     } else {
-                      lastMessage.contentBlocks.push({ type: 'text', text: currentTextSegment.value });
+                      lastMessage.contentBlocks.push({ type: 'text', text: textSegment });
                     }
-                    await throttledStreamingSave();
+                    await throttledSaveCtx();
                   }
                   messageComplete = true;
-                  await scrollToBottom();
                 }
               } catch (e) {
                 console.debug('Error processing remaining buffer:', e);
@@ -2471,26 +2594,32 @@ export default defineComponent({
 
         // If we completed a message, save to history
         if (messageComplete) {
-          // Immediately show all remaining text and stop typewriter animation
-          displayedStreamingContent.value = currentTextSegment.value;
-          if (typewriterAnimationId.value) {
-            cancelAnimationFrame(typewriterAnimationId.value);
-            typewriterAnimationId.value = null;
+          if (isActive()) {
+            // Immediately show all remaining text and stop typewriter animation
+            displayedStreamingContent.value = textSegment;
+            if (typewriterAnimationId.value) {
+              cancelAnimationFrame(typewriterAnimationId.value);
+              typewriterAnimationId.value = null;
+            }
           }
           // Update final text in contentBlocks
-          const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+          const lastMessage = msgs[msgs.length - 1];
           if (lastMessage && lastMessage.role === 'assistant' && lastMessage.contentBlocks) {
             const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
             if (lastBlock && lastBlock.type === 'text') {
-              lastBlock.text = currentTextSegment.value;
+              lastBlock.text = textSegment;
             }
           }
-          await saveToHistory();
+          await saveCtx();
         }
       } catch (error) {
         // Handle different types of errors appropriately
         if (error instanceof Error && error.name === 'AbortError') {
           // Request was cancelled by user - this is expected behavior, not an error
+          // Do a final save for background streams before exiting
+          if (!isActive() && msgs.length > 0 && ctxSessionId) {
+            await dbSaveToHistory(msgs, ctxSessionId, ctxTitle, ctxChatId);
+          }
           return; // Exit gracefully without logging as error
         } else {
           // Genuine error occurred during stream processing
@@ -2566,23 +2695,28 @@ export default defineComponent({
     };
 
     /**
-     * If a streaming request is in progress, abort it and save the current
-     * session state to IndexedDB so the partial response is preserved in history.
+     * Detach the current streaming request so it continues in the background.
+     * processStream's captured context (msgs) keeps writing to the old array
+     * while we clear the UI for a new session. When the stream completes,
+     * processStream saves to IndexedDB via saveCtx().
      */
-    const abortAndSaveCurrentSession = () => {
+    const detachCurrentStream = () => {
       if (!currentAbortController.value) return;
 
-      // Capture previous session state before clearing
-      const prevMessages = chatMessages.value.map((msg) => ({ ...msg }));
-      const prevSessionId = currentSessionId.value;
-      const prevChatId = currentChatId.value;
-      const prevTitle = aiGeneratedTitle.value || undefined;
-
-      // Abort the ongoing request — processStream will catch AbortError and exit
-      currentAbortController.value.abort();
+      // Move controller to background set so onUnmounted can clean it up
+      // and enforce the max background stream limit.
+      if (backgroundStreams.size >= MAX_BACKGROUND_STREAMS) {
+        // Abort the oldest background stream to stay within limits
+        const oldest = backgroundStreams.values().next().value;
+        if (oldest) {
+          oldest.abort();
+          backgroundStreams.delete(oldest);
+        }
+      }
+      backgroundStreams.add(currentAbortController.value);
       currentAbortController.value = null;
 
-      // Clean up streaming/animation state
+      // Clean up UI state — processStream continues silently in background
       isLoading.value = false;
       activeToolCall.value = null;
       stopAnalyzingRotation();
@@ -2590,38 +2724,13 @@ export default defineComponent({
         cancelAnimationFrame(typewriterAnimationId.value);
         typewriterAnimationId.value = null;
       }
-
-      // Finalize partial assistant message in the snapshot
-      if (prevMessages.length > 0) {
-        const lastMessage = prevMessages[prevMessages.length - 1];
-        if (lastMessage.role === 'assistant') {
-          if (!lastMessage.content) {
-            prevMessages.pop();
-          } else {
-            if (lastMessage.contentBlocks) {
-              const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
-              if (lastBlock && lastBlock.type === 'text') {
-                lastBlock.text = currentTextSegment.value;
-              }
-            }
-            lastMessage.content += '\n\n_[Response stopped]_';
-          }
-        }
-      }
-
-      // Reset streaming state
       currentStreamingMessage.value = '';
       currentTextSegment.value = '';
       displayedStreamingContent.value = '';
-
-      // Save the previous session to IndexedDB (fire-and-forget)
-      if (prevMessages.length > 0 && prevSessionId) {
-        dbSaveToHistory(prevMessages, prevSessionId, prevTitle, prevChatId);
-      }
     };
 
     const addNewChat = () => {
-      abortAndSaveCurrentSession();
+      detachCurrentStream();
 
       chatMessages.value = [];
       currentChatId.value = null;
@@ -3134,8 +3243,8 @@ export default defineComponent({
           return;
         }
 
-        // Abort any in-progress request and save the current session before switching
-        abortAndSaveCurrentSession();
+        // Detach any in-progress stream so it continues in the background
+        detachCurrentStream();
 
         // Load chat using the composable
         const chat = await dbLoadChat(chatId);
@@ -3279,11 +3388,23 @@ export default defineComponent({
         }
 
         const reader = response.body.getReader();
+
+        // Capture the controller and messages ref so we can detect detachment after processStream
+        const streamController = currentAbortController.value;
+        const streamMsgs = chatMessages.value;
+
         await processStream(reader);
 
-        store.dispatch('setCurrentChatTimestamp', currentChatId.value);
-        store.dispatch('setChatUpdated', true);
-        
+        // Remove controller from background set if it was detached during streaming
+        if (streamController) backgroundStreams.delete(streamController);
+
+        // Only update UI/store if stream was NOT detached (session is still the same)
+        const wasDetached = chatMessages.value !== streamMsgs;
+        if (!wasDetached) {
+          store.dispatch('setCurrentChatTimestamp', currentChatId.value);
+          store.dispatch('setChatUpdated', true);
+        }
+
       } catch (error: any) {
         // Remove the empty assistant message that was added before the error
         //this will impact in the case of error showing empty message above the error message in the chat
@@ -3311,7 +3432,7 @@ export default defineComponent({
 
       // Clean up AbortController after request completion (success or error)
       currentAbortController.value = null;
-      
+
       await scrollToBottom();
     };
 
@@ -3920,6 +4041,12 @@ export default defineComponent({
         currentAbortController.value.abort();
         currentAbortController.value = null;
       }
+
+      // Abort all background streams to prevent memory leaks
+      for (const controller of backgroundStreams) {
+        controller.abort();
+      }
+      backgroundStreams.clear();
 
       // Clean up typewriter animation to prevent memory leaks
       if (typewriterAnimationId.value) {
