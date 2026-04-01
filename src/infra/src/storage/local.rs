@@ -20,7 +20,7 @@ use std::{ops::Range, path::PathBuf};
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::metrics;
-use futures::stream::BoxStream;
+use futures::{StreamExt, stream::BoxStream};
 use object_store::{
     CopyOptions, Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta,
     ObjectStore, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, limit::LimitStore,
@@ -205,7 +205,13 @@ impl ObjectStore for Local {
         &self,
         locations: BoxStream<'static, Result<Path>>,
     ) -> BoxStream<'static, Result<Path>> {
-        self.client.delete_stream(locations)
+        let with_prefix = self.with_prefix;
+        let formatted = locations
+            .map(move |result| {
+                result.map(|path| format_key(path.as_ref(), with_prefix).into())
+            })
+            .boxed();
+        self.client.delete_stream(formatted)
     }
 
     fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
