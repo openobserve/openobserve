@@ -214,14 +214,20 @@ vi.mock("@/composables/useTraces", () => ({
     getUrlQueryParams: vi.fn(() => ({})),
     copyTracesUrl: vi.fn(),
     formatTracesMetaData: vi.fn((hits) => hits),
+    setServiceColors: mockSetServiceColors,
+    loadLocalLogFilterField: vi.fn(),
+    updatedLocalLogFilterField: vi.fn(),
   }),
 }));
 
 // Hoisted so vi.mock factory can reference them and tests can override per-call
-const { mockGetStreams, mockGetStream } = vi.hoisted(() => ({
-  mockGetStreams: vi.fn(),
-  mockGetStream: vi.fn(),
-}));
+const { mockGetStreams, mockGetStream, mockSetServiceColors } = vi.hoisted(
+  () => ({
+    mockGetStreams: vi.fn(),
+    mockGetStream: vi.fn(),
+    mockSetServiceColors: vi.fn(),
+  }),
+);
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
@@ -1110,8 +1116,8 @@ describe("Index.vue (Main Traces Page)", () => {
       wrapper.vm.handleServiceGraphViewTraces(serviceGraphData);
       await flushPromises();
 
-      // handleServiceGraphViewTraces now sets searchMode = "traces" (not activeTab)
-      expect(mockSearchObj.meta.searchMode).toBe("traces");
+      // handleServiceGraphViewTraces now sets searchMode = "spans" (not activeTab)
+      expect(mockSearchObj.meta.searchMode).toBe("spans");
       expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
       expect(mockSearchObj.data.editorValue).toContain("test-service");
     });
@@ -1148,6 +1154,186 @@ describe("Index.vue (Main Traces Page)", () => {
 
       // SQL-style escaping uses double quotes: test'service becomes test''service
       expect(mockSearchObj.data.editorValue).toContain("test''service");
+    });
+
+    function mountIndexComponent() {
+      return mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+    }
+
+    it("should include operationName in filter query when provided", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        operationName: "GET /api/health",
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toContain(
+        "AND operation_name = 'GET /api/health'",
+      );
+    });
+
+    it("should include nodeName in filter query when provided", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        nodeName: "node-1",
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toContain(
+        "AND service_k8s_node_name = 'node-1'",
+      );
+    });
+
+    it("should include podName in filter query when provided", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        podName: "pod-abc",
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toContain(
+        "AND service_k8s_pod_name = 'pod-abc'",
+      );
+    });
+
+    it("should append span_status = 'ERROR' when errorsOnly is true", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        errorsOnly: true,
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toContain(
+        "AND span_status = 'ERROR'",
+      );
+    });
+
+    it("should include minDurationMicros in filter when greater than zero", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        minDurationMicros: 5000,
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toContain("AND duration >= 5000");
+    });
+
+    it("should include maxDurationMicros in filter when greater than zero", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        maxDurationMicros: 20000,
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toContain(
+        "AND duration <= 20000",
+      );
+    });
+
+    it("should combine all optional filter fields when all are provided", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        operationName: "POST /ingest",
+        nodeName: "node-2",
+        podName: "pod-xyz",
+        errorsOnly: true,
+        minDurationMicros: 1000,
+        maxDurationMicros: 9000,
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      const query = mockSearchObj.data.editorValue;
+      expect(query).toContain("service_name = 'svc'");
+      expect(query).toContain("AND operation_name = 'POST /ingest'");
+      expect(query).toContain("AND service_k8s_node_name = 'node-2'");
+      expect(query).toContain("AND service_k8s_pod_name = 'pod-xyz'");
+      expect(query).toContain("AND span_status = 'ERROR'");
+      expect(query).toContain("AND duration >= 1000");
+      expect(query).toContain("AND duration <= 9000");
+    });
+
+    it("should omit optional fields from filter when they are not provided", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      const query = mockSearchObj.data.editorValue;
+      expect(query).toBe("service_name = 'svc'");
+      expect(query).not.toContain("operation_name");
+      expect(query).not.toContain("service_k8s_node_name");
+      expect(query).not.toContain("service_k8s_pod_name");
+      expect(query).not.toContain("span_status");
+      expect(query).not.toContain("duration");
+    });
+
+    it("should not include duration filters when minDurationMicros and maxDurationMicros are zero", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        minDurationMicros: 0,
+        maxDurationMicros: 0,
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).not.toContain("duration");
     });
   });
 
