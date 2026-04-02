@@ -25,14 +25,6 @@ const service_accounts = {
       `/api/${org_identifier}/service_accounts`
     );
   },
-  get_service_token: (
-    org_identifier: string,
-    email_id: string
-  ) => {
-    return http().get(
-      `/api/${org_identifier}/service_accounts/${email_id}`
-    );
-  },
   create: (data: any, org_identifier: string) => {
     return http().post(`/api/${org_identifier}/service_accounts`, data);
   },
