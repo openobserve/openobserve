@@ -110,9 +110,13 @@ class MonacoEditorHelper {
     /**
      * Wait for the suggestions widget to be visible
      * @param {number} timeout - Timeout in milliseconds (default 5000)
+     * @param {import('@playwright/test').Locator|null} container - Optional editor container to
+     *   re-focus before the retry trigger. Without this, Ctrl+Space on retry may go to a
+     *   different element if focus drifted during the initial wait (e.g. due to Vue reactive
+     *   re-renders when stream fields load on cold start).
      * @returns {Promise<import('@playwright/test').Locator>}
      */
-    async waitForSuggestions(timeout = 5000) {
+    async waitForSuggestions(timeout = 5000, container = null) {
         const suggestWidget = this.page.locator(this.selectors.suggestWidget);
         const suggestionRows = this.page.locator(this.selectors.suggestionRows);
 
@@ -125,7 +129,12 @@ class MonacoEditorHelper {
         try {
             await suggestionRows.first().waitFor({ state: 'visible', timeout: shortTimeout });
         } catch (error) {
-            // Retry once by retriggering suggestions (handles cold start, toggle-closed widget)
+            // Retry once by retriggering suggestions (handles cold start, toggle-closed widget).
+            // Re-focus the editor first — focus may have drifted during the initial wait
+            // (e.g. a Vue re-render triggered by stream-field loading on cold start).
+            if (container) {
+                await this.focus(container);
+            }
             await this.triggerSuggestions();
             await suggestionRows.first().waitFor({ state: 'visible', timeout });
         }
@@ -145,10 +154,12 @@ class MonacoEditorHelper {
     /**
      * Get all suggestion labels from the autocomplete widget
      * @param {number} timeout - Timeout to wait for suggestions (default 5000)
+     * @param {import('@playwright/test').Locator|null} container - Optional editor container
+     *   forwarded to waitForSuggestions for focus recovery on retry.
      * @returns {Promise<string[]>}
      */
-    async getSuggestionLabels(timeout = 5000) {
-        await this.waitForSuggestions(timeout);
+    async getSuggestionLabels(timeout = 5000, container = null) {
+        await this.waitForSuggestions(timeout, container);
 
         const suggestionRows = this.page.locator(this.selectors.suggestionRows);
 
