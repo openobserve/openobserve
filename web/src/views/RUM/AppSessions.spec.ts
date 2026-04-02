@@ -465,7 +465,7 @@ describe("AppSessions.vue", () => {
       expect(mockSessionState.data.editorValue).toBe("field_name='value'");
     });
 
-    it("should append field with AND when existing query", async () => {
+    it("should append field with AND when adding a different field", async () => {
       const routerPushSpy = vi
         .spyOn(router, "push")
         .mockResolvedValue(undefined);
@@ -478,6 +478,13 @@ describe("AppSessions.vue", () => {
       );
 
       routerPushSpy.mockRestore();
+    });
+
+    it("should replace existing condition when adding same field again", () => {
+      mockSessionState.data.editorValue = "env='production'";
+      wrapper.vm.handleSidebarEvent("add-field", "env='staging'");
+
+      expect(mockSessionState.data.editorValue).toBe("env='staging'");
     });
   });
 
