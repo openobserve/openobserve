@@ -22,14 +22,14 @@
       </div>
     </div>
 
-    <!-- Timeline Ruler + Chart wrapper — unified mousemove zone -->
+    <!-- Ruler + chart: outer flex column, mousemove for cursor badge on ruler -->
     <div
       class="tw:flex tw:flex-col tw:flex-1"
-      style="min-height: 0; position: relative"
+      style="min-height: 0"
       @mousemove="handleChartMouseMove"
       @mouseleave="cursorVisible = false"
     >
-      <!-- Timeline Ruler -->
+      <!-- Timeline Ruler — stays fixed above the scrollable chart -->
       <div
         class="tw:relative tw:bg-[var(--o2-card-bg)] tw:select-none tw:flex-shrink-0"
         style="height: 1.5rem"
@@ -41,7 +41,8 @@
           class="tw:absolute tw:text-[10px] tw:text-[var(--o2-text-secondary)] tw:leading-none tw:whitespace-nowrap"
           style="top: 50%; padding-left: 3px"
           :style="{ left: tick.left, transform: tick.transform }"
-        >{{ tick.label }}</span>
+          >{{ tick.label }}</span
+        >
 
         <!-- Static tick marks — skip first and last -->
         <template v-for="(tick, index) in timelineTicks" :key="'tic-' + index">
@@ -60,35 +61,52 @@
           style="top: 2px; z-index: 20; transform: translateX(-50%)"
           :style="{ left: cursorX + 'px' }"
         >
-          <!-- Time label pill -->
           <div
             class="tw:text-[10px] tw:text-white tw:px-[6px] tw:py-[2px] tw:rounded tw:whitespace-nowrap tw:font-medium"
-            style="background: rgba(30,30,30,0.9); line-height: 1.4"
+            style="background: rgba(30, 30, 30, 0.9); line-height: 1.4"
           >
             {{ cursorTimeLabel }}
           </div>
-          <!-- Downward caret -->
-          <div style="width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid rgba(30,30,30,0.9); margin-top: 0"></div>
+          <div
+            style="
+              width: 0;
+              height: 0;
+              border-left: 4px solid transparent;
+              border-right: 4px solid transparent;
+              border-top: 5px solid rgba(30, 30, 30, 0.9);
+              margin-top: 0;
+            "
+          ></div>
         </div>
       </div>
 
-      <!-- ECharts container -->
+      <!-- Scrollable chart area: grows to fit all rows, scrolls vertically -->
       <div
-        class="tw:flex-1 tw:w-full"
-        style="min-height: 300px; position: relative"
+        class="tw:flex-1 tw:overflow-y-auto tw:relative"
+        style="min-height: 0"
       >
         <div
-          ref="chartContainerRef"
-          class="tw:absolute tw:inset-0 tw:pt-[0.625rem]"
-        ></div>
+          :style="{
+            height: chartContentHeight + 'px',
+            minHeight: '100%',
+            position: 'relative',
+          }"
+        >
+          <ChartRenderer
+            v-if="hasData"
+            :data="chartData"
+            style="height: 100%; width: 100%"
+            @click="handleChartClick"
+          />
 
-        <!-- Vertical cursor line (no label — label is on ruler) -->
-        <div
-          v-if="cursorVisible"
-          class="tw:absolute tw:top-0 tw:bottom-0 tw:pointer-events-none"
-          style="width: 1px; background: rgba(80,80,80,0.6); z-index: 10"
-          :style="{ left: cursorX + 'px' }"
-        ></div>
+          <!-- Vertical cursor line -->
+          <div
+            v-if="cursorVisible"
+            class="tw:absolute tw:top-0 tw:bottom-0 tw:pointer-events-none"
+            style="width: 1px; background: rgba(80, 80, 80, 0.6); z-index: 10"
+            :style="{ left: cursorX + 'px' }"
+          ></div>
+        </div>
       </div>
     </div>
 
@@ -106,18 +124,15 @@
 </template>
 
 <script setup lang="ts">
-import {
-  ref,
-  computed,
-  watch,
-  onMounted,
-  onBeforeUnmount,
-  nextTick,
-} from "vue";
-import * as echarts from "echarts";
-import { type EnrichedSpan } from "@/types/traces/span.types";
+import { ref, computed, defineAsyncComponent } from "vue";
+import { type EnrichedSpan } from "@/ts/interfaces/traces/span.types";
 import { formatDuration } from "@/composables/traces/useTraceProcessing";
 import useTraces from "@/composables/useTraces";
+import { escapeHtml } from "@/utils/html";
+
+const ChartRenderer = defineAsyncComponent(
+  () => import("@/components/dashboards/panels/ChartRenderer.vue"),
+);
 
 // Props
 interface Props {
@@ -132,18 +147,13 @@ const props = withDefaults(defineProps<Props>(), {
 
 // Emits
 const emit = defineEmits<{
-  "span-selected": [spanId: string];
+  "span-selected": [spanId: string, boolean];
 }>();
 
 // Composables
 const { searchObj } = useTraces();
 
-// Refs
-const chartContainerRef = ref<HTMLDivElement | null>(null);
-let chartInstance: echarts.ECharts | null = null;
-
 // State
-const viewMode = ref<"time" | "percentage">("time");
 const cursorVisible = ref(false);
 const cursorX = ref(0);
 const cursorTimeLabel = ref("");
@@ -151,7 +161,10 @@ const cursorTimeLabel = ref("");
 // Constants
 const BLOCK_PADDING = 2;
 const MIN_BLOCK_WIDTH = 1;
-const BLOCK_HEIGHT = 24; // 1rem (16px)
+const BLOCK_HEIGHT = 24;
+
+const GRID_LEFT = 10;
+const GRID_RIGHT = 10;
 
 // Computed
 const totalSpans = computed(() => props.spans.length);
@@ -164,56 +177,119 @@ const hasData = computed(() => {
   return props.spans.length > 0 && props.traceDuration > 0;
 });
 
-const GRID_LEFT = 10;
-const GRID_RIGHT = 10;
-
 const timelineTicks = computed(() => {
   const duration = props.traceDuration || 0;
   const totalPad = GRID_LEFT + GRID_RIGHT;
   return [0, 0.25, 0.5, 0.75, 1].map((fraction) => ({
     label: formatDuration(duration * fraction),
     left: `calc(${GRID_LEFT}px + ${fraction} * (100% - ${totalPad}px))`,
-    transform: fraction === 1 ? "translateX(-100%) translateY(-50%)" : "translateY(-50%)",
+    transform:
+      fraction === 1
+        ? "translateX(-100%) translateY(-50%)"
+        : "translateY(-50%)",
   }));
 });
 
-// Cursor line handler
+// Assigns a collision-free visual row to each span using a tree-aware DFS.
+//
+// Children are always placed starting one row below their parent's *visual* row
+// (not their tree depth). This ensures that when parallel siblings are bumped to
+// different rows due to time overlap, their subtrees remain contiguous and do not
+// interleave with each other.
+const computeVisualRows = (
+  spans: EnrichedSpan[],
+): { rowMap: Map<string, number>; maxRow: number } => {
+  // Build parent→children map from parent_span_id
+  const spanIds = new Set(spans.map((s) => s.span_id));
+  const childrenMap = new Map<string, EnrichedSpan[]>();
+  const roots: EnrichedSpan[] = [];
 
-const handleChartMouseMove = (event: MouseEvent) => {
-  if (!hasData.value) return;
+  for (const span of spans) {
+    if (span.parent_span_id && spanIds.has(span.parent_span_id)) {
+      if (!childrenMap.has(span.parent_span_id))
+        childrenMap.set(span.parent_span_id, []);
+      childrenMap.get(span.parent_span_id)!.push(span);
+    } else {
+      roots.push(span);
+    }
+  }
 
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-  const offsetX = event.clientX - rect.left;
-  const gridWidth = rect.width - GRID_LEFT - GRID_RIGHT;
-  const percentage = Math.max(0, Math.min(1, (offsetX - GRID_LEFT) / gridWidth));
+  const rowOccupancy: Array<Array<{ start: number; end: number }>> = [];
+  const rowMap = new Map<string, number>();
+  let maxRow = 0;
 
-  cursorX.value = offsetX;
-  cursorTimeLabel.value = formatDuration(percentage * props.traceDuration);
-  cursorVisible.value = true;
+  // Recursively place a span at the first non-overlapping row >= minRow,
+  // then place its children starting at chosenRow + 1.
+  const place = (span: EnrichedSpan, minRow: number): void => {
+    const spanStart = span.startOffsetMs;
+    const spanEnd = span.startOffsetMs + span.durationMs;
+    let candidate = minRow;
+
+    while (true) {
+      const occupants = rowOccupancy[candidate];
+      if (!occupants) break;
+      const overlaps = occupants.some(
+        (o) => spanStart < o.end && o.start < spanEnd,
+      );
+      if (!overlaps) break;
+      candidate++;
+    }
+
+    rowMap.set(span.span_id, candidate);
+    if (!rowOccupancy[candidate]) rowOccupancy[candidate] = [];
+    rowOccupancy[candidate].push({ start: spanStart, end: spanEnd });
+    if (candidate > maxRow) maxRow = candidate;
+
+    // Children always start directly below this span's visual row.
+    const children = (childrenMap.get(span.span_id) ?? []).sort(
+      (a, b) => a.startOffsetMs - b.startOffsetMs,
+    );
+    for (const child of children) {
+      place(child, candidate + 1);
+    }
+  };
+
+  // Process roots sorted by depth then start time; use tree depth as the
+  // initial minRow so the conventional flame graph indentation is preserved.
+  roots
+    .sort((a, b) => a.depth - b.depth || a.startOffsetMs - b.startOffsetMs)
+    .forEach((root) => place(root, root.depth));
+
+  return { rowMap, maxRow };
 };
 
-// Build flame graph data for ECharts
-const buildFlameGraphData = () => {
+// O(n log n) layout — only re-runs when spans change, not on selection changes
+const visualLayout = computed(() => computeVisualRows(props.spans));
+
+// Build flame graph series data, incorporating selected span highlighting
+const flameGraphDataAndDepth = computed(() => {
   const data: any[] = [];
   const traceDuration = props.traceDuration || 1;
+
+  const { rowMap, maxRow } = visualLayout.value;
 
   props.spans.forEach((span) => {
     const startPercent = (span.startOffsetMs / traceDuration) * 100;
     const durationPercent = (span.durationMs / traceDuration) * 100;
 
-    // Only include if width is above minimum threshold
     if (durationPercent > 0.1) {
+      const visualRow = rowMap.get(span.span_id) ?? span.depth;
+      const isSelected = span.span_id === props.selectedSpanId;
       data.push({
         value: [
           startPercent, // x position (percentage)
-          span.depth, // y position (depth level)
+          visualRow, // y position (collision-free visual row)
           durationPercent, // width (percentage of trace)
           span.durationMs, // actual duration in ms
         ],
         itemStyle: {
           color: searchObj.meta.serviceColors[span.serviceName] || "#9CA3AF",
-          borderColor: span.hasError ? "#EF4444" : "#ffffff",
-          borderWidth: span.hasError ? 2 : 1,
+          borderColor: isSelected
+            ? "#2563EB"
+            : span.hasError
+              ? "#EF4444"
+              : "#ffffff",
+          borderWidth: isSelected ? 3 : span.hasError ? 2 : 1,
         },
         emphasis: {
           itemStyle: {
@@ -228,23 +304,13 @@ const buildFlameGraphData = () => {
     }
   });
 
-  return data;
-};
+  return { data, maxRow };
+});
 
-// Initialize ECharts
-const initChart = () => {
-  if (!chartContainerRef.value) return;
+const chartOptions = computed(() => {
+  const { data, maxRow } = flameGraphDataAndDepth.value;
 
-  // Dispose existing instance if any
-  if (chartInstance) {
-    chartInstance.dispose();
-  }
-
-  chartInstance = echarts.init(chartContainerRef.value);
-
-  const data = buildFlameGraphData();
-
-  const option: echarts.EChartsOption = {
+  return {
     tooltip: {
       trigger: "item",
       backgroundColor: "rgba(30, 41, 59, 0.95)",
@@ -262,11 +328,11 @@ const initChart = () => {
 
         return `
           <div style="padding: 4px 0;">
-            <div style="font-weight: bold; margin-bottom: 6px;">${span.operationName}</div>
+            <div style="font-weight: bold; margin-bottom: 6px;">${escapeHtml(span.operationName)}</div>
             <div style="font-size: 11px; line-height: 1.6;">
               <div style="display: flex; justify-content: space-between; gap: 16px;">
                 <span style="color: #cbd5e1;">Service:</span>
-                <span>${span.serviceName}</span>
+                <span>${escapeHtml(span.serviceName)}</span>
               </div>
               <div style="display: flex; justify-content: space-between; gap: 16px;">
                 <span style="color: #cbd5e1;">Duration:</span>
@@ -289,8 +355,8 @@ const initChart = () => {
       bottom: 10,
       containLabel: false,
       height:
-        maxDepth.value > 0
-          ? maxDepth.value * (BLOCK_HEIGHT + BLOCK_PADDING) + BLOCK_HEIGHT
+        maxRow > 0
+          ? maxRow * (BLOCK_HEIGHT + BLOCK_PADDING) + BLOCK_HEIGHT
           : BLOCK_HEIGHT,
     },
     xAxis: {
@@ -314,20 +380,18 @@ const initChart = () => {
           const depth = api.value(1); // depth level
           const width = api.value(2); // width percentage
 
-          // Use coordinate system for x positioning (horizontal)
           const point1 = api.coord([startX, 0]);
           const point2 = api.coord([startX + width, 0]);
 
           const x = point1[0];
-          // Calculate y position directly in pixels based on depth
           const y = depth * (BLOCK_HEIGHT + BLOCK_PADDING);
           const rectWidth = point2[0] - point1[0];
 
           return {
             type: "rect",
             shape: {
-              x: x,
-              y: y,
+              x,
+              y,
               width: Math.max(rectWidth, MIN_BLOCK_WIDTH),
               height: BLOCK_HEIGHT,
               r: 2,
@@ -367,109 +431,48 @@ const initChart = () => {
             },
           };
         },
-        data: data,
+        data,
       },
     ],
   };
-
-  chartInstance.setOption(option);
-
-  // Handle click events
-  chartInstance.on("click", (params: any) => {
-    if (params.data && params.data.spanData) {
-      emit("span-selected", params.data.spanData.span_id);
-    }
-  });
-};
-
-// Update chart when data changes
-const updateChart = () => {
-  if (!chartInstance || !hasData.value) return;
-
-  const data = buildFlameGraphData();
-
-  chartInstance.setOption(
-    {
-      yAxis: {
-        max: maxDepth.value + 0.5,
-      },
-      series: [
-        {
-          data: data,
-        },
-      ],
-    },
-    { notMerge: false, lazyUpdate: false },
-  );
-
-  // Trigger resize to ensure proper dimensions
-  nextTick(() => {
-    chartInstance?.resize();
-  });
-};
-
-// Handle window resize
-const handleResize = () => {
-  if (chartInstance) {
-    chartInstance.resize();
-  }
-};
-
-// Watchers
-watch(
-  [() => props.spans, () => props.traceDuration],
-  () => {
-    nextTick(() => {
-      if (!chartInstance && hasData.value) {
-        initChart();
-      } else if (chartInstance) {
-        updateChart();
-      }
-    });
-  },
-  { deep: true },
-);
-
-watch(
-  () => props.selectedSpanId,
-  (newSpanId) => {
-    if (!chartInstance) return;
-
-    // Highlight selected span
-    const data = buildFlameGraphData();
-    data.forEach((item) => {
-      if (item.spanData.span_id === newSpanId) {
-        item.itemStyle.borderColor = "#2563EB";
-        item.itemStyle.borderWidth = 3;
-      }
-    });
-
-    chartInstance.setOption({
-      series: [{ data }],
-    });
-  },
-);
-
-// Lifecycle
-onMounted(() => {
-  nextTick(() => {
-    if (!hasData.value) return;
-
-    initChart();
-
-    // Force resize in next tick to ensure proper dimensions
-    nextTick(() => {
-      handleResize();
-    });
-  });
 });
 
-onBeforeUnmount(() => {
-  if (chartInstance) {
-    chartInstance.dispose();
-    chartInstance = null;
-  }
+const chartData = computed(() => ({
+  options: chartOptions.value,
+  notMerge: false,
+  lazyUpdate: true,
+}));
+
+// Height of the chart canvas — enough to show all rows without clipping
+const chartContentHeight = computed(() => {
+  const { maxRow } = flameGraphDataAndDepth.value;
+  const gridH =
+    maxRow > 0
+      ? maxRow * (BLOCK_HEIGHT + BLOCK_PADDING) + BLOCK_HEIGHT
+      : BLOCK_HEIGHT;
+  return gridH + 20; // 20 = grid.top(10) + grid.bottom(10)
 });
+
+// Cursor line handler
+const handleChartMouseMove = (event: any) => {
+  if (!hasData.value) return;
+
+  const rect = event.currentTarget.getBoundingClientRect();
+  const offsetX = event.clientX - rect.left;
+  const gridWidth = rect.width - GRID_LEFT - GRID_RIGHT;
+  const fraction = Math.max(0, Math.min(1, (offsetX - GRID_LEFT) / gridWidth));
+
+  cursorX.value = offsetX;
+  cursorTimeLabel.value = formatDuration(fraction * props.traceDuration);
+  cursorVisible.value = true;
+};
+
+// Handle click events from ChartRenderer
+const handleChartClick = (params: any) => {
+  if (params.data && params.data.spanData) {
+    emit("span-selected", params.data.spanData.span_id, true);
+  }
+};
 </script>
 
 <style scoped lang="scss">

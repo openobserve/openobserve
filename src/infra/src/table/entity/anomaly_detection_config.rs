@@ -36,8 +36,11 @@ pub struct Model {
     pub rcf_tree_size: i32,
     pub rcf_shingle_size: i32,
     pub alert_enabled: bool,
-    pub alert_destination_id: Option<String>,
-    /// 0=waiting, 1=active, 2=training, 3=failed, 4=disabled
+    pub alert_destinations: Option<Json>,
+    /// Folder PK (folders.id KSUID). Stores the same FK as the alerts table.
+    pub folder_id: String,
+    pub owner: Option<String>,
+    /// 0=waiting, 1=ready, 2=training, 3=failed, 4=disabled
     pub status: i32,
     pub retries: i32,
     pub last_updated: i64,

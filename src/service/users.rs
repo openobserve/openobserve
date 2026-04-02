@@ -46,6 +46,7 @@ use crate::{
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::{DEFAULT_ORG, OrgRoleMapping},
+            service_account::ServiceAccountCreateResponse,
             user::{
                 UpdateUser, UserList, UserOrgRole, UserRequest, UserResponse, UserUpdateMode,
                 get_default_user_org,
@@ -55,6 +56,14 @@ use crate::{
     },
     service::{db, organization},
 };
+
+fn redact_token(token: &str) -> String {
+    if token.len() <= 4 {
+        "*".repeat(token.len())
+    } else {
+        format!("{}{}", &token[..4], "*".repeat(token.len() - 4))
+    }
+}
 
 pub async fn post_user(
     org_id: &str,
@@ -87,6 +96,17 @@ pub async fn post_user(
                 }
             }
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    if !matches!(
+        usr_req.role.base_role,
+        UserRole::Admin | UserRole::ServiceAccount
+    ) && !get_openfga_config().enabled
+    {
+        return Ok(MetaHttpResponse::bad_request(
+            "Non-admin roles require open-fga enabled",
+        ));
     }
 
     let is_allowed = if is_root_user(initiator_id) {
@@ -129,6 +149,7 @@ pub async fn post_user(
             let password = get_hash(&usr_req.password, &salt);
             let password_ext = get_hash(&usr_req.password, &cfg.auth.ext_auth_salt);
             let token = generate_random_string(16);
+            let token_for_response = token.clone();
             let rum_token = format!("rum{}", generate_random_string(16));
             let org_id = org_id.replace(' ', "_");
             let user = usr_req.to_new_dbuser(
@@ -180,7 +201,16 @@ pub async fn post_user(
                     }
                 }
             }
-            Ok(MetaHttpResponse::ok("User saved successfully"))
+            if usr_req.role.base_role == UserRole::ServiceAccount {
+                Ok(MetaHttpResponse::json(ServiceAccountCreateResponse {
+                    code: 200,
+                    message: "User saved successfully".to_string(),
+                    token: token_for_response,
+                    user: usr_req.email.clone(),
+                }))
+            } else {
+                Ok(MetaHttpResponse::ok("User saved successfully"))
+            }
         } else {
             Ok(MetaHttpResponse::bad_request("User already exists"))
         }
@@ -562,8 +592,8 @@ pub async fn add_user_to_org(
     if !is_valid_email(email) {
         return Ok(MetaHttpResponse::bad_request("Invalid email"));
     }
-    let email = email.trim().to_lowercase();
-    let existing_user = db::user::get_user_record(&email).await;
+    let email = email.trim();
+    let existing_user = db::user::get_user_record(email).await;
     let root_user = ROOT_USER.clone();
     if let Ok(existing_user) = existing_user {
         // If the user is root, we don't need to add to the org, as root user
@@ -602,14 +632,14 @@ pub async fn add_user_to_org(
         if is_allowed {
             let token = generate_random_string(16);
             let rum_token = format!("rum{}", generate_random_string(16));
-            let is_member = db::org_users::get(org_id, &email).await.is_ok();
+            let is_member = db::org_users::get(org_id, email).await.is_ok();
             if is_member {
                 return Ok(MetaHttpResponse::conflict(
                     "User is already part of the organization",
                 ));
             }
 
-            if db::org_users::add(org_id, &email, base_role.clone(), &token, Some(rum_token))
+            if db::org_users::add(org_id, email, base_role.clone(), &token, Some(rum_token))
                 .await
                 .is_err()
             {
@@ -626,11 +656,11 @@ pub async fn add_user_to_org(
                 };
                 if get_openfga_config().enabled {
                     let mut tuples = vec![];
-                    get_add_user_to_org_tuples(org_id, &email, &base_role.to_string(), &mut tuples);
+                    get_add_user_to_org_tuples(org_id, email, &base_role.to_string(), &mut tuples);
                     if role.custom_role.is_some() {
                         let custom_role = role.custom_role.unwrap();
                         custom_role.iter().for_each(|crole| {
-                            tuples.push(get_user_crole_tuple(org_id, crole, &email));
+                            tuples.push(get_user_crole_tuple(org_id, crole, email));
                         });
                     }
                     match update_tuples(tuples, vec![]).await {
@@ -740,6 +770,7 @@ pub async fn list_users(
                 is_external: user.is_external,
                 orgs: None,
                 created_at: 0, // Not used
+                token: None,
             });
         }
         return Ok(MetaHttpResponse::json(UserList { data: user_list }));
@@ -769,6 +800,11 @@ pub async fn list_users(
                 user.role.ne(&UserRole::ServiceAccount)
             };
             if should_include {
+                let token = if user.role.eq(&UserRole::ServiceAccount) {
+                    Some(redact_token(&org_user.value().token))
+                } else {
+                    None
+                };
                 user_list.push(UserResponse {
                     email: user.email.clone(),
                     role: user.role.to_string(),
@@ -777,6 +813,7 @@ pub async fn list_users(
                     is_external: user.is_external,
                     orgs: None,
                     created_at: org_user.value().created_at,
+                    token,
                 });
             }
         }
@@ -803,6 +840,7 @@ pub async fn list_users(
                 is_external: user.user_type.is_external(),
                 orgs: user_orgs.get(user.email.as_str()).cloned(),
                 created_at,
+                token: None,
             });
         }
     }
@@ -831,6 +869,7 @@ pub async fn list_users(
                 is_external: root_user.is_external,
                 orgs: None,
                 created_at: 0,
+                token: None,
             });
         }
     }
@@ -844,12 +883,10 @@ pub async fn remove_user_from_org(
     email_id: &str,
     initiator_id: &str,
 ) -> Result<Response, Error> {
-    let email_id = email_id.to_lowercase();
-    let initiator_id = initiator_id.to_lowercase();
-    let initiating_user = if is_root_user(&initiator_id) {
+    let initiating_user = if is_root_user(initiator_id) {
         ROOT_USER.get("root").unwrap().to_owned()
     } else {
-        db::user::get(Some(org_id), &initiator_id)
+        db::user::get(Some(org_id), initiator_id)
             .await
             .unwrap()
             .unwrap()
@@ -866,7 +903,7 @@ pub async fn remove_user_from_org(
     };
 
     if is_allowed {
-        let ret_user = db::user::get_db_user(&email_id).await;
+        let ret_user = db::user::get_db_user(email_id).await;
         match ret_user {
             Ok(mut user) => {
                 if is_root_user(user.email.as_str()) {
@@ -881,7 +918,7 @@ pub async fn remove_user_from_org(
                 {
                     use o2_enterprise::enterprise::cloud::org_invites;
 
-                    if let Err(e) = org_invites::delete_invites_for_user(org_id, &email_id).await {
+                    if let Err(e) = org_invites::delete_invites_for_user(org_id, email_id).await {
                         log::error!(
                             "error deleting invites when deleting user {email_id} from org {org_id} : {e}"
                         );
@@ -897,7 +934,7 @@ pub async fn remove_user_from_org(
                         if orgs[0].role.eq(&UserRole::ServiceAccount) && user.is_external {
                             return Ok(MetaHttpResponse::forbidden("Not Allowed"));
                         }
-                        if let Err(e) = db::user::delete(&email_id).await {
+                        if let Err(e) = db::user::delete(email_id).await {
                             log::error!("error deleting user from db : {e}");
                             return Ok(MetaHttpResponse::internal_error(e.to_string()));
                         }
@@ -914,9 +951,9 @@ pub async fn remove_user_from_org(
                             };
                             if get_openfga_config().enabled {
                                 log::debug!("delete user single org, role: {}", &user_fga_role);
-                                delete_user_from_org(org_id, &email_id, &user_fga_role).await;
+                                delete_user_from_org(org_id, email_id, &user_fga_role).await;
                                 if user_role.eq(&UserRole::ServiceAccount) {
-                                    delete_service_account_from_org(org_id, &email_id).await;
+                                    delete_service_account_from_org(org_id, email_id).await;
                                 }
                             }
                         }
@@ -941,7 +978,7 @@ pub async fn remove_user_from_org(
                             }
                         }
                         orgs.retain(|x| !x.name.eq(org_id));
-                        let resp = db::org_users::remove(org_id, &email_id).await;
+                        let resp = db::org_users::remove(org_id, email_id).await;
                         // special case as we cache flattened user struct
                         match resp {
                             Ok(_) => {
@@ -957,13 +994,12 @@ pub async fn remove_user_from_org(
                                     {
                                         delete_user_from_org(
                                             org_id,
-                                            &email_id,
+                                            email_id,
                                             _user_fga_role.as_str(),
                                         )
                                         .await;
                                         if is_service_account {
-                                            delete_service_account_from_org(org_id, &email_id)
-                                                .await;
+                                            delete_service_account_from_org(org_id, email_id).await;
                                         }
                                     }
                                 }
@@ -1211,6 +1247,28 @@ mod tests {
 
     // Mutex to ensure test setup is serialized to prevent race conditions
     static TEST_SETUP_LOCK: tokio::sync::OnceCell<Mutex<()>> = tokio::sync::OnceCell::const_new();
+
+    #[test]
+    fn test_redact_token_normal() {
+        assert_eq!(redact_token("abcd1234567890ef"), "abcd************");
+    }
+
+    #[test]
+    fn test_redact_token_exactly_four_chars() {
+        // tokens of 4 chars or fewer are fully masked (nothing revealed)
+        assert_eq!(redact_token("abcd"), "****");
+    }
+
+    #[test]
+    fn test_redact_token_shorter_than_four() {
+        assert_eq!(redact_token("ab"), "**");
+        assert_eq!(redact_token(""), "");
+    }
+
+    #[test]
+    fn test_redact_token_five_chars() {
+        assert_eq!(redact_token("abcde"), "abcd*");
+    }
 
     #[test]
     fn test_is_user_from_org() {

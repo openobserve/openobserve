@@ -17,17 +17,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div
-    data-test="alert-list-page"
-    class="q-pa-none flex flex-col"
-  >
-    <div class="tw:w-full  tw:px-[0.625rem] q-pt-xs" v-if="!showAddAlertDialog && !showImportAlertDialog">
+  <div data-test="alert-list-page" class="q-pa-none flex flex-col">
+    <div
+      class="tw:w-full tw:px-[0.625rem] q-pt-xs"
+      v-if="!showAddAlertDialog && !showImportAlertDialog"
+    >
       <div class="card-container">
         <div
           class="flex justify-between full-width tw:py-3 tw:mb-[0.625rem] tw:px-4 tw:h-[68px] items-center"
         >
           <div class="tw:flex tw:items-center tw:gap-4">
-            <div class="q-table__title tw:font-[600]" data-test="alert-list-title">
+            <div
+              class="q-table__title tw:font-[600]"
+              data-test="alert-list-title"
+            >
               {{ t("alerts.header") }}
             </div>
           </div>
@@ -35,11 +38,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Alert Tabs -->
             <div class="app-tabs-container tw:h-[36px] q-mr-sm">
               <app-tabs
-              class="tabs-selection-container"
-              :tabs="alertTabs"
-              v-model:active-tab="activeTab"
-              @update:active-tab="filterAlertsByTab"
-            />
+                class="tabs-selection-container"
+                :tabs="alertTabs"
+                v-model:active-tab="activeTab"
+                @update:active-tab="filterAlertsByTab"
+              />
             </div>
             <!-- Search for Alerts -->
             <q-input
@@ -54,23 +57,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-list-search-input"
               :clearable="searchAcrossFolders"
               @clear="clearSearchHistory"
-              class="o2-search-input"
+              :class="[
+                'o2-search-input',
+                isCompactToolbar ? 'alert-search-input' : '',
+              ]"
             >
               <template #prepend>
                 <q-icon class="o2-search-input-icon" name="search" />
               </template>
-            </q-input>
-            <!-- All Folders toggle -->
-            <div class="tw:ml-2">
+              <template v-if="isCompactToolbar" #append>
                 <q-toggle
                   data-test="alert-list-search-across-folders-toggle"
                   v-model="searchAcrossFolders"
-                  label="All Folders"
-                  class="tw:mr-3 tw:h-[32px] o2-toggle-button-lg all-folders-toggle"
-                  size="lg"
+                  class="o2-toggle-button-xs"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'o2-toggle-button-xs-dark'
+                      : 'o2-toggle-button-xs-light'
+                  "
+                  size="xs"
                 >
-              </q-toggle>
-              <q-tooltip class="q-mt-lg" anchor="top middle" self="bottom middle">
+                  <q-tooltip>
+                    {{
+                      searchAcrossFolders
+                        ? t('dashboard.searchSelf')
+                        : t('dashboard.searchAll')
+                    }}
+                  </q-tooltip>
+                </q-toggle>
+              </template>
+            </q-input>
+            <!-- All Folders toggle (normal resolution) -->
+            <div v-if="!isCompactToolbar" class="tw:ml-2">
+              <q-toggle
+                data-test="alert-list-search-across-folders-toggle"
+                v-model="searchAcrossFolders"
+                label="All Folders"
+                class="tw:h-[32px] tw:mr-3 o2-toggle-button-lg all-folders-toggle"
+                size="lg"
+              />
+              <q-tooltip
+                class="q-mt-lg"
+                anchor="top middle"
+                self="bottom middle"
+              >
                 {{
                   searchAcrossFolders
                     ? t("dashboard.searchSelf")
@@ -91,25 +121,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <!-- Import button -->
           <q-btn
-            class="q-ml-sm o2-secondary-button tw:h-[36px]"
+            :class="[
+              'q-ml-sm o2-secondary-button tw:h-[36px]',
+              isCompactToolbar
+                ? 'compact-icon-btn'
+                : '',
+            ]"
             no-caps
             flat
-            :label="t(`dashboard.import`)"
+            :label="isCompactToolbar ? undefined : t(`dashboard.import`)"
+            icon="file_upload"
             @click="importAlert"
             data-test="alert-import"
-          />
+          >
+            <q-tooltip v-if="isCompactToolbar">
+              {{ t("dashboard.import") }}
+            </q-tooltip>
+          </q-btn>
           <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
           <q-btn
             data-test="alert-list-add-alert-btn"
             class="q-ml-sm o2-primary-button tw:h-[36px]"
             no-caps
             flat
-            :disable="activeTab !== 'anomalyDetection' && !destinations.length"
-            :title="activeTab !== 'anomalyDetection' && !destinations.length ? t('alerts.noDestinations') : ''"
+            :disable="!destinations.length || !templates.length"
+            :title="!destinations.length ? t('alerts.noDestinations') : ''"
             :label="t(`alerts.add`)"
-            @click="activeTab === 'anomalyDetection'
-              ? router.push({ name: 'addAnomalyDetection', query: { org_identifier: store.state.selectedOrganization.identifier } })
-              : showAddUpdateFn({})"
+            @click="
+              activeTab === 'anomalyDetection'
+                ? router.push({
+                    name: 'addAnomalyDetection',
+                    query: {
+                      org_identifier:
+                        store.state.selectedOrganization.identifier,
+                      folder: activeFolderId,
+                      tab: activeTab,
+                    },
+                  })
+                : showAddUpdateFn({})
+            "
           />
         </div>
       </div>
@@ -140,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #after>
           <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
             <div class="tw:h-full card-container">
-                  <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
+              <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
               <q-table
                 v-model:selected="selectedAlerts"
                 :selected-rows-label="getSelectedString"
@@ -151,37 +201,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :columns="columns"
                 row-key="alert_id"
                 :pagination="pagination"
-                style="width: 100%;"
-                :style="filteredResults?.length
-                ? 'width: 100%; height: calc(100vh - 124px)'
-                : 'width: 100%'"
-
+                style="width: 100%"
+                :style="
+                  filteredResults?.length
+                    ? 'width: 100%; height: calc(100vh - 124px)'
+                    : 'width: 100%'
+                "
                 class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
               >
-              <template v-slot:header="props">
-                <q-tr :props="props">
-                  <!-- Adding this block to render the select-all checkbox -->
-                  <q-th auto-width>
-                    <q-checkbox
-                      v-model="props.selected"
-                      size="sm"
-                      class="o2-table-checkbox"
-                      @update:model-value="props.select"
-                    />
-                  </q-th>
+                <template v-slot:header="props">
+                  <q-tr :props="props">
+                    <!-- Adding this block to render the select-all checkbox -->
+                    <q-th auto-width>
+                      <q-checkbox
+                        v-model="props.selected"
+                        size="sm"
+                        class="o2-table-checkbox"
+                        @update:model-value="props.select"
+                      />
+                    </q-th>
 
-                  <!-- Rendering the rest of the columns -->
-                  <q-th
-                    v-for="col in props.cols"
-                    :key="col.name"
-                    :props="props"
-                    :class="col.classes"
-                    :style="col.style"
-                  >
-                    {{ col.label }}
-                  </q-th>
-                </q-tr>
-              </template>
+                    <!-- Rendering the rest of the columns -->
+                    <q-th
+                      v-for="col in props.cols"
+                      :key="col.name"
+                      :props="props"
+                      :class="col.classes"
+                      :style="col.style"
+                    >
+                      <span
+                        :style="col.name === 'name' ? 'padding-left: 21px' : ''"
+                        >{{ col.label }}</span
+                      >
+                    </q-th>
+                  </q-tr>
+                </template>
 
                 <template v-slot:body-selection="scope">
                   <q-checkbox
@@ -205,9 +259,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </q-td>
 
-                    <q-td v-for="col in columns" :key="col.name" :props="props">
+                    <q-td v-for="col in columns" :key="col.name"
+:props="props">
                       <template v-if="col.name === 'name'">
-                        <div class="tw:flex tw:items-center tw:gap-1">
+                        <div class="tw:flex tw:items-center tw:gap-1.5">
+                          <q-icon
+                            v-if="props.row.is_real_time === 'anomaly'"
+                            name="query_stats"
+                            size="15px"
+                            class="tw:text-blue-600 tw:shrink-0"
+                          />
+                          <q-icon
+                            v-else-if="props.row.is_real_time"
+                            name="bolt"
+                            size="15px"
+                            class="tw:text-orange-500 tw:shrink-0"
+                          />
+                          <q-icon
+                            v-else
+                            name="schedule"
+                            size="15px"
+                            class="tw:text-grey-7 tw:shrink-0"
+                          />
                           <span>{{ computedName(props.row[col.field]) }}</span>
                         </div>
                         <q-tooltip
@@ -229,16 +302,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template
                         v-else-if="
                           col.name == 'last_triggered_at' ||
-                          col.name == 'last_satisfied_at'
+                          col.name == 'last_satisfied_at' ||
+                          col.name == 'last_trained_at'
                         "
                       >
-                        {{ props.row[col.field] }}
+                        <span v-if="props.row[col.field]">{{ props.row[col.field] }}</span>
+                        <span v-else class="tw:block">--</span>
+                      </template>
+                      <template v-else-if="col.name === 'status'">
+                        <template v-if="props.row.status && props.row.status !== '--'">
+                          <q-badge
+                            :color="
+                              props.row.status === 'failed'
+                                ? 'negative'
+                                : props.row.status === 'active'
+                                  ? 'positive'
+                                  : props.row.status === 'training'
+                                    ? 'warning'
+                                    : props.row.status === 'disabled'
+                                      ? 'grey'
+                                      : 'info'
+                            "
+                            :label="props.row.status"
+                            style="text-transform: capitalize; cursor: default"
+                          >
+                            <q-tooltip
+                              v-if="
+                                props.row.status === 'failed' &&
+                                props.row.last_error
+                              "
+                              max-width="400px"
+                              anchor="top middle"
+                              self="bottom middle"
+                            >
+                              {{ props.row.last_error }}
+                            </q-tooltip>
+                          </q-badge>
+                        </template>
+                        <span v-else class="tw:block">--</span>
                       </template>
                       <template v-else-if="col.name === 'period'">
-                        {{ props.row[col.field] ?  props.row[col.field] + " Mins" : "--" }}
+                        {{
+                          props.row[col.field]
+                            ? props.row[col.field] >= 60
+                              ? props.row[col.field] % 60 === 0
+                                ? `${Math.floor(props.row[col.field] / 60)} Hours`
+                                : `${Math.floor(props.row[col.field] / 60)} Hours ${props.row[col.field] % 60} Mins`
+                              : `${props.row[col.field]} Mins`
+                            : "--"
+                        }}
                       </template>
                       <template v-else-if="col.name === 'frequency'">
-                        {{ props.row[col.field] ? props.row[col.field] + (props.row?.frequency_type == "cron" ? "" : " Mins") : "--" }}
+                        {{
+                          props.row[col.field]
+                            ? props.row[col.field] +
+                              (props.row?.frequency_type == "cron"
+                                ? ""
+                                : " Mins")
+                            : "--"
+                        }}
                       </template>
                       <template v-else-if="col.name === 'folder_name'">
                         <div
@@ -250,8 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </template>
                       <template v-else-if="col.name == 'actions'">
-                        <div class="tw:flex tw:items-center actions-container"
-                        >
+                        <div class="tw:flex tw:items-center actions-container">
                           <div
                             data-test="alert-list-loading-alert"
                             v-if="alertStateLoadingMap[props.row.uuid]"
@@ -279,7 +400,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             unelevated
                             size="sm"
                             :color="props.row.enabled ? 'negative' : 'positive'"
-                            :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
+                            :icon="
+                              props.row.enabled
+                                ? outlinedPause
+                                : outlinedPlayArrow
+                            "
                             round
                             flat
                             :title="
@@ -289,7 +414,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                             @click.stop="toggleAlertState(props.row)"
                           >
-                        </q-btn>
+                          </q-btn>
                           <q-btn
                             :data-test="`alert-list-${props.row.name}-update-alert`"
                             unelevated
@@ -300,7 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click.stop="editAlert(props.row)"
                             icon="edit"
                           >
-                        </q-btn>
+                          </q-btn>
                           <q-btn
                             icon="content_copy"
                             :title="t('alerts.clone')"
@@ -311,7 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click.stop="duplicateAlert(props.row)"
                             :data-test="`alert-list-${props.row.name}-clone-alert`"
                           >
-                        </q-btn>
+                          </q-btn>
                           <q-btn
                             :icon="outlinedMoreVert"
                             unelevated
@@ -330,10 +455,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   @click="moveAlertToAnotherFolder(props.row)"
                                 >
                                   <q-item-section dense avatar>
-                                     <q-icon
-                                        size="16px"
-                                        :name="outlinedDriveFileMove"
-                                      />
+                                    <q-icon
+                                      size="16px"
+                                      :name="outlinedDriveFileMove"
+                                    />
                                   </q-item-section>
                                   <q-item-section>Move</q-item-section>
                                 </q-item>
@@ -345,7 +470,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   @click="showDeleteDialogFn(props)"
                                 >
                                   <q-item-section dense avatar>
-                                     <q-icon size="16px" :name="outlinedDelete" />
+                                    <q-icon
+                                      size="16px"
+                                      :name="outlinedDelete"
+                                    />
                                   </q-item-section>
                                   <q-item-section>{{
                                     t("alerts.delete")
@@ -359,19 +487,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   @click="exportAlert(props.row)"
                                 >
                                   <q-item-section dense avatar>
-                                     <q-icon size="16px" name="download" />
+                                    <q-icon size="16px" name="download" />
                                   </q-item-section>
                                   <q-item-section>Export</q-item-section>
                                 </q-item>
                                 <q-separator />
+                                <!-- Anomaly Detection: Trigger Detection + Re-train (always available) -->
+                                <template v-if="props.row.type === 'anomaly'">
+                                  <q-item
+                                    class="flex items-center justify-center"
+                                    clickable
+                                    v-close-popup
+                                    :data-test="`alert-list-${props.row.name}-trigger-detection`"
+                                    @click="triggerAlert(props.row)"
+                                  >
+                                    <q-item-section dense avatar>
+                                      <q-icon
+                                        size="16px"
+                                        :name="symOutlinedSoundSampler"
+                                      />
+                                    </q-item-section>
+                                    <q-item-section
+                                      >Trigger Detection</q-item-section
+                                    >
+                                  </q-item>
+                                  <q-item
+                                    class="flex items-center justify-center"
+                                    clickable
+                                    v-close-popup
+                                    :data-test="`alert-list-${props.row.name}-retrain-anomaly`"
+                                    @click="retrainAnomaly(props.row)"
+                                  >
+                                    <q-item-section dense avatar>
+                                      <q-icon size="16px" name="replay" />
+                                    </q-item-section>
+                                    <q-item-section>Re-train</q-item-section>
+                                  </q-item>
+                                </template>
+                                <!-- Regular alerts: existing Trigger Alert item -->
                                 <q-item
+                                  v-else
                                   class="flex items-center justify-center"
                                   clickable
                                   v-close-popup
                                   @click="triggerAlert(props.row)"
                                 >
                                   <q-item-section dense avatar>
-                                     <q-icon size="16px" :name="symOutlinedSoundSampler" />
+                                    <q-icon
+                                      size="16px"
+                                      :name="symOutlinedSoundSampler"
+                                    />
                                   </q-item-section>
                                   <q-item-section>{{
                                     t("alerts.triggerAlert")
@@ -380,7 +545,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </q-list>
                             </q-menu>
                           </q-btn>
-                      </div>
+                        </div>
                       </template>
                       <template v-else>
                         {{ props.row[col.field] }}
@@ -399,8 +564,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="text-subtitle1"
                           data-test="alert-list-create-template-text"
                         >
-                          It looks like you haven't created any Templates yet. To
-                          create an Alert, you'll need to have at least one
+                          It looks like you haven't created any Templates yet.
+                          To create an Alert, you'll need to have at least one
                           Destination and one Template in place
                         </div>
                         <q-btn
@@ -419,9 +584,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="text-subtitle1"
                           data-test="alert-list-create-destination-text"
                         >
-                          It looks like you haven't created any Destinations yet. To
-                          create an Alert, you'll need to have at least one
-                          Destination and one Template in place
+                          It looks like you haven't created any Destinations
+                          yet. To create an Alert, you'll need to have at least
+                          one Destination and one Template in place
                         </div>
                         <q-btn
                           data-test="alert-list-create-destination-btn"
@@ -446,7 +611,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-tooltip>
                       <pre>{{ props.row.sql }}</pre>
                     </q-tooltip>
-                    <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
+                    <pre style="white-space: break-spaces">{{
+                      props.row.sql
+                    }}</pre>
                   </q-td>
                 </template>
 
@@ -463,70 +630,92 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <template #bottom="scope">
                   <div class="bottom-btn tw:h-[48px]">
-                   <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
-                      {{ resultTotal }} {{ t('alerts.header') }}
+                    <div
+                      class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md"
+                    >
+                      {{ resultTotal }} {{ t("alerts.header") }}
                     </div>
 
                     <q-btn
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-move-across-folders-btn"
                       class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                      :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'o2-secondary-button-dark'
+                          : 'o2-secondary-button-light'
+                      "
                       no-caps
                       dense
                       @click="moveMultipleAlerts"
-                      >
-                        <q-icon :name="outlinedDriveFileMove" size="16px" />
-                        <span class="tw:ml-2">Move</span>
+                    >
+                      <q-icon :name="outlinedDriveFileMove" size="16px" />
+                      <span class="tw:ml-2">Move</span>
                     </q-btn>
                     <q-btn
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-export-alerts-btn"
                       class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                      :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'o2-secondary-button-dark'
+                          : 'o2-secondary-button-light'
+                      "
                       no-caps
                       dense
                       @click="multipleExportAlert"
                     >
                       <q-icon name="download" size="16px" />
                       <span class="tw:ml-2">Export</span>
-                  </q-btn>
-                  <q-btn
+                    </q-btn>
+                    <q-btn
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-pause-alerts-btn"
                       class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                      :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'o2-secondary-button-dark'
+                          : 'o2-secondary-button-light'
+                      "
                       no-caps
                       dense
                       @click="bulkToggleAlerts('pause')"
                     >
                       <q-icon name="pause" size="16px" />
                       <span class="tw:ml-2">Pause</span>
-                  </q-btn>
-                  <q-btn
+                    </q-btn>
+                    <q-btn
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-unpause-alerts-btn"
                       class="tw:flex items-center no-border o2-secondary-button tw:h-[36px] q-mr-sm tw:w-[180px]"
-                      :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'o2-secondary-button-dark'
+                          : 'o2-secondary-button-light'
+                      "
                       no-caps
                       dense
                       @click="bulkToggleAlerts('resume')"
                     >
                       <q-icon name="play_arrow" size="16px" />
                       <span class="tw:ml-2">Resume</span>
-                  </q-btn>
-                  <q-btn
+                    </q-btn>
+                    <q-btn
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-delete-alerts-btn"
                       class="tw:flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px] tw:ml-sm"
-                      :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'o2-secondary-button-dark'
+                          : 'o2-secondary-button-light'
+                      "
                       no-caps
                       dense
                       @click="openBulkDeleteDialog"
                     >
                       <q-icon name="delete" size="16px" />
                       <span class="tw:ml-2">Delete</span>
-                  </q-btn>
+                    </q-btn>
                     <QTablePagination
                       :scope="scope"
                       :position="'bottom'"
@@ -558,7 +747,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ImportAlert
         :destinations="destinations"
         :templates="templates"
-        :alerts="store?.state?.organizationData?.allAlertsListByFolderId[activeFolderId]"
+        :alerts="
+          store?.state?.organizationData?.allAlertsListByFolderId[
+            activeFolderId
+          ]
+        "
+        :folderId="activeFolderId"
         @update:alerts="refreshImportedAlerts"
         @update:destinations="refreshDestination"
         @update:templates="getTemplates"
@@ -582,7 +776,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <template>
-      <q-dialog class="q-pa-md" v-model="showForm" persistent>
+      <q-dialog class="q-pa-md" v-model="showForm"
+persistent>
         <q-card class="clone-alert-popup tw:pt-2">
           <div class="row items-center no-wrap q-mx-md q-my-sm">
             <div class="flex items-center">
@@ -683,12 +878,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <MoveAcrossFolders
           :activeFolderId="activeFolderToMove"
           :moduleId="selectedAlertToMove"
+          :anomalyConfigIds="selectedAnomalyConfigsToMove"
           type="alerts"
           @updated="updateAcrossFolders"
         />
       </q-dialog>
 
-             <!-- Alert Details Dialog -->
+      <!-- Alert Details Dialog -->
       <q-dialog
         v-model="showAlertDetailsDrawer"
         position="right"
@@ -699,6 +895,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <AlertHistoryDrawer
           :alert-details="selectedAlertDetails"
           :alert-id="selectedAlertDetails?.alert_id || ''"
+          :alert-type="selectedAlertDetails?.alert_type"
           @close="showAlertDetailsDrawer = false"
           @edit="editAlertFromDrawer"
         />
@@ -797,6 +994,15 @@ export default defineComponent({
     const { track } = useReo();
     const formData: Ref<Alert | {}> = ref({});
     const toBeClonedAlert: Ref<any> = ref({});
+    // Flag to skip clearing search state on the first folder emission after mount.
+    // When returning from add/edit screens, the FolderList emits the active folder
+    // which would normally clear restored search filters. This flag prevents that.
+    const savedAlertListFilters = store.state.alertListFilters || {};
+    const isRestoringState = ref(
+      !!savedAlertListFilters.searchQuery ||
+        !!savedAlertListFilters.filterQuery ||
+        !!savedAlertListFilters.searchAcrossFolders,
+    );
     const showAddAlertDialog: any = ref(false);
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const selectedDelete: any = ref(null);
@@ -810,6 +1016,16 @@ export default defineComponent({
     const isFetchingStreams = ref(false);
     const isSubmitting = ref(false);
 
+    // Compact toolbar: icon-only buttons when AI sidebar is open at narrow widths
+    const windowWidth = ref(window.innerWidth);
+    const onWindowResize = () => {
+      windowWidth.value = window.innerWidth;
+    };
+    const isCompactToolbar = computed(
+      () => store.state.isAiChatEnabled && windowWidth.value <= 1440,
+    );
+
+
     const showImportAlertDialog = ref(false);
     const showHistoryDrawer = ref(false);
     const selectedHistoryAlertId = ref("");
@@ -819,6 +1035,7 @@ export default defineComponent({
 
     const toBeCloneAlertName = ref("");
     const toBeClonedID = ref("");
+    const toBeClonedIsAnomaly = ref(false);
     const toBeClonestreamType = ref("");
     const toBeClonestreamName = ref("");
     const streamTypes = ref(["logs", "metrics", "traces"]);
@@ -832,7 +1049,9 @@ export default defineComponent({
         name: "folder2",
       },
     ]);
-    const activeFolderId = ref<any>(router.currentRoute.value.query.folder ?? "default");
+    const activeFolderId = ref<any>(
+      router.currentRoute.value.query.folder ?? "default",
+    );
     const showMoveAlertDialog = ref(false);
     const showAlertDetailsDrawer = ref(false);
     const selectedAlertDetails: Ref<any> = ref(null);
@@ -845,16 +1064,21 @@ export default defineComponent({
       // This improves performance by avoiding conversion of all alerts on list load
       let displayConditions = "--";
       if (alert.rawCondition && Object.keys(alert.rawCondition).length) {
-        if (alert.rawCondition.type == 'custom') {
+        if (alert.rawCondition.type == "custom") {
           const conditionData = alert.rawCondition.conditions;
 
           // Detect format by structure, not by version field (more reliable)
-          if (conditionData?.filterType === 'group') {
+          if (conditionData?.filterType === "group") {
             // V2 format: {filterType: "group", logicalOperator: "AND", conditions: [...]}
             displayConditions = transformV2ToExpression(conditionData);
-          } else if (conditionData?.version === 2 && conditionData?.conditions) {
+          } else if (
+            conditionData?.version === 2 &&
+            conditionData?.conditions
+          ) {
             // V2 format with version wrapper: {version: 2, conditions: {filterType: "group", ...}}
-            displayConditions = transformV2ToExpression(conditionData.conditions);
+            displayConditions = transformV2ToExpression(
+              conditionData.conditions,
+            );
           } else if (conditionData?.or || conditionData?.and) {
             // V1 format: {or: [...]} or {and: [...]}
             displayConditions = transformToExpression(conditionData);
@@ -862,15 +1086,18 @@ export default defineComponent({
             // V0 format (legacy): flat array [{column, operator, value}, ...]
             // V0 had implicit AND between all conditions (no groups)
             const parts = conditionData.map((item: any) => {
-              const column = item.column || 'field';
-              const operator = item.operator || '=';
-              const value = typeof item.value === 'string' ? `'${item.value}'` : item.value;
+              const column = item.column || "field";
+              const operator = item.operator || "=";
+              const value =
+                typeof item.value === "string" ? `'${item.value}'` : item.value;
               return `${column} ${operator} ${value}`;
             });
-            displayConditions = parts.length > 0 ? `(${parts.join(' AND ')})` : '--';
+            displayConditions =
+              parts.length > 0 ? `(${parts.join(" AND ")})` : "--";
           } else {
             // Unknown format or empty
-            displayConditions = typeof conditionData === 'string' ? conditionData : '--';
+            displayConditions =
+              typeof conditionData === "string" ? conditionData : "--";
           }
         } else if (alert.rawCondition.sql) {
           displayConditions = alert.rawCondition.sql;
@@ -882,7 +1109,7 @@ export default defineComponent({
       // Set selectedAlertDetails with converted conditions
       selectedAlertDetails.value = {
         ...alert,
-        conditions: displayConditions
+        conditions: displayConditions,
       };
 
       showAlertDetailsDrawer.value = true;
@@ -890,7 +1117,7 @@ export default defineComponent({
 
     // Handle ESC key and click outside to close drawer
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && showAlertDetailsDrawer.value) {
+      if (event.key === "Escape" && showAlertDetailsDrawer.value) {
         showAlertDetailsDrawer.value = false;
       }
     };
@@ -902,31 +1129,31 @@ export default defineComponent({
 
       // Check if clicked element is the backdrop or outside drawer content
       if (
-        target.classList.contains('q-drawer__backdrop') ||
-        target.classList.contains('q-layout__shadow')
+        target.classList.contains("q-drawer__backdrop") ||
+        target.classList.contains("q-layout__shadow")
       ) {
         showAlertDetailsDrawer.value = false;
         return;
       }
 
       // Check if the click is outside the drawer content
-      const drawerElement = document.querySelector('.alert-details-drawer .q-drawer__content');
+      const drawerElement = document.querySelector(
+        ".alert-details-drawer .q-drawer__content",
+      );
       if (drawerElement && !drawerElement.contains(target)) {
         showAlertDetailsDrawer.value = false;
       }
     };
 
     onMounted(() => {
-      document.addEventListener('keydown', handleKeyDown);
-      document.addEventListener('click', handleClickOutside, true);
+      document.addEventListener("keydown", handleKeyDown);
+      document.addEventListener("click", handleClickOutside, true);
+      window.addEventListener("resize", onWindowResize);
     });
 
     onBeforeUnmount(() => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('click', handleClickOutside, true);
+      window.removeEventListener("resize", onWindowResize);
     });
-
-    const activeFolderToMove = ref("default");
 
     // Show anomaly detection only when the backend is an enterprise or cloud build.
     // The frontend build flag alone is not sufficient — an enterprise UI can be
@@ -934,8 +1161,7 @@ export default defineComponent({
     const isAnomalyDetectionEnabled = computed(
       () =>
         store.state.zoConfig.build_type !== "opensource" &&
-        config.isEnterprise === "true" && 
-        config.isCloud === "false",
+        config.isEnterprise === "true",
     );
 
     // Initialize activeTab from URL query parameter, default to "all".
@@ -947,15 +1173,71 @@ export default defineComponent({
         : rawTab,
     );
 
+    const filteredResults: Ref<any[]> = ref([]);
+
+    // ── Anomaly polling ──────────────────────────────────────────────────────
+    // Statuses that mean the anomaly job is done — no need to keep polling
+    const ANOMALY_TERMINAL_STATUSES = ["failed", "active", "completed"];
+
+    const hasNonTerminalAnomalyRows = computed(
+      () =>
+        activeTab.value === "anomalyDetection" &&
+        filteredResults.value.some(
+          (row: any) =>
+            row.type === "anomaly" &&
+            !ANOMALY_TERMINAL_STATUSES.includes(row.status),
+        ),
+    );
+
+    let anomalyPollingTimer: ReturnType<typeof setInterval> | null = null;
+
+    const stopAnomalyPolling = () => {
+      if (anomalyPollingTimer !== null) {
+        clearInterval(anomalyPollingTimer);
+        anomalyPollingTimer = null;
+      }
+    };
+
+    const startAnomalyPolling = () => {
+      if (anomalyPollingTimer !== null) return; // already running
+      anomalyPollingTimer = setInterval(async () => {
+        if (!hasNonTerminalAnomalyRows.value) {
+          stopAnomalyPolling();
+          return;
+        }
+        await getAlertsFn(store, activeFolderId.value);
+      }, 10000);
+    };
+
+    watch(hasNonTerminalAnomalyRows, (hasNonTerminal) => {
+      if (hasNonTerminal) {
+        startAnomalyPolling();
+      } else {
+        stopAnomalyPolling();
+      }
+    });
+    // ── End anomaly polling ──────────────────────────────────────────────────
+
+    onBeforeUnmount(() => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("click", handleClickOutside, true);
+      stopAnomalyPolling();
+    });
+
+    const activeFolderToMove = ref("default");
+
     // Tabs for alerts view
     const alertTabs = computed(() => {
       const tabs: { label: string; value: string }[] = [
-        { label: t("alerts.all"),      value: "all" },
+        { label: t("alerts.all"), value: "all" },
         { label: t("alerts.scheduled"), value: "scheduled" },
-        { label: t("alerts.realTime"),  value: "realTime" },
+        { label: t("alerts.realTime"), value: "realTime" },
       ];
       if (isAnomalyDetectionEnabled.value) {
-        tabs.push({ label: t("alerts.anomalyDetection"), value: "anomalyDetection" });
+        tabs.push({
+          label: t("alerts.anomalyDetection"),
+          value: "anomalyDetection",
+        });
       }
       return tabs;
     });
@@ -1000,35 +1282,32 @@ export default defineComponent({
           sortable: true,
           style: "width: 150px",
         },
-        // Anomaly Detection tab — extra columns
-        ...(activeTab.value === 'anomalyDetection' ? [
-          {
-            name: "detection_window",
-            field: "detection_window",
-            label: "Detection Window",
-            align: "center" as const,
-            sortable: true,
-            style: "width: 150px",
-          },
-        ] : []),
-        // "period" column — conditional
-        ...(activeTab.value !== 'realTime' && activeTab.value !== 'anomalyDetection' ? [{
-          name: "period",
-          field: "period",
-          label: t("alerts.period"),
-          align: "center",
-          sortable: true,
-          style: "width: 150px",
-        }] : []),
-        // "frequency" column — conditional
-        ...(activeTab.value !== 'realTime' && activeTab.value !== 'anomalyDetection' ? [{
-          name: "frequency",
-          field: "frequency",
-          label: t("alerts.frequency"),
-          align: "left",
-          sortable: true,
-          style: "width: 150px",
-        }] : []),
+        // "period" (Look back window) — all tabs except realTime
+        ...(activeTab.value !== "realTime"
+          ? [
+              {
+                name: "period",
+                field: "period",
+                label: t("alerts.period"),
+                align: "center",
+                sortable: true,
+                style: "width: 150px",
+              },
+            ]
+          : []),
+        // "frequency" (Check every) — all tabs except realTime
+        ...(activeTab.value !== "realTime"
+          ? [
+              {
+                name: "frequency",
+                field: "frequency",
+                label: t("alerts.frequency"),
+                align: "left",
+                sortable: true,
+                style: "width: 150px",
+              },
+            ]
+          : []),
         {
           name: "last_triggered_at",
           field: "last_triggered_at",
@@ -1045,17 +1324,27 @@ export default defineComponent({
           sortable: true,
           style: "width: 150px",
         },
-        // Anomaly Detection tab — extra columns
-        ...(activeTab.value === 'anomalyDetection' ? [
-          {
-            name: "last_trained_at",
-            field: "last_trained_at",
-            label: "Last Trained At",
-            align: "left" as const,
-            sortable: true,
-            style: "width: 150px",
-          },
-        ] : []),
+        // Anomaly Detection columns — shown on anomalyDetection and all tabs
+        ...(activeTab.value === "anomalyDetection" || activeTab.value === "all"
+          ? [
+              {
+                name: "last_trained_at",
+                field: "last_trained_at",
+                label: "Last Trained At",
+                align: "left" as const,
+                sortable: true,
+                style: "width: 150px",
+              },
+              {
+                name: "status",
+                field: "status",
+                label: "Status",
+                align: "left" as const,
+                sortable: true,
+                style: "width: 120px",
+              },
+            ]
+          : []),
         {
           name: "actions",
           field: "actions",
@@ -1063,7 +1352,7 @@ export default defineComponent({
           align: "center",
           sortable: false,
           style: "width: 150px",
-          classes: 'actions-column' //this is the class that we are adding to the actions column so that we can apply the styling to the actions column only
+          classes: "actions-column", //this is the class that we are adding to the actions column so that we can apply the styling to the actions column only
         },
       ];
 
@@ -1088,50 +1377,76 @@ export default defineComponent({
     const allSelectedAlerts = ref(false);
     const allAlerts: Ref<any[]> = ref([]);
 
-    const searchQuery = ref<any>("");
-    const filterQuery = ref<any>("");
-    const searchAcrossFolders = ref<any>(false);
-    const filteredResults: Ref<any[]> = ref([]);
-    const selectedAlertToMove: Ref<any> = ref({});
-    const folderIdToBeCloned = ref<any>(router.currentRoute.value.query.folder ?? "default");
+    const searchQuery = ref<any>(savedAlertListFilters.searchQuery || "");
+    const filterQuery = ref<any>(savedAlertListFilters.filterQuery || "");
+    const searchAcrossFolders = ref<any>(
+      savedAlertListFilters.searchAcrossFolders || false,
+    );
+    const selectedAlertToMove: Ref<any[]> = ref([]);
+    const selectedAnomalyConfigsToMove: Ref<any[]> = ref([]);
+    const folderIdToBeCloned = ref<any>(
+      router.currentRoute.value.query.folder ?? "default",
+    );
     // ---------------------------------------------------------------------------
     // Anomaly detection scaffolding — TEMPORARY until backend returns anomaly
     // data as part of the alert list API. Remove this block when that happens.
     // ---------------------------------------------------------------------------
-    const normalizeAnomalyToAlertRow = (anomaly: any, counter: number): any => ({
+    // Normalizes an anomaly-detection item returned by the merged alerts list API
+    // (alert_type === "anomaly_detection") into the standard alert row shape.
+    const normalizeAnomalyToAlertRow = (
+      anomaly: any,
+      counter: number,
+    ): any => ({
       "#": counter <= 9 ? `0${counter}` : `${counter}`,
-      alert_id: anomaly.anomaly_id,
-      anomaly_id: anomaly.anomaly_id,
+      alert_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
+      anomaly_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
       name: anomaly.name,
-      alert_type: "Anomaly Detection",
+      alert_type: "anomaly_detection",
       stream_name: anomaly.stream_name || "--",
       stream_type: anomaly.stream_type || "--",
       enabled: anomaly.enabled,
       conditions: "--",
       rawCondition: {},
+      detection_function: anomaly.detection_function || "",
+      query_mode: anomaly.query_mode || "filters",
+      custom_sql: anomaly.custom_sql || "",
+      filters: anomaly.filters || [],
+      histogram_interval: anomaly.histogram_interval || "",
       description: anomaly.description || "",
       uuid: getUUID(),
       owner: anomaly.owner || "",
-      period: "",
-      frequency: anomaly.schedule_interval != null ? String(anomaly.schedule_interval) : "--",
-      frequency_type: "cron",
-      last_triggered_at: anomaly.last_detection_run
-        ? convertUnixToQuasarFormat(anomaly.last_detection_run)
+      period: anomaly.trigger_condition?.period ?? "",
+      frequency: anomaly.trigger_condition?.frequency ?? "",
+      frequency_type: anomaly.trigger_condition?.frequency_type ?? "minutes",
+      last_triggered_at: anomaly.last_triggered_at
+        ? convertUnixToQuasarFormat(anomaly.last_triggered_at)
         : "",
-      last_satisfied_at: anomaly.last_anomaly_detected_at
-        ? convertUnixToQuasarFormat(anomaly.last_anomaly_detected_at)
+      last_satisfied_at: anomaly.last_satisfied_at
+        ? convertUnixToQuasarFormat(anomaly.last_satisfied_at)
         : "",
-      detection_window: anomaly.detection_window_seconds
-        ? (anomaly.detection_window_seconds >= 3600 && anomaly.detection_window_seconds % 3600 === 0
-            ? `${anomaly.detection_window_seconds / 3600}h`
-            : `${Math.round(anomaly.detection_window_seconds / 60)} mins`)
-        : "--",
-      last_trained_at: anomaly.training_completed_at
-        ? convertUnixToQuasarFormat(anomaly.training_completed_at)
+      detection_window: (() => {
+        const mins = anomaly.trigger_condition?.period_minutes;
+        if (!mins) return "--";
+        if (mins >= 60) {
+          const h = Math.floor(mins / 60);
+          const m = mins % 60;
+          return m === 0 ? `${h} Hours` : `${h} Hours ${m} Mins`;
+        }
+        return `${mins} mins`;
+      })(),
+      last_trained_at: anomaly.last_trained_at
+        ? convertUnixToQuasarFormat(anomaly.last_trained_at)
         : "",
+      total_evaluations: anomaly.total_evaluations ?? "--",
+      firing_count: anomaly.firing_count ?? "--",
+      status: anomaly.status || "--",
+      last_error: anomaly.last_error || null,
       selected: false,
       type: "anomaly",
-      folder_name: { name: "—", id: "" },
+      folder_name: {
+        name: anomaly.folder_name || "default",
+        id: anomaly.folder_id || "",
+      },
       // Marker: "anomaly" distinguishes these rows from boolean is_real_time alerts
       is_real_time: "anomaly",
     });
@@ -1140,33 +1455,39 @@ export default defineComponent({
 
     const getAlertsByFolderId = async (store: any, folderId: any) => {
       try {
-        //this is the condition where we are fetching the alerts from the server 
+        //this is the condition where we are fetching the alerts from the server
         // assigning it to the allAlertsListByFolderId in the store
         if (!store.state.organizationData.allAlertsListByFolderId[folderId]) {
           await getAlertsFn(store, folderId);
         } else {
-          //this is the condition where we are assigning the alerts to the filteredResults so whenever 
+          //this is the condition where we are assigning the alerts to the filteredResults so whenever
           // we are not fetching the alerts again, we are just assigning the alerts to the filteredResults
-         allAlerts.value = store.state.organizationData.allAlertsListByFolderId[folderId];
+          allAlerts.value =
+            store.state.organizationData.allAlertsListByFolderId[folderId];
         }
       } catch (error) {
         throw error;
       }
     };
-    const getAlertsFn = async (store: any, folderId: any, query = "", refreshResults = true) => {
-      //why refreshResults flag is used 
-      // this is the only used for one edge case when we move alerts from one folder to another folder 
+    const getAlertsFn = async (
+      store: any,
+      folderId: any,
+      query = "",
+      refreshResults = true,
+    ) => {
+      //why refreshResults flag is used
+      // this is the only used for one edge case when we move alerts from one folder to another folder
       //we forcing the destination and source folder to fetch the alerts again
       //so what happens is that if destination folder takes time to fetch the alerts by the time source folder finishes it call
       //and assign the alerts and the after that destination folder will resovle and override the source folder alerts
       //so to avoid this we are using the refreshResults flag
       //if the flag is false then we are not assigning the alerts to the filteredResults
       //and if the flag is true then we are assigning the alerts to the filteredResults
-      //and also we are not filtering the alerts by the activeTab if the flag is false because we dont need to show the alerts in the table 
-      //for a moment also so we are not filtering the alerts by the activeTab 
+      //and also we are not filtering the alerts by the activeTab if the flag is false because we dont need to show the alerts in the table
+      //for a moment also so we are not filtering the alerts by the activeTab
       selectedAlerts.value = [];
       allSelectedAlerts.value = false;
-      if (query){
+      if (query) {
         //here we reset the filteredResults before fetching the filtered alerts
         filteredResults.value = [];
       }
@@ -1178,134 +1499,132 @@ export default defineComponent({
         folderId = "";
       }
       try {
-        const res = await alertsService.listByFolderId(1,1000,"name",false,"",store?.state?.selectedOrganization?.identifier,folderId,query);
-          var counter = 1;
-          let localAllAlerts = [];
-          //this is the alerts that we use to store
-          localAllAlerts = res.data.list.map((alert: any) => {
-            return {
-              ...alert,
-              uuid: getUUID(),
-            };
-          });
+        const res = await alertsService.listByFolderId(
+          1,
+          1000,
+          "name",
+          false,
+          "",
+          store?.state?.selectedOrganization?.identifier,
+          folderId,
+          query,
+        );
+        var counter = 1;
+        let localAllAlerts = [];
+        //this is the alerts that we use to store
+        localAllAlerts = res.data.list.map((alert: any) => {
+          return {
+            ...alert,
+            uuid: getUUID(),
+          };
+        });
 
-          //general alerts that we use to display (formatting the alerts into the table format)
-          //localAllAlerts is the alerts that we use to store
-          // PERFORMANCE OPTIMIZATION: Store raw condition data without conversion
-          // Conversion happens lazily only when user expands an alert (in triggerExpand)
-          localAllAlerts = localAllAlerts.map((data: any) => {
-            let frequency = "";
-            if (data.trigger_condition?.frequency_type == "cron") {
-              frequency = data.trigger_condition.cron;
-            } else {
-              frequency = data.trigger_condition.frequency;
-            }
+        //general alerts that we use to display (formatting the alerts into the table format)
+        //localAllAlerts is the alerts that we use to store
+        // PERFORMANCE OPTIMIZATION: Store raw condition data without conversion
+        // Conversion happens lazily only when user expands an alert (in triggerExpand)
+        // Anomaly detection items (alert_type === "anomaly_detection") are handled by
+        // normalizeAnomalyToAlertRow which reads period/frequency from trigger_condition.
+        localAllAlerts = localAllAlerts.map((data: any) => {
+          if (data.alert_type === "anomaly_detection") {
+            const num = counter++;
+            return normalizeAnomalyToAlertRow(data, num);
+          }
 
-            return {
-              "#": counter <= 9 ? `0${counter++}` : counter++,
-              alert_id: data.alert_id,
-              name: data.name,
-              alert_type: data.is_real_time ? "Real Time" : "Scheduled",
-              stream_name: data.stream_name ? data.stream_name : "--",
-              stream_type: data.stream_type,
-              enabled: data.enabled,
-              conditions: "--", // Placeholder - will be converted on-demand in triggerExpand
-              rawCondition: data.condition, // Store raw condition for lazy conversion
-              description: data.description,
-              uuid: data.uuid,
-              owner: data.owner,
-              period: data.is_real_time ? "" :  data?.trigger_condition?.period,
-              frequency: data.is_real_time ? "" : frequency,
-              frequency_type: data?.trigger_condition?.frequency_type,
-              last_triggered_at: convertUnixToQuasarFormat(
-                data.last_triggered_at,
-              ),
-              last_satisfied_at: convertUnixToQuasarFormat(
-                data.last_satisfied_at,
-              ),
-              selected: false,
-              type: data.condition.type,
-              folder_name: {
-                name: data.folder_name,
-                id: data.folder_id,
-              },
-              is_real_time: data.is_real_time,
-            };
-          });
-          // ---------------------------------------------------------------------------
-          // TEMPORARY: Fetch anomaly detections and merge as synthetic alert rows.
-          // Remove this block once the backend returns anomaly data in the alert list API.
-          // ---------------------------------------------------------------------------
-          if (isAnomalyDetectionEnabled.value) {
-            try {
-              const anomalyRes = await anomalyDetectionService.list(
-                store?.state?.selectedOrganization?.identifier,
-              );
-              const anomalyList: any[] = anomalyRes.data?.list ?? anomalyRes.data ?? [];
-              let anomalyCounter = localAllAlerts.length + 1;
-              const anomalyRows = anomalyList.map((a: any) =>
-                normalizeAnomalyToAlertRow(a, anomalyCounter++),
-              );
-              localAllAlerts = [...localAllAlerts, ...anomalyRows];
-            } catch (anomalyError) {
-              console.warn("Failed to fetch anomaly detections:", anomalyError);
-            }
+          let frequency = "";
+          if (data.trigger_condition?.frequency_type == "cron") {
+            frequency = data.trigger_condition.cron;
+          } else {
+            frequency = data.trigger_condition.frequency;
           }
-          // ---------------------------------------------------------------------------
 
-          //this is the condition where we are setting the alertStateLoadingMap
-          localAllAlerts.forEach((alert: any) => {
-            alertStateLoadingMap.value[alert.uuid as string] = false;
-          });
-          //this is the condition where we are setting the allAlertsListByFolderId in the store
-          store?.dispatch("setAllAlertsListByFolderId", {
-            ...store.state.organizationData.allAlertsListByFolderId,
-            [folderId]: localAllAlerts,
-          });
-          //RACE CONDITION handling
-          //this is the condition where we are checking the if the folderId is not equal to the activeFolderId
-          //if it is not equal then we are returning  and if is not search across folders then we are returning as well as in previous step we are anyways storing in the store for future use
-          //this will prevent the side effects of allAlerts are overriding the actual alerts if users are rapidly moving from one folder to another folder
-          if(folderId != activeFolderId.value && !query){
-            dismiss();
-            return;
-          }
-          //here we are actually assigning the localAllAlerts to the allAlerts to avoid the side effects of allAlerts are overriding the actual alerts if users are rapidly moving from one folder to another folder
-          allAlerts.value = localAllAlerts;
-          //this is the condition where we are setting the filteredResults 
-          //1. If it is search across folders then also we are setting the filteredResults(which contains the filtered alerts)
-          //2. If it is not search across folders then we are setting the filteredResults to the alerts(which contains all the alerts)
-            //here we are setting the filteredResults to the alerts
-            if(refreshResults){
-              filteredResults.value = allAlerts.value;
-            }
-          
-          //here we are filtering the alerts by the activeTab
-          //why we are passing the refreshResults flag as false because we dont need to show the alerts in the table
-          filterAlertsByTab(refreshResults);
-          if (router.currentRoute.value.query.action == "import") {
-            showImportAlertDialog.value = true;
-          }
-          if (router.currentRoute.value.query.action == "add") {
-            showAddUpdateFn({ row: undefined });
-          }
-          if (router.currentRoute.value.query.action == "update") {
-            const alertId = router.currentRoute.value.query.alert_id as string;
-            const alert = await getAlertById(alertId);
+          return {
+            "#": counter <= 9 ? `0${counter++}` : counter++,
+            alert_id: data.alert_id,
+            name: data.name,
+            alert_type: data.is_real_time ? "Real Time" : "Scheduled",
+            stream_name: data.stream_name ? data.stream_name : "--",
+            stream_type: data.stream_type,
+            enabled: data.enabled,
+            conditions: "--", // Placeholder - will be converted on-demand in triggerExpand
+            rawCondition: data.condition, // Store raw condition for lazy conversion
+            description: data.description,
+            uuid: data.uuid,
+            owner: data.owner,
+            period: data.is_real_time ? "" : data?.trigger_condition?.period,
+            frequency: data.is_real_time ? "" : frequency,
+            frequency_type: data?.trigger_condition?.frequency_type,
+            last_triggered_at: convertUnixToQuasarFormat(
+              data.last_triggered_at,
+            ),
+            last_satisfied_at: convertUnixToQuasarFormat(
+              data.last_satisfied_at,
+            ),
+            last_trained_at: "",
+            status: "--",
+            selected: false,
+            type: data.condition.type,
+            folder_name: {
+              name: data.folder_name,
+              id: data.folder_id,
+            },
+            is_real_time: data.is_real_time,
+          };
+        });
 
-            showAddUpdateFn({
-              row: alert,
-            });
-          }
+        //this is the condition where we are setting the alertStateLoadingMap
+        localAllAlerts.forEach((alert: any) => {
+          alertStateLoadingMap.value[alert.uuid as string] = false;
+        });
+        //this is the condition where we are setting the allAlertsListByFolderId in the store
+        store?.dispatch("setAllAlertsListByFolderId", {
+          ...store.state.organizationData.allAlertsListByFolderId,
+          [folderId]: localAllAlerts,
+        });
+        //RACE CONDITION handling
+        //this is the condition where we are checking the if the folderId is not equal to the activeFolderId
+        //if it is not equal then we are returning  and if is not search across folders then we are returning as well as in previous step we are anyways storing in the store for future use
+        //this will prevent the side effects of allAlerts are overriding the actual alerts if users are rapidly moving from one folder to another folder
+        if (folderId != activeFolderId.value && !query) {
           dismiss();
+          return;
+        }
+        //here we are actually assigning the localAllAlerts to the allAlerts to avoid the side effects of allAlerts are overriding the actual alerts if users are rapidly moving from one folder to another folder
+        allAlerts.value = localAllAlerts;
+        //this is the condition where we are setting the filteredResults
+        //1. If it is search across folders then also we are setting the filteredResults(which contains the filtered alerts)
+        //2. If it is not search across folders then we are setting the filteredResults to the alerts(which contains all the alerts)
+        //here we are setting the filteredResults to the alerts
+        if (refreshResults) {
+          filteredResults.value = allAlerts.value;
+        }
+
+        //here we are filtering the alerts by the activeTab
+        //why we are passing the refreshResults flag as false because we dont need to show the alerts in the table
+        filterAlertsByTab(refreshResults);
+        if (router.currentRoute.value.query.action == "import") {
+          showImportAlertDialog.value = true;
+        }
+        if (router.currentRoute.value.query.action == "add") {
+          showAddUpdateFn({ row: undefined });
+        }
+        if (router.currentRoute.value.query.action == "update") {
+          const alertId = router.currentRoute.value.query.alert_id as string;
+          const alert = await getAlertById(alertId);
+
+          showAddUpdateFn({
+            row: alert,
+          });
+        }
+        dismiss();
       } catch (error) {
-          console.error(error);
-          dismiss();
-          $q.notify({
-            type: "negative",
-            message: "Error while pulling alerts.",
-            timeout: 2000,
-          });
+        console.error(error);
+        dismiss();
+        $q.notify({
+          type: "negative",
+          message: "Error while pulling alerts.",
+          timeout: 2000,
+        });
       }
     };
     const getAlertById = async (id: string) => {
@@ -1379,19 +1698,20 @@ export default defineComponent({
     //   filterAlertsByTab();
     // });
     watch(
-        () => store.state.organizationData.foldersByType["alerts"],
-        async (folders) => {
-          if (!folders) return;
+      () => store.state.organizationData.foldersByType["alerts"],
+      async (folders) => {
+        if (!folders) return;
 
-          const folderQuery = router.currentRoute.value.query.folder;
-          const matchingFolder = folders.find((it: any) => it.folderId === folderQuery);
+        const folderQuery = router.currentRoute.value.query.folder;
+        const matchingFolder = folders.find(
+          (it: any) => it.folderId === folderQuery,
+        );
 
-
-          activeFolderId.value = matchingFolder ? folderQuery : "default";
-          filterAlertsByTab();
-        },
-        { immediate: true }
-      );
+        activeFolderId.value = matchingFolder ? folderQuery : "default";
+        filterAlertsByTab();
+      },
+      { immediate: true },
+    );
     watch(
       () => activeFolderId.value,
       async (newVal) => {
@@ -1399,7 +1719,7 @@ export default defineComponent({
         selectedAlerts.value = [];
         allSelectedAlerts.value = false;
 
-        if(newVal == router.currentRoute.value.query.folder){
+        if (newVal == router.currentRoute.value.query.folder) {
           return;
         }
         if (searchAcrossFolders.value) {
@@ -1428,15 +1748,14 @@ export default defineComponent({
       //here we check the if the new Query is empty and searchAcrossFolders is true
       //then only we are fetching the alerts by the folderId and then filtering the alerts by the activeTab
       //this is done because when we click on the any folder that is there in the the row when we do search across folders
-      //at that time also we are resetting theh searchQuery if any so it will trigger this watch which will cause fetching the alerts again 
+      //at that time also we are resetting theh searchQuery if any so it will trigger this watch which will cause fetching the alerts again
       //so to avoid we are checking the if the newQuery is empty and searchAcrossFolders is true
-      if(newQuery == "" && searchAcrossFolders.value){
+      if (newQuery == "" && searchAcrossFolders.value) {
         //here we are fetching the alerts by the folderId and then filtering the alerts by the activeTab
         //this is done because for empty searchQuery we need to fetch the alerts by the folderId
         await getAlertsByFolderId(store, activeFolderId.value);
-       filterAlertsByTab();
-      }
-      else{
+        filterAlertsByTab();
+      } else {
         //here we are filtering the alerts by the searchQuery
         await debouncedSearch(newQuery);
         filterAlertsByTab();
@@ -1524,9 +1843,9 @@ export default defineComponent({
       return filteredResults.value?.length;
     });
     const maxRecordToReturn = ref<number>(100);
-    const selectedPerPage = ref<number>(20);
+    const selectedPerPage = ref<number>(savedAlertListFilters.perPage || 20);
     const pagination: any = ref({
-      rowsPerPage: 20,
+      rowsPerPage: savedAlertListFilters.perPage || 20,
     });
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
@@ -1552,13 +1871,73 @@ export default defineComponent({
     const duplicateAlert = async (row: any) => {
       toBeClonedID.value = row.alert_id;
       toBeCloneAlertName.value = row.name;
+      toBeClonedIsAnomaly.value = row.type === "anomaly";
       toBeClonestreamName.value = "";
       toBeClonestreamType.value = "";
       showForm.value = true;
-      toBeClonedAlert.value = await getAlertById(row.alert_id);
+      // Anomaly rows use the /clone endpoint — no need to pre-fetch full data
+      if (!toBeClonedIsAnomaly.value) {
+        toBeClonedAlert.value = await getAlertById(row.alert_id);
+      }
     };
     const submitForm = async () => {
-
+      // Anomaly rows: use the dedicated /clone endpoint (no fetch+mutate dance needed)
+      if (toBeClonedIsAnomaly.value) {
+        if (!toBeClonestreamType.value) {
+          $q.notify({
+            type: "negative",
+            message: "Please select stream type ",
+            timeout: 2000,
+          });
+          return;
+        }
+        if (!toBeClonestreamName.value) {
+          $q.notify({
+            type: "negative",
+            message: "Please select stream name",
+            timeout: 2000,
+          });
+          return;
+        }
+        isSubmitting.value = true;
+        const dismiss = $q.notify({
+          spinner: true,
+          message: "Please wait...",
+          timeout: 2000,
+        });
+        try {
+          await alertsService.clone_by_id(
+            store.state.selectedOrganization.identifier,
+            toBeClonedID.value,
+            {
+              name: toBeCloneAlertName.value,
+              folder_id: (folderIdToBeCloned.value as string) || "default",
+              stream_type: toBeClonestreamType.value,
+              stream_name: toBeClonestreamName.value,
+            },
+          );
+          dismiss();
+          $q.notify({
+            type: "positive",
+            message: "Anomaly detection cloned successfully",
+            timeout: 2000,
+          });
+          showForm.value = false;
+          await getAlertsFn(store, folderIdToBeCloned.value);
+          activeFolderId.value = folderIdToBeCloned.value;
+        } catch (e: any) {
+          dismiss();
+          $q.notify({
+            type: "negative",
+            message:
+              e?.response?.data?.message || "Failed to clone anomaly detection",
+            timeout: 2000,
+          });
+        } finally {
+          isSubmitting.value = false;
+        }
+        return;
+      }
 
       if (!toBeClonedAlert.value) {
         $q.notify({
@@ -1601,9 +1980,9 @@ export default defineComponent({
           delete toBeClonedAlert.value?.id;
         }
         //assigning the owner from the alert payload because the current logged in user will be the owner of the cloned alert
-          toBeClonedAlert.value.owner = store.state.userInfo.email;
+        toBeClonedAlert.value.owner = store.state.userInfo.email;
         //assigning the last_edited_by from the alert payload because the current logged in user will be the last_edited_by of the cloned alert
-          toBeClonedAlert.value.last_edited_by = store.state.userInfo.email;
+        toBeClonedAlert.value.last_edited_by = store.state.userInfo.email;
         //here using the folderIdToBeCloned.value because we need to clone the alert in the folder which is selected by the user
         alertsService
           .create_by_alert_id(
@@ -1663,59 +2042,64 @@ export default defineComponent({
       let action;
       try {
         if (!props.row) {
-        isUpdated.value = false;
-        action = "Add Alert";
-        await router.push({
-          name: "alertList",
-          query: {
-            ...router.currentRoute.value.query,
-            action: "add",
-            org_identifier: store.state.selectedOrganization.identifier,
-            folder: activeFolderId.value,
-            alert_type: activeTab.value
-          },
-        });
-      } else {
-        isUpdated.value = true;
-        action = "Update Alert";
-        await router.push({
-          name: "alertList",
-          query: {
-            ...router.currentRoute.value.query,
-            alert_id: props.row.id,
-            action: "update",
-            name: props.row.name,
-            org_identifier: store.state.selectedOrganization.identifier,
-            folder: activeFolderId.value
-          },
-        });
-      }
-      addAlert();
-      if (config.enableAnalytics == "true") {
-        segment.track("Button Click", {
+          isUpdated.value = false;
+          action = "Add Alert";
+          await router.push({
+            name: "alertList",
+            query: {
+              ...router.currentRoute.value.query,
+              action: "add",
+              org_identifier: store.state.selectedOrganization.identifier,
+              folder: activeFolderId.value,
+              alert_type: activeTab.value,
+            },
+          });
+        } else {
+          isUpdated.value = true;
+          action = "Update Alert";
+          await router.push({
+            name: "alertList",
+            query: {
+              ...router.currentRoute.value.query,
+              alert_id: props.row.id,
+              action: "update",
+              name: props.row.name,
+              org_identifier: store.state.selectedOrganization.identifier,
+              folder: activeFolderId.value,
+            },
+          });
+        }
+        addAlert();
+        if (config.enableAnalytics == "true") {
+          segment.track("Button Click", {
+            button: action,
+            user_org: store.state.selectedOrganization.identifier,
+            user_id: store.state.userInfo.email,
+            page: "Alerts",
+          });
+        }
+        track("Button Click", {
           button: action,
-          user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
-          page: "Alerts",
+          page: "Add Alert",
         });
-      }
-      track("Button Click", {
-        button: action,
-        page: "Add Alert"
-      });
       } catch (error) {
-        console.error('Navigation failed:', error);
+        console.error("Navigation failed:", error);
       }
-
     };
-    const refreshList = async (folderId: string) => {
+    const refreshList = async (folderId?: string) => {
       //here we are fetching the alerts from the server because after creating the alert we should get the latest alerts
       //and then we are setting the activeFolderId to the folderId
       //this is done to avoid multiple api calls , when we assign the folderId before fetching it will trigger the watch and it will fetch the alerts again
       //and we dont need to fetch the alerts again because we are already fetching the alerts in the getAlertsFn
-      await getAlertsFn(store, folderId);
+      const resolvedFolderId = folderId || activeFolderId.value || "default";
+      // Always fetch the latest alerts for the folder from backend
+      await getAlertsFn(store, resolvedFolderId);
+      // Re-apply active search/filter on the freshly fetched data
+      if (filterQuery.value) {
+        filterAlertsByQuery(filterQuery.value);
+      }
       await hideForm();
-      activeFolderId.value = folderId;
+      activeFolderId.value = resolvedFolderId;
     };
     const hideForm = async () => {
       showAddAlertDialog.value = false;
@@ -1724,11 +2108,12 @@ export default defineComponent({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           folder: activeFolderId.value,
+          tab: activeTab.value,
         },
       });
       track("Button Click", {
         button: "Hide Form",
-        page: "Add Alert"
+        page: "Add Alert",
       });
     };
     const deleteAlertByAlertId = () => {
@@ -1746,7 +2131,7 @@ export default defineComponent({
               timeout: 2000,
             });
             await getAlertsFn(store, activeFolderId.value);
-            if(filterQuery.value){
+            if (filterQuery.value) {
               filterAlertsByQuery(filterQuery.value);
             }
           } else {
@@ -1908,8 +2293,12 @@ export default defineComponent({
     };
 
     const exportAlert = async (row: any) => {
-      // Find the alert based on uuid
-      const alertToBeExported = await getAlertById(row.alert_id);
+      // Use the /export endpoint — strips runtime fields for anomaly configs, works for regular alerts too
+      const res = await alertsService.export_by_id(
+        store.state.selectedOrganization.identifier,
+        row.alert_id,
+      );
+      const alertToBeExported = res.data;
 
       if (alertToBeExported.hasOwnProperty("id")) {
         delete alertToBeExported.id;
@@ -1949,13 +2338,16 @@ export default defineComponent({
         await alertsService.trigger_alert(
           store.state.selectedOrganization.identifier,
           row.alert_id,
-          row.folder_name?.id
+          row.folder_name?.id,
         );
         $q.notify({
           type: "positive",
           message: t("alerts.alertTriggeredSuccess"),
           timeout: 2000,
         });
+        if (row.type === "anomaly") {
+          await getAlertsFn(store, activeFolderId.value);
+        }
       } catch (error: any) {
         $q.notify({
           type: "negative",
@@ -1965,21 +2357,69 @@ export default defineComponent({
       }
     };
 
+    const retrainAnomaly = async (row: any) => {
+      try {
+        await alertsService.retrain_by_id(
+          store.state.selectedOrganization.identifier,
+          row.alert_id,
+        );
+        row.status = "training";
+        $q.notify({
+          type: "positive",
+          message: "Retraining triggered",
+          timeout: 2000,
+        });
+      } catch (error: any) {
+        $q.notify({
+          type: "negative",
+          message:
+            error?.response?.data?.message || "Failed to trigger retraining",
+          timeout: 2000,
+        });
+      }
+    };
+
     const updateActiveFolderId = async (newVal: any) => {
       //this is the condition we kept because when we we click on the any folder that is there in the the row when we do search across folders
-      //at that time if it is the same folder it wont trigger the watch and it will show the alerts of the filtered only 
+      //at that time if it is the same folder it wont trigger the watch and it will show the alerts of the filtered only
       //so we are fetching the alerts by the folderId and then filtering the alerts by the activeTab this is done explicitly on only if users clicks on same folder
-      if(newVal == activeFolderId.value){
-        getAlertsByFolderId(store, newVal);
+      if (newVal == activeFolderId.value) {
+        if (isRestoringState.value) {
+          // Force fresh fetch from backend (cache may be stale after add/edit on another route)
+          isRestoringState.value = false;
+          await getAlertsFn(store, newVal);
+          if (searchAcrossFolders.value && searchQuery.value) {
+            await getAlertsFn(store, activeFolderId.value, searchQuery.value);
+            filterAlertsByTab();
+          } else if (filterQuery.value) {
+            filterAlertsByQuery(filterQuery.value);
+          } else {
+            filterAlertsByTab();
+          }
+          return;
+        }
+        await getAlertsByFolderId(store, newVal);
         filterAlertsByTab();
+      }
+      // When restoring state from a prior navigation, skip clearing search filters
+      if (isRestoringState.value) {
+        isRestoringState.value = false;
+        await getAlertsFn(store, newVal);
+        if (filterQuery.value) {
+          filterAlertsByQuery(filterQuery.value);
+        } else {
+          filterAlertsByTab();
+        }
+        activeFolderId.value = newVal;
+        return;
       }
       //here we are resetting the searchQuery, filterQuery, searchAcrossFolders, allSelectedAlerts, selectedAlerts
       //here we only reset if the value is not null
-      if(searchQuery.value) searchQuery.value = "";
-      if(filterQuery.value) filterQuery.value = "";
-      if(searchAcrossFolders.value) searchAcrossFolders.value = false;
-      if(allSelectedAlerts.value) allSelectedAlerts.value = false;
-      if(selectedAlerts.value) selectedAlerts.value = [];
+      if (searchQuery.value) searchQuery.value = "";
+      if (filterQuery.value) filterQuery.value = "";
+      if (searchAcrossFolders.value) searchAcrossFolders.value = false;
+      if (allSelectedAlerts.value) allSelectedAlerts.value = false;
+      if (selectedAlerts.value) selectedAlerts.value = [];
       activeFolderId.value = newVal;
       //here we are resetting the selected alerts
       //this is done because we need to reset the selected alerts when the user is changing the folder
@@ -1990,6 +2430,19 @@ export default defineComponent({
     };
 
     const editAlert = async (row: any) => {
+      // Anomaly detection rows route to the dedicated edit page
+      if (row.type === "anomaly") {
+        await router.push({
+          name: "editAnomalyDetection",
+          params: { anomaly_id: row.alert_id },
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+            folder: activeFolderId.value,
+            tab: activeTab.value,
+          },
+        });
+        return;
+      }
       // Don't fetch alert data here - let the watcher handle it to avoid duplicate API calls
       // Just trigger the route change with alert_id, the watcher will fetch and call showAddUpdateFn
       await router.push({
@@ -2000,7 +2453,7 @@ export default defineComponent({
           action: "update",
           name: row.name,
           org_identifier: store.state.selectedOrganization.identifier,
-          folder: activeFolderId.value
+          folder: activeFolderId.value,
         },
       });
     };
@@ -2011,14 +2464,19 @@ export default defineComponent({
       // Close the drawer first
       showAlertDetailsDrawer.value = false;
 
-      // Get the full alert data and open the edit form
-      const selectedAlert = await getAlertById(selectedAlertDetails.value.alert_id);
-      showAddUpdateFn({ row: selectedAlert });
+      // Reuse the same edit flow as the listing page
+      await editAlert(selectedAlertDetails.value);
     };
 
     const moveAlertToAnotherFolder = (row: any) => {
       showMoveAlertDialog.value = true;
-      selectedAlertToMove.value = [row.alert_id];
+      if (row.type === "anomaly") {
+        selectedAlertToMove.value = [];
+        selectedAnomalyConfigsToMove.value = [row.alert_id];
+      } else {
+        selectedAlertToMove.value = [row.alert_id];
+        selectedAnomalyConfigsToMove.value = [];
+      }
       activeFolderToMove.value = activeFolderId.value;
     };
 
@@ -2027,10 +2485,11 @@ export default defineComponent({
       selectedFolderId: any,
     ) => {
       //here we are fetching the alerts of the selected folder first and then fetching the alerts of the active folder
-      await getAlertsFn(store, selectedFolderId, "",false);
+      await getAlertsFn(store, selectedFolderId, "", false);
       await getAlertsFn(store, activeFolderId);
       showMoveAlertDialog.value = false;
       selectedAlertToMove.value = [];
+      selectedAnomalyConfigsToMove.value = [];
       activeFolderToMove.value = "";
       selectedAlerts.value = [];
       allSelectedAlerts.value = false;
@@ -2046,10 +2505,12 @@ export default defineComponent({
 
     const moveMultipleAlerts = () => {
       showMoveAlertDialog.value = true;
-      const selectedAlertsToMove = selectedAlerts.value.map((alert: any) => {
-        return alert.alert_id;
-      });
-      selectedAlertToMove.value = selectedAlertsToMove;
+      selectedAlertToMove.value = selectedAlerts.value
+        .filter((alert: any) => alert.type !== "anomaly")
+        .map((alert: any) => alert.alert_id);
+      selectedAnomalyConfigsToMove.value = selectedAlerts.value
+        .filter((alert: any) => alert.type === "anomaly")
+        .map((alert: any) => alert.alert_id);
       activeFolderToMove.value = activeFolderId.value;
     };
 
@@ -2086,7 +2547,7 @@ export default defineComponent({
     }, 600);
 
     watch(filterQuery, (newVal) => {
-      if(newVal == ""){
+      if (newVal == "") {
         filterAlertsByTab();
       }
       if (newVal) {
@@ -2096,27 +2557,39 @@ export default defineComponent({
     watch(searchAcrossFolders, (newVal) => {
       selectedAlerts.value = [];
       allSelectedAlerts.value = false;
-      if(newVal){
+      if (newVal) {
         //here we are setting the searchQuery to null and then setting the filterQuery to the searchQuery
         //this is done because we want to clear the searchQuery and then set the filterQuery to the searchQuery
         searchQuery.value = null;
         searchQuery.value = filterQuery.value;
         filterQuery.value = null;
       }
-      if(!newVal){
-        //here we are setting the filterQuery to null and then setting the searchQuery to the filterQuery
-        //here we are also setting the filteredResults to the allAlertsListByFolderId as we are not searching across folders
-        //this is done because we want to clear the filterQuery and then set the searchQuery to the filterQuery
-        filteredResults.value = store.state.organizationData.allAlertsListByFolderId[activeFolderId.value];
+      if (!newVal) {
+        //here we are restoring the current folder's alerts and re-filtering by the active tab
+        //this ensures cross-folder results are cleared and only the current folder's data is shown
+        const currentFolderAlerts =
+          store.state.organizationData.allAlertsListByFolderId[
+            activeFolderId.value
+          ] || [];
+        allAlerts.value = currentFolderAlerts;
         filterQuery.value = null;
-        filterQuery.value = searchQuery.value;
         searchQuery.value = null;
+        filterAlertsByTab();
       }
+    });
+    // Persist filter state to Vuex so it survives navigation to add/edit screens
+    watch([searchQuery, filterQuery, searchAcrossFolders, selectedPerPage], () => {
+      store.commit("setAlertListFilters", {
+        searchQuery: searchQuery.value || "",
+        filterQuery: filterQuery.value || "",
+        searchAcrossFolders: !!searchAcrossFolders.value,
+        perPage: selectedPerPage.value,
+      });
     });
     watch(activeTab, async (newVal) => {
       //here we are resetting the filterQuery when the activeTab is changed
       //this is done because we need to trigger again the filterQuery watch
-      if(filterQuery.value){
+      if (filterQuery.value) {
         let tempQuery = filterQuery.value;
         filterQuery.value = null;
         await nextTick();
@@ -2169,11 +2642,11 @@ export default defineComponent({
 
         const alertsData = await Promise.all(
           selectedAlertsToExport.map(async (alertId: string) => {
-            const alertData = await getAlertById(alertId);
-            if (alertData.hasOwnProperty("id")) {
-              delete alertData.id;
-            }
-            return alertData;
+            const res = await alertsService.export_by_id(
+              store.state.selectedOrganization.identifier,
+              alertId,
+            );
+            return res.data;
           }),
         );
         alertToBeExported.push(...alertsData);
@@ -2234,61 +2707,62 @@ export default defineComponent({
 
     // V1 format: {or: [...]} or {and: [...]}
     function transformToExpression(data: any, wrap = true): any {
-        if (!data) return null;
+      if (!data) return null;
 
-        const keys = Object.keys(data);
-        if (keys.length !== 1) return null;
+      const keys = Object.keys(data);
+      if (keys.length !== 1) return null;
 
-        const label = keys[0].toUpperCase(); // AND or OR
-        const itemsArray = data[label.toLowerCase()];
+      const label = keys[0].toUpperCase(); // AND or OR
+      const itemsArray = data[label.toLowerCase()];
 
-        const parts = itemsArray.map((item: any) => {
-          if (item.and || item.or) {
-            return transformToExpression(item, true); // wrap nested groups
-          } else {
-            const column = item.column;
-            const operator = item.operator;
-            const value = typeof item.value === 'string' ? `'${item.value}'` : item.value;
-            return `${column} ${operator} ${value}`;
-          }
-        });
+      const parts = itemsArray.map((item: any) => {
+        if (item.and || item.or) {
+          return transformToExpression(item, true); // wrap nested groups
+        } else {
+          const column = item.column;
+          const operator = item.operator;
+          const value =
+            typeof item.value === "string" ? `'${item.value}'` : item.value;
+          return `${column} ${operator} ${value}`;
+        }
+      });
 
-        const joined = parts.join(` ${label} `);
-        return wrap ? `(${joined})` : joined;
-      }
-
-      // V2 format: {filterType: "group", logicalOperator: "AND", conditions: [...]}
-      // Uses shared buildConditionsString utility for consistency
-      function transformV2ToExpression(group: any, isRoot = true): string {
-        const result = buildConditionsString(group, {
-          sqlMode: false,        // Display format (lowercase operators)
-          addWherePrefix: false,
-          formatValues: false,   // Simple display without type-aware formatting
-        });
-
-        // Wrap in parentheses if it's the root level and has content
-        return isRoot && result ? `(${result})` : result;
-      }
-      //this function is used to filter the alerts by the local search not the global search
-      //this will be used when the user is searching for the alerts in the same folder
-    const filterAlertsByQuery = (query: string) => {
-      let tempResults = allAlerts.value.filter((alert: any) =>
-          alert.name.toLowerCase().includes(query.toLowerCase())
-        )
-        filteredResults.value = tempResults.filter((alert: any) => {
-          if (activeTab.value === "scheduled") {
-            return !alert.is_real_time;
-          } else if (activeTab.value === "realTime") {
-            return alert.is_real_time === true;
-          } else if (activeTab.value === "anomalyDetection") {
-            return alert.is_real_time === "anomaly";
-          } else {
-            return true;
-          }
-        })
+      const joined = parts.join(` ${label} `);
+      return wrap ? `(${joined})` : joined;
     }
 
-  const bulkToggleAlerts = async (action: "pause" | "resume") => {
+    // V2 format: {filterType: "group", logicalOperator: "AND", conditions: [...]}
+    // Uses shared buildConditionsString utility for consistency
+    function transformV2ToExpression(group: any, isRoot = true): string {
+      const result = buildConditionsString(group, {
+        sqlMode: false, // Display format (lowercase operators)
+        addWherePrefix: false,
+        formatValues: false, // Simple display without type-aware formatting
+      });
+
+      // Wrap in parentheses if it's the root level and has content
+      return isRoot && result ? `(${result})` : result;
+    }
+    //this function is used to filter the alerts by the local search not the global search
+    //this will be used when the user is searching for the alerts in the same folder
+    const filterAlertsByQuery = (query: string) => {
+      let tempResults = allAlerts.value.filter((alert: any) =>
+        alert.name.toLowerCase().includes(query.toLowerCase()),
+      );
+      filteredResults.value = tempResults.filter((alert: any) => {
+        if (activeTab.value === "scheduled") {
+          return !alert.is_real_time;
+        } else if (activeTab.value === "realTime") {
+          return alert.is_real_time === true;
+        } else if (activeTab.value === "anomalyDetection") {
+          return alert.is_real_time === "anomaly";
+        } else {
+          return true;
+        }
+      });
+    };
+
+    const bulkToggleAlerts = async (action: "pause" | "resume") => {
       const dismiss = $q.notify({
         spinner: true,
         message: `${action === "resume" ? "Resuming" : "Pausing"} alerts...`,
@@ -2299,7 +2773,7 @@ export default defineComponent({
 
         // Filter alerts based on action
         const alertsToToggle = selectedAlerts.value.filter((alert: any) =>
-          isResuming ? !alert.enabled : alert.enabled
+          isResuming ? !alert.enabled : alert.enabled,
         );
 
         if (alertsToToggle.length === 0) {
@@ -2322,7 +2796,7 @@ export default defineComponent({
         const response = await alertsService.bulkToggleState(
           store.state.selectedOrganization.identifier,
           isResuming,
-          payload
+          payload,
         );
 
         if (response) {
@@ -2337,8 +2811,8 @@ export default defineComponent({
         await getAlertsFn(store, activeFolderId.value);
 
         if (filterQuery.value) {
-            filterAlertsByQuery(filterQuery.value);
-          };
+          filterAlertsByQuery(filterQuery.value);
+        }
       } catch (error) {
         dismiss();
         console.error(`Error ${action}ing alerts:`, error);
@@ -2350,103 +2824,106 @@ export default defineComponent({
       }
     };
 
-  const confirmBulkDelete = ref<boolean>(false);
+    const confirmBulkDelete = ref<boolean>(false);
 
-  const openBulkDeleteDialog = () => {
-    confirmBulkDelete.value = true;
-  };
+    const openBulkDeleteDialog = () => {
+      confirmBulkDelete.value = true;
+    };
 
-  const bulkDeleteAlerts = async () => {
-    const dismiss = $q.notify({
-      spinner: true,
-      message: "Deleting alerts...",
-      timeout: 0,
-    });
+    const bulkDeleteAlerts = async () => {
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Deleting alerts...",
+        timeout: 0,
+      });
 
-    try {
-      if (selectedAlerts.value.length === 0) {
-        $q.notify({
-          type: "negative",
-          message: "No alerts selected for deletion",
-          timeout: 2000,
-        });
-        dismiss();
-        return;
-      }
-
-      // Extract alert ids
-      const payload = {
-        ids: selectedAlerts.value.map((a: any) => a.alert_id),
-      };
-
-      const response = await alertsService.bulkDelete(
-        store.state.selectedOrganization.identifier,
-        payload,
-        activeFolderId.value
-      );
-
-      dismiss();
-
-      // Handle response based on successful/unsuccessful arrays
-      if (response.data) {
-        const { successful = [], unsuccessful = [] } = response.data;
-        const successCount = successful.length;
-        const failCount = unsuccessful.length;
-
-        if (failCount > 0 && successCount > 0) {
-          // Partial success
-          $q.notify({
-            type: "warning",
-            message: `${successCount} alert(s) deleted successfully, ${failCount} failed`,
-            timeout: 5000,
-          });
-        } else if (failCount > 0) {
-          // All failed
+      try {
+        if (selectedAlerts.value.length === 0) {
           $q.notify({
             type: "negative",
-            message: `Failed to delete ${failCount} alert(s)`,
-            timeout: 3000,
+            message: "No alerts selected for deletion",
+            timeout: 2000,
           });
+          dismiss();
+          return;
+        }
+
+        // Extract alert ids
+        const payload = {
+          ids: selectedAlerts.value.map((a: any) => a.alert_id),
+        };
+
+        const response = await alertsService.bulkDelete(
+          store.state.selectedOrganization.identifier,
+          payload,
+          activeFolderId.value,
+        );
+
+        dismiss();
+
+        // Handle response based on successful/unsuccessful arrays
+        if (response.data) {
+          const { successful = [], unsuccessful = [] } = response.data;
+          const successCount = successful.length;
+          const failCount = unsuccessful.length;
+
+          if (failCount > 0 && successCount > 0) {
+            // Partial success
+            $q.notify({
+              type: "warning",
+              message: `${successCount} alert(s) deleted successfully, ${failCount} failed`,
+              timeout: 5000,
+            });
+          } else if (failCount > 0) {
+            // All failed
+            $q.notify({
+              type: "negative",
+              message: `Failed to delete ${failCount} alert(s)`,
+              timeout: 3000,
+            });
+          } else {
+            // All successful
+            $q.notify({
+              type: "positive",
+              message: `${successCount} alert(s) deleted successfully`,
+              timeout: 2000,
+            });
+          }
         } else {
-          // All successful
+          // Fallback success message
           $q.notify({
             type: "positive",
-            message: `${successCount} alert(s) deleted successfully`,
+            message: `${selectedAlerts.value.length} alert(s) deleted successfully`,
             timeout: 2000,
           });
         }
-      } else {
-        // Fallback success message
-        $q.notify({
-          type: "positive",
-          message: `${selectedAlerts.value.length} alert(s) deleted successfully`,
-          timeout: 2000,
-        });
+
+        selectedAlerts.value = [];
+        // Refresh alerts
+        await getAlertsFn(store, activeFolderId.value);
+
+        if (filterQuery.value) {
+          filterAlertsByQuery(filterQuery.value);
+        }
+      } catch (error: any) {
+        dismiss();
+
+        // Show error message from response if available
+        const errorMessage =
+          error.response?.data?.message ||
+          error?.message ||
+          "Error deleting alerts. Please try again.";
+        if (error.response?.status != 403 || error?.status != 403) {
+          $q.notify({
+            type: "negative",
+            message: errorMessage,
+            timeout: 3000,
+          });
+        }
       }
 
-      selectedAlerts.value = [];
-      // Refresh alerts
-      await getAlertsFn(store, activeFolderId.value);
-
-      if (filterQuery.value) {
-        filterAlertsByQuery(filterQuery.value);
-      }
-    } catch (error: any) {
-      dismiss();
-
-      // Show error message from response if available
-      const errorMessage = error.response?.data?.message || error?.message || "Error deleting alerts. Please try again.";
-      if (error.response?.status != 403 || error?.status != 403) {
-        $q.notify({
-          type: "negative",
-          message: errorMessage,
-          timeout: 3000,
-        });
-      }
-    }
-
-    confirmBulkDelete.value = false;
-  };
+      confirmBulkDelete.value = false;
+    };
 
     return {
       t,
@@ -2475,6 +2952,7 @@ export default defineComponent({
       showAddAlertDialog,
       showForm,
       toBeCloneAlertName,
+      toBeClonedIsAnomaly,
       toBeClonestreamType,
       toBeClonestreamName,
       streamTypes,
@@ -2520,6 +2998,7 @@ export default defineComponent({
       getTemplates,
       exportAlert,
       triggerAlert,
+      retrainAnomaly,
       updateActiveFolderId,
       activeFolderId,
       editAlert,
@@ -2528,6 +3007,7 @@ export default defineComponent({
       showMoveAlertDialog,
       outlinedDriveFileMove,
       selectedAlertToMove,
+      selectedAnomalyConfigsToMove,
       moveAlertToAnotherFolder,
       activeFolderToMove,
       updateAcrossFolders,
@@ -2567,6 +3047,7 @@ export default defineComponent({
       confirmBulkDelete,
       symOutlinedSoundSampler,
       config,
+      isCompactToolbar,
     };
   },
 });
@@ -2611,7 +3092,6 @@ export default defineComponent({
   width: calc(14vw);
 }
 
-
 .clone-alert-popup {
   width: 400px;
 }
@@ -2642,12 +3122,19 @@ export default defineComponent({
   word-wrap: break-word;
   font-size: 12px;
 }
+
+@media (max-width: 1440px) {
+  .app-tabs-container .o2-tab {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+    min-width: auto !important;
+  }
+}
 </style>
 
 <style lang="scss" scoped>
 .dark-theme {
   background-color: $dark-page;
-  
 
   .alerts-list-tabs {
     height: fit-content;
@@ -2657,7 +3144,6 @@ export default defineComponent({
     }
 
     :deep(.rum-tab) {
-      
       &:hover {
         background: #464646;
       }
@@ -2695,11 +3181,32 @@ export default defineComponent({
     }
   }
 }
-.all-folders-toggle{
-  :deep(.q-toggle__inner){
+.compact-icon-btn {
+  padding: 0 0.5rem !important;
+  min-width: 0 !important;
+}
+
+.alert-search-input {
+  :deep(.q-field__control) {
+    padding: 0 2px !important;
+  }
+
+  :deep(.q-field__prepend) {
+    padding-left: 2px !important;
+    padding-right: 0 !important;
+  }
+
+  :deep(.q-field__append) {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+
+.all-folders-toggle {
+  :deep(.q-toggle__inner) {
     height: 1.1em !important;
   }
-  :deep(.q-toggle__label ){
+  :deep(.q-toggle__label) {
     margin-top: 2px !important;
   }
 }

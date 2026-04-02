@@ -16,7 +16,6 @@
 use std::{
     io::BufReader,
     net::{Ipv4Addr, Ipv6Addr},
-    sync::Arc,
 };
 
 use itertools::Itertools;
@@ -61,34 +60,38 @@ pub fn http_tls_config() -> Result<rustls::ServerConfig, anyhow::Error> {
     Ok(tls_config)
 }
 
-pub fn client_tls_config() -> Result<Arc<rustls::ClientConfig>, anyhow::Error> {
+pub fn client_tls_config() -> Result<rustls::ClientConfig, anyhow::Error> {
     let cfg = config::get_config();
-    let cert_store = if cfg.http.tls_root_certificates.as_str().to_lowercase() == "native" {
-        // Load native system certificates
-        let mut cert_store = rustls::RootCertStore::empty();
-        let certs = rustls_native_certs::load_native_certs();
-        for cert in certs.certs {
-            cert_store.add(cert)?;
+    let cert_store = match cfg.http.tls_root_certificates {
+        config::TlsRootCertificates::Native => {
+            let mut cert_store = rustls::RootCertStore::empty();
+            let native_certs = rustls_native_certs::load_native_certs();
+            for cert in native_certs.certs {
+                cert_store.add(cert)?;
+            }
+            if let Some(err) = native_certs.errors.first() {
+                log::warn!("Failed to load some native certificates: {}", err);
+            }
+            cert_store
         }
-        if let Some(err) = certs.errors.first() {
-            log::warn!("Failed to load some native certificates: {}", err);
+        config::TlsRootCertificates::Webpki => {
+            let mut cert_store = rustls::RootCertStore::empty();
+            cert_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+            if !cfg.http.tls_cert_path.is_empty() {
+                let cert_file = &mut BufReader::new(
+                    std::fs::File::open(&cfg.http.tls_cert_path).map_err(|e| {
+                        anyhow::anyhow!(
+                            "Failed to open TLS certificate file {}: {}",
+                            &cfg.http.tls_cert_path,
+                            e
+                        )
+                    })?,
+                );
+                let cert_chain = certs(cert_file);
+                cert_store.add_parsable_certificates(cert_chain.try_collect::<_, Vec<_>, _>()?);
+            }
+            cert_store
         }
-        cert_store
-    } else {
-        // default use webpki, and add custom ca certificates
-        let mut cert_store = rustls::RootCertStore::empty();
-        cert_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-        let cert_file =
-            &mut BufReader::new(std::fs::File::open(&cfg.http.tls_cert_path).map_err(|e| {
-                anyhow::anyhow!(
-                    "Failed to open TLS certificate file {}: {}",
-                    &cfg.http.tls_cert_path,
-                    e
-                )
-            })?);
-        let cert_chain = certs(cert_file);
-        cert_store.add_parsable_certificates(cert_chain.try_collect::<_, Vec<_>, _>()?);
-        cert_store
     };
 
     let mut config = rustls::ClientConfig::builder()
@@ -98,7 +101,7 @@ pub fn client_tls_config() -> Result<Arc<rustls::ClientConfig>, anyhow::Error> {
     let protos = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
     config.alpn_protocols = protos;
 
-    Ok(Arc::new(config))
+    Ok(config)
 }
 
 pub fn reqwest_client_tls_config() -> Result<reqwest::Client, anyhow::Error> {

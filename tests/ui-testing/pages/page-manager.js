@@ -37,6 +37,7 @@ import { IngestionConfigPage } from "./generalPages/ingestionConfigPage.js";
 import { HomePage } from "./generalPages/homePage.js";
 import { MetricsPage } from "./metricsPages/metricsPage.js";
 import { MetricsQueryEditorPage } from "./metricsPages/metricsQueryEditorPage.js";
+import { MetricsBuilderPage } from "./metricsPages/metricsBuilderPage.js";
 import { TracesPage } from "./tracesPages/tracesPage.js";
 import { ServiceGraphPage } from "./tracesPages/serviceGraphPage.js";
 import { RumPage } from "./logsPages/rumPage.js";
@@ -120,6 +121,7 @@ class PageManager {
     this.homePage = new HomePage(page);
     this.metricsPage = new MetricsPage(page);
     this.metricsQueryEditorPage = new MetricsQueryEditorPage(page);
+    this.metricsBuilderPage = new MetricsBuilderPage(page);
     this.tracesPage = new TracesPage(page);
     this.serviceGraphPage = new ServiceGraphPage(page);
     this.rumPage = new RumPage(page);

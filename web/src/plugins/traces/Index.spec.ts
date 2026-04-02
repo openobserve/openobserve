@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { reactive } from "vue";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
@@ -149,11 +150,15 @@ const mockSearchObj = {
     lastSplitterPosition: 20,
     splitterLimit: [0, 40],
   },
-  meta: {
+  // Only meta is reactive so the searchMode watcher fires without making
+  // the entire mock reactive (which would cause loadPageData side-effects
+  // to re-render DOM in unrelated tests).
+  meta: reactive({
     showFields: true,
     showQuery: true,
     showHistogram: true,
     sqlMode: false,
+    searchMode: "traces" as "traces" | "spans" | "service-graph",
     resultGrid: {
       rowsPerPage: 25,
     },
@@ -161,7 +166,7 @@ const mockSearchObj = {
     serviceColors: {},
     metricsRangeFilters: new Map(),
     showErrorOnly: false,
-  },
+  }),
   data: {
     query: "",
     editorValue: "",
@@ -198,6 +203,10 @@ const mockSearchObj = {
   runQuery: false,
 };
 
+vi.mock("@/aws-exports", () => ({
+  default: { isCloud: "false", isEnterprise: "true" },
+}));
+
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
     searchObj: mockSearchObj,
@@ -205,14 +214,20 @@ vi.mock("@/composables/useTraces", () => ({
     getUrlQueryParams: vi.fn(() => ({})),
     copyTracesUrl: vi.fn(),
     formatTracesMetaData: vi.fn((hits) => hits),
+    setServiceColors: mockSetServiceColors,
+    loadLocalLogFilterField: vi.fn(),
+    updatedLocalLogFilterField: vi.fn(),
   }),
 }));
 
 // Hoisted so vi.mock factory can reference them and tests can override per-call
-const { mockGetStreams, mockGetStream } = vi.hoisted(() => ({
-  mockGetStreams: vi.fn(),
-  mockGetStream: vi.fn(),
-}));
+const { mockGetStreams, mockGetStream, mockSetServiceColors } = vi.hoisted(
+  () => ({
+    mockGetStreams: vi.fn(),
+    mockGetStream: vi.fn(),
+    mockSetServiceColors: vi.fn(),
+  }),
+);
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
@@ -314,6 +329,7 @@ describe("Index.vue (Main Traces Page)", () => {
     // Reset mock data
     mockSearchObj.loading = false;
     mockSearchObj.loadingStream = false;
+    mockSearchObj.meta.searchMode = "traces";
     mockSearchObj.data.stream.streamLists = [];
     mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
     mockSearchObj.data.queryResults = { hits: [] };
@@ -412,10 +428,7 @@ describe("Index.vue (Main Traces Page)", () => {
   });
 
   describe("Tab Navigation", () => {
-    it("should switch to service-graph tab when service graph is enabled", async () => {
-      // Enable service graph in store
-      store.state.zoConfig.service_graph_enabled = true;
-
+    it("should switch to service-graph tab on enterprise", async () => {
       routerCurrentRouteSpy.mockReturnValue({
         value: {
           query: { tab: "service-graph" },
@@ -441,21 +454,12 @@ describe("Index.vue (Main Traces Page)", () => {
 
       await flushPromises();
 
+      // onBeforeMount sets searchMode from URL; activeTab computed reflects it
+      expect(mockSearchObj.meta.searchMode).toBe("service-graph");
       expect(wrapper.vm.activeTab).toBe("service-graph");
     });
 
-    it("should default to search tab when service graph is disabled", async () => {
-      // Disable service graph
-      store.state.zoConfig.service_graph_enabled = false;
-
-      routerCurrentRouteSpy.mockReturnValue({
-        value: {
-          query: { tab: "service-graph" },
-          name: "traces",
-          path: "/traces",
-        },
-      } as any);
-
+    it("should update URL with tab=service-graph when searchMode changes to service-graph", async () => {
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -472,12 +476,24 @@ describe("Index.vue (Main Traces Page)", () => {
       });
 
       await flushPromises();
+      routerReplaceSpy.mockClear();
 
-      expect(wrapper.vm.activeTab).toBe("search");
+      // Emit update:searchMode from the search-bar stub to invoke onSearchModeChange,
+      // which mutates the reactive searchObj and triggers the watcher.
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "service-graph");
+      await flushPromises();
+
+      expect(routerReplaceSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({ tab: "service-graph" }),
+        }),
+      );
     });
 
-    it("should update URL when tab changes", async () => {
-      store.state.zoConfig.service_graph_enabled = true;
+    it("should update URL with tab=traces when searchMode changes to traces", async () => {
+      // Start in service-graph mode so switching to traces is an actual change
+      mockSearchObj.meta.searchMode = "service-graph";
 
       wrapper = mount(Index, {
         attachTo: node,
@@ -495,12 +511,18 @@ describe("Index.vue (Main Traces Page)", () => {
       });
 
       await flushPromises();
+      routerReplaceSpy.mockClear();
 
-      // Change tab
-      wrapper.vm.activeTab = "service-graph";
+      // Switching to traces sets tab=traces in URL
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "traces");
       await flushPromises();
 
-      expect(routerReplaceSpy).toHaveBeenCalled();
+      expect(routerReplaceSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({ tab: "traces" }),
+        }),
+      );
     });
   });
 
@@ -570,7 +592,6 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("should show no stream selected message when no stream is selected", async () => {
-      // Clear stream list
       mockSearchObj.data.stream.streamLists = [];
       mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
 
@@ -633,7 +654,7 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(
         wrapper
-          .find('[data-test="traces-search-result-not-found-text"]')
+          .find('[data-test="traces-search-not-started-text"]')
           .exists(),
       ).toBe(true);
     });
@@ -749,7 +770,7 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(
         wrapper
-          .find('[data-test="traces-search-result-not-found-text"]')
+          .find('[data-test="traces-search-error-text"]')
           .exists(),
       ).toBe(true);
     });
@@ -1062,8 +1083,10 @@ describe("Index.vue (Main Traces Page)", () => {
   });
 
   describe("Service Graph Integration", () => {
-    it("should switch to search tab when viewing traces from service graph", async () => {
-      store.state.zoConfig.service_graph_enabled = true;
+    it("should set searchMode to traces when viewing traces from service graph", async () => {
+      // Start in service-graph mode
+      mockSearchObj.meta.searchMode = "service-graph";
+
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -1081,9 +1104,6 @@ describe("Index.vue (Main Traces Page)", () => {
 
       await flushPromises();
 
-      wrapper.vm.activeTab = "service-graph";
-      await flushPromises();
-
       const serviceGraphData = {
         stream: "default",
         serviceName: "test-service",
@@ -1096,7 +1116,8 @@ describe("Index.vue (Main Traces Page)", () => {
       wrapper.vm.handleServiceGraphViewTraces(serviceGraphData);
       await flushPromises();
 
-      expect(wrapper.vm.activeTab).toBe("search");
+      // handleServiceGraphViewTraces now sets searchMode = "spans" (not activeTab)
+      expect(mockSearchObj.meta.searchMode).toBe("spans");
       expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
       expect(mockSearchObj.data.editorValue).toContain("test-service");
     });
@@ -1134,6 +1155,186 @@ describe("Index.vue (Main Traces Page)", () => {
       // SQL-style escaping uses double quotes: test'service becomes test''service
       expect(mockSearchObj.data.editorValue).toContain("test''service");
     });
+
+    function mountIndexComponent() {
+      return mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+    }
+
+    it("should include operationName in filter query when provided", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        operationName: "GET /api/health",
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toContain(
+        "AND operation_name = 'GET /api/health'",
+      );
+    });
+
+    it("should include nodeName in filter query when provided", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        nodeName: "node-1",
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toContain(
+        "AND service_k8s_node_name = 'node-1'",
+      );
+    });
+
+    it("should include podName in filter query when provided", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        podName: "pod-abc",
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toContain(
+        "AND service_k8s_pod_name = 'pod-abc'",
+      );
+    });
+
+    it("should append span_status = 'ERROR' when errorsOnly is true", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        errorsOnly: true,
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toContain(
+        "AND span_status = 'ERROR'",
+      );
+    });
+
+    it("should include minDurationMicros in filter when greater than zero", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        minDurationMicros: 5000,
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toContain("AND duration >= 5000");
+    });
+
+    it("should include maxDurationMicros in filter when greater than zero", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        maxDurationMicros: 20000,
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toContain(
+        "AND duration <= 20000",
+      );
+    });
+
+    it("should combine all optional filter fields when all are provided", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        operationName: "POST /ingest",
+        nodeName: "node-2",
+        podName: "pod-xyz",
+        errorsOnly: true,
+        minDurationMicros: 1000,
+        maxDurationMicros: 9000,
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      const query = mockSearchObj.data.editorValue;
+      expect(query).toContain("service_name = 'svc'");
+      expect(query).toContain("AND operation_name = 'POST /ingest'");
+      expect(query).toContain("AND service_k8s_node_name = 'node-2'");
+      expect(query).toContain("AND service_k8s_pod_name = 'pod-xyz'");
+      expect(query).toContain("AND span_status = 'ERROR'");
+      expect(query).toContain("AND duration >= 1000");
+      expect(query).toContain("AND duration <= 9000");
+    });
+
+    it("should omit optional fields from filter when they are not provided", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      const query = mockSearchObj.data.editorValue;
+      expect(query).toBe("service_name = 'svc'");
+      expect(query).not.toContain("operation_name");
+      expect(query).not.toContain("service_k8s_node_name");
+      expect(query).not.toContain("service_k8s_pod_name");
+      expect(query).not.toContain("span_status");
+      expect(query).not.toContain("duration");
+    });
+
+    it("should not include duration filters when minDurationMicros and maxDurationMicros are zero", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        minDurationMicros: 0,
+        maxDurationMicros: 0,
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).not.toContain("duration");
+    });
   });
 
   describe("Splitter Behavior", () => {
@@ -1161,6 +1362,100 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(dispatchEventSpy).toHaveBeenCalledWith(expect.any(Event));
+    });
+  });
+
+  describe("Horizontal Splitter Layout", () => {
+    it("should render the outer horizontal splitter with the correct class", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      expect(
+        wrapper.find(".traces-horizontal-splitter").exists(),
+      ).toBe(true);
+    });
+
+    it("should initialize splitterModel with a default value of 15", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      expect(wrapper.vm.splitterModel).toBe(15);
+    });
+
+    it("should render the second-level container with full-height class", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      expect(wrapper.find("#tracesSecondLevel").classes()).toContain(
+        "full-height",
+      );
+    });
+
+    it("should render search-bar inside the outer horizontal splitter", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": { template: '<div data-test="logs-search-bar" />' },
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      const horizontalSplitter = wrapper.find(".traces-horizontal-splitter");
+      expect(horizontalSplitter.exists()).toBe(true);
+      expect(
+        horizontalSplitter.find('[data-test="logs-search-bar"]').exists(),
+      ).toBe(true);
     });
   });
 

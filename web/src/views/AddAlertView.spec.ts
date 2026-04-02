@@ -23,6 +23,12 @@ describe('AddAlertView.vue', () => {
         selectedOrganization: {
           identifier: 'test-org',
         },
+        organizationData: {
+          allAlertsListByFolderId: {},
+        },
+      },
+      actions: {
+        setAllAlertsListByFolderId: vi.fn(),
       },
     });
 
@@ -160,6 +166,7 @@ describe('AddAlertView.vue', () => {
       query: {
         org_identifier: 'test-org',
         folder: 'default',
+        tab: 'all',
       },
     });
   });

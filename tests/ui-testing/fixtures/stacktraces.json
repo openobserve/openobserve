@@ -1,0 +1,92 @@
+{
+  "typeError": {
+    "description": "Access property on undefined",
+    "expected": {
+      "original_file": "src/errors/sync-errors.js",
+      "original_line": 10,
+      "original_column": 15,
+      "original_function_name": "profile",
+      "source_content_contains": "return user.profile.name"
+    }
+  },
+  "referenceError": {
+    "description": "Use undeclared variable",
+    "expected": {
+      "original_file": "src/errors/sync-errors.js",
+      "original_line": 16,
+      "source_content_contains": "undeclaredVariableThatDoesNotExist"
+    }
+  },
+  "rangeError": {
+    "description": "Invalid array length",
+    "expected": {
+      "original_file": "src/errors/sync-errors.js",
+      "original_line": 22,
+      "source_content_contains": "new Array(-1)"
+    }
+  },
+  "customError": {
+    "description": "Custom PaymentError class",
+    "expected": {
+      "original_file": "src/errors/sync-errors.js",
+      "original_line": 36,
+      "source_content_contains": "PaymentError"
+    }
+  },
+  "nestedError": {
+    "description": "5-deep call stack",
+    "expected": {
+      "frames": [
+        {
+          "file": "src/errors/nested-errors.js",
+          "line": 40,
+          "function": "validatePaymentAmount"
+        },
+        {
+          "file": "src/errors/nested-errors.js",
+          "line": 35,
+          "function": "processPayment"
+        },
+        {
+          "file": "src/errors/nested-errors.js",
+          "line": 26,
+          "function": "submitOrder"
+        },
+        {
+          "file": "src/errors/nested-errors.js",
+          "line": 22,
+          "function": "handleCheckout"
+        },
+        {
+          "file": "src/errors/nested-errors.js",
+          "line": 16,
+          "function": "triggerNestedError"
+        },
+        {
+          "file": "src/index.js",
+          "line": 142
+        },
+        {
+          "file": "src/index.js",
+          "line": 102
+        }
+      ]
+    }
+  },
+  "crossChunk": {
+    "description": "Cross-chunk error in lazy-loaded module",
+    "expected": {
+      "frames": [
+        {
+          "file": "src/errors/lazy-module.js",
+          "line": 20,
+          "function": "triggerLazyModuleError"
+        },
+        {
+          "file": "src/index.js",
+          "line": 157
+        }
+      ]
+    }
+  }
+}

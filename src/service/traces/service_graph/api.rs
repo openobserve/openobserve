@@ -70,10 +70,7 @@ pub async fn get_current_topology(
             (start, end)
         } else {
             let now = chrono::Utc::now().timestamp_micros();
-            let window_minutes = o2_enterprise::enterprise::common::config::get_config()
-                .service_graph
-                .query_time_range_minutes;
-            let window_micros = window_minutes * 60 * 1_000_000;
+            let window_micros = super::DEFAULT_QUERY_WINDOW_MINUTES * 60 * 1_000_000;
             (now - window_micros, now)
         };
 
@@ -231,12 +228,8 @@ pub async fn query_edges_from_stream_internal(
         if let (Some(start), Some(end)) = (custom_start_time, custom_end_time) {
             (start, end)
         } else {
-            // Use configured time range (same as processor)
             let now = chrono::Utc::now().timestamp_micros();
-            let window_minutes = o2_enterprise::enterprise::common::config::get_config()
-                .service_graph
-                .query_time_range_minutes;
-            let window_micros = window_minutes * 60 * 1_000_000;
+            let window_micros = super::DEFAULT_QUERY_WINDOW_MINUTES * 60 * 1_000_000;
             (now - window_micros, now)
         };
 

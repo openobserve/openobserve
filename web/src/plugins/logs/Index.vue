@@ -643,6 +643,7 @@ export default defineComponent({
       initialLogsState,
       resetStreamData,
       fieldValues,
+      resetSearchError,
     } = searchState();
     const { getStreamList, updateGridColumns, extractFields } =
       useStreamFields();
@@ -973,6 +974,9 @@ export default defineComponent({
      * Handles validation, loading states, and error handling
      */
     const extractPatternsForCurrentQuery = async (clear_cache = false) => {
+      // Clear any stale error from previous logs search
+      resetSearchError();
+
       searchObj.meta.resultGrid.showPagination = false;
       searchObj.loading = true;
 
@@ -1936,12 +1940,22 @@ export default defineComponent({
                 searchObj?.meta?.showHistogram === true
               ) {
                 // replace hits with histogram query data
+                // Override time_offset with the full query time range so that
+                // fillMissingValues uses the correct start time. The main search
+                // time_offset only covers the current page (last N rows), which
+                // would cause the chart to display partial data.
                 searchResponseForVisualization.value = {
                   ...searchObj.data.queryResults,
                   hits: searchObj.data.queryResults.aggs,
                   histogram_interval:
                     searchObj?.data?.queryResults
                       ?.visualization_histogram_interval,
+                  time_offset: {
+                    start_time:
+                      searchObj?.data?.customDownloadQueryObj?.query?.start_time,
+                    end_time:
+                      searchObj?.data?.customDownloadQueryObj?.query?.end_time,
+                  },
                 };
 
                 // assign converted_histogram_query to dashboardPanelData

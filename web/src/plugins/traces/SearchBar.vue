@@ -15,48 +15,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="search-bar-component" id="searchBarComponent">
+  <div class="search-bar-component tw:h-full" id="searchBarComponent">
     <div class="row tw:m-0! tw:p-[0.375rem]">
       <div class="float-right col flex items-center">
-        <!-- Tab Toggle Buttons -->
+        <!-- Unified View Toggle: Service Graph / Traces / Spans -->
         <div
-          v-if="store.state.zoConfig.service_graph_enabled"
           class="button-group logs-visualize-toggle element-box-shadow tw:mr-[0.375rem]"
         >
           <div class="row">
             <div>
               <q-btn
-                data-test="traces-search-toggle"
-                :class="activeTab === 'search' ? 'selected' : ''"
-                @click="$emit('update:activeTab', 'search')"
+                data-test="traces-search-mode-spans-btn"
+                :class="[
+                  'button button-left tw:w-[5.5rem]! tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
+                  searchObj.meta.searchMode === 'spans' ? 'selected' : '',
+                ]"
+                @click="$emit('update:searchMode', 'spans')"
                 no-caps
                 size="sm"
-                icon="search"
-                class="button button-left tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm tw:h-[1.94rem]!"
               >
-                <q-tooltip>
-                  {{ t("common.search") }}
-                </q-tooltip>
+                Spans
+                <q-tooltip>Spans</q-tooltip>
               </q-btn>
             </div>
             <div>
               <q-btn
-                data-test="traces-service-graph-toggle"
-                :class="activeTab === 'service-graph' ? 'selected' : ''"
-                @click="$emit('update:activeTab', 'service-graph')"
+                data-test="traces-search-mode-traces-btn"
+                :class="[
+                  'button tw:w-[5.5rem]! tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
+                  config.isEnterprise == 'true'
+                    ? 'button-center tw:rounded-none!'
+                    : 'button-right tw:rounded-l-none!',
+                  searchObj.meta.searchMode === 'traces' ? 'selected' : '',
+                ]"
+                @click="$emit('update:searchMode', 'traces')"
                 no-caps
                 size="sm"
-                icon="hub"
-                class="button button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[1.94rem]!"
               >
-                <q-tooltip> Service Graph </q-tooltip>
+                Traces
+                <q-tooltip>Traces</q-tooltip>
+              </q-btn>
+            </div>
+            <div v-if="config.isEnterprise == 'true'">
+              <q-btn
+                data-test="traces-service-graph-toggle"
+                :class="
+                  searchObj.meta.searchMode === 'service-graph'
+                    ? 'selected'
+                    : ''
+                "
+                @click="$emit('update:searchMode', 'service-graph')"
+                no-caps
+                size="sm"
+                class="button button-right tw:w-[6.1rem]! tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!"
+              >
+                Service Graph
+                <q-tooltip>Service Graph</q-tooltip>
               </q-btn>
             </div>
           </div>
         </div>
 
-        <!-- Show search controls only when on Search tab -->
-        <template v-if="activeTab === 'search'">
+        <!-- Show search controls only when not on Service Graph -->
+        <template v-if="searchObj.meta.searchMode !== 'service-graph'">
           <div
             class="q-pr-xs tw:mr-[0.375rem] tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem]"
           >
@@ -126,48 +147,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :sqlmode="searchObj.meta.sqlMode"
             class="tw:border! tw:border-[var(--o2-border-color)]! tw:h-[2rem]! tw:w-[2.25rem]!"
           />
-          <!-- Search Mode Toggle: Traces / Spans -->
-          <template v-if="activeTab === 'search'">
-            <div
-              class="button-group logs-visualize-toggle element-box-shadow tw:mr-[0.375rem] tw:ml-[0.625rem]"
-            >
-              <div class="row">
-                <div>
-                  <q-btn
-                    data-test="traces-search-mode-traces-btn"
-                    :class="
-                      searchObj.meta.searchMode === 'traces' ? 'selected' : ''
-                    "
-                    @click="$emit('update:searchMode', 'traces')"
-                    no-caps
-                    size="sm"
-                    class="button tw:w-[3.85rem]! button-left tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!"
-                  >
-                    Traces
-                    <q-tooltip>Search by Traces</q-tooltip>
-                  </q-btn>
-                </div>
-                <div>
-                  <q-btn
-                    data-test="traces-search-mode-spans-btn"
-                    :class="
-                      searchObj.meta.searchMode === 'spans' ? 'selected' : ''
-                    "
-                    @click="$emit('update:searchMode', 'spans')"
-                    no-caps
-                    size="sm"
-                    class="button tw:w-[3.85rem]! button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!"
-                  >
-                    Spans
-                    <q-tooltip>Search by Spans</q-tooltip>
-                  </q-btn>
-                </div>
-              </div>
-            </div>
-          </template>
         </template>
       </div>
-      <div v-if="activeTab === 'search'" class="float-right col-auto">
+      <div
+        v-if="searchObj.meta.searchMode !== 'service-graph'"
+        class="float-right col-auto"
+      >
         <div class="float-left tw:mr-[0.375rem]">
           <date-time
             ref="dateTimeRef"
@@ -230,9 +215,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-    <div v-if="activeTab === 'search' && searchObj.meta.showQuery" class="row">
+    <div
+      v-if="
+        searchObj.meta.searchMode !== 'service-graph' &&
+        searchObj.meta.showQuery
+      "
+      class="row tw:h-[calc(100%-3.1rem)]!"
+    >
       <div
-        class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mx-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden"
+        class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mx-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full!"
       >
         <code-query-editor
           ref="queryEditorRef"
@@ -284,100 +275,10 @@ import config from "@/aws-exports";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import useStreams from "@/composables/useStreams";
 import { getImageURL } from "@/utils/zincutils";
-
-/**
- * Extracts the field name from a filter expression such as `field='val'`,
- * `field!='val'`, `(field='x' OR field='y')`, etc.
- */
-const getFieldFromExpression = (expression: string): string | null => {
-  const cleaned = expression.trim().replace(/^\(\s*/, "");
-  const match =
-    cleaned.match(/^"[^"]+"\."?(\w+)"?\s*(?:=|!=|is)/i) ||
-    cleaned.match(/^(\w+)\s*(?:=|!=|>=|<=|>|<|is)/i);
-  return match ? match[1] : null;
-};
-
-/**
- * Tries to replace an existing condition for `fieldName` in `queryStr` with
- * `newExpression`. Returns the modified string if found, or null if not found.
- * Handles both parenthesized multi-value groups and single conditions.
- */
-const replaceExistingFieldCondition = (
-  queryStr: string,
-  fieldName: string,
-  newExpression: string,
-): string | null => {
-  const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
-  const opPat = `(?:=|!=|>=|<=|>|<|is(?:\\s+not)?)`;
-  const condPat = `(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
-
-  // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
-  const multiRegex = new RegExp(
-    `\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`,
-    "gi",
-  );
-  if (multiRegex.test(queryStr)) {
-    return queryStr.replace(multiRegex, newExpression);
-  }
-
-  // Try range condition: field >= val AND field <= val (e.g. duration filters)
-  const rangeRegex = new RegExp(
-    `${condPat}\\s+(?:and|AND)\\s+${condPat}`,
-    "gi",
-  );
-  if (rangeRegex.test(queryStr)) {
-    return queryStr.replace(rangeRegex, newExpression);
-  }
-
-  // Try single condition
-  const singleRegex = new RegExp(condPat, "gi");
-  if (singleRegex.test(queryStr)) {
-    return queryStr.replace(singleRegex, newExpression);
-  }
-
-  return null;
-};
-
-/**
- * Applies a single filter term to a base editor value using replace-or-append logic.
- * Returns the new editor value.
- */
-const applyFilterTerm = (filterTerm: string, baseValue: string): string => {
-  let filter = filterTerm;
-
-  const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
-  if (isFilterValueNull) {
-    filter = filter
-      .replace(/=|!=/, (match) => {
-        return match === "=" ? " is " : " is not ";
-      })
-      .replace(/'null'/, "null");
-  }
-
-  const parts = baseValue.split("|");
-  if (parts.length > 1) {
-    if (parts[1].trim() !== "") {
-      const fieldName = getFieldFromExpression(filter);
-      const replaced = fieldName
-        ? replaceExistingFieldCondition(parts[1], fieldName, filter)
-        : null;
-      parts[1] = replaced !== null ? replaced : parts[1] + " and " + filter;
-    } else {
-      parts[1] = filter;
-    }
-    return parts.join("| ");
-  } else {
-    const fieldName = getFieldFromExpression(filter);
-    const replaced = fieldName
-      ? replaceExistingFieldCondition(parts[0] as string, fieldName, filter)
-      : null;
-    if (replaced !== null) return replaced;
-    return (parts[0] as string) !== ""
-      ? (parts[0] as string) + " and " + filter
-      : filter;
-  }
-};
+import {
+  applyFilterTerm,
+  replaceExistingFieldCondition,
+} from "@/utils/traces/filterUtils";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -391,7 +292,6 @@ export default defineComponent({
   },
   emits: [
     "searchdata",
-    "update:activeTab",
     "cancel-query",
     "update:searchMode",
     "error-only-toggled",
@@ -409,10 +309,6 @@ export default defineComponent({
     isLoading: {
       type: Boolean,
       default: false,
-    },
-    activeTab: {
-      type: String,
-      default: "search",
     },
   },
   methods: {
@@ -496,6 +392,14 @@ export default defineComponent({
       autoCompleteData.value.fieldValues = props.fieldValues;
       autoCompleteData.value.popup.open =
         queryEditorRef.value.triggerAutoComplete;
+      // [NEW] Set stream context so getSuggestions can read stored values from
+      // IndexedDB. Traces field expansion already writes to IDB via
+      // captureFromValuesApi (useFieldValuesStream) with stream_type="traces",
+      // so values are already being captured — this just enables the read side.
+      autoCompleteData.value.org = store.state.selectedOrganization.identifier;
+      autoCompleteData.value.streamType = "traces";
+      autoCompleteData.value.streamName =
+        searchObj.data.stream.selectedStream.value ?? "";
       getSuggestions();
     };
 
@@ -874,10 +778,6 @@ export default defineComponent({
   }
   .fields_autocomplete {
     max-height: 250px;
-  }
-  .monaco-editor {
-    width: 100% !important;
-    height: 40px !important;
   }
 
   .search-button {

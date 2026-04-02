@@ -23,6 +23,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
 import { getSpanColorHex } from "@/utils/traces/traceColors";
+import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 
 const defaultObject = {
   organizationIdentifier: "",
@@ -88,7 +89,7 @@ const defaultObject = {
     >(),
     showErrorOnly: false,
     queryEditorPlaceholderFlag: true,
-    searchMode: "traces" as "traces" | "spans",
+    searchMode: "spans" as TraceSearchMode,
   },
   data: {
     query: "",
@@ -161,6 +162,26 @@ const defaultObject = {
 
 const searchObj = reactive(Object.assign({}, defaultObject));
 
+/** Default ordered column ID lists used when no localStorage entry exists. */
+export const DEFAULT_TRACE_COLUMNS: Record<"traces" | "spans", string[]> = {
+  spans: [
+    "service_name",
+    "operation_name",
+    "duration",
+    "status",
+    "status_code",
+    "method",
+  ],
+  traces: [
+    "service_name",
+    "operation_name",
+    "duration",
+    "spans",
+    "status",
+    "service_latency",
+  ],
+};
+
 const useTraces = () => {
   const store = useStore();
   const router = useRouter();
@@ -192,16 +213,37 @@ const useTraces = () => {
     searchObj.data.traceDetails.isLoadingTraceMeta = false;
   };
 
-  const updatedLocalLogFilterField = (): void => {
+  /**
+   * Persist the current selectedFields for the given mode.
+   * Stored as traceFilterField[orgId_stream][mode] = string[].
+   */
+  const updatedLocalLogFilterField = (
+    searchMode: "traces" | "spans" = "traces",
+  ): void => {
     const identifier: string = searchObj.organizationIdentifier || "default";
-    const selectedFields: any =
-      useLocalTraceFilterField()?.value != null
-        ? useLocalTraceFilterField()?.value
-        : {};
-    selectedFields[
-      `${identifier}_${searchObj.data.stream.selectedStream.value}`
-    ] = searchObj.data.stream.selectedFields;
-    useLocalTraceFilterField(selectedFields);
+    const key = `${identifier}_${searchObj.data.stream.selectedStream.value}`;
+    const all: any = useLocalTraceFilterField()?.value ?? {};
+    all[key] = {
+      ...(all[key] ?? {}),
+      [searchMode]: searchObj.data.stream.selectedFields,
+    };
+    useLocalTraceFilterField(all);
+  };
+
+  /**
+   * Restore selectedFields for the given mode from localStorage.
+   * Falls back to the default ordered column list when no saved value exists.
+   */
+  const loadLocalLogFilterField = (
+    searchMode: "traces" | "spans" = "traces",
+  ): void => {
+    const identifier: string = searchObj.organizationIdentifier || "default";
+    const key = `${identifier}_${searchObj.data.stream.selectedStream.value}`;
+    const saved = useLocalTraceFilterField()?.value?.[key];
+
+    searchObj.data.stream.selectedFields = saved?.[searchMode]?.length
+      ? saved?.[searchMode]
+      : [...DEFAULT_TRACE_COLUMNS[searchMode]];
   };
 
   function getUrlQueryParams(getShareLink: boolean = false) {
@@ -341,14 +383,34 @@ const useTraces = () => {
   });
 
   /**
-   * Format raw trace hits from API into structured trace metadata
-   * Assigns service colors using hash-based consistent coloring from traceColors utility
-   * @param traces - Raw trace hits from the API
-   * @returns Formatted trace metadata array
+   * Assign service colors for raw hits from either traces or spans mode.
+   * - Traces mode: service_name is an array of strings or objects with a service_name property.
+   * - Spans mode: service_name is a plain string.
    */
+  const setServiceColors = (hits: any[]): void => {
+    let colorIndex = Object.keys(searchObj.meta.serviceColors).length;
+    hits.forEach((hit: any) => {
+      const serviceNames = Array.isArray(hit.service_name)
+        ? hit.service_name
+        : hit.service_name
+          ? [hit.service_name]
+          : [];
+      serviceNames.forEach((service: any) => {
+        const serviceName =
+          typeof service === "string" ? service : service.service_name;
+        if (serviceName && !searchObj.meta.serviceColors[serviceName]) {
+          searchObj.meta.serviceColors[serviceName] =
+            getSpanColorHex(colorIndex);
+          colorIndex += 1;
+        }
+      });
+    });
+  };
+
   const formatTracesMetaData = (traces: any[]): any[] => {
     if (!traces.length) return [];
-    let colorIndex = 0;
+
+    setServiceColors(traces);
 
     return traces.map((trace) => {
       const _trace = {
@@ -369,21 +431,11 @@ const useTraces = () => {
         llm_input: trace.llm_input || {},
       };
 
-      // Assign colors to services
+      // Build per-trace service span count and duration map
       if (trace.service_name && Array.isArray(trace.service_name)) {
-        trace.service_name.forEach((service: any, index: number) => {
+        trace.service_name.forEach((service: any) => {
           const serviceName =
             typeof service === "string" ? service : service.service_name;
-
-          if (!searchObj.meta.serviceColors[serviceName]) {
-            // Use hash-based color assignment for consistency
-            searchObj.meta.serviceColors[serviceName] =
-              getSpanColorHex(colorIndex);
-
-            colorIndex += 1;
-          }
-
-          // Track service span count and duration
           const serviceCount =
             typeof service === "string" ? 1 : service.count || 1;
           const serviceDuration =
@@ -403,12 +455,14 @@ const useTraces = () => {
     searchObj,
     resetSearchObj,
     updatedLocalLogFilterField,
+    loadLocalLogFilterField,
     getUrlQueryParams,
     copyTracesUrl,
     buildQueryDetails,
     navigateToLogs,
     tracesShareURL,
     formatTracesMetaData,
+    setServiceColors,
   };
 };
 

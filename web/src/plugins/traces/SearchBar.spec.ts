@@ -34,7 +34,7 @@ vi.mock("@/services/segment_analytics", () => ({
 }));
 
 vi.mock("@/aws-exports", () => ({
-  default: { isCloud: "false" },
+  default: { isCloud: "false", isEnterprise: "true" },
 }));
 
 // getImageURL is called by the metricsIcon computed; stub to avoid asset loading.
@@ -312,7 +312,6 @@ function mountSearchBar(props: Record<string, unknown> = {}): VueWrapper {
     props: {
       fieldValues: {},
       isLoading: false,
-      activeTab: "search",
       ...props,
     },
     global: {
@@ -331,9 +330,6 @@ describe("SearchBar", () => {
   beforeEach(() => {
     // Fresh searchObj per test — mutations cannot bleed across tests.
     searchObjInstance = makeSearchObj();
-
-    // Ensure store flag is reset.
-    store.state.zoConfig.service_graph_enabled = true;
 
     // Spy on router so updateDateTime's route guard does not early-return.
     vi.spyOn(router, "currentRoute", "get").mockReturnValue({
@@ -362,51 +358,25 @@ describe("SearchBar", () => {
 
   // -------------------------------------------------------------------------
   describe("tab toggle visibility", () => {
-    it("should render tab toggle buttons when service_graph_enabled is true", async () => {
-      store.state.zoConfig.service_graph_enabled = true;
+    it("should render tab toggle buttons on enterprise", async () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
       expect(wrapper.find(".button-group.logs-visualize-toggle").exists()).toBe(
         true,
       );
-      expect(wrapper.find('[data-test="traces-search-toggle"]').exists()).toBe(
-        true,
-      );
+      expect(
+        wrapper.find('[data-test="traces-search-mode-traces-btn"]').exists(),
+      ).toBe(true);
       expect(
         wrapper.find('[data-test="traces-service-graph-toggle"]').exists(),
       ).toBe(true);
     });
-
-    it("should not render tab toggle buttons when service_graph_enabled is false", async () => {
-      store.state.zoConfig.service_graph_enabled = false;
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="traces-search-toggle"]').exists()).toBe(
-        false,
-      );
-      expect(
-        wrapper.find('[data-test="traces-service-graph-toggle"]').exists(),
-      ).toBe(false);
-    });
   });
 
   // -------------------------------------------------------------------------
-  describe("tab toggle emits (update:activeTab)", () => {
-    it("should emit update:activeTab with 'search' when the search button is clicked", async () => {
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      const searchBtn = wrapper.find('[data-test="traces-search-toggle"]');
-      expect(searchBtn.exists()).toBe(true);
-      await searchBtn.trigger("click");
-
-      expect(wrapper.emitted("update:activeTab")).toBeTruthy();
-      expect(wrapper.emitted("update:activeTab")![0]).toEqual(["search"]);
-    });
-
-    it("should emit update:activeTab with 'service-graph' when the service-graph button is clicked", async () => {
+  describe("search mode toggle emits (update:searchMode)", () => {
+    it("should emit update:searchMode with 'service-graph' when the service-graph button is clicked", async () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
@@ -414,17 +384,18 @@ describe("SearchBar", () => {
       expect(sgBtn.exists()).toBe(true);
       await sgBtn.trigger("click");
 
-      expect(wrapper.emitted("update:activeTab")).toBeTruthy();
-      expect(wrapper.emitted("update:activeTab")![0]).toEqual([
+      expect(wrapper.emitted("update:searchMode")).toBeTruthy();
+      expect(wrapper.emitted("update:searchMode")![0]).toEqual([
         "service-graph",
       ]);
     });
   });
 
   // -------------------------------------------------------------------------
-  describe("activeTab conditional rendering", () => {
-    it("should show search controls when activeTab is 'search'", async () => {
-      wrapper = mountSearchBar({ activeTab: "search" });
+  describe("searchMode conditional rendering", () => {
+    it("should show search controls when searchMode is 'traces'", async () => {
+      searchObjInstance.meta.searchMode = "traces";
+      wrapper = mountSearchBar();
       await flushPromises();
 
       expect(
@@ -442,8 +413,9 @@ describe("SearchBar", () => {
       ).toBe(true);
     });
 
-    it("should hide search controls when activeTab is 'service-graph'", async () => {
-      wrapper = mountSearchBar({ activeTab: "service-graph" });
+    it("should hide search controls when searchMode is 'service-graph'", async () => {
+      searchObjInstance.meta.searchMode = "service-graph";
+      wrapper = mountSearchBar();
       await flushPromises();
 
       expect(
@@ -461,16 +433,17 @@ describe("SearchBar", () => {
       ).toBe(false);
     });
 
-    it("should re-show controls when activeTab changes back to 'search'", async () => {
-      wrapper = mountSearchBar({ activeTab: "service-graph" });
+    it("should re-show controls when searchMode changes back to 'traces'", async () => {
+      searchObjInstance.meta.searchMode = "service-graph";
+      wrapper = mountSearchBar();
       await flushPromises();
 
       expect(
         wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists(),
       ).toBe(false);
 
-      await wrapper.setProps({ activeTab: "search" });
-      await flushPromises();
+      searchObjInstance.meta.searchMode = "traces";
+      await wrapper.vm.$nextTick();
 
       expect(
         wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists(),
@@ -722,12 +695,12 @@ describe("SearchBar", () => {
       expect(wrapper.emitted("searchdata")).toHaveLength(1);
     });
 
-    it("should be disabled when isLoading prop is true", async () => {
+    it("should show cancel button when isLoading prop is true on enterprise", async () => {
       wrapper = mountSearchBar({ isLoading: true });
       await flushPromises();
 
-      const runBtn = wrapper.find('[data-test="logs-search-bar-refresh-btn"]');
-      expect(runBtn.classes()).toContain("disabled");
+      expect(wrapper.find('[data-test="traces-search-bar-cancel-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(false);
     });
 
     it("should not emit searchdata when searchObj.loading is true", async () => {
@@ -1092,11 +1065,13 @@ describe("SearchBar", () => {
       expect(wrapper.findComponent({ name: "QTooltip" }).exists()).toBe(true);
     });
 
-    it("should have a tooltip inside the search tab toggle button", async () => {
+    it("should have a tooltip inside the Traces mode toggle button", async () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
-      const searchBtn = wrapper.find('[data-test="traces-search-toggle"]');
+      const searchBtn = wrapper.find(
+        '[data-test="traces-search-mode-traces-btn"]',
+      );
       expect(searchBtn.exists()).toBe(true);
       expect(wrapper.findComponent({ name: "QTooltip" }).exists()).toBe(true);
     });
@@ -1205,15 +1180,17 @@ describe("SearchBar", () => {
       expect(wrapper.props("fieldValues")).toHaveProperty("service_name");
     });
 
-    it("should disable the run query button when isLoading changes to true", async () => {
+    it("should switch to cancel button when isLoading changes to true on enterprise", async () => {
       wrapper = mountSearchBar({ isLoading: false });
       await flushPromises();
+
+      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(true);
 
       await wrapper.setProps({ isLoading: true });
       await flushPromises();
 
-      const runBtn = wrapper.find('[data-test="logs-search-bar-refresh-btn"]');
-      expect(runBtn.classes()).toContain("disabled");
+      expect(wrapper.find('[data-test="traces-search-bar-cancel-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(false);
     });
   });
 });

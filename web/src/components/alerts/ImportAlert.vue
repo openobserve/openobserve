@@ -411,6 +411,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import alertsService from "../../services/alerts";
+import anomalyDetectionService from "../../services/anomaly_detection";
 import useStreams from "@/composables/useStreams";
 import BaseImport from "../common/BaseImport.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
@@ -439,6 +440,10 @@ export default defineComponent({
     alerts: {
       type: Array,
       default: () => [],
+    },
+    folderId: {
+      type: String,
+      default: "",
     },
   },
   emits: ["update:destinations", "update:templates", "update:alerts"],
@@ -486,10 +491,11 @@ export default defineComponent({
     });
     const streamTypes = ["logs", "metrics", "traces"];
     const selectedFolderId = ref<any>(
-      router.currentRoute.value.query.folder || "default",
+      props.folderId || router.currentRoute.value.query.folder || "default",
     );
     const activeFolderId = ref(
-      router.currentRoute.value.query.folder ||
+      props.folderId ||
+        router.currentRoute.value.query.folder ||
         router.currentRoute.value.query?.folderId,
     );
     const activeFolderAlerts = ref<any>([]);
@@ -570,6 +576,7 @@ export default defineComponent({
 
     onMounted(() => {
       activeFolderId.value =
+        props.folderId ||
         router.currentRoute.value.query?.folder ||
         router.currentRoute.value.query?.folderId;
       getActiveFolderAlerts(activeFolderId.value as string);
@@ -600,6 +607,10 @@ export default defineComponent({
           position: "bottom",
           timeout: 2000,
         });
+        // Reset BaseImport's importing flag on validation error
+        if (baseImportRef.value) {
+          baseImportRef.value.isImporting = false;
+        }
         return;
       }
 
@@ -643,8 +654,55 @@ export default defineComponent({
       }
     };
 
+    const importAnomalyConfig = async (jsonObj: any, index: number) => {
+      try {
+        const org = store.state.selectedOrganization.identifier;
+        // Convert the exported anomaly config (GET format) back to the create (POST) format.
+        const payload: any = {
+          alert_type: "anomaly_detection",
+          name: jsonObj.name,
+          stream_name: jsonObj.stream_name,
+          stream_type: jsonObj.stream_type,
+          destinations: [],
+          anomaly_config: {
+            detection_function: jsonObj.detection_function,
+            histogram_interval: jsonObj.histogram_interval,
+            schedule_interval: jsonObj.schedule_interval,
+            detection_window_seconds: jsonObj.detection_window_seconds,
+            training_window_days: jsonObj.training_window_days,
+            retrain_interval_days: jsonObj.retrain_interval_days ?? 0,
+            threshold: jsonObj.threshold,
+            seasonality: jsonObj.seasonality ?? "none",
+            query_mode: jsonObj.query_mode ?? "filters",
+            filters: jsonObj.filters ?? [],
+            custom_sql: jsonObj.custom_sql ?? "",
+            alert_destinations: jsonObj.alert_destinations ?? [],
+            alert_enabled: jsonObj.alert_enabled ?? true,
+          },
+        };
+        await anomalyDetectionService.create(org, payload);
+        alertCreators.value.push({
+          message: `Anomaly Detection - ${index}: "${jsonObj.name}" imported successfully`,
+          success: true,
+        });
+        return true;
+      } catch (e: any) {
+        alertCreators.value.push({
+          message: `Anomaly Detection - ${index}: "${jsonObj.name}" import failed — ${e?.response?.data?.message || "Unknown Error"}`,
+          success: false,
+        });
+        return false;
+      }
+    };
+
     const processJsonObject = async (jsonObj: any, index: number) => {
       try {
+        // Anomaly detection configs have anomaly_id — route to separate import path.
+        // Regular alert flow is completely unchanged.
+        if (jsonObj.anomaly_id !== undefined) {
+          return await importAnomalyConfig(jsonObj, index);
+        }
+
         const isValidAlert = await validateAlertInputs(jsonObj, index);
         if (!isValidAlert) {
           return false;

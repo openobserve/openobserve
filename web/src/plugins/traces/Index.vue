@@ -16,222 +16,238 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="tracePage" id="tracePage" style="min-height: auto">
-    <div id="tracesSecondLevel">
-      <div
-        class="tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
-        :class="
-          activeTab === 'service-graph' ? 'tw:min-h-[45px]' : 'tw:min-h-[82px]'
+  <q-page
+    class="tracePage tw:h-[calc(100vh-2.25rem)] tw:min-h-[calc(100vh-2.25rem)]! tw:max-h-[calc(100vh-2.25rem)]! tw:overflow-hidden!"
+    id="tracePage"
+    style="min-height: auto"
+  >
+    <div id="tracesSecondLevel" class="full-height">
+      <q-splitter
+        class="traces-horizontal-splitter full-height"
+        v-model="splitterModel"
+        :disable="activeTab === 'service-graph'"
+        horizontal
+        :before-class="
+          activeTab === 'service-graph' ? 'tw:max-h-[3.54rem]!' : ''
         "
+        @update:model-value="onSplitterUpdate"
       >
-        <!-- Search Bar with Tab Toggle - Always visible to show tabs -->
-        <search-bar
-          data-test="logs-search-bar"
-          ref="searchBarRef"
-          :fieldValues="fieldValues"
-          :isLoading="searchObj.loading"
-          :activeTab="activeTab"
-          class="card-container"
-          @searchdata="searchData"
-          @onChangeTimezone="refreshTimezone"
-          @update:activeTab="activeTab = $event"
-          @error-only-toggled="onErrorOnlyToggled"
-          @filters-reset="onFiltersReset"
-          @cancel-query="cancelSearch"
-          @update:searchMode="onSearchModeChange"
-        />
-      </div>
-
-      <!-- Service Graph Tab Content -->
-      <div
-        v-if="
-          activeTab === 'service-graph' &&
-          store.state.zoConfig.service_graph_enabled
-        "
-        class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-[calc(100vh-90px)] tw:overflow-hidden"
-      >
-        <service-graph
-          class="tw:h-full"
-          @view-traces="handleServiceGraphViewTraces"
-        />
-      </div>
-
-      <!-- Search Tab Content -->
-      <div
-        v-if="activeTab === 'search'"
-        id="tracesThirdLevel"
-        class="traces-search-result-container relative-position"
-      >
-        <!-- Note: Splitter max-height to be dynamically calculated with JS -->
-        <q-splitter
-          v-model="searchObj.config.splitterModel"
-          :limits="searchObj.config.splitterLimit"
-          style="width: 100%"
-          @update:model-value="onSplitterUpdate"
-          class="tw:h-full"
-        >
-          <template #before>
-            <div class="tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
-              <index-list
-                v-show="searchObj.meta.showFields"
-                ref="indexListRef"
-                :field-list="searchObj.data.stream.selectedStreamFields"
-                :active-include-field-values="activeIncludeFilterValues"
-                :active-exclude-field-values="activeExcludeFilterValues"
-                data-test="traces-search-index-list"
-                class="card-container"
-                :key="searchObj.data.stream.streamLists"
-                @update:changeStream="onChangeStream"
-              />
-            </div>
-          </template>
-          <template #separator>
-            <q-btn
-              data-test="logs-search-field-list-collapse-btn"
-              :icon="
-                searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'
-              "
-              :title="
-                searchObj.meta.showFields
-                  ? t('traces.collapseFields')
-                  : t('traces.openFields')
-              "
-              :class="
-                searchObj.meta.showFields
-                  ? 'splitter-icon-collapse'
-                  : 'splitter-icon-expand'
-              "
-              color="primary"
-              size="sm"
-              dense
-              round
-              @click="collapseFieldList"
+        <template v-slot:before>
+          <div
+            class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
+          >
+            <!-- Search Bar with Tab Toggle - Always visible to show tabs -->
+            <search-bar
+              data-test="logs-search-bar"
+              ref="searchBarRef"
+              :fieldValues="fieldValues"
+              :isLoading="searchObj.loading"
+              :activeTab="activeTab"
+              class="card-container"
+              @searchdata="searchData"
+              @onChangeTimezone="refreshTimezone"
+              @update:activeTab="activeTab = $event"
+              @error-only-toggled="onErrorOnlyToggled"
+              @filters-reset="onFiltersReset"
+              @cancel-query="cancelSearch"
+              @update:searchMode="onSearchModeChange"
             />
-          </template>
-          <template #after>
-            <div class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-              <div
-                v-if="
-                  searchObj.data.errorMsg !== '' &&
-                  parseInt(searchObj.data.errorCode) !== 0 &&
-                  searchObj.loading == false
-                "
-                class="card-container tw:h-full"
-              >
-                <div class="text-center tw:pt-[2rem]">
-                  <!-- Actual error case -->
+          </div>
+        </template>
+        <template v-slot:after>
+          <!-- Service Graph Tab Content -->
+          <div
+            v-if="
+              activeTab === 'service-graph' && config.isEnterprise == 'true'
+            "
+            class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
+          >
+            <service-graph
+              class="tw:h-full"
+              @view-traces="handleServiceGraphViewTraces"
+            />
+          </div>
+
+          <!-- Search Tab Content -->
+          <div
+            v-if="activeTab === 'search'"
+            id="tracesThirdLevel"
+            class="traces-search-result-container relative-position tw:h-full"
+          >
+            <!-- Note: Splitter max-height to be dynamically calculated with JS -->
+            <q-splitter
+              v-model="searchObj.config.splitterModel"
+              :limits="searchObj.config.splitterLimit"
+              style="width: 100%"
+              @update:model-value="onSplitterUpdate"
+              class="tw:h-full"
+            >
+              <template #before>
+                <div class="tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
+                  <index-list
+                    v-show="searchObj.meta.showFields"
+                    ref="indexListRef"
+                    :field-list="searchObj.data.stream.selectedStreamFields"
+                    :active-include-field-values="activeIncludeFilterValues"
+                    :active-exclude-field-values="activeExcludeFilterValues"
+                    data-test="traces-search-index-list"
+                    class="card-container tw:h-full"
+                    :key="searchObj.data.stream.streamLists"
+                    @update:changeStream="onChangeStream"
+                    @update:selectedFields="updateFieldVisibility"
+                  />
+                </div>
+              </template>
+              <template #separator>
+                <q-btn
+                  data-test="logs-search-field-list-collapse-btn"
+                  :icon="
+                    searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'
+                  "
+                  :title="
+                    searchObj.meta.showFields
+                      ? t('traces.collapseFields')
+                      : t('traces.openFields')
+                  "
+                  :class="
+                    searchObj.meta.showFields
+                      ? 'splitter-icon-collapse'
+                      : 'splitter-icon-expand'
+                  "
+                  color="primary"
+                  size="sm"
+                  dense
+                  round
+                  @click="collapseFieldList"
+                />
+              </template>
+              <template #after>
+                <div class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
                   <div
-                    data-test="traces-search-error-message"
-                    class="tw:text-[1.3rem] q-pt-lg"
+                    v-if="
+                      searchObj.data.errorMsg !== '' &&
+                      parseInt(searchObj.data.errorCode) !== 0 &&
+                      searchObj.loading == false
+                    "
+                    class="card-container tw:h-full"
                   >
-                    {{ t("traces.errorRetrievingTraces") }}
-                    <q-btn
-                      v-if="
-                        searchObj.data.errorDetail || searchObj?.data?.errorMsg
-                      "
-                      @click="toggleErrorDetails"
-                      size="sm"
-                      class="o2-secondary-button q-ml-sm"
-                      data-test="traces-search-error-details-btn"
-                      >{{ t("search.histogramErrorBtnLabel") }}</q-btn
-                    >
-                  </div>
-                  <!-- Collapsible error detail — shown below results when toggled -->
-                  <div class="text-center">
-                    <div class="tw:my-none tw:text-[1rem]! tw:px-[2rem]!">
-                      <span v-if="disableMoreErrorDetails">
-                        <SanitizedHtmlRenderer
-                          data-test="traces-search-detail-error-message"
-                          :htmlContent="searchObj?.data?.errorMsg"
-                          class="tw:pt-[1rem]"
-                        />
-                        <div
-                          v-if="searchObj?.data?.errorDetail"
-                          class="error-display__message tw:pt-[1rem]! tw:text-[var(--o2-text-2)]!"
+                    <div class="text-center tw:pt-[2rem]">
+                      <!-- Actual error case -->
+                      <div
+                        data-test="traces-search-error-message"
+                        class="tw:text-[1.3rem] q-pt-lg"
+                      >
+                        {{ t("traces.errorRetrievingTraces") }}
+                        <q-btn
+                          v-if="
+                            searchObj.data.errorDetail ||
+                            searchObj?.data?.errorMsg
+                          "
+                          @click="toggleErrorDetails"
+                          size="sm"
+                          class="o2-secondary-button q-ml-sm"
+                          data-test="traces-search-error-details-btn"
+                          >{{ t("search.histogramErrorBtnLabel") }}</q-btn
                         >
-                          {{ searchObj.data.errorDetail }}
+                      </div>
+                      <!-- Collapsible error detail — shown below results when toggled -->
+                      <div class="text-center">
+                        <div class="tw:my-none tw:text-[1rem]! tw:px-[2rem]!">
+                          <span v-if="disableMoreErrorDetails">
+                            <SanitizedHtmlRenderer
+                              data-test="traces-search-detail-error-message"
+                              :htmlContent="searchObj?.data?.errorMsg"
+                              class="tw:pt-[1rem]"
+                            />
+                            <div
+                              v-if="searchObj?.data?.errorDetail"
+                              class="error-display__message tw:pt-[1rem]! tw:text-[var(--o2-text-2)]!"
+                            >
+                              {{ searchObj.data.errorDetail }}
+                            </div>
+                          </span>
                         </div>
-                      </span>
+                      </div>
+                      <!-- FTS not configured -->
+                      <div
+                        data-test="traces-search-error-20003"
+                        v-if="parseInt(searchObj.data.errorCode) == 20003"
+                      >
+                        <q-btn
+                          no-caps
+                          unelevated
+                          size="sm"
+                          bg-secondary
+                          class="no-border bg-secondary text-white"
+                          :to="
+                            '/streams?dialog=' +
+                            searchObj.data.stream.selectedStream.label
+                          "
+                          >Click here</q-btn
+                        >
+                        {{ t("traces.configureFullTextSearch") }}
+                      </div>
+                      <q-item-label>{{
+                        searchObj.data.additionalErrorMsg
+                      }}</q-item-label>
                     </div>
                   </div>
-                  <!-- FTS not configured -->
                   <div
-                    data-test="traces-search-error-20003"
-                    v-if="parseInt(searchObj.data.errorCode) == 20003"
+                    v-else-if="
+                      searchObj.data.errorMsg !== '' &&
+                      parseInt(searchObj.data.errorCode) == 0 &&
+                      !searchObj.loading
+                    "
+                    data-test="traces-search-error-text"
+                    class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
                   >
-                    <q-btn
-                      no-caps
-                      unelevated
-                      size="sm"
-                      bg-secondary
-                      class="no-border bg-secondary text-white"
-                      :to="
-                        '/streams?dialog=' +
-                        searchObj.data.stream.selectedStream.label
-                      "
-                      >Click here</q-btn
-                    >
-                    {{ t("traces.configureFullTextSearch") }}
+                    <q-icon name="info" color="primary" size="md" />
+                    {{ searchObj.data.errorMsg }}
                   </div>
-                  <q-item-label>{{
-                    searchObj.data.additionalErrorMsg
-                  }}</q-item-label>
+                  <div
+                    v-else-if="!isStreamSelected"
+                    class="card-container tw:h-full"
+                  >
+                    <div
+                      data-test="logs-search-no-stream-selected-text"
+                      class="text-center tw:mx-[10%] tw:py-[40px] tw:mt-0 tw:text-[20px]"
+                    >
+                      <q-icon name="info" color="primary" size="md" />
+                      {{ t("search.noStreamSelectedMessage") }}
+                    </div>
+                  </div>
+                  <div
+                    data-test="traces-search-not-started-text"
+                    v-else-if="
+                      isStreamSelected &&
+                      !searchObj.searchApplied &&
+                      !searchObj.data.queryResults?.hits?.length
+                    "
+                    class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
+                  >
+                    <q-icon name="info" color="primary" size="md" />
+                    {{ t("search.applySearch") }}
+                  </div>
+                  <div
+                    v-else
+                    data-test="logs-search-search-result"
+                    class="tw:h-full!"
+                  >
+                    <search-result
+                      ref="searchResultRef"
+                      @update:datetime="setHistogramDate"
+                      @update:scroll="getMoreData"
+                      @update:sort="runQueryOnSort"
+                      @shareLink="copyTracesUrl"
+                      @metrics:filters-updated="onMetricsFiltersUpdated"
+                    />
+                  </div>
                 </div>
-              </div>
-              <div
-                v-else-if="
-                  searchObj.data.errorMsg !== '' &&
-                  parseInt(searchObj.data.errorCode) == 0 &&
-                  !searchObj.loading
-                "
-                data-test="traces-search-result-not-found-text"
-                class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
-              >
-                <q-icon name="info" color="primary" size="md" />
-                {{ searchObj.data.errorMsg }}
-              </div>
-              <div
-                v-else-if="!isStreamSelected"
-                class="card-container tw:h-full"
-              >
-                <div
-                  data-test="logs-search-no-stream-selected-text"
-                  class="text-center tw:mx-[10%] tw:py-[40px] tw:mt-0 tw:text-[20px]"
-                >
-                  <q-icon name="info" color="primary" size="md" />
-                  {{ t("search.noStreamSelectedMessage") }}
-                </div>
-              </div>
-              <div
-                data-test="traces-search-result-not-found-text"
-                v-else-if="
-                  isStreamSelected &&
-                  !searchObj.searchApplied &&
-                  !searchObj.data.queryResults?.hits?.length
-                "
-                class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
-              >
-                <q-icon name="info" color="primary" size="md" />
-                {{ t("search.applySearch") }}
-              </div>
-              <div
-                v-else
-                data-test="logs-search-search-result"
-                class="tw:h-full!"
-              >
-                <search-result
-                  ref="searchResultRef"
-                  @update:datetime="setHistogramDate"
-                  @update:scroll="getMoreData"
-                  @update:sort="runQueryOnSort"
-                  @shareLink="copyTracesUrl"
-                  @metrics:filters-updated="onMetricsFiltersUpdated"
-                />
-              </div>
-            </div>
-          </template>
-        </q-splitter>
-      </div>
+              </template>
+            </q-splitter>
+          </div>
+        </template>
+      </q-splitter>
     </div>
   </q-page>
 </template>
@@ -243,6 +259,7 @@ import {
   ref,
   onDeactivated,
   onActivated,
+  onUnmounted,
   onBeforeMount,
   nextTick,
   defineAsyncComponent,
@@ -254,6 +271,10 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 
 import useTraces from "@/composables/useTraces";
+import {
+  contextRegistry,
+  createTracesContextProvider,
+} from "@/composables/contextProviders";
 
 import TransformService from "@/services/jstransform";
 import {
@@ -277,6 +298,9 @@ import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { useTracesTableColumns } from "./composables/useTracesTableColumns";
+import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
+import { isLLMTrace } from "@/utils/llmUtils";
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
@@ -287,7 +311,9 @@ const SanitizedHtmlRenderer = defineAsyncComponent(
 const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
 
 const store = useStore();
-const activeTab = ref("search");
+const activeTab = computed(() =>
+  searchObj.meta.searchMode === "service-graph" ? "service-graph" : "search",
+);
 const router = useRouter();
 const $q = useQuasar();
 const { t } = useI18n();
@@ -297,11 +323,15 @@ const {
   getUrlQueryParams,
   copyTracesUrl,
   formatTracesMetaData,
+  setServiceColors,
+  loadLocalLogFilterField,
+  updatedLocalLogFilterField,
 } = useTraces();
 const { fnParsedSQL } = logsUtils();
 let refreshIntervalID = 0;
 const searchResultRef = ref(null);
 const searchBarRef = ref(null);
+const splitterModel = ref(15);
 let parser: any;
 const fieldValues = ref({});
 const { showErrorNotification } = useNotifications();
@@ -314,6 +344,19 @@ const { getStreams, getStream } = useStreams();
 const chartRedrawTimeout = ref(null);
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
   useHttpStreaming();
+// AI copilot context provider for traces page
+const setupContextProvider = () => {
+  const provider = createTracesContextProvider(searchObj, store);
+  contextRegistry.register("traces", provider);
+  contextRegistry.setActive("traces");
+};
+
+const cleanupContextProvider = () => {
+  contextRegistry.unregister("traces");
+  contextRegistry.setActive("");
+};
+const { buildColumns } = useTracesTableColumns();
+
 // Track the current search stream so we can cancel it when a new search starts
 let currentSearchTraceId: string | null = null;
 // Track the count query stream so it can be cancelled independently
@@ -336,6 +379,8 @@ searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
 const selectedStreamName = computed(
   () => searchObj.data.stream.selectedStream.value,
 );
+
+const isLLMSpanPresent = ref(false);
 
 const importSqlParser = async () => {
   const useSqlParser: any = await import("@/composables/useParser");
@@ -381,7 +426,7 @@ function getQueryTransform() {
 
 async function getStreamList() {
   try {
-    getStreams("traces", false)
+    return getStreams("traces", false)
       .then(async (res) => {
         searchObj.data.streamResults = res;
 
@@ -909,25 +954,25 @@ async function getQueryData(
             const rawHits: any[] = response.content?.results?.hits || [];
             if (rawHits.length === 0) return;
 
-            // Handle single-trace-id filter: auto-adjust time range on first hit batch
-            if (
-              filter &&
-              filter.includes("trace_id") &&
-              rawHits.length === 1 &&
-              rawHits[0].start_time &&
-              rawHits[0].end_time
-            ) {
-              const startTime = Math.floor(rawHits[0].start_time / 1000);
-              const endTime = Math.ceil(rawHits[0].end_time / 1000);
-              if (
-                !(
-                  startTime >= queryReq.query.start_time &&
-                  endTime <= queryReq.query.end_time
-                )
-              ) {
-                updateNewDateTime(startTime, endTime);
-              }
-            }
+            // // Handle single-trace-id filter: auto-adjust time range on first hit batch
+            // if (
+            //   filter &&
+            //   filter.includes("trace_id") &&
+            //   rawHits.length === 1 &&
+            //   rawHits[0].start_time &&
+            //   rawHits[0].end_time
+            // ) {
+            //   const startTime = Math.floor(rawHits[0].start_time / 1000);
+            //   const endTime = Math.ceil(rawHits[0].end_time / 1000);
+            //   if (
+            //     !(
+            //       startTime >= queryReq.query.start_time &&
+            //       endTime <= queryReq.query.end_time
+            //     )
+            //   ) {
+            //     updateNewDateTime(startTime, endTime);
+            //   }
+            // }
 
             const partition = tracesPartitionMap[searchTraceId]?.partition ?? 1;
             const chunkCount =
@@ -941,6 +986,15 @@ async function getQueryData(
               searchObj.meta.searchMode === "traces"
                 ? formatTracesMetaData(rawHits)
                 : rawHits;
+
+            if (searchObj.meta.searchMode === "spans") {
+              setServiceColors(rawHits);
+            }
+
+            isLLMSpanPresent.value =
+              (!appendResult ? false : isLLMSpanPresent.value) ||
+              formattedHits.some((hit: any) => isLLMTrace(hit));
+
             // Replace hits on the first partition of a pagination fetch (clears the
             // previous page) or on the very first data chunk of a fresh search
             if ((isPagination && partition === 1) || !appendResult) {
@@ -951,7 +1005,10 @@ async function getQueryData(
             searchObj.data.queryResults.from = queryReq.query.from;
 
             updateFieldValues(rawHits);
-            updateGridColumns();
+
+            // load the field stored in localstorage and rebuild the columns
+            loadLocalLogFilterField(searchObj.meta.searchMode);
+            rebuildColumns();
           }
         },
         error: (_payload: any, err: any) => {
@@ -995,6 +1052,28 @@ async function getQueryData(
     searchObj.data.errorDetail = "";
   }
 }
+
+const updateFieldVisibility = async (field: any) => {
+  const idx = searchObj.data.stream.selectedFields.indexOf(field.name);
+  if (idx === -1) {
+    searchObj.data.stream.selectedFields.push(field.name);
+  } else {
+    searchObj.data.stream.selectedFields.splice(idx, 1);
+  }
+
+  updatedLocalLogFilterField(searchObj.meta.searchMode);
+
+  await nextTick();
+  rebuildColumns();
+};
+
+const rebuildColumns = () => {
+  searchObj.data.resultGrid.columns = buildColumns(
+    isLLMSpanPresent.value,
+    searchObj.meta.searchMode ?? "traces",
+    searchObj.data.stream.selectedFields,
+  );
+};
 
 const cancelSearch = () => {
   // Cancel dashboard panel queries (RenderDashboardCharts via usePanelDataLoader)
@@ -1101,6 +1180,7 @@ async function extractFields() {
             showValues: !idFields[rowName],
             label: rowName === "duration" ? "duration (µs)" : rowName,
             dataType: schemaTypeMap.get(rowName),
+            isSchemaField: true,
           });
         }
       });
@@ -1116,6 +1196,7 @@ async function extractFields() {
               ftsKey: ftsKeys.has(row.name),
               showValues: !idFields[row.name],
               dataType: row.type,
+              isSchemaField: true,
             });
           }
         }
@@ -1130,8 +1211,6 @@ async function extractFields() {
 function updateGridColumns() {
   try {
     searchObj.data.resultGrid.columns = [];
-
-    searchObj.data.stream.selectedFields = [];
 
     searchObj.meta.resultGrid.manualRemoveFields = false;
 
@@ -1271,34 +1350,45 @@ async function loadPageData() {
   await getStreamList();
 }
 
-onBeforeMount(async () => {
-  restoreUrlQueryParams();
-  // Restore active tab from URL query params
+function runQueryIfRequested() {
   const queryParams = router.currentRoute.value.query;
-  if (queryParams.tab === "service-graph") {
-    // Only allow service-graph tab if service graph is enabled
-    if (store.state.zoConfig.service_graph_enabled) {
-      activeTab.value = "service-graph";
-    } else {
-      // If service graph is disabled, default to search tab
-      activeTab.value = "search";
-    }
+  const hasStream = !!queryParams.stream;
+  const hasOrg = !!queryParams.org_identifier;
+  const hasPeriod =
+    !!queryParams.period || (!!queryParams.from && !!queryParams.to);
+  const shouldRunQuery = queryParams["run-query"] === "true";
+
+  if (hasStream && hasOrg && hasPeriod && shouldRunQuery) {
+    searchData();
   }
+}
+
+onBeforeMount(async () => {
+  setupContextProvider();
+  restoreUrlQueryParams();
   await importSqlParser();
   if (!searchObj.loading) {
     await loadPageData();
+    runQueryIfRequested();
   }
 });
 
 onDeactivated(() => {
+  cleanupContextProvider();
   clearInterval(refreshIntervalID);
 });
 
-onActivated(() => {
+onUnmounted(() => {
+  cleanupContextProvider();
+});
+
+onActivated(async () => {
+  setupContextProvider();
   const params = router.currentRoute.value.query;
   if (params.reload === "true") {
     restoreUrlQueryParams();
-    loadPageData();
+    await loadPageData();
+    runQueryIfRequested();
   }
   if (
     searchObj.organizationIdentifier !=
@@ -1345,11 +1435,15 @@ function restoreUrlQueryParams() {
     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
   }
 
+  const tab = typeof queryParams.tab === "string" ? queryParams.tab : undefined;
   if (
-    queryParams.search_mode === "spans" ||
-    queryParams.search_mode === "traces"
+    tab !== undefined &&
+    (["service-graph", "traces", "spans"] as const).includes(
+      tab as "service-graph" | "traces" | "spans",
+    )
   ) {
-    searchObj.meta.searchMode = queryParams.search_mode as "traces" | "spans";
+    if (tab === "service-graph" && config.isEnterprise !== "true") return;
+    searchObj.meta.searchMode = tab as TraceSearchMode;
   }
 
   if (
@@ -1368,7 +1462,7 @@ const onSplitterUpdate = () => {
 };
 
 const refreshTimezone = () => {
-  updateGridColumns();
+  // updateGridColumns();
   generateHistogramData();
 
   // searchResultRef.value?.reDrawChart();
@@ -1442,9 +1536,10 @@ const onErrorOnlyToggled = (value: boolean) => {
   }
 };
 
-// Handler for Search Mode toggle (Traces / Spans)
-const onSearchModeChange = (mode: "traces" | "spans") => {
+// Handler for Search Mode toggle (Service Graph / Traces / Spans)
+const onSearchModeChange = (mode: "traces" | "spans" | "service-graph") => {
   searchObj.meta.searchMode = mode;
+  if (mode === "service-graph") return;
   searchObj.data.resultGrid.currentPage = 0;
   searchObj.data.queryResults = {
     hits: [],
@@ -1676,9 +1771,9 @@ const changeRelativeDate = computed(() => {
     searchObj.data.datetime.relative.period.value
   );
 });
-const updateSelectedColumns = computed(() => {
-  return searchObj.data.stream.selectedFields.length;
-});
+// const updateSelectedColumns = computed(() => {
+//   return searchObj.data.stream.selectedFields.length;
+// });
 const runQuery = computed(() => {
   return searchObj.runQuery;
 });
@@ -1739,7 +1834,7 @@ watch(moveSplitter, () => {
 // Handler for service graph view traces event
 const handleServiceGraphViewTraces = (data: any) => {
   // Switch to search tab
-  activeTab.value = "search";
+  searchObj.meta.searchMode = "spans";
 
   // Set the selected stream in dropdown
   if (data.stream) {
@@ -1752,7 +1847,28 @@ const handleServiceGraphViewTraces = (data: any) => {
   // Set the filter query (just the WHERE condition, no SELECT or ORDER BY)
   if (data.serviceName) {
     const escapedServiceName = escapeSingleQuotes(data.serviceName);
-    const filterQuery = `service_name = '${escapedServiceName}'`;
+    let filterQuery = `service_name = '${escapedServiceName}'`;
+    if (data.operationName) {
+      const escapedOpName = escapeSingleQuotes(data.operationName);
+      filterQuery += ` AND operation_name = '${escapedOpName}'`;
+    }
+    if (data.nodeName) {
+      const escapedNodeName = escapeSingleQuotes(data.nodeName);
+      filterQuery += ` AND service_k8s_node_name = '${escapedNodeName}'`;
+    }
+    if (data.podName) {
+      const escapedPodName = escapeSingleQuotes(data.podName);
+      filterQuery += ` AND service_k8s_pod_name = '${escapedPodName}'`;
+    }
+    if (data.errorsOnly) {
+      filterQuery += ` AND span_status = 'ERROR'`;
+    }
+    if (data.minDurationMicros && data.minDurationMicros > 0) {
+      filterQuery += ` AND duration >= ${data.minDurationMicros}`;
+    }
+    if (data.maxDurationMicros && data.maxDurationMicros > 0) {
+      filterQuery += ` AND duration <= ${data.maxDurationMicros}`;
+    }
     searchObj.data.editorValue = filterQuery;
     searchObj.data.query = filterQuery;
     searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
@@ -1774,37 +1890,29 @@ const handleServiceGraphViewTraces = (data: any) => {
   });
 };
 
-watch(updateSelectedColumns, () => {
-  searchObj.meta.resultGrid.manualRemoveFields = true;
-  setTimeout(() => {
-    updateGridColumns();
-  }, 300);
-});
+// watch(updateSelectedColumns, () => {
+//   searchObj.meta.resultGrid.manualRemoveFields = true;
+//   setTimeout(() => {
+//     // updateGridColumns();
+//   }, 300);
+// });
 
 // Watch for active tab changes and update URL
-watch(activeTab, (newTab) => {
-  const query = { ...router.currentRoute.value.query };
-  if (newTab === "service-graph") {
-    // Only set service-graph tab if service graph is enabled
-    if (store.state.zoConfig.service_graph_enabled) {
-      query.tab = "service-graph";
+watch(
+  () => searchObj.meta.searchMode,
+  (mode) => {
+    const query = { ...router.currentRoute.value.query };
+    if (mode !== "spans") {
+      query.tab = mode;
     } else {
-      // If service graph is disabled, force back to search tab
-      activeTab.value = "search";
       delete query.tab;
     }
-  } else {
-    delete query.tab;
-  }
-  router.replace({ query });
-});
+    router.replace({ query });
+  },
+);
 </script>
 
-<style lang="scss" scoped>
-.traces-search-result-container {
-  height: calc(100vh - 144px) !important;
-}
-</style>
+<style lang="scss" scoped></style>
 <style lang="scss">
 .tracePage {
   .index-menu .field_list .field_overlay .field_label,

@@ -138,7 +138,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :props="props"
                 :style="col.style"
               >
-                {{ col.label }}
+                <template v-if="col.field === 'permission'">
+                  <div class="tw:flex tw:items-center tw:justify-center tw:gap-0.5">
+                    <q-checkbox
+                      :data-test="`edit-role-permissions-table-header-column-${col.name}-select-all`"
+                      size="xs"
+                      :model-value="getHeaderCheckboxState(col.name)"
+                      :indeterminate-value="'indeterminate'"
+                      class="filter-check-box cursor-pointer"
+                      @update:model-value="toggleColumnAll(col.name)"
+                    />
+                    <span>{{ col.label }}</span>
+                  </div>
+                </template>
+                <template v-else>
+                  {{ col.label }}
+                </template>
               </th>
             </tr>
             <tr v-if="!visibleResourceCount">
@@ -191,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-else-if="col.field === 'permission'">
                 <q-checkbox
                   :data-test="`edit-role-permissions-table-body-row-${row.name}-col-${col.name}-checkbox`"
-                  v-if="row.permission[col.name]?.show"
+                  v-if="row.permission?.[col.name]?.show"
                   size="xs"
                   v-model="row.permission[col.name].value"
                   :val="col.name"
@@ -231,6 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :customFilteredPermissions="customFilteredPermissions"
                   :parent="row"
                   @updated:permission="handlePermissionChange"
+                  @updated:permission-batch="(changes: any) => emits('updated:permission-batch', changes)"
                   @expand:row="expandPermission"
                 />
               </template>
@@ -278,7 +294,7 @@ const props = defineProps({
   },
 });
 
-const emits = defineEmits(["updated:permission", "expand:row"]);
+const emits = defineEmits(["updated:permission", "updated:permission-batch", "expand:row"]);
 
 const { t } = useI18n();
 
@@ -363,6 +379,45 @@ const columns: any = [
     style: { width: "80px" },
   }
 ];
+
+// Only top-level "Type" rows are toggled by the header checkbox.
+// Child/nested rows inherit permissions through their parent type row,
+// so toggling them individually here is not needed.
+const getTopLevelTypeRows = computed(() => {
+  return props.rows.filter(
+    (row: any) => row?.show && row.type === "Type"
+  );
+});
+
+const getHeaderCheckboxState = (colName: string) => {
+  const visibleRows = getTopLevelTypeRows.value.filter(
+    (row: any) => row.permission?.[colName]?.show
+  );
+  if (!visibleRows.length) return false;
+  const checkedCount = visibleRows.filter(
+    (row: any) => row.permission[colName].value
+  ).length;
+  if (checkedCount === 0) return false;
+  if (checkedCount === visibleRows.length) return true;
+  return "indeterminate";
+};
+
+const toggleColumnAll = (colName: string) => {
+  const visibleRows = getTopLevelTypeRows.value.filter(
+    (row: any) => row.permission?.[colName]?.show
+  );
+  const allChecked = visibleRows.every(
+    (row: any) => row.permission[colName].value
+  );
+  const newValue = !allChecked;
+  const changedRows = visibleRows
+    .filter((row: any) => row.permission[colName].value !== newValue)
+    .map((row: any) => ({ row, permission: colName, newValue }));
+
+  if (changedRows.length) {
+    emits("updated:permission-batch", changedRows);
+  }
+};
 
 const expandPermission = async (resource: any) => {
   emits("expand:row", resource);

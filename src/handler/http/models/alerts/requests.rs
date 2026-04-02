@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::alerts::alert as meta_alerts;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
@@ -57,45 +57,128 @@ pub struct CreateAlertRequestBody {
     #[schema(example = "default")]
     pub folder_id: Option<String>,
 
+    /// Discriminates the alert type. Defaults to scheduled alert when absent.
+    /// Set to `"anomaly_detection"` to create an anomaly detection config instead.
+    pub alert_type: Option<meta_alerts::AlertTypeFilter>,
+
+    /// Anomaly-detection-specific fields (nested object).
+    pub anomaly_config: Option<AnomalyAlertFields>,
+
     /// The alert configuration. All fields from Alert are flattened into this request body.
     #[serde(flatten)]
     #[schema(inline)]
     pub alert: Alert,
 }
 
+impl CreateAlertRequestBody {
+    /// Return the anomaly config fields, combining `detection_function` +
+    /// `detection_function_field` into the canonical "avg(field)" form.
+    /// Returns `None` when no `anomaly_config` was supplied or when
+    /// `detection_function` is missing (required).
+    pub fn anomaly_fields(&self) -> Option<AnomalyAlertFields> {
+        let mut base = self.anomaly_config.clone()?;
+        base.detection_function = combine_detection_function(
+            Some(base.detection_function),
+            base.detection_function_field.take(),
+        )?;
+        Some(base)
+    }
+}
+
+/// Anomaly-detection-specific fields for `CreateAlertRequestBody`.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct AnomalyAlertFields {
+    /// "filters" or "custom_sql"
+    pub query_mode: String,
+    pub filters: Option<serde_json::Value>,
+    pub custom_sql: Option<String>,
+    /// Aggregation function, e.g. "count(*)" or "avg(cpu_usage)"
+    pub detection_function: String,
+    /// Field to aggregate (required for avg/sum/min/max/pXX, ignored for count).
+    /// Combined with `detection_function` into "avg(field)" before saving.
+    pub detection_function_field: Option<String>,
+    /// SQL histogram bucket size, e.g. "5m", "1h"
+    pub histogram_interval: String,
+    /// How often the detection job fires, e.g. "1h", "30m"
+    pub schedule_interval: String,
+    /// Look-back window per detection run, in seconds
+    pub detection_window_seconds: i64,
+    pub training_window_days: Option<i32>,
+    /// 0 = never retrain automatically; otherwise days between retrains
+    pub retrain_interval_days: Option<i32>,
+    /// Percentile threshold (50.0–99.9). Default: 97.0
+    /// Also accepts the name `threshold` (integer, e.g. 97) for API convenience.
+    #[serde(alias = "threshold")]
+    pub percentile: Option<f64>,
+    pub rcf_num_trees: Option<i32>,
+    pub rcf_tree_size: Option<i32>,
+    pub rcf_shingle_size: Option<i32>,
+    pub alert_enabled: Option<bool>,
+}
+
 /// HTTP request body for `UpdateAlert` endpoint.
 ///
-/// Updates an existing alert. Provide the full alert configuration - this replaces
+/// Updates an existing alert. Provide the full alert configuration — this replaces
 /// the existing alert entirely (not a partial update). The request body is the same
 /// structure as Alert.
 ///
-/// ## Example
-///
-/// ```json
-/// {
-///     "name": "Updated Alert Name",
-///     "stream_type": "logs",
-///     "stream_name": "default",
-///     "is_real_time": false,
-///     "query_condition": {
-///         "type": "sql",
-///         "sql": "SELECT count(*) as count FROM \"default\" WHERE level = 'error'"
-///     },
-///     "trigger_condition": {
-///         "period": 15,
-///         "operator": ">=",
-///         "threshold": 100,
-///         "frequency": 5,
-///         "frequency_type": "minutes",
-///         "silence": 60
-///     },
-///     "destinations": ["slack-alerts"],
-///     "enabled": true,
-///     "description": "Updated description"
-/// }
-/// ```
+/// For anomaly detection configs, set `alert_type = "anomaly_detection"` and supply
+/// anomaly-specific fields directly at the top level (flat). Only fields present in
+/// the request body will be updated (partial update semantics for anomaly fields).
 #[derive(Clone, Debug, Deserialize, ToSchema)]
-pub struct UpdateAlertRequestBody(#[schema(inline)] pub Alert);
+pub struct UpdateAlertRequestBody {
+    /// Discriminates the alert type. When `"anomaly_detection"`, delegates to the
+    /// anomaly config update path.
+    pub alert_type: Option<meta_alerts::AlertTypeFilter>,
+
+    /// Anomaly-detection-specific fields to update (partial — only supplied fields
+    /// are changed).
+    pub anomaly_config: Option<UpdateAnomalyAlertFields>,
+
+    /// Alert configuration fields (used for scheduled/realtime alerts).
+    #[serde(flatten)]
+    #[schema(inline)]
+    pub alert: Alert,
+}
+
+impl UpdateAlertRequestBody {
+    /// Return the anomaly config fields, combining `detection_function` +
+    /// `detection_function_field` into the canonical "avg(field)" form when both are present.
+    pub fn anomaly_fields(&self) -> UpdateAnomalyAlertFields {
+        let mut base = self.anomaly_config.clone().unwrap_or_default();
+        // Combine detection_function + detection_function_field if either is supplied.
+        if base.detection_function.is_some() || base.detection_function_field.is_some() {
+            base.detection_function = combine_detection_function(
+                base.detection_function,
+                base.detection_function_field.take(),
+            );
+        }
+        base
+    }
+}
+
+/// Anomaly-detection-specific fields for `UpdateAlertRequestBody` (all optional).
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
+pub struct UpdateAnomalyAlertFields {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub query_mode: Option<String>,
+    pub filters: Option<serde_json::Value>,
+    pub custom_sql: Option<String>,
+    pub detection_function: Option<String>,
+    /// Field to aggregate. Combined with `detection_function` into "avg(field)" before saving.
+    pub detection_function_field: Option<String>,
+    pub histogram_interval: Option<String>,
+    pub schedule_interval: Option<String>,
+    pub detection_window_seconds: Option<i64>,
+    pub training_window_days: Option<i32>,
+    pub retrain_interval_days: Option<i32>,
+    pub percentile: Option<f64>,
+    pub alert_enabled: Option<bool>,
+    pub enabled: Option<bool>,
+    pub folder_id: Option<String>,
+    pub owner: Option<String>,
+}
 
 /// HTTP request body for `MoveAlerts` endpoint.
 #[derive(Clone, Debug, Deserialize, ToSchema)]
@@ -103,6 +186,12 @@ pub struct MoveAlertsRequestBody {
     /// IDs of the alerts to move.
     #[schema(value_type = Vec<String>)]
     pub alert_ids: Vec<Ksuid>,
+
+    /// IDs of anomaly detection configs to move. Defaults to empty when not
+    /// provided. Callers should always supply this to avoid per-ID DB lookups.
+    #[schema(value_type = Vec<String>)]
+    #[serde(default)]
+    pub anomaly_config_ids: Vec<Ksuid>,
 
     /// Indicates the folder to which alerts should be moved.
     pub dst_folder_id: String,
@@ -142,6 +231,10 @@ pub struct ListAlertsQuery {
     ///
     /// This parameter is only used if `page_size` is also set.
     pub page_idx: Option<u64>,
+
+    /// Optional alert type filter: `all` (default), `scheduled`, `realtime`,
+    /// or `anomaly_detection`.
+    pub alert_type: Option<meta_alerts::AlertTypeFilter>,
 }
 
 /// HTTP URL query component that contains parameters for enabling alerts.
@@ -161,7 +254,7 @@ impl From<CreateAlertRequestBody> for meta_alerts::Alert {
 
 impl From<UpdateAlertRequestBody> for meta_alerts::Alert {
     fn from(value: UpdateAlertRequestBody) -> Self {
-        value.0.into()
+        value.alert.into()
     }
 }
 
@@ -179,6 +272,7 @@ impl ListAlertsQuery {
             page_size_and_idx: self
                 .page_size
                 .map(|page_size| (page_size, self.page_idx.unwrap_or(0))),
+            alert_type: self.alert_type.unwrap_or_default(),
         }
     }
 }
@@ -187,6 +281,41 @@ impl ListAlertsQuery {
 pub struct AlertBulkEnableRequest {
     #[schema(value_type = Vec<String>)]
     pub ids: Vec<Ksuid>,
+}
+
+/// HTTP request body for `CloneAlert` endpoint.
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+pub struct CloneAlertRequestBody {
+    /// Optional new name for the cloned alert. Defaults to `<source_name>_copy`.
+    pub name: Option<String>,
+
+    /// Optional folder ID to place the clone in. Defaults to the source folder.
+    pub folder_id: Option<String>,
+}
+
+/// Combine a detection function name and optional field into the stored form.
+///
+/// "avg" + Some("cpu_millicores") → Some("avg(cpu_millicores)")
+/// "count" + _ → Some("count(*)")
+/// "avg" + None → Some("avg")  (legacy — field will use fallback at query-build time)
+/// None → None
+pub fn combine_detection_function(
+    function: Option<String>,
+    field: Option<String>,
+) -> Option<String> {
+    let fn_name = function?;
+    if fn_name.contains('(') {
+        // Already in combined form (e.g. "avg(cpu_millicores)") — pass through.
+        return Some(fn_name);
+    }
+    let combined = match fn_name.as_str() {
+        "count" => "count(*)".to_string(),
+        other => match field {
+            Some(f) if !f.is_empty() => format!("{}({})", other, f),
+            _ => fn_name, // no field yet — store bare name, query builder will warn
+        },
+    };
+    Some(combined)
 }
 
 /// HTTP request body for `GenerateSql` endpoint.
