@@ -683,7 +683,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       treatAsNonTimestamp:
         row.name === store.state.zoConfig.timestamp_column ? false : true,
       showFieldAsJson:
-        store?.state?.zoConfig?.dashboard_show_field_as_json_enabled ?? false,
+        pageKey === "logs"
+          ? (store?.state?.zoConfig?.dashboard_show_field_as_json_enabled ?? false)
+          : false,
     });
 
     updateArrayAlias();
@@ -824,7 +826,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       treatAsNonTimestamp:
         row.name === store.state.zoConfig.timestamp_column ? false : true,
       showFieldAsJson:
-        store?.state?.zoConfig?.dashboard_show_field_as_json_enabled ?? false,
+        pageKey === "logs"
+          ? (store?.state?.zoConfig?.dashboard_show_field_as_json_enabled ?? false)
+          : false,
     });
     updateArrayAlias();
   };
