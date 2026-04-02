@@ -143,6 +143,8 @@ pub enum PanelType {
     Geomap,
     #[serde(rename = "sankey")]
     Sankey,
+    #[serde(rename = "maps")]
+    Maps,
     #[serde(rename = "html")]
     Html,
     #[serde(rename = "markdown")]
