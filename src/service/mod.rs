@@ -53,6 +53,7 @@ pub mod tantivy;
 #[cfg(feature = "cloud")]
 pub mod trial_quota;
 
+pub mod org_storage_providers;
 #[cfg(feature = "enterprise")]
 pub mod search_jobs;
 pub mod self_reporting;
