@@ -80,9 +80,8 @@ mod tests {
 
     #[test]
     fn test_valid_maps_custom_query() {
-        let json_str = include_str!(
-            "../../../../../../test-fixtures/valid/maps-custom-query-dashboard.json"
-        );
+        let json_str =
+            include_str!("../../../../../../test-fixtures/valid/maps-custom-query-dashboard.json");
         let json: Value = serde_json::from_str(json_str).unwrap();
         let errors = validate_dashboard(&json);
         assert!(
@@ -97,9 +96,8 @@ mod tests {
         // Simulate what the backend does: deserialize into v8 structs, re-serialize, validate
         use crate::meta::dashboards::v8;
 
-        let json_str = include_str!(
-            "../../../../../../test-fixtures/valid/maps-custom-query-dashboard.json"
-        );
+        let json_str =
+            include_str!("../../../../../../test-fixtures/valid/maps-custom-query-dashboard.json");
         let dashboard: v8::Dashboard = serde_json::from_str(json_str).unwrap();
 
         // Re-serialize (this is what the backend does before validation)
