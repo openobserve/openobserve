@@ -213,6 +213,7 @@ jobs:
                 "dashboard-sankey.spec.js",
                 "dashboard-pie-donut.spec.js",
                 "dashboard-table-chart.spec.js",
+                "dashboard-metric-camelcase.spec.js",
               ]
           - testfolder: "Dashboards-Streaming"
             browser: "chrome"
