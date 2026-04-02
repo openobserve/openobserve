@@ -1829,7 +1829,7 @@ watch(moveSplitter, () => {
 // Handler for service graph view traces event
 const handleServiceGraphViewTraces = (data: any) => {
   // Switch to search tab
-  searchObj.meta.searchMode = "traces";
+  searchObj.meta.searchMode = "spans";
 
   // Set the selected stream in dropdown
   if (data.stream) {
@@ -1842,7 +1842,28 @@ const handleServiceGraphViewTraces = (data: any) => {
   // Set the filter query (just the WHERE condition, no SELECT or ORDER BY)
   if (data.serviceName) {
     const escapedServiceName = escapeSingleQuotes(data.serviceName);
-    const filterQuery = `service_name = '${escapedServiceName}'`;
+    let filterQuery = `service_name = '${escapedServiceName}'`;
+    if (data.operationName) {
+      const escapedOpName = escapeSingleQuotes(data.operationName);
+      filterQuery += ` AND operation_name = '${escapedOpName}'`;
+    }
+    if (data.nodeName) {
+      const escapedNodeName = escapeSingleQuotes(data.nodeName);
+      filterQuery += ` AND service_k8s_node_name = '${escapedNodeName}'`;
+    }
+    if (data.podName) {
+      const escapedPodName = escapeSingleQuotes(data.podName);
+      filterQuery += ` AND service_k8s_pod_name = '${escapedPodName}'`;
+    }
+    if (data.errorsOnly) {
+      filterQuery += ` AND span_status = 'ERROR'`;
+    }
+    if (data.minDurationMicros && data.minDurationMicros > 0) {
+      filterQuery += ` AND duration >= ${data.minDurationMicros}`;
+    }
+    if (data.maxDurationMicros && data.maxDurationMicros > 0) {
+      filterQuery += ` AND duration <= ${data.maxDurationMicros}`;
+    }
     searchObj.data.editorValue = filterQuery;
     searchObj.data.query = filterQuery;
     searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
