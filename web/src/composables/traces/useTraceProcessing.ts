@@ -10,11 +10,11 @@ import {
   type SpanFilter,
   SpanKind,
   SpanStatus,
-} from "@/types/traces/span.types";
+} from "@/ts/interfaces/traces/span.types";
 import {
   type TraceMetadata,
   type ServiceBreakdown,
-} from "@/types/traces/trace.types";
+} from "@/ts/interfaces/traces/trace.types";
 import { getServiceColor } from "@/utils/traces/traceColors";
 
 /**

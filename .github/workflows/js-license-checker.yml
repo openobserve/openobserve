@@ -15,9 +15,10 @@ on:
     #   - "**.md"
     #   - "**.yml"
     #   - "**.yaml"
+  merge_group:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -66,7 +67,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.check_changes.outputs.has_changes == 'true' && steps.check_package_changes.outputs.has_package_changes == 'true'
-        run: cd web && npm install
+        run: cd web && npm ci
 
       - name: Check licenses
         if: steps.check_changes.outputs.has_changes == 'true' && steps.check_package_changes.outputs.has_package_changes == 'true'

@@ -561,10 +561,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
 
-                    <!-- Correlation Key -->
+                    <!-- Key Type -->
                     <div class="tw:grid tw:gap-2" style="grid-template-columns: 120px 1fr;">
                       <div :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs tw:font-medium">
-                        Correlation Key
+                        Key Type
                       </div>
                       <div
                         class="tw:flex tw:items-center tw:gap-2 tw:px-2.5 tw:py-1 tw:rounded tw:border tw:text-xs tw:font-mono tw:min-w-0"
@@ -574,13 +574,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           color: store.state.theme === 'dark' ? '#E5E7EB' : '#374151'
                         }"
                       >
-                        <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ incidentDetails?.correlation_key || 'N/A' }}</span>
+                        <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ incidentDetails?.key_type || 'N/A' }}</span>
                         <q-icon
-                          :name="copiedField === 'correlation_key' ? 'check' : 'content_copy'"
-                          :class="copiedField === 'correlation_key' ? 'tw:text-green-500' : 'tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500'"
+                          :name="copiedField === 'key_type' ? 'check' : 'content_copy'"
+                          :class="copiedField === 'key_type' ? 'tw:text-green-500' : 'tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500'"
                           class="tw:cursor-pointer tw:transition-all tw:flex-shrink-0"
                           style="font-size: 14px; cursor: pointer;"
-                          @click="copyToClipboard(incidentDetails?.correlation_key, 'correlation_key')"
+                          @click="copyToClipboard(incidentDetails?.key_type, 'key_type')"
                         />
                       </div>
                     </div>
@@ -748,17 +748,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Content -->
                 <div class="tw:flex tw:flex-col tw:p-3 tw:overflow-y-auto tw:gap-0 tw:flex-1" style="min-height: 0;">
                   <div
-                    v-if="incidentDetails?.stable_dimensions && Object.keys(incidentDetails.stable_dimensions).length > 0"
+                    v-if="incidentDetails?.group_values && Object.keys(incidentDetails.group_values).length > 0"
                     class="tw:flex tw:flex-col"
                   >
                     <div
-                      v-for="(value, key) in incidentDetails.stable_dimensions"
+                      v-for="(value, key) in incidentDetails.group_values"
                       :key="key"
                       class="tw:py-2.5 tw:border-b tw:flex tw:gap-2"
                       :style="{
                         borderColor: store.state.theme === 'dark' ? '#444444' : '#E7EAEE'
                       }"
-                      :class="{ 'tw:border-b-0': key === Object.keys(incidentDetails.stable_dimensions)[Object.keys(incidentDetails.stable_dimensions).length - 1] }"
+                      :class="{ 'tw:border-b-0': key === Object.keys(incidentDetails.group_values)[Object.keys(incidentDetails.group_values).length - 1] }"
                     >
                       <div
                         :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'"
@@ -1047,18 +1047,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Error/No Data State -->
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
             <q-icon
-              :name="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'error_outline') : 'info_outline'"
-              :color="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'negative') : 'grey-5'"
+              :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error_outline') : 'info_outline'"
+              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
               size="4rem"
             />
             <div class="text-h6 q-mt-md">
               {{ correlationError || 'No correlated logs found' }}
             </div>
-            <div v-if="correlationError && correlationError.includes('FQN priority')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
-              The service discovery configuration (FQN priority dimensions) was changed after this incident was created.
+            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+              The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
             <q-btn
-              v-if="correlationError && !correlationError.includes('FQN priority')"
+              v-if="correlationError && !correlationError.includes('disambiguation fields')"
               color="primary"
               outline
               size="md"
@@ -1101,18 +1101,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Error/No Data State -->
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
             <q-icon
-              :name="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'error_outline') : 'info_outline'"
-              :color="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'negative') : 'grey-5'"
+              :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error_outline') : 'info_outline'"
+              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
               size="4rem"
             />
             <div class="text-h6 q-mt-md">
               {{ correlationError || 'No correlated metrics found' }}
             </div>
-            <div v-if="correlationError && correlationError.includes('FQN priority')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
-              The service discovery configuration (FQN priority dimensions) was changed after this incident was created.
+            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+              The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
             <q-btn
-              v-if="correlationError && !correlationError.includes('FQN priority')"
+              v-if="correlationError && !correlationError.includes('disambiguation fields')"
               color="primary"
               outline
               size="md"
@@ -1167,18 +1167,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Error/No Data State -->
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
             <q-icon
-              :name="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'error_outline') : 'info_outline'"
-              :color="correlationError ? (correlationError.includes('FQN priority') ? 'warning' : 'negative') : 'grey-5'"
+              :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error_outline') : 'info_outline'"
+              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
               size="4rem"
             />
             <div class="text-h6 q-mt-md">
               {{ correlationError || 'No correlated traces found' }}
             </div>
-            <div v-if="correlationError && correlationError.includes('FQN priority')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
-              The service discovery configuration (FQN priority dimensions) was changed after this incident was created.
+            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+              The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
             <q-btn
-              v-if="correlationError && !correlationError.includes('FQN priority')"
+              v-if="correlationError && !correlationError.includes('disambiguation fields')"
               color="primary"
               outline
               size="md"
@@ -1231,7 +1231,6 @@ import incidentsService, {
   IncidentAlert,
   IncidentCorrelatedStreams,
 } from "@/services/incidents";
-import http from "@/services/http";
 import streamService from "@/services/stream";
 import serviceStreamsApi from "@/services/service_streams";
 import { getImageURL } from "@/utils/zincutils";
@@ -1581,34 +1580,13 @@ export default defineComponent({
           incidentDetails.value
         );
 
-        // Check if correlation failed (null response or no data)
+        // Check if correlation failed (null response or no data) — try fallback
         if (!correlationData.value?.correlationData &&
             (!correlationData.value?.logStreams?.length &&
              !correlationData.value?.metricStreams?.length &&
              !correlationData.value?.traceStreams?.length)) {
-          // Fetch FQN priority config to check if it was modified after incident creation
-          try {
-            const fqnConfigResponse = await http().get(
-              `/api/${org}/settings/v2/fqn_priority_dimensions`
-            );
-            const fqnConfig = fqnConfigResponse.data;
-
-            // Compare timestamps (both in microseconds)
-            if (fqnConfig.updated_at > incidentDetails.value.created_at) {
-              correlationError.value =
-                "FQN priority was modified since this incident was created, cannot correlate";
-              console.warn(
-                `[Incident Correlation] FQN config updated at ${fqnConfig.updated_at}, incident created at ${incidentDetails.value.created_at}`
-              );
-            } else {
-              // Not a config issue - try building fallback correlation
-              await buildFallbackCorrelation(org, incidentDetails.value);
-            }
-          } catch (configError) {
-            // If can't fetch config, try fallback anyway
-            console.error("Failed to fetch FQN config:", configError);
-            await buildFallbackCorrelation(org, incidentDetails.value);
-          }
+          // No correlation data found - try building fallback correlation
+          await buildFallbackCorrelation(org, incidentDetails.value);
         }
       } catch (error: any) {
         console.error("Failed to load correlated streams:", error);
@@ -1655,7 +1633,7 @@ export default defineComponent({
         const filters: Record<string, string> = {};
 
         // Step 4: For each dimension, find the matching schema field
-        for (const [dimId, dimValue] of Object.entries(incident.stable_dimensions)) {
+        for (const [dimId, dimValue] of Object.entries(incident.group_values)) {
           let matchedField = null;
 
           // Get semantic group
@@ -1709,15 +1687,15 @@ export default defineComponent({
 
         // Build correlation response with only the source stream type
         correlationData.value = {
-          serviceName: `dimension-match-${incident.stable_dimensions.service || 'unknown'}`,
-          matchedDimensions: incident.stable_dimensions,
+          serviceName: `dimension-match-${incident.group_values.service || 'unknown'}`,
+          matchedDimensions: incident.group_values,
           additionalDimensions: {},
           logStreams: streamType === 'logs' ? [streamInfo] : [],
           metricStreams: streamType === 'metrics' ? [streamInfo] : [],
           traceStreams: streamType === 'traces' ? [streamInfo] : [],
           correlationData: {
-            service_name: `dimension-match-${incident.stable_dimensions.service || 'unknown'}`,
-            matched_dimensions: incident.stable_dimensions,
+            service_name: `dimension-match-${incident.group_values.service || 'unknown'}`,
+            matched_dimensions: incident.group_values,
             additional_dimensions: {},
             related_streams: {
               logs: streamType === 'logs' ? [streamInfo] : [],
@@ -1766,7 +1744,7 @@ export default defineComponent({
         alert_count: incidentDetails.value.alert_count,
         first_alert_at: incidentDetails.value.first_alert_at,
         last_alert_at: incidentDetails.value.last_alert_at,
-        stable_dimensions: incidentDetails.value.stable_dimensions,
+        group_values: incidentDetails.value.group_values,
         topology_context: incidentDetails.value.topology_context,
         triggers: triggers.value,
         rca_analysis: hasExistingRca.value
@@ -3085,15 +3063,17 @@ body.body--dark .ai-chat-panel::-webkit-scrollbar-thumb {
 
 /* AI Button Styles */
 .ai-btn-active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
 }
 
 .ai-hover-btn {
-  transition: background 0.3s ease;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
 }
 
 .ai-hover-btn:hover {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
+  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
 }
 
 .ai-icon {

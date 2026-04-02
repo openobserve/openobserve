@@ -17,7 +17,7 @@
 /* global BufferSource, Event, IDBCursorWithValue, IDBObjectStore, IDBRequest, IDBVersionChangeEvent, queueMicrotask, setTimeout, crypto, TextEncoder */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import type { ChatMessage } from "@/types/chat";
+import type { ChatMessage } from "@/ts/interfaces/chat";
 
 // ---------------------------------------------------------------------------
 // crypto.subtle mock — deterministic fake hash based on input bytes

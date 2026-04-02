@@ -1,13 +1,13 @@
 <template>
   <div
-    class="field_overlay tw:absolute tw:right-0 tw:top-[50%] table-cell-actions tw:translate-y-[-50%]"
+    class="field_overlay tw:absolute tw:right-0 tw:top-[50%] tw:translate-y-1/2 table-cell-actions tw:translate-y-[-50%] tw:h-full! tw:flex! tw:items-center tw:justify-center tw:rounded"
     :class="backgroundClass"
     :title="row[column.id]"
     :data-test="`log-add-data-from-column-${row[column.id]}`"
   >
     <q-btn
-      class="q-mr-xs"
-      size="6px"
+      class="q-mx-xs"
+      size="0.375rem"
       @click.prevent.stop="copyLogToClipboard(row[column.id])"
       title="Copy"
       round
@@ -16,7 +16,7 @@
     <q-btn
       v-if="isStreamField && !hideSearchTermActions"
       class="q-mr-xs"
-      size="6px"
+      size="0.375rem"
       @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'include')"
       :data-test="`log-details-include-field-${row[column.id]}`"
       title="Include Term"
@@ -28,11 +28,12 @@
     </q-btn>
     <q-btn
       v-if="isStreamField && !hideSearchTermActions"
-      size="6px"
+      size="0.375rem"
       @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'exclude')"
       title="Exclude Term"
       :data-test="`log-details-exclude-field-${row[column.id]}`"
       round
+      class="q-mr-xs"
     >
       <q-icon style="height: 8px; width: 8px">
         <NotEqualIcon></NotEqualIcon>
@@ -41,6 +42,7 @@
     <!-- o2 ai context add button in the cell actions when user adds a interesting field to the table 
      then we show some options there we need this  -->
     <O2AIContextAddBtn
+      v-if="!hideAi"
       @send-to-ai-chat="sendToAiChat(JSON.stringify(row[column.id]))"
       :style="'border: 1px solid #fff;'"
       :size="'6px'"
@@ -73,6 +75,10 @@ const props = defineProps({
     default: () => [],
   },
   hideSearchTermActions: {
+    type: Boolean,
+    default: false,
+  },
+  hideAi: {
     type: Boolean,
     default: false,
   },

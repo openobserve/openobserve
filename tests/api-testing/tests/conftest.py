@@ -51,8 +51,9 @@ def create_session():
 
 @pytest.fixture(scope="module")
 def base_url():
-    """Return the base URL."""
-    return BASE_URL
+    """Return the base URL with trailing slash."""
+    url = BASE_URL
+    return url if url.endswith('/') else url + '/'
 
 
 @pytest.fixture(scope="module")
@@ -78,7 +79,8 @@ def ingest_data():
 
     stream_name = "stream_pytest_data"
     org = DEFAULT_ORG_ID
-    url = f"{BASE_URL}api/{org}/{stream_name}/_json"
+    base_url_with_slash = BASE_URL if BASE_URL.endswith('/') else BASE_URL + '/'
+    url = f"{base_url_with_slash}api/{org}/{stream_name}/_json"
     resp1 = session.post(url, data=data, headers={"Content-Type": "application/json"})
     logging.info("Main data ingested successfully, status code: %s", resp1.status_code)
     assert resp1.status_code == 200, \
@@ -94,7 +96,7 @@ def ingest_data():
         f"Failed to ingest camel case test data: {resp2.status_code} - {resp2.text[:500]}"
 
     # Flush data to ensure it's indexed
-    flush_url = f"{BASE_URL}node/flush"
+    flush_url = f"{base_url_with_slash}node/flush"
     logging.info("Flushing data to ensure indexing...")
     flush_resp = session.put(flush_url)
 

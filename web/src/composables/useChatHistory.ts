@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { ChatMessage, ChatHistoryEntry } from '@/types/chat';
+import type { ChatMessage, ChatHistoryEntry } from "@/ts/interfaces/chat";
 
-const DB_NAME = 'o2ChatDB';
+const DB_NAME = "o2ChatDB";
 const DB_VERSION = 2;
-const STORE_NAME = 'chatHistory';
+const STORE_NAME = "chatHistory";
 const MAX_HISTORY_ITEMS = 100;
 
 /**
@@ -37,17 +37,17 @@ const initDB = (): Promise<IDBDatabase> => {
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         // Fresh install — create store with all indexes
         const store = db.createObjectStore(STORE_NAME, {
-          keyPath: 'id',
+          keyPath: "id",
           autoIncrement: true,
         });
-        store.createIndex('timestamp', 'timestamp', { unique: false });
-        store.createIndex('title', 'title', { unique: false });
-        store.createIndex('userOrgKey', 'userOrgKey', { unique: false });
+        store.createIndex("timestamp", "timestamp", { unique: false });
+        store.createIndex("title", "title", { unique: false });
+        store.createIndex("userOrgKey", "userOrgKey", { unique: false });
       } else {
         // Upgrade from v1 — add userOrgKey index to existing store
         const store = transaction.objectStore(STORE_NAME);
-        if (!store.indexNames.contains('userOrgKey')) {
-          store.createIndex('userOrgKey', 'userOrgKey', { unique: false });
+        if (!store.indexNames.contains("userOrgKey")) {
+          store.createIndex("userOrgKey", "userOrgKey", { unique: false });
         }
       }
     };
@@ -65,14 +65,14 @@ const computeUserOrgKey = async (
 ): Promise<string> => {
   const raw = `${userEmail}:${orgIdentifier}`;
 
-  if (typeof crypto !== 'undefined' && crypto.subtle) {
+  if (typeof crypto !== "undefined" && crypto.subtle) {
     const buf = await crypto.subtle.digest(
-      'SHA-256',
+      "SHA-256",
       new TextEncoder().encode(raw),
     );
     return Array.from(new Uint8Array(buf))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
   }
 
   // Synchronous djb2 fallback (test environments without crypto.subtle)
@@ -134,18 +134,18 @@ export function useChatHistory(
 
     try {
       const [db, userOrgKey] = await Promise.all([initDB(), getUserOrgKey()]);
-      const transaction = db.transaction(STORE_NAME, 'readwrite');
+      const transaction = db.transaction(STORE_NAME, "readwrite");
       const dbStore = transaction.objectStore(STORE_NAME);
 
       // Generate title from first user message if not provided
-      const firstUserMessage = messages.find((msg) => msg.role === 'user');
+      const firstUserMessage = messages.find((msg) => msg.role === "user");
       const resolvedTitle =
         title ||
         (firstUserMessage
           ? firstUserMessage.content.length > 40
-            ? firstUserMessage.content.substring(0, 40) + '...'
+            ? firstUserMessage.content.substring(0, 40) + "..."
             : firstUserMessage.content
-          : 'New Chat');
+          : "New Chat");
 
       // Strip Vue reactivity from messages
       const serializableMessages = messages.map((msg) => {
@@ -160,6 +160,9 @@ export function useChatHistory(
         }
         if (msg.images && msg.images.length > 0) {
           serialized.images = JSON.parse(JSON.stringify(msg.images));
+        }
+        if (msg.feedback) {
+          serialized.feedback = msg.feedback;
         }
         return serialized;
       });
@@ -181,12 +184,12 @@ export function useChatHistory(
           resolve(resultId);
         };
         request.onerror = () => {
-          console.error('Error saving chat history:', request.error);
+          console.error("Error saving chat history:", request.error);
           reject(request.error);
         };
       });
     } catch (error) {
-      console.error('Error saving to chat history:', error);
+      console.error("Error saving to chat history:", error);
       return null;
     }
   };
@@ -201,9 +204,9 @@ export function useChatHistory(
   const loadHistory = async (): Promise<ChatHistoryEntry[]> => {
     try {
       const [db, userOrgKey] = await Promise.all([initDB(), getUserOrgKey()]);
-      const transaction = db.transaction(STORE_NAME, 'readonly');
+      const transaction = db.transaction(STORE_NAME, "readonly");
       const store = transaction.objectStore(STORE_NAME);
-      const index = store.index('userOrgKey');
+      const index = store.index("userOrgKey");
 
       const history = await new Promise<ChatHistoryEntry[]>(
         (resolve, reject) => {
@@ -223,7 +226,7 @@ export function useChatHistory(
       // Prune old entries beyond MAX_HISTORY_ITEMS (only for this user+org)
       if (history.length > MAX_HISTORY_ITEMS) {
         const itemsToDelete = history.slice(MAX_HISTORY_ITEMS);
-        const deleteTransaction = db.transaction(STORE_NAME, 'readwrite');
+        const deleteTransaction = db.transaction(STORE_NAME, "readwrite");
         const deleteStore = deleteTransaction.objectStore(STORE_NAME);
 
         for (const item of itemsToDelete) {
@@ -238,7 +241,7 @@ export function useChatHistory(
 
       return history.slice(0, MAX_HISTORY_ITEMS);
     } catch (error) {
-      console.error('Error loading chat history:', error);
+      console.error("Error loading chat history:", error);
       return [];
     }
   };
@@ -250,12 +253,10 @@ export function useChatHistory(
    * @param chatId - The ID of the chat to load
    * @returns The chat entry, or null if not found / not owned
    */
-  const loadChat = async (
-    chatId: number,
-  ): Promise<ChatHistoryEntry | null> => {
+  const loadChat = async (chatId: number): Promise<ChatHistoryEntry | null> => {
     try {
       const [db, userOrgKey] = await Promise.all([initDB(), getUserOrgKey()]);
-      const transaction = db.transaction(STORE_NAME, 'readonly');
+      const transaction = db.transaction(STORE_NAME, "readonly");
       const store = transaction.objectStore(STORE_NAME);
 
       return new Promise((resolve, reject) => {
@@ -263,19 +264,22 @@ export function useChatHistory(
         request.onsuccess = () => {
           const record = request.result as ChatHistoryEntry | undefined;
           // Verify ownership — reject records belonging to another user+org
-          if (!record || (record.userOrgKey && record.userOrgKey !== userOrgKey)) {
+          if (
+            !record ||
+            (record.userOrgKey && record.userOrgKey !== userOrgKey)
+          ) {
             resolve(null);
             return;
           }
           resolve(record);
         };
         request.onerror = () => {
-          console.error('Error loading chat:', request.error);
+          console.error("Error loading chat:", request.error);
           reject(request.error);
         };
       });
     } catch (error) {
-      console.error('Error loading chat:', error);
+      console.error("Error loading chat:", error);
       return null;
     }
   };
@@ -290,31 +294,34 @@ export function useChatHistory(
   const deleteChatById = async (chatId: number): Promise<boolean> => {
     try {
       const [db, userOrgKey] = await Promise.all([initDB(), getUserOrgKey()]);
-      const transaction = db.transaction(STORE_NAME, 'readwrite');
+      const transaction = db.transaction(STORE_NAME, "readwrite");
       const store = transaction.objectStore(STORE_NAME);
 
       return new Promise((resolve, reject) => {
         const getRequest = store.get(chatId);
         getRequest.onsuccess = () => {
           const record = getRequest.result as ChatHistoryEntry | undefined;
-          if (!record || (record.userOrgKey && record.userOrgKey !== userOrgKey)) {
+          if (
+            !record ||
+            (record.userOrgKey && record.userOrgKey !== userOrgKey)
+          ) {
             resolve(false);
             return;
           }
           const deleteRequest = store.delete(chatId);
           deleteRequest.onsuccess = () => resolve(true);
           deleteRequest.onerror = () => {
-            console.error('Error deleting chat:', deleteRequest.error);
+            console.error("Error deleting chat:", deleteRequest.error);
             reject(deleteRequest.error);
           };
         };
         getRequest.onerror = () => {
-          console.error('Error loading chat for deletion:', getRequest.error);
+          console.error("Error loading chat for deletion:", getRequest.error);
           reject(getRequest.error);
         };
       });
     } catch (error) {
-      console.error('Error deleting chat:', error);
+      console.error("Error deleting chat:", error);
       return false;
     }
   };
@@ -328,9 +335,9 @@ export function useChatHistory(
   const clearAllHistory = async (): Promise<boolean> => {
     try {
       const [db, userOrgKey] = await Promise.all([initDB(), getUserOrgKey()]);
-      const transaction = db.transaction(STORE_NAME, 'readwrite');
+      const transaction = db.transaction(STORE_NAME, "readwrite");
       const store = transaction.objectStore(STORE_NAME);
-      const index = store.index('userOrgKey');
+      const index = store.index("userOrgKey");
 
       return new Promise((resolve, reject) => {
         const request = index.openCursor(IDBKeyRange.only(userOrgKey));
@@ -345,12 +352,12 @@ export function useChatHistory(
           }
         };
         request.onerror = () => {
-          console.error('Error clearing history:', request.error);
+          console.error("Error clearing history:", request.error);
           reject(request.error);
         };
       });
     } catch (error) {
-      console.error('Error clearing history:', error);
+      console.error("Error clearing history:", error);
       return false;
     }
   };
@@ -369,7 +376,7 @@ export function useChatHistory(
   ): Promise<boolean> => {
     try {
       const [db, userOrgKey] = await Promise.all([initDB(), getUserOrgKey()]);
-      const transaction = db.transaction(STORE_NAME, 'readwrite');
+      const transaction = db.transaction(STORE_NAME, "readwrite");
       const store = transaction.objectStore(STORE_NAME);
 
       return new Promise((resolve, reject) => {
@@ -384,20 +391,20 @@ export function useChatHistory(
           const putRequest = store.put(chat);
           putRequest.onsuccess = () => resolve(true);
           putRequest.onerror = () => {
-            console.error('Error updating title:', putRequest.error);
+            console.error("Error updating title:", putRequest.error);
             reject(putRequest.error);
           };
         };
         getRequest.onerror = () => {
           console.error(
-            'Error retrieving chat for title update:',
+            "Error retrieving chat for title update:",
             getRequest.error,
           );
           reject(getRequest.error);
         };
       });
     } catch (error) {
-      console.error('Error updating chat title:', error);
+      console.error("Error updating chat title:", error);
       return false;
     }
   };

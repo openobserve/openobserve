@@ -56,22 +56,15 @@ export class LogsQueryPage {
   }
 
   async toggleHistogram() {
-    // Histogram toggle is now inside the utilities hamburger menu
-    await this.page.locator(this.utilitiesMenuButton).click();
-    await this.page.waitForTimeout(200);
+    // Histogram toggle is now directly visible in the toolbar (moved out of utilities menu)
     await this.page.locator(this.histogramToggle).click();
   }
 
   async isHistogramOn() {
-    // Histogram toggle is now inside the utilities hamburger menu
-    await this.page.locator(this.utilitiesMenuButton).click();
-    await this.page.waitForTimeout(200);
+    // Histogram toggle is now directly visible in the toolbar (moved out of utilities menu)
     const histogramToggle = this.page.locator(this.histogramToggle);
-    const isOn = await histogramToggle
-      .locator('[role="switch"]')
-      .evaluate(el => el.getAttribute('aria-checked') === 'true');
-    await this.page.keyboard.press('Escape');
-    return isOn;
+    const isChecked = await histogramToggle.getAttribute('aria-checked');
+    return isChecked === 'true';
   }
 
   async ensureHistogramState(desiredState) {

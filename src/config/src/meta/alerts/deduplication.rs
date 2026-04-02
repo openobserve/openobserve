@@ -95,22 +95,6 @@ pub struct GlobalDeduplicationConfig {
     )]
     pub time_window_minutes: Option<i32>,
 
-    /// FQN (Fully Qualified Name) priority dimensions for service correlation
-    ///
-    /// Defines which semantic dimensions are used to derive the service-fqn,
-    /// in priority order. The first dimension with a value wins.
-    ///
-    /// Default priority (if empty):
-    /// 1. k8s-deployment, k8s-statefulset, k8s-daemonset, k8s-job (K8s workloads)
-    /// 2. aws-ecs-task, faas-name, gcp-cloud-run, azure-cloud-role (Cloud workloads)
-    /// 3. process-name (Bare metal)
-    /// 4. service (Fallback)
-    ///
-    /// Example custom priority: ["k8s-deployment", "aws-ecs-task", "service"]
-    /// This would skip statefulset/daemonset and use deployment directly.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub fqn_priority_dimensions: Vec<String>,
-
     /// Time window for hierarchical incident upgrade (minutes)
     /// Incidents created within this window can be upgraded from weak to strong correlation keys.
     #[serde(default = "default_upgrade_window")]
@@ -259,24 +243,8 @@ impl GlobalDeduplicationConfig {
             alert_dedup_enabled: false,
             alert_fingerprint_groups: vec![],
             time_window_minutes: None,
-            fqn_priority_dimensions: Self::default_fqn_priority(),
             upgrade_window_minutes: default_upgrade_window(),
         }
-    }
-
-    /// Get default FQN priority dimensions
-    ///
-    /// For OSS builds, returns empty (must be configured).
-    /// For enterprise builds, ServiceStreamsConfig provides the full default list.
-    ///
-    /// Default priority order for deriving service-fqn (first match wins):
-    /// 1. K8s workload: deployment, statefulset, daemonset, job
-    /// 2. Cloud workload: ECS task family, Lambda function, Cloud Run service
-    /// 3. Bare metal: process name
-    /// 4. Fallback: service dimension
-    pub fn default_fqn_priority() -> Vec<String> {
-        // OSS builds return empty - enterprise provides defaults via ServiceStreamsConfig
-        vec![]
     }
 }
 

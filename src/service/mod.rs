@@ -58,6 +58,7 @@ pub mod search_jobs;
 pub mod self_reporting;
 pub mod session;
 pub mod short_url;
+pub mod sourcemaps;
 pub mod stream;
 pub mod tls;
 pub mod traces;
