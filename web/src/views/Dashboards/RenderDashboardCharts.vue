@@ -1704,5 +1704,12 @@ export default defineComponent({
   .grid-stack-item-content {
     overflow: hidden !important;
   }
+
+  /* Quasar virtual-scroll inserts padding divs above/below the rendered
+   * rows to simulate the full scroll height. In print mode these become
+   * empty white space. Hide them so no blank gaps appear in table panels. */
+  :deep(.q-virtual-scroll__padding) {
+    display: none !important;
+  }
 }
 </style>

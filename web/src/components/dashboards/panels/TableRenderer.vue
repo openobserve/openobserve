@@ -17,13 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="table-wrapper">
     <q-table
+      :key="store.state.printMode ? 'print' : 'normal'"
       :class="[
         'my-sticky-virtscroll-table',
         { 'no-position-absolute': store.state.printMode },
         { 'wrap-enabled': wrapCells },
         { 'pivot-sticky-totals': stickyRowTotals },
       ]"
-      :virtual-scroll="!showPagination"
+      :virtual-scroll="!showPagination && !store.state.printMode"
       v-model:pagination="pagination"
       :rows-per-page-options="paginationOptions"
       :virtual-scroll-sticky-size-start="pivotHeaderLevels.length > 0 ? PIVOT_TABLE_HEADER_ROW_HEIGHT * pivotHeaderLevels.length : PIVOT_TABLE_DEFAULT_HEADER_HEIGHT"
@@ -863,11 +864,50 @@ export default defineComponent({
 }
 
 @media print {
+  // .table-wrapper is the containing block (position:relative).
+  // It clips the expanded table at the panel height; the footer is
+  // pinned to its bottom edge via absolute positioning (see below).
   .table-wrapper {
-    overflow: hidden !important;
+    position: relative !important;
     height: 100% !important;
-    max-height: 100% !important;
-    page-break-inside: avoid;
+    max-height: none !important;
+    overflow: hidden !important;
+  }
+
+  .my-sticky-virtscroll-table {
+    // Expand to natural content height so all rows are rendered from the top.
+    height: auto !important;
+    overflow: visible !important;
+
+    // Remove sticky — no scroll container in print, sticky causes quirks.
+    :deep(thead tr th) {
+      position: static !important;
+      top: auto !important;
+    }
+
+    // Let Quasar's scroll wrapper expand to content height.
+    :deep(.q-table__middle) {
+      overflow: visible !important;
+      height: auto !important;
+    }
+
+    // Pin the footer to the bottom of .table-wrapper (the nearest
+    // position:relative ancestor) so it is always visible at the
+    // bottom of the panel, regardless of how many rows the table has.
+    :deep(.q-table__bottom) {
+      position: absolute !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      background-color: #fff !important;
+      z-index: 1 !important;
+    }
+  }
+
+  .body--dark .my-sticky-virtscroll-table {
+    :deep(.q-table__bottom) {
+      background-color: #1a1a2e !important;
+    }
   }
 }
 </style>
