@@ -89,6 +89,17 @@ pub async fn post_user(
         }
     }
 
+    #[cfg(feature = "enterprise")]
+    if !matches!(
+        usr_req.role.base_role,
+        UserRole::Admin | UserRole::ServiceAccount
+    ) && !get_openfga_config().enabled
+    {
+        return Ok(MetaHttpResponse::bad_request(
+            "Non-admin roles require open-fga enabled",
+        ));
+    }
+
     let is_allowed = if is_root_user(initiator_id) {
         true
     } else {

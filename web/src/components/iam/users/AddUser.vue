@@ -552,12 +552,14 @@ export default defineComponent({
                 dismiss();
                 this.existingUser = false;
               } else {
+              if (err.response?.status != 403 || err?.status != 403) {
                 this.q.notify({
                   color: "negative",
                   message: err.response.data.message,
                   timeout: 2000,
                 });
                 dismiss();
+              }
                 this.formData.email = userEmail;
               }
             });
