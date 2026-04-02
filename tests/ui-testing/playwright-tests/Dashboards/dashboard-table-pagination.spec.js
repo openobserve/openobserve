@@ -254,11 +254,11 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify pagination controls are visible in the table
-    const tableBottom = page.locator('[data-test="dashboard-panel-table"] .q-table__bottom');
+    const tableBottom = page.locator('[data-test="dashboard-panel-table"] [data-test="dashboard-table-pagination"]');
     await expect(tableBottom).toBeVisible();
 
     // Check for "Records per page" text
-    const rowsPerPageText = page.locator('[data-test="dashboard-panel-table"]').getByText('Records per page');
+    const rowsPerPageText = page.locator('[data-test="dashboard-table-rows-per-page-label"]');
     await expect(rowsPerPageText).toBeVisible();
 
     testLogger.info('Verified pagination controls are visible in table');
@@ -495,11 +495,18 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
-    // Check that row count text is displayed (format: "X-Y of Z")
-    const tableBottom = page.locator('[data-test="dashboard-panel-table"] .q-table__bottom');
-    await tableBottom.waitFor({ state: "visible" });
-    const bottomText = await tableBottom.textContent();
-    
+    // Wait for row count text to show actual data in format "X-Y of Z"
+    // (After re-apply, rows load asynchronously so we poll until the text matches)
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector('[data-test="dashboard-table-row-count"]');
+        return el && /\d+-\d+\s+of\s+\d+/.test(el.textContent ?? "");
+      },
+      { timeout: 15000 }
+    );
+    const rowCount = page.locator('[data-test="dashboard-table-row-count"]');
+    const bottomText = await rowCount.textContent();
+
     // Verify the text contains the expected format (e.g., "1-10 of 100" or similar)
     expect(bottomText).toMatch(/\d+-\d+\s+of\s+\d+/);
 
@@ -616,10 +623,9 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     const paginationChecked = await paginationToggle.getAttribute('aria-checked');
     expect(paginationChecked).toBe('true');
 
-    // Verify table has wrap-enabled class
-    const table = page.locator('[data-test="dashboard-panel-table"]');
-    const tableClasses = await table.getAttribute('class');
-    expect(tableClasses).toContain('wrap-enabled');
+    // Verify table wrapper has wrap-enabled class (set by TenstackTable when wrap=true)
+    const tableWrapper = page.locator('[data-test="dashboard-panel-table"]');
+    await expect(tableWrapper).toHaveClass(/wrap-enabled/);
 
     testLogger.info('Verified pagination works with wrap cells option');
 
@@ -769,7 +775,7 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Table should still work with default value (10)
-    const tableBottom = page.locator('[data-test="dashboard-panel-table"] .q-table__bottom');
+    const tableBottom = page.locator('[data-test="dashboard-panel-table"] [data-test="dashboard-table-pagination"]');
     await tableBottom.waitFor({ state: "visible" });
     await expect(tableBottom).toBeVisible();
 
@@ -1144,12 +1150,13 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Wait for the table to render with data rows
-    // Quasar's q-table with hide-no-data does NOT render .q-table__bottom when rows are empty
+    // TenstackTable does NOT render the pagination container when rows are empty
     const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
     await tablePanel.waitFor({ state: "visible", timeout: 15000 });
 
     // Wait for table rows - if first attempt returns no data, re-apply to retry the query
-    const tableRows = tablePanel.locator('tbody tr, .q-table__grid-content .q-card');
+    // TanStack table (dashboard mode) renders rows directly in tbody with class dashboard-data-row
+    const tableRows = tablePanel.locator('tbody tr.dashboard-data-row');
     let hasRows = await tableRows.first().waitFor({ state: "visible", timeout: 15000 }).then(() => true).catch(() => false);
 
     if (!hasRows) {
@@ -1163,17 +1170,23 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     expect(hasRows, 'PromQL query "up" must return data rows for pagination test - check metrics ingestion').toBe(true);
 
     // Wait for the table bottom container which holds all pagination controls
-    const tableBottom = tablePanel.locator('.q-table__bottom');
+    // (PromQL with legend uses a custom bottom slot that also has this data-test)
+    const tableBottom = page.locator('[data-test="dashboard-table-pagination"]');
     await tableBottom.waitFor({ state: "visible", timeout: 15000 });
 
-    // Verify "Records per page:" text is visible (note: text includes colon)
-    const rowsPerPageText = tableBottom.locator('span.text-caption').filter({ hasText: 'Records per page' });
+    // Verify "Records per page" text is visible
+    const rowsPerPageText = page.locator('[data-test="dashboard-table-rows-per-page-label"]');
     await expect(rowsPerPageText).toBeVisible({ timeout: 10000 });
 
-    // Verify the record count display shows correct format (e.g., "1-10 of 99")
-    // The pagination info is in a span with class "text-caption q-pa-sm"
-    const paginationInfo = tableBottom.locator('span.text-caption').filter({ hasText: /\d+-\d+\s+of\s+\d+/ });
-    await expect(paginationInfo).toBeVisible({ timeout: 5000 });
+    // Wait for row count to show actual data in format "X-Y of Z"
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector('[data-test="dashboard-table-row-count"]');
+        return el && /\d+-\d+\s+of\s+\d+/.test(el.textContent ?? "");
+      },
+      { timeout: 15000 }
+    );
+    const paginationInfo = page.locator('[data-test="dashboard-table-row-count"]');
 
     // Verify pagination shows correct format (e.g., "1-10 of X" or "1-N of N" if fewer records)
     const paginationText = await paginationInfo.textContent();

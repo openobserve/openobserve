@@ -15,28 +15,97 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- Outer wrapper: full panel height, flex-column so pagination sits below the scroll area -->
+  <div
+    class="my-sticky-virtscroll-table tw:h-full tw:flex tw:flex-col tw:rounded-none!"
+    :data-sticky-id="tableId"
+    :class="{ 'pivot-sticky-totals': stickyRowTotals, 'wrap-enabled': wrap }"
+    :style="store.state.printMode ? { position: 'static' } : {}"
+  >
+  <!-- Scroll container: grows to fill available height -->
   <div
     ref="parentRef"
-    class="container tw:h-full tw:rounded-none! tw:overflow-x-auto tw:relative table-container"
+    class="container table-container tw:flex-1 tw:min-h-0 tw:overflow-auto tw:relative"
   >
     <table
       v-if="table"
       data-test="o2-table"
-      class="tw:w-full tw:table-auto"
+      :class="['tw:w-full', 'tw:table-auto']"
       :style="{
         minWidth: '100%',
         ...columnSizeVars,
-        minHeight: totalSize + 'px',
-        width: !defaultColumns
-          ? table.getCenterTotalSize() + 'px'
-          : wrap
-            ? width
-              ? width - 12 + 'px'
-              : '100%'
-            : '100%',
+        minHeight: (showPagination || isDashboard) ? undefined : totalSize + 'px',
+        width: isDashboard
+          ? '100%'
+          : !defaultColumns
+            ? table.getCenterTotalSize() + 'px'
+            : wrap
+              ? width
+                ? width - 12 + 'px'
+                : '100%'
+              : '100%',
       }"
     >
+      <!-- ── Pivot multi-level headers (dashboard only) ───────────────────── -->
+      <thead v-if="pivotHeaderLevels.length > 0" class="tw:sticky tw:top-0 tw:z-10">
+        <tr
+          v-for="(level, levelIdx) in (pivotHeaderLevels as any[])"
+          :key="'hl_' + levelIdx"
+          style="max-height: 28px; height: 28px"
+        >
+          <!-- Row-field headers: first <tr> only, rowspan all levels -->
+          <th
+            v-if="levelIdx === 0"
+            v-for="col in pivotRowColumns"
+            :key="'rh_' + col.name"
+            :rowspan="pivotHeaderLevels.length"
+            class="pivot-group-header tw:cursor-pointer tw:px-2 tw:text-left"
+            :style="(getStickyColumnStyle(col) as any)"
+            @click="handlePivotSort(col.name)"
+          >
+            {{ col.label }}
+            <q-icon
+              :name="pivotSortState.descending ? 'arrow_downward' : 'arrow_upward'"
+              size="12px"
+              class="q-ml-xs pivot-sort-icon"
+              :class="{ 'pivot-sort-active': pivotSortState.sortBy === col.name }"
+            />
+          </th>
+          <!-- Pivot group / value headers -->
+          <th
+            v-for="(cell, cellIdx) in level.cells"
+            :key="'c_' + levelIdx + '_' + cellIdx"
+            :colspan="cell.colspan"
+            :rowspan="cell.rowspan || 1"
+            class="tw:px-2"
+            :class="[
+              level.isLeaf ? 'pivot-value-header' : 'pivot-group-header tw:text-center',
+              { 'pivot-section-border': cell.hasBorder },
+              { 'pivot-total-col': stickyColTotals && cell._isTotalHeader },
+              { 'tw:cursor-pointer': cell._sortColumn },
+            ]"
+            :style="
+              (stickyColTotals && cell._isTotalHeader
+                ? getStickyTotalHeaderForPivot(cell)
+                : {}) as any
+            "
+            @click="cell._sortColumn && handlePivotSort(cell._sortColumn)"
+          >
+            {{ cell.label }}
+            <q-icon
+              v-if="level.isLeaf && cell._sortColumn"
+              :name="pivotSortState.descending ? 'arrow_downward' : 'arrow_upward'"
+              size="12px"
+              class="q-ml-xs pivot-sort-icon"
+              :class="{ 'pivot-sort-active': pivotSortState.sortBy === cell._sortColumn }"
+            />
+          </th>
+        </tr>
+      </thead>
+
+      <!-- ── Standard TanStack headers (logs / non-pivot) ─────────────────── -->
       <thead
+        v-else
         class="tw:sticky tw:top-0 tw:z-10"
         style="max-height: 44px; height: 22px"
         v-for="headerGroup in table.getHeaderGroups()"
@@ -48,11 +117,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :animation="200"
           :sort="enableColumnReorder && (!isResizingHeader || !defaultColumns)"
           handle=".table-head"
-          :class="
+          :class="[
+            // Flex only for logs/traces (enables drag-reorder + virtual-scroll alignment)
+            // Dashboard uses table-layout:auto — no flex so browser auto-sizes columns
+            !isDashboard ? 'tw:flex items-center' : '',
+            { 'dashboard-header-row': !!isDashboard },
             enableColumnReorder && table.getState().columnOrder.length
               ? 'tw:cursor-move!'
-              : ''
-          "
+              : '',
+          ]"
           :style="{
             width:
               defaultColumns && wrap
@@ -66,7 +139,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           tag="tr"
           @start="(event) => handleDragStart(event)"
           @end="() => handleDragEnd()"
-          class="tw:flex items-center"
         >
           <th
             v-for="header in headerGroup.headers"
@@ -279,8 +351,127 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </td>
         </tr>
       </thead>
-      <tbody data-test="o2-table-body" ref="tableBodyRef" class="tw:relative">
-        <template v-for="virtualRow in virtualRows" :key="virtualRow.id">
+      <!-- tw:relative is only needed for virtual-scroll absolute rows (logs/traces).
+           In dashboard mode (regular DOM rows) it must be absent so that
+           position:sticky on <thead> works correctly. -->
+      <tbody
+        data-test="o2-table-body"
+        ref="tableBodyRef"
+        :class="{ 'tw:relative': !isDashboard && !showPagination }"
+      >
+        <!-- ── Dashboard: regular DOM rows (no virtual scroll) ──────────────── -->
+        <!-- Used when `data` prop is present (dashboard mode) OR pagination is
+             enabled. Virtual scroll (below) is only for logs/traces. -->
+        <template v-if="showPagination || !!isDashboard">
+          <tr
+            v-for="(row, rowIdx) in pagedRows"
+            :key="row.id"
+            class="tw:border-b tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)] dashboard-data-row"
+            @click="handleDataRowClick(row.original, rowIdx as number, $event)"
+          >
+            <td
+              v-for="(cell, cellIndex) in row.getVisibleCells()"
+              :key="cell.id"
+              class="tw:py-1 tw:px-2 tw:overflow-hidden tw:relative table-cell copy-cell-td"
+              :class="[
+                (cell.column.columnDef.meta as any)?.align === 'center'
+                  ? 'tw:text-center!'
+                  : '',
+                (cell.column.columnDef.meta as any)?.align === 'right'
+                  ? 'tw:text-right!'
+                  : '',
+                (cell.column.columnDef.meta as any)?.cellClass ?? '',
+                { 'sticky-column': (cell.column.columnDef.meta as any)?.sticky },
+                {
+                  'pivot-total-col':
+                    stickyColTotals &&
+                    (cell.column.columnDef.meta as any)?._isTotalColumn,
+                },
+                isPivotMergeNoBorder(
+                  row.original,
+                  (cell.column.columnDef.meta as any)?._col,
+                )
+                  ? 'pivot-no-border'
+                  : '',
+              ]"
+              :style="[
+                {
+                  width: `calc(var(--col-${sanitizeCssId(cell.column.columnDef.id)}-size) * 1px)`,
+                  height: rowHeight ? rowHeight + 'px' : undefined,
+                },
+                getDashboardCellStyle(cell),
+                (getStickyColumnStyle(
+                  (cell.column.columnDef.meta as any)?._col,
+                ) as any),
+                (getStickyTotalColumnStyle(
+                  (cell.column.columnDef.meta as any)?._col,
+                ) as any),
+              ]"
+            >
+              <template
+                v-if="
+                  !isPivotMergeHidden(
+                    row.original,
+                    (cell.column.columnDef.meta as any)?._col,
+                  )
+                "
+              >
+                <div
+                  class="tw:h-full tw:w-full tw:flex tw:items-center"
+                  :class="[
+                    (cell.column.columnDef.meta as any)?.align === 'center'
+                      ? 'tw:justify-center!'
+                      : '',
+                    (cell.column.columnDef.meta as any)?.align === 'right'
+                      ? 'tw:justify-end!'
+                      : '',
+                  ]"
+                >
+                  <!-- Copy button LEFT (right-aligned) -->
+                  <q-btn
+                    v-if="
+                      enableCellCopy &&
+                      (cell.column.columnDef.meta as any)?.align === 'right' &&
+                      shouldShowCopyButton(cell.getValue())
+                    "
+                    :icon="isCellCopied(rowIdx as number, cell.column.id) ? 'check' : 'content_copy'"
+                    dense size="xs" no-caps flat class="copy-btn q-mr-xs"
+                    @click.stop="copyCellContent(cell.getValue(), rowIdx as number, cell.column.id)"
+                  />
+                  <!-- JSON field inline renderer -->
+                  <JsonFieldRenderer
+                    v-if="(cell.column.columnDef.meta as any)?.showFieldAsJson"
+                    :value="cell.getValue()"
+                  />
+                  <!-- Default value with format fn -->
+                  <span
+                    v-else
+                    :class="[
+                      !props.wrap ? 'tw:min-w-0 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap' : '',
+                      props.wrap ? 'tw:break-words' : '',
+                    ]"
+                  >
+                    {{ getDashboardCellValue(cell) }}
+                  </span>
+                  <!-- Copy button RIGHT (left/center-aligned) -->
+                  <q-btn
+                    v-if="
+                      enableCellCopy &&
+                      (cell.column.columnDef.meta as any)?.align !== 'right' &&
+                      shouldShowCopyButton(cell.getValue())
+                    "
+                    :icon="isCellCopied(rowIdx as number, cell.column.id) ? 'check' : 'content_copy'"
+                    dense size="xs" no-caps flat class="copy-btn q-ml-xs"
+                    @click.stop="copyCellContent(cell.getValue(), rowIdx as number, cell.column.id)"
+                  />
+                </div>
+              </template>
+            </td>
+          </tr>
+        </template>
+
+        <!-- ── Virtual scroll rows (logs / traces only — no `data` prop) ────── -->
+        <template v-if="!showPagination && !isDashboard" v-for="virtualRow in virtualRows" :key="virtualRow.index">
           <tr
             :data-test="`o2-table-detail-${
               (tableRows[virtualRow.index] as any)[
@@ -296,7 +487,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               formattedRows?.[virtualRow.index]?.original?.isExpandedRow
             "
             :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
-            class="tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b-[1px] tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
+            class="tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
             :class="[
               defaultColumns &&
               !wrap &&
@@ -319,7 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="
               !(formattedRows[virtualRow.index]?.original as any)
                 ?.isExpandedRow &&
-              handleDataRowClick(tableRows[virtualRow.index], virtualRow.index)
+              handleDataRowClick(tableRows[virtualRow.index], virtualRow.index, $event)
             "
           >
             <!-- Status color line for entire row -->
@@ -377,7 +568,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   '-' +
                   cell.column.columnDef.id
                 "
-                class="tw:py-none tw:px-2 tw:items-center tw:justify-start tw:relative table-cell"
+                class="tw:py-none tw:px-2 tw:items-center tw:justify-start tw:relative table-cell copy-cell-td"
                 :class="[
                   ...tableCellClass,
                   { 'tw:pl-2': cellIndex === 0 },
@@ -388,17 +579,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'tw:justify-end! tw:text-right!'
                     : '',
                   (cell.column.columnDef.meta as any)?.cellClass ?? '',
+                  { 'sticky-column': (cell.column.columnDef.meta as any)?.sticky },
+                  {
+                    'pivot-total-col':
+                      stickyColTotals &&
+                      (cell.column.columnDef.meta as any)?._isTotalColumn,
+                  },
+                  isPivotMergeNoBorder(
+                    cell.row.original,
+                    (cell.column.columnDef.meta as any)?._col,
+                  )
+                    ? 'pivot-no-border'
+                    : '',
                 ]"
-                :style="{
-                  width:
-                    cell.column.columnDef.id !== 'source' ||
-                    cell.column.columnDef.enableResizing
-                      ? `calc(var(--col-${sanitizeCssId(cell.column.columnDef.id)}-size) * 1px)`
-                      : wrap
-                        ? width - 260 - 12 + 'px'
-                        : 'auto',
-                  height: wrap ? 'stretch' : rowHeight != null ? rowHeight + 'px' : undefined,
-                }"
+                :style="[
+                  {
+                    width:
+                      cell.column.columnDef.id !== 'source' ||
+                      cell.column.columnDef.enableResizing
+                        ? `calc(var(--col-${sanitizeCssId(cell.column.columnDef.id)}-size) * 1px)`
+                        : wrap
+                          ? width - 260 - 12 + 'px'
+                          : 'auto',
+                    height: wrap ? 'stretch' : rowHeight != null ? (rowHeight ?? 28) + 'px' : undefined,
+                  },
+                  getDashboardCellStyle(cell),
+                  (getStickyColumnStyle(
+                    (cell.column.columnDef.meta as any)?._col,
+                  ) as any),
+                  (getStickyTotalColumnStyle(
+                    (cell.column.columnDef.meta as any)?._col,
+                  ) as any),
+                ]"
                 @mouseover="handleCellMouseOver(cell)"
                 @mouseleave="handleCellMouseLeave()"
               >
@@ -444,51 +656,119 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <!-- Otherwise render the default cell content inline -->
                   <template v-else>
-                    <span
+                    <!-- Pivot merge: skip content for hidden (merged) cells -->
+                    <template
                       v-if="
-                        processedResults[
-                          `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
-                        ]
+                        !isPivotMergeHidden(
+                          cell.row.original,
+                          (cell.column.columnDef.meta as any)?._col,
+                        )
                       "
-                      :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
-                      :class="store.state.theme === 'dark' ? 'dark' : ''"
-                      v-html="
-                        processedResults[
-                          `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
-                        ]
-                      "
-                    />
-                    <span
-                      :style="{
-                        width:
-                          cell.column.columnDef.id !== 'source' ||
-                          cell.column.columnDef.enableResizing
-                            ? `calc((var(--col-${sanitizeCssId(cell.column.columnDef.id)}-size) * 1px) - 0.5rem)`
-                            : wrap
-                              ? width - 260 - 12 + 'px'
-                              : 'auto',
-                      }"
-                      :class="[
-                        !props.wrap
-                          ? 'tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap'
-                          : '',
-                        props.wrap ? 'tw:break-words' : '',
-                      ]"
-                      v-else
                     >
-                      {{ cell.renderValue() }}
-                    </span>
-                    <O2AIContextAddBtn
-                      v-if="
-                        enableAiContextButton &&
-                        cell.column.columnDef.id ===
-                          store.state.zoConfig.timestamp_column
-                      "
-                      class="tw:absolute tw:top-[14px] tw:left-[18px] tw:transform tw:invisible tw:-translate-y-1/2 ai-btn"
-                      @send-to-ai-chat="
-                        sendToAiChat(JSON.stringify(cell.row.original), true)
-                      "
-                    />
+                      <!-- Dashboard: copy button LEFT (right-aligned columns) -->
+                      <q-btn
+                        v-if="
+                          enableCellCopy &&
+                          (cell.column.columnDef.meta as any)?.align === 'right' &&
+                          shouldShowCopyButton(cell.getValue())
+                        "
+                        :icon="
+                          isCellCopied(virtualRow.index, cell.column.id)
+                            ? 'check'
+                            : 'content_copy'
+                        "
+                        dense
+                        size="xs"
+                        no-caps
+                        flat
+                        class="copy-btn q-mr-xs"
+                        @click.stop="
+                          copyCellContent(
+                            cell.getValue(),
+                            virtualRow.index,
+                            cell.column.id,
+                          )
+                        "
+                      />
+                      <!-- Dashboard: JSON field inline renderer -->
+                      <JsonFieldRenderer
+                        v-if="(cell.column.columnDef.meta as any)?.showFieldAsJson"
+                        :value="cell.getValue()"
+                      />
+                      <!-- Logs: FTS-highlighted text -->
+                      <span
+                        v-else-if="
+                          processedResults[
+                            `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
+                          ]
+                        "
+                        :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
+                        :class="store.state.theme === 'dark' ? 'dark' : ''"
+                        v-html="
+                          processedResults[
+                            `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
+                          ]
+                        "
+                      />
+                      <!-- Default value (dashboard: format fn; logs: renderValue) -->
+                      <span
+                        :style="{
+                          width:
+                            cell.column.columnDef.id !== 'source' ||
+                            cell.column.columnDef.enableResizing
+                              ? `calc((var(--col-${sanitizeCssId(cell.column.columnDef.id)}-size) * 1px) - 0.5rem)`
+                              : wrap
+                                ? width - 260 - 12 + 'px'
+                                : 'auto',
+                        }"
+                        :class="[
+                          !props.wrap
+                            ? 'tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap'
+                            : '',
+                          props.wrap ? 'tw:break-words' : '',
+                        ]"
+                        v-else
+                      >
+                        {{ getDashboardCellValue(cell) }}
+                      </span>
+                      <!-- Logs: AI context button -->
+                      <O2AIContextAddBtn
+                        v-if="
+                          enableAiContextButton &&
+                          cell.column.columnDef.id ===
+                            store.state.zoConfig.timestamp_column
+                        "
+                        class="tw:absolute tw:top-[14px] tw:left-[18px] tw:transform tw:invisible tw:-translate-y-1/2 ai-btn"
+                        @send-to-ai-chat="
+                          sendToAiChat(JSON.stringify(cell.row.original), true)
+                        "
+                      />
+                      <!-- Dashboard: copy button RIGHT (left/center-aligned) -->
+                      <q-btn
+                        v-if="
+                          enableCellCopy &&
+                          (cell.column.columnDef.meta as any)?.align !== 'right' &&
+                          shouldShowCopyButton(cell.getValue())
+                        "
+                        :icon="
+                          isCellCopied(virtualRow.index, cell.column.id)
+                            ? 'check'
+                            : 'content_copy'
+                        "
+                        dense
+                        size="xs"
+                        no-caps
+                        flat
+                        class="copy-btn q-ml-xs"
+                        @click.stop="
+                          copyCellContent(
+                            cell.getValue(),
+                            virtualRow.index,
+                            cell.column.id,
+                          )
+                        "
+                      />
+                    </template>
                   </template>
                 </div>
               </td>
@@ -502,7 +782,130 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </td>
         </tr>
       </tbody>
+
+      <!-- ── Dashboard: sticky grand-total row ──────────────────────────────── -->
+      <tfoot
+        v-if="stickyTotalRow"
+        style="position: sticky; bottom: 0; z-index: 10"
+      >
+        <tr class="pivot-total-row pivot-sticky-total-row">
+          <td
+            v-for="col in ((columns as any[]) || [])"
+            :key="'ft_' + col.name"
+            class="tw:px-2"
+            :class="[
+              col.align === 'right' ? 'tw:text-right' : col.align === 'center' ? 'tw:text-center' : 'tw:text-left',
+              { 'sticky-column': col.sticky },
+              { 'pivot-total-col': stickyColTotals && col._isTotalColumn },
+            ]"
+            :style="([getStickyTotalColumnStyle(col), getStickyColumnStyle(col)] as any)"
+          >
+            {{
+              stickyTotalRow[col.field] === undefined ||
+              stickyTotalRow[col.field] === null
+                ? ''
+                : col.format
+                  ? col.format(stickyTotalRow[col.field], stickyTotalRow)
+                  : stickyTotalRow[col.field]
+            }}
+          </td>
+        </tr>
+      </tfoot>
     </table>
+
+  </div><!-- end scroll container -->
+
+    <!-- ── Dashboard: bottom slot (custom footer) or default pagination ──── -->
+    <!-- Lives OUTSIDE the scroll container so it's always visible -->
+    <template v-if="$slots.bottom">
+      <slot
+        name="bottom"
+        :setRowsPerPage="
+          (val: number) => {
+            localRowsPerPage = val;
+            currentPage = 1;
+          }
+        "
+        :paginationOptions="paginationOptions"
+        :totalRows="tableRows.length"
+        :pagination="{ rowsPerPage: localRowsPerPage, page: currentPage }"
+        :pagesNumber="
+          localRowsPerPage === 0
+            ? 1
+            : Math.ceil(tableRows.length / localRowsPerPage) || 1
+        "
+        :isFirstPage="currentPage === 1"
+        :isLastPage="
+          currentPage >=
+          (localRowsPerPage === 0
+            ? 1
+            : Math.ceil(tableRows.length / localRowsPerPage) || 1)
+        "
+        :firstPage="() => (currentPage = 1)"
+        :prevPage="() => (currentPage = Math.max(1, currentPage - 1))"
+        :nextPage="
+          () => {
+            const pages =
+              localRowsPerPage === 0
+                ? 1
+                : Math.ceil(tableRows.length / localRowsPerPage) || 1;
+            currentPage = Math.min(pages, currentPage + 1);
+          }
+        "
+        :lastPage="
+          () => {
+            currentPage =
+              localRowsPerPage === 0
+                ? 1
+                : Math.ceil(tableRows.length / localRowsPerPage) || 1;
+          }
+        "
+      />
+    </template>
+    <!-- Show pagination controls (or just the row count) for all dashboard tables -->
+    <div v-else-if="showPagination || !!isDashboard" class="row items-center full-width" data-test="dashboard-table-pagination">
+      <q-space />
+      <TablePaginationControls
+        :show-pagination="showPagination"
+        :pagination="{ rowsPerPage: localRowsPerPage, page: currentPage }"
+        :pagination-options="paginationOptions"
+        :total-rows="tableRows.length"
+        :pages-number="
+          localRowsPerPage === 0
+            ? 1
+            : Math.ceil(tableRows.length / localRowsPerPage) || 1
+        "
+        :is-first-page="currentPage === 1"
+        :is-last-page="
+          currentPage >=
+          (localRowsPerPage === 0
+            ? 1
+            : Math.ceil(tableRows.length / localRowsPerPage) || 1)
+        "
+        @update:rows-per-page="
+          (val: number) => {
+            localRowsPerPage = val;
+            currentPage = 1;
+          }
+        "
+        @first-page="currentPage = 1"
+        @prev-page="currentPage = Math.max(1, currentPage - 1)"
+        @next-page="
+          currentPage = Math.min(
+            localRowsPerPage === 0
+              ? 1
+              : Math.ceil(tableRows.length / localRowsPerPage) || 1,
+            currentPage + 1,
+          )
+        "
+        @last-page="
+          currentPage =
+            localRowsPerPage === 0
+              ? 1
+              : Math.ceil(tableRows.length / localRowsPerPage) || 1
+        "
+      />
+    </div>
   </div>
 </template>
 
@@ -530,13 +933,25 @@ import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
-import { debounce } from "quasar";
+import { debounce, copyToClipboard, exportFile } from "quasar";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
+// ── Dashboard additions ──────────────────────────────────────────────────────
+import { useStickyColumns } from "@/composables/useStickyColumns";
+import useNotifications from "@/composables/useNotifications";
+import { getColorForTable } from "@/utils/dashboard/colorPalette";
+import { findFirstValidMappedValue } from "@/utils/dashboard/panelValidation";
+import {
+  TABLE_ROWS_PER_PAGE_DEFAULT_VALUE,
+  PIVOT_TABLE_TOTAL_COLUMN_WIDTH,
+  PIVOT_TABLE_ROW_KEY_SEPARATOR,
+} from "@/utils/dashboard/constants";
+import JsonFieldRenderer from "@/components/dashboards/panels/JsonFieldRenderer.vue";
+import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 
-interface StreamField {
+export interface StreamField {
   name: string;
   isSchemaField: boolean;
 }
@@ -544,11 +959,11 @@ interface StreamField {
 const props = defineProps({
   rows: {
     type: Array,
-    required: true,
+    default: () => [],
   },
   columns: {
     type: Array,
-    required: true,
+    default: () => [],
   },
   wrap: {
     type: Boolean,
@@ -657,6 +1072,54 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  // ── Dashboard / TableRenderer parity props ───────────────────────────────
+  /** When true, enables all dashboard features (pivot, sticky cols, cell copy, etc.).
+   *  Also signals that `columns` prop is in Quasar format (name/label/field)
+   *  rather than TanStack format (id/header/accessorKey). */
+  isDashboard: {
+    type: Boolean,
+    default: false,
+  },
+  /** Pivot multi-level header config produced by the dashboard pivot transformer. */
+  pivotHeaderLevels: {
+    type: Array,
+    default: () => [],
+  },
+  /** Grand-total row pinned to the bottom of the table (dashboard pivot). */
+  stickyTotalRow: {
+    type: Object as PropType<any | null>,
+    default: null,
+  },
+  /** Pin the grand-total row to the bottom of the scroll area. */
+  stickyRowTotals: {
+    type: Boolean,
+    default: false,
+  },
+  /** Pin total columns to the right edge of the table. */
+  stickyColTotals: {
+    type: Boolean,
+    default: false,
+  },
+  /** Value-mapping config for per-cell background coloring (dashboard). */
+  valueMapping: {
+    type: Array,
+    default: () => [],
+  },
+  /** Show per-cell copy-to-clipboard button on hover. Default: false */
+  enableCellCopy: {
+    type: Boolean,
+    default: false,
+  },
+  /** Enable paginated mode (turns off virtual scroll). Default: false */
+  showPagination: {
+    type: Boolean,
+    default: false,
+  },
+  /** Rows per page when `showPagination` is true. */
+  rowsPerPage: {
+    type: Number,
+    default: TABLE_ROWS_PER_PAGE_DEFAULT_VALUE,
+  },
 });
 
 const { t } = useI18n();
@@ -684,6 +1147,11 @@ const sanitizeCssId = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, "_");
 const store = useStore();
 const { isFTSColumn } = useTextHighlighter();
 const { processedResults, processHitsInChunks } = useLogsHighlighter();
+
+// ── Dashboard: sticky columns composable ─────────────────────────────────────
+// useStickyColumns reads props.columns (Quasar-format when isDashboard=true).
+const { getStickyColumnStyle, tableId } = useStickyColumns(props, store);
+const { showErrorNotification, showPositiveNotification } = useNotifications();
 
 const getSortingHandler = (e: Event, fn: any) => {
   return fn(e);
@@ -720,9 +1188,390 @@ const tableRowSize = ref(0);
 
 const columnOrder = ref<any>([]);
 
-const tableRows = ref([...props.rows]);
+const tableRows = ref<any[]>([...(props.rows ?? [])]);
 
-const selectedStreamFtsKeys: ComputedRef<string[] | []> = computed(() => {
+// ── Dashboard: convert Quasar column defs → TanStack ColumnDef[] ─────────────
+const dashboardColumns = computed<ColumnDef<unknown, any>[] | null>(() => {
+  if (!props.isDashboard || !props.columns) return null;
+  return (props.columns as any[]).map((col: any) => ({
+    id: col.name,
+    header: col.label,
+    ...(typeof col.field === "function"
+      ? { accessorFn: col.field }
+      : { accessorKey: col.field ?? col.name }),
+    ...(col.sort ? { sortingFn: col.sort } : {}),
+    meta: {
+      align: col.align,
+      format: col.format,
+      sticky: col.sticky,
+      colorMode: col.colorMode,
+      showFieldAsJson: col.showFieldAsJson,
+      _isRowField: col._isRowField,
+      _isTotalColumn: col._isTotalColumn,
+      _totalColRightIndex: col._totalColRightIndex,
+      _col: col, // reference to original Quasar column for style helpers
+    },
+  }));
+});
+
+// ── Dashboard: pivot helpers ─────────────────────────────────────────────────
+const pivotHeaderLevels = computed(() => props.pivotHeaderLevels || []);
+const pivotRowColumns = computed(() =>
+  ((props.columns as any[]) || []).filter((c: any) => c._isRowField),
+);
+const stickyRowTotals = computed(() => !!props.stickyRowTotals);
+const stickyColTotals = computed(() => !!props.stickyColTotals);
+const stickyTotalRow = computed(() => props.stickyTotalRow || null);
+const isPivotMode = computed(() => pivotHeaderLevels.value.length > 0);
+
+// Pivot sort state (managed manually — TanStack sort is disabled for pivot).
+const pivotSortState = ref<{ sortBy: string; descending: boolean }>({
+  sortBy: "",
+  descending: false,
+});
+const handlePivotSort = (field: string) => {
+  if (pivotSortState.value.sortBy === field) {
+    pivotSortState.value = {
+      ...pivotSortState.value,
+      descending: !pivotSortState.value.descending,
+    };
+  } else {
+    pivotSortState.value = { sortBy: field, descending: false };
+  }
+};
+
+// Re-sort pivot rows whenever sort state changes.
+watch(
+  () => pivotSortState.value,
+  () => {
+    if (!props.isDashboard) return;
+    const rows = ((props.rows as any[]) || []).filter((r: any) => !r.__isTotalRow);
+    const { sortBy, descending } = pivotSortState.value;
+    if (!sortBy) {
+      tableRows.value = [...rows];
+      return;
+    }
+    const col = ((props.columns as any[]) || []).find((c: any) => c.name === sortBy);
+    tableRows.value = [...rows].sort((a: any, b: any) => {
+      const va = a[sortBy];
+      const vb = b[sortBy];
+      let result: number;
+      if (col?.sort) result = col.sort(va, vb, a, b);
+      else if (typeof va === "number" && typeof vb === "number") result = va - vb;
+      else result = String(va ?? "").localeCompare(String(vb ?? ""));
+      return descending ? -result : result;
+    });
+  },
+  { deep: true },
+);
+
+// Also sync tableRows when rows changes externally (dashboard re-render only).
+watch(
+  () => props.rows,
+  (newRows) => {
+    if (!props.isDashboard || !newRows) return;
+    const rows = (newRows as any[]).filter((r: any) => !r.__isTotalRow);
+    const { sortBy, descending } = pivotSortState.value;
+    if (!sortBy) {
+      tableRows.value = [...rows];
+      return;
+    }
+    const col = ((props.columns as any[]) || []).find((c: any) => c.name === sortBy);
+    tableRows.value = [...rows].sort((a: any, b: any) => {
+      const va = a[sortBy];
+      const vb = b[sortBy];
+      let result: number;
+      if (col?.sort) result = col.sort(va, vb, a, b);
+      else if (typeof va === "number" && typeof vb === "number") result = va - vb;
+      else result = String(va ?? "").localeCompare(String(vb ?? ""));
+      return descending ? -result : result;
+    });
+    // Also sync column order for dashboard.
+    if (props.columns) {
+      columnOrder.value = (props.columns as any[]).map((c: any) => c.name);
+    }
+  },
+  { deep: true },
+);
+
+// Sync column order when dashboard columns change (Quasar cols use `name` as id).
+watch(
+  () => props.columns,
+  (cols) => {
+    if (props.isDashboard && cols) columnOrder.value = (cols as any[]).map((c: any) => c.name);
+  },
+  { immediate: true },
+);
+
+// ── Dashboard: pivot merge map ───────────────────────────────────────────────
+const pivotMergeMap = computed(() => {
+  const map = new Map<
+    string,
+    Record<string, { hideContent: boolean; hideBorder: boolean }>
+  >();
+  const rowCols = pivotRowColumns.value;
+  if (rowCols.length === 0) return map;
+  const rows = tableRows.value.filter((r: any) => !r.__isTotalRow);
+  if (rows.length === 0) return map;
+
+  const getRowKey = (row: any) =>
+    rowCols
+      .map((c: any) => String(row[c.name] ?? ""))
+      .join(PIVOT_TABLE_ROW_KEY_SEPARATOR);
+
+  for (let colIdx = 0; colIdx < rowCols.length; colIdx++) {
+    const col = rowCols[colIdx];
+    let groupStart = 0;
+    for (let i = 0; i <= rows.length; i++) {
+      let sameGroup = i < rows.length;
+      if (sameGroup) {
+        for (let p = 0; p <= colIdx; p++) {
+          if (rows[i][rowCols[p].name] !== rows[groupStart][rowCols[p].name]) {
+            sameGroup = false;
+            break;
+          }
+        }
+      }
+      if (!sameGroup) {
+        const size = i - groupStart;
+        if (size > 1) {
+          for (let r = groupStart; r < i; r++) {
+            const key = getRowKey(rows[r]);
+            if (!map.has(key)) map.set(key, {});
+            map.get(key)![col.name] = {
+              hideContent: r !== groupStart,
+              hideBorder: r < i - 1,
+            };
+          }
+        }
+        groupStart = i;
+      }
+    }
+  }
+  return map;
+});
+
+const pivotRowKey = (row: any) =>
+  pivotRowColumns.value
+    .map((c: any) => String(row[c.name] ?? ""))
+    .join(PIVOT_TABLE_ROW_KEY_SEPARATOR);
+
+const isPivotMergeHidden = (row: any, col: any): boolean => {
+  if (!col?._isRowField) return false;
+  return (
+    pivotMergeMap.value.get(pivotRowKey(row))?.[col.name]?.hideContent === true
+  );
+};
+const isPivotMergeNoBorder = (row: any, col: any): boolean => {
+  if (!col?._isRowField) return false;
+  return (
+    pivotMergeMap.value.get(pivotRowKey(row))?.[col.name]?.hideBorder === true
+  );
+};
+
+// ── Dashboard: sticky total columns ─────────────────────────────────────────
+const getStickyTotalColumnStyle = (col: any) => {
+  if (!stickyColTotals.value || !col?._isTotalColumn) return {};
+  const rightOffset =
+    (col._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
+  return {
+    position: "sticky",
+    right: `${rightOffset}px`,
+    "z-index": 2,
+    width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    "min-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    "max-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
+    "box-shadow": "-2px 0 4px rgba(0, 0, 0, 0.1)",
+    "white-space": "normal",
+    "word-break": "break-word",
+  };
+};
+
+const getStickyTotalHeaderForPivot = (cell: any) => {
+  if (!stickyColTotals.value) return {};
+  const rightOffset =
+    (cell._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
+  const width = cell.colspan
+    ? cell.colspan * PIVOT_TABLE_TOTAL_COLUMN_WIDTH
+    : PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
+  return {
+    position: "sticky",
+    right: `${rightOffset}px`,
+    "z-index": 3,
+    width: `${width}px`,
+    "min-width": `${width}px`,
+    "max-width": `${width}px`,
+    "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
+    "box-shadow": "-2px 0 4px rgba(0, 0, 0, 0.1)",
+    "white-space": "normal",
+    "word-break": "break-word",
+  };
+};
+
+// ── Dashboard: cell coloring ─────────────────────────────────────────────────
+const isDashboardColor = (hex: string): boolean => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return false;
+  const r = parseInt(result[1], 16);
+  const g = parseInt(result[2], 16);
+  const b = parseInt(result[3], 16);
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
+};
+
+const getDashboardCellStyle = (cell: any): string => {
+  if (!props.isDashboard) return "";
+  const col = (cell.column.columnDef.meta as any)?._col;
+  const value = cell.getValue();
+  // 1) Auto color mode — stable palette per distinct string value.
+  if (col?.colorMode === "auto") {
+    const palette = getColorForTable;
+    const key = String(value);
+    const cacheKey = `__autoColorMap_${col.field ?? col.name}`;
+    if (!col[cacheKey]) col[cacheKey] = new Map<string, string>();
+    const map: Map<string, string> = col[cacheKey];
+    if (!map.has(key)) map.set(key, palette[map.size % palette.length]);
+    const hex = map.get(key) as string;
+    return `background-color: ${hex}; color: ${isDashboardColor(hex) ? "#ffffff" : "#000000"}`;
+  }
+  // 2) Value-mapping color.
+  const found = findFirstValidMappedValue(value, props.valueMapping, "color");
+  if (found?.color) {
+    const hex = found.color;
+    if (!/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(hex)) return "";
+    return `background-color: ${hex}; color: ${isDashboardColor(hex) ? "#ffffff" : "#000000"}`;
+  }
+  return "";
+};
+
+const getDashboardCellValue = (cell: any): any => {
+  const value = cell.getValue();
+  if (value === "undefined" || value === null || value === undefined) return "";
+  const format = (cell.column.columnDef.meta as any)?.format;
+  return format ? format(value, cell.row.original) : value;
+};
+
+// ── Dashboard: cell copy ─────────────────────────────────────────────────────
+const copiedCells = ref(new Map<string, boolean>());
+
+const isCellCopied = (rowIndex: number, colName: string) =>
+  copiedCells.value.has(`${rowIndex}_${colName}`);
+
+const shouldShowCopyButton = (value: any) => {
+  if (value === null || value === undefined || value === "undefined") return false;
+  return String(value).trim() !== "";
+};
+
+const copyCellContent = (value: any, rowIndex: number, colName: string) => {
+  if (value === null || value === undefined) return;
+  copyToClipboard(String(value))
+    .then(() => {
+      const key = `${rowIndex}_${colName}`;
+      copiedCells.value.set(key, true);
+      setTimeout(() => copiedCells.value.delete(key), 3000);
+    })
+    .catch(() => {});
+};
+
+// ── Dashboard: pagination ────────────────────────────────────────────────────
+const currentPage = ref(1);
+const localRowsPerPage = ref(
+  props.showPagination
+    ? props.rowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE
+    : 0,
+);
+
+watch(
+  () => [props.showPagination, props.rowsPerPage] as const,
+  ([newShow, newRpp]) => {
+    localRowsPerPage.value = newShow
+      ? newRpp || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE
+      : 0;
+    currentPage.value = 1;
+  },
+);
+
+const paginationOptions = computed(() => {
+  if (!props.showPagination) return [0];
+  const base = [10, 20, 50, 100, 250, 500, 1000];
+  const configured = props.rowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE;
+  const set = new Set(base);
+  if (configured > 0) set.add(configured);
+  const sorted = Array.from(set).sort((a, b) => a - b);
+  sorted.push(0);
+  return sorted;
+});
+
+// pagedRows is defined after formattedRows below — see declaration near virtualizer.
+
+// ── Dashboard: CSV / JSON export ─────────────────────────────────────────────
+const wrapCsvValue = (val: any, formatFn?: any, row?: any): string => {
+  let formatted = formatFn !== undefined ? formatFn(val, row) : val;
+  formatted =
+    formatted === undefined || formatted === null ? "" : String(formatted);
+  return `"${formatted.split('"').join('""')}"`;
+};
+
+const downloadCsv = (title?: string) => {
+  const cols = (props.columns as any[]) || [];
+  const rows = [
+    ...(table?.getRowModel().rows.map((r: any) => r.original) || []),
+    ...(stickyTotalRow.value ? [stickyTotalRow.value] : []),
+  ];
+  const content = [
+    cols.map((col: any) => wrapCsvValue(col.label)).join(","),
+    ...rows.map((row: any) =>
+      cols
+        .map((col: any) =>
+          wrapCsvValue(
+            typeof col.field === "function"
+              ? col.field(row)
+              : row[col.field ?? col.name],
+            col.format,
+            row,
+          ),
+        )
+        .join(","),
+    ),
+  ].join("\r\n");
+  const status = exportFile(
+    `${title ?? "table-export"}.csv`,
+    content,
+    "text/csv",
+  );
+  if (status === true)
+    showPositiveNotification("Table downloaded as a CSV file", { timeout: 2000 });
+  else showErrorNotification("Browser denied file download...");
+};
+
+const downloadJson = (title?: string) => {
+  try {
+    const rows = [
+      ...(table?.getRowModel().rows.map((r: any) => r.original) || []),
+      ...(stickyTotalRow.value ? [stickyTotalRow.value] : []),
+    ];
+    const content = JSON.stringify(
+      { columns: props.columns, rows },
+      null,
+      2,
+    );
+    const status = exportFile(
+      `${title ?? "table-export"}.json`,
+      content,
+      "application/json",
+    );
+    if (status === true)
+      showPositiveNotification("Table downloaded as a JSON file", {
+        timeout: 2000,
+      });
+    else showErrorNotification("Browser denied file download...");
+  } catch (error) {
+    console.error("Error downloading JSON:", error);
+    showErrorNotification("Failed to download data as JSON");
+  }
+};
+
+const selectedStreamFtsKeys: ComputedRef<StreamField[]> = computed(() => {
   return props.selectedStreamFtsKeys || [];
 });
 
@@ -757,7 +1606,7 @@ watch(
         true,
         props.highlightQuery,
         100,
-        selectedStreamFtsKeys.value,
+        selectedStreamFtsKeys.value as unknown as string[],
       );
     }
 
@@ -787,7 +1636,7 @@ watch(
         false,
         props.highlightQuery,
         100,
-        selectedStreamFtsKeys.value,
+        selectedStreamFtsKeys.value as unknown as string[],
       );
     }
 
@@ -811,7 +1660,9 @@ let table: any = useVueTable({
     return tableRows.value || [];
   },
   get columns() {
-    return props.columns as ColumnDef<unknown, any>[];
+    // Dashboard: use converted TanStack columns; Logs: use columns prop as-is.
+    return (dashboardColumns.value ??
+      props.columns) as ColumnDef<unknown, any>[];
   },
   state: {
     get sorting() {
@@ -822,7 +1673,10 @@ let table: any = useVueTable({
     },
   },
   onSortingChange: setSorting,
-  enableSorting: true,
+  // Disable TanStack client sort for pivot — rows are pre-sorted manually.
+  get enableSorting() {
+    return !isPivotMode.value;
+  },
   getCoreRowModel: getCoreRowModel(),
   getSortedRowModel: getSortedRowModel(),
   defaultColumn: {
@@ -918,6 +1772,14 @@ const formattedRows = computed(() => {
   return table?.getRowModel().rows;
 });
 
+/** Rows for current page when showPagination=true (dashboard). */
+const pagedRows = computed(() => {
+  const all = formattedRows.value ?? [];
+  if (!props.showPagination || localRowsPerPage.value === 0) return all;
+  const start = (currentPage.value - 1) * localRowsPerPage.value;
+  return all.slice(start, start + localRowsPerPage.value);
+});
+
 const isResizingHeader = ref(false);
 
 const headerGroups = computed(() => table?.getHeaderGroups()[0]);
@@ -960,7 +1822,7 @@ const rowVirtualizerOptions = computed(() => {
       const isExpandedRow = formattedRows.value[index]?.original?.isExpandedRow;
       return isExpandedRow
         ? expandedRowHeights.value[index] || 300 // Default expanded height
-        : props.rowHeight; // Fixed collapsed height
+        : props.rowHeight ?? 28; // Default collapsed height
     },
     overscan: 100,
     measureElement:
@@ -978,7 +1840,7 @@ const rowVirtualizerOptions = computed(() => {
                 expandedRowHeights.value[index] = height;
                 return height;
               }
-              return props.rowHeight; // Fixed height for collapsed rows
+              return props.rowHeight ?? 28; // Default height for collapsed rows
             }
           : undefined,
   };
@@ -1161,11 +2023,11 @@ const calculateVirtualIndex = (index: number): number => {
   return virtualIndex;
 };
 
-const handleDataRowClick = (row: any, index: number) => {
+const handleDataRowClick = (row: any, index: number, event?: MouseEvent) => {
   const actualIndex = calculateActualIndex(index);
 
   if (actualIndex !== -1) {
-    emits("click:dataRow", row, actualIndex);
+    emits("click:dataRow", row, actualIndex, event);
   }
 };
 
@@ -1253,6 +2115,13 @@ defineExpose({
   store,
   selectedStreamFtsKeys,
   processedResults,
+  // Dashboard / TableRenderer parity
+  downloadCsv,
+  downloadJson,
+  /** @deprecated use downloadCsv */
+  downloadTableAsCSV: downloadCsv,
+  /** @deprecated use downloadJson */
+  downloadTableAsJSON: downloadJson,
 });
 </script>
 <style>
@@ -1261,12 +2130,85 @@ defineExpose({
 <style scoped lang="scss">
 @import "@/styles/logs/tenstack-table.scss";
 
+// Outer wrapper for the table (used for sticky-column CSS scoping via data-sticky-id)
+.my-sticky-virtscroll-table {
+  overflow: hidden;
+}
+
+
 // Add explicit hover styles for log rows
 .table-row-hover {
   transition: background-color 0.15s ease-in-out;
 
   &:hover {
     background-color: var(--o2-hover-gray) !important;
+  }
+}
+
+// ── Dashboard / pivot table styles ──────────────────────────────────────────
+
+// Pivot multi-level header cells
+.pivot-group-header {
+  text-align: center;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.pivot-value-header {
+  text-align: center;
+}
+
+// Column separator between pivot sections
+.pivot-section-border {
+  border-left: 2px solid rgba(0, 0, 0, 0.2) !important;
+}
+
+// Right-sticky total column body cells
+.pivot-total-col {
+  font-weight: 600;
+}
+
+// Cells hidden by pivot row merging (duplicates suppressed)
+.pivot-no-border {
+  border-bottom: none !important;
+  color: transparent !important;
+}
+
+// Left-sticky columns
+.sticky-column {
+  background-color: inherit;
+}
+
+// Sticky total row at bottom
+.pivot-sticky-total-row {
+  font-weight: bold;
+
+  td {
+    background-color: var(--q-color-grey-2, #f5f5f5);
+  }
+}
+
+// Sort icon shown in pivot header clicks
+.pivot-sort-icon {
+  font-size: 0.8rem;
+  opacity: 0.5;
+  vertical-align: middle;
+
+  &.pivot-sort-active {
+    opacity: 1;
+    color: var(--q-primary);
+  }
+}
+
+// Copy button — only visible on cell hover
+.copy-cell-td {
+  .copy-btn {
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  &:hover .copy-btn {
+    opacity: 1;
   }
 }
 </style>
