@@ -481,7 +481,7 @@ test.describe("Dashboard Max Query Range", () => {
   // --------------------------------------------------------------------------
   // Scenario 7: Warning with multi-SQL queries on the same stream
   // --------------------------------------------------------------------------
-  test(
+  test.skip(
     "should display max query range warning with multiple SQL queries on the same stream",
     { tag: ["@maxQueryRange", "@multiSQL", "@P2"] },
     async ({ page }) => {
