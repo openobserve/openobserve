@@ -691,7 +691,7 @@ export default defineComponent({
           emit("update:query", newValue, e);
 
           // Check for natural language after user stops typing (debounced)
-          checkForNaturalLanguage(newValue);
+          if (newValue) checkForNaturalLanguage(newValue);
         }, props.debounceTime),
       );
 
