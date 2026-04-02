@@ -266,6 +266,8 @@ const userDataSet = new Set([
   "usr_email",
   "session_id",
   "view_id",
+  "view_url",
+  "resource_url",
 ]);
 
 const columns = ref([
@@ -370,8 +372,10 @@ const getStreamFields = () => {
         const priorityFields = [
           "application_id",
           "usr_email",
-          "session_id",
           "env",
+          "view_url",
+          "resource_url",
+          "session_id",
         ];
         const priorityFieldsMap = new Map(
           priorityFields.map((field, index) => [field, index]),
