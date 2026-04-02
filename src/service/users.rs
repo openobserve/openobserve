@@ -58,10 +58,15 @@ use crate::{
 };
 
 fn redact_token(token: &str) -> String {
-    if token.len() <= 4 {
-        "*".repeat(token.len())
+    if token.is_empty() {
+        return String::new();
+    }
+    if token.len() < 4 {
+        // For tokens shorter than 4 chars, mask completely
+        "*".repeat(12)
     } else {
-        format!("{}{}", &token[..4], "*".repeat(token.len() - 4))
+        // For tokens 4+ chars, show first 4 chars + asterisks
+        format!("{}{}", &token[..4], "*".repeat(8))
     }
 }
 
@@ -482,10 +487,10 @@ pub async fn update_user(
                             if !old.eq(&new) {
                                 let mut old_str = old.to_string();
                                 let mut new_str = new.to_string();
-                                if old.eq(&UserRole::User) || old.eq(&UserRole::ServiceAccount) {
+                                if old.eq(&UserRole::User) || old.is_service_account() {
                                     old_str = "allowed_user".to_string();
                                 }
-                                if new.eq(&UserRole::User) || new.eq(&UserRole::ServiceAccount) {
+                                if new.eq(&UserRole::User) || new.is_service_account() {
                                     new_str = "allowed_user".to_string();
                                 }
                                 if old_str != new_str {
@@ -762,6 +767,7 @@ pub async fn list_users(
         // This user does not have list users permission
         // Hence only return this specific user
         if let Some(user) = get_user(Some(org_id), _user_id).await {
+            let is_system = crate::service::organization::is_system_service_account(&user.email);
             user_list.push(UserResponse {
                 email: user.email.clone(),
                 role: user.role.to_string(),
@@ -771,6 +777,8 @@ pub async fn list_users(
                 orgs: None,
                 created_at: 0, // Not used
                 token: None,
+                is_system,
+                description: is_system.then(|| "Used by the AI SRE Agent.".to_string()),
             });
         }
         return Ok(MetaHttpResponse::json(UserList { data: user_list }));
@@ -794,17 +802,20 @@ pub async fn list_users(
             && let Some(user) = get_user(Some(org_id), org_user.value().email.as_str()).await
         {
             let should_include = if let Some(ref required_role) = role {
-                // Filter by role if specified
+                // Filter by role if specified — treat all service-account variants as matching
                 user.role.eq(required_role)
+                    || (user.role.is_service_account() && required_role.is_service_account())
             } else {
-                user.role.ne(&UserRole::ServiceAccount)
+                !user.role.is_service_account()
             };
             if should_include {
-                let token = if user.role.eq(&UserRole::ServiceAccount) {
+                let token = if user.role.is_service_account() {
                     Some(redact_token(&org_user.value().token))
                 } else {
                     None
                 };
+                let is_system =
+                    crate::service::organization::is_system_service_account(&user.email);
                 user_list.push(UserResponse {
                     email: user.email.clone(),
                     role: user.role.to_string(),
@@ -814,6 +825,8 @@ pub async fn list_users(
                     orgs: None,
                     created_at: org_user.value().created_at,
                     token,
+                    is_system,
+                    description: is_system.then(|| "Used by the AI SRE Agent.".to_string()),
                 });
             }
         }
@@ -832,6 +845,7 @@ pub async fn list_users(
                 }
                 None => ("".to_string(), 0),
             };
+            let is_system = crate::service::organization::is_system_service_account(&user.email);
             user_list.push(UserResponse {
                 email: user.email.clone(),
                 role,
@@ -841,12 +855,15 @@ pub async fn list_users(
                 orgs: user_orgs.get(user.email.as_str()).cloned(),
                 created_at,
                 token: None,
+                is_system,
+                description: is_system.then(|| "Used by the AI SRE Agent.".to_string()),
             });
         }
     }
 
     user_list.retain(|user| {
-        if user.role.eq(&UserRole::ServiceAccount.to_string())
+        let role: UserRole = user.role.parse().unwrap_or(UserRole::Admin);
+        if role.is_service_account()
             && let Some(ref permitted) = permitted
         {
             permitted.contains(&format!("service_accounts:{}", user.email))
@@ -870,6 +887,8 @@ pub async fn list_users(
                 orgs: None,
                 created_at: 0,
                 token: None,
+                is_system: false,
+                description: None,
             });
         }
     }
@@ -912,6 +931,17 @@ pub async fn remove_user_from_org(
 
                 if initiating_user.email == email_id {
                     return Ok(MetaHttpResponse::forbidden("Not Allowed"));
+                }
+
+                if user
+                    .organizations
+                    .iter()
+                    .any(|o| o.role == UserRole::SreAgent)
+                    || crate::service::organization::is_system_service_account(&user.email)
+                {
+                    return Ok(MetaHttpResponse::forbidden(
+                        "System service accounts cannot be deleted",
+                    ));
                 }
 
                 #[cfg(feature = "cloud")]
@@ -1250,24 +1280,28 @@ mod tests {
 
     #[test]
     fn test_redact_token_normal() {
-        assert_eq!(redact_token("abcd1234567890ef"), "abcd************");
+        // output is always 12 chars: first 4 visible, rest padded with '*'
+        assert_eq!(redact_token("abcd1234567890ef"), "abcd********");
     }
 
     #[test]
     fn test_redact_token_exactly_four_chars() {
-        // tokens of 4 chars or fewer are fully masked (nothing revealed)
-        assert_eq!(redact_token("abcd"), "****");
+        // 4 visible chars + 8 stars = 12 total
+        assert_eq!(redact_token("abcd"), "abcd********");
     }
 
     #[test]
     fn test_redact_token_shorter_than_four() {
-        assert_eq!(redact_token("ab"), "**");
+        // tokens shorter than 4 chars are fully masked for security
+        assert_eq!(redact_token("ab"), "************");
+        assert_eq!(redact_token("x"), "************");
         assert_eq!(redact_token(""), "");
     }
 
     #[test]
     fn test_redact_token_five_chars() {
-        assert_eq!(redact_token("abcde"), "abcd*");
+        // still shows first 4, pads to 12 total
+        assert_eq!(redact_token("abcde"), "abcd********");
     }
 
     #[test]

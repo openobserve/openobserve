@@ -173,20 +173,30 @@ export class IamPage {
     }
 
     async reloadServiceAccountPage(emailName) {
-
-        await this.page.reload(); // Optional, if necessary
-        // await this.page.locator('[data-test="iam-page"]').getByText('arrow_drop_down').click({ force: true });
-        // await this.page.getByText('100').click({ force: true });
-
+        await this.page.reload();
+        // Wait for the page to fully load including any system accounts
+        await this.page.waitForLoadState('networkidle');
+        // Allow time for service accounts table to populate
+        await this.page.waitForTimeout(1000);
     }
 
     async deletedServiceAccount(emailName) {
         const deleteButtonLocator = this.page.locator(this.deleteButton(emailName));
-        // Wait for the delete button to be visible
+
+        // First check if this is a system account that shouldn't be deleted
+        const isSystemAccount = emailName.includes('o2-sre-agent');
+        if (isSystemAccount) {
+            throw new Error(`Cannot delete system account: ${emailName}. System accounts are protected.`);
+        }
+
+        // Wait for the delete button to be visible and enabled
         await deleteButtonLocator.waitFor({ state: 'visible', timeout: 30000 });
+
+        // Verify the button is not disabled before clicking
+        await expect(deleteButtonLocator).toBeEnabled();
+
         // Click the delete button
         await deleteButtonLocator.click({ force: true });
-
     }
 
     async requestServiceAccountOk(emailName) {
@@ -212,8 +222,19 @@ export class IamPage {
 
     async updatedServiceAccount(emailName) {
         const updateButtonLocator = this.page.locator(this.updateButton(emailName));
-        // Wait for the update button to be visible
+
+        // First check if this is a system account that shouldn't be updated
+        const isSystemAccount = emailName.includes('o2-sre-agent');
+        if (isSystemAccount) {
+            throw new Error(`Cannot update system account: ${emailName}. System accounts are protected.`);
+        }
+
+        // Wait for the update button to be visible and enabled
         await updateButtonLocator.waitFor({ state: 'visible', timeout: 30000 });
+
+        // Verify the button is not disabled before clicking
+        await expect(updateButtonLocator).toBeEnabled();
+
         // Click the update button
         await updateButtonLocator.click({ force: true });
         await expect(this.page.getByRole('dialog')).toContainText('Update Service Account');

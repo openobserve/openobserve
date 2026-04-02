@@ -60,6 +60,50 @@ pub use file_downloader::{download_from_node, queue_download};
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
 #[cfg(feature = "enterprise")]
+async fn backfill_sys_rca_agent_openfga_tuples() {
+    use bytes::Bytes;
+
+    // Use a dedicated system org for migration flags, separate from user orgs.
+    const MIGRATION_ORG: &str = "_migration";
+    const FLAG_KEY: &str = "sys_rca_agent_openfga_migration_v1";
+
+    // Check if already done via KV flag
+    if crate::service::kv::get(MIGRATION_ORG, FLAG_KEY)
+        .await
+        .is_ok()
+    {
+        return; // Already done
+    }
+
+    // Get all orgs and ensure SA exists (idempotent — creates OpenFGA tuples for existing DB rows)
+    match crate::service::db::organization::list(None).await {
+        Ok(orgs) => {
+            for org in orgs {
+                if let Err(e) =
+                    crate::service::organization::ensure_sys_rca_agent(&org.identifier).await
+                {
+                    log::warn!(
+                        "Failed to backfill SysRcaAgent OpenFGA tuples for org '{}': {e}",
+                        org.identifier
+                    );
+                }
+            }
+            // Set flag so we don't run again
+            if let Err(e) =
+                crate::service::kv::set(MIGRATION_ORG, FLAG_KEY, Bytes::from_static(b"done")).await
+            {
+                log::error!("Failed to set OpenFGA backfill flag: {e}");
+            } else {
+                log::info!("SysRcaAgent OpenFGA tuple backfill complete");
+            }
+        }
+        Err(e) => {
+            log::error!("Failed to list orgs for OpenFGA backfill: {e}");
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
 async fn enforce_usage_stream_retention() {
     use config::{
         META_ORG_ID,
@@ -242,6 +286,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         {
             log::error!("OFGA init failed: {e}");
         }
+        // Backfill OpenFGA tuples for SysRcaAgent service accounts created by DB migration
+        backfill_sys_rca_agent_openfga_tuples().await;
     }
 
     tokio::task::spawn(promql_self_consume::run());
