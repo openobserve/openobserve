@@ -79,6 +79,52 @@ mod tests {
     }
 
     #[test]
+    fn test_valid_maps_custom_query() {
+        let json_str = include_str!(
+            "../../../../../../test-fixtures/valid/maps-custom-query-dashboard.json"
+        );
+        let json: Value = serde_json::from_str(json_str).unwrap();
+        let errors = validate_dashboard(&json);
+        assert!(
+            errors.is_empty(),
+            "Expected valid maps dashboard, got errors: {:?}",
+            errors
+        );
+    }
+
+    #[test]
+    fn test_maps_panel_roundtrip_validation() {
+        // Simulate what the backend does: deserialize into v8 structs, re-serialize, validate
+        use crate::meta::dashboards::v8;
+
+        let json_str = include_str!(
+            "../../../../../../test-fixtures/valid/maps-custom-query-dashboard.json"
+        );
+        let dashboard: v8::Dashboard = serde_json::from_str(json_str).unwrap();
+
+        // Re-serialize (this is what the backend does before validation)
+        let re_serialized = serde_json::to_value(&dashboard).unwrap();
+
+        // Check that the panel type round-trips correctly
+        let panel_type = re_serialized
+            .get("tabs")
+            .and_then(|t| t.get(0))
+            .and_then(|t| t.get("panels"))
+            .and_then(|p| p.get(0))
+            .and_then(|p| p.get("type"))
+            .and_then(|t| t.as_str())
+            .unwrap();
+        assert_eq!(panel_type, "maps", "Panel type should round-trip as 'maps'");
+
+        let errors = validate_dashboard(&re_serialized);
+        assert!(
+            errors.is_empty(),
+            "Expected valid maps dashboard after round-trip, got errors: {:?}",
+            errors
+        );
+    }
+
+    #[test]
     fn test_invalid_pie_wrong_fields() {
         let json_str =
             include_str!("../../../../../../test-fixtures/invalid/pie-wrong-fields.json");
