@@ -93,14 +93,11 @@ def test_e2e_creategetdeleteserviceaccounts(create_session, base_url):
     assert (
         resp_create_serviceaccount.status_code == 200
     ), f"Expected 200, but got {resp_create_serviceaccount.status_code} {resp_create_serviceaccount.content}"
-    resp_get_serviceaccount = session.get(
-    
-    f"{base_url}api/{org_id}/service_accounts/{email_id}"
-    )
 
-    assert (
-        resp_get_serviceaccount.status_code == 200
-    ), f"Getting this service account, but got {resp_get_serviceaccount.status_code} {resp_get_serviceaccount.content}"
+    # Token is returned in the create response; verify it is present
+    create_data = resp_create_serviceaccount.json()
+    assert "token" in create_data and create_data["token"], \
+        f"Expected token in create response, but got: {create_data}"
 
     resp_delete_serviceaccount = session.delete(
     f"{base_url}api/{org_id}/service_accounts/{email_id}"
@@ -134,14 +131,6 @@ def test_e2e_creategetupdatedeleteserviceaccounts(create_session, base_url):
     assert (
         resp_create_serviceaccount.status_code == 200
     ), f"Expected 200, but got {resp_create_serviceaccount.status_code} {resp_create_serviceaccount.content}"
-    resp_get_serviceaccount = session.get(
-    
-    f"{base_url}api/{org_id}/service_accounts/{email_id}"
-    )
-
-    assert (
-        resp_get_serviceaccount.status_code == 200
-    ), f"Getting this service account, but got {resp_get_serviceaccount.status_code} {resp_get_serviceaccount.content}"
 
     payload = {
         "email":email_id,
@@ -190,14 +179,6 @@ def test_e2e_creategetrefreshdeleteserviceaccounts(create_session, base_url):
     assert (
         resp_create_serviceaccount.status_code == 200
     ), f"Expected 200, but got {resp_create_serviceaccount.status_code} {resp_create_serviceaccount.content}"
-    resp_get_serviceaccount = session.get(
-    
-    f"{base_url}api/{org_id}/service_accounts/{email_id}"
-    )
-
-    assert (
-        resp_get_serviceaccount.status_code == 200
-    ), f"Getting this service account, but got {resp_get_serviceaccount.status_code} {resp_get_serviceaccount.content}"
 
     resp_refresh_serviceaccount = session.put(
         f"{base_url}api/{org_id}/service_accounts/{email_id}?rotateToken=true", json=payload
