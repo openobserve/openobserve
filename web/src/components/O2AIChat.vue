@@ -1150,6 +1150,15 @@ export default defineComponent({
     const backgroundStreams = new Set<AbortController>();
     const MAX_BACKGROUND_STREAMS = 3;
 
+    // Map sessionId → live stream context for re-attachment when user navigates back.
+    // This allows loadChat to swap chatMessages.value back to the live array so that
+    // processStream's isActive() becomes true again and the UI updates in real-time.
+    const backgroundStreamMap = new Map<string, {
+      msgs: ChatMessage[];
+      controller: AbortController;
+      chatId: number | null;
+    }>();
+
     // Typewriter animation state for LLM responses
     const displayedStreamingContent = ref('');
     const typewriterAnimationId = ref<number | null>(null);
@@ -2713,8 +2722,19 @@ export default defineComponent({
           backgroundStreams.delete(oldest);
         }
       }
-      backgroundStreams.add(currentAbortController.value);
+      const detachedController = currentAbortController.value;
+      backgroundStreams.add(detachedController);
       currentAbortController.value = null;
+
+      // Register for re-attachment: when user navigates back to this session,
+      // loadChat swaps chatMessages.value to this live array so the UI resumes.
+      if (currentSessionId.value) {
+        backgroundStreamMap.set(currentSessionId.value, {
+          msgs: chatMessages.value,
+          controller: detachedController,
+          chatId: currentChatId.value,
+        });
+      }
 
       // Clean up UI state — processStream continues silently in background
       isLoading.value = false;
@@ -3257,12 +3277,44 @@ export default defineComponent({
             ...(msg.contentBlocks ? { contentBlocks: msg.contentBlocks } : {}),
             ...(msg.images ? { images: msg.images } : {})
           }));
+          
+          // Check if this session has an active background stream.
+          // If so, re-attach by using the LIVE array that processStream is writing to
+          // instead of the stale IndexedDB snapshot. Setting chatMessages.value to the
+          // same array makes processStream's isActive() true again, so UI updates resume.
+          const bgCtx = chat.sessionId ? backgroundStreamMap.get(chat.sessionId) : null;
 
-          chatMessages.value = formattedMessages;
-          currentChatId.value = chatId;
-          currentSessionId.value = chat.sessionId || null; // Restore session ID from history
+          if (bgCtx) {
+            // Re-attach: use the live streaming array
+            chatMessages.value = bgCtx.msgs;
+            currentChatId.value = bgCtx.chatId || chatId;
+            currentSessionId.value = chat.sessionId || null;
+
+            // Move controller back to foreground
+            currentAbortController.value = bgCtx.controller;
+            backgroundStreams.delete(bgCtx.controller);
+            backgroundStreamMap.delete(chat.sessionId!);
+
+            // Restore streaming UI state so loading indicator shows
+            isLoading.value = true;
+            startAnalyzingRotation();
+          } else {
+            // Normal load from IndexedDB snapshot (no active stream)
+            const formattedMessages = chat.messages.map((msg: any) => ({
+              role: msg.role,
+              content: msg.content,
+              ...(msg.contentBlocks ? { contentBlocks: msg.contentBlocks } : {}),
+              ...(msg.images ? { images: msg.images } : {}),
+              ...(msg.feedback ? { feedback: msg.feedback } : {})
+            }));
+
+            chatMessages.value = formattedMessages;
+            currentChatId.value = chatId;
+            currentSessionId.value = chat.sessionId || null;
+          }
+
           showHistory.value = false;
-          shouldAutoScroll.value = true; // Reset auto-scroll when loading chat
+          shouldAutoScroll.value = true;
 
           // Load title from history (no animation for existing chats)
           displayedTitle.value = chat.title || '';
@@ -3389,14 +3441,17 @@ export default defineComponent({
 
         const reader = response.body.getReader();
 
-        // Capture the controller and messages ref so we can detect detachment after processStream
+        // Capture the controller, messages ref, and sessionId so we can detect
+        // detachment and clean up after processStream
         const streamController = currentAbortController.value;
         const streamMsgs = chatMessages.value;
+        const streamSessionId = currentSessionId.value;
 
         await processStream(reader);
 
-        // Remove controller from background set if it was detached during streaming
+        // Remove controller from background set and clean up re-attachment map
         if (streamController) backgroundStreams.delete(streamController);
+        if (streamSessionId) backgroundStreamMap.delete(streamSessionId);
 
         // Only update UI/store if stream was NOT detached (session is still the same)
         const wasDetached = chatMessages.value !== streamMsgs;
@@ -4047,6 +4102,7 @@ export default defineComponent({
         controller.abort();
       }
       backgroundStreams.clear();
+      backgroundStreamMap.clear();
 
       // Clean up typewriter animation to prevent memory leaks
       if (typewriterAnimationId.value) {
