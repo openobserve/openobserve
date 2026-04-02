@@ -22,10 +22,15 @@ use utoipa::ToSchema;
 use super::{OrdF64, datetime_now};
 use crate::meta::stream::StreamType;
 
+fn default_version() -> i32 {
+    8
+}
+
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct Dashboard {
+    #[serde(default = "default_version")]
     version: i32,
     #[serde(default)]
     pub dashboard_id: String,
@@ -234,6 +239,7 @@ pub struct PanelFields {
     pub target: Option<AxisItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<AxisItem>,
+    #[schema(value_type = Object)]
     pub filter: PanelFilter,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub promql_labels: Vec<PromQLLabelFilter>,
