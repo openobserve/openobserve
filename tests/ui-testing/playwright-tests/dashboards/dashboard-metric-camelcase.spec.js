@@ -12,8 +12,6 @@ import PageManager from "../../pages/page-manager";
 const STREAM_NAME = "e2e_automate";
 
 test.describe("Dashboard Metric Chart CamelCase Alias", () => {
-  test.describe.configure({ mode: "serial" });
-
   let pm;
 
   test.beforeEach(async ({ page }) => {
@@ -65,39 +63,6 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
     await deleteDashboard(page, dashboardName);
     testLogger.info("Test cleanup complete");
   }
-
-  test("should render metric panel with custom SQL camelCase alias", {
-    tag: ["@dashboard-metric-camelcase", "@regression", "@P0"],
-  }, async ({ page }) => {
-    testLogger.info("Testing metric panel with camelCase alias via custom SQL mode (PR #11116)");
-
-    const dashboardName = "MetricCC_" + Math.random().toString(36).substring(2, 11);
-    const panelName = pm.dashboardPanelActions.generateUniquePanelName("metric-cc");
-
-    // Navigate to dashboards and create one
-    await pm.dashboardList.menuItem("dashboards-item");
-    await waitForDashboardPage(page);
-    await pm.dashboardCreate.createDashboard(dashboardName);
-
-    // Add a panel and select metric chart type
-    await pm.dashboardCreate.addPanel();
-    await pm.dashboardPanelActions.addPanelName(panelName);
-    await pm.chartTypeSelector.selectChartType("metric");
-
-    // Switch to custom SQL mode and enter query with camelCase alias
-    await switchToCustomSQL(page);
-    await pm.chartTypeSelector.enterCustomSQL(
-      `SELECT count(*) AS countRecords FROM "${STREAM_NAME}"`
-    );
-    testLogger.info("Custom SQL with camelCase alias entered");
-
-    // Apply with time range and verify
-    await applyWithTimeRange(page);
-    await assertMetricRenders(page);
-    testLogger.info("Metric panel with camelCase alias renders correctly");
-
-    await cleanup(page, dashboardName);
-  });
 
   test("should render metric panel with builder-mode alias", {
     tag: ["@dashboard-metric-camelcase", "@smoke", "@P0"],
@@ -152,6 +117,9 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
     await pm.chartTypeSelector.enterCustomSQL(
       `SELECT count(*) AS totalcount FROM "${STREAM_NAME}"`
     );
+
+    // Add the lowercase alias as Y-axis field (metric chart requires Y-axis to render)
+    await pm.chartTypeSelector.searchAndAddField("totalcount", "y");
     testLogger.info("Custom SQL with lowercase alias entered");
 
     // Apply with time range and verify
@@ -185,6 +153,9 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
     await pm.chartTypeSelector.enterCustomSQL(
       `SELECT count(*) AS metricValue FROM "${STREAM_NAME}" WHERE kubernetes_container_name = 'nonexistent_container_xyz_99999'`
     );
+
+    // Add Y-axis field (metric chart requires Y-axis to render)
+    await pm.chartTypeSelector.searchAndAddField("metricValue", "y");
     testLogger.info("Custom SQL with non-existent filter entered");
 
     // Apply and set narrow time range
@@ -215,6 +186,44 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
       chartVisible,
       noDataText: noDataText.trim(),
     });
+
+    await cleanup(page, dashboardName);
+  });
+
+  test("should render metric panel with custom SQL camelCase alias", {
+    tag: ["@dashboard-metric-camelcase", "@regression", "@P0"],
+  }, async ({ page }) => {
+    testLogger.info("Testing metric panel with camelCase alias via custom SQL mode (PR #11116)");
+
+    const dashboardName = "MetricCC_" + Math.random().toString(36).substring(2, 11);
+    const panelName = pm.dashboardPanelActions.generateUniquePanelName("metric-cc");
+
+    // Navigate to dashboards and create one
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+    await pm.dashboardCreate.createDashboard(dashboardName);
+
+    // Add a panel and select metric chart type
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.chartTypeSelector.selectChartType("metric");
+
+    // Switch to custom SQL mode and enter query with camelCase alias
+    await switchToCustomSQL(page);
+    await pm.chartTypeSelector.enterCustomSQL(
+      `SELECT count(*) AS countRecords FROM "${STREAM_NAME}"`
+    );
+
+    // Add the camelCase alias as Y-axis field (metric chart requires Y-axis to render)
+    await pm.chartTypeSelector.searchAndAddField("countRecords", "y");
+    testLogger.info("Custom SQL with camelCase alias entered");
+
+    // Apply with time range and verify
+    // The SQL returns "countrecords" (lowercase) but Y-axis alias is "countRecords" (camelCase)
+    // PR #11116 fix: getDataValue() handles this case-insensitive lookup
+    await applyWithTimeRange(page);
+    await assertMetricRenders(page);
+    testLogger.info("Metric panel with camelCase alias renders correctly");
 
     await cleanup(page, dashboardName);
   });
