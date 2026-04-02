@@ -350,7 +350,11 @@ const handleApplyMultiSelect = (action: string) => {
     [...selectedValues.value],
     action,
   );
-  selectedValues.value = [];
+  // Do NOT clear selectedValues here. The watcher on allActiveValues will sync
+  // selectedValues once the parent query updates, keeping checkboxes in step
+  // with the active filter. Clearing here causes a visual flash (deselect) and
+  // a duplicate-append when the user clicks Include a second time without
+  // changing the selection.
 };
 
 /**
