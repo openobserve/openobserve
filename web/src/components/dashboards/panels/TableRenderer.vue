@@ -865,6 +865,7 @@ export default defineComponent({
 @media print {
   .table-wrapper {
     overflow: hidden !important;
+    height: 100% !important;
     max-height: 100% !important;
     page-break-inside: avoid;
   }

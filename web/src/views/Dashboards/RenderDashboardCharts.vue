@@ -1694,4 +1694,15 @@ export default defineComponent({
 .grid-stack-item-content {
   box-sizing: border-box;
 }
+
+@media print {
+  /* Prevent panel content from expanding beyond its allocated grid cell.
+   * Without this, tables with many rows (position:static in print mode)
+   * can grow taller than the cell, pushing the grid container's height up
+   * while other absolutely-positioned panels stay at their original pixel
+   * offsets — causing visible overlap across printed pages. */
+  .grid-stack-item-content {
+    overflow: hidden !important;
+  }
+}
 </style>
