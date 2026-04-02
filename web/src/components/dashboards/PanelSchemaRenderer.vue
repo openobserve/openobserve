@@ -332,6 +332,7 @@ import {
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
+import { getDataValue } from "@/utils/dashboard/aliasUtils";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import {
   getAllDashboardsByFolderId,
@@ -1275,7 +1276,7 @@ export default defineComponent({
             data.value[0]?.length > 1 ||
             yAlias.every(
               (y: any) =>
-                data.value[0][0][y] != null || data.value[0][0][y] === 0,
+                getDataValue(data.value[0]?.[0], y) != null,
             )
           );
         }
