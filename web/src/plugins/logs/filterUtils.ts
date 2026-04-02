@@ -27,6 +27,26 @@ export const getFieldFromExpression = (expression: string): string | null => {
 };
 
 /**
+ * Builds the regex patterns used to match a field condition in a query string.
+ * Both `hasFieldCondition` and `replaceExistingFieldCondition` share these patterns.
+ */
+const buildFieldRegexes = (
+  fieldName: string,
+): { multiRegex: RegExp; singleRegex: RegExp } => {
+  const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
+  const opPat = `(?:=|!=|is(?:\\s+not)?)`;
+  const condPat = `(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
+
+  const multiRegex = new RegExp(
+    `\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`,
+    "gi",
+  );
+  const singleRegex = new RegExp(condPat, "i");
+  return { multiRegex, singleRegex };
+};
+
+/**
  * Checks whether a query string already contains an existing condition for
  * the given field name (single value or parenthesized multi-value group).
  *
@@ -38,19 +58,8 @@ export const hasFieldCondition = (
   queryStr: string,
   fieldName: string,
 ): boolean => {
-  const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
-  const opPat = `(?:=|!=|is(?:\\s+not)?)`;
-  const condPat = `(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
-
-  const multiRegex = new RegExp(
-    `\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`,
-    "gi",
-  );
-  if (multiRegex.test(queryStr)) return true;
-
-  const singleRegex = new RegExp(condPat, "gi");
-  return singleRegex.test(queryStr);
+  const { multiRegex, singleRegex } = buildFieldRegexes(fieldName);
+  return multiRegex.test(queryStr) || singleRegex.test(queryStr);
 };
 
 /**
@@ -63,22 +72,14 @@ export const replaceExistingFieldCondition = (
   fieldName: string,
   newExpression: string,
 ): string => {
-  const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
-  const opPat = `(?:=|!=|is(?:\\s+not)?)`;
-  const condPat = `(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
+  const { multiRegex, singleRegex } = buildFieldRegexes(fieldName);
 
   // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
-  const multiRegex = new RegExp(
-    `\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`,
-    "gi",
-  );
   if (multiRegex.test(queryStr)) {
     return queryStr.replace(multiRegex, newExpression);
   }
 
-  // Try single condition
-  const singleRegex = new RegExp(condPat, "gi");
+  // Try single condition (replace first match only)
   if (singleRegex.test(queryStr)) {
     return queryStr.replace(singleRegex, newExpression);
   }
