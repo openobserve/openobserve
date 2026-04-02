@@ -822,8 +822,10 @@ export default defineComponent({
           field.showFieldAsJson === null
         ) {
           field.showFieldAsJson =
-            store?.state?.zoConfig?.dashboard_show_field_as_json_enabled ??
-            false;
+            dashboardPanelDataPageKey === "logs"
+              ? (store?.state?.zoConfig?.dashboard_show_field_as_json_enabled ??
+                false)
+              : false;
         }
       };
 
