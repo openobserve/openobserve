@@ -184,6 +184,7 @@ import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocatio
 import FrustrationBadge from "@/components/rum/FrustrationBadge.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import useStreams from "@/composables/useStreams";
+import { applyFilterTerm } from "@/utils/traces/filterUtils";
 
 interface Session {
   timestamp: string;
@@ -674,11 +675,10 @@ const handleCellClick = (payload: any) => {
 
 const handleSidebarEvent = (event: string, value: any) => {
   if (event === "add-field") {
-    if (sessionState.data.editorValue.length) {
-      sessionState.data.editorValue += " and " + value;
-    } else {
-      sessionState.data.editorValue += value;
-    }
+    sessionState.data.editorValue = applyFilterTerm(
+      value,
+      sessionState.data.editorValue,
+    );
   }
 };
 
