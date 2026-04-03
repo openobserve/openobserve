@@ -745,8 +745,10 @@ export default defineComponent({
             currentVarParams[name] = initialVariableValues.value[name];
           });
 
+          const sortedStringify = (obj: Record<string, any>) =>
+            JSON.stringify(Object.fromEntries(Object.entries(obj).sort()));
           const hasVarChanges =
-            JSON.stringify(urlVarParams) !== JSON.stringify(currentVarParams);
+            sortedStringify(urlVarParams) !== sortedStringify(currentVarParams);
 
           if (!hasVarChanges) {
             return; // Truly nothing changed
@@ -1181,31 +1183,34 @@ export default defineComponent({
 
         // Set drilldown guard to prevent updateUrlWithCurrentState from clobbering
         // the new var-* params before the manager processes them
-        isDrilldownInProgress.value = true;
+        try {
+          isDrilldownInProgress.value = true;
 
-        // Re-read variable values from URL into initialVariableValues
-        const newInitialVars: Record<string, any> = {};
-        Object.keys(route.query).forEach((key) => {
-          if (key.startsWith("var-")) {
-            const newKey = key.slice(4);
-            newInitialVars[newKey] = route.query[key];
+          // Re-read variable values from URL into initialVariableValues
+          const newInitialVars: Record<string, any> = {};
+          Object.keys(route.query).forEach((key) => {
+            if (key.startsWith("var-")) {
+              const newKey = key.slice(4);
+              newInitialVars[newKey] = route.query[key];
+            }
+          });
+
+          // Update initialVariableValues prop
+          initialVariableValues.value = newInitialVars;
+
+          // Directly call updateInitialVariableValues on RenderDashboardCharts
+          // The emit chain from usePanelDrilldown doesn't reliably reach RenderDashboardCharts,
+          // so we call the exposed method directly via the component ref
+          if (renderDashboardChartsRef.value?.updateInitialVariableValues) {
+            await renderDashboardChartsRef.value.updateInitialVariableValues();
           }
-        });
 
-        // Update initialVariableValues prop
-        initialVariableValues.value = newInitialVars;
-
-        // Directly call updateInitialVariableValues on RenderDashboardCharts
-        // The emit chain from usePanelDrilldown doesn't reliably reach RenderDashboardCharts,
-        // so we call the exposed method directly via the component ref
-        if (renderDashboardChartsRef.value?.updateInitialVariableValues) {
-          await renderDashboardChartsRef.value.updateInitialVariableValues();
+          // Clear the drilldown guard after reactivity settles
+          await nextTick();
+          await nextTick();
+        } finally {
+          isDrilldownInProgress.value = false;
         }
-
-        // Clear the drilldown guard after reactivity settles
-        await nextTick();
-        await nextTick();
-        isDrilldownInProgress.value = false;
 
         // Now sync the full URL state (adds back from/to, refresh, print, etc.)
         // The drilldown's router.push may not include all params (e.g. when passAllVariables is false),
