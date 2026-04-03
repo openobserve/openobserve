@@ -2061,6 +2061,12 @@ pub struct S3 {
     pub feature_bulk_delete: bool,
     #[env_config(name = "ZO_S3_ALLOW_INVALID_CERTIFICATES", default = false)]
     pub allow_invalid_certificates: bool,
+    #[env_config(
+        name = "ZO_S3_FEATURE_FORCE_INFREQUENT_ACCESS",
+        default = false,
+        help = "Use STANDARD_IA storage class for compliance storage type"
+    )]
+    pub feature_force_infrequent_access: bool,
     #[env_config(name = "ZO_S3_SYNC_TO_CACHE_INTERVAL", default = 600)] // seconds
     pub sync_to_cache_interval: u64,
     #[env_config(name = "ZO_S3_MAX_RETRIES", default = 10)]
