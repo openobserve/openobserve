@@ -2691,7 +2691,13 @@
     "cached": "Zwischengespeichert",
     "cachedReport": "Zwischengespeicherter Bericht",
     "destination": "Reiseziel",
-    "scheduled": "Geplant"
+    "scheduled": "Geplant",
+    "reportFormat": "Format des Berichts",
+    "reportType": "Art des Berichts",
+    "attachmentType": "Art der Anlage",
+    "dimensionWidth": "Breite (px)",
+    "dimensionHeight": "Höhe (px)",
+    "imagePreview": "Fügen Sie ein Inline-Dashboard-Vorschaubild hinzu"
   },
   "queries": {
     "runningQueries": "Abfragen ausführen",

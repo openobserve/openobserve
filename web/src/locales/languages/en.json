@@ -2893,7 +2893,13 @@
     "cached": "Cached",
     "cachedReport": "Cached Report",
     "destination": "Destination",
-    "scheduled": "Scheduled"
+    "scheduled": "Scheduled",
+    "reportFormat": "Report Format",
+    "reportType": "Report Type",
+    "attachmentType": "Attachment Style",
+    "dimensionWidth": "Width (px)",
+    "dimensionHeight": "Height (px)",
+    "imagePreview": "Include inline dashboard preview image"
   },
   "queries": {
     "runningQueries": "Running Queries",

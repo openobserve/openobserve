@@ -2689,7 +2689,13 @@
     "cached": "En caché",
     "cachedReport": "Informe en caché",
     "destination": "Destino",
-    "scheduled": "Programado"
+    "scheduled": "Programado",
+    "reportFormat": "Formato del informe",
+    "reportType": "Tipo de informe",
+    "attachmentType": "Estilo de apego",
+    "dimensionWidth": "Anchura (px)",
+    "dimensionHeight": "Altura (px)",
+    "imagePreview": "Incluir una imagen de vista previa del panel de control en línea"
   },
   "queries": {
     "runningQueries": "Consultas en ejecución",

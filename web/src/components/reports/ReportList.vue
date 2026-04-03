@@ -139,6 +139,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-td>
             </template>
 
+            <!-- Show report type and image preview badges in the name column -->
+            <template v-slot:body-cell-name="props">
+              <q-td :props="props">
+                <span>{{ props.row.name }}</span>
+                <q-badge
+                  v-if="props.row.dashboards?.[0]?.report_type === 'png'"
+                  color="teal"
+                  class="q-ml-xs"
+                  label="PNG"
+                  outline
+                />
+                <q-badge
+                  v-if="props.row.image_preview"
+                  color="blue-grey"
+                  class="q-ml-xs"
+                  label="Preview"
+                  outline
+                />
+              </q-td>
+            </template>
+
             <template v-slot:body-cell-function="props">
               <q-td :props="props">
                 <q-tooltip>
