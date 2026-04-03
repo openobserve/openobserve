@@ -73,6 +73,38 @@ export const replaceExistingFieldCondition = (
 };
 
 /**
+ * Removes all conditions for `fieldName` from `queryStr`.
+ * Handles pipe-separated queries (`SELECT ... | WHERE conditions`) by operating
+ * only on the WHERE part. Cleans up dangling AND connectors after removal.
+ */
+export const removeFieldCondition = (
+  queryStr: string,
+  fieldName: string,
+): string => {
+  const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const fieldPattern = new RegExp(`^"?${esc}"?\\s*[=!<>]`, "i");
+  const multiPattern = new RegExp(`^\\(\\s*"?${esc}"?\\s*[=!<>]`, "i");
+
+  const removeFromClause = (clause: string): string => {
+    const remaining = clause
+      .trim()
+      .split(/\s+AND\s+/i)
+      .filter((cond) => {
+        const trimmed = cond.trim();
+        return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
+      });
+    return remaining.join(" AND ");
+  };
+
+  const parts = queryStr.split("|");
+  if (parts.length > 1) {
+    parts[1] = removeFromClause(parts[1] as string);
+    return parts.join("|");
+  }
+  return removeFromClause(parts[0] as string);
+};
+
+/**
  * Applies a single filter term to a base editor value using replace-or-append logic.
  * Returns the new editor value.
  */
