@@ -20,7 +20,11 @@ const MAX_QUERY_STREAM = "e2e_max_query_range";
 // Warning icon selector (from PanelErrorButtons.vue)
 const WARNING_SELECTOR = '[data-test="panel-max-duration-warning"]';
 
-test.describe.configure({ mode: "serial" });
+// Serial mode is required: all tests share the same stream (e2e_max_query_range)
+// and its max_query_range setting. Running in parallel would cause tests to
+// reset each other's stream state mid-execution.
+test.describe.configure({ mode: "default" });
+
 
 // ============================================================================
 // Helpers
@@ -105,7 +109,7 @@ test.describe("Dashboard Max Query Range", () => {
 
       // Verify tooltip text
       const tooltipText = await mqr.getWarningTooltipText();
-      expect(tooltipText).toContain("max query range limit");
+      expect(tooltipText).toContain("Query duration is modified due to query range restriction");
       expect(tooltipText).toContain("Data returned for:");
 
       testLogger.info("Tooltip text verified", { tooltipText });
@@ -318,7 +322,7 @@ test.describe("Dashboard Max Query Range", () => {
 
       // Hover and verify the tooltip mentions the correct restriction hours
       const tooltipText = await mqr.getWarningTooltipText();
-      expect(tooltipText).toContain("max query range limit");
+      expect(tooltipText).toContain("restriction of 3 hours");
       expect(tooltipText).toContain("Data returned for:");
       testLogger.info("Tooltip correctly shows 3-hour restriction", { tooltipText });
 
@@ -407,7 +411,7 @@ test.describe("Dashboard Max Query Range", () => {
 
       // Verify tooltip
       const tooltipText = await mqr.getWarningTooltipText();
-      expect(tooltipText).toContain("max query range limit");
+      expect(tooltipText).toContain("Query duration is modified due to query range restriction");
 
       // Cleanup
       await pm.dashboardPanelActions.addPanelName("MultiSQL Max Query Panel");
