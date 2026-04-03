@@ -666,12 +666,9 @@ export class TracesPage {
     try {
       await expect(queryEditor).toBeVisible({ timeout: 5000 });
 
-      // Use .fill() method to avoid pointer interception issues
-      // Try different selectors: .inputarea (Monaco's input area) or textarea (fallback)
-      const monacoInput = queryEditor.locator('.inputarea, textarea').first();
-      await expect(monacoInput).toBeVisible({ timeout: 3000 });
-
-      // Fill directly without clicking to avoid pointer interception
+      // Target only the editable Monaco textarea — exclude readonly IME/a11y textareas
+      const monacoInput = queryEditor.locator('textarea:not([readonly])').first();
+      await monacoInput.click({ force: true });
       await monacoInput.fill(query);
       await this.page.waitForTimeout(500);
 
