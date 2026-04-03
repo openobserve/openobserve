@@ -166,16 +166,16 @@ async function setQueryEditorContent(page, pm, content) {
  * Wait for Monaco suggestions widget to be visible
  */
 async function waitForSuggestionsWidget(page, pm, timeout = 5000) {
-    const { monacoHelper } = getMonacoHelper(page, pm);
-    return await monacoHelper.waitForSuggestions(timeout);
+    const { monacoHelper, container } = getMonacoHelper(page, pm);
+    return await monacoHelper.waitForSuggestions(timeout, container);
 }
 
 /**
  * Get all suggestion labels from Monaco autocomplete widget
  */
 async function getSuggestionLabels(page, pm) {
-    const { monacoHelper } = getMonacoHelper(page, pm);
-    return await monacoHelper.getSuggestionLabels();
+    const { monacoHelper, container } = getMonacoHelper(page, pm);
+    return await monacoHelper.getSuggestionLabels(5000, container);
 }
 
 /**
@@ -1108,9 +1108,11 @@ test.describe("Autocomplete Value Suggestions - Cold Start & TTL", () => {
         // Don't run search - just type in query editor
         await setQueryEditorContent(page, pm, `SELECT * FROM "${streamName}" WHERE `);
         await page.waitForTimeout(500);
-        await page.keyboard.press('Control+Space');
 
-        // Wait for suggestions widget - cold start should still show SQL keywords/field names
+        // Wait for suggestions widget - cold start should still show SQL keywords/field names.
+        // The helper handles focus + trigger internally; no manual Ctrl+Space needed here
+        // (an extra press before calling the helper can toggle the widget closed if Monaco
+        // auto-showed it during typing, causing the first wait in the helper to time out).
         await waitForSuggestionsWidget(page, pm, 10000);
         const suggestions = await getSuggestionLabels(page, pm);
 

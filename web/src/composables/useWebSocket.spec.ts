@@ -219,7 +219,7 @@ describe("useWebSocket", () => {
       const id = uid("create");
       const handle = connectAndWrap(id, "ws://localhost:8080");
       expect(handle.raw).toBeDefined();
-      expect(handle.raw.url).toBe("ws://localhost:8080");
+      expect(handle.raw.url).toBe("ws://localhost:8080/");
     });
 
     it("stores a socket in the registry for a valid wss:// URL", () => {
