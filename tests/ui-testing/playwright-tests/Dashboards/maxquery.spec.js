@@ -61,6 +61,13 @@ test.describe("Dashboard Max Query Range", () => {
     await page.waitForTimeout(2000);
   });
 
+  // Ensure max query range is always reset even when a test fails mid-way,
+  // preventing restriction state from cascading into subsequent tests.
+  test.afterEach(async ({ page }) => {
+    const pm = new PageManager(page);
+    await pm.dashboardMaxQueryRange.resetMaxQueryRange();
+  });
+
   // --------------------------------------------------------------------------
   // Scenario 1: Warning icon appears when query range exceeds max limit
   // --------------------------------------------------------------------------
@@ -87,8 +94,9 @@ test.describe("Dashboard Max Query Range", () => {
       await pm.dashboardList.clickOnDashboard(dashboardName);
 
       await waitForDateTimeButtonToBeEnabled(page);
+      const searchDone1 = mqr.createSearchResponsePromise();
       await pm.dateTimeHelper.setRelativeTimeRange("6-w");
-      await mqr.waitForSearchResponse();
+      await searchDone1;
 
       // Assert warning icon is visible
       await expect(page.locator(WARNING_SELECTOR).first()).toBeVisible({
@@ -133,8 +141,9 @@ test.describe("Dashboard Max Query Range", () => {
       await pm.dashboardList.clickOnDashboard(dashboardName);
 
       await waitForDateTimeButtonToBeEnabled(page);
+      const searchDone6w = mqr.createSearchResponsePromise();
       await pm.dateTimeHelper.setRelativeTimeRange("6-w");
-      await mqr.waitForSearchResponse();
+      await searchDone6w;
 
       // Warning should be visible
       await expect(page.locator(WARNING_SELECTOR).first()).toBeVisible({
@@ -144,8 +153,9 @@ test.describe("Dashboard Max Query Range", () => {
 
       // Set time range within the limit (2 hours)
       await waitForDateTimeButtonToBeEnabled(page);
+      const searchDone2h = mqr.createSearchResponsePromise();
       await pm.dateTimeHelper.setRelativeTimeRange("2-h");
-      await mqr.waitForSearchResponse();
+      await searchDone2h;
 
       // Warning should disappear
       await expect(page.locator(WARNING_SELECTOR)).not.toBeVisible({
@@ -261,8 +271,10 @@ test.describe("Dashboard Max Query Range", () => {
       await pm.dashboardList.clickOnDashboard(dashboardName);
 
       await waitForDateTimeButtonToBeEnabled(page);
+      // Register listener before triggering the time range change to avoid race condition
+      const searchDone = mqr.createSearchResponsePromise();
       await pm.dateTimeHelper.setRelativeTimeRange("6-w");
-      await page.waitForTimeout(5000);
+      await searchDone;
 
       // All panels should show the warning
       const warningCount = await page.locator(WARNING_SELECTOR).count();
@@ -300,8 +312,9 @@ test.describe("Dashboard Max Query Range", () => {
       await pm.dashboardList.clickOnDashboard(dashboardName);
 
       await waitForDateTimeButtonToBeEnabled(page);
+      const searchDone5 = mqr.createSearchResponsePromise();
       await pm.dateTimeHelper.setRelativeTimeRange("6-w");
-      await mqr.waitForSearchResponse();
+      await searchDone5;
 
       // Verify warning is present
       await expect(page.locator(WARNING_SELECTOR).first()).toBeVisible({

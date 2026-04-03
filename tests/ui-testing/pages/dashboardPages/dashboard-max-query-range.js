@@ -64,9 +64,19 @@ export default class DashboardMaxQueryRange {
   // ---------------------------------------------------------------------------
 
   /**
-   * Wait for the search API response to complete (SSE or JSON).
+   * Register the search response listener BEFORE triggering the action that
+   * fires the request, then await the returned promise after the action.
+   * This avoids the race condition where a fast response is already gone by
+   * the time waitForResponse() is called.
+   *
+   * Usage:
+   *   const searchDone = mqr.createSearchResponsePromise();
+   *   await pm.dateTimeHelper.setRelativeTimeRange("6-w");  // triggers search
+   *   await searchDone;
+   *
+   * @returns {Promise<void>}
    */
-  async waitForSearchResponse() {
+  async createSearchResponsePromise() {
     const orgName = process.env.ORGNAME || "default";
     await this.page.waitForResponse(
       (resp) =>
@@ -77,6 +87,16 @@ export default class DashboardMaxQueryRange {
       { timeout: 30000 }
     );
     await this.page.waitForTimeout(2000);
+  }
+
+  /**
+   * Wait for the search API response to complete (SSE or JSON).
+   * Safe to use when you are certain no response has been missed yet
+   * (e.g. immediately after page load before any user action).
+   * Prefer createSearchResponsePromise() when registering after an action.
+   */
+  async waitForSearchResponse() {
+    return this.createSearchResponsePromise();
   }
 
   // ---------------------------------------------------------------------------
