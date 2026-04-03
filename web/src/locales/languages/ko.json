@@ -1570,7 +1570,11 @@
     "axisLabelRotateTooltipText": "레이블이 길거나 혼잡할 때 가독성을 높이려면 x축 레이블 텍스트를 선택한 각도 (도) 만큼 회전합니다.",
     "axisLabelTruncateTooltipText": "x축 레이블을 지정된 너비 (픽셀 단위) 로 자릅니다.",
     "axisLabelTooltipNotePrefix": "노트:",
-    "axisLabelTooltipNoteText": " 이 옵션은 시계열 x축 필드에는 지원되지 않습니다."
+    "axisLabelTooltipNoteText": " 이 옵션은 시계열 x축 필드에는 지원되지 않습니다.",
+    "multiSqlQueryLabel": "쿼리 라벨",
+    "multiSqlQueryLabelHint": "범례로 표시된 이 쿼리의 사용자 지정 이름 (예: 'Production')",
+    "multiQueryWarning": "{ChartType} 에 대해서는 쿼리 1만 렌더링됩니다.",
+    "trellisNotSupportedWithMultiQuery": "다중 쿼리에서 격자 레이아웃을 사용할 수 없습니다.격자를 사용하려면 추가 쿼리를 제거하세요."
   },
   "panel": {
     "header": "패널",

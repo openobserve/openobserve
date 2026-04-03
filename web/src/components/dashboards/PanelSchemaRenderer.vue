@@ -683,11 +683,6 @@ export default defineComponent({
         return data.value;
       }
 
-      // Only filter for PromQL queries
-      if (panelSchema.value.queryType !== "promql") {
-        return data.value;
-      }
-
       // If no hidden queries or empty array, return as is
       if (
         !hiddenQueries.value ||
@@ -697,13 +692,31 @@ export default defineComponent({
         return data.value;
       }
 
-      // Filter out hidden queries
+      // Filter out hidden queries by index (works for both SQL and PromQL)
       const filtered = data.value.filter(
         (_: any, index: number) => !hiddenQueries.value.includes(index),
       );
 
-      // Return filtered data
       return filtered;
+    });
+
+    // E2: Also filter panelSchema.queries in sync with filteredData
+    // to keep data[i] aligned with queries[i] in convertMultiSQLData
+    const filteredPanelSchema = computed(() => {
+      if (
+        panelSchema.value.queryType === "promql" ||
+        !hiddenQueries.value?.length ||
+        !Array.isArray(panelSchema.value.queries)
+      ) {
+        return panelSchema.value;
+      }
+
+      return {
+        ...panelSchema.value,
+        queries: panelSchema.value.queries.filter(
+          (_: any, i: number) => !hiddenQueries.value.includes(i),
+        ),
+      };
     });
 
     // need tableRendererRef to access downloadTableAsCSV method
@@ -840,7 +853,7 @@ export default defineComponent({
       ) {
         try {
           panelData.value = await convertPanelData(
-            panelSchema.value,
+            filteredPanelSchema.value,
             filteredData.value,
             store,
             chartPanelRef,

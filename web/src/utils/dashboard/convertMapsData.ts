@@ -27,11 +27,10 @@ import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 
 export const convertMapsData = (panelSchema: any, mapData: any) => {
   //if no name and value than return it
-  if (
-    !panelSchema.queries[0]?.fields?.name ||
-    !panelSchema.queries[0]?.fields?.value_for_maps ||
-    !mapData
-  ) {
+  const hasValidQuery = panelSchema.queries?.some(
+    (query: any) => query.fields?.name && query.fields?.value_for_maps,
+  );
+  if (!hasValidQuery || !mapData) {
     return { options: null };
   }
 

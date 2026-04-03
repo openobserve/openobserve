@@ -127,6 +127,8 @@ pub struct Query {
     pub config: QueryConfig,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub joins: Option<Vec<Join>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tab_name: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -625,6 +627,8 @@ pub struct QueryConfig {
     max: Option<OrdF64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     time_shift: Option<Vec<TimeShift>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    query_label: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]

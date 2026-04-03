@@ -1570,7 +1570,11 @@
     "axisLabelRotateTooltipText": "Ruota il testo dell'etichetta sull'asse x di un angolo scelto (in gradi) per migliorare la leggibilità quando le etichette sono lunghe o affollate.",
     "axisLabelTruncateTooltipText": "Tronca le etichette dell'asse x alla larghezza specificata (in pixel).",
     "axisLabelTooltipNotePrefix": "Nota:",
-    "axisLabelTooltipNoteText": " Questa opzione non è supportata per i campi dell'asse x delle serie temporali."
+    "axisLabelTooltipNoteText": " Questa opzione non è supportata per i campi dell'asse x delle serie temporali.",
+    "multiSqlQueryLabel": "Etichetta di interrogazione",
+    "multiSqlQueryLabelHint": "Nome personalizzato per questa query nelle legende (ad esempio, 'Produzione')",
+    "multiQueryWarning": "Viene renderizzato solo l'interrogazione 1 per {chartType}",
+    "trellisNotSupportedWithMultiQuery": "Il layout di Trellis è disabilitato con più query. Rimuovi le query aggiuntive per utilizzare trellis."
   },
   "panel": {
     "header": "Pannello",
