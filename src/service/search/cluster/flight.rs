@@ -219,7 +219,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         &file_id_list_vec,
     )
     .await?;
-    let took_wait = _lock.took_wait;
+    let mut _took_wait = _lock.took_wait;
 
     let work_group_str = _lock.work_group_str.clone();
     #[cfg(feature = "enterprise")]
@@ -240,14 +240,16 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
                 admission::acquire_node_slots(trace_id, &nodes, &work_group, remaining_ms).await?,
             );
             let took_wait = start_time.elapsed().as_millis() as usize;
+            _took_wait += took_wait;
             log::info!(
-                "[trace_id {trace_id}] flight->search: wait in node slot took: {took_wait} ms"
+                "[trace_id {trace_id}] flight->search: wait in node slot queue took: {took_wait} ms"
             );
             guard
         } else {
             None
         }
     };
+    log::info!("[trace_id {trace_id}] flight->search: total wait in queue took: {_took_wait} ms");
 
     // Move metric updates to here, after all admission stages complete.
     // A request blocked on slot budget should not be counted as "running".
@@ -370,7 +372,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     Ok((
         data,
         scan_stats,
-        took_wait,
+        _took_wait,
         !partial_err.is_empty(),
         partial_err,
     ))
@@ -509,6 +511,10 @@ pub async fn get_online_querier_nodes(
             role_group,
         )
         .await;
+        log::debug!(
+            "[trace_id {trace_id}] flight->search: slot admission select_nodes for org: {_org_id}, nodes: {:?}",
+            nodes.iter().map(|node| node.name.clone()).collect_vec()
+        );
     }
 
     Ok(nodes)

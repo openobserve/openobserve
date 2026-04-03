@@ -169,7 +169,7 @@ pub async fn search(
     .await
     .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
 
-    let _took_wait = _lock.took_wait;
+    let mut _took_wait = _lock.took_wait;
 
     // Node-level slot admission for PromQL (enterprise)
     // Placed here alongside the work_group check so both admission stages are co-located.
@@ -193,14 +193,16 @@ pub async fn search(
                 .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?,
             );
             let took_wait = start_time.elapsed().as_millis() as usize;
+            _took_wait += took_wait;
             log::info!(
-                "[trace_id {trace_id}] promql->search: wait in node slot took: {took_wait} ms"
+                "[trace_id {trace_id}] promql->search: wait in node slot queue took: {took_wait} ms"
             );
             guard
         } else {
             None
         }
     };
+    log::info!("[trace_id {trace_id}] promql->search: total wait in queue took: {_took_wait} ms");
 
     #[cfg(feature = "enterprise")]
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
