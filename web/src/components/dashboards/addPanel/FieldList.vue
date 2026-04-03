@@ -122,7 +122,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #no-option>
           <q-item>
-            <q-item-section> {{ t("search.noResult") }}</q-item-section>
+            <q-item-section :class="store.state.theme === 'dark' ? 'text-white' : ''">
+              {{ t("search.noResult") }}
+            </q-item-section>
           </q-item>
         </template>
       </q-select>
