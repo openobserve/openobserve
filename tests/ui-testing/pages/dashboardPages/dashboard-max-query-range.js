@@ -86,7 +86,6 @@ export default class DashboardMaxQueryRange {
         resp.status() === 200,
       { timeout: 30000 }
     );
-    await this.page.waitForTimeout(2000);
   }
 
   /**
@@ -97,6 +96,25 @@ export default class DashboardMaxQueryRange {
    */
   async waitForSearchResponse() {
     return this.createSearchResponsePromise();
+  }
+
+  /**
+   * Register N search response listeners BEFORE triggering the action,
+   * then await the returned promise after. Use when multiple panels will
+   * each fire their own search request (e.g. a dashboard with N panels).
+   *
+   * Usage:
+   *   const allDone = mqr.createNSearchResponsesPromise(3);
+   *   await pm.dateTimeHelper.setRelativeTimeRange("6-w");
+   *   await allDone;
+   *
+   * @param {number} n - number of search responses to wait for
+   * @returns {Promise<void>}
+   */
+  createNSearchResponsesPromise(n) {
+    return Promise.all(
+      Array.from({ length: n }, () => this.createSearchResponsePromise())
+    );
   }
 
   // ---------------------------------------------------------------------------

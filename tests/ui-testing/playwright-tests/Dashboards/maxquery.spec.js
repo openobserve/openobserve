@@ -113,7 +113,6 @@ test.describe("Dashboard Max Query Range", () => {
       // Cleanup
       await pm.dashboardCreate.backToDashboardList();
       await deleteDashboard(page, dashboardName);
-      await mqr.resetMaxQueryRange();
     }
   );
 
@@ -166,7 +165,6 @@ test.describe("Dashboard Max Query Range", () => {
       // Cleanup
       await pm.dashboardCreate.backToDashboardList();
       await deleteDashboard(page, dashboardName);
-      await mqr.resetMaxQueryRange();
     }
   );
 
@@ -217,7 +215,6 @@ test.describe("Dashboard Max Query Range", () => {
       await pm.dashboardPanelActions.savePanel();
       await pm.dashboardCreate.backToDashboardList();
       await deleteDashboard(page, dashboardName);
-      await mqr.resetMaxQueryRange();
     }
   );
 
@@ -237,7 +234,7 @@ test.describe("Dashboard Max Query Range", () => {
       await waitForDashboardPage(page);
       await pm.dashboardCreate.createDashboard(dashboardName);
 
-      const chartTypes = ["bar", "line", "pie"];
+      const chartTypes = ["bar", "line", "area"];
 
       for (let i = 0; i < chartTypes.length; i++) {
         const chartType = chartTypes[i];
@@ -271,20 +268,18 @@ test.describe("Dashboard Max Query Range", () => {
       await pm.dashboardList.clickOnDashboard(dashboardName);
 
       await waitForDateTimeButtonToBeEnabled(page);
-      // Register listener before triggering the time range change to avoid race condition
-      const searchDone = mqr.createSearchResponsePromise();
+      // Register one listener per panel before triggering the time range change
+      const allSearchesDone = mqr.createNSearchResponsesPromise(chartTypes.length);
       await pm.dateTimeHelper.setRelativeTimeRange("6-w");
-      await searchDone;
+      await allSearchesDone;
 
-      // All panels should show the warning
-      const warningCount = await page.locator(WARNING_SELECTOR).count();
-      expect(warningCount).toBeGreaterThanOrEqual(chartTypes.length);
-      testLogger.info(`All ${warningCount} panels show max query range warning`);
+      // Verify all panels show the warning (retries until count is met or timeout)
+      await expect(page.locator(WARNING_SELECTOR)).toHaveCount(chartTypes.length, { timeout: 15000 });
+      testLogger.info(`All ${chartTypes.length} panels show max query range warning`);
 
       // Cleanup
       await pm.dashboardCreate.backToDashboardList();
       await deleteDashboard(page, dashboardName);
-      await mqr.resetMaxQueryRange();
     }
   );
 
@@ -330,7 +325,6 @@ test.describe("Dashboard Max Query Range", () => {
       // Cleanup
       await pm.dashboardCreate.backToDashboardList();
       await deleteDashboard(page, dashboardName);
-      await mqr.resetMaxQueryRange();
     }
   );
 
@@ -353,8 +347,6 @@ test.describe("Dashboard Max Query Range", () => {
       await waitForDashboardPage(page);
       await pm.dashboardCreate.createDashboard(dashboardName);
       await buildPanelWithWideRange(page, pm, "No Limit Panel", "area");
-
-      await page.waitForTimeout(3000);
 
       // Warning should NOT be visible since there is no max query range limit
       await expect(page.locator(WARNING_SELECTOR)).not.toBeVisible({
@@ -422,7 +414,6 @@ test.describe("Dashboard Max Query Range", () => {
       await pm.dashboardPanelActions.savePanel();
       await pm.dashboardCreate.backToDashboardList();
       await deleteDashboard(page, dashboardName);
-      await mqr.resetMaxQueryRange();
     }
   );
 });
