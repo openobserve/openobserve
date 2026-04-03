@@ -1,6 +1,8 @@
 <template>
   <q-card flat class="tw:h-full">
-    <q-card-section class="tw:p-[0.375rem] tw:h-full card-container service-graph-container">
+    <q-card-section
+      class="tw:p-[0.375rem] tw:h-full card-container service-graph-container"
+    >
       <!-- Top row with search and control buttons -->
       <div class="row items-center q-col-gutter-sm q-mb-md">
         <div class="col-12 col-md-5 tw:flex tw:gap-[0.5rem]">
@@ -72,7 +74,7 @@
             @click="loadServiceGraph"
             :loading="loading"
           >
-          Refresh
+            Refresh
           </q-btn>
 
           <!-- 3. Graph/Tree view toggle -->
@@ -104,78 +106,144 @@
       <!-- Graph Visualization -->
       <q-card flat bordered class="graph-card tw:h-[calc(100%-4rem)]">
         <q-card-section class="q-pa-none tw:h-full" style="height: 100%">
-          <div class="graph-container tw:h-full tw:bg-[var(--o2-bg)]" style="position: relative;">
-            <!-- Legend info button -->
-            <q-btn
-              v-if="!loading && graphData.nodes.length"
-              round
-              flat
-              icon="info_outline"
-              size="sm"
-              class="sg-info-btn"
-              :class="$q.dark.isActive ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+          <div
+            class="graph-container tw:h-full tw:bg-[var(--o2-bg)]"
+            style="position: relative"
+          >
+            <div
+              class="tw:absolute tw:p-[0.325rem] tw:rounded tw:border tw:border-[var(--o2-border-color)]! tw:top-[0.62rem] tw:flex tw:flex-col tw:left-[0.62rem]"
             >
-              <q-tooltip
-                :delay="150"
-                anchor="bottom right"
-                self="top right"
-                :offset="[0, 8]"
-                class="sg-legend-tooltip"
+              <div
+                data-test="sg-legend"
+                class="tw:w-fit tw:flex tw:flex-col tw:items-center tw:gap-2 tw:min-w-0"
               >
-                <div class="sg-legend">
-                  <!-- Node Size — Graph View only (Tree View uses fixed sizes) -->
-                  <template v-if="visualizationType === 'graph'">
-                    <div class="sg-legend-title">Node Size <span class="sg-legend-subtitle">| Request Volume</span></div>
-                    <div class="sg-legend-row sg-legend-sizes">
-                      <div class="sg-legend-size-item">
-                        <div class="sg-legend-circle" style="width:22px;height:22px;border-color:#52c41a;"></div>
-                        <span class="sg-legend-label">Low</span>
+                <!-- Border Color -->
+                <div
+                  class="sg-legend-title tw:mb-0! tw:whitespace-nowrap tw:text-[var(--o2-text-4)]!"
+                >
+                  Border Color
+                  <span class="sg-legend-subtitle">| Errors</span>
+                </div>
+                <div class="tw:flex! tw:flex-col tw:gap-2">
+                  <div
+                    class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+                  >
+                    <div
+                      class="sg-legend-dot"
+                      style="border-color: #52c41a"
+                    ></div>
+                    <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
+                      <div
+                        class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                      >
+                        Healthy
                       </div>
-                      <div class="sg-legend-size-dots">···</div>
-                      <div class="sg-legend-size-item">
-                        <div class="sg-legend-circle" style="width:42px;height:42px;border-color:#52c41a;"></div>
-                        <span class="sg-legend-label">High</span>
-                      </div>
-                    </div>
-
-                    <div class="sg-legend-divider"></div>
-                  </template>
-
-                  <!-- Border Color -->
-                  <div class="sg-legend-title">Border Color <span class="sg-legend-subtitle">| Error Rate</span></div>
-                  <div class="sg-legend-color-row">
-                    <div class="sg-legend-color-item">
-                      <div class="sg-legend-dot" style="border-color:#52c41a;"></div>
-                      <div>
-                        <div class="sg-legend-color-label">Healthy</div>
-                        <div class="sg-legend-color-value">&lt; 1%</div>
+                      <div class="sg-legend-color-value tw:text-left">
+                        &lt; 1%
                       </div>
                     </div>
-                    <div class="sg-legend-color-item">
-                      <div class="sg-legend-dot" style="border-color:#faad14;"></div>
-                      <div>
-                        <div class="sg-legend-color-label">Degraded</div>
-                        <div class="sg-legend-color-value">1 – 5%</div>
+                  </div>
+                  <div
+                    class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+                  >
+                    <div
+                      class="sg-legend-dot"
+                      style="border-color: #faad14"
+                    ></div>
+                    <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
+                      <div
+                        class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                      >
+                        Degraded
+                      </div>
+                      <div class="sg-legend-color-value tw:text-left">
+                        1 – 5%
                       </div>
                     </div>
-                    <div class="sg-legend-color-item">
-                      <div class="sg-legend-dot" style="border-color:#fa8c16;"></div>
-                      <div>
-                        <div class="sg-legend-color-label">Warning</div>
-                        <div class="sg-legend-color-value">5 – 10%</div>
+                  </div>
+                  <div
+                    class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+                  >
+                    <div
+                      class="sg-legend-dot"
+                      style="border-color: #fa8c16"
+                    ></div>
+                    <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
+                      <div
+                        class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                      >
+                        Warning
+                      </div>
+                      <div class="sg-legend-color-value tw:text-left">
+                        5 – 10%
                       </div>
                     </div>
-                    <div class="sg-legend-color-item">
-                      <div class="sg-legend-dot" style="border-color:#f5222d;"></div>
-                      <div>
-                        <div class="sg-legend-color-label">Critical</div>
-                        <div class="sg-legend-color-value">&gt; 10%</div>
+                  </div>
+                  <div
+                    class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+                  >
+                    <div
+                      class="sg-legend-dot"
+                      style="border-color: #f5222d"
+                    ></div>
+                    <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
+                      <div
+                        class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                      >
+                        Critical
+                      </div>
+                      <div class="sg-legend-color-value tw:text-left">
+                        &gt; 10%
                       </div>
                     </div>
                   </div>
                 </div>
-              </q-tooltip>
-            </q-btn>
+              </div>
+              <q-separator
+                v-if="visualizationType === 'graph'"
+                class="tw:my-[0.5rem]!"
+              />
+              <div
+                v-if="visualizationType === 'graph'"
+                data-test="sg-node-size-info"
+                class="tw:flex tw:flex-row tw:items-center tw:gap-4 tw:min-w-0"
+              >
+                <!-- Node Size — Graph View only (Tree View uses fixed sizes) -->
+                <div class="tw:flex tw:flex-col tw:items-start tw:gap-2">
+                  <div
+                    class="sg-legend-title tw:mb-0! tw:whitespace-nowrap tw:text-[var(--o2-text-4)]!"
+                  >
+                    Node Size
+                    <span class="sg-legend-subtitle">| Requests</span>
+                  </div>
+                  <div class="sg-legend-row sg-legend-sizes tw:py-0!">
+                    <div
+                      class="sg-legend-size-item tw:flex-row tw:items-center tw:gap-1.5"
+                    >
+                      <div
+                        class="sg-legend-circle"
+                        style="width: 16px; height: 16px; border-color: #52c41a"
+                      ></div>
+                      <span class="sg-legend-label tw:text-[var(--o2-text-2)]!"
+                        >Low</span
+                      >
+                    </div>
+                    <div class="sg-legend-size-dots tw:mb-0">···</div>
+                    <div
+                      class="sg-legend-size-item tw:flex-row tw:items-center tw:gap-1.5"
+                    >
+                      <div
+                        class="sg-legend-circle"
+                        style="width: 28px; height: 28px; border-color: #52c41a"
+                      ></div>
+                      <span class="sg-legend-label tw:text-[var(--o2-text-2)]!"
+                        >High</span
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             <div v-if="loading" class="flex flex-center tw:h-full">
               <div class="text-center tw:flex tw:flex-col tw:items-center">
@@ -217,7 +285,11 @@
                 </div>
               </div>
             </div>
-            <div v-else ref="graphContainerRef" class="tw:h-full graph-with-panel-container">
+            <div
+              v-else
+              ref="graphContainerRef"
+              class="tw:h-full graph-with-panel-container"
+            >
               <ChartRenderer
                 ref="chartRendererRef"
                 data-test="service-graph-chart"
@@ -237,16 +309,8 @@
                 :visible="showSidePanel"
                 :stream-filter="streamFilter"
                 @close="handleCloseSidePanel"
+                @view-traces="$emit('view-traces', $event)"
               />
-
-              <!-- Service Graph Edge Side Panel -->
-              <ServiceGraphEdgeSidePanel
-                v-if="selectedEdge"
-                :selected-edge="selectedEdge"
-                :visible="showEdgeSidePanel"
-                @close="handleCloseEdgeSidePanel"
-              />
-
             </div>
           </div>
         </q-card-section>
@@ -294,7 +358,15 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from "vue";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  onBeforeUnmount,
+  computed,
+  watch,
+  nextTick,
+} from "vue";
 import * as echarts from "echarts";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -304,7 +376,6 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import DateTime from "@/components/DateTime.vue";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
-import ServiceGraphEdgeSidePanel from "./ServiceGraphEdgeSidePanel.vue";
 import {
   convertServiceGraphToTree,
   convertServiceGraphToNetwork,
@@ -321,7 +392,6 @@ import {
 import useStreams from "@/composables/useStreams";
 import useTraces from "@/composables/useTraces";
 
-
 export default defineComponent({
   name: "ServiceGraph",
   components: {
@@ -329,9 +399,8 @@ export default defineComponent({
     ChartRenderer,
     DateTime,
     ServiceGraphSidePanel,
-    ServiceGraphEdgeSidePanel,
   },
-  emits: [],
+  emits: ["view-traces"],
   setup(props, { emit }) {
     const store = useStore();
     const $q = useQuasar();
@@ -347,10 +416,6 @@ export default defineComponent({
     // Node side panel state
     const selectedNode = ref<any>(null);
     const showSidePanel = ref(false);
-
-    // Edge side panel state
-    const selectedEdge = ref<any>(null);
-    const showEdgeSidePanel = ref(false);
 
     // Persist visualization type in localStorage
     const storedVisualizationType = localStorage.getItem(
@@ -379,7 +444,7 @@ export default defineComponent({
     const searchFilter = ref("");
 
     // Stream filter — synced from traces page selected stream
-    const tracesStream = searchObj.data.stream?.selectedStream?.value || '';
+    const tracesStream = searchObj.data.stream?.selectedStream?.value || "";
     const storedStreamFilter = localStorage.getItem(
       "serviceGraph_streamFilter",
     );
@@ -403,7 +468,6 @@ export default defineComponent({
 
     const dateTimeRef = ref<any>(null);
 
-
     // Key to control chart recreation - only change when layout/visualization type changes
     const chartKey = ref(0);
 
@@ -418,9 +482,7 @@ export default defineComponent({
           { label: "Vertical", value: "vertical" },
         ];
       } else {
-        return [
-          { label: "Force Directed", value: "force" },
-        ];
+        return [{ label: "Force Directed", value: "force" }];
       }
     });
 
@@ -434,10 +496,12 @@ export default defineComponent({
 
       // Use cached options if chartKey hasn't changed (prevents double rendering)
       // BUT only if no filters are active and no new baselines have arrived
-      if (visualizationType.value === "graph" &&
-          lastChartOptions.value &&
-          chartKey.value === lastChartOptions.value.key &&
-          !hasActiveFilters) {
+      if (
+        visualizationType.value === "graph" &&
+        lastChartOptions.value &&
+        chartKey.value === lastChartOptions.value.key &&
+        !hasActiveFilters
+      ) {
         return {
           options: lastChartOptions.value.data.options,
           notMerge: false,
@@ -459,7 +523,7 @@ export default defineComponent({
               new Map(),
               $q.dark.isActive,
               undefined,
-              graphContainerRef.value?.clientWidth  || 1200,
+              graphContainerRef.value?.clientWidth || 1200,
               graphContainerRef.value?.clientHeight || 700,
             );
 
@@ -498,7 +562,7 @@ export default defineComponent({
         // Unselect the old node (if any)
         if (oldId) {
           chart.dispatchAction({
-            type: 'unselect',
+            type: "unselect",
             seriesIndex: 0,
             name: oldId,
           });
@@ -507,13 +571,13 @@ export default defineComponent({
         // Select the new node (if any)
         if (newId) {
           chart.dispatchAction({
-            type: 'select',
+            type: "select",
             seriesIndex: 0,
             name: newId,
           });
         }
       },
-      { flush: 'post' }
+      { flush: "post" },
     );
 
     // Watch for theme changes and re-apply selection
@@ -536,12 +600,12 @@ export default defineComponent({
 
           // Re-apply node selection
           chart.dispatchAction({
-            type: 'select',
+            type: "select",
             seriesIndex: 0,
             name: nodeIdToReselect,
           });
         }, 500); // 500ms delay to ensure chart has fully regenerated
-      }
+      },
     );
 
     // Watch for stream filter changes and restore chart viewport
@@ -559,10 +623,10 @@ export default defineComponent({
 
           // Restore chart to default zoom/pan to fit all content
           chart.dispatchAction({
-            type: 'restore',
+            type: "restore",
           });
         }, 500); // Longer delay to ensure chart has recalculated positions
-      }
+      },
     );
 
     // --- Graph view: flowing edge animation on node hover ---
@@ -580,7 +644,7 @@ export default defineComponent({
 
       // Tree view: emphasis.focus:'relative' in the series config handles dimming natively.
       // No manual dispatch needed — ECharts triggers it on mouseover automatically.
-      if (visualizationType.value !== 'graph') return;
+      if (visualizationType.value !== "graph") return;
 
       const rawEdges: any[] = filteredGraphData.value.edges || [];
 
@@ -588,14 +652,17 @@ export default defineComponent({
       const edgeMap = new Map<string, any>();
       rawEdges.forEach((edge: any) => {
         const key = `${edge.from}|||${edge.to}`;
-        if (!edgeMap.has(key) ||
-            (edge.total_requests || 0) > (edgeMap.get(key).total_requests || 0)) {
+        if (
+          !edgeMap.has(key) ||
+          (edge.total_requests || 0) > (edgeMap.get(key).total_requests || 0)
+        ) {
           edgeMap.set(key, edge);
         }
       });
 
       const updatedLinks = Array.from(edgeMap.values()).map((edge: any) => {
-        const isAdj = hoveredNodeId !== null &&
+        const isAdj =
+          hoveredNodeId !== null &&
           (edge.from === hoveredNodeId || edge.to === hoveredNodeId);
         return {
           source: edge.from,
@@ -604,7 +671,7 @@ export default defineComponent({
           tooltip: { show: false },
           lineStyle: {
             width: 4,
-            type: isAdj ? 'dashed' : 'solid',
+            type: isAdj ? "dashed" : "solid",
             opacity: hoveredNodeId !== null ? (isAdj ? 1 : 0.15) : 0.6,
           },
         };
@@ -620,36 +687,38 @@ export default defineComponent({
     let edgeTooltipCleanup: (() => void) | null = null;
     let pendingTooltipSetup: ReturnType<typeof setTimeout> | null = null;
 
-
     const setupTreeEdgeTooltips = (chart: any) => {
       const zr = chart.getZr();
       let hideTimer: ReturnType<typeof setTimeout> | null = null;
 
       // Custom tooltip element — node tooltips use innerHTML, edge tooltips use an ECharts mini chart
-      const tooltipEl = document.createElement('div');
+      const tooltipEl = document.createElement("div");
       const isDarkInit = $q.dark.isActive;
       tooltipEl.style.cssText = `
         position: absolute; pointer-events: none; z-index: 9999;
-        background: ${isDarkInit ? 'rgba(22, 22, 26, 0.90)' : 'rgba(255, 255, 255, 0.88)'};
+        background: ${isDarkInit ? "rgba(22, 22, 26, 0.90)" : "rgba(255, 255, 255, 0.88)"};
         backdrop-filter: blur(24px) saturate(180%);
         -webkit-backdrop-filter: blur(24px) saturate(180%);
-        border: 1px solid ${isDarkInit ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)'};
+        border: 1px solid ${isDarkInit ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)"};
         border-radius: 14px;
         display: none;
-        box-shadow: 0 12px 40px rgba(0,0,0,${isDarkInit ? '0.5' : '0.14'}), 0 1px 0 rgba(255,255,255,${isDarkInit ? '0.04' : '0'}) inset;
+        box-shadow: 0 12px 40px rgba(0,0,0,${isDarkInit ? "0.5" : "0.14"}), 0 1px 0 rgba(255,255,255,${isDarkInit ? "0.04" : "0"}) inset;
         overflow: hidden;
       `;
       const chartDom = chart.getDom();
-      if (!chartDom.style.position || chartDom.style.position === 'static') {
-        chartDom.style.position = 'relative';
+      if (!chartDom.style.position || chartDom.style.position === "static") {
+        chartDom.style.position = "relative";
       }
       chartDom.appendChild(tooltipEl);
 
       // Keep tooltip open when user hovers over it (for button interaction)
-      tooltipEl.addEventListener('mouseenter', () => {
-        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      tooltipEl.addEventListener("mouseenter", () => {
+        if (hideTimer) {
+          clearTimeout(hideTimer);
+          hideTimer = null;
+        }
       });
-      tooltipEl.addEventListener('mouseleave', () => {
+      tooltipEl.addEventListener("mouseleave", () => {
         if (!hideTimer) {
           hideTimer = setTimeout(() => {
             hideTimer = null;
@@ -666,13 +735,19 @@ export default defineComponent({
         childName: string;
         parentName: string;
       }> = [];
-      let nodePositions: Array<{ idx: number; x: number; y: number; name: string }> = [];
+      let nodePositions: Array<{
+        idx: number;
+        x: number;
+        y: number;
+        name: string;
+      }> = [];
 
       // Robust child access — handles children(), _children, or childAt/childCount
       const getChildren = (group: any): any[] => {
-        if (typeof group.children === 'function') return group.children();
+        if (typeof group.children === "function") return group.children();
         if (Array.isArray(group._children)) return group._children;
-        const count = typeof group.childCount === 'function' ? group.childCount() : 0;
+        const count =
+          typeof group.childCount === "function" ? group.childCount() : 0;
         const result: any[] = [];
         for (let i = 0; i < count; i++) {
           const c = group.childAt?.(i);
@@ -684,13 +759,13 @@ export default defineComponent({
       // Check if a group contains bezier-curve children
       const hasBezierChildren = (group: any): boolean => {
         const kids = getChildren(group);
-        return kids.some((c: any) => c.type === 'bezier-curve');
+        return kids.some((c: any) => c.type === "bezier-curve");
       };
 
       // Recursively search for a group containing bezier-curve elements
       const findBezierGroup = (el: any, depth = 0): any => {
         if (!el || depth > 6) return null;
-        if (el.type === 'group' && hasBezierChildren(el)) return el;
+        if (el.type === "group" && hasBezierChildren(el)) return el;
         for (const child of getChildren(el)) {
           const found = findBezierGroup(child, depth + 1);
           if (found) return found;
@@ -714,7 +789,12 @@ export default defineComponent({
           for (let i = 0; i < count; i++) {
             const layout = data.getItemLayout(i);
             if (layout) {
-              newNodePositions.push({ idx: i, x: layout.x, y: layout.y, name: data.getName(i) });
+              newNodePositions.push({
+                idx: i,
+                x: layout.x,
+                y: layout.y,
+                name: data.getName(i),
+              });
             }
           }
 
@@ -732,7 +812,7 @@ export default defineComponent({
             const parent = current.parent;
             for (const sibling of getChildren(parent)) {
               if (sibling === current) continue;
-              if (sibling.type === 'group' && hasBezierChildren(sibling)) {
+              if (sibling.type === "group" && hasBezierChildren(sibling)) {
                 newEdgesGroupEl = sibling;
                 break;
               }
@@ -754,20 +834,30 @@ export default defineComponent({
 
           // Collect bezier shapes + match endpoints to node names
           for (const bezier of getChildren(newEdgesGroupEl)) {
-            if (bezier.type !== 'bezier-curve' || !bezier.shape) continue;
+            if (bezier.type !== "bezier-curve" || !bezier.shape) continue;
             const { x1, y1, x2, y2 } = bezier.shape;
 
-            let parentName = '';
+            let parentName = "";
             let pDist = Infinity;
-            let childName = '';
+            let childName = "";
             let cDist = Infinity;
             for (const np of newNodePositions) {
               const dp = Math.hypot(np.x - x1, np.y - y1);
-              if (dp < pDist) { pDist = dp; parentName = np.name; }
+              if (dp < pDist) {
+                pDist = dp;
+                parentName = np.name;
+              }
               const dc = Math.hypot(np.x - x2, np.y - y2);
-              if (dc < cDist) { cDist = dc; childName = np.name; }
+              if (dc < cDist) {
+                cDist = dc;
+                childName = np.name;
+              }
             }
-            newBezierEdges.push({ shape: { ...bezier.shape }, childName, parentName });
+            newBezierEdges.push({
+              shape: { ...bezier.shape },
+              childName,
+              parentName,
+            });
           }
         } catch {
           return; // Keep previous good data on error
@@ -788,7 +878,7 @@ export default defineComponent({
         if (buildTimer) clearTimeout(buildTimer);
         buildTimer = setTimeout(buildEdgeData, 200);
       };
-      chart.on('finished', debouncedBuild);
+      chart.on("finished", debouncedBuild);
       // Also try immediately (works if chart already rendered)
       buildEdgeData();
 
@@ -800,62 +890,101 @@ export default defineComponent({
         const ch = chartDom.clientHeight;
         let left = mouseX + 15;
         let top = mouseY + 15;
-        tooltipEl.style.display = 'block';
-        if (left + tooltipEl.offsetWidth > cw) left = mouseX - tooltipEl.offsetWidth - 10;
-        if (top + tooltipEl.offsetHeight > ch) top = mouseY - tooltipEl.offsetHeight - 10;
-        tooltipEl.style.left = left + 'px';
-        tooltipEl.style.top = top + 'px';
+        tooltipEl.style.display = "block";
+        if (left + tooltipEl.offsetWidth > cw)
+          left = mouseX - tooltipEl.offsetWidth - 10;
+        if (top + tooltipEl.offsetHeight > ch)
+          top = mouseY - tooltipEl.offsetHeight - 10;
+        tooltipEl.style.left = left + "px";
+        tooltipEl.style.top = top + "px";
       };
 
       const resetToTextTooltip = () => {
-        tooltipEl.style.pointerEvents = 'none';
-        tooltipEl.style.width = '';
-        tooltipEl.style.height = '';
-        tooltipEl.style.padding = '9px 13px';
-        tooltipEl.style.fontSize = '12px';
-        tooltipEl.style.lineHeight = '1.5';
-        tooltipEl.style.fontFamily = '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif';
-        tooltipEl.style.letterSpacing = '0.01em';
-        tooltipEl.style.whiteSpace = 'nowrap';
-        tooltipEl.style.color = $q.dark.isActive ? 'rgba(255,255,255,0.88)' : 'rgba(0,0,0,0.82)';
+        tooltipEl.style.pointerEvents = "none";
+        tooltipEl.style.width = "";
+        tooltipEl.style.height = "";
+        tooltipEl.style.padding = "9px 13px";
+        tooltipEl.style.fontSize = "12px";
+        tooltipEl.style.lineHeight = "1.5";
+        tooltipEl.style.fontFamily =
+          '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif';
+        tooltipEl.style.letterSpacing = "0.01em";
+        tooltipEl.style.whiteSpace = "nowrap";
+        tooltipEl.style.color = $q.dark.isActive
+          ? "rgba(255,255,255,0.88)"
+          : "rgba(0,0,0,0.82)";
       };
 
-      const showNodeTooltip = (mouseX: number, mouseY: number, nodeName: string) => {
+      const showNodeTooltip = (
+        mouseX: number,
+        mouseY: number,
+        nodeName: string,
+      ) => {
         resetToTextTooltip();
 
         // Always use node-level data for the tooltip — same source as border color
         const nodes = graphData.value?.nodes || [];
         const node = nodes.find((n: any) => (n.label || n.id) === nodeName);
-        if (!node) { tooltipEl.style.display = 'none'; return; }
+        if (!node) {
+          tooltipEl.style.display = "none";
+          return;
+        }
 
         const requests = node.requests || 0;
         const errors = node.errors || 0;
-        const errRate = node.error_rate ?? (requests > 0 ? (errors / requests) * 100 : 0);
-        tooltipEl.innerHTML = generateNodeTooltipContent(nodeName, requests, errors, errRate);
+        const errRate =
+          node.error_rate ?? (requests > 0 ? (errors / requests) * 100 : 0);
+        tooltipEl.innerHTML = generateNodeTooltipContent(
+          nodeName,
+          requests,
+          errors,
+          errRate,
+        );
         positionTooltip(mouseX, mouseY);
       };
 
-      const showStatsTooltip = (mouseX: number, mouseY: number, parentName: string, childName: string) => {
+      const showStatsTooltip = (
+        mouseX: number,
+        mouseY: number,
+        parentName: string,
+        childName: string,
+      ) => {
         const edges = graphData.value?.edges || [];
         const edge = findIncomingEdgeForNode(childName, parentName, edges);
-        if (!edge) { tooltipEl.style.display = 'none'; return; }
+        if (!edge) {
+          tooltipEl.style.display = "none";
+          return;
+        }
 
         resetToTextTooltip();
 
         const total = edge.total_requests || 0;
         const failed = edge.failed_requests || 0;
-        const errRate = edge.error_rate ?? (total > 0 ? (failed / total) * 100 : 0);
-        tooltipEl.innerHTML = generateEdgeTooltipContent(total, failed, errRate, edge.p50_latency_ns, edge.p95_latency_ns, edge.p99_latency_ns);
+        const errRate =
+          edge.error_rate ?? (total > 0 ? (failed / total) * 100 : 0);
+        tooltipEl.innerHTML = generateEdgeTooltipContent(
+          total,
+          failed,
+          errRate,
+          edge.p50_latency_ns,
+          edge.p95_latency_ns,
+          edge.p99_latency_ns,
+        );
         positionTooltip(mouseX, mouseY);
       };
 
-      const showEdgeTooltip = (mouseX: number, mouseY: number, parentName: string, childName: string) => {
+      const showEdgeTooltip = (
+        mouseX: number,
+        mouseY: number,
+        parentName: string,
+        childName: string,
+      ) => {
         showStatsTooltip(mouseX, mouseY, parentName, childName);
       };
 
       const hideTooltip = () => {
-        tooltipEl.style.display = 'none';
-        tooltipEl.style.pointerEvents = 'none';
+        tooltipEl.style.display = "none";
+        tooltipEl.style.pointerEvents = "none";
       };
 
       let activeKey: string | null = null; // tracks current tooltip target
@@ -866,7 +995,10 @@ export default defineComponent({
         if (!edgesGroupEl.transformCoordToLocal) return;
 
         // Convert mouse pixel coords → edges group local coords
-        const [mx, my] = edgesGroupEl.transformCoordToLocal(e.offsetX, e.offsetY);
+        const [mx, my] = edgesGroupEl.transformCoordToLocal(
+          e.offsetX,
+          e.offsetY,
+        );
 
         // Compute pixel-to-layout scale so hit area is consistent across zoom levels
         const [ox] = edgesGroupEl.transformCoordToLocal(0, 0);
@@ -876,7 +1008,7 @@ export default defineComponent({
         const nodeRadius = 42 * pxToLayout; // half of max symbolSize=80 + small margin
 
         // Check if mouse is near a node center
-        let nearestNode: typeof nodePositions[0] | null = null;
+        let nearestNode: (typeof nodePositions)[0] | null = null;
         let nearestNodeDist = Infinity;
         for (const np of nodePositions) {
           const d = Math.hypot(np.x - mx, np.y - my);
@@ -888,7 +1020,10 @@ export default defineComponent({
 
         if (nearestNode) {
           // Show node tooltip
-          if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+          if (hideTimer) {
+            clearTimeout(hideTimer);
+            hideTimer = null;
+          }
           const key = `node:${nearestNode.name}`;
           activeKey = key;
           showNodeTooltip(e.offsetX, e.offsetY, nearestNode.name);
@@ -900,15 +1035,26 @@ export default defineComponent({
         let bestIdx = -1;
         for (let i = 0; i < bezierEdges.length; i++) {
           const d = pointToBezierDistance(mx, my, bezierEdges[i].shape);
-          if (d < bestDist) { bestDist = d; bestIdx = i; }
+          if (d < bestDist) {
+            bestDist = d;
+            bestIdx = i;
+          }
         }
 
         if (bestIdx >= 0 && bestDist < hitThreshold) {
-          if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+          if (hideTimer) {
+            clearTimeout(hideTimer);
+            hideTimer = null;
+          }
           const edge = bezierEdges[bestIdx];
           const key = `edge:${edge.parentName}->${edge.childName}`;
           activeKey = key;
-          showEdgeTooltip(e.offsetX, e.offsetY, edge.parentName, edge.childName);
+          showEdgeTooltip(
+            e.offsetX,
+            e.offsetY,
+            edge.parentName,
+            edge.childName,
+          );
         } else if (activeKey) {
           if (!hideTimer) {
             hideTimer = setTimeout(() => {
@@ -921,56 +1067,28 @@ export default defineComponent({
       };
 
       const onGlobalOut = () => {
-        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        if (hideTimer) {
+          clearTimeout(hideTimer);
+          hideTimer = null;
+        }
         activeKey = null;
         hideTooltip();
       };
 
-      // Tree mode: click on an edge opens the edge side panel
-      const onZrClick = (e: any) => {
-        if (!edgesGroupEl || bezierEdges.length === 0) return;
-        if (!edgesGroupEl.transformCoordToLocal) return;
-
-        const [mx, my] = edgesGroupEl.transformCoordToLocal(e.offsetX, e.offsetY);
-        const [ox] = edgesGroupEl.transformCoordToLocal(0, 0);
-        const [ox1] = edgesGroupEl.transformCoordToLocal(1, 0);
-        const pxToLayout = Math.abs(ox1 - ox) || 1;
-        const hitThreshold = HIT_PIXELS * pxToLayout;
-        const nodeRadius = 42 * pxToLayout;
-
-        // Ignore clicks near nodes (those are handled by ECharts)
-        for (const np of nodePositions) {
-          if (Math.hypot(np.x - mx, np.y - my) < nodeRadius) return;
-        }
-
-        let bestDist = Infinity;
-        let bestIdx = -1;
-        for (let i = 0; i < bezierEdges.length; i++) {
-          const d = pointToBezierDistance(mx, my, bezierEdges[i].shape);
-          if (d < bestDist) { bestDist = d; bestIdx = i; }
-        }
-
-        if (bestIdx >= 0 && bestDist < hitThreshold) {
-          const { parentName, childName } = bezierEdges[bestIdx];
-          const edgeData = graphData.value.edges.find(
-            (ed: any) => ed.from === parentName && ed.to === childName
-          );
-          if (edgeData) openEdgePanel(edgeData);
-        }
-      };
-
-      zr.on('mousemove', onMouseMove);
-      zr.on('globalout', onGlobalOut);
-      zr.on('click', onZrClick);
+      zr.on("mousemove", onMouseMove);
+      zr.on("globalout", onGlobalOut);
 
       // Graph mode: ECharts fires mouseover/mouseout for graph series edges.
       // These share the same showEdgeTooltip/hideTooltip as tree mode.
       const onEChartsEdgeMouseover = (params: any) => {
-        if (params.dataType !== 'edge') return;
-        const parentName = params.data?.source ?? '';
-        const childName = params.data?.target ?? '';
+        if (params.dataType !== "edge") return;
+        const parentName = params.data?.source ?? "";
+        const childName = params.data?.target ?? "";
         if (!parentName || !childName) return;
-        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        if (hideTimer) {
+          clearTimeout(hideTimer);
+          hideTimer = null;
+        }
         const mouseX = params.event?.offsetX ?? params.event?.zrX ?? 0;
         const mouseY = params.event?.offsetY ?? params.event?.zrY ?? 0;
         const key = `edge:${parentName}->${childName}`;
@@ -979,7 +1097,7 @@ export default defineComponent({
       };
 
       const onEChartsEdgeMouseout = (params: any) => {
-        if (params.dataType !== 'edge') return;
+        if (params.dataType !== "edge") return;
         if (!hideTimer) {
           hideTimer = setTimeout(() => {
             hideTimer = null;
@@ -991,28 +1109,27 @@ export default defineComponent({
 
       // Node hover → animate adjacent edges
       const onNodeMouseover = (params: any) => {
-        if (params.dataType !== 'node') return;
+        if (params.dataType !== "node") return;
         updateEdgeStylesForHover(params.data?.id ?? params.name ?? null);
       };
       const onNodeMouseout = (params: any) => {
-        if (params.dataType !== 'node') return;
+        if (params.dataType !== "node") return;
         updateEdgeStylesForHover(null);
       };
 
-      chart.on('mouseover', onEChartsEdgeMouseover);
-      chart.on('mouseout', onEChartsEdgeMouseout);
-      chart.on('mouseover', onNodeMouseover);
-      chart.on('mouseout', onNodeMouseout);
+      chart.on("mouseover", onEChartsEdgeMouseover);
+      chart.on("mouseout", onEChartsEdgeMouseout);
+      chart.on("mouseover", onNodeMouseover);
+      chart.on("mouseout", onNodeMouseout);
 
       return () => {
-        zr.off('mousemove', onMouseMove);
-        zr.off('globalout', onGlobalOut);
-        zr.off('click', onZrClick);
-        chart.off('mouseover', onEChartsEdgeMouseover);
-        chart.off('mouseout', onEChartsEdgeMouseout);
-        chart.off('mouseover', onNodeMouseover);
-        chart.off('mouseout', onNodeMouseout);
-        chart.off('finished', debouncedBuild);
+        zr.off("mousemove", onMouseMove);
+        zr.off("globalout", onGlobalOut);
+        chart.off("mouseover", onEChartsEdgeMouseover);
+        chart.off("mouseout", onEChartsEdgeMouseout);
+        chart.off("mouseover", onNodeMouseover);
+        chart.off("mouseout", onNodeMouseout);
+        chart.off("finished", debouncedBuild);
         if (buildTimer) clearTimeout(buildTimer);
         if (hideTimer) clearTimeout(hideTimer);
         tooltipEl.remove();
@@ -1042,7 +1159,7 @@ export default defineComponent({
           }
         }, 300);
       },
-      { flush: 'post' }
+      { flush: "post" },
     );
 
     // Watch for data loading completion to set up tooltips on initial load
@@ -1073,7 +1190,7 @@ export default defineComponent({
             }
           }, 500);
         }
-      }
+      },
     );
 
     // When visualization type changes (tree↔graph), the chart component is reused
@@ -1099,7 +1216,7 @@ export default defineComponent({
             edgeTooltipCleanup = setupTreeEdgeTooltips(chart);
           }
         }, 300);
-      }
+      },
     );
 
     onBeforeUnmount(() => {
@@ -1396,7 +1513,8 @@ export default defineComponent({
         startTime: value.startTime,
         endTime: value.endTime,
         relativeTimePeriod:
-          value.relativeTimePeriod || searchObj.data.datetime.relativeTimePeriod,
+          value.relativeTimePeriod ||
+          searchObj.data.datetime.relativeTimePeriod,
         type: value.relativeTimePeriod ? "relative" : "absolute",
       };
       // Reload service graph with new time range
@@ -1422,36 +1540,9 @@ export default defineComponent({
     };
 
     // Side Panel Handlers
-    const openEdgePanel = (edgeData: any) => {
-      // Close node panel
-      showSidePanel.value = false;
-      selectedNode.value = null;
-
-      if (selectedEdge.value?.from === edgeData.from && selectedEdge.value?.to === edgeData.to) {
-        // Toggle: clicking same edge closes it
-        showEdgeSidePanel.value = false;
-        selectedEdge.value = null;
-      } else {
-        selectedEdge.value = edgeData;
-        showEdgeSidePanel.value = true;
-      }
-    };
-
     const handleNodeClick = (params: any) => {
-      // Check if it's an edge click (for graph visualization)
-      if (params.dataType === 'edge' && params.data) {
-        const edgeData = graphData.value.edges.find(
-          (e: any) => e.from === params.data.source && e.to === params.data.target
-        );
-        if (edgeData) openEdgePanel(edgeData);
-        return;
-      }
       // Check if it's a node click (for graph visualization)
-      else if (params.dataType === 'node' && params.data) {
-        // Close edge panel when opening node panel
-        showEdgeSidePanel.value = false;
-        selectedEdge.value = null;
-
+      if (params.dataType === "node" && params.data) {
         // Check if clicking the same node - if so, close the panel
         if (selectedNode.value && selectedNode.value.id === params.data.id) {
           showSidePanel.value = false;
@@ -1462,10 +1553,14 @@ export default defineComponent({
         }
       }
       // For tree visualization, check if it's a tree node
-      else if (params.componentType === 'series' && params.data && params.data.name) {
+      else if (
+        params.componentType === "series" &&
+        params.data &&
+        params.data.name
+      ) {
         // Find the actual node data from graphData
         const nodeData = graphData.value.nodes.find(
-          (n: any) => n.label === params.data.name || n.id === params.data.name
+          (n: any) => n.label === params.data.name || n.id === params.data.name,
         );
 
         if (nodeData) {
@@ -1478,10 +1573,13 @@ export default defineComponent({
             showSidePanel.value = true;
           }
         } else {
-          console.warn('[ServiceGraph] Could not find node data for:', params.data.name);
+          console.warn(
+            "[ServiceGraph] Could not find node data for:",
+            params.data.name,
+          );
         }
       } else {
-        console.log('[ServiceGraph] Click not on a node or edge, ignoring');
+        console.log("[ServiceGraph] Click not on a node or edge, ignoring");
       }
     };
 
@@ -1490,13 +1588,6 @@ export default defineComponent({
       // Don't clear selectedNode immediately to allow smooth close animation
       setTimeout(() => {
         selectedNode.value = null;
-      }, 300);
-    };
-
-    const handleCloseEdgeSidePanel = () => {
-      showEdgeSidePanel.value = false;
-      setTimeout(() => {
-        selectedEdge.value = null;
       }, 300);
     };
 
@@ -1538,10 +1629,6 @@ export default defineComponent({
       showSidePanel,
       handleNodeClick,
       handleCloseSidePanel,
-      // Edge side panel
-      selectedEdge,
-      showEdgeSidePanel,
-      handleCloseEdgeSidePanel,
     };
   },
 });
@@ -1595,7 +1682,6 @@ export default defineComponent({
   border-radius: 8px;
   padding: 14px 16px;
   min-width: 260px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
   color: #374151;
   font-size: 12px;
 }
@@ -1604,7 +1690,7 @@ export default defineComponent({
   background: #1f2937;
   border-color: #374151;
   color: #e5e7eb;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 :global(.sg-legend-title) {
@@ -1631,20 +1717,20 @@ export default defineComponent({
 :global(.sg-legend-sizes) {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
   padding: 4px 0 6px;
 }
 
 :global(.sg-legend-size-item) {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   gap: 6px;
 }
 
 :global(.sg-legend-circle) {
   border-radius: 50%;
-  border-width: 3px;
+  border-width: 2px;
   border-style: solid;
   background: transparent;
   flex-shrink: 0;
@@ -1654,12 +1740,10 @@ export default defineComponent({
   opacity: 0.35;
   font-size: 16px;
   letter-spacing: 2px;
-  margin-bottom: 18px;
 }
 
 :global(.sg-legend-label) {
   font-size: 11px;
-  opacity: 0.6;
 }
 
 :global(.sg-legend-color-row) {
@@ -1669,17 +1753,17 @@ export default defineComponent({
 
 :global(.sg-legend-color-item) {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 5px;
-  flex: 1;
+  gap: 6px;
+  flex: none;
 }
 
 :global(.sg-legend-dot) {
-  width: 20px;
-  height: 20px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  border-width: 3px;
+  border-width: 2px;
   border-style: solid;
   background: transparent;
 }
@@ -1695,6 +1779,43 @@ export default defineComponent({
   font-size: 10px;
   opacity: 0.55;
   text-align: center;
+}
+
+:global(.sg-legend--floating) {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  min-width: unset;
+  padding: 10px 16px;
+}
+
+:global(.sg-legend--floating .sg-legend-title) {
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+:global(.sg-legend--floating .sg-legend-color-row) {
+  gap: 16px;
+}
+
+:global(.sg-legend--floating .sg-legend-color-item) {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  flex: unset;
+}
+
+:global(.sg-legend--floating .sg-legend-color-item > div) {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 4px;
+}
+
+:global(.sg-legend--floating .sg-legend-color-label),
+:global(.sg-legend--floating .sg-legend-color-value) {
+  text-align: left;
 }
 
 .service-graph-container {
@@ -1724,8 +1845,12 @@ code {
 <!-- Flowing edge animation — non-scoped so it reaches inside ECharts SVG output -->
 <style lang="scss">
 @keyframes sg-edge-flow {
-  from { stroke-dashoffset: 14; }
-  to   { stroke-dashoffset: 0;  }
+  from {
+    stroke-dashoffset: 14;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
 /*

@@ -40,6 +40,12 @@ const mockStreamData = {
     { name: "geo_info_city", type: "UTF8" },
     { name: "geo_info_country", type: "UTF8" },
     { name: "usr_email", type: "UTF8" },
+    { name: "session_id", type: "UTF8" },
+    { name: "view_id", type: "UTF8" },
+    { name: "view_url", type: "UTF8" },
+    { name: "resource_url", type: "UTF8" },
+    { name: "application_id", type: "UTF8" },
+    { name: "env", type: "UTF8" },
   ],
 };
 
@@ -447,6 +453,78 @@ describe("AppSessions.vue", () => {
 
       expect(typeof formatted).toBe("string");
     });
+
+    it("should include usr_email, session_id, and view_id in the field filter set", async () => {
+      // getStreamFields populates streamFields only with fields whose names are in
+      // userDataSet. After mount the mock schema has usr_email, session_id, view_id
+      // so all three must appear in streamFields.
+      await wrapper.vm.getStreamFields();
+      const names = wrapper.vm.streamFields.map((f: any) => f.name);
+
+      expect(names).toContain("usr_email");
+      expect(names).toContain("session_id");
+      expect(names).toContain("view_id");
+    });
+
+    it("should include view_url and resource_url in the field filter set", async () => {
+      // view_url and resource_url were re-added to userDataSet; the mock schema
+      // contains both fields so they must appear in streamFields.
+      await wrapper.vm.getStreamFields();
+      const names = wrapper.vm.streamFields.map((f: any) => f.name);
+
+      expect(names).toContain("view_url");
+      expect(names).toContain("resource_url");
+    });
+
+    it("should sort priority fields as application_id, usr_email, env, view_url, resource_url, session_id", async () => {
+      // priorityFields is ["application_id", "usr_email", "env", "view_url", "resource_url", "session_id"].
+      // Fields in that list must appear at the front of streamFields in that exact order.
+      await wrapper.vm.getStreamFields();
+      const priorityNames = [
+        "application_id",
+        "usr_email",
+        "env",
+        "view_url",
+        "resource_url",
+        "session_id",
+      ];
+      const streamFieldNames: string[] = wrapper.vm.streamFields.map(
+        (f: any) => f.name,
+      );
+
+      // Collect only the entries that are priority fields, preserving their positions.
+      const priorityInResult = streamFieldNames.filter((n) =>
+        priorityNames.includes(n),
+      );
+
+      expect(priorityInResult).toEqual(priorityNames);
+    });
+
+    it("should place all priority fields before non-priority fields", async () => {
+      await wrapper.vm.getStreamFields();
+      const prioritySet = new Set([
+        "application_id",
+        "usr_email",
+        "env",
+        "view_url",
+        "resource_url",
+        "session_id",
+      ]);
+      const names: string[] = wrapper.vm.streamFields.map((f: any) => f.name);
+
+      const lastPriorityIndex = names.reduce(
+        (max, name, idx) => (prioritySet.has(name) ? idx : max),
+        -1,
+      );
+      const firstNonPriorityIndex = names.findIndex(
+        (name) => !prioritySet.has(name),
+      );
+
+      // Every priority field must come before every non-priority field.
+      if (lastPriorityIndex !== -1 && firstNonPriorityIndex !== -1) {
+        expect(lastPriorityIndex).toBeLessThan(firstNonPriorityIndex);
+      }
+    });
   });
 
   describe("Field List Integration", () => {
@@ -465,7 +543,7 @@ describe("AppSessions.vue", () => {
       expect(mockSessionState.data.editorValue).toBe("field_name='value'");
     });
 
-    it("should append field with AND when existing query", async () => {
+    it("should append field with AND when adding a different field", async () => {
       const routerPushSpy = vi
         .spyOn(router, "push")
         .mockResolvedValue(undefined);
@@ -478,6 +556,13 @@ describe("AppSessions.vue", () => {
       );
 
       routerPushSpy.mockRestore();
+    });
+
+    it("should replace existing condition when adding same field again", () => {
+      mockSessionState.data.editorValue = "env='production'";
+      wrapper.vm.handleSidebarEvent("add-field", "env='staging'");
+
+      expect(mockSessionState.data.editorValue).toBe("env='staging'");
     });
   });
 
