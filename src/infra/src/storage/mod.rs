@@ -167,11 +167,23 @@ async fn put_multipart(account: &str, file: &str, data: bytes::Bytes) -> Result<
 }
 
 pub async fn put_with_compliance(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
-    let attrs = Attributes::from_iter([(
-        Attribute::StorageClass,
-        AttributeValue::from("STANDARD_IA".to_string()),
-    )]);
-    let multi_part_upload_size = get_config().s3.multi_part_upload_size;
+    let cfg = get_config();
+    let attrs = match cfg.s3.provider.as_str() {
+        "aws" | "s3" => Attributes::from_iter([(
+            Attribute::StorageClass,
+            AttributeValue::from("STANDARD_IA".to_string()),
+        )]),
+        "gcs" | "gcp" => Attributes::from_iter([(
+            Attribute::StorageClass,
+            AttributeValue::from("NEARLINE".to_string()),
+        )]),
+        "azure" => Attributes::from_iter([(
+            Attribute::StorageClass,
+            AttributeValue::from("Cool".to_string()),
+        )]),
+        _ => Attributes::new(),
+    };
+    let multi_part_upload_size = cfg.s3.multi_part_upload_size;
     if multi_part_upload_size > 0 && multi_part_upload_size < bytes_size_in_mb(&data) as usize {
         let opts = PutMultipartOptions {
             attributes: attrs,
