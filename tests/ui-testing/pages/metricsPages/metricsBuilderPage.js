@@ -372,21 +372,25 @@ export class MetricsBuilderPage {
         const dialog = this.page.locator('.q-dialog');
         await dialog.waitFor({ state: 'visible', timeout: 5000 });
 
+        // Wait for operation list items to populate before searching
+        await dialog.locator('.q-item').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
         // Search for the operation
         const searchInput = dialog.locator('input').first();
         if (await searchInput.isVisible({ timeout: 2000 })) {
             await searchInput.fill(operationName);
-            await this.page.waitForTimeout(500);
         }
 
-        // Click on the operation item
+        // Wait for the filtered operation item to appear
         const opItem = dialog.locator(`.q-item:has-text("${operationName}")`).first();
-        if (await opItem.isVisible({ timeout: 3000 })) {
+        try {
+            await opItem.waitFor({ state: 'visible', timeout: 5000 });
             await opItem.click();
             await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
+        } catch {
+            return false;
         }
-        return false;
     }
 
     /**
