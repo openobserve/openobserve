@@ -1079,46 +1079,43 @@ export function usePanelDrilldown({
           let oldParams: any = {};
           // if pass all variables is true
           if (drilldownData.data.passAllVariables) {
-            // get current query params
+            // get current query params — spread to avoid mutating Vue Router's reactive object
             oldParams = { ...route.query };
           }
 
           drilldownData.data.variables.forEach((variable: any) => {
             if (variable?.name?.trim() && variable?.value?.trim()) {
-              const newKey = "var-" + replacePlaceholders(variable.name, drilldownVariables);
-              const newValue = replacePlaceholders(variable.value, drilldownVariables);
-              oldParams[newKey] = newValue;
+              oldParams[
+                "var-" + replacePlaceholders(variable.name, drilldownVariables)
+              ] = replacePlaceholders(variable.value, drilldownVariables);
             }
           });
 
-          const newQueryParams = {
-              ...oldParams,
-              org_identifier: store.state.selectedOrganization.identifier,
-              dashboard: dashboardData.dashboardId,
-              folder: folderId,
-              tab: tabId,
+          // make changes in router
+          const pushQuery = {
+            ...oldParams,
+            org_identifier: store.state.selectedOrganization.identifier,
+            dashboard: dashboardData.dashboardId,
+            folder: folderId,
+            tab: tabId,
           };
+          await router.push({
+            path: "/dashboards/view",
+            query: pushQuery,
+          });
 
           // ======= [START] default variable values
+
           const initialVariableValues: any = {};
-          Object.keys(newQueryParams).forEach((key) => {
+          Object.keys(route.query).forEach((key) => {
             if (key.startsWith("var-")) {
               const newKey = key.slice(4);
-              initialVariableValues[newKey] = newQueryParams[key];
+              initialVariableValues[newKey] = route.query[key];
             }
           });
           // ======= [END] default variable values
 
-          // FIX: Emit BEFORE `router.push` so that the event has time to bubble up
-          // to the parent before the component potentially unmounts.
-          // ALSO: Pass newQueryParams as second arg as planned.
-          emit("update:initialVariableValues", initialVariableValues, newQueryParams);
-
-          // make changes in router
-          await router.push({
-            path: "/dashboards/view",
-            query: newQueryParams,
-          });
+          emit("update:initialVariableValues", initialVariableValues);
         }
       }
     }

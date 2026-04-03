@@ -1178,45 +1178,43 @@ export default defineComponent({
 
     /**
      * Updates the initial variable values (used for drilldowns)
-     * @param args - Any arguments (not used with variables manager)
+     * Handles same-dashboard drilldown by pushing new var-* values
+     * from the URL into the variables manager and committing them.
      */
     const updateInitialVariableValues = async (...args: any) => {
       // if view panel is open then close it
       showViewPanel.value = false;
 
-      // Extract newQueryParams if passed (it will be args[1]). Fall back to route.query if unavailable.
-      const queryToLoad = args[1] || route.query;
+      // Check if this is a same-dashboard drilldown (tab may differ)
+      const isSameDashboard =
+        route.query.dashboard === props.dashboardData?.dashboardId;
 
-      // FIX: Update selectedTabId if it's in the query
-      if (queryToLoad.tab && queryToLoad.tab !== selectedTabId.value) {
-              selectedTabId.value = queryToLoad.tab;
+      if (isSameDashboard) {
+        // Same-dashboard drilldown: update variables in-place without reloading dashboard
+        // Reloading would reinitialize the variables manager, wiping out the new values
+
+        // Push new variable values into the manager using loadFromUrl
+        // This properly parses values, handles multi-select, and marks variables as loaded
+        variablesManager.loadFromUrl({ query: route.query });
+
+        // Commit the updated values immediately so panels see them
+        variablesManager.commitAll();
+
+        // Update currentVariablesDataRef with the newly committed state
+        // This triggers panel re-renders via the :variablesData binding
+        const allGlobalVars = variablesManager.committedVariablesData.global;
+        currentVariablesDataRef.value = {
+          __global: JSON.parse(
+            JSON.stringify({
+              isVariablesLoading: variablesManager.isLoading.value,
+              values: allGlobalVars,
+            }),
+          ),
+        };
+      } else {
+        // Different-dashboard drilldown: full reload (existing behavior)
+        refreshDashboard(false);
       }
-
-      // FIX: Manually load the variables from the new query params so that
-      // the manager updates immediately rather than waiting for dashboard components to reload
-      variablesManager.loadFromUrl({ query: queryToLoad });
-      variablesManager.commitAll();
-
-      // first, refresh the dashboard
-      // refreshDashboard(true);
-      // Removed redundant refreshDashboard(true) to avoid immediate state reversion
-      // because selectedTabId and pinned variables will trigger parent URL sync anyway.
-
-      // NOTE: With the variables manager, this works without changing the initial variable values
-      // The manager handles variable updates automatically
-
-      // This is necessary to ensure that panels refresh automatically based on the drilldown
-      // without requiring the user to click on refresh to load the panel/whole dashboard
-      // Use committed state to match panel expectations
-      const allGlobalVars = variablesManager.committedVariablesData.global;
-      currentVariablesDataRef.value = {
-        __global: JSON.parse(
-          JSON.stringify({
-            isVariablesLoading: variablesManager.isLoading.value,
-            values: allGlobalVars,
-          }),
-        ),
-      };
     };
 
     // Track which panels are currently being synced to prevent infinite loops
@@ -1639,6 +1637,7 @@ export default defineComponent({
   &.dark {
     border-color: rgba(204, 204, 220, 0.12) !important;
   }
+
   .grid-stack-item-content {
     border: 1px solid #c2c2c27a;
     border-radius: 4px;

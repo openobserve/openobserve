@@ -248,7 +248,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <RenderDashboardCharts
-        :key="currentDashboardData.data?.dashboardId + '-' + dashboardRemountKey"
+        :key="
+          currentDashboardData.data?.dashboardId + '-' + dashboardRemountKey
+        "
         v-if="selectedDate"
         ref="renderDashboardChartsRef"
         @variablesData="variablesDataUpdated"
@@ -361,7 +363,11 @@ import {
   movePanelToAnotherTab,
   getFoldersList,
 } from "../../utils/commons.ts";
-import { parseDuration, generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
+import {
+  parseDuration,
+  generateDurationLabel,
+  getConsumableRelativeTime,
+} from "../../utils/date";
 import { useRoute } from "vue-router";
 import { deletePanel } from "../../utils/commons";
 import {
@@ -606,6 +612,8 @@ export default defineComponent({
       },
       async () => {
         // When committed variables change, update the URL
+        // Skip during same-dashboard drilldown to avoid clobbering drilldown var-* params
+        if (isDrilldownInProgress.value) return;
         await nextTick();
         if (selectedDate.value && variablesManager.value) {
           updateUrlWithCurrentState();
@@ -618,7 +626,7 @@ export default defineComponent({
       // Explicitly dereference to ensure Vue tracks the dependency
       const manager = variablesManager.value;
 
-      if (manager && 'hasUncommittedChanges' in manager) {
+      if (manager && "hasUncommittedChanges" in manager) {
         // Access the value (Vue auto-unwraps computed refs in composable returns)
         const hasChanges = manager.hasUncommittedChanges;
         return hasChanges;
@@ -649,7 +657,9 @@ export default defineComponent({
     });
     // ======= [START] default variable values
 
-    const initialVariableValues = { value: {} };
+    const initialVariableValues = reactive({
+      value: {} as Record<string, any>,
+    });
     Object.keys(route.query).forEach((key) => {
       if (key.startsWith("var-")) {
         const newKey = key.slice(4);
@@ -702,6 +712,16 @@ export default defineComponent({
     // Prevents updateUrlWithCurrentState() from overwriting the incoming tab ID.
     const isDashboardLoading = ref(false);
 
+    // Guard flag: true while a same-dashboard drilldown is being processed.
+    // Prevents updateUrlWithCurrentState() from clobbering drilldown var-* params
+    // with stale committed variable values before the manager has been updated.
+    const isDrilldownInProgress = ref(false);
+
+    // Guard flag: true while updateUrlWithCurrentState is updating the URL.
+    // Prevents the var-* watcher from re-triggering when the app itself syncs
+    // variable params to the URL (e.g., after a normal dropdown change).
+    const isInternalUrlUpdate = ref(false);
+
     const loadDashboard = async (onlyIfRequired = false) => {
       // check if drilldown or soft-refresh request
       if (onlyIfRequired) {
@@ -711,7 +731,29 @@ export default defineComponent({
           // check for tab
           selectedTabId.value === route.query.tab
         ) {
-          return;
+          // Even for same dashboard+tab, check if var-* params changed
+          // This handles same-dashboard drilldown where variables are passed via URL
+          const urlVarParams: Record<string, any> = {};
+          Object.keys(route.query).forEach((key) => {
+            if (key.startsWith("var-")) {
+              urlVarParams[key.slice(4)] = route.query[key];
+            }
+          });
+
+          const currentVarParams: Record<string, any> = {};
+          Object.keys(initialVariableValues.value).forEach((name) => {
+            currentVarParams[name] = initialVariableValues.value[name];
+          });
+
+          const sortedStringify = (obj: Record<string, any>) =>
+            JSON.stringify(Object.fromEntries(Object.entries(obj).sort()));
+          const hasVarChanges =
+            sortedStringify(urlVarParams) !== sortedStringify(currentVarParams);
+
+          if (!hasVarChanges) {
+            return; // Truly nothing changed
+          }
+          // Fall through ΓÇö variable values changed, need to re-apply
         }
       }
 
@@ -729,14 +771,15 @@ export default defineComponent({
           !Object.keys(dashboard).length
         ) {
           showErrorNotification(
-            "Dashboard not found or has been deleted. Redirecting to dashboard list."
+            "Dashboard not found or has been deleted. Redirecting to dashboard list.",
           );
           goBackToDashboardList();
           return;
         }
       } catch (error: any) {
         showErrorNotification(
-          error?.message || "Failed to load dashboard. Redirecting to dashboard list."
+          error?.message ||
+            "Failed to load dashboard. Redirecting to dashboard list.",
         );
         goBackToDashboardList();
         return;
@@ -843,15 +886,20 @@ export default defineComponent({
     const convertPickerToTimeObj = (pickerValue: any) => {
       if (!pickerValue) return null;
 
-      if (pickerValue.valueType === 'relative' && pickerValue.relativeTimePeriod) {
-        const result = getConsumableRelativeTime(pickerValue.relativeTimePeriod);
+      if (
+        pickerValue.valueType === "relative" &&
+        pickerValue.relativeTimePeriod
+      ) {
+        const result = getConsumableRelativeTime(
+          pickerValue.relativeTimePeriod,
+        );
         if (result) {
           return {
             start_time: new Date(result.startTime),
             end_time: new Date(result.endTime),
           };
         }
-      } else if (pickerValue.valueType === 'absolute') {
+      } else if (pickerValue.valueType === "absolute") {
         return {
           start_time: new Date(pickerValue.startTime),
           end_time: new Date(pickerValue.endTime),
@@ -875,7 +923,9 @@ export default defineComponent({
 
       // Priority 2: Use panel's configured time range (if set)
       if (panel.config?.panel_time_range) {
-        const pickerValue = convertPanelTimeRangeToPicker(panel.config.panel_time_range);
+        const pickerValue = convertPanelTimeRangeToPicker(
+          panel.config.panel_time_range,
+        );
         if (pickerValue) {
           return convertPickerToTimeObj(pickerValue);
         }
@@ -906,8 +956,12 @@ export default defineComponent({
       }
 
       const globalTime = {
-        start_time: new Date(dateTimePicker.value.getConsumableDateTime().startTime),
-        end_time: new Date(dateTimePicker.value.getConsumableDateTime().endTime),
+        start_time: new Date(
+          dateTimePicker.value.getConsumableDateTime().startTime,
+        ),
+        end_time: new Date(
+          dateTimePicker.value.getConsumableDateTime().endTime,
+        ),
       };
 
       // Check if panel has its own time configuration
@@ -945,14 +999,19 @@ export default defineComponent({
       }
 
       const globalTime = {
-        start_time: new Date(dateTimePicker.value.getConsumableDateTime().startTime),
-        end_time: new Date(dateTimePicker.value.getConsumableDateTime().endTime),
+        start_time: new Date(
+          dateTimePicker.value.getConsumableDateTime().startTime,
+        ),
+        end_time: new Date(
+          dateTimePicker.value.getConsumableDateTime().endTime,
+        ),
       };
 
       // CRITICAL FIX: Preserve existing __global reference if time hasn't changed
       // This prevents unnecessary refreshes of panels that depend on global time
       const existingGlobalTime = currentTimeObjPerPanel.value.__global;
-      const shouldUpdateGlobal = forceRefresh || !areTimesEqual(existingGlobalTime, globalTime);
+      const shouldUpdateGlobal =
+        forceRefresh || !areTimesEqual(existingGlobalTime, globalTime);
 
       // Build the new panel times object
       const newPanelTimes: Record<string, any> = {
@@ -991,13 +1050,13 @@ export default defineComponent({
       // CRITICAL: Update individual properties instead of replacing the entire object
       // This prevents triggering reactivity for panels whose time hasn't changed
       // Remove keys that no longer exist
-      Object.keys(currentTimeObjPerPanel.value).forEach(key => {
+      Object.keys(currentTimeObjPerPanel.value).forEach((key) => {
         if (!newPanelTimes.hasOwnProperty(key)) {
           delete currentTimeObjPerPanel.value[key];
         }
       });
       // Update or add keys
-      Object.keys(newPanelTimes).forEach(key => {
+      Object.keys(newPanelTimes).forEach((key) => {
         if (currentTimeObjPerPanel.value[key] !== newPanelTimes[key]) {
           currentTimeObjPerPanel.value[key] = newPanelTimes[key];
         }
@@ -1049,9 +1108,10 @@ export default defineComponent({
           newQuery.to !== oldQuery.to;
 
         // Check if only panel time params changed
-        const onlyPanelParamsChanged = Object.keys(newQuery).some(key =>
-          key.startsWith('pt-') && newQuery[key] !== oldQuery?.[key]
-        ) && !globalTimeParamsChanged;
+        const onlyPanelParamsChanged =
+          Object.keys(newQuery).some(
+            (key) => key.startsWith("pt-") && newQuery[key] !== oldQuery?.[key],
+          ) && !globalTimeParamsChanged;
 
         // If only panel params changed, don't recompute (panel refresh handles it)
         // If global time or other params changed, recompute all panel times
@@ -1061,15 +1121,16 @@ export default defineComponent({
           computeAllPanelTimes();
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
-    // Sync selectedTabId from URL changes (handles back/forward navigation)
+    // Sync selectedTabId from URL changes (handles back/forward navigation and drilldown)
     watch(
       () => route.query.tab,
       (newTabId) => {
         if (newTabId && newTabId !== selectedTabId.value) {
           selectedTabId.value = newTabId;
+          // Variable re-reading is handled by the var-* watcher below
         }
       },
     );
@@ -1089,7 +1150,74 @@ export default defineComponent({
             isDashboardLoading.value = false;
           }
         }
-      }
+      },
+    );
+
+    // Watch for var-* query param changes (handles same-dashboard drilldown)
+    // When a drilldown targets the same dashboard, only var-* params change in the URL.
+    // This watcher detects that and re-reads variable values from the URL.
+    watch(
+      () => {
+        const varParams: Record<string, any> = {};
+        Object.keys(route.query).forEach((key) => {
+          if (key.startsWith("var-")) {
+            varParams[key] = route.query[key];
+          }
+        });
+        return JSON.stringify(varParams);
+      },
+      async (newVarParamsStr, oldVarParamsStr) => {
+        if (newVarParamsStr === oldVarParamsStr) {
+          return;
+        }
+        // Skip during cross-dashboard navigation (loadDashboard handles it)
+        if (isDashboardLoading.value) {
+          return;
+        }
+
+        // Skip if this URL change was caused by updateUrlWithCurrentState (app-initiated sync)
+        // This prevents redundant loadFromUrl+commitAll when user changes a variable via dropdown
+        if (isInternalUrlUpdate.value) {
+          return;
+        }
+
+        // Set drilldown guard to prevent updateUrlWithCurrentState from clobbering
+        // the new var-* params before the manager processes them
+        try {
+          isDrilldownInProgress.value = true;
+
+          // Re-read variable values from URL into initialVariableValues
+          const newInitialVars: Record<string, any> = {};
+          Object.keys(route.query).forEach((key) => {
+            if (key.startsWith("var-")) {
+              const newKey = key.slice(4);
+              newInitialVars[newKey] = route.query[key];
+            }
+          });
+
+          // Update initialVariableValues prop
+          initialVariableValues.value = newInitialVars;
+
+          // Directly call updateInitialVariableValues on RenderDashboardCharts
+          // The emit chain from usePanelDrilldown doesn't reliably reach RenderDashboardCharts,
+          // so we call the exposed method directly via the component ref
+          if (renderDashboardChartsRef.value?.updateInitialVariableValues) {
+            await renderDashboardChartsRef.value.updateInitialVariableValues();
+          }
+
+          // Clear the drilldown guard after reactivity settles
+          await nextTick();
+          await nextTick();
+        } finally {
+          isDrilldownInProgress.value = false;
+        }
+
+        // Now sync the full URL state (adds back from/to, refresh, print, etc.)
+        // The drilldown's router.push may not include all params (e.g. when passAllVariables is false),
+        // so we need updateUrlWithCurrentState to fill in the missing ones.
+        // This is safe now because the manager has already been updated with new values.
+        updateUrlWithCurrentState();
+      },
     );
 
     const getPanelFromTab = (tabId: string, panelId: string) => {
@@ -1110,11 +1238,15 @@ export default defineComponent({
       }
 
       // Primary check: use valueType if available
-      if (data.valueType === 'relative' && data.relativeTimePeriod) {
+      if (data.valueType === "relative" && data.relativeTimePeriod) {
         return {
           period: data.relativeTimePeriod,
         };
-      } else if (data.valueType === 'absolute' && data.startTime && data.endTime) {
+      } else if (
+        data.valueType === "absolute" &&
+        data.startTime &&
+        data.endTime
+      ) {
         return {
           from: data.startTime,
           to: data.endTime,
@@ -1277,6 +1409,7 @@ export default defineComponent({
 
     // Helper function to update URL with current state
     const updateUrlWithCurrentState = () => {
+      isInternalUrlUpdate.value = true;
       // Build variable params - prefer manager if available, otherwise use route.query
       let variableParams: Record<string, any> = {};
 
@@ -1308,10 +1441,9 @@ export default defineComponent({
 
       // Find the currently active tab and iterate through its panels only
       const activeTab = currentDashboardData.data.tabs.find(
-        (tab: any) => tab.tabId === selectedTabId.value
+        (tab: any) => tab.tabId === selectedTabId.value,
       );
       if (currentDashboardData.data?.tabs && selectedTabId.value) {
-
         if (activeTab?.panels) {
           activeTab.panels.forEach((panel: any) => {
             if (!panel.id) return;
@@ -1326,30 +1458,51 @@ export default defineComponent({
             if (hasExistingUrlParams) {
               // Preserve existing URL params (they may have been set by panel refresh)
               if (route.query[`pt-period.${panelId}`]) {
-                panelTimeParams[`pt-period.${panelId}`] = route.query[`pt-period.${panelId}`];
+                panelTimeParams[`pt-period.${panelId}`] =
+                  route.query[`pt-period.${panelId}`];
               }
-              if (route.query[`pt-from.${panelId}`] && route.query[`pt-to.${panelId}`]) {
-                panelTimeParams[`pt-from.${panelId}`] = route.query[`pt-from.${panelId}`];
-                panelTimeParams[`pt-to.${panelId}`] = route.query[`pt-to.${panelId}`];
+              if (
+                route.query[`pt-from.${panelId}`] &&
+                route.query[`pt-to.${panelId}`]
+              ) {
+                panelTimeParams[`pt-from.${panelId}`] =
+                  route.query[`pt-from.${panelId}`];
+                panelTimeParams[`pt-to.${panelId}`] =
+                  route.query[`pt-to.${panelId}`];
               }
             } else if (panel.config?.panel_time_range) {
               // Panel has an explicit custom time range configured (no URL params yet)
               const panelTimeRange = panel.config.panel_time_range;
 
-              if (panelTimeRange.type === 'relative' && panelTimeRange.relativeTimePeriod) {
-                panelTimeParams[`pt-period.${panelId}`] = panelTimeRange.relativeTimePeriod;
-              } else if (panelTimeRange.type === 'absolute' && panelTimeRange.startTime && panelTimeRange.endTime) {
-                panelTimeParams[`pt-from.${panelId}`] = panelTimeRange.startTime.toString();
-                panelTimeParams[`pt-to.${panelId}`] = panelTimeRange.endTime.toString();
+              if (
+                panelTimeRange.type === "relative" &&
+                panelTimeRange.relativeTimePeriod
+              ) {
+                panelTimeParams[`pt-period.${panelId}`] =
+                  panelTimeRange.relativeTimePeriod;
+              } else if (
+                panelTimeRange.type === "absolute" &&
+                panelTimeRange.startTime &&
+                panelTimeRange.endTime
+              ) {
+                panelTimeParams[`pt-from.${panelId}`] =
+                  panelTimeRange.startTime.toString();
+                panelTimeParams[`pt-to.${panelId}`] =
+                  panelTimeRange.endTime.toString();
               }
             } else if (panel.config?.panel_time_enabled) {
               // Panel has time picker enabled but no custom range → use global time (initial load only)
-              const globalTimeParams = getQueryParamsForDuration(selectedDate.value);
+              const globalTimeParams = getQueryParamsForDuration(
+                selectedDate.value,
+              );
               if (globalTimeParams.period) {
-                panelTimeParams[`pt-period.${panelId}`] = globalTimeParams.period;
+                panelTimeParams[`pt-period.${panelId}`] =
+                  globalTimeParams.period;
               } else if (globalTimeParams.from && globalTimeParams.to) {
-                panelTimeParams[`pt-from.${panelId}`] = globalTimeParams.from.toString();
-                panelTimeParams[`pt-to.${panelId}`] = globalTimeParams.to.toString();
+                panelTimeParams[`pt-from.${panelId}`] =
+                  globalTimeParams.from.toString();
+                panelTimeParams[`pt-to.${panelId}`] =
+                  globalTimeParams.to.toString();
               }
             }
           });
@@ -1376,7 +1529,7 @@ export default defineComponent({
       Object.keys(route.query).forEach((key) => {
         if (key.startsWith("pt-")) {
           // Extract panel ID from parameter name (e.g., "pt-period.panel123" -> "panel123")
-          const panelId = key.split('.').slice(1).join('.');
+          const panelId = key.split(".").slice(1).join(".");
 
           // Only preserve if panel still exists in any tab of the dashboard
           if (panelId && existingPanelIds.has(panelId)) {
@@ -1403,26 +1556,28 @@ export default defineComponent({
 
       // CRITICAL: Only update URL if query has actually changed
       // This prevents unnecessary route updates and panel recomputations
-      const hasQueryChanged = Object.keys(newQuery).some(
-        key => newQuery[key] !== route.query[key]
-      ) || Object.keys(route.query).some(
-        key => !newQuery.hasOwnProperty(key)
-      );
+      const hasQueryChanged =
+        Object.keys(newQuery).some(
+          (key) => newQuery[key] !== route.query[key],
+        ) ||
+        Object.keys(route.query).some((key) => !newQuery.hasOwnProperty(key));
 
       if (hasQueryChanged) {
-        router.replace({ query: newQuery });
+        router.replace({ query: newQuery }).finally(() => {
+          isInternalUrlUpdate.value = false;
+        });
+      } else {
+        isInternalUrlUpdate.value = false;
       }
     };
 
     // whenever the refreshInterval or selectedTabId is changed, update the query params
     // Note: selectedDate changes are handled in the selectedDate watch above
     watch(
-      [
-        refreshInterval,
-        selectedTabId,
-      ],
+      [refreshInterval, selectedTabId],
       () => {
         if (isDashboardLoading.value) return; // skip during cross-dashboard navigation
+        if (isDrilldownInProgress.value) return; // skip during same-dashboard drilldown
         generateNewDashboardRunId();
         updateUrlWithCurrentState();
       },
@@ -1591,14 +1746,17 @@ export default defineComponent({
     const dashboardRemountKey = ref(0);
 
     // Listen for AI assistant dashboard mutations to auto-refresh
-    const { on: onDashboardEvent, off: offDashboardEvent } = useAiDashboardEvents();
+    const { on: onDashboardEvent, off: offDashboardEvent } =
+      useAiDashboardEvents();
     const handleAiDashboardEvent = async (event: AiDashboardEvent) => {
       const currentDashboardId = route.query.dashboard as string;
       const shouldReload = event.dashboardId === currentDashboardId;
 
       if (shouldReload && currentDashboardId) {
         // Clear cached dashboard data so getDashboard() fetches fresh from API
-        delete store.state.organizationData.allDashboardData[currentDashboardId];
+        delete store.state.organizationData.allDashboardData[
+          currentDashboardId
+        ];
         await loadDashboard();
         // Bump key to force RenderDashboardCharts to fully remount with new data
         dashboardRemountKey.value++;
@@ -1784,6 +1942,7 @@ export default defineComponent({
   top: 40px;
   z-index: 1001;
 }
+
 .stickyHeader.fullscreenHeader {
   top: 0px;
   z-index: 5100 !important;
