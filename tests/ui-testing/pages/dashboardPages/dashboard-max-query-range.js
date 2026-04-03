@@ -64,10 +64,12 @@ export default class DashboardMaxQueryRange {
   // ---------------------------------------------------------------------------
 
   /**
-   * Register the search response listener BEFORE triggering the action that
-   * fires the request, then await the returned promise after the action.
-   * This avoids the race condition where a fast response is already gone by
-   * the time waitForResponse() is called.
+   * Returns a Promise that resolves when the next matching search response
+   * arrives. Call this BEFORE triggering the action that fires the request
+   * to avoid a race condition.
+   *
+   * Non-async so the listener is registered synchronously the moment you
+   * call the method — no hidden await to accidentally skip past.
    *
    * Usage:
    *   const searchDone = mqr.createSearchResponsePromise();
@@ -76,9 +78,9 @@ export default class DashboardMaxQueryRange {
    *
    * @returns {Promise<void>}
    */
-  async createSearchResponsePromise() {
+  createSearchResponsePromise() {
     const orgName = process.env.ORGNAME || "default";
-    await this.page.waitForResponse(
+    return this.page.waitForResponse(
       (resp) =>
         resp.url().includes(`/api/${orgName}/`) &&
         resp.url().includes("_search") &&
@@ -90,31 +92,47 @@ export default class DashboardMaxQueryRange {
 
   /**
    * Wait for the search API response to complete (SSE or JSON).
-   * Safe to use when you are certain no response has been missed yet
-   * (e.g. immediately after page load before any user action).
-   * Prefer createSearchResponsePromise() when registering after an action.
+   * Prefer createSearchResponsePromise() when the listener must be
+   * registered before the triggering action.
    */
   async waitForSearchResponse() {
     return this.createSearchResponsePromise();
   }
 
   /**
-   * Register N search response listeners BEFORE triggering the action,
-   * then await the returned promise after. Use when multiple panels will
-   * each fire their own search request (e.g. a dashboard with N panels).
+   * Returns a Promise that resolves only after N DISTINCT matching search
+   * responses have arrived. Uses a shared counter on a single page event
+   * listener so each response is counted exactly once regardless of how
+   * many panels are on the page.
    *
    * Usage:
    *   const allDone = mqr.createNSearchResponsesPromise(3);
    *   await pm.dateTimeHelper.setRelativeTimeRange("6-w");
    *   await allDone;
    *
-   * @param {number} n - number of search responses to wait for
+   * @param {number} n - number of distinct search responses to wait for
    * @returns {Promise<void>}
    */
   createNSearchResponsesPromise(n) {
-    return Promise.all(
-      Array.from({ length: n }, () => this.createSearchResponsePromise())
-    );
+    const orgName = process.env.ORGNAME || "default";
+    return new Promise((resolve) => {
+      let remaining = n;
+      const handler = (response) => {
+        if (
+          response.url().includes(`/api/${orgName}/`) &&
+          response.url().includes("_search") &&
+          response.url().includes("type=logs") &&
+          response.status() === 200
+        ) {
+          remaining--;
+          if (remaining === 0) {
+            this.page.off("response", handler);
+            resolve();
+          }
+        }
+      };
+      this.page.on("response", handler);
+    });
   }
 
   // ---------------------------------------------------------------------------
