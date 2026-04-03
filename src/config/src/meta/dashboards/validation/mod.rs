@@ -277,14 +277,8 @@ mod tests {
             cond.get("filterType").and_then(|v| v.as_str()),
             Some("condition")
         );
-        assert_eq!(
-            cond.get("operator").and_then(|v| v.as_str()),
-            Some("=")
-        );
-        assert_eq!(
-            cond.get("value").and_then(|v| v.as_str()),
-            Some("$myvar")
-        );
+        assert_eq!(cond.get("operator").and_then(|v| v.as_str()), Some("="));
+        assert_eq!(cond.get("value").and_then(|v| v.as_str()), Some("$myvar"));
 
         // Also validate against schema
         let errors = validate_dashboard(&re_serialized);
