@@ -219,7 +219,7 @@ pub mod remote {
     ) -> Result<()> {
         // Create remote key with enrichment table prefix
         let remote_key = create_remote_key(org_id, table_name, created_at);
-        let account = infra::storage::get_account(&remote_key).unwrap_or_default();
+        let account = infra::storage::get_account(org_id, &remote_key).unwrap_or_default();
 
         // Use existing storage::put function for remote upload
         infra::storage::put(&account, &remote_key, Bytes::from(data.to_owned()))

@@ -27,8 +27,8 @@ use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hashbrown::HashMap;
 use object_store::{
     Attribute, AttributeValue, Attributes, GetOptions, GetResult, ListResult, MultipartUpload,
-    ObjectMeta, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, WriteMultipart,
-    path::Path,
+    ObjectMeta, ObjectStore, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result,
+    WriteMultipart, path::Path,
 };
 use parquet::file::metadata::{FooterTail, ParquetMetaDataReader};
 
@@ -46,7 +46,8 @@ static MULTI_ACCOUNTS: Lazy<Box<dyn ObjectStoreExt>> = Lazy::new(accounts::defau
 // Create a wrapper trait that extends ObjectStore
 #[async_trait]
 pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
-    fn get_account(&self, file: &str) -> Option<String>;
+    fn get_account(&self, org_id: &str, file: &str) -> Option<String>;
+    async fn add_account(&self, key: String, acc: Box<dyn ObjectStore>);
     async fn put(&self, account: &str, location: &Path, payload: PutPayload) -> Result<PutResult>;
     async fn put_opts(
         &self,
@@ -86,7 +87,7 @@ pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
         &self,
         account: &str,
         locations: BoxStream<'static, Result<Path>>,
-    ) -> BoxStream<'static, Result<Path>>;
+    ) -> Result<Vec<Path>>;
     fn list(&self, account: &str, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>>;
     fn list_with_offset(
         &self,
@@ -112,8 +113,12 @@ pub async fn list(account: &str, prefix: &str) -> Result<Vec<String>> {
     Ok(files)
 }
 
-pub fn get_account(file: &str) -> Option<String> {
-    MULTI_ACCOUNTS.get_account(file)
+pub fn get_account(org_id: &str, file: &str) -> Option<String> {
+    MULTI_ACCOUNTS.get_account(org_id, file)
+}
+
+pub async fn add_account(key: String, acc: Box<dyn ObjectStore>) {
+    MULTI_ACCOUNTS.add_account(key, acc).await;
 }
 
 pub async fn get(account: &str, file: &str) -> Result<GetResult> {
@@ -244,17 +249,13 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
             let files = futures::stream::iter(files)
                 .map(|file| Ok(Path::from(file)))
                 .boxed();
-            match MULTI_ACCOUNTS
-                .delete_stream(&account, files)
-                .try_collect::<Vec<Path>>()
-                .await
-            {
-                Ok(deleted) => {
+            match MULTI_ACCOUNTS.delete_stream(account, files).await {
+                Ok(files) => {
                     log::debug!("Deleted objects: {deleted:?}");
                     if columns.len() > 2 && columns[0] == "files" {
                         metrics::STORAGE_WRITE_REQUESTS
                             .with_label_values(&[columns[1], columns[2], "remote"])
-                            .inc_by(deleted.len() as u64);
+                            .inc_by(files.len() as u64);
                     }
                 }
                 Err(e) => {

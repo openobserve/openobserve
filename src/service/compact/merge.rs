@@ -913,7 +913,8 @@ pub async fn merge_files(
                 log::debug!("merge_files {new_file_key} file_data::disk::set success");
             }
 
-            let account = storage::get_account(&new_file_key).unwrap_or_default();
+            // TODO: check how compliance will interact with org storage
+            let account = storage::get_account(org_id, &new_file_key).unwrap_or_default();
             if cfg.s3.feature_force_infrequent_access && storage_type.is_compliance() {
                 storage::put_with_compliance(&account, &new_file_key, buf.clone()).await?;
             } else {
@@ -923,6 +924,7 @@ pub async fn merge_files(
             if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
                 // generate inverted index
                 generate_inverted_index(
+                    org_id,
                     &new_file_key,
                     &full_text_search_fields,
                     &index_fields,
@@ -959,7 +961,8 @@ pub async fn merge_files(
                     log::debug!("merge_files {new_file_key} file_data::disk::set success");
                 }
 
-                let account = storage::get_account(&new_file_key).unwrap_or_default();
+                // TODO: check how compliance will interact with org storage
+                let account = storage::get_account(org_id, &new_file_key).unwrap_or_default();
                 if cfg.s3.feature_force_infrequent_access && storage_type.is_compliance() {
                     storage::put_with_compliance(&account, &new_file_key, buf.clone()).await?;
                 } else {
@@ -969,6 +972,7 @@ pub async fn merge_files(
                 if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
                     // generate inverted index
                     generate_inverted_index(
+                        org_id,
                         &new_file_key,
                         &full_text_search_fields,
                         &index_fields,
@@ -1000,6 +1004,7 @@ pub async fn merge_files(
 }
 
 async fn generate_inverted_index(
+    org_id: &str,
     new_file_key: &str,
     full_text_search_fields: &[String],
     index_fields: &[String],
@@ -1012,6 +1017,7 @@ async fn generate_inverted_index(
     let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
     let index_size = create_tantivy_index(
         "COMPACTOR",
+        org_id,
         new_file_key,
         full_text_search_fields,
         index_fields,

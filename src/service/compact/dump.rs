@@ -689,7 +689,7 @@ async fn generate_dump(
     };
 
     // store the file in storage
-    let account = infra::storage::get_account(&file_key).unwrap_or_default();
+    let account = infra::storage::get_account(org_id, &file_key).unwrap_or_default();
     infra::storage::put(&account, &file_key, buf.into()).await?;
 
     let dump_file = FileKey {
