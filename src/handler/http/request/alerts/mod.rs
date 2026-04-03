@@ -1109,7 +1109,7 @@ pub async fn enable_alert_bulk(
     tag = "Alerts",
     operation_id = "TriggerAlert",
     summary = "Manually trigger alert",
-    description = "Manually triggers an alert to test its functionality and notification delivery. Useful for testing alert configurations, verifying notification channels, and ensuring alerts work as expected before relying on them for monitoring.",
+    description = "Manually triggers an alert to test its functionality and notification delivery. Useful for testing alert configurations, verifying notification channels, and ensuring alerts work as expected before relying on them for monitoring. Only requires view (GET) permission on the alert.",
     security(
         ("Authorization"= [])
     ),

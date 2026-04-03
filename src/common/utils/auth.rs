@@ -50,6 +50,40 @@ use crate::common::{
 
 pub const V2_API_PREFIX: &str = "v2";
 
+/// Resolves the effective permission method for write requests (PUT/DELETE/PATCH).
+///
+/// Certain endpoints use HTTP methods that don't map 1:1 to their required
+/// permission level. This function handles those overrides:
+/// - `delete_fields` endpoints: PATCH/PUT → DELETE (needs delete permission)
+/// - General PATCH normalization: PATCH → PUT (treat as update)
+/// - Alert trigger: → GET (non-mutating test action, only needs view permission)
+#[cfg(any(feature = "enterprise", test))]
+pub(crate) fn resolve_write_method(method: &str, path_columns: &[&str]) -> String {
+    let url_len = path_columns.len();
+    let mut resolved = method.to_string();
+
+    if url_len > 0 && path_columns[url_len - 1] == "delete_fields" {
+        resolved = "DELETE".to_string();
+    }
+
+    if resolved == "PATCH" {
+        resolved = "PUT".to_string();
+    }
+
+    // Alert trigger is a non-mutating action (fires a test notification),
+    // so it only requires GET (view) permission, not PUT (update).
+    // Fixes: https://github.com/openobserve/openobserve/issues/10765
+    if url_len >= 5
+        && path_columns[0] == V2_API_PREFIX
+        && path_columns.get(2) == Some(&"alerts")
+        && path_columns[url_len - 1] == "trigger"
+    {
+        resolved = "GET".to_string();
+    }
+
+    resolved
+}
+
 pub static RE_OFGA_UNSUPPORTED_NAME: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"[:#?\s'"%&]+"#).unwrap());
 static RE_SPACE_AROUND: Lazy<Regex> = Lazy::new(|| {
@@ -863,16 +897,7 @@ where
                 )
             }
         } else if method.eq("PUT") || method.eq("DELETE") || method.eq("PATCH") {
-            // this block is for all other urls
-            // specifically checking PUT /org_id/streams/stream_name/delete_fields
-            // even though method is put, we actually need to check delete permissions
-            if path_columns[url_len - 1].eq("delete_fields") {
-                method = "DELETE".to_string();
-            }
-
-            if method.eq("PATCH") {
-                method = "PUT".to_string();
-            }
+            method = resolve_write_method(&method, &path_columns);
 
             // Handle /v2 folders apis
             if path_columns[0].eq(V2_API_PREFIX) && path_columns[2].eq("folders") {
@@ -899,8 +924,6 @@ where
                 && path_columns[2].eq("alerts")
                 && path_columns[url_len - 1].eq("trigger")
             {
-                // For v2/default/alerts/3ATPoRfPdc0n1mEcORhMHV4h56n/trigger api to trigger
-                // destination
                 format!(
                     "{}:{}",
                     OFGA_MODELS
@@ -1794,5 +1817,64 @@ mod tests {
         // Test that the regexes work as expected
         assert!(!RE_OFGA_UNSUPPORTED_NAME.is_match("valid_name"));
         assert!(!EMAIL_REGEX.is_match("invalid-email"));
+    }
+
+    #[test]
+    fn test_resolve_write_method_alert_trigger_uses_get() {
+        let path: Vec<&str> = "v2/default/alerts/abc123/trigger".split('/').collect();
+        assert_eq!(resolve_write_method("PATCH", &path), "GET");
+    }
+
+    #[test]
+    fn test_resolve_write_method_alert_enable_uses_put() {
+        let path: Vec<&str> = "v2/default/alerts/abc123/enable".split('/').collect();
+        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
+    }
+
+    #[test]
+    fn test_resolve_write_method_alert_crud_put() {
+        let path: Vec<&str> = "v2/default/alerts/abc123".split('/').collect();
+        assert_eq!(resolve_write_method("PUT", &path), "PUT");
+    }
+
+    #[test]
+    fn test_resolve_write_method_alert_crud_delete() {
+        let path: Vec<&str> = "v2/default/alerts/abc123".split('/').collect();
+        assert_eq!(resolve_write_method("DELETE", &path), "DELETE");
+    }
+
+    #[test]
+    fn test_resolve_write_method_patch_normalizes_to_put() {
+        let path: Vec<&str> = "v2/default/alerts/abc123".split('/').collect();
+        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
+    }
+
+    #[test]
+    fn test_resolve_write_method_delete_fields_uses_delete() {
+        let path: Vec<&str> = "default/streams/mystream/delete_fields"
+            .split('/')
+            .collect();
+        assert_eq!(resolve_write_method("PUT", &path), "DELETE");
+        assert_eq!(resolve_write_method("PATCH", &path), "DELETE");
+    }
+
+    #[test]
+    fn test_resolve_write_method_non_alert_patch_becomes_put() {
+        let path: Vec<&str> = "v2/default/dashboards/dash123".split('/').collect();
+        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
+    }
+
+    #[test]
+    fn test_resolve_write_method_trigger_only_matches_v2_alerts() {
+        // v1-style path should NOT get the GET override
+        let path: Vec<&str> = "default/streams/alerts/abc123/trigger".split('/').collect();
+        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
+    }
+
+    #[test]
+    fn test_resolve_write_method_trigger_requires_full_path() {
+        // Too short a path should not match
+        let path: Vec<&str> = "v2/default/trigger".split('/').collect();
+        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
     }
 }
