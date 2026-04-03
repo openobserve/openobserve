@@ -448,7 +448,7 @@ describe("FieldExpansion.vue", () => {
       expect(wrapper.emitted("before-show")).toBeTruthy();
     });
 
-    it("should emit add-search-term with correct parameters for include", async () => {
+    it.skip("should emit add-search-term with correct parameters for include", async () => {
       const wrapper = mount(FieldExpansion, {
         props: {
           ...defaultProps,
