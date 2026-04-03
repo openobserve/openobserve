@@ -1092,15 +1092,16 @@ export function usePanelDrilldown({
           });
 
           // make changes in router
+          const pushQuery = {
+            ...oldParams,
+            org_identifier: store.state.selectedOrganization.identifier,
+            dashboard: dashboardData.dashboardId,
+            folder: folderId,
+            tab: tabId,
+          };
           await router.push({
             path: "/dashboards/view",
-            query: {
-              ...oldParams,
-              org_identifier: store.state.selectedOrganization.identifier,
-              dashboard: dashboardData.dashboardId,
-              folder: folderId,
-              tab: tabId,
-            },
+            query: pushQuery,
           });
 
           // ======= [START] default variable values
