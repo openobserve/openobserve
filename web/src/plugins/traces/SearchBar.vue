@@ -278,6 +278,7 @@ import { getImageURL } from "@/utils/zincutils";
 import {
   applyFilterTerm,
   replaceExistingFieldCondition,
+  removeFieldCondition,
 } from "@/utils/traces/filterUtils";
 
 export default defineComponent({
@@ -664,6 +665,9 @@ export default defineComponent({
     addSearchTerm() {
       return this.searchObj.data.stream.addToFilter;
     },
+    removeFieldTerm() {
+      return this.searchObj.data.stream.removeFilterField;
+    },
   },
   watch: {
     addSearchTerm() {
@@ -677,6 +681,16 @@ export default defineComponent({
         if (this.queryEditorRef?.setValue)
           this.queryEditorRef.setValue(newValue);
       }
+    },
+    removeFieldTerm(fieldName: string) {
+      if (!fieldName) return;
+      const newValue = removeFieldCondition(
+        this.searchObj.data.editorValue,
+        fieldName,
+      );
+      this.searchObj.data.editorValue = newValue;
+      this.searchObj.data.stream.removeFilterField = "";
+      if (this.queryEditorRef?.setValue) this.queryEditorRef.setValue(newValue);
     },
     filters() {},
   },

@@ -44,6 +44,7 @@ interface StreamData {
   selectedFields: any[];
   filterField: string;
   addToFilter: string;
+  removeFilterField: string;
   functions: any[];
   streamType: string;
 }

@@ -2385,6 +2385,7 @@ import {
   getFieldFromExpression,
   hasFieldCondition,
   replaceExistingFieldCondition,
+  removeFieldCondition,
 } from "@/plugins/logs/filterUtils";
 
 const defaultValue: any = () => {
@@ -5304,6 +5305,9 @@ export default defineComponent({
     addSearchTerm() {
       return this.searchObj.data.stream.addToFilter;
     },
+    removeFieldTerm() {
+      return this.searchObj.data.stream.removeFilterField;
+    },
     toggleTransformEditor() {
       return this.searchObj.meta.showTransformEditor;
     },
@@ -5496,6 +5500,17 @@ export default defineComponent({
             this.queryEditorRef.setValue(this.searchObj.data.query);
         }
       }
+    },
+    removeFieldTerm(fieldName: string) {
+      if (!fieldName) return;
+      const newValue = removeFieldCondition(
+        this.searchObj.data.editorValue,
+        fieldName,
+      );
+      this.searchObj.data.editorValue = newValue;
+      this.searchObj.data.query = newValue;
+      this.searchObj.data.stream.removeFilterField = "";
+      if (this.queryEditorRef?.setValue) this.queryEditorRef.setValue(newValue);
     },
     toggleTransformEditor(newVal) {
       if (newVal == false) {
