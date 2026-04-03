@@ -426,15 +426,24 @@ pub enum FilterConditionType {
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct FilterCondition {
+    /// Required — group filters never carry `"type"`, so leaving this without
+    /// `#[serde(default)]` lets the `#[serde(untagged)]` `PanelFilter` enum
+    /// correctly skip the `Condition` variant and fall through to `Group`.
     #[serde(rename = "type")]
     pub typ: FilterConditionType,
+    #[serde(default)]
     pub values: Vec<String>,
+    #[serde(default)]
     pub column: Option<StreamFieldObj>,
+    #[serde(default)]
     pub operator: Option<String>,
+    #[serde(default)]
     pub value: Option<String>,
+    #[serde(default)]
     pub logical_operator: LogicalOperator,
+    #[serde(default)]
     pub filter_type: FilterType,
 }
 
