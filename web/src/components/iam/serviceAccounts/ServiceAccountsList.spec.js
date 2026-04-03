@@ -453,22 +453,25 @@ describe("ServiceAccountsList Component", () => {
   });
 
   describe("Token Display", () => {
-    it("redactToken masks all but first 4 chars", () => {
-      expect(wrapper.vm.redactToken("abcd1234567890ef")).toBe("abcd************");
+    it("redactToken shows first 4 chars and pads to fixed length of 12", () => {
+      // output is always 12 chars: first 4 visible, rest padded with '*'
+      expect(wrapper.vm.redactToken("abcd1234567890ef")).toBe("abcd********");
     });
 
-    it("redactToken with exactly 4 chars masks all", () => {
-      // tokens of 4 chars or fewer are fully masked (nothing revealed)
-      expect(wrapper.vm.redactToken("abcd")).toBe("****");
+    it("redactToken with exactly 4 chars shows all 4 and pads to 12", () => {
+      // 4 visible chars + 8 stars = 12 total
+      expect(wrapper.vm.redactToken("abcd")).toBe("abcd********");
     });
 
-    it("redactToken with fewer than 4 chars masks all", () => {
-      expect(wrapper.vm.redactToken("ab")).toBe("**");
-      expect(wrapper.vm.redactToken("")).toBe("");
+    it("redactToken with fewer than 4 chars shows available chars and pads to 12", () => {
+      // fewer than 4 visible chars; rest padded to reach 12 total
+      expect(wrapper.vm.redactToken("ab")).toBe("ab**********");
+      expect(wrapper.vm.redactToken("")).toBe("************");
     });
 
-    it("redactToken with 5 chars masks last char only", () => {
-      expect(wrapper.vm.redactToken("abcde")).toBe("abcd*");
+    it("redactToken with 5 chars shows first 4 and pads to 12", () => {
+      // still shows first 4, pads to 12 total
+      expect(wrapper.vm.redactToken("abcde")).toBe("abcd********");
     });
   });
 
