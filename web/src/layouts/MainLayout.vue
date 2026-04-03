@@ -310,7 +310,7 @@ export default defineComponent({
     const { getStreams, resetStreams } = useStreams();
     const { closeSocket } = useSearchWebSocket();
     const { isOpen: isPredefinedThemesOpen, toggleThemes } = usePredefinedThemes();
-    const { prefetchRoute } = useRoutePrefetch();
+    const { prefetchRoute, startBackgroundPrefetch } = useRoutePrefetch();
 
     const isMonacoEditorLoaded = ref(false);
     const showGetStarted = ref(
@@ -528,6 +528,7 @@ export default defineComponent({
 
     onMounted(async () => {
       filterMenus();
+      startBackgroundPrefetch();
 
       // TODO OK : Clean get config functions which sets rum user and functions menu. Move it to common method.
       if (

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { createRouter, createWebHistory } from "vue-router";
+import { LoadingBar } from "quasar";
 import { getDecodedUserInfo, getPath, mergeRoutes } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -56,6 +57,17 @@ export default function (store: any) {
   };
 
   const router = createRouter(routerMap);
+
+  // Show loading bar on every navigation except the initial page load
+  router.beforeEach((_to, from) => {
+    if (from.name !== null) {
+      LoadingBar.start();
+    }
+  });
+
+  router.afterEach(() => {
+    LoadingBar.stop();
+  });
 
   router.beforeEach((to: any, from: any, next: any) => {
     // Set page title with OpenObserve prefix
