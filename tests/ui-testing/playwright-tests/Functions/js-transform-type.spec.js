@@ -176,7 +176,8 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       await pm.functionsPage.selectJavaScriptType();
       await pm.functionsPage.enterFunctionCode(invalidCode);
 
-      await pm.functionsPage.clickSaveButton();
+      // Save is expected to fail (compilation error) — form stays open, use error variant.
+      await pm.functionsPage.clickSaveButtonExpectError();
 
       const pageContent = await page.content();
       const hasErrorIndicator = pageContent.toLowerCase().includes('error') ||
@@ -196,10 +197,12 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       await pm.functionsPage.selectJavaScriptType();
       await pm.functionsPage.enterFunctionCode(emptyCode);
 
-      await pm.functionsPage.clickSaveButton();
+      // Empty code may succeed or fail — use the error variant which doesn't require
+      // navigating back to the list page.
+      await pm.functionsPage.clickSaveButtonExpectError();
       testLogger.info('Empty function handling tested');
 
-      // Cancel if save failed
+      // Cancel if still on the form (save failed or was rejected)
       if (await pm.functionsPage.isCancelButtonVisible()) {
         await pm.functionsPage.clickCancelButton();
       }
