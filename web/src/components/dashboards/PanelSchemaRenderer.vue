@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :data="tableRendererData"
           :config="panelSchema.config"
+          :has-drilldown="hasDrilldown"
           @row-click="onChartClick"
         />
         <TableRenderer
@@ -64,6 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             panelSchema.config?.table_pagination && !store.state.printMode
           "
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
+          :has-drilldown="hasDrilldown"
         />
         <div
           v-else-if="panelSchema.type == 'html'"
@@ -124,6 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onChartClick"
           @contextmenu="onChartContextMenu"
           @domcontextmenu="onChartDomContextMenu"
+          :has-drilldown="hasDrilldown"
         />
       </div>
       <div
@@ -1218,6 +1221,7 @@ export default defineComponent({
 
     const {
       drilldownArray,
+      crossLinksData,
       onChartClick,
       openDrilldown,
       hidePopupsAndOverlays,
@@ -1253,6 +1257,19 @@ export default defineComponent({
       tableRendererRef,
       showErrorNotification,
       showPositiveNotification,
+    });
+
+    const hasDrilldown = computed(() => {
+      const panelDrilldowns = panelSchema.value?.config?.drilldown;
+      if (panelDrilldowns && panelDrilldowns.length > 0) return true;
+      const links = crossLinksData.value;
+      if (
+        links &&
+        ((links.stream_links && links.stream_links.length > 0) ||
+          (links.org_links && links.org_links.length > 0))
+      )
+        return true;
+      return false;
     });
 
     const chartPanelHeight = computed(() => {
@@ -1316,6 +1333,7 @@ export default defineComponent({
       metadata,
       tableRendererRef,
       tableRendererData,
+      hasDrilldown,
       onChartClick,
       onDataZoom,
       drilldownArray,
