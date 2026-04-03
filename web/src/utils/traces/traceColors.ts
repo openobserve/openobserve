@@ -7,12 +7,12 @@
  * Light mode span colors (50 colors)
  */
 export const LIGHT_SPAN_COLORS = [
-  "#3B82F6",
   "#10B981",
   "#06B6D4",
   "#84CC16",
   "#6366F1",
   "#F59E0B",
+  "#3B82F6",
   "#14B8A6",
   "#D946EF",
   "#7C3AED",
@@ -35,12 +35,12 @@ export const LIGHT_SPAN_COLORS = [
   "#FB923C",
   "#0EA5E9",
   "#F472B6",
-  "#A78BFA",
   "#A855F7",
+  "#818CF8",
   "#F97316",
   "#FCA5A5",
   "#06B6D4",
-  "#818CF8",
+  "#A78BFA",
   "#3B82F6",
 ] as const;
 
