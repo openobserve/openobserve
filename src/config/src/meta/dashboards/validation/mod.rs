@@ -290,6 +290,122 @@ mod tests {
     }
 
     #[test]
+    fn test_metrics_promql_panel_roundtrip() {
+        // Simulate a PromQL panel saved from Metrics Explorer "Add to Dashboard".
+        // The FE sends minimal config — must deserialize and round-trip.
+        use crate::meta::dashboards::v8;
+
+        let json_str = r#"{
+            "dashboardId": "test-metrics-promql",
+            "title": "Metrics Dashboard",
+            "version": 8,
+            "description": "",
+            "tabs": [{
+                "tabId": "tab-1",
+                "name": "Default",
+                "panels": [{
+                    "id": "panel-1",
+                    "type": "line",
+                    "title": "PromQL Panel",
+                    "description": "",
+                    "queryType": "promql",
+                    "layout": { "x": 0, "y": 0, "w": 96, "h": 20, "i": 1 },
+                    "queries": [{
+                        "query": "rate(http_requests_total[5m])",
+                        "customQuery": true,
+                        "fields": {
+                            "stream": "",
+                            "stream_type": "metrics",
+                            "x": [],
+                            "y": [],
+                            "z": [],
+                            "filter": []
+                        },
+                        "config": {
+                            "promql_legend": "",
+                            "layer_type": "scatter",
+                            "weight_fixed": 1,
+                            "limit": 0,
+                            "min": 0,
+                            "max": 100
+                        }
+                    }],
+                    "config": {
+                        "show_legends": true,
+                        "legends_position": null,
+                        "unit": null,
+                        "unit_custom": null,
+                        "base_map": { "type": "osm" },
+                        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+                    }
+                }]
+            }]
+        }"#;
+
+        let result: Result<v8::Dashboard, _> = serde_json::from_str(json_str);
+        assert!(
+            result.is_ok(),
+            "Metrics PromQL panel must deserialize, got error: {:?}",
+            result.err()
+        );
+
+        let dashboard = result.unwrap();
+        let re_serialized = serde_json::to_value(&dashboard).unwrap();
+        let errors = validate_dashboard(&re_serialized);
+        assert!(
+            errors.is_empty(),
+            "Metrics PromQL panel should validate after round-trip, got: {:?}",
+            errors
+        );
+    }
+
+    #[test]
+    fn test_promql_panel_custom_query_false_should_validate() {
+        // The Metrics Explorer sends customQuery=false for builder-mode PromQL panels.
+        // Schema field-count rules (e.g. "line needs 1 x, 1 y") must NOT apply
+        // when queryType is "promql".
+        let json_str = r#"{
+            "dashboardId": "test-promql-cqf",
+            "title": "PromQL customQuery false",
+            "version": 8,
+            "description": "",
+            "tabs": [{
+                "tabId": "tab-1",
+                "name": "Default",
+                "panels": [{
+                    "id": "panel-1",
+                    "type": "line",
+                    "title": "PromQL Panel",
+                    "description": "",
+                    "queryType": "promql",
+                    "layout": { "x": 0, "y": 0, "w": 96, "h": 20, "i": 1 },
+                    "queries": [{
+                        "query": "rate(http_requests_total[5m])",
+                        "customQuery": false,
+                        "fields": {
+                            "stream": "",
+                            "stream_type": "metrics",
+                            "x": [],
+                            "y": [],
+                            "z": [],
+                            "filter": []
+                        },
+                        "config": { "promql_legend": "" }
+                    }],
+                    "config": { "show_legends": true }
+                }]
+            }]
+        }"#;
+        let json: Value = serde_json::from_str(json_str).unwrap();
+        let errors = validate_dashboard(&json);
+        assert!(
+            errors.is_empty(),
+            "PromQL panel with customQuery=false should validate, got: {:?}",
+            errors
+        );
+    }
+
+    #[test]
     fn test_invalid_pie_wrong_fields() {
         let json_str =
             include_str!("../../../../../../test-fixtures/invalid/pie-wrong-fields.json");
