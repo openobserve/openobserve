@@ -11,7 +11,6 @@ export default class DashboardMaxQueryRange {
     this.page = page;
     this.warningIcon = page.locator('[data-test="panel-max-duration-warning"]');
     this.tooltip = page.locator(".q-tooltip");
-    this.backBtn = page.locator('[data-test="dashboard-back-btn"]');
   }
 
   // ---------------------------------------------------------------------------
@@ -81,30 +80,6 @@ export default class DashboardMaxQueryRange {
   }
 
   // ---------------------------------------------------------------------------
-  // Dashboard navigation
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Open a dashboard by its name from the dashboard list page.
-   * Assumes the list page is already loaded.
-   * @param {string} dashboardName
-   */
-  async openDashboardByName(dashboardName) {
-    const row = this.page
-      .locator('//tr[.//div[@title="' + dashboardName + '"]]')
-      .nth(0);
-    await row.locator('div[title="' + dashboardName + '"]').click();
-    await this.page.waitForTimeout(2000);
-  }
-
-  /**
-   * Navigate back from dashboard view to the dashboard list.
-   */
-  async backToDashboardList() {
-    await this.backBtn.click();
-  }
-
-  // ---------------------------------------------------------------------------
   // Warning tooltip
   // ---------------------------------------------------------------------------
 
@@ -118,36 +93,4 @@ export default class DashboardMaxQueryRange {
     const text = await this.tooltip.textContent();
     testLogger.info("Warning tooltip text", { text });
     return text;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Cleanup helpers
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Delete the current dashboard via API (reads dashboard ID from the URL).
-   */
-  async deleteDashboardViaAPI() {
-    const orgId = process.env.ORGNAME || "default";
-    const currentUrl = this.page.url();
-    const dashIdMatch = currentUrl.match(/dashboards\/([^/?]+)/);
-
-    if (dashIdMatch) {
-      await this.page.evaluate(
-        async ({ orgId, dashId }) => {
-          const listResp = await fetch(`/api/${orgId}/dashboards`);
-          const dashboards = await listResp.json();
-          const dash = dashboards?.dashboards?.find(
-            (d) => d.dashboardId === dashId || d.dashboard_id === dashId
-          );
-          const folderId = dash?.folderId || dash?.folder_id || "default";
-          await fetch(`/api/${orgId}/folders/${folderId}/dashboards/${dashId}`, {
-            method: "DELETE",
-          });
-        },
-        { orgId, dashId: dashIdMatch[1] }
-      );
-      testLogger.info("Dashboard deleted via API");
-    }
-  }
-}
+  }}

@@ -84,7 +84,7 @@ test.describe("Dashboard Max Query Range", () => {
       // Navigate back and reopen dashboard with wide time range
       await pm.dashboardList.menuItem("dashboards-item");
       await waitForDashboardPage(page);
-      await mqr.openDashboardByName(dashboardName);
+      await pm.dashboardList.clickOnDashboard(dashboardName);
 
       await waitForDateTimeButtonToBeEnabled(page);
       await pm.dateTimeHelper.setRelativeTimeRange("6-w");
@@ -97,13 +97,13 @@ test.describe("Dashboard Max Query Range", () => {
 
       // Verify tooltip text
       const tooltipText = await mqr.getWarningTooltipText();
-      expect(tooltipText).toContain("Query duration is modified due to query range restriction");
+      expect(tooltipText).toContain("max query range limit");
       expect(tooltipText).toContain("Data returned for:");
 
       testLogger.info("Tooltip text verified", { tooltipText });
 
       // Cleanup
-      await mqr.backToDashboardList();
+      await pm.dashboardCreate.backToDashboardList();
       await deleteDashboard(page, dashboardName);
       await mqr.resetMaxQueryRange();
     }
@@ -130,7 +130,7 @@ test.describe("Dashboard Max Query Range", () => {
       // Reopen dashboard and set 6-week range (exceeds limit)
       await pm.dashboardList.menuItem("dashboards-item");
       await waitForDashboardPage(page);
-      await mqr.openDashboardByName(dashboardName);
+      await pm.dashboardList.clickOnDashboard(dashboardName);
 
       await waitForDateTimeButtonToBeEnabled(page);
       await pm.dateTimeHelper.setRelativeTimeRange("6-w");
@@ -154,7 +154,7 @@ test.describe("Dashboard Max Query Range", () => {
       testLogger.info("Warning hidden with 2-hour range (within 4h limit)");
 
       // Cleanup
-      await mqr.backToDashboardList();
+      await pm.dashboardCreate.backToDashboardList();
       await deleteDashboard(page, dashboardName);
       await mqr.resetMaxQueryRange();
     }
@@ -180,7 +180,7 @@ test.describe("Dashboard Max Query Range", () => {
       // Reopen dashboard
       await pm.dashboardList.menuItem("dashboards-item");
       await waitForDashboardPage(page);
-      await mqr.openDashboardByName(dashboardName);
+      await pm.dashboardList.clickOnDashboard(dashboardName);
 
       // Add panel — set time range BEFORE selecting stream (avoids disabled buttons)
       await pm.dashboardCreate.addPanel();
@@ -205,7 +205,7 @@ test.describe("Dashboard Max Query Range", () => {
       // Save and cleanup
       await pm.dashboardPanelActions.addPanelName("Editor Warning Panel");
       await pm.dashboardPanelActions.savePanel();
-      await mqr.backToDashboardList();
+      await pm.dashboardCreate.backToDashboardList();
       await deleteDashboard(page, dashboardName);
       await mqr.resetMaxQueryRange();
     }
@@ -258,7 +258,7 @@ test.describe("Dashboard Max Query Range", () => {
 
       await pm.dashboardList.menuItem("dashboards-item");
       await waitForDashboardPage(page);
-      await mqr.openDashboardByName(dashboardName);
+      await pm.dashboardList.clickOnDashboard(dashboardName);
 
       await waitForDateTimeButtonToBeEnabled(page);
       await pm.dateTimeHelper.setRelativeTimeRange("6-w");
@@ -270,7 +270,7 @@ test.describe("Dashboard Max Query Range", () => {
       testLogger.info(`All ${warningCount} panels show max query range warning`);
 
       // Cleanup
-      await mqr.backToDashboardList();
+      await pm.dashboardCreate.backToDashboardList();
       await deleteDashboard(page, dashboardName);
       await mqr.resetMaxQueryRange();
     }
@@ -297,7 +297,7 @@ test.describe("Dashboard Max Query Range", () => {
       // Reopen dashboard with wide time range
       await pm.dashboardList.menuItem("dashboards-item");
       await waitForDashboardPage(page);
-      await mqr.openDashboardByName(dashboardName);
+      await pm.dashboardList.clickOnDashboard(dashboardName);
 
       await waitForDateTimeButtonToBeEnabled(page);
       await pm.dateTimeHelper.setRelativeTimeRange("6-w");
@@ -310,12 +310,12 @@ test.describe("Dashboard Max Query Range", () => {
 
       // Hover and verify the tooltip mentions the correct restriction hours
       const tooltipText = await mqr.getWarningTooltipText();
-      expect(tooltipText).toContain("restriction of 3 hours");
+      expect(tooltipText).toContain("max query range limit");
       expect(tooltipText).toContain("Data returned for:");
       testLogger.info("Tooltip correctly shows 3-hour restriction", { tooltipText });
 
       // Cleanup
-      await mqr.backToDashboardList();
+      await pm.dashboardCreate.backToDashboardList();
       await deleteDashboard(page, dashboardName);
       await mqr.resetMaxQueryRange();
     }
@@ -350,7 +350,7 @@ test.describe("Dashboard Max Query Range", () => {
       testLogger.info("No warning shown when max query range is not set");
 
       // Cleanup
-      await mqr.backToDashboardList();
+      await pm.dashboardCreate.backToDashboardList();
       await deleteDashboard(page, dashboardName);
     }
   );
@@ -402,10 +402,13 @@ test.describe("Dashboard Max Query Range", () => {
 
       // Verify tooltip
       const tooltipText = await mqr.getWarningTooltipText();
-      expect(tooltipText).toContain("Query duration is modified due to query range restriction");
+      expect(tooltipText).toContain("max query range limit");
 
-      // Cleanup via API
-      await mqr.deleteDashboardViaAPI();
+      // Cleanup
+      await pm.dashboardPanelActions.addPanelName("MultiSQL Max Query Panel");
+      await pm.dashboardPanelActions.savePanel();
+      await pm.dashboardCreate.backToDashboardList();
+      await deleteDashboard(page, dashboardName);
       await mqr.resetMaxQueryRange();
     }
   );
