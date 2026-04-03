@@ -424,10 +424,12 @@ const setupSession = async () => {
 };
 
 const updatePlayerState = () => {
+  if (!player?.value) return;
   const playerMeta = player.value?.getMetaData();
-  playerState.value.startTime = playerMeta.startTime;
-  playerState.value.endTime = playerMeta.endTime;
-  playerState.value.totalTime = playerMeta.totalTime;
+
+  playerState.value.startTime = playerMeta?.startTime;
+  playerState.value.endTime = playerMeta?.endTime;
+  playerState.value.totalTime = playerMeta?.totalTime;
   playerState.value.duration = formatTimeDifference(
     playerState.value.totalTime,
   );
