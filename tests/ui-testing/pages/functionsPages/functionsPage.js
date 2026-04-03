@@ -110,19 +110,35 @@ class FunctionsPage {
 
     const success = await this.page.evaluate((args) => {
       const [selector, value] = args;
-      // Try finding Monaco editor instance via the DOM element
-      const editorElements = document.querySelectorAll(`${selector} .monaco-editor`);
-      const editorElement = editorElements[editorElements.length - 1];
-      if (editorElement && editorElement.__vscode_monaco_editor__) {
-        editorElement.__vscode_monaco_editor__.setValue(value);
-        return true;
+      const container = document.querySelector(selector);
+      if (!container) return false;
+
+      // 1. Try getEditorByDomElement — scoped to our container (most reliable)
+      const monacoEditorEl = container.querySelector('.monaco-editor');
+      if (monacoEditorEl) {
+        const editor = window.monaco?.editor?.getEditorByDomElement?.(monacoEditorEl);
+        if (editor) {
+          editor.setValue(value);
+          return true;
+        }
+        // 2. Try __vscode_monaco_editor__ property on the DOM element
+        if (monacoEditorEl.__vscode_monaco_editor__) {
+          monacoEditorEl.__vscode_monaco_editor__.setValue(value);
+          return true;
+        }
       }
-      // Fallback: try via monaco global API
+
+      // 3. Iterate all editors and find the one whose DOM node is inside our container
       const editors = window.monaco?.editor?.getEditors?.();
       if (editors && editors.length > 0) {
-        editors[editors.length - 1].setValue(value);
-        return true;
+        for (const ed of editors) {
+          if (container.contains(ed.getDomNode?.())) {
+            ed.setValue(value);
+            return true;
+          }
+        }
       }
+
       return false;
     }, [this.functionEditor, code]);
 
@@ -146,14 +162,15 @@ class FunctionsPage {
     const saveButton = this.page.locator(this.saveButton);
     await saveButton.click();
 
-    // Wait for the success notification to confirm the save completed,
-    // or fall back to a timeout if the notification is missed.
-    const successNotif = this.page.locator('.q-notification').filter({ hasText: /saved successfully/i });
-    await successNotif.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+    // Wait for any notification to appear (success or error).
+    // Use a broad selector — the backend message text varies, so avoid text filters.
+    const notification = this.page.locator('.q-notification').first();
+    await notification.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
 
-    // Wait for the Add Function button to reappear (indicates we're back on the list page)
+    // Wait for the Add Function button to reappear (indicates save completed and we're back on list).
+    // No .catch here — if this times out the save did not complete and the test should fail clearly.
     const addButton = this.page.locator(this.addFunctionButton);
-    await addButton.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    await expect(addButton).toBeVisible({ timeout: 15000 });
   }
 
   async clickCancelButton() {
@@ -180,9 +197,11 @@ class FunctionsPage {
   }
 
   async clickFunctionByName(name) {
-    // Find the row containing the function name and click its edit button
+    // Find the row containing the function name and click its edit button.
+    // 30 s timeout: the reactive filter re-applies when data arrives, so this correctly
+    // handles slow CI where the list API responds after the search field is filled.
     const functionRow = this.page.locator('tr').filter({ hasText: name }).first();
-    await expect(functionRow).toBeVisible({ timeout: 10000 });
+    await expect(functionRow).toBeVisible({ timeout: 30000 });
     const editButton = functionRow.locator('[data-test="function-list-edit-btn"]');
     await editButton.click();
     await this.page.waitForTimeout(1000);
@@ -212,17 +231,35 @@ class FunctionsPage {
 
     const success = await this.page.evaluate((args) => {
       const [selector, value] = args;
-      const editorElements = document.querySelectorAll(`${selector} .monaco-editor`);
-      const editorElement = editorElements[editorElements.length - 1];
-      if (editorElement && editorElement.__vscode_monaco_editor__) {
-        editorElement.__vscode_monaco_editor__.setValue(value);
-        return true;
+      const container = document.querySelector(selector);
+      if (!container) return false;
+
+      // 1. Try getEditorByDomElement — scoped to our container (most reliable)
+      const monacoEditorEl = container.querySelector('.monaco-editor');
+      if (monacoEditorEl) {
+        const editor = window.monaco?.editor?.getEditorByDomElement?.(monacoEditorEl);
+        if (editor) {
+          editor.setValue(value);
+          return true;
+        }
+        // 2. Try __vscode_monaco_editor__ property on the DOM element
+        if (monacoEditorEl.__vscode_monaco_editor__) {
+          monacoEditorEl.__vscode_monaco_editor__.setValue(value);
+          return true;
+        }
       }
+
+      // 3. Iterate all editors and find the one whose DOM node is inside our container
       const editors = window.monaco?.editor?.getEditors?.();
       if (editors && editors.length > 0) {
-        editors[editors.length - 1].setValue(value);
-        return true;
+        for (const ed of editors) {
+          if (container.contains(ed.getDomNode?.())) {
+            ed.setValue(value);
+            return true;
+          }
+        }
       }
+
       return false;
     }, [this.testEventsEditor, eventJson]);
 
@@ -298,9 +335,11 @@ class FunctionsPage {
   }
 
   async expectFunctionInList(functionName) {
-    // Use a table row locator for more reliable matching
+    // Use a table row locator for more reliable matching.
+    // 30 s timeout: the reactive filter re-applies when data arrives, so this correctly
+    // handles slow CI where the list API responds after the search field is filled.
     const functionRow = this.page.locator('tr').filter({ hasText: functionName }).first();
-    await expect(functionRow).toBeVisible({ timeout: 15000 });
+    await expect(functionRow).toBeVisible({ timeout: 30000 });
   }
 
   async isCancelButtonVisible() {
@@ -407,6 +446,12 @@ class FunctionsPage {
    * @returns {Promise<'js'|'vrl'|null>} Function type
    */
   async openFunctionAndCheckType(functionName) {
+    // Wait for the functions table to have at least one data row before searching.
+    // After page navigation, getJSTransforms() is async — the list may not be
+    // populated yet even after waitForLoadState+2s in the spec.
+    const anyDataRow = this.page.locator('tbody tr').first();
+    await anyDataRow.waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
+
     await this.searchFunction(functionName);
     await this.clickFunctionByName(functionName);
 
