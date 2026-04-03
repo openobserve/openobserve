@@ -93,9 +93,7 @@ const parseResult = computed(() => {
       // Only treat as JSON if the parsed result is an object or array.
       // Bare primitives ("42", "true", "null") are valid JSON but should
       // not be colored -> they're just plain field values stored as strings.
-      const isStructuredJSON =
-        parsed !== null &&
-        (typeof parsed === "object" || Array.isArray(parsed));
+      const isStructuredJSON = parsed !== null && typeof parsed === "object";
       return { data: parsed, isJSON: isStructuredJSON };
     } catch (e) {
       return { data: props.value, isJSON: false };
