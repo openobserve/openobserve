@@ -1184,23 +1184,8 @@ export default defineComponent({
       // if view panel is open then close it
       showViewPanel.value = false;
 
-      // Extract newQueryParams if passed (it will be args[1]). Fall back to route.query if unavailable.
-      const queryToLoad = args[1] || route.query;
-
-      // FIX: Update selectedTabId if it's in the query
-      if (queryToLoad.tab && queryToLoad.tab !== selectedTabId.value) {
-              selectedTabId.value = queryToLoad.tab;
-      }
-
-      // FIX: Manually load the variables from the new query params so that
-      // the manager updates immediately rather than waiting for dashboard components to reload
-      variablesManager.loadFromUrl({ query: queryToLoad });
-      variablesManager.commitAll();
-
       // first, refresh the dashboard
-      // refreshDashboard(true);
-      // Removed redundant refreshDashboard(true) to avoid immediate state reversion
-      // because selectedTabId and pinned variables will trigger parent URL sync anyway.
+      refreshDashboard(true);
 
       // NOTE: With the variables manager, this works without changing the initial variable values
       // The manager handles variable updates automatically
