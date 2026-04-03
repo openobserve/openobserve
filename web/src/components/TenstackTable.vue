@@ -34,8 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :style="{
           minWidth: '100%',
           ...columnSizeVars,
-          minHeight: showPagination || isDashboard ? undefined : totalSize + 'px',
-          width: isDashboard
+          minHeight: showPagination || !useVirtualScroll ? undefined : totalSize + 'px',
+          width: !useVirtualScroll
             ? '100%'
             : !defaultColumns
               ? table.getCenterTotalSize() + 'px'
@@ -134,11 +134,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             handle=".table-head"
             :class="[
-              // Flex only for logs/traces (enables drag-reorder + virtual-scroll alignment)
-              // Dashboard uses table-layout:auto — no flex so browser auto-sizes columns
-              !isDashboard ? 'tw:flex items-center' : '',
-              { 'dashboard-header-row': !!isDashboard },
-              enableColumnReorder && table.getState().columnOrder.length
+              // Flex only for virtual-scroll mode (logs/traces) for drag-reorder + alignment
+              // Non-virtual (dashboard) uses table-layout:auto — no flex so browser auto-sizes columns
+              useVirtualScroll ? 'tw:flex items-center' : '',
+                enableColumnReorder && table.getState().columnOrder.length
                 ? 'tw:cursor-move!'
                 : '',
             ]"
@@ -376,16 +375,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <tbody
           data-test="o2-table-body"
           ref="tableBodyRef"
-          :class="{ 'tw:relative': !isDashboard && !showPagination }"
+          :class="{ 'tw:relative': useVirtualScroll && !showPagination }"
         >
           <!-- ── Dashboard: regular DOM rows (no virtual scroll) ──────────────── -->
           <!-- Used when `data` prop is present (dashboard mode) OR pagination is
              enabled. Virtual scroll (below) is only for logs/traces. -->
-          <template v-if="showPagination || !!isDashboard">
+          <template v-if="showPagination || !useVirtualScroll">
             <tr
               v-for="(row, rowIdx) in pagedRows"
               :key="row.id"
-              class="tw:border-b tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)] dashboard-data-row"
+              class="tw:border-b tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
               @click="
                 handleDataRowClick(row.original, rowIdx as number, $event)
               "
@@ -423,7 +422,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     width: `calc(var(--col-${sanitizeCssId(cell.column.columnDef.id)}-size) * 1px)`,
                     height: rowHeight ? rowHeight + 'px' : undefined,
                   },
-                  getDashboardCellStyle(cell),
+                  props.getCellStyle?.(cell),
                   getStickyColumnStyle(
                     (cell.column.columnDef.meta as any)?._col,
                   ) as any,
@@ -494,7 +493,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         props.wrap ? 'tw:break-words' : '',
                       ]"
                     >
-                      {{ getDashboardCellValue(cell) }}
+                      {{ getCellDisplayValue(cell) }}
                     </span>
                     <!-- Copy button RIGHT (left/center-aligned) -->
                     <q-btn
@@ -530,7 +529,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- ── Virtual scroll rows (logs / traces only — no `data` prop) ────── -->
           <template
-            v-if="!showPagination && !isDashboard"
+            v-if="!showPagination && useVirtualScroll"
             v-for="virtualRow in virtualRows"
             :key="virtualRow.index"
           >
@@ -684,7 +683,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? (rowHeight ?? 28) + 'px'
                           : undefined,
                     },
-                    getDashboardCellStyle(cell),
+                    props.getCellStyle?.(cell),
                     getStickyColumnStyle(
                       (cell.column.columnDef.meta as any)?._col,
                     ) as any,
@@ -813,7 +812,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ]"
                           v-else
                         >
-                          {{ getDashboardCellValue(cell) }}
+                          {{ getCellDisplayValue(cell) }}
                         </span>
                         <!-- Logs: AI context button -->
                         <O2AIContextAddBtn
@@ -871,48 +870,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </tr>
         </tbody>
 
-        <!-- ── Dashboard: sticky grand-total row ──────────────────────────────── -->
-        <tfoot
-          v-if="stickyTotalRow"
-          style="position: sticky; bottom: 0; z-index: 10"
-        >
-          <tr class="pivot-total-row pivot-sticky-total-row">
-            <td
-              v-for="col in (columns as any[]) || []"
-              :key="'ft_' + col.name"
-              class="tw:px-2"
-              :class="[
-                col.align === 'right'
-                  ? 'tw:text-right'
-                  : col.align === 'center'
-                    ? 'tw:text-center'
-                    : 'tw:text-left',
-                { 'sticky-column': col.sticky },
-                { 'pivot-total-col': stickyColTotals && col._isTotalColumn },
-              ]"
-              :style="
-                [
-                  getStickyTotalColumnStyle(col),
-                  getStickyColumnStyle(col),
-                ] as any
-              "
-            >
-              {{
-                stickyTotalRow[col.field] === undefined ||
-                stickyTotalRow[col.field] === null
-                  ? ""
-                  : col.format
-                    ? col.format(stickyTotalRow[col.field], stickyTotalRow)
-                    : stickyTotalRow[col.field]
-              }}
-            </td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-    <!-- end scroll container -->
+      <!-- ── Dashboard: sticky grand-total row ──────────────────────────────── -->
+      <tfoot
+        v-if="stickyTotalRow"
+        style="position: sticky; bottom: 0; z-index: 10"
+      >
+        <tr class="pivot-total-row pivot-sticky-total-row">
+          <td
+            v-for="col in ((columns as any[]) || [])"
+            :key="'ft_' + col.name"
+            class="tw:px-2"
+            :class="[
+              col.align === 'right' ? 'tw:text-right' : col.align === 'center' ? 'tw:text-center' : 'tw:text-left',
+              { 'sticky-column': col.sticky },
+              { 'pivot-total-col': stickyColTotals && col._isTotalColumn },
+            ]"
+            :style="([getStickyTotalColumnStyle(col), getStickyColumnStyle(col)] as any)"
+          >
+            {{
+              stickyTotalRow[col.field] === undefined ||
+              stickyTotalRow[col.field] === null
+                ? ''
+                : col.format
+                  ? col.format(stickyTotalRow[col.field], stickyTotalRow)
+                  : stickyTotalRow[col.field]
+            }}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
 
-    <!-- ── Dashboard: bottom slot (custom footer) or default pagination ──── -->
+  </div><!-- end scroll container -->
+
+    <!-- ── Bottom slot: pagination footer or custom footer ──── -->
     <!-- Lives OUTSIDE the scroll container so it's always visible -->
     <template v-if="$slots.bottom">
       <slot
@@ -959,53 +949,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       />
     </template>
-    <!-- Show pagination controls (or just the row count) for all dashboard tables -->
-    <div
-      v-else-if="showPagination || !!isDashboard"
-      class="row items-center full-width" data-test="dashboard-table-pagination"
-    >
-      <q-space />
-      <TablePaginationControls
-        :show-pagination="showPagination"
-        :pagination="{ rowsPerPage: localRowsPerPage, page: currentPage }"
-        :pagination-options="paginationOptions"
-        :total-rows="tableRows.length"
-        :pages-number="
-          localRowsPerPage === 0
-            ? 1
-            : Math.ceil(tableRows.length / localRowsPerPage) || 1
-        "
-        :is-first-page="currentPage === 1"
-        :is-last-page="
-          currentPage >=
-          (localRowsPerPage === 0
-            ? 1
-            : Math.ceil(tableRows.length / localRowsPerPage) || 1)
-        "
-        @update:rows-per-page="
-          (val: number) => {
-            localRowsPerPage = val;
-            currentPage = 1;
-          }
-        "
-        @first-page="currentPage = 1"
-        @prev-page="currentPage = Math.max(1, currentPage - 1)"
-        @next-page="
-          currentPage = Math.min(
-            localRowsPerPage === 0
-              ? 1
-              : Math.ceil(tableRows.length / localRowsPerPage) || 1,
-            currentPage + 1,
-          )
-        "
-        @last-page="
-          currentPage =
-            localRowsPerPage === 0
-              ? 1
-              : Math.ceil(tableRows.length / localRowsPerPage) || 1
-        "
-      />
-    </div>
   </div>
 </template>
 
@@ -1033,23 +976,19 @@ import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
-import { debounce, copyToClipboard, exportFile } from "quasar";
+import { debounce, copyToClipboard } from "quasar";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 // ── Dashboard additions ──────────────────────────────────────────────────────
 import { useStickyColumns } from "@/composables/useStickyColumns";
-import useNotifications from "@/composables/useNotifications";
-import { getColorForTable } from "@/utils/dashboard/colorPalette";
-import { findFirstValidMappedValue } from "@/utils/dashboard/panelValidation";
 import {
   TABLE_ROWS_PER_PAGE_DEFAULT_VALUE,
   PIVOT_TABLE_TOTAL_COLUMN_WIDTH,
   PIVOT_TABLE_ROW_KEY_SEPARATOR,
 } from "@/utils/dashboard/constants";
 import JsonFieldRenderer from "@/components/dashboards/panels/JsonFieldRenderer.vue";
-import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 
 export interface StreamField {
   name: string;
@@ -1177,12 +1116,11 @@ const props = defineProps({
     default: true,
   },
   // ── Dashboard / TableRenderer parity props ───────────────────────────────
-  /** When true, enables all dashboard features (pivot, sticky cols, cell copy, etc.).
-   *  Also signals that `columns` prop is in Quasar format (name/label/field)
-   *  rather than TanStack format (id/header/accessorKey). */
-  isDashboard: {
+  /** When false, uses regular DOM rows (no virtual scroll). Set to false for dashboard/small-data tables.
+   *  Default: true (virtual scroll mode for logs/traces). */
+  useVirtualScroll: {
     type: Boolean,
-    default: false,
+    default: true,
   },
   /** Pivot multi-level header config produced by the dashboard pivot transformer. */
   pivotHeaderLevels: {
@@ -1204,10 +1142,12 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  /** Value-mapping config for per-cell background coloring (dashboard). */
-  valueMapping: {
-    type: Array,
-    default: () => [],
+  /** Optional function to compute inline style string for a cell.
+   *  Use this to add cell background coloring from the parent.
+   *  Returns empty string by default (no coloring). */
+  getCellStyle: {
+    type: Function as PropType<(cell: any) => string>,
+    default: undefined,
   },
   /** Show per-cell copy-to-clipboard button on hover. Default: false */
   enableCellCopy: {
@@ -1253,10 +1193,8 @@ const { isFTSColumn } = useTextHighlighter();
 const { processedResults, processHitsInChunks } = useLogsHighlighter();
 
 // ── Dashboard: sticky columns composable ─────────────────────────────────────
-// useStickyColumns reads props.columns (Quasar-format when isDashboard=true).
+// useStickyColumns reads props.columns (Quasar-format when useVirtualScroll=false).
 const { getStickyColumnStyle, tableId } = useStickyColumns(props, store);
-const { showErrorNotification, showPositiveNotification } = useNotifications();
-
 const getSortingHandler = (e: Event, fn: any) => {
   return fn(e);
 };
@@ -1296,7 +1234,7 @@ const tableRows = ref<any[]>([...(props.rows ?? [])]);
 
 // ── Dashboard: convert Quasar column defs → TanStack ColumnDef[] ─────────────
 const dashboardColumns = computed<ColumnDef<unknown, any>[] | null>(() => {
-  if (!props.isDashboard || !props.columns) return null;
+  if (props.useVirtualScroll || !props.columns) return null;
   return (props.columns as any[]).map((col: any) => ({
     id: col.name,
     header: col.label,
@@ -1348,7 +1286,7 @@ const handlePivotSort = (field: string) => {
 watch(
   () => pivotSortState.value,
   () => {
-    if (!props.isDashboard) return;
+    if (!isPivotMode.value) return;
     const rows = ((props.rows as any[]) || []).filter((r: any) => !r.__isTotalRow);
     const { sortBy, descending } = pivotSortState.value;
     if (!sortBy) {
@@ -1370,44 +1308,6 @@ watch(
   { deep: true },
 );
 
-// Also sync tableRows when rows changes externally (dashboard re-render only).
-watch(
-  () => props.rows,
-  (newRows) => {
-    if (!props.isDashboard || !newRows) return;
-    const rows = (newRows as any[]).filter((r: any) => !r.__isTotalRow);
-    const { sortBy, descending } = pivotSortState.value;
-    if (!sortBy) {
-      tableRows.value = [...rows];
-      return;
-    }
-    const col = ((props.columns as any[]) || []).find((c: any) => c.name === sortBy);
-    tableRows.value = [...rows].sort((a: any, b: any) => {
-      const va = a[sortBy];
-      const vb = b[sortBy];
-      let result: number;
-      if (col?.sort) result = col.sort(va, vb, a, b);
-      else if (typeof va === "number" && typeof vb === "number")
-        result = va - vb;
-      else result = String(va ?? "").localeCompare(String(vb ?? ""));
-      return descending ? -result : result;
-    });
-    // Also sync column order for dashboard.
-    if (props.columns) {
-      columnOrder.value = (props.columns as any[]).map((c: any) => c.name);
-    }
-  },
-  { deep: true },
-);
-
-// Sync column order when dashboard columns change (Quasar cols use `name` as id).
-watch(
-  () => props.columns,
-  (cols) => {
-    if (props.isDashboard && cols) columnOrder.value = (cols as any[]).map((c: any) => c.name);
-  },
-  { immediate: true },
-);
 
 // ── Dashboard: pivot merge map ───────────────────────────────────────────────
 const pivotMergeMap = computed(() => {
@@ -1515,42 +1415,7 @@ const getStickyTotalHeaderForPivot = (cell: any) => {
   };
 };
 
-// ── Dashboard: cell coloring ─────────────────────────────────────────────────
-const isDashboardColor = (hex: string): boolean => {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!result) return false;
-  const r = parseInt(result[1], 16);
-  const g = parseInt(result[2], 16);
-  const b = parseInt(result[3], 16);
-  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
-};
-
-const getDashboardCellStyle = (cell: any): string => {
-  if (!props.isDashboard) return "";
-  const col = (cell.column.columnDef.meta as any)?._col;
-  const value = cell.getValue();
-  // 1) Auto color mode — stable palette per distinct string value.
-  if (col?.colorMode === "auto") {
-    const palette = getColorForTable;
-    const key = String(value);
-    const cacheKey = `__autoColorMap_${col.field ?? col.name}`;
-    if (!col[cacheKey]) col[cacheKey] = new Map<string, string>();
-    const map: Map<string, string> = col[cacheKey];
-    if (!map.has(key)) map.set(key, palette[map.size % palette.length]);
-    const hex = map.get(key) as string;
-    return `background-color: ${hex}; color: ${isDashboardColor(hex) ? "#ffffff" : "#000000"}`;
-  }
-  // 2) Value-mapping color.
-  const found = findFirstValidMappedValue(value, props.valueMapping, "color");
-  if (found?.color) {
-    const hex = found.color;
-    if (!/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(hex)) return "";
-    return `background-color: ${hex}; color: ${isDashboardColor(hex) ? "#ffffff" : "#000000"}`;
-  }
-  return "";
-};
-
-const getDashboardCellValue = (cell: any): any => {
+const getCellDisplayValue = (cell: any): any => {
   const value = cell.getValue();
   if (value === "undefined" || value === null || value === undefined) return "";
   const format = (cell.column.columnDef.meta as any)?.format;
@@ -1611,75 +1476,6 @@ const paginationOptions = computed(() => {
 
 // pagedRows is defined after formattedRows below — see declaration near virtualizer.
 
-// ── Dashboard: CSV / JSON export ─────────────────────────────────────────────
-const wrapCsvValue = (val: any, formatFn?: any, row?: any): string => {
-  let formatted = formatFn !== undefined ? formatFn(val, row) : val;
-  formatted =
-    formatted === undefined || formatted === null ? "" : String(formatted);
-  return `"${formatted.split('"').join('""')}"`;
-};
-
-const downloadCsv = (title?: string) => {
-  const cols = (props.columns as any[]) || [];
-  const rows = [
-    ...(table?.getRowModel().rows.map((r: any) => r.original) || []),
-    ...(stickyTotalRow.value ? [stickyTotalRow.value] : []),
-  ];
-  const content = [
-    cols.map((col: any) => wrapCsvValue(col.label)).join(","),
-    ...rows.map((row: any) =>
-      cols
-        .map((col: any) =>
-          wrapCsvValue(
-            typeof col.field === "function"
-              ? col.field(row)
-              : row[col.field ?? col.name],
-            col.format,
-            row,
-          ),
-        )
-        .join(","),
-    ),
-  ].join("\r\n");
-  const status = exportFile(
-    `${title ?? "table-export"}.csv`,
-    content,
-    "text/csv",
-  );
-  if (status === true)
-    showPositiveNotification("Table downloaded as a CSV file", {
-      timeout: 2000,
-    });
-  else showErrorNotification("Browser denied file download...");
-};
-
-const downloadJson = (title?: string) => {
-  try {
-    const rows = [
-      ...(table?.getRowModel().rows.map((r: any) => r.original) || []),
-      ...(stickyTotalRow.value ? [stickyTotalRow.value] : []),
-    ];
-    const content = JSON.stringify(
-      { columns: props.columns, rows },
-      null,
-      2,
-    );
-    const status = exportFile(
-      `${title ?? "table-export"}.json`,
-      content,
-      "application/json",
-    );
-    if (status === true)
-      showPositiveNotification("Table downloaded as a JSON file", {
-        timeout: 2000,
-      });
-    else showErrorNotification("Browser denied file download...");
-  } catch (error) {
-    console.error("Error downloading JSON:", error);
-    showErrorNotification("Failed to download data as JSON");
-  }
-};
-
 const selectedStreamFtsKeys: ComputedRef<StreamField[]> = computed(() => {
   return props.selectedStreamFtsKeys || [];
 });
@@ -1700,7 +1496,7 @@ const getRowStatusColor = (rowData: any) => {
 watch(
   () => props.columns,
   async (newVal) => {
-    columnOrder.value = newVal.map((column: any) => column.id);
+    columnOrder.value = newVal.map((column: any) => column.id ?? column.name);
 
     await nextTick();
 
@@ -1730,7 +1526,29 @@ watch(
 watch(
   () => props.rows,
   async (newVal) => {
-    if (newVal) tableRows.value = [...newVal];
+    if (!newVal) return;
+
+    // Filter out total rows (dashboard pivot); no-op for logs/traces
+    const rows = (newVal as any[]).filter((r: any) => !r.__isTotalRow);
+
+    // Apply pivot sort when active, otherwise just assign
+    const { sortBy, descending } = pivotSortState.value;
+    if (isPivotMode.value && sortBy) {
+      const col = ((props.columns as any[]) || []).find(
+        (c: any) => c.name === sortBy || c.id === sortBy,
+      );
+      tableRows.value = [...rows].sort((a: any, b: any) => {
+        const va = a[sortBy];
+        const vb = b[sortBy];
+        let result: number;
+        if (col?.sort) result = col.sort(va, vb, a, b);
+        else if (typeof va === "number" && typeof vb === "number") result = va - vb;
+        else result = String(va ?? "").localeCompare(String(vb ?? ""));
+        return descending ? -result : result;
+      });
+    } else {
+      tableRows.value = [...rows];
+    }
 
     await nextTick();
 
@@ -2226,13 +2044,8 @@ defineExpose({
   store,
   selectedStreamFtsKeys,
   processedResults,
-  // Dashboard / TableRenderer parity
-  downloadCsv,
-  downloadJson,
-  /** @deprecated use downloadCsv */
-  downloadTableAsCSV: downloadCsv,
-  /** @deprecated use downloadJson */
-  downloadTableAsJSON: downloadJson,
+  /** Returns the current sorted/filtered rows as plain objects (for export, etc.) */
+  getRows: () => table?.getRowModel().rows.map((r: any) => r.original) ?? [],
 });
 </script>
 <style>
