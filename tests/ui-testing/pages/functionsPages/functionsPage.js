@@ -173,6 +173,21 @@ class FunctionsPage {
     await expect(addButton).toBeVisible({ timeout: 15000 });
   }
 
+  /**
+   * Click save and wait for an error notification to appear.
+   * Use this instead of clickSaveButton() when the save is expected to fail
+   * (e.g. invalid/empty code) so the form stays open and the list-page add
+   * button never reappears.
+   */
+  async clickSaveButtonExpectError() {
+    const saveButton = this.page.locator(this.saveButton);
+    await saveButton.click();
+
+    // Wait for an error notification; .catch keeps the test flowing if none appears.
+    const notification = this.page.locator('.q-notification').first();
+    await notification.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+  }
+
   async clickCancelButton() {
     const cancelButton = this.page.locator(this.cancelButton);
     await cancelButton.click();
