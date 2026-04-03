@@ -9,6 +9,7 @@ import DashboardSetting from "./dashboardPages/dashboard-settings";
 import DashboardVariables from "./dashboardPages/dashboard-variables";
 import DashboardVariablesScoped from "./dashboardPages/dashboard-variables-scoped.js";
 import ChartTypeSelector from "./dashboardPages/dashboard-chart";
+import DashboardMaxQueryRange from "./dashboardPages/dashboard-max-query-range";
 import DashboardDrilldownPage from "./dashboardPages/dashboard-drilldown";
 import DashboardLegendsCopy from "./dashboardPages/dashboard-legends-copy";
 import DashboardFilter from "./dashboardPages/dashboard-filter";
@@ -90,6 +91,7 @@ class PageManager {
     this.dashboardVariables = new DashboardVariables(page);
     this.dashboardVariablesScoped = new DashboardVariablesScoped(page);
     this.chartTypeSelector = new ChartTypeSelector(page);
+    this.dashboardMaxQueryRange = new DashboardMaxQueryRange(page);
     this.dashboardDrilldown = new DashboardDrilldownPage(page);
     this.dashboardLegendsCopy = new DashboardLegendsCopy(page);
     this.dashboardFilter = new DashboardFilter(page);

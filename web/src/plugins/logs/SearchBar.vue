@@ -2381,6 +2381,11 @@ import {
   Minimize,
 } from "lucide-vue-next";
 import { outlinedShowChart } from "@quasar/extras/material-icons-outlined";
+import {
+  getFieldFromExpression,
+  hasFieldCondition,
+  replaceExistingFieldCondition,
+} from "@/plugins/logs/filterUtils";
 
 const defaultValue: any = () => {
   return {
@@ -2389,52 +2394,6 @@ const defaultValue: any = () => {
     params: "row",
     transType: "0",
   };
-};
-
-/**
- * Extracts the field name from a filter expression.
- * Handles single: `field = 'val'`, multi: `(field = 'x' OR field = 'y')`,
- * and SQL-prefixed: `"stream".field = 'val'`.
- */
-const getFieldFromExpression = (expression: string): string | null => {
-  const cleaned = expression.trim().replace(/^\(\s*/, "");
-  const match =
-    cleaned.match(/^"[^"]+"\."?(\w+)"?\s*(?:=|!=|is)/i) ||
-    cleaned.match(/^(\w+)\s*(?:=|!=|is)/i);
-  return match ? match[1] : null;
-};
-
-/**
- * Tries to replace an existing condition for `fieldName` in `queryStr` with
- * `newExpression`. Returns the modified string, or the original if not found.
- * Handles both parenthesized multi-value groups and single conditions.
- */
-const replaceExistingFieldCondition = (
-  queryStr: string,
-  fieldName: string,
-  newExpression: string,
-): string => {
-  const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
-  const opPat = `(?:=|!=|is(?:\\s+not)?)`;
-  const condPat = `(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
-
-  // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
-  const multiRegex = new RegExp(
-    `\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`,
-    "gi",
-  );
-  if (multiRegex.test(queryStr)) {
-    return queryStr.replace(multiRegex, newExpression);
-  }
-
-  // Try single condition
-  const singleRegex = new RegExp(condPat, "gi");
-  if (singleRegex.test(queryStr)) {
-    return queryStr.replace(singleRegex, newExpression);
-  }
-
-  return queryStr;
 };
 
 export default defineComponent({
@@ -5424,14 +5383,14 @@ export default defineComponent({
               // if query contains where clause then add filter after that with and operator and keep order by or limit after that
               // if query does not contain where clause then add where clause before filter
               if (query.toLowerCase().includes("where")) {
-                // Try to replace existing condition for this field first
+                // Replace an existing condition for this field, or append if none.
                 const fieldNameSQL = getFieldFromExpression(filter);
-                const replacedSQL = fieldNameSQL
-                  ? replaceExistingFieldCondition(query, fieldNameSQL, filter)
-                  : query;
-
-                if (replacedSQL !== query) {
-                  query = replacedSQL;
+                if (fieldNameSQL && hasFieldCondition(query, fieldNameSQL)) {
+                  query = replaceExistingFieldCondition(
+                    query,
+                    fieldNameSQL,
+                    filter,
+                  );
                 } else if (query.toLowerCase().includes("order by")) {
                   const [beforeOrderBy, afterOrderBy] = queryIndexSplit(
                     query,
@@ -5509,15 +5468,12 @@ export default defineComponent({
               currentQuery[0] = query;
             } else {
               const fieldName = getFieldFromExpression(filter);
-              const replaced = fieldName
-                ? replaceExistingFieldCondition(
-                    currentQuery[0],
-                    fieldName,
-                    filter,
-                  )
-                : currentQuery[0];
-              if (replaced !== currentQuery[0]) {
-                currentQuery[0] = replaced;
+              if (fieldName && hasFieldCondition(currentQuery[0], fieldName)) {
+                currentQuery[0] = replaceExistingFieldCondition(
+                  currentQuery[0],
+                  fieldName,
+                  filter,
+                );
               } else {
                 currentQuery[0].length == 0
                   ? (currentQuery[0] = filter)
