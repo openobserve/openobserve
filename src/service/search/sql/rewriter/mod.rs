@@ -17,7 +17,6 @@ pub mod add_new_filter;
 pub mod add_o2_id;
 pub mod add_ordering_term;
 pub mod add_timestamp;
-pub mod approx_percentile;
 pub mod index;
 pub mod match_all_raw;
 pub mod remove_dashboard_placeholder;

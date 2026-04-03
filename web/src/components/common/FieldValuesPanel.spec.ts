@@ -337,7 +337,12 @@ describe("FieldValuesPanel.vue", () => {
       expect(emitted![0]).toEqual(["status", ["value-1"], "exclude"]);
     });
 
-    it("clears selectedValues after applying multi-select include", async () => {
+    it("does NOT clear selectedValues after applying multi-select include", async () => {
+      // Fix: selectedValues must not be wiped on apply. The watcher on
+      // allActiveValues (driven by activeIncludeValues / activeExcludeValues
+      // props) is responsible for syncing selection state once the parent query
+      // updates. Clearing here caused a visual deselect flash and allowed a
+      // duplicate append when Include was clicked a second time.
       wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(3) });
       (wrapper.vm as any).selectedValues = ["value-1"];
       await nextTick();
@@ -345,7 +350,53 @@ describe("FieldValuesPanel.vue", () => {
         '[data-test="log-search-subfield-include-selected-status"]'
       );
       await includeBtn.trigger("click");
-      expect((wrapper.vm as any).selectedValues).toEqual([]);
+      expect((wrapper.vm as any).selectedValues).toEqual(["value-1"]);
+    });
+
+    it("syncs selectedValues from activeIncludeValues when parent query updates", async () => {
+      // Simulates what happens after the query has been updated by the parent:
+      // selectedValues must reflect the new active filter state.
+      wrapper = createWrapper({
+        showMultiSelect: true,
+        fieldValues: buildFieldValues(3),
+        activeIncludeValues: ["value-1"],
+      });
+      await nextTick();
+      expect((wrapper.vm as any).selectedValues).toEqual(["value-1"]);
+
+      // Parent query changes (e.g. user clicks Include on a different value)
+      await wrapper.setProps({ activeIncludeValues: ["value-2"] });
+      await nextTick();
+      expect((wrapper.vm as any).selectedValues).toEqual(["value-2"]);
+    });
+
+    it("keeps selectedValues stable when Include is clicked a second time with the same selection", async () => {
+      // This verifies the no-op behaviour: clicking Include twice without
+      // changing the selection must not append or change selectedValues.
+      wrapper = createWrapper({
+        showMultiSelect: true,
+        fieldValues: buildFieldValues(3),
+        activeIncludeValues: ["value-1"],
+      });
+      await nextTick();
+      expect((wrapper.vm as any).selectedValues).toEqual(["value-1"]);
+
+      const includeBtn = wrapper.find(
+        '[data-test="log-search-subfield-include-selected-status"]'
+      );
+      await includeBtn.trigger("click");
+      // Still emits so parent can do a no-op replace — but selectedValues unchanged
+      expect((wrapper.vm as any).selectedValues).toEqual(["value-1"]);
+    });
+
+    it("syncs selectedValues from activeExcludeValues when exclude is active", async () => {
+      wrapper = createWrapper({
+        showMultiSelect: true,
+        fieldValues: buildFieldValues(3),
+        activeExcludeValues: ["value-3"],
+      });
+      await nextTick();
+      expect((wrapper.vm as any).selectedValues).toEqual(["value-3"]);
     });
   });
 
