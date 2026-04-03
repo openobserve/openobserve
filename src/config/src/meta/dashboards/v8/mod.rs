@@ -105,6 +105,7 @@ pub struct Tab {
 #[serde(rename_all = "lowercase")]
 pub enum QueryType {
     #[default]
+    #[serde(alias = "")]
     Sql,
     Promql,
 }
@@ -860,7 +861,8 @@ pub enum LayerType {
     Heatmap,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
 pub struct QueryConfig {
     promql_legend: String,
     #[serde(skip_serializing_if = "Option::is_none")]
