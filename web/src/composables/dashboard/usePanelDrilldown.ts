@@ -1076,11 +1076,11 @@ export function usePanelDrilldown({
 
           window.open(currentUrl, "_blank");
         } else {
-          let oldParams: any = [];
+          let oldParams: any = {};
           // if pass all variables is true
           if (drilldownData.data.passAllVariables) {
-            // get current query params
-            oldParams = route.query;
+            // get current query params — spread to avoid mutating Vue Router's reactive object
+            oldParams = { ...route.query };
           }
 
           drilldownData.data.variables.forEach((variable: any) => {
