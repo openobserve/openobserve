@@ -30,7 +30,60 @@ pub enum ReportDestination {
 pub enum ReportMediaType {
     #[default]
     #[serde(rename = "pdf")]
-    Pdf, // Supports Pdf only
+    Pdf,
+    #[serde(rename = "png")]
+    Png,
+}
+
+impl From<i16> for ReportMediaType {
+    fn from(v: i16) -> Self {
+        match v {
+            1 => ReportMediaType::Png,
+            _ => ReportMediaType::Pdf,
+        }
+    }
+}
+
+impl From<ReportMediaType> for i16 {
+    fn from(t: ReportMediaType) -> i16 {
+        match t {
+            ReportMediaType::Pdf => 0,
+            ReportMediaType::Png => 1,
+        }
+    }
+}
+
+#[derive(Serialize, Debug, Default, Deserialize, Clone, ToSchema, PartialEq)]
+pub enum ReportEmailAttachmentType {
+    #[default]
+    #[serde(rename = "standard")]
+    Standard,
+    #[serde(rename = "inline")]
+    Inline,
+}
+
+impl From<i16> for ReportEmailAttachmentType {
+    fn from(v: i16) -> Self {
+        match v {
+            1 => ReportEmailAttachmentType::Inline,
+            _ => ReportEmailAttachmentType::Standard,
+        }
+    }
+}
+
+impl From<ReportEmailAttachmentType> for i16 {
+    fn from(t: ReportEmailAttachmentType) -> i16 {
+        match t {
+            ReportEmailAttachmentType::Standard => 0,
+            ReportEmailAttachmentType::Inline => 1,
+        }
+    }
+}
+
+#[derive(Serialize, Debug, Deserialize, Clone, ToSchema, PartialEq)]
+pub struct ReportAttachmentDimensions {
+    pub width: u32,
+    pub height: u32,
 }
 
 #[derive(Serialize, Debug, Default, Deserialize, Clone, ToSchema, PartialEq, Eq)]
@@ -51,6 +104,16 @@ pub struct ReportDashboard {
     /// The timerange of dashboard data.
     #[serde(default)]
     pub timerange: ReportTimerange,
+    /// The type of report attachment — PDF or PNG.
+    #[serde(default)]
+    pub report_type: ReportMediaType,
+    /// How the attachment is sent in the email — as a downloadable file or embedded inline.
+    #[serde(default)]
+    pub email_attachment_type: ReportEmailAttachmentType,
+    /// Optional override for the browser viewport dimensions used when capturing the report.
+    /// When `None` the report server's configured defaults are used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attachment_dimensions: Option<ReportAttachmentDimensions>,
 }
 
 #[derive(Serialize, Debug, Default, Deserialize, Clone, ToSchema, PartialEq, Eq)]
@@ -144,6 +207,10 @@ pub struct Report {
     pub enabled: bool,
     #[serde(default)]
     pub media_type: ReportMediaType,
+    /// When `true` and the report type is PDF, a PNG screenshot is also captured and embedded
+    /// inline in the email body alongside the PDF attachment.
+    #[serde(default)]
+    pub image_preview: bool,
     #[serde(default)]
     pub timezone: String,
     /// Fixed timezone offset in minutes
@@ -174,6 +241,7 @@ impl Default for Report {
             message: "".to_string(),
             enabled: false,
             media_type: ReportMediaType::default(),
+            image_preview: false,
             timezone: "".to_string(),
             tz_offset: 0, // UTC
             created_at: datetime_now(),
@@ -193,6 +261,9 @@ pub struct ReportEmailDetails {
     pub name: String,
     pub message: String,
     pub dashb_url: String,
+    /// When `true` and the report type is PDF, a PNG screenshot is embedded inline in the email.
+    #[serde(default)]
+    pub image_preview: bool,
 }
 
 #[derive(Serialize, Debug, Deserialize, Clone)]
@@ -306,6 +377,7 @@ mod tests {
             name: "name".to_string(),
             message: "message".to_string(),
             dashb_url: "https://example.com/dashb_url".to_string(),
+            image_preview: false,
         };
         let json = serde_json::to_string(&email_details).unwrap();
         let json_using_alias = json.replace("recipients", "recepients");
@@ -349,6 +421,9 @@ mod tests {
                 id: None,
             }],
             timerange: ReportTimerange::default(),
+            report_type: ReportMediaType::default(),
+            email_attachment_type: ReportEmailAttachmentType::default(),
+            attachment_dimensions: None,
         };
 
         let serialized = serde_json::to_string(&dashboard).unwrap();
@@ -448,12 +523,16 @@ mod tests {
                 tabs: vec!["tab1".to_string()],
                 variables: vec![],
                 timerange: ReportTimerange::default(),
+                report_type: ReportMediaType::default(),
+                email_attachment_type: ReportEmailAttachmentType::default(),
+                attachment_dimensions: None,
             }],
             destinations: vec![ReportDestination::Email("test@example.com".to_string())],
             description: "Test description".to_string(),
             message: "Test message".to_string(),
             enabled: true,
             media_type: ReportMediaType::Pdf,
+            image_preview: false,
             timezone: "UTC".to_string(),
             tz_offset: 0,
             created_at: datetime_now(),
@@ -491,6 +570,7 @@ mod tests {
             message: "Test message".to_string(),
             enabled: true,
             media_type: ReportMediaType::Pdf,
+            image_preview: false,
             timezone: "UTC".to_string(),
             tz_offset: 0,
             created_at: datetime_now(),
@@ -519,6 +599,7 @@ mod tests {
             name: "test_name".to_string(),
             message: "Test message".to_string(),
             dashb_url: "https://example.com/dashboard".to_string(),
+            image_preview: false,
         };
 
         assert_eq!(email_details.recipients.len(), 2);
@@ -536,6 +617,7 @@ mod tests {
             name: "test".to_string(),
             message: "test".to_string(),
             dashb_url: "https://example.com".to_string(),
+            image_preview: false,
         };
 
         let payload = HttpReportPayload {
@@ -545,6 +627,9 @@ mod tests {
                 tabs: vec!["tab1".to_string()],
                 variables: vec![],
                 timerange: ReportTimerange::default(),
+                report_type: ReportMediaType::default(),
+                email_attachment_type: ReportEmailAttachmentType::default(),
+                attachment_dimensions: None,
             }],
             email_details: email_details.clone(),
         };

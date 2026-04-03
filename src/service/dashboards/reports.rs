@@ -368,6 +368,7 @@ impl SendReport for Report {
                     name: self.name.clone(),
                     message: self.message.clone(),
                     dashb_url: format!("{}{}/web", cfg.common.web_url, cfg.common.base_uri),
+                    image_preview: self.image_preview,
                 },
             };
 
