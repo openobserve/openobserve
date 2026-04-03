@@ -66,10 +66,8 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       testLogger.info(`JavaScript function created in _meta org: ${functionName}`);
 
       // Step 3: Verify function appears in list
-      // Reload the page to ensure a fresh list fetch
-      await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=_meta`);
-      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-      await page.waitForTimeout(2000);
+      // clickSaveButton() already navigates back to the list and triggers getJSTransforms().
+      // expectFunctionInList's 30s timeout handles waiting for the reactive data update.
       await pm.functionsPage.searchFunction(functionName);
       await pm.functionsPage.expectFunctionInList(functionName);
       testLogger.info('Function visible in functions list');
@@ -253,10 +251,8 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       await pm.functionsPage.enterFunctionCode(vrlCode);
       await pm.functionsPage.clickSaveButton();
 
-      // Navigate back to functions list and search for the function
-      await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${nonMetaOrg}`);
-      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-      await page.waitForTimeout(2000);
+      // clickSaveButton() already navigates back to the list and triggers getJSTransforms().
+      // expectFunctionInList's 30s timeout handles waiting for the reactive data update.
       await pm.functionsPage.searchFunction(functionName);
       await pm.functionsPage.expectFunctionInList(functionName);
       testLogger.info(`VRL function created successfully in ${nonMetaOrg} org`);
