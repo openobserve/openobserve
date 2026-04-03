@@ -224,29 +224,29 @@ describe("FieldValuesPanel.vue", () => {
     });
   });
 
-  // ─── Emit: add-search-term ───────────────────────────────────────────────────
+  // ─── Emit: checkbox-driven add-multiple-search-terms ────────────────────────
 
-  describe("Emit: add-search-term", () => {
-    it("emits 'add-search-term' with include when include button clicked", async () => {
+  describe("Emit: checkbox-driven add-multiple-search-terms", () => {
+    it("emits 'add-multiple-search-terms' with include when checkbox checked in include mode", async () => {
       wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(1) });
-      const includeBtn = wrapper.find(
-        '[data-test="log-search-subfield-list-equal-status-field-btn"]'
-      );
-      await includeBtn.trigger("click");
-      const emitted = wrapper.emitted("add-search-term");
+      // filterMode defaults to 'include'
+      (wrapper.vm as any).handleUserCheckboxChange(["value-1"]);
+      await nextTick();
+      const emitted = wrapper.emitted("add-multiple-search-terms");
       expect(emitted).toBeTruthy();
-      expect(emitted![0]).toEqual(["status", "value-1", "include"]);
+      expect(emitted![0]).toEqual(["status", ["value-1"], "include"]);
     });
 
-    it("emits 'add-search-term' with exclude when exclude button clicked", async () => {
+    it("emits 'add-multiple-search-terms' with exclude when checkbox checked in exclude mode", async () => {
       wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(1) });
-      const excludeBtn = wrapper.find(
-        '[data-test="log-search-subfield-list-not-equal-status-field-btn"]'
-      );
-      await excludeBtn.trigger("click");
-      const emitted = wrapper.emitted("add-search-term");
+      // Set filterMode to 'exclude' while selectedValues is empty so watcher doesn't fire
+      (wrapper.vm as any).filterMode = "exclude";
+      await nextTick();
+      (wrapper.vm as any).handleUserCheckboxChange(["value-1"]);
+      await nextTick();
+      const emitted = wrapper.emitted("add-multiple-search-terms");
       expect(emitted).toBeTruthy();
-      expect(emitted![0]).toEqual(["status", "value-1", "exclude"]);
+      expect(emitted![0]).toEqual(["status", ["value-1"], "exclude"]);
     });
   });
 
@@ -282,22 +282,22 @@ describe("FieldValuesPanel.vue", () => {
   describe("Multi-select action bar", () => {
     it("is hidden when no values are selected", () => {
       wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(3) });
-      const bar = wrapper.find(".multi-select-action-bar");
-      expect(bar.exists()).toBe(false);
+      // selection-count is only shown when selectedValues.length > 0
+      expect(wrapper.find(".selection-count").exists()).toBe(false);
     });
 
     it("appears when at least one value is selected", async () => {
       wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(3) });
       (wrapper.vm as any).selectedValues = ["value-1"];
       await nextTick();
-      expect(wrapper.find(".multi-select-action-bar").exists()).toBe(true);
+      expect(wrapper.find(".selection-count").exists()).toBe(true);
     });
 
     it("shows count of selected values", async () => {
       wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(3) });
       (wrapper.vm as any).selectedValues = ["value-1", "value-2"];
       await nextTick();
-      expect(wrapper.find(".multi-select-count").text()).toContain("2 selected");
+      expect(wrapper.find(".selection-count").text()).toContain("2 selected");
     });
 
     it("clears selection when clear button clicked", async () => {
@@ -305,18 +305,21 @@ describe("FieldValuesPanel.vue", () => {
       (wrapper.vm as any).selectedValues = ["value-1"];
       await nextTick();
       const clearBtn = wrapper.find(
-        '[data-test="log-search-subfield-clear-selected-status"]'
+        '[data-test="field-values-panel-clear-selection-btn"]'
       );
       await clearBtn.trigger("click");
       expect((wrapper.vm as any).selectedValues).toEqual([]);
     });
 
-    it("emits 'add-multiple-search-terms' with include when Include clicked", async () => {
+    it("emits 'add-multiple-search-terms' with include when Include mode button clicked", async () => {
       wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(3) });
+      // Set filterMode to 'exclude' while selectedValues is empty so no premature emit
+      (wrapper.vm as any).filterMode = "exclude";
+      await nextTick();
       (wrapper.vm as any).selectedValues = ["value-1", "value-2"];
       await nextTick();
       const includeBtn = wrapper.find(
-        '[data-test="log-search-subfield-include-selected-status"]'
+        '[data-test="field-values-panel-include-mode-btn"]'
       );
       await includeBtn.trigger("click");
       const emitted = wrapper.emitted("add-multiple-search-terms");
@@ -324,12 +327,13 @@ describe("FieldValuesPanel.vue", () => {
       expect(emitted![0]).toEqual(["status", ["value-1", "value-2"], "include"]);
     });
 
-    it("emits 'add-multiple-search-terms' with exclude when Exclude clicked", async () => {
+    it("emits 'add-multiple-search-terms' with exclude when Exclude mode button clicked", async () => {
       wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(3) });
+      // filterMode defaults to 'include'; set selectedValues then click exclude
       (wrapper.vm as any).selectedValues = ["value-1"];
       await nextTick();
       const excludeBtn = wrapper.find(
-        '[data-test="log-search-subfield-exclude-selected-status"]'
+        '[data-test="field-values-panel-exclude-mode-btn"]'
       );
       await excludeBtn.trigger("click");
       const emitted = wrapper.emitted("add-multiple-search-terms");
@@ -338,16 +342,18 @@ describe("FieldValuesPanel.vue", () => {
     });
 
     it("does NOT clear selectedValues after applying multi-select include", async () => {
-      // Fix: selectedValues must not be wiped on apply. The watcher on
-      // allActiveValues (driven by activeIncludeValues / activeExcludeValues
-      // props) is responsible for syncing selection state once the parent query
-      // updates. Clearing here caused a visual deselect flash and allowed a
-      // duplicate append when Include was clicked a second time.
+      // selectedValues must not be wiped after a filter mode change.
+      // The watcher on allActiveValues (driven by activeIncludeValues /
+      // activeExcludeValues props) is responsible for syncing selection state
+      // once the parent query updates.
       wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(3) });
+      // Set filterMode to 'exclude' while empty, then add selectedValues
+      (wrapper.vm as any).filterMode = "exclude";
+      await nextTick();
       (wrapper.vm as any).selectedValues = ["value-1"];
       await nextTick();
       const includeBtn = wrapper.find(
-        '[data-test="log-search-subfield-include-selected-status"]'
+        '[data-test="field-values-panel-include-mode-btn"]'
       );
       await includeBtn.trigger("click");
       expect((wrapper.vm as any).selectedValues).toEqual(["value-1"]);
@@ -371,8 +377,9 @@ describe("FieldValuesPanel.vue", () => {
     });
 
     it("keeps selectedValues stable when Include is clicked a second time with the same selection", async () => {
-      // This verifies the no-op behaviour: clicking Include twice without
-      // changing the selection must not append or change selectedValues.
+      // filterMode starts as 'include'; clicking include again is a no-op —
+      // Vue's watcher does not fire when the value doesn't change, so selectedValues
+      // remains untouched.
       wrapper = createWrapper({
         showMultiSelect: true,
         fieldValues: buildFieldValues(3),
@@ -382,10 +389,10 @@ describe("FieldValuesPanel.vue", () => {
       expect((wrapper.vm as any).selectedValues).toEqual(["value-1"]);
 
       const includeBtn = wrapper.find(
-        '[data-test="log-search-subfield-include-selected-status"]'
+        '[data-test="field-values-panel-include-mode-btn"]'
       );
       await includeBtn.trigger("click");
-      // Still emits so parent can do a no-op replace — but selectedValues unchanged
+      // filterMode was already 'include', no reactive change, no emit
       expect((wrapper.vm as any).selectedValues).toEqual(["value-1"]);
     });
 
@@ -400,13 +407,14 @@ describe("FieldValuesPanel.vue", () => {
     });
   });
 
-  // ─── handleApplyMultiSelect edge cases ──────────────────────────────────────
+  // ─── Filter mode edge cases ──────────────────────────────────────────────────
 
-  describe("handleApplyMultiSelect edge cases", () => {
-    it("does not emit when selectedValues is empty", async () => {
+  describe("Filter mode edge cases", () => {
+    it("does not emit add-multiple-search-terms when selectedValues is empty", async () => {
       wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(2) });
-      (wrapper.vm as any).selectedValues = [];
-      (wrapper.vm as any).handleApplyMultiSelect("include");
+      // selectedValues is empty; changing filterMode should not emit add-multiple-search-terms
+      const excludeBtn = wrapper.find('[data-test="field-values-panel-exclude-mode-btn"]');
+      await excludeBtn.trigger("click");
       await nextTick();
       expect(wrapper.emitted("add-multiple-search-terms")).toBeFalsy();
     });
