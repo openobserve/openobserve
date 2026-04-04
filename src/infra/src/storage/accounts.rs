@@ -17,12 +17,13 @@ use std::ops::Range;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{get_config, is_local_disk_storage, utils::hash::Sum64};
+use config::{get_config, is_local_disk_storage, metrics, utils::hash::Sum64};
 use futures::stream::BoxStream;
 use hashbrown::{HashMap, HashSet};
 use object_store::{
     GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
-    PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, path::Path,
+    ObjectStoreExt as ObjStoreExt, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result,
+    path::Path,
 };
 
 use crate::storage::{ObjectStoreExt, get_stream_from_file, remote::StorageConfig};
@@ -329,14 +330,34 @@ impl ObjectStoreExt for StorageClientFactory {
     }
 
     async fn delete(&self, account: &str, location: &Path) -> Result<()> {
-        self.get_client_by_name(account).delete(location).await
+        let mut result: Result<()> = Ok(());
+        for _ in 0..3 {
+            result = self.get_client_by_name(account).delete(location).await;
+            if result.is_ok() {
+                let file = location.to_string();
+                let columns = file.split('/').collect::<Vec<&str>>();
+                if columns.len() > 2 && columns[0] == "files" {
+                    let storage_type = if is_local_disk_storage() {
+                        "local"
+                    } else {
+                        "remote"
+                    };
+                    metrics::STORAGE_WRITE_REQUESTS
+                        .with_label_values(&[columns[1], columns[2], storage_type])
+                        .inc();
+                }
+                break;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+        result
     }
 
-    fn delete_stream<'a>(
-        &'a self,
+    fn delete_stream(
+        &self,
         account: &str,
-        locations: BoxStream<'a, Result<Path>>,
-    ) -> BoxStream<'a, Result<Path>> {
+        locations: BoxStream<'static, Result<Path>>,
+    ) -> BoxStream<'static, Result<Path>> {
         self.get_client_by_name(account).delete_stream(locations)
     }
 

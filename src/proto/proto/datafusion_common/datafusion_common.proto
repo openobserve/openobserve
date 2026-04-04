@@ -183,6 +183,11 @@ message Map {
   bool keys_sorted = 2;
 }
 
+message RunEndEncoded {
+  Field run_ends_field = 1;
+  Field values_field = 2;
+}
+
 enum UnionMode{
   sparse = 0;
   dense = 1;
@@ -234,6 +239,12 @@ message ScalarTimestampValue {
 message ScalarDictionaryValue {
   ArrowType index_type = 1;
   ScalarValue value = 2;
+}
+
+message ScalarRunEndEncodedValue {
+  Field run_ends_field = 1;
+  Field values_field = 2;
+  ScalarValue value = 3;
 }
 
 message IntervalDayTimeValue {
@@ -321,6 +332,8 @@ message ScalarValue{
     IntervalMonthDayNanoValue interval_month_day_nano = 31;
     ScalarFixedSizeBinary fixed_size_binary_value = 34;
     UnionValue union_value = 42;
+
+    ScalarRunEndEncodedValue run_end_encoded_value = 45;
   }
 }
 
@@ -389,6 +402,7 @@ message ArrowType{
     Union UNION = 29;
     Dictionary DICTIONARY = 30;
     Map MAP = 33;
+    RunEndEncoded RUN_END_ENCODED = 42;
   }
 }
 
@@ -469,6 +483,7 @@ message JsonOptions {
   CompressionTypeVariant compression = 1; // Compression type
   optional uint64 schema_infer_max_rec = 2; // Optional max records for schema inference
   optional uint32 compression_level = 3; // Optional compression level
+  optional bool newline_delimited = 4; // Whether to read as newline-delimited JSON (default true). When false, expects JSON array format [{},...]
 }
 
 message TableParquetOptions {
