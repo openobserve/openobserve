@@ -229,7 +229,7 @@ async function globalSetup() {
     if (isCleanupOnly || process.env.SKIP_INGESTION === 'true') {
       testLogger.info('[alpha1] Skipping data ingestion (cleanup-only run or SKIP_INGESTION=true)');
     } else {
-      await performGlobalIngestion(page, baseUrl);
+      await performGlobalIngestion(page);
     }
 
   } catch (error) {
@@ -259,7 +259,7 @@ async function globalSetup() {
  * Ingest test data into streams so they appear in UI dropdowns.
  * Uses cloud auth (email:passcode) from cloud-config.json.
  */
-async function performGlobalIngestion(page, baseUrl) {
+async function performGlobalIngestion(page) {
   const cloudConfigFile = path.join(__dirname, 'auth', 'cloud-config.json');
   let headers;
   let orgId;
@@ -285,15 +285,15 @@ async function performGlobalIngestion(page, baseUrl) {
 
   for (const stream of streams) {
     try {
-      const response = await page.evaluate(async ({ url, headers, orgId, streamName, data }) => {
-        const base = url.endsWith('/') ? url.slice(0, -1) : url;
-        const r = await fetch(`${base}/api/${orgId}/${streamName}/_json`, {
+      const response = await page.evaluate(async ({ headers, orgId, streamName, data }) => {
+        // Use relative URL to avoid CORS when Dex redirects to a different hostname than ZO_BASE_URL
+        const r = await fetch(`/api/${orgId}/${streamName}/_json`, {
           method: 'POST',
           headers,
           body: JSON.stringify(data),
         });
         return { status: r.status, text: await r.text() };
-      }, { url: baseUrl, headers, orgId, streamName: stream.name, data: stream.data });
+      }, { headers, orgId, streamName: stream.name, data: stream.data });
 
       if (response.status === 200) {
         testLogger.info(`[alpha1] Ingested test data into '${stream.name}'`, { status: response.status });
@@ -314,14 +314,14 @@ async function performGlobalIngestion(page, baseUrl) {
 
   while (Date.now() - startTime < maxWaitMs) {
     try {
-      const streamsResult = await page.evaluate(async ({ url, orgId, headers }) => {
-        const base = url.endsWith('/') ? url.slice(0, -1) : url;
-        const r = await fetch(`${base}/api/${orgId}/streams?type=logs&page_num=0&page_size=1000`, { headers });
+      const streamsResult = await page.evaluate(async ({ orgId, headers }) => {
+        // Use relative URL to avoid CORS when Dex redirects to a different hostname than ZO_BASE_URL
+        const r = await fetch(`/api/${orgId}/streams?type=logs&page_num=0&page_size=1000`, { headers });
         if (!r.ok) return { ok: false, status: r.status };
         const data = await r.json();
         const names = (data.list || []).map(s => s.name);
         return { ok: true, names };
-      }, { url: baseUrl, orgId, headers });
+      }, { orgId, headers });
 
       if (streamsResult.ok) {
         const hasE2e = streamsResult.names.includes('e2e_automate');
