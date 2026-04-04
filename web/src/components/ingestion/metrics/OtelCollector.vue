@@ -55,7 +55,12 @@ const getOtelGrpcConfig = computed(() => {
         organization: ${props.currOrgIdentifier}
         stream-name: default
       tls:
-        insecure: true`;
+        insecure: true
+
+service:
+  telemetry:
+    logs:
+      level: warn`;
 });
 
 const getOtelHttpConfig = computed(() => {
@@ -64,7 +69,12 @@ const getOtelHttpConfig = computed(() => {
     endpoint: ${endpoint.value.url}/api/${props.currOrgIdentifier}
     headers:
       Authorization: Basic [BASIC_PASSCODE]
-      stream-name: default`;
+      stream-name: default
+
+service:
+  telemetry:
+    logs:
+      level: warn`;
 });
 </script>
 
