@@ -192,6 +192,8 @@ pub struct UserResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub orgs: Option<Vec<OrgRoleMapping>>,
     pub created_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -629,6 +631,7 @@ mod tests {
                 role: UserRole::Admin,
             }]),
             created_at: 1234567890,
+            token: None,
         };
 
         assert_eq!(response.email, "test@example.com");
@@ -651,6 +654,7 @@ mod tests {
                 is_external: false,
                 orgs: None,
                 created_at: 1234567890,
+                token: None,
             }],
         };
 

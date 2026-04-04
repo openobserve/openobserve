@@ -2382,6 +2382,11 @@ import {
   Minimize,
 } from "lucide-vue-next";
 import { outlinedShowChart } from "@quasar/extras/material-icons-outlined";
+import {
+  getFieldFromExpression,
+  hasFieldCondition,
+  replaceExistingFieldCondition,
+} from "@/plugins/logs/filterUtils";
 
 const defaultValue: any = () => {
   return {
@@ -5433,14 +5438,14 @@ export default defineComponent({
               // if query contains where clause then add filter after that with and operator and keep order by or limit after that
               // if query does not contain where clause then add where clause before filter
               if (query.toLowerCase().includes("where")) {
-                // Try to replace existing condition for this field first
+                // Replace an existing condition for this field, or append if none.
                 const fieldNameSQL = getFieldFromExpression(filter);
-                const replacedSQL = fieldNameSQL
-                  ? replaceExistingFieldCondition(query, fieldNameSQL, filter)
-                  : query;
-
-                if (replacedSQL !== query) {
-                  query = replacedSQL;
+                if (fieldNameSQL && hasFieldCondition(query, fieldNameSQL)) {
+                  query = replaceExistingFieldCondition(
+                    query,
+                    fieldNameSQL,
+                    filter,
+                  );
                 } else if (query.toLowerCase().includes("order by")) {
                   const [beforeOrderBy, afterOrderBy] = queryIndexSplit(
                     query,
@@ -5518,15 +5523,12 @@ export default defineComponent({
               currentQuery[0] = query;
             } else {
               const fieldName = getFieldFromExpression(filter);
-              const replaced = fieldName
-                ? replaceExistingFieldCondition(
-                    currentQuery[0],
-                    fieldName,
-                    filter,
-                  )
-                : currentQuery[0];
-              if (replaced !== currentQuery[0]) {
-                currentQuery[0] = replaced;
+              if (fieldName && hasFieldCondition(currentQuery[0], fieldName)) {
+                currentQuery[0] = replaceExistingFieldCondition(
+                  currentQuery[0],
+                  fieldName,
+                  filter,
+                );
               } else {
                 currentQuery[0].length == 0
                   ? (currentQuery[0] = filter)
