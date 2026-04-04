@@ -20,7 +20,7 @@ import {
   formatUnitValue,
 } from "../convertDataIntoUnitValue";
 import { formatDate } from "../dateTimeUtils";
-import { findFirstValidMappedValue } from "../panelValidation";
+import { findFirstValidMappedValue } from "../dashboardValidator";
 import { toZonedTime } from "date-fns-tz";
 import { parseOverrideConfigs } from "../tableConfigUtils";
 

@@ -212,16 +212,16 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
    * Check if this is initial dashboard panel data (no fields configured)
    */
   const isInitialDashboardPanelData = (): boolean => {
+    const fields = dashboardPanelData.data.queries[0]?.fields;
     return (
       dashboardPanelData.data.description === "" &&
       !dashboardPanelData.data.config.unit &&
       !dashboardPanelData.data.config.unit_custom &&
-      dashboardPanelData.data.queries[0].fields.x.length === 0 &&
-      dashboardPanelData.data.queries[0].fields?.breakdown?.length === 0 &&
-      dashboardPanelData.data.queries[0].fields.y.length === 0 &&
-      dashboardPanelData.data.queries[0].fields.z.length === 0 &&
-      dashboardPanelData.data.queries[0].fields.filter.conditions.length ===
-        0 &&
+      (fields?.x?.length ?? 0) === 0 &&
+      (fields?.breakdown?.length ?? 0) === 0 &&
+      (fields?.y?.length ?? 0) === 0 &&
+      (fields?.z?.length ?? 0) === 0 &&
+      (fields?.filter?.conditions?.length ?? 0) === 0 &&
       dashboardPanelData.data.queries.length === 1
     );
   };

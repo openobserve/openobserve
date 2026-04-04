@@ -122,6 +122,9 @@ pub enum DashboardError {
     #[error("Permission denied")]
     PermissionDenied,
 
+    /// Error that occurs when dashboard validation fails against the shared JSON Schema.
+    #[error("Dashboard validation failed: {0:?}")]
+    PutValidationFailed(Vec<String>),
     #[error("panel operations are only supported for v8 dashboards")]
     PanelUnsupportedVersion,
 
@@ -609,6 +612,29 @@ async fn put(
         .and_then(|t| if t.is_empty() { None } else { Some(t) })
         .ok_or_else(|| DashboardError::PutMissingTitle)?;
     dashboard.set_title(title);
+
+    // Validate v8 dashboards against shared JSON Schema + native rules
+    if dashboard.version == 8
+        && let Ok(json_value) = serde_json::to_value(&dashboard)
+    {
+        // Extract the inner v8 data for validation
+        if let Some(v8_json) = json_value.get("v8") {
+            let validation_errors =
+                config::meta::dashboards::validation::validate_dashboard(v8_json);
+            if !validation_errors.is_empty() {
+                let error_messages: Vec<String> = validation_errors
+                    .iter()
+                    .map(|e| e.message.clone())
+                    .collect();
+                log::warn!(
+                    "Dashboard validation errors for {}: {:?}",
+                    dashboard_id,
+                    error_messages
+                );
+                return Err(DashboardError::PutValidationFailed(error_messages));
+            }
+        }
+    }
 
     dashboard.set_dashboard_id(dashboard_id.to_owned());
     let dash = table::dashboards::put(org_id, folder_id, new_folder_id, dashboard, false).await?;

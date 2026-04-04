@@ -27,7 +27,7 @@ vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
   getUnitValue: vi.fn((value, unit, customUnit, decimals) => ({ value: value?.toString() || "0", unit: unit || "" })),
 }));
 
-vi.mock("@/utils/dashboard/panelValidation", () => ({
+vi.mock("@/utils/dashboard/dashboardValidator", () => ({
   findFirstValidMappedValue: vi.fn((value, mappings, type) => {
     if (mappings && mappings.length > 0) {
       const mapping = mappings.find((m: any) => m.from === value);
