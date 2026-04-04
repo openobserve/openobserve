@@ -199,6 +199,16 @@ impl HttpResponse {
             .into_response()
     }
 
+    /// Send a Gone (410) response in json format and associate the
+    /// provided error as `error` field. Used for deprecated endpoints.
+    pub fn gone(error: impl ToString) -> Response {
+        (
+            StatusCode::GONE,
+            Json(Self::error(StatusCode::GONE, error.to_string())),
+        )
+            .into_response()
+    }
+
     /// Send a InternalServerError response in json format and associate the
     /// provided error as `error` field.
     pub fn internal_error(error: impl ToString) -> Response {

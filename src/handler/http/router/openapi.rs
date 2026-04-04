@@ -202,6 +202,7 @@ use crate::{common::meta, handler::http::request};
         request::authz::fga::delete_role,
         request::authz::fga::get_roles,
         request::authz::fga::update_role,
+        request::authz::fga::update_role_deprecated,
         request::authz::fga::get_role_permissions,
         request::authz::fga::get_users_with_role,
         request::authz::fga::create_group,
