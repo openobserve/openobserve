@@ -107,6 +107,8 @@ mod m20260318_000003_alter_alert_incidents_schema;
 mod m20260318_000004_add_set_id_to_service_streams;
 mod m20260318_000005_add_all_dimensions_to_service_streams;
 mod m20260326_000001_add_field_name_mapping_to_service_streams;
+mod m20260401_000001_create_model_pricing_table;
+mod m20260401_000002_add_source_to_model_pricing;
 
 pub struct Migrator;
 
@@ -203,6 +205,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260318_000004_add_set_id_to_service_streams::Migration),
             Box::new(m20260318_000005_add_all_dimensions_to_service_streams::Migration),
             Box::new(m20260326_000001_add_field_name_mapping_to_service_streams::Migration),
+            Box::new(m20260401_000001_create_model_pricing_table::Migration),
+            Box::new(m20260401_000002_add_source_to_model_pricing::Migration),
         ]
     }
 }

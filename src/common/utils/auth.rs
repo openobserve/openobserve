@@ -397,6 +397,46 @@ where
                 OFGA_MODELS.get(key).map_or(key, |model| model.key),
                 entity
             )
+        } else if path_columns[1].eq("llm") {
+            // LLM model pricing routes — treated as admin-level settings.
+            // url_len==3: /{org_id}/llm/models  (list / create)
+            // url_len==4: /{org_id}/llm/models/built-in  (read-only catalog)
+            // url_len==4: /{org_id}/llm/models/{model_id}  (get / update / delete)
+            if url_len == 3 {
+                if method.eq("GET") {
+                    method = "LIST".to_string();
+                } else if method.eq("POST") {
+                    method = "PUT".to_string();
+                }
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS.get("settings").map_or("settings", |m| m.key),
+                    path_columns[0] // org_id
+                )
+            } else if path_columns.get(3) == Some(&"built-in") {
+                // Read-only built-in catalog — same permission as list
+                method = "LIST".to_string();
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS.get("settings").map_or("settings", |m| m.key),
+                    path_columns[0] // org_id
+                )
+            } else if path_columns.get(3) == Some(&"refresh-built-in") {
+                // Refresh built-in pricing — requires PUT permission on settings
+                method = "PUT".to_string();
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS.get("settings").map_or("settings", |m| m.key),
+                    path_columns[0] // org_id
+                )
+            } else {
+                // Specific model_id: GET/PUT/DELETE on settings:{model_id}
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS.get("settings").map_or("settings", |m| m.key),
+                    path_columns[3] // model_id
+                )
+            }
         } else if path_columns[1].eq("groups") || path_columns[1].eq("roles") {
             // for groups or roles, path will be of format /org/roles/id , so we need
             // to check permission on role:org/id for permissions on that specific role
