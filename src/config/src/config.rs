@@ -37,11 +37,10 @@ use lettre::{
 };
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use sha256::digest;
 
 use crate::{
     meta::{cluster, stream::QueryPartitionStrategy},
-    utils::sysinfo,
+    utils::{hash::sha256_digest, sysinfo},
 };
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
@@ -348,7 +347,7 @@ pub fn get_instance_id() -> String {
 
 pub fn calculate_config_file_hash(path: &PathBuf) -> Result<String, anyhow::Error> {
     let content = std::fs::read_to_string(path)?;
-    Ok(digest(content))
+    Ok(sha256_digest(content))
 }
 
 pub fn load_config() -> Result<(), anyhow::Error> {
