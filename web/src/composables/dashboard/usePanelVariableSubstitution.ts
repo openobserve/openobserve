@@ -52,7 +52,7 @@ export const usePanelVariableSubstitution = ({
             ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
             ?.filter((it: any) => {
               const regexForVariable = new RegExp(
-                `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`,
+                `(?:\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?\\}?)|(?:\\{\\{${it.name}(?::(csv|pipe|doublequote|singlequote))?\\}\\})`,
               );
 
               return panelSchema.value.queries
@@ -88,7 +88,7 @@ export const usePanelVariableSubstitution = ({
       ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
       ?.filter((it: any) => {
         const regexForVariable = new RegExp(
-          `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`,
+          `(?:\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?\\}?)|(?:\\{\\{${it.name}(?::(csv|pipe|doublequote|singlequote))?\\}\\})`,
         );
 
         return panelSchema.value.queries
@@ -519,13 +519,15 @@ export const usePanelVariableSubstitution = ({
 
     // replace fixed variables with its values
     fixedVariables?.forEach((variable: any) => {
-      // replace $VARIABLE_NAME or ${VARIABLE_NAME} with its value
+      // replace $VARIABLE_NAME, ${VARIABLE_NAME}, or {{VARIABLE_NAME}} with its value
       const variableName = `$${variable.name}`;
       const variableNameWithBrackets = `\${${variable.name}}`;
+      const mustachePlaceholder = `{{${variable.name}}}`;
       const variableValue = variable.value;
       if (
         query.includes(variableName) ||
-        query.includes(variableNameWithBrackets)
+        query.includes(variableNameWithBrackets) ||
+        query.includes(mustachePlaceholder)
       ) {
         metadata.push({
           type: "fixed",
@@ -533,6 +535,7 @@ export const usePanelVariableSubstitution = ({
           value: variable.value,
         });
       }
+      query = query.replaceAll(mustachePlaceholder, variableValue);
       query = query.replaceAll(variableNameWithBrackets, variableValue);
       query = query.replaceAll(variableName, variableValue);
     });
@@ -556,6 +559,29 @@ export const usePanelVariableSubstitution = ({
               )
               .join(",") || "''";
           const possibleVariablesPlaceHolderTypes = [
+            // Mustache forms
+            {
+              placeHolder: `{{${variable.name}:csv}}`,
+              value: valueToUse.join(","),
+            },
+            {
+              placeHolder: `{{${variable.name}:pipe}}`,
+              value: valueToUse.join("|"),
+            },
+            {
+              placeHolder: `{{${variable.name}:doublequote}}`,
+              value:
+                valueToUse.map((value: any) => `"${value}"`).join(",") || '""',
+            },
+            {
+              placeHolder: `{{${variable.name}:singlequote}}`,
+              value: value,
+            },
+            {
+              placeHolder: `{{${variable.name}}}`,
+              value: queryType === "sql" ? value : valueToUse.join("|"),
+            },
+            // Dollar-sign forms (existing)
             {
               placeHolder: `\${${variable.name}:csv}`,
               value: valueToUse.join(","),
@@ -601,9 +627,11 @@ export const usePanelVariableSubstitution = ({
           const valueToUse =
             variable.value === null ? SELECT_ALL_VALUE : variable.value;
           variableValue = `${variable.escapeSingleQuotes ? escapeSingleQuotes(valueToUse) : valueToUse}`;
+          const mustachePlaceholder = `{{${variable.name}}}`;
           if (
             query.includes(variableName) ||
-            query.includes(variableNameWithBrackets)
+            query.includes(variableNameWithBrackets) ||
+            query.includes(mustachePlaceholder)
           ) {
             metadata.push({
               type: "variable",
@@ -611,6 +639,11 @@ export const usePanelVariableSubstitution = ({
               value: valueToUse,
             });
           }
+          query = query.replaceAll(`{{${variable.name}:csv}}`, variableValue);
+          query = query.replaceAll(`{{${variable.name}:pipe}}`, variableValue);
+          query = query.replaceAll(`{{${variable.name}:doublequote}}`, variableValue);
+          query = query.replaceAll(`{{${variable.name}:singlequote}}`, variableValue);
+          query = query.replaceAll(mustachePlaceholder, variableValue);
           query = query.replaceAll(variableNameWithBrackets, variableValue);
           query = query.replaceAll(variableName, variableValue);
         }
