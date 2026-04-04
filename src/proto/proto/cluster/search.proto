@@ -166,8 +166,7 @@ message GetSourcemapFileResponse {
 message TryAcquireRequest {
     string   trace_id = 1;
     string work_group = 2; // "short" | "long" | "background"
-    uint32      slots = 3;
-    uint64     ttl_ms = 4;
+    uint64     ttl_ms = 3;
 }
 
 message TryAcquireResponse {

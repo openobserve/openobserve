@@ -69,7 +69,7 @@ use {
     o2_enterprise::enterprise::{
         common::config::get_config as get_o2_config,
         search::{
-            TaskStatus, WorkGroup,
+            TaskStatus,
             cache::streaming_agg::{
                 create_aggregation_cache_file_path, discover_cache_for_query,
                 generate_optimal_partitions, get_aggregation_cache_key_from_request,
@@ -259,13 +259,9 @@ pub async fn search(
     {
         if let Some(status) = SEARCH_SERVER.remove(&trace_id, false).await
             && let Some((_, stat)) = status.first()
+            && let Some(wg) = stat.work_group.as_ref()
         {
-            match stat.work_group.as_ref() {
-                Some(WorkGroup::Long) => _work_group = Some("long".to_string()),
-                Some(WorkGroup::Short) => _work_group = Some("short".to_string()),
-                Some(WorkGroup::Background) => _work_group = Some("background".to_string()),
-                None => _work_group = None,
-            }
+            _work_group = Some(wg.to_string());
         };
     }
 

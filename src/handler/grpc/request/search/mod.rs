@@ -24,11 +24,6 @@ use proto::cluster_rpc::{
     SearchPartitionRequest, SearchPartitionResponse, SearchRequest, SearchResponse,
     search_server::Search,
 };
-#[cfg(feature = "enterprise")]
-use proto::cluster_rpc::{
-    ReleaseQueryRequest, ReleaseQueryResponse, StartQueryRequest, StartQueryResponse,
-    TryAcquireRequest, TryAcquireResponse,
-};
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
@@ -37,6 +32,11 @@ use {
     o2_enterprise::enterprise::search::{
         QueryManager, TaskStatus, WorkGroup, admission::ledger::NODE_LEDGER,
     },
+    proto::cluster_rpc::{
+        ReleaseQueryRequest, ReleaseQueryResponse, StartQueryRequest, StartQueryResponse,
+        TryAcquireRequest, TryAcquireResponse,
+    },
+    std::str::FromStr,
 };
 
 use crate::{handler::grpc::MetadataMap, service::search as SearchService};
@@ -420,7 +420,8 @@ impl Search for Searcher {
         req: Request<TryAcquireRequest>,
     ) -> Result<Response<TryAcquireResponse>, Status> {
         let r = req.into_inner();
-        match NODE_LEDGER.try_acquire(&r.trace_id, &r.work_group, r.slots, r.ttl_ms) {
+        let wg = WorkGroup::from_str(&r.work_group).unwrap_or(WorkGroup::Short);
+        match NODE_LEDGER.try_acquire(&r.trace_id, &wg, r.ttl_ms) {
             Ok(()) => Ok(Response::new(TryAcquireResponse {
                 success: true,
                 reason: String::new(),

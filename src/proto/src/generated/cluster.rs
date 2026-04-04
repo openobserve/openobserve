@@ -1173,9 +1173,7 @@ pub struct TryAcquireRequest {
     /// "short" | "long" | "background"
     #[prost(string, tag = "2")]
     pub work_group: ::prost::alloc::string::String,
-    #[prost(uint32, tag = "3")]
-    pub slots: u32,
-    #[prost(uint64, tag = "4")]
+    #[prost(uint64, tag = "3")]
     pub ttl_ms: u64,
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]

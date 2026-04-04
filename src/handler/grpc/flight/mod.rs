@@ -96,9 +96,6 @@ impl FlightService for FlightServiceImpl {
             .map_err(|e| Status::internal(e.to_string()))?;
 
         let req: FlightSearchRequest = req.into();
-        // orig_trace_id is the base trace_id used for slot admission (no job suffix).
-        // It matches the key stored in NODE_LEDGER by the Leader's TryAcquire call.
-        let orig_trace_id = req.query_identifier.trace_id.clone();
         let trace_id = format!(
             "{}-{}",
             req.query_identifier.trace_id, req.query_identifier.job_id
@@ -159,7 +156,7 @@ impl FlightService for FlightServiceImpl {
             Err(e) => {
                 clear_session_data(&trace_id);
                 #[cfg(feature = "enterprise")]
-                o2_enterprise::enterprise::search::admission::ledger::release(&orig_trace_id);
+                o2_enterprise::enterprise::search::admission::ledger::release(&trace_id);
                 log::error!(
                     "[trace_id {trace_id}] flight->search: do_get physical plan generate error: {e:?}",
                 );
@@ -217,7 +214,7 @@ impl FlightService for FlightServiceImpl {
         let stream = execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
             clear_session_data(&trace_id);
             #[cfg(feature = "enterprise")]
-            o2_enterprise::enterprise::search::admission::ledger::release(&orig_trace_id);
+            o2_enterprise::enterprise::search::admission::ledger::release(&trace_id);
             log::error!(
                 "[trace_id {trace_id}] flight->search: do_get physical plan execution error: {e:?}",
             );
@@ -226,7 +223,6 @@ impl FlightService for FlightServiceImpl {
 
         let mut stream = FlightEncoderStreamBuilder::new(write_options, 33554432)
             .with_trace_id(trace_id.to_string())
-            .with_orig_trace_id(orig_trace_id.clone())
             .with_is_super(is_super_cluster)
             .with_defer_lock(lock)
             .with_start(start)
