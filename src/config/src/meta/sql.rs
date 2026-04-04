@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use datafusion::sql::{parser::DFParser, resolve::resolve_table_references, TableReference};
+use datafusion::sql::{TableReference, parser::DFParser, resolve::resolve_table_references};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use sqlparser::{
@@ -61,9 +61,7 @@ fn extract_projection_identifier(stmt: &Statement) -> Option<String> {
             SetExpr::Select(s) => s.projection.first().and_then(|item| match item {
                 SelectItem::UnnamedExpr(e) | SelectItem::ExprWithAlias { expr: e, .. } => match e {
                     Expr::Identifier(id) => Some(id.value.clone()),
-                    Expr::CompoundIdentifier(ids) if ids.len() == 1 => {
-                        Some(ids[0].value.clone())
-                    }
+                    Expr::CompoundIdentifier(ids) if ids.len() == 1 => Some(ids[0].value.clone()),
                     _ => None,
                 },
                 _ => None,
