@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{any::Any, sync::Arc};
+use std::{
+    any::Any,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use arrow::array::{Array, ArrayRef, GenericStringBuilder, ListBuilder, OffsetSizeTrait};
 use arrow_schema::Field;
@@ -23,7 +26,6 @@ use datafusion::{
     error::{DataFusionError, Result},
     logical_expr::{ColumnarValue, ScalarUDF, ScalarUDFImpl, Signature, TypeSignature, Volatility},
 };
-use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::service::search::datafusion::udf::REGEX_MATCHES_UDF_NAME;

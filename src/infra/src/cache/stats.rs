@@ -13,12 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::LazyLock as Lazy;
+
 use config::{
     RwHashMap,
     meta::stream::{FileMeta, StreamStats, StreamType},
     stats::CacheStats,
 };
-use once_cell::sync::Lazy;
 
 static STATS: Lazy<RwHashMap<String, StreamStats>> = Lazy::new(Default::default);
 

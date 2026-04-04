@@ -17,7 +17,7 @@ use std::{
     cmp::max,
     collections::BTreeMap,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, LazyLock as Lazy},
     time::Duration,
 };
 
@@ -35,7 +35,6 @@ use lettre::{
         client::{Tls, TlsParameters},
     },
 };
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use sha256::digest;
 
@@ -3380,6 +3379,15 @@ fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_config_static_uses_std_lazylock_api() {
+        let cfg = std::sync::LazyLock::force(&CONFIG).load();
+        assert_eq!(
+            cfg.limit.req_cols_per_record_limit,
+            get_config().limit.req_cols_per_record_limit
+        );
+    }
 
     #[test]
     fn test_get_config() {

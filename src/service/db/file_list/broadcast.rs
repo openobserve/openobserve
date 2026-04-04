@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use config::{
     cluster::LOCAL_NODE,
@@ -25,7 +25,6 @@ use config::{
 };
 use hashbrown::HashMap;
 use infra::{client::grpc::get_cached_channel, cluster};
-use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use tokio::sync::{RwLock, mpsc};
 use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};

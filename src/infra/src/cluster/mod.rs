@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, ops::Bound, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    ops::Bound,
+    sync::{Arc, LazyLock as Lazy},
+    time::Duration,
+};
 
 use config::{
     RwAHashMap, RwBTreeMap,
@@ -26,7 +31,6 @@ use config::{
         sysinfo::{NodeMetrics, get_node_metrics},
     },
 };
-use once_cell::sync::Lazy;
 
 use crate::{
     db::{Event, get_coordinator},

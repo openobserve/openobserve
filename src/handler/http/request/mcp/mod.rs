@@ -291,7 +291,7 @@ pub async fn handle_mcp_get(Path(_org_id): Path<String>, _body: Bytes) -> Respon
     )
 )]
 pub async fn oauth_authorization_server_metadata() -> Response {
-    use once_cell::sync::Lazy;
+    use std::sync::LazyLock as Lazy;
 
     static METADATA: Lazy<OAuthServerMetadata> = Lazy::new(|| {
         let dex_config = o2_dex::config::get_config();

@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::LazyLock as Lazy;
+
 use aes_siv::{KeyInit, siv::Aes256Siv};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use config::get_config;
-use once_cell::sync::Lazy;
 use sea_orm::{ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Set, SqlErr};
 use serde::{Deserialize, Serialize};
 
