@@ -521,7 +521,7 @@ export default defineComponent({
 
     .field_list {
       &.selected {
-        background-color: rgba(89, 96, 178, 0.3);
+        background-color: var(--o2-hover-accent);
 
         .field_overlay {
           // background-color: #ffffff;
