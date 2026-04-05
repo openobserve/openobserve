@@ -154,8 +154,9 @@ impl FlightService for FlightServiceImpl {
         let (ctx, physical_plan, lock, scan_stats) = match result {
             Ok(v) => v,
             Err(e) => {
-                // clear session data
                 clear_session_data(&trace_id);
+                #[cfg(feature = "enterprise")]
+                o2_enterprise::enterprise::search::admission::ledger::release(&trace_id);
                 log::error!(
                     "[trace_id {trace_id}] flight->search: do_get physical plan generate error: {e:?}",
                 );
@@ -211,8 +212,9 @@ impl FlightService for FlightServiceImpl {
         let peak_memory_ref = get_peak_memory(&physical_plan);
 
         let stream = execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
-            // clear session data
             clear_session_data(&trace_id);
+            #[cfg(feature = "enterprise")]
+            o2_enterprise::enterprise::search::admission::ledger::release(&trace_id);
             log::error!(
                 "[trace_id {trace_id}] flight->search: do_get physical plan execution error: {e:?}",
             );
