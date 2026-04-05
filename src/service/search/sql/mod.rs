@@ -106,6 +106,23 @@ impl Sql {
         Self::new_with_options(query, org_id, stream_type, search_event_type, false).await
     }
 
+    pub fn get_first_stream_key(&self) -> String {
+        self.stream_names
+            .first()
+            .map(|s| {
+                format!(
+                    "{}/{}",
+                    s.get_stream_type(self.stream_type),
+                    s.stream_name()
+                )
+            })
+            // For multi-stream / cross-index queries there is no single stream
+            // name.  Fall back to the stream-type prefix so select_nodes always
+            // receives a non-empty, deterministic key (rather than "" which
+            // would silently select all nodes and defeat org/stream affinity).
+            .unwrap_or_else(|| format!("{}/", self.stream_type))
+    }
+
     pub async fn new_with_options(
         query: &SearchQuery,
         org_id: &str,
