@@ -516,10 +516,9 @@ describe("AppErrors.vue", () => {
       );
     });
 
-    it("should append to existing query when adding field", async () => {
+    it("should append to existing query when adding a different field", async () => {
       wrapper = await createWrapper();
 
-      // Set existing query
       (wrapper.vm as any).errorTrackingState.data.editorValue =
         'existing_field = "value"';
 
@@ -530,6 +529,22 @@ describe("AppErrors.vue", () => {
 
       expect((wrapper.vm as any).errorTrackingState.data.editorValue).toBe(
         'existing_field = "value" and error_type = "javascript"',
+      );
+    });
+
+    it("should replace existing condition when adding same field", async () => {
+      wrapper = await createWrapper();
+
+      (wrapper.vm as any).errorTrackingState.data.editorValue =
+        "error_type='TypeError'";
+
+      await (wrapper.vm as any).handleSidebarEvent(
+        "add-field",
+        "error_type='RangeError'",
+      );
+
+      expect((wrapper.vm as any).errorTrackingState.data.editorValue).toBe(
+        "error_type='RangeError'",
       );
     });
   });

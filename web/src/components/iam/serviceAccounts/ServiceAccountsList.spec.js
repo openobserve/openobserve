@@ -24,7 +24,6 @@ vi.mock("@/services/service_accounts", () => ({
   default: {
     list: vi.fn(),
     delete: vi.fn(),
-    get_service_token: vi.fn(),
     refresh_token: vi.fn()
   }
 }));
@@ -88,7 +87,6 @@ describe("ServiceAccountsList Component", () => {
     // Reset mock implementations
     vi.mocked(service_accounts.list).mockReset();
     vi.mocked(service_accounts.delete).mockReset();
-    vi.mocked(service_accounts.get_service_token).mockReset();
     vi.mocked(service_accounts.refresh_token).mockReset();
 
     // Setup default successful response for list
@@ -258,103 +256,6 @@ describe("ServiceAccountsList Component", () => {
   });
 
   describe("Token Management", () => {
-    it("gets service token successfully", async () => {
-      const mockToken = "test-token-123";
-      vi.mocked(service_accounts.get_service_token).mockResolvedValue({
-        data: { token: mockToken }
-      });
-
-      const row = {
-        email: "service1@example.com",
-        isLoading: false,
-        isTokenVisible: false
-      };
-
-      await wrapper.vm.getServiceToken(row);
-      
-      expect(service_accounts.get_service_token).toHaveBeenCalledWith("test-org", "service1@example.com");
-      expect(row.token).toBe(mockToken);
-      expect(row.isTokenVisible).toBe(true);
-    });
-
-    it("toggles token visibility when token exists", () => {
-      const row = {
-        token: "existing-token",
-        isTokenVisible: false
-      };
-
-      wrapper.vm.getServiceToken(row);
-      
-      expect(row.isTokenVisible).toBe(true);
-    });
-
-    it("hides token when already visible", () => {
-      const row = {
-        token: "existing-token",
-        isTokenVisible: true
-      };
-
-      wrapper.vm.getServiceToken(row);
-      
-      expect(row.isTokenVisible).toBe(false);
-    });
-
-    it("gets service token for service token variable", async () => {
-      const mockToken = "service-token-456";
-      vi.mocked(service_accounts.get_service_token).mockResolvedValue({
-        data: { token: mockToken }
-      });
-
-      const row = { email: "service@example.com" };
-
-      await wrapper.vm.getServiceToken(row, false);
-
-      expect(wrapper.vm.serviceToken).toBe(mockToken);
-    });
-
-    it("handles token fetch error", async () => {
-      const mockError = {
-        response: {
-          status: 500,
-          data: { message: "Token fetch failed" }
-        }
-      };
-      
-      vi.mocked(service_accounts.get_service_token).mockRejectedValue(mockError);
-
-      const row = {
-        email: "service1@example.com",
-        isLoading: true,
-        isTokenVisible: false
-      };
-
-      await wrapper.vm.getServiceToken(row, true);
-      await flushPromises();
-
-      expect(row.isLoading).toBe(false);
-    });
-
-    it("does not show error notification for 403 token fetch", async () => {
-      const mockError = {
-        response: {
-          status: 403,
-          data: { message: "Forbidden" }
-        }
-      };
-      
-      vi.mocked(service_accounts.get_service_token).mockRejectedValue(mockError);
-
-      const row = {
-        email: "service1@example.com",
-        isLoading: false,
-        isTokenVisible: false
-      };
-
-      await wrapper.vm.getServiceToken(row, true);
-
-      expect(notifyMock).not.toHaveBeenCalled();
-    });
-
     it("refreshes service token successfully", async () => {
       const mockToken = "refreshed-token-789";
       vi.mocked(service_accounts.refresh_token).mockResolvedValue({
@@ -366,10 +267,10 @@ describe("ServiceAccountsList Component", () => {
         isLoading: false
       };
 
-      await wrapper.vm.refreshServiceToken(row, true);
+      await wrapper.vm.refreshServiceToken(row);
 
       expect(service_accounts.refresh_token).toHaveBeenCalledWith("test-org", "service1@example.com");
-      expect(row.token).toBe(mockToken);
+      expect(wrapper.vm.serviceToken).toBe(mockToken);
     });
 
     it("confirms refresh action", () => {
@@ -552,45 +453,22 @@ describe("ServiceAccountsList Component", () => {
   });
 
   describe("Token Display", () => {
-    it("masks token correctly", () => {
-      const token = "abcd1234efgh5678";
-      const maskedToken = wrapper.vm.maskToken(token);
-      expect(maskedToken).toBe("abcd **** 5678");
+    it("redactToken masks all but first 4 chars", () => {
+      expect(wrapper.vm.redactToken("abcd1234567890ef")).toBe("abcd************");
     });
 
-    it("handles short tokens in maskToken", () => {
-      const shortToken = "abc123";
-      const maskedToken = wrapper.vm.maskToken(shortToken);
-      expect(maskedToken).toBe("abc123");
+    it("redactToken with exactly 4 chars masks all", () => {
+      // tokens of 4 chars or fewer are fully masked (nothing revealed)
+      expect(wrapper.vm.redactToken("abcd")).toBe("****");
     });
 
-    it("displays token correctly when visible", () => {
-      const row = {
-        token: "test-token-123",
-        isTokenVisible: true
-      };
-      
-      const displayToken = wrapper.vm.getDisplayToken(row);
-      expect(displayToken).toBe("test **** -123");
+    it("redactToken with fewer than 4 chars masks all", () => {
+      expect(wrapper.vm.redactToken("ab")).toBe("**");
+      expect(wrapper.vm.redactToken("")).toBe("");
     });
 
-    it("displays stars when token not visible", () => {
-      const row = {
-        token: "test-token-123",
-        isTokenVisible: false
-      };
-      
-      const displayToken = wrapper.vm.getDisplayToken(row);
-      expect(displayToken).toBe("* * * * * * * * * * * * * * * *");
-    });
-
-    it("displays stars when no token", () => {
-      const row = {
-        isTokenVisible: true
-      };
-      
-      const displayToken = wrapper.vm.getDisplayToken(row);
-      expect(displayToken).toBe("* * * * * * * * * * * * * * * *");
+    it("redactToken with 5 chars masks last char only", () => {
+      expect(wrapper.vm.redactToken("abcde")).toBe("abcd*");
     });
   });
 

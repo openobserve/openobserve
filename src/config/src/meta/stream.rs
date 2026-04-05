@@ -362,6 +362,40 @@ pub struct FileListDeleted {
     pub flattened: bool,
 }
 
+#[derive(Serialize, Deserialize, Debug, Default, Clone, Copy, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum StorageType {
+    #[default]
+    Normal,
+    Compliance,
+}
+
+impl std::fmt::Display for StorageType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StorageType::Normal => write!(f, "normal"),
+            StorageType::Compliance => write!(f, "compliance"),
+        }
+    }
+}
+
+impl std::str::FromStr for StorageType {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.to_lowercase().as_str() {
+            "compliance" => StorageType::Compliance,
+            _ => StorageType::Normal,
+        })
+    }
+}
+
+impl StorageType {
+    pub fn is_compliance(&self) -> bool {
+        matches!(self, StorageType::Compliance)
+    }
+}
+
 #[derive(Serialize, Debug, Default, Clone, PartialEq)]
 pub enum QueryPartitionStrategy {
     #[default]
@@ -744,6 +778,8 @@ pub struct UpdateStreamSettings {
     pub enable_log_patterns_extraction: Option<bool>,
     #[serde(default)]
     pub cross_links: UpdateSettingsWrapper<CrossLink>,
+    #[serde(default)]
+    pub storage_type: Option<StorageType>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
@@ -912,6 +948,8 @@ pub struct StreamSettings {
     pub is_llm_stream: bool,
     #[serde(default)]
     pub cross_links: Vec<CrossLink>,
+    #[serde(default)]
+    pub storage_type: StorageType,
 }
 
 impl Default for StreamSettings {
@@ -936,6 +974,7 @@ impl Default for StreamSettings {
             enable_log_patterns_extraction: false,
             is_llm_stream: false,
             cross_links: Vec::new(),
+            storage_type: StorageType::Normal,
         }
     }
 }
@@ -991,6 +1030,7 @@ impl Serialize for StreamSettings {
         } else {
             state.skip_field("cross_links")?;
         }
+        state.serialize_field("storage_type", &self.storage_type)?;
         state.end()
     }
 }
@@ -1143,6 +1183,11 @@ impl From<&str> for StreamSettings {
                 }
             }
         }
+        let storage_type = settings
+            .get("storage_type")
+            .and_then(Value::as_str)
+            .and_then(|s| s.parse::<StorageType>().ok())
+            .unwrap_or_default();
         Self {
             partition_keys,
             full_text_search_keys,
@@ -1163,6 +1208,7 @@ impl From<&str> for StreamSettings {
             enable_log_patterns_extraction,
             is_llm_stream,
             cross_links,
+            storage_type,
         }
     }
 }

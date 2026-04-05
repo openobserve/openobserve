@@ -196,6 +196,7 @@ import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useStreamFields } from "@/composables/useLogs/useStreamFields";
 import { captureFromValuesApi } from "@/composables/useFieldValueStore";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 
 interface Filter {
   fieldName: string;
@@ -674,6 +675,16 @@ export default defineComponent({
     };
 
     const addToFilter = (field: any) => {
+      if (searchObj.meta.sqlMode === true && typeof field === "string") {
+        const fieldAndOperator = field.match(
+          /^([^=!<>\s()"]+)(\s*(?:!=|=)\s*.*)$/,
+        );
+        if (fieldAndOperator) {
+          searchObj.data.stream.addToFilter =
+            `${quoteSqlIdentifierIfNeeded(fieldAndOperator[1])}${fieldAndOperator[2]}`;
+          return;
+        }
+      }
       searchObj.data.stream.addToFilter = field;
     };
 

@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #after>
         <div class="tw:pr-[0.625rem] tw:h-full">
-          <div class="card-container tw:h-[calc(100%-46px)]">
+          <div class="card-container tw:h-full">
             <template v-if="isLoading.length">
               <div
                 class="q-pb-lg flex items-center justify-center text-center tw:h-[calc(100vh-18.75rem)]"
@@ -138,6 +138,7 @@ import FieldList from "@/components/common/sidebar/FieldList.vue";
 import { useI18n } from "vue-i18n";
 import useStreams from "@/composables/useStreams";
 import { useQuasar } from "quasar";
+import { applyFilterTerm } from "@/utils/traces/filterUtils";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -252,11 +253,10 @@ onMounted(async () => {
 
 const handleSidebarEvent = (event: string, value: any) => {
   if (event === "add-field") {
-    if (errorTrackingState.data.editorValue.length) {
-      errorTrackingState.data.editorValue += " and " + value;
-    } else {
-      errorTrackingState.data.editorValue += value;
-    }
+    errorTrackingState.data.editorValue = applyFilterTerm(
+      value,
+      errorTrackingState.data.editorValue,
+    );
   }
 };
 

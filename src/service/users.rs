@@ -46,6 +46,7 @@ use crate::{
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::{DEFAULT_ORG, OrgRoleMapping},
+            service_account::ServiceAccountCreateResponse,
             user::{
                 UpdateUser, UserList, UserOrgRole, UserRequest, UserResponse, UserUpdateMode,
                 get_default_user_org,
@@ -55,6 +56,14 @@ use crate::{
     },
     service::{db, organization},
 };
+
+fn redact_token(token: &str) -> String {
+    if token.len() <= 4 {
+        "*".repeat(token.len())
+    } else {
+        format!("{}{}", &token[..4], "*".repeat(token.len() - 4))
+    }
+}
 
 pub async fn post_user(
     org_id: &str,
@@ -87,6 +96,17 @@ pub async fn post_user(
                 }
             }
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    if !matches!(
+        usr_req.role.base_role,
+        UserRole::Admin | UserRole::ServiceAccount
+    ) && !get_openfga_config().enabled
+    {
+        return Ok(MetaHttpResponse::bad_request(
+            "Non-admin roles require open-fga enabled",
+        ));
     }
 
     let is_allowed = if is_root_user(initiator_id) {
@@ -129,6 +149,7 @@ pub async fn post_user(
             let password = get_hash(&usr_req.password, &salt);
             let password_ext = get_hash(&usr_req.password, &cfg.auth.ext_auth_salt);
             let token = generate_random_string(16);
+            let token_for_response = token.clone();
             let rum_token = format!("rum{}", generate_random_string(16));
             let org_id = org_id.replace(' ', "_");
             let user = usr_req.to_new_dbuser(
@@ -180,7 +201,16 @@ pub async fn post_user(
                     }
                 }
             }
-            Ok(MetaHttpResponse::ok("User saved successfully"))
+            if usr_req.role.base_role == UserRole::ServiceAccount {
+                Ok(MetaHttpResponse::json(ServiceAccountCreateResponse {
+                    code: 200,
+                    message: "User saved successfully".to_string(),
+                    token: token_for_response,
+                    user: usr_req.email.clone(),
+                }))
+            } else {
+                Ok(MetaHttpResponse::ok("User saved successfully"))
+            }
         } else {
             Ok(MetaHttpResponse::bad_request("User already exists"))
         }
@@ -740,6 +770,7 @@ pub async fn list_users(
                 is_external: user.is_external,
                 orgs: None,
                 created_at: 0, // Not used
+                token: None,
             });
         }
         return Ok(MetaHttpResponse::json(UserList { data: user_list }));
@@ -769,6 +800,11 @@ pub async fn list_users(
                 user.role.ne(&UserRole::ServiceAccount)
             };
             if should_include {
+                let token = if user.role.eq(&UserRole::ServiceAccount) {
+                    Some(redact_token(&org_user.value().token))
+                } else {
+                    None
+                };
                 user_list.push(UserResponse {
                     email: user.email.clone(),
                     role: user.role.to_string(),
@@ -777,6 +813,7 @@ pub async fn list_users(
                     is_external: user.is_external,
                     orgs: None,
                     created_at: org_user.value().created_at,
+                    token,
                 });
             }
         }
@@ -803,6 +840,7 @@ pub async fn list_users(
                 is_external: user.user_type.is_external(),
                 orgs: user_orgs.get(user.email.as_str()).cloned(),
                 created_at,
+                token: None,
             });
         }
     }
@@ -831,6 +869,7 @@ pub async fn list_users(
                 is_external: root_user.is_external,
                 orgs: None,
                 created_at: 0,
+                token: None,
             });
         }
     }
@@ -1208,6 +1247,28 @@ mod tests {
 
     // Mutex to ensure test setup is serialized to prevent race conditions
     static TEST_SETUP_LOCK: tokio::sync::OnceCell<Mutex<()>> = tokio::sync::OnceCell::const_new();
+
+    #[test]
+    fn test_redact_token_normal() {
+        assert_eq!(redact_token("abcd1234567890ef"), "abcd************");
+    }
+
+    #[test]
+    fn test_redact_token_exactly_four_chars() {
+        // tokens of 4 chars or fewer are fully masked (nothing revealed)
+        assert_eq!(redact_token("abcd"), "****");
+    }
+
+    #[test]
+    fn test_redact_token_shorter_than_four() {
+        assert_eq!(redact_token("ab"), "**");
+        assert_eq!(redact_token(""), "");
+    }
+
+    #[test]
+    fn test_redact_token_five_chars() {
+        assert_eq!(redact_token("abcde"), "abcd*");
+    }
 
     #[test]
     fn test_is_user_from_org() {
