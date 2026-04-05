@@ -698,7 +698,7 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         if LOCAL_NODE.is_querier() {
             o2_enterprise::enterprise::license::start_license_check(
                 crate::service::self_reporting::search::get_usage,
-                LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role(),
+                LOCAL_NODE.is_single_role(),
             )
             .await;
             tokio::task::spawn(db::license::watch());
