@@ -22,8 +22,9 @@ use datafusion::parquet::{data_type::AsBytes, file::metadata::ParquetMetaData};
 use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hashbrown::HashMap;
 use object_store::{
-    GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, PutMultipartOptions,
-    PutOptions, PutPayload, PutResult, Result, WriteMultipart, path::Path,
+    Attribute, AttributeValue, Attributes, GetOptions, GetResult, ListResult, MultipartUpload,
+    ObjectMeta, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, WriteMultipart,
+    path::Path,
 };
 use once_cell::sync::Lazy;
 use parquet::file::metadata::{FooterTail, ParquetMetaDataReader};
@@ -156,9 +157,61 @@ pub async fn put(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
     Ok(())
 }
 
-pub async fn put_multipart(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
+async fn put_multipart(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
     let path = Path::from(file);
     let upload = MULTI_ACCOUNTS.put_multipart(account, &path).await?;
+    let mut write = WriteMultipart::new(upload);
+    write.write(data.as_bytes());
+    write.finish().await?;
+    Ok(())
+}
+
+pub async fn put_with_compliance(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
+    let cfg = get_config();
+    let attrs = match cfg.s3.provider.as_str() {
+        "aws" | "s3" => Attributes::from_iter([(
+            Attribute::StorageClass,
+            AttributeValue::from("STANDARD_IA".to_string()),
+        )]),
+        "gcs" | "gcp" => Attributes::from_iter([(
+            Attribute::StorageClass,
+            AttributeValue::from("NEARLINE".to_string()),
+        )]),
+        "azure" => Attributes::from_iter([(
+            Attribute::StorageClass,
+            AttributeValue::from("Cool".to_string()),
+        )]),
+        _ => Attributes::new(),
+    };
+    let multi_part_upload_size = cfg.s3.multi_part_upload_size;
+    if multi_part_upload_size > 0 && multi_part_upload_size < bytes_size_in_mb(&data) as usize {
+        let opts = PutMultipartOptions {
+            attributes: attrs,
+            ..Default::default()
+        };
+        put_multipart_opts(account, file, data, opts).await?;
+    } else {
+        let opts = PutOptions {
+            attributes: attrs,
+            ..Default::default()
+        };
+        MULTI_ACCOUNTS
+            .put_opts(account, &file.into(), data.into(), opts)
+            .await?;
+    }
+    Ok(())
+}
+
+async fn put_multipart_opts(
+    account: &str,
+    file: &str,
+    data: bytes::Bytes,
+    opts: PutMultipartOptions,
+) -> Result<()> {
+    let path = Path::from(file);
+    let upload = MULTI_ACCOUNTS
+        .put_multipart_opts(account, &path, opts)
+        .await?;
     let mut write = WriteMultipart::new(upload);
     write.write(data.as_bytes());
     write.finish().await?;

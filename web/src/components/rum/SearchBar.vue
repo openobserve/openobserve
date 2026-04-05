@@ -97,6 +97,7 @@ import { useQuasar } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import useTraces from "@/composables/useTraces";
+import { applyFilterTerm } from "@/utils/traces/filterUtils";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 
 import segment from "@/services/segment_analytics";
@@ -299,37 +300,14 @@ export default defineComponent({
   watch: {
     addSearchTerm() {
       if (this.searchObj.data.stream.addToFilter != "") {
-        let currentQuery = this.searchObj.data.editorValue.split("|");
-        let filter = this.searchObj.data.stream.addToFilter;
-
-        const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
-
-        if (isFilterValueNull) {
-          filter = filter
-            .replace(/=|!=/, (match) => {
-              return match === "=" ? " is " : " is not ";
-            })
-            .replace(/'null'/, "null");
-        }
-
-        if (currentQuery.length > 1) {
-          if (currentQuery[1].trim() != "") {
-            currentQuery[1] += " and " + filter;
-          } else {
-            currentQuery[1] = filter;
-          }
-          this.searchObj.data.query = currentQuery.join("| ");
-        } else {
-          if (currentQuery != "") {
-            currentQuery += " and " + filter;
-          } else {
-            currentQuery = filter;
-          }
-          this.searchObj.data.query = currentQuery;
-        }
+        const newValue = applyFilterTerm(
+          this.searchObj.data.stream.addToFilter,
+          this.searchObj.data.editorValue,
+        );
+        this.searchObj.data.query = newValue;
         this.searchObj.data.stream.addToFilter = "";
         if (this.queryEditorRef?.setValue)
-          this.queryEditorRef.setValue(this.searchObj.data.query);
+          this.queryEditorRef.setValue(newValue);
       }
     },
   },

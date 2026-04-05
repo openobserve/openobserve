@@ -37,11 +37,7 @@ vi.mock("@/services/service_graph", () => ({
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: vi.fn().mockResolvedValue({
-      list: [
-        { name: "default" },
-        { name: "stream1" },
-        { name: "stream2" },
-      ],
+      list: [{ name: "default" }, { name: "stream1" }, { name: "stream2" }],
     }),
   }),
 }));
@@ -169,7 +165,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
-      mockApiResponse
+      mockApiResponse,
     );
   });
 
@@ -195,7 +191,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
         expect.objectContaining({
           startTime: expect.any(Number),
           endTime: expect.any(Number),
-        })
+        }),
       );
     });
 
@@ -258,7 +254,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
           streamName: "stream1",
           startTime: expect.any(Number),
           endTime: expect.any(Number),
-        })
+        }),
       );
     });
 
@@ -284,7 +280,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       };
 
       vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
-        newApiResponse
+        newApiResponse,
       );
 
       // Change stream filter
@@ -305,7 +301,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       expect(setItemSpy).toHaveBeenCalledWith(
         "serviceGraph_streamFilter",
-        "stream1"
+        "stream1",
       );
 
       setItemSpy.mockRestore();
@@ -327,7 +323,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
           streamName: undefined,
           startTime: expect.any(Number),
           endTime: expect.any(Number),
-        })
+        }),
       );
     });
   });
@@ -398,7 +394,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       };
 
       vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
-        newApiResponse
+        newApiResponse,
       );
 
       // Click refresh button
@@ -419,7 +415,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
         () =>
           new Promise((resolve) => {
             resolvePromise = () => resolve(mockApiResponse);
-          })
+          }),
       );
 
       // Start refresh
@@ -442,9 +438,11 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(
-        new Error("API Error")
+        new Error("API Error"),
       );
 
       await wrapper.vm.loadServiceGraph();
@@ -519,7 +517,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
         expect.objectContaining({
           startTime: newStartTime,
           endTime: newEndTime,
-        })
+        }),
       );
     });
 
@@ -564,7 +562,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       };
 
       vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
-        newApiResponse
+        newApiResponse,
       );
 
       await wrapper.vm.updateTimeRange({
@@ -766,7 +764,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       };
 
       vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
-        invalidApiResponse
+        invalidApiResponse,
       );
 
       await wrapper.vm.loadServiceGraph();
@@ -847,8 +845,8 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(wrapper.vm.filteredGraphData.nodes.length).toBeGreaterThan(0);
       expect(
         wrapper.vm.filteredGraphData.nodes.some((n: any) =>
-          n.label.toLowerCase().includes("service a")
-        )
+          n.label.toLowerCase().includes("service a"),
+        ),
       ).toBe(true);
     });
 
@@ -860,11 +858,11 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       wrapper.vm.applyFilters();
 
       // Verify all edges are connected to filtered nodes
-      const nodeIds = new Set(wrapper.vm.filteredGraphData.nodes.map((n: any) => n.id));
+      const nodeIds = new Set(
+        wrapper.vm.filteredGraphData.nodes.map((n: any) => n.id),
+      );
       wrapper.vm.filteredGraphData.edges.forEach((edge: any) => {
-        expect(
-          nodeIds.has(edge.from) || nodeIds.has(edge.to)
-        ).toBe(true);
+        expect(nodeIds.has(edge.from) || nodeIds.has(edge.to)).toBe(true);
       });
     });
 
@@ -931,7 +929,10 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       wrapper.vm.setLayout("circular");
 
-      expect(setItemSpy).toHaveBeenCalledWith("serviceGraph_layoutType", "circular");
+      expect(setItemSpy).toHaveBeenCalledWith(
+        "serviceGraph_layoutType",
+        "circular",
+      );
       setItemSpy.mockRestore();
     });
 
@@ -962,7 +963,10 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       wrapper.vm.setVisualizationType("tree");
 
-      expect(setItemSpy).toHaveBeenCalledWith("serviceGraph_visualizationType", "tree");
+      expect(setItemSpy).toHaveBeenCalledWith(
+        "serviceGraph_visualizationType",
+        "tree",
+      );
       setItemSpy.mockRestore();
     });
 
@@ -1054,33 +1058,6 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       // Edge panel was removed; edges are handled via hover tooltip only
       expect(wrapper.vm.showSidePanel).toBe(false);
-    });
-
-    it("should close node panel when edge is clicked", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // First open node panel
-      wrapper.vm.handleNodeClick({
-        dataType: "node",
-        data: wrapper.vm.graphData.nodes[0],
-      });
-
-      expect(wrapper.vm.showSidePanel).toBe(true);
-
-      // Then click edge
-      const edgeData = wrapper.vm.graphData.edges[0];
-      wrapper.vm.handleNodeClick({
-        dataType: "edge",
-        data: {
-          source: edgeData.from,
-          target: edgeData.to,
-        },
-      });
-
-      // Node panel should be closed
-      expect(wrapper.vm.showSidePanel).toBe(false);
-      expect(wrapper.vm.selectedNode).toBeNull();
     });
 
     it("should handle tree node click", async () => {
@@ -1200,14 +1177,18 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.vm.stats?.services).toBe(mockApiResponse.data.nodes.length);
+      expect(wrapper.vm.stats?.services).toBe(
+        mockApiResponse.data.nodes.length,
+      );
     });
 
     it("should calculate total connections count", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.vm.stats?.connections).toBe(mockApiResponse.data.edges.length);
+      expect(wrapper.vm.stats?.connections).toBe(
+        mockApiResponse.data.edges.length,
+      );
     });
 
     it("should calculate total requests", async () => {
@@ -1216,7 +1197,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       const expectedRequests = mockApiResponse.data.edges.reduce(
         (sum, e) => sum + e.total_requests,
-        0
+        0,
       );
 
       expect(wrapper.vm.stats?.totalRequests).toBe(expectedRequests);
@@ -1228,7 +1209,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       const expectedErrors = mockApiResponse.data.edges.reduce(
         (sum, e) => sum + e.failed_requests,
-        0
+        0,
       );
 
       expect(wrapper.vm.stats?.totalErrors).toBe(expectedErrors);
@@ -1240,13 +1221,14 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       const totalRequests = mockApiResponse.data.edges.reduce(
         (sum, e) => sum + e.total_requests,
-        0
+        0,
       );
       const totalErrors = mockApiResponse.data.edges.reduce(
         (sum, e) => sum + e.failed_requests,
-        0
+        0,
       );
-      const expectedRate = totalRequests > 0 ? (totalErrors / totalRequests) * 100 : 0;
+      const expectedRate =
+        totalRequests > 0 ? (totalErrors / totalRequests) * 100 : 0;
 
       expect(wrapper.vm.stats?.errorRate).toBe(expectedRate);
     });
@@ -1254,7 +1236,9 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     it("should handle zero requests for error rate", async () => {
       const noRequestsResponse = {
         data: {
-          nodes: [{ id: "a", label: "A", requests: 0, errors: 0, error_rate: 0 }],
+          nodes: [
+            { id: "a", label: "A", requests: 0, errors: 0, error_rate: 0 },
+          ],
           edges: [],
           availableStreams: ["default"],
         },
@@ -1265,7 +1249,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       };
 
       vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
-        noRequestsResponse
+        noRequestsResponse,
       );
 
       wrapper = createWrapper();
@@ -1292,7 +1276,9 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       const error404 = new Error("Not Found");
       (error404 as any).response = { status: 404 };
 
-      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(error404);
+      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(
+        error404,
+      );
 
       wrapper = createWrapper();
       await flushPromises();
@@ -1304,7 +1290,9 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       const error403 = new Error("Forbidden");
       (error403 as any).response = { status: 403 };
 
-      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(error403);
+      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(
+        error403,
+      );
 
       wrapper = createWrapper();
       await flushPromises();
@@ -1316,7 +1304,9 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       const error500 = new Error("Internal Server Error");
       (error500 as any).response = { status: 500 };
 
-      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(error500);
+      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(
+        error500,
+      );
 
       wrapper = createWrapper();
       await flushPromises();
@@ -1328,7 +1318,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       const timeoutError = new Error("Request timeout");
 
       vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(
-        timeoutError
+        timeoutError,
       );
 
       wrapper = createWrapper();
@@ -1341,7 +1331,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       const networkError = new Error("Network Error");
 
       vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(
-        networkError
+        networkError,
       );
 
       wrapper = createWrapper();
@@ -1352,10 +1342,13 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
     it("should set generic error state for unknown errors", async () => {
       const unknownError = new Error("Unknown error");
-      (unknownError as any).response = { status: 418, data: { message: "I'm a teapot" } };
+      (unknownError as any).response = {
+        status: 418,
+        data: { message: "I'm a teapot" },
+      };
 
       vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(
-        unknownError
+        unknownError,
       );
 
       wrapper = createWrapper();
@@ -1394,7 +1387,9 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     it("should filter out edges with invalid endpoints", async () => {
       const invalidDataResponse = {
         data: {
-          nodes: [{ id: "a", label: "A", requests: 100, errors: 0, error_rate: 0 }],
+          nodes: [
+            { id: "a", label: "A", requests: 100, errors: 0, error_rate: 0 },
+          ],
           edges: [
             { from: "a", to: "b", total_requests: 100 }, // 'b' doesn't exist
             { from: "c", to: "a", total_requests: 100 }, // 'c' doesn't exist
@@ -1408,10 +1403,12 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       };
 
       vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
-        invalidDataResponse
+        invalidDataResponse,
       );
 
-      const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const consoleWarn = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => {});
 
       wrapper = createWrapper();
       await flushPromises();
@@ -1447,11 +1444,13 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
           availableStreams: [],
         },
         status: 200,
-        statusText: 'OK',
+        statusText: "OK",
         headers: {},
         config: {} as any,
       };
-      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(emptyMock);
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
+        emptyMock,
+      );
 
       wrapper = createWrapper();
       wrapper.vm.visualizationType = "tree";
@@ -1502,10 +1501,10 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       // Simulate clicking a tree node
       const nodeClickParams = {
-        componentType: 'series',
+        componentType: "series",
         data: {
           name: mockApiResponse.data.nodes[0].label,
-        }
+        },
       };
 
       wrapper.vm.handleNodeClick(nodeClickParams);
@@ -1528,8 +1527,8 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       // Second click - closes panel
       const nodeClickParams = {
-        componentType: 'series',
-        data: { name: nodeData.label }
+        componentType: "series",
+        data: { name: nodeData.label },
       };
 
       wrapper.vm.handleNodeClick(nodeClickParams);
@@ -1544,20 +1543,22 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       await flushPromises();
 
       wrapper.vm.visualizationType = "tree";
-      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const consoleWarn = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => {});
 
       // Click with a name that doesn't exist in graphData
       const nodeClickParams = {
-        componentType: 'series',
-        data: { name: 'non-existent-service' }
+        componentType: "series",
+        data: { name: "non-existent-service" },
       };
 
       wrapper.vm.handleNodeClick(nodeClickParams);
       await nextTick();
 
       expect(consoleWarn).toHaveBeenCalledWith(
-        '[ServiceGraph] Could not find node data for:',
-        'non-existent-service'
+        "[ServiceGraph] Could not find node data for:",
+        "non-existent-service",
       );
 
       consoleWarn.mockRestore();
