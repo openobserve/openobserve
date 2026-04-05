@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! HTTP handlers for backfill job management (Enterprise only)
-
+//! HTTP handlers for backfill job management
 use axum::{
     Json,
     extract::{Path, Query},

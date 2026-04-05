@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,6 +22,8 @@ use datafusion::execution::SendableRecordBatchStream;
 use flight::{common::PreCustomMessage, encoder::FlightDataEncoder};
 use futures::{Stream, StreamExt};
 use futures_core::ready;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use tracing::info_span;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -268,15 +270,22 @@ impl Drop for FlightEncoderStream {
             .with_label_values(&["/search/flight/do_get", "200", "", "", "", ""])
             .inc();
 
+        // Release the node-level slot reservation for this Follow node.
+        #[cfg(feature = "enterprise")]
+        if get_o2_config().work_group.max_nodes_per_query > 0 {
+            o2_enterprise::enterprise::search::admission::ledger::release(trace_id);
+            log::info!("[trace_id {trace_id}] flight->search: releasing slot");
+        }
+
         // defer is only set for super cluster follower leader
         if let Some(defer) = self.defer_lock.take() {
             drop(defer);
         } else {
+            // clear session data
+            clear_session_data(&self.trace_id);
             log::info!(
                 "[trace_id {trace_id}] flight->search: drop FlightEncoderStream, is_super: {is_super}",
             );
-            // clear session data
-            clear_session_data(&self.trace_id);
         }
     }
 }
