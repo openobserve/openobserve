@@ -193,8 +193,8 @@ pub fn create_wal_dir_datetime_filter(
 
         let month = match components.next().map(|c| c.parse::<u32>()) {
             Some(Ok(m @ 1..=12)) => m,
-            Some(_) => return false,    // Parsed, but invalid month number
-            None => start_time.month(), // Not present or failed to parse
+            Some(_) => return false, // Parsed, but invalid month number
+            None => return true,     // Not present or failed to parse, could be a skippable path
         };
 
         let month_days = [31u32, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -209,13 +209,25 @@ pub fn create_wal_dir_datetime_filter(
                 }
             }
             Some(_) => return false,
-            None => start_time.day(),
+            None => {
+                if month == start_time.month() {
+                    start_time.day()
+                } else {
+                    end_time.day()
+                }
+            }
         };
 
         let hour = match components.next().map(|c| c.parse::<u32>()) {
             Some(Ok(hour @ 0..24)) => hour,
             Some(_) => return false,
-            None => start_time.hour(),
+            None => {
+                if month == start_time.month() && day == start_time.day() {
+                    start_time.hour()
+                } else {
+                    end_time.hour()
+                }
+            }
         };
 
         let date_range_check =

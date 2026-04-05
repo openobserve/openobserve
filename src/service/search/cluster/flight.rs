@@ -44,9 +44,13 @@ use itertools::Itertools;
 use parking_lot::Mutex;
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-
 #[cfg(feature = "enterprise")]
-use crate::service::search::SEARCH_SERVER;
+use {
+    crate::service::search::SEARCH_SERVER,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::search::{WorkGroup, admission},
+};
+
 use crate::{
     handler::grpc::flight::visitor::get_peak_memory_from_ctx,
     service::{
@@ -138,6 +142,10 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         ..Default::default()
     };
 
+    // Compute stream_key once — used for both work group prediction and slot
+    // node selection so both see the same node set.
+    let stream_key = sql.get_first_stream_key();
+
     // 3. get nodes
     let is_local_mode = req.local_mode.unwrap_or_default();
     let role_group = if is_local_mode {
@@ -152,7 +160,8 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
             })
             .unwrap_or(Some(RoleGroup::Interactive))
     };
-    let mut nodes = get_online_querier_nodes(trace_id, role_group).await?;
+    let mut nodes =
+        get_online_querier_nodes(trace_id, &sql.org_id, &stream_key, role_group).await?;
 
     // local mode, only use local node as querier node
     if is_local_mode {
@@ -196,7 +205,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         )
     );
 
-    // waiting in work group queue
+    // 4. Wait in DB search queue (org/user concurrency check)
     metrics::QUERY_PENDING_NUMS
         .with_label_values(&[&req.org_id])
         .inc();
@@ -210,13 +219,40 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         &file_id_list_vec,
     )
     .await?;
+    let mut _took_wait = _lock.took_wait;
 
-    let took_wait = _lock.took_wait;
     let work_group_str = _lock.work_group_str.clone();
+    #[cfg(feature = "enterprise")]
+    let work_group = _lock.work_group.clone().unwrap_or(WorkGroup::Short);
 
     // add work_group
     req.add_work_group(Some(work_group_str));
 
+    // 5a. Node-level slot admission (enterprise, O2_WORK_GROUP_SLOT_ENABLED=true).
+    //     Reuses stream_key so select_nodes picks the same node set as predict().
+    #[cfg(feature = "enterprise")]
+    let _node_slot_guard = {
+        if get_o2_config().work_group.max_nodes_per_query > 0 {
+            let start_time = std::time::Instant::now();
+            let elapsed_ms = took_watch.total_millis();
+            let remaining_ms = (timeout * 1000).saturating_sub(elapsed_ms);
+            let guard = Some(
+                admission::acquire_node_slots(trace_id, &nodes, &work_group, remaining_ms).await?,
+            );
+            let took_wait = start_time.elapsed().as_millis() as usize;
+            _took_wait += took_wait;
+            log::info!(
+                "[trace_id {trace_id}] flight->search: wait in node slot queue took: {took_wait} ms"
+            );
+            guard
+        } else {
+            None
+        }
+    };
+    log::info!("[trace_id {trace_id}] flight->search: total wait in queue took: {_took_wait} ms");
+
+    // Move metric updates to here, after all admission stages complete.
+    // A request blocked on slot budget should not be counted as "running".
     metrics::QUERY_PENDING_NUMS
         .with_label_values(&[&sql.org_id])
         .dec();
@@ -336,7 +372,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     Ok((
         data,
         scan_stats,
-        took_wait,
+        _took_wait,
         !partial_err.is_empty(),
         partial_err,
     ))
@@ -433,6 +469,8 @@ pub async fn run_datafusion(
 
 pub async fn get_online_querier_nodes(
     trace_id: &str,
+    _org_id: &str,
+    _stream_key: &str,
     role_group: Option<RoleGroup>,
 ) -> Result<Vec<Node>> {
     // get nodes from cluster
@@ -456,14 +494,27 @@ pub async fn get_online_querier_nodes(
 
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
     if querier_num == 0 {
-        log::error!("no querier node online");
+        log::error!("[trace_id {trace_id}] flight->search: no querier node online");
         return Err(Error::Message("no querier node online".to_string()));
     }
 
     // use enterprise scheduler to filter nodes
     #[cfg(feature = "enterprise")]
     {
+        // filter nodes by cpu
         nodes = o2_enterprise::enterprise::search::scheduler::filter_nodes_by_cpu(nodes);
+        // filter nodes by slot admission
+        nodes = o2_enterprise::enterprise::search::admission::node_selection::select_nodes(
+            _org_id,
+            _stream_key,
+            nodes,
+            role_group,
+        )
+        .await;
+        log::debug!(
+            "[trace_id {trace_id}] flight->search: slot admission select_nodes for org: {_org_id}, nodes: {:?}",
+            nodes.iter().map(|node| node.name.clone()).collect_vec()
+        );
     }
 
     Ok(nodes)
@@ -581,9 +632,25 @@ pub(crate) async fn partition_file_by_hash(
         idx += 1;
     }
     let mut partitions = vec![Vec::new(); idx];
+    if idx == 0 {
+        return partitions;
+    }
+
+    // Build the allowed set from the selected querier nodes.  When all online
+    // queriers are selected this degrades to the normal global-ring behaviour.
+    // When only a subset is selected (e.g. max_nodes_per_query=3, strategy=org)
+    // the ring walk skips nodes outside the subset, so every file maps to one
+    // of the selected nodes without any fallback-to-0 imbalance.
+    let allowed: HashSet<String> = node_idx.keys().map(|s| s.to_string()).collect();
+
     for fk in file_id_list {
-        let node_name =
-            cluster::get_node_from_consistent_hash(&fk.id.to_string(), &Role::Querier, group).await;
+        let node_name = cluster::get_node_from_consistent_hash_within(
+            &fk.id.to_string(),
+            &Role::Querier,
+            group,
+            &allowed,
+        )
+        .await;
         let idx = match node_name {
             Some(node_name) => match node_idx.get(&node_name) {
                 Some(idx) => *idx,

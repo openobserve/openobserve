@@ -177,14 +177,14 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         let trace_id = auth_data.get_trace_id();
         let user_id = &auth_data.user_id;
         let org_id_str = org_id.as_str();
-        let config = get_o2_config();
+        let o2_cfg = get_o2_config();
 
         // Check if AI/agent is enabled
-        if !config.ai.enabled {
+        if !o2_cfg.ai.enabled {
             return MetaHttpResponse::bad_request("AI is not enabled");
         }
 
-        if config.ai.agent_url.is_empty() {
+        if o2_cfg.ai.agent_url.is_empty() {
             return MetaHttpResponse::bad_request("AI agent URL is not set");
         }
 
@@ -244,7 +244,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         // Create agent client
         let zo_config = get_config();
         let client = match RcaAgentClient::new(
-            &config.ai.agent_url,
+            &o2_cfg.ai.agent_url,
             &zo_config.auth.root_user_email,
             &zo_config.auth.root_user_password,
         ) {
@@ -473,8 +473,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
     // don't get properly exported when held inside async_stream::stream!).
     #[cfg(feature = "enterprise")]
     let otel_chat_span = {
-        let config = get_o2_config();
-        if config.ai.tracing_enabled {
+        if get_o2_config().ai.tracing_enabled {
             use opentelemetry::trace::{SpanKind, TraceContextExt, Tracer};
 
             // Extract parent context from incoming traceparent header
@@ -560,7 +559,6 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
     // Extract and merge passthrough headers from config
     #[cfg(feature = "enterprise")]
     {
-        let _config = get_o2_config();
         // Note: passthrough_headers config field needs to be added to o2_enterprise Ai config
         // For now, use empty string (no passthrough) until config is updated
         let passthrough_config = ""; // TODO: Replace with _config.ai.passthrough_headers once field is added
@@ -602,14 +600,13 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         use futures::StreamExt;
         use o2_enterprise::enterprise::alerts::rca_agent::{QueryRequest, get_agent_client};
 
-        let config = get_o2_config();
         let org_id_str = org_id.clone();
 
         let mut code = StatusCode::OK.as_u16();
         let body_bytes_str = serde_json::to_string(&prompt_body).unwrap_or_default();
 
         // Check if AI/agent is enabled
-        if !config.ai.enabled {
+        if !get_o2_config().ai.enabled {
             let error_message = Some("AI is not enabled".to_string());
             code = StatusCode::BAD_REQUEST.as_u16();
             report_to_audit(
@@ -929,9 +926,7 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
     {
         use o2_enterprise::enterprise::alerts::rca_agent::get_agent_client;
 
-        let config = get_o2_config();
-
-        if !config.ai.enabled {
+        if !get_o2_config().ai.enabled {
             return MetaHttpResponse::bad_request("AI is not enabled");
         }
 
@@ -1024,9 +1019,8 @@ pub async fn confirm_action(
     {
         use o2_enterprise::enterprise::alerts::rca_agent::get_agent_client;
 
-        let config = get_o2_config();
-
-        if !config.ai.enabled {
+        let o2_cfg = get_o2_config();
+        if !o2_cfg.ai.enabled {
             return MetaHttpResponse::bad_request("AI is not enabled");
         }
 
@@ -1061,7 +1055,7 @@ pub async fn confirm_action(
         // Forward the confirmation to the agent's /confirm endpoint
         let confirm_url = format!(
             "{}/confirm/{}",
-            config.ai.agent_url.trim_end_matches('/'),
+            o2_cfg.ai.agent_url.trim_end_matches('/'),
             session_id
         );
 
