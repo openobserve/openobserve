@@ -15,6 +15,45 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+const quoteSqlIdentifierForTest = (field: string) =>
+  field === "user" ? `"${field}"` : field;
+
+const getFieldFromExpressionForTest = (expression: string): string | null => {
+  const cleaned = expression.trim().replace(/^\(\s*/, "");
+  const match =
+    cleaned.match(/^"[^"]+"\."?(\w+)"?\s*(?:=|!=|is)/i) ||
+    cleaned.match(/^"?(\w+)"?\s*(?:=|!=|is)/i);
+
+  return match ? match[1] : null;
+};
+
+const replaceExistingFieldConditionForTest = (
+  queryStr: string,
+  fieldName: string,
+  newExpression: string,
+): string => {
+  const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
+  const opPat = `(?:=|!=|is(?:\\s+not)?)`;
+  const fieldPat = `(?:"${esc}"|${esc})`;
+  const condPat = `(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;
+
+  const multiRegex = new RegExp(
+    `\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`,
+    "gi",
+  );
+  if (multiRegex.test(queryStr)) {
+    return queryStr.replace(multiRegex, newExpression);
+  }
+
+  const singleRegex = new RegExp(condPat, "gi");
+  if (singleRegex.test(queryStr)) {
+    return queryStr.replace(singleRegex, newExpression);
+  }
+
+  return queryStr;
+};
+
 // Mock all external services at the top level
 vi.mock("@/services/search", () => ({
   default: {
@@ -1654,7 +1693,14 @@ describe("SearchBar.vue Actual Component Methods", () => {
         const template = 'SELECT [FIELD_LIST] FROM "[STREAM_NAME]"';
         return template
           .replace("[STREAM_NAME]", stream)
-          .replace("[FIELD_LIST]", fieldList && fieldList.length > 0 && isQuickMode ? fieldList.join(",") : "*");
+          .replace(
+            "[FIELD_LIST]",
+            fieldList && fieldList.length > 0 && isQuickMode
+              ? fieldList
+                  .map((field: string) => quoteSqlIdentifierForTest(field))
+                  .join(",")
+              : "*",
+          );
       }),
       
       resetFilters: vi.fn(() => {
@@ -2271,6 +2317,58 @@ describe("SearchBar.vue Actual Component Methods", () => {
     const result = componentInstance.buildStreamQuery("logs", ["field1", "field2"], true);
     
     expect(result).toBe('SELECT field1,field2 FROM "logs"');
+  });
+
+  it("should quote reserved fields when building stream query", () => {
+    const result = componentInstance.buildStreamQuery("logs", ["user"], true);
+
+    expect(result).toBe('SELECT "user" FROM "logs"');
+  });
+
+  it("should keep non-reserved fields unquoted when replacing an existing condition", () => {
+    const newExpression = "firstName = 'alice'";
+    const fieldName = getFieldFromExpressionForTest(newExpression);
+
+    const result = replaceExistingFieldConditionForTest(
+      `SELECT * FROM "logs" WHERE firstName = 'bob'`,
+      fieldName!,
+      newExpression,
+    );
+
+    expect(fieldName).toBe("firstName");
+    expect(result).toContain("WHERE firstName = 'alice'");
+    expect(result).not.toContain("firstName = 'bob'");
+  });
+
+  it("should preserve quoted reserved fields when replacing an existing condition", () => {
+    const newExpression = `"user" = 'alice'`;
+    const fieldName = getFieldFromExpressionForTest(newExpression);
+
+    const result = replaceExistingFieldConditionForTest(
+      `SELECT * FROM "logs" WHERE "user" = 'bob'`,
+      fieldName!,
+      newExpression,
+    );
+
+    expect(fieldName).toBe("user");
+    expect(result).toContain(`WHERE "user" = 'alice'`);
+    expect(result).not.toContain(`"user" = 'bob'`);
+  });
+
+  it("should match quoted identifiers with a stream prefix when replacing a condition", () => {
+    const newExpression = `"logs"."user" = 'alice'`;
+    const fieldName = getFieldFromExpressionForTest(newExpression);
+
+    const result = replaceExistingFieldConditionForTest(
+      `SELECT * FROM "logs" WHERE "logs"."user" = 'bob' AND level = 'info'`,
+      fieldName!,
+      newExpression,
+    );
+
+    expect(fieldName).toBe("user");
+    expect(result).toContain(`"logs"."user" = 'alice'`);
+    expect(result).toContain(`level = 'info'`);
+    expect(result).not.toContain(`"logs"."user" = 'bob'`);
   });
 
   // Test 118: buildStreamQuery method with no fields

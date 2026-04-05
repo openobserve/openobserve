@@ -2809,7 +2809,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
     )
     .await?;
 
-    // Phase 1: Autovacuum tuning + column width compatibility
+    // Autovacuum tuning + column width compatibility
     if cfg.common.meta_partition_mode == "auto" {
         apply_autovacuum_tuning(&pool).await?;
         apply_column_width_compat(&pool).await?;
