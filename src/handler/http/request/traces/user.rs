@@ -200,7 +200,7 @@ pub async fn get_latest_users(
     let stream_type = StreamType::Traces;
     let user_id_opt = Some(user_id.to_string());
 
-    // Phase 1: Get paginated user list with trace_ids per user
+    // Get paginated user list with trace_ids per user
     let user_filter = if filter.is_empty() {
         format!("{user_id_col} IS NOT NULL AND {user_id_col} != ''")
     } else {
