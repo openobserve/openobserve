@@ -442,6 +442,7 @@ import {
   useLocalInterestingFields,
   deepCopy,
   b64EncodeUnicode,
+  addSpacesToOperators,
 } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
@@ -457,6 +458,10 @@ import {
   isSimpleSelectAllQuery,
   getStreamFromQuery,
 } from "@/utils/query/sqlUtils";
+import {
+  buildColumnIdentifierAst,
+  quoteSqlIdentifierIfNeeded,
+} from "@/utils/query/sqlIdentifiers";
 import useNotifications from "@/composables/useNotifications";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
@@ -1383,7 +1388,22 @@ export default defineComponent({
           if (!hasSelect) {
             if (currentQuery != "") {
               if (currentQuery.trim() != "") {
-                whereClause = "WHERE " + currentQuery;
+                const parsedFilterQuery = addSpacesToOperators(currentQuery)
+                  .split(" ")
+                  .map((token: string) => token.replaceAll('"', ""));
+                const streamFieldNames = new Set(
+                  searchObj.data.stream.selectedStreamFields.map(
+                    (item: any) => item.name,
+                  ),
+                );
+
+                for (const [index, token] of parsedFilterQuery.entries()) {
+                  if (streamFieldNames.has(token)) {
+                    parsedFilterQuery[index] = quoteSqlIdentifierIfNeeded(token);
+                  }
+                }
+
+                whereClause = "WHERE " + parsedFilterQuery.join(" ");
               }
             }
 
@@ -1434,7 +1454,9 @@ export default defineComponent({
               ) {
                 searchObj.data.query = searchObj.data.query.replace(
                   /\[FIELD_LIST\]/g,
-                  searchObj.data.stream.interestingFieldList.join(","),
+                  searchObj.data.stream.interestingFieldList
+                    .map((field: string) => quoteSqlIdentifierIfNeeded(field))
+                    .join(","),
                 );
               } else {
                 searchObj.data.query = searchObj.data.query.replace(
@@ -1531,7 +1553,7 @@ export default defineComponent({
           if (
             (item.expr.type === "column_ref" &&
               (item.expr?.column?.expr?.value === fieldName ||
-                item.expr.column === fieldName)) ||
+                (typeof item.expr.column === "string" && item.expr.column.replace(/['"`]/g, "") === fieldName))) ||
             (item.expr.type === "aggr_func" &&
               item.expr?.args?.expr?.column?.value === fieldName)
           ) {
@@ -1556,16 +1578,7 @@ export default defineComponent({
       );
 
       // Modify the query based on stream name
-      const streamName = searchObj.data.stream.selectedStream[0].replace(
-        /[.*+?^${}()|[\]\\]/g,
-        "\\$&",
-      );
-      const newQuery = fnUnparsedSQL(parsedSQL)
-        .replace(/`/g, "")
-        .replace(
-          new RegExp(`\\b${streamName}\\b`, "g"),
-          `"${searchObj.data.stream.selectedStream[0]}"`,
-        );
+      const newQuery = fnUnparsedSQL(parsedSQL).replace(/`/g, '"');
 
       if (newQuery) {
         searchObj.data.query = newQuery;
@@ -1579,7 +1592,7 @@ export default defineComponent({
       field,
       isFieldExistInSQL,
     ) => {
-      let fieldPrefix = "";
+      let fieldTable = null;
       if (parsedSQL) {
         if (isFieldExistInSQL) {
           // Remove the field from the query
@@ -1597,9 +1610,7 @@ export default defineComponent({
         } else {
           if (searchObj.data.stream.selectedStream.length > 1) {
             if (parsedSQL && parsedSQL?.from?.length > 1) {
-              fieldPrefix = parsedSQL.from[0].as
-                ? `${parsedSQL.from[0].as}.`
-                : `${parsedSQL.from[0].table}.`;
+              fieldTable = parsedSQL.from[0].as || parsedSQL.from[0].table;
             }
           }
           // Add the field in the query
@@ -1617,7 +1628,8 @@ export default defineComponent({
                   parsedSQL.columns.push({
                     expr: {
                       type: "column_ref",
-                      column: fieldPrefix + field.name,
+                      table: fieldTable,
+                      column: buildColumnIdentifierAst(field.name),
                     },
                     type: "expr",
                   });
@@ -1632,7 +1644,8 @@ export default defineComponent({
           parsedSQL.columns.push({
             expr: {
               type: "column_ref",
-              column: fieldPrefix + "*",
+              table: fieldTable,
+              column: "*",
             },
             type: "expr",
           });
@@ -1655,7 +1668,9 @@ export default defineComponent({
       if (searchObj.meta.quickMode == true) {
         let field_list: string = "*";
         if (searchObj.data.stream.interestingFieldList.length > 0) {
-          field_list = searchObj.data.stream.interestingFieldList.join(",");
+          field_list = searchObj.data.stream.interestingFieldList
+            .map((field: string) => quoteSqlIdentifierIfNeeded(field))
+            .join(",");
         }
         if (searchObj.meta.sqlMode == true) {
           searchObj.data.query = searchObj.data.query.replace(
