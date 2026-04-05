@@ -70,7 +70,7 @@ pub async fn get_dedup_summary(Path(org_id): Path<String>) -> Response {
         .filter(|alert| alert.deduplication.as_ref().is_some_and(|d| d.enabled))
         .count();
 
-    // Get current pending batches count from in-memory state (enterprise only)
+    // Get current pending batches count from in-memory state
     #[cfg(feature = "enterprise")]
     let pending_batches = crate::service::alerts::grouping::get_pending_batch_count(&org_id);
 
