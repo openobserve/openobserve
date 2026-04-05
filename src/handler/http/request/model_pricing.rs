@@ -58,7 +58,7 @@ pub async fn list(
         &org_id,
         &org_id,
         &user_email.user_id,
-        "settings",
+        "model_pricing",
         "LIST",
         None,
     )
@@ -91,11 +91,13 @@ pub async fn list(
     }
 
     // Include built-in entries (synced from GitHub), shadowed by org/meta entries.
+    // Filter out disabled built-in models (soft-deleted from upstream) so they
+    // don't appear in the UI list — the hot-path cache already filters them.
     if org_id != BUILT_IN_ORG {
         match model_pricing::list(BUILT_IN_ORG).await {
             Ok(built_in_items) => {
                 for item in built_in_items {
-                    if seen_names.insert(item.name.clone()) {
+                    if item.enabled && seen_names.insert(item.name.clone()) {
                         items.push(item);
                     }
                 }
@@ -136,7 +138,7 @@ pub async fn get(
         &org_id,
         &org_id,
         &user_email.user_id,
-        "settings",
+        "model_pricing",
         "GET",
         None,
     )
@@ -186,7 +188,7 @@ pub async fn create(
         &org_id,
         &org_id,
         &user_email.user_id,
-        "settings",
+        "model_pricing",
         "PUT",
         None,
     )
@@ -211,6 +213,22 @@ pub async fn create(
 
     if let Err(e) = validate_definition(&item) {
         return MetaHttpResponse::bad_request(e);
+    }
+
+    // Reject if a definition with the same name already exists in this org.
+    // The underlying `put()` does upsert-by-name (needed by the sync job),
+    // so user-facing create must enforce uniqueness explicitly.
+    match model_pricing::get_by_name(&org_id, &item.name).await {
+        Ok(Some(_)) => {
+            return MetaHttpResponse::bad_request(format!(
+                "A model pricing definition with name '{}' already exists in this organization",
+                item.name
+            ));
+        }
+        Err(e) => {
+            return MetaHttpResponse::internal_error(e);
+        }
+        Ok(None) => {} // good — name is available
     }
 
     match model_pricing::set(item).await {
@@ -251,7 +269,7 @@ pub async fn update(
         &org_id,
         &org_id,
         &user_email.user_id,
-        "settings",
+        "model_pricing",
         "PUT",
         None,
     )
@@ -319,7 +337,7 @@ pub async fn delete(
         &org_id,
         &org_id,
         &user_email.user_id,
-        "settings",
+        "model_pricing",
         "DELETE",
         None,
     )
@@ -398,7 +416,7 @@ pub async fn get_built_in(
         &_org_id,
         &_org_id,
         &user_email.user_id,
-        "settings",
+        "model_pricing",
         "LIST",
         None,
     )
@@ -485,7 +503,7 @@ pub async fn refresh_built_in(
         &_org_id,
         &_org_id,
         &user_email.user_id,
-        "settings",
+        "model_pricing",
         "PUT",
         None,
     )

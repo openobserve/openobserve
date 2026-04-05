@@ -56,9 +56,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 stack-label
                 dense
                 borderless
-                :rules="[(val: string) => !!val?.trim() || 'Model name is required']"
-                reactive-rules
-                lazy-rules
+                :error="nameTouched && !!nameError"
+                :error-message="nameError"
+                @blur="nameTouched = true"
+                @update:model-value="nameTouched = true"
                 data-test="model-pricing-name-input"
               />
             </div>
@@ -71,15 +72,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 stack-label
                 dense
                 borderless
-                :rules="[
-                  (val: string) => !!val?.trim() || 'Match pattern is required',
-                  (val: string) => {
-                    try { new RegExp(val); return true; }
-                    catch { return 'Invalid regex pattern'; }
-                  },
-                ]"
-                reactive-rules
-                lazy-rules
+                :error="patternTouched && !!regexError"
+                :error-message="regexError"
+                @blur="patternTouched = true"
+                @update:model-value="patternTouched = true"
                 data-test="model-pricing-pattern-input"
               />
               <q-btn
@@ -327,6 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         no-caps flat
         label="Save"
         :loading="saving"
+        :disable="!!nameError || !!regexError"
         @click="save"
         data-test="model-pricing-editor-save-btn"
       />
@@ -349,6 +346,8 @@ const route = useRoute();
 const q = useQuasar();
 
 const saving = ref(false);
+const nameTouched = ref(false);
+const patternTouched = ref(false);
 const addState = ref<Array<{ key: string; value: number }>>([{ key: "", value: 0 }]);
 const showExamples = ref(false);
 const copiedPattern = ref<string | null>(null);
@@ -370,6 +369,39 @@ const patternExamples = [
 const orgIdentifier = computed(
   () => store.state.selectedOrganization?.identifier || ""
 );
+
+/** Real-time name validation. */
+const nameError = computed(() => {
+  const name = model.value.name;
+  if (!name || !name.trim()) return "Model name is required";
+  if (name.length > 256) return "Model name must be 256 characters or fewer";
+  return "";
+});
+
+/**
+ * Strip Rust/PCRE inline flag groups that JavaScript RegExp doesn't understand.
+ * Handles: (?i), (?m), (?s), (?x), (?u), and combinations like (?ims).
+ * Does NOT strip flag-scoped groups like (?i:...) — those are left as non-capturing groups.
+ */
+function stripInlineFlags(pattern: string): string {
+  // (?FLAGS) where FLAGS is one or more of i, m, s, x, u — standalone (not followed by ':')
+  return pattern.replace(/\(\?[imsxu]+\)/g, "");
+}
+
+/** Real-time regex validation — shows error as the user types. */
+const regexError = computed(() => {
+  const pattern = model.value.match_pattern;
+  if (!pattern || !pattern.trim()) return "Match pattern is required";
+  if (pattern.length > 512) return "Match pattern must be 512 characters or fewer";
+  try {
+    // Strip Rust-specific inline flags before testing with JS RegExp.
+    // The backend (Rust regex crate) is the authority; this is a best-effort client check.
+    new RegExp(stripInlineFlags(pattern));
+    return "";
+  } catch (e: any) {
+    return `Invalid regex: ${e.message}`;
+  }
+});
 
 const isEdit = computed(() => !!route.query.id && route.query.duplicate !== "true");
 
@@ -489,15 +521,42 @@ function goBack() {
   });
 }
 
+function notifyWarn(message: string) {
+  q.notify({ type: "warning", message, position: "bottom", timeout: 4000 });
+}
+
 async function save() {
   const m = model.value;
-  if (!m.name.trim()) {
-    q.notify({ type: "warning", message: "Model name is required" });
+
+  // Auto-commit any pending add-row values before validation.
+  // Users often type a price and hit Save without clicking "+".
+  for (let i = 0; i < m.tiers.length; i++) {
+    const pending = addState.value[i];
+    if (pending && pending.value > 0 && !pending.key.trim()) {
+      notifyWarn(`Tier "${m.tiers[i].name}" has a price without a usage key. Add a usage key (e.g. "input") or use a quick setup template.`);
+      return;
+    }
+    if (pending && pending.key.trim()) {
+      addPrice(m.tiers[i], i);
+    }
+  }
+
+  // Name and pattern have inline errors — just mark fields as touched so errors show,
+  // no duplicate snackbar needed.
+  if (nameError.value || regexError.value) {
+    nameTouched.value = true;
+    patternTouched.value = true;
     return;
   }
-  if (!m.match_pattern.trim()) {
-    q.notify({ type: "warning", message: "Match pattern is required" });
-    return;
+
+  // Require at least one price in the default tier (no inline field for this)
+  const defaultTier = m.tiers?.[0];
+  if (defaultTier) {
+    const priceValues = Object.values(defaultTier.prices || {}) as number[];
+    if (priceValues.length === 0 || priceValues.every((v: number) => v === 0)) {
+      notifyWarn("Add at least one token price in the default tier.");
+      return;
+    }
   }
   if (m.tiers.length > 0) {
     m.tiers[0].condition = null;
@@ -510,11 +569,11 @@ async function save() {
     } else {
       await modelPricingService.create(orgIdentifier.value, m);
     }
-    q.notify({ type: "positive", message: "Model pricing saved" });
+    q.notify({ type: "positive", message: "Model pricing saved", position: "bottom", timeout: 3000 });
     goBack();
   } catch (e: any) {
     const msg = e.response?.data?.message || e.message;
-    q.notify({ type: "negative", message: "Failed to save: " + msg });
+    q.notify({ type: "negative", message: "Failed to save: " + msg, position: "bottom", timeout: 5000 });
   } finally {
     saving.value = false;
   }
@@ -529,6 +588,8 @@ onBeforeMount(async () => {
       const found = res.data;
       if (found) {
         model.value = JSON.parse(JSON.stringify(found));
+        nameTouched.value = true;
+        patternTouched.value = true; // existing model — show validation immediately
         if (isDuplicate) {
           model.value.id = null;
           model.value.org_id = orgIdentifier.value;
@@ -543,7 +604,7 @@ onBeforeMount(async () => {
         }
       }
     } catch (e: any) {
-      q.notify({ type: "negative", message: "Failed to load model: " + e.message });
+      q.notify({ type: "negative", message: "Failed to load model: " + e.message, position: "bottom", timeout: 5000 });
     }
   }
   resetAddState(model.value.tiers.length);
@@ -570,6 +631,10 @@ onBeforeMount(async () => {
   border-radius: 10px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+  .body--dark & {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
 }
 
 .form-card-header {
@@ -581,6 +646,10 @@ onBeforeMount(async () => {
   padding: 10px 16px;
   background: rgba(0, 0, 0, 0.025);
   border-bottom: 1px solid var(--o2-border-color);
+
+  .body--dark & {
+    background: rgba(255, 255, 255, 0.04);
+  }
 }
 
 .form-card-title {
@@ -614,6 +683,10 @@ onBeforeMount(async () => {
   border-radius: 10px;
   overflow: hidden;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+
+  .body--dark & {
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  }
 }
 
 .tier-header {
@@ -624,6 +697,10 @@ onBeforeMount(async () => {
   padding: 8px 16px;
   background: rgba(0, 0, 0, 0.025);
   border-bottom: 1px solid var(--o2-border-color);
+
+  .body--dark & {
+    background: rgba(255, 255, 255, 0.04);
+  }
 }
 
 .tier-name-label {
@@ -679,6 +756,10 @@ onBeforeMount(async () => {
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.02);
   border: 1px solid var(--o2-border-color);
+
+  .body--dark & {
+    background: rgba(255, 255, 255, 0.03);
+  }
 }
 
 
@@ -848,6 +929,10 @@ onBeforeMount(async () => {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   opacity: 0.45;
+
+  .body--dark & {
+    background: rgba(255, 255, 255, 0.05);
+  }
 }
 
 .examples-table-row {
@@ -878,6 +963,10 @@ onBeforeMount(async () => {
   padding: 2px 6px;
   border-radius: 4px;
   word-break: break-all;
+
+  .body--dark & {
+    background: rgba(255, 255, 255, 0.08);
+  }
 }
 
 /* ── showLabelOnTop input border override ───────────── */

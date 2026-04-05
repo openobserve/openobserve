@@ -169,7 +169,7 @@ import BaseImport from "../common/BaseImport.vue";
 
 import modelPricingService from "@/services/model_pricing";
 
-defineProps<{
+const props = defineProps<{
   existingModels?: string[];
 }>();
 
@@ -264,7 +264,19 @@ async function importJson({ jsonStr: jsonString }: any) {
   const totalCount = jsonArrayOfObj.value.length;
   isImporting.value = true;
 
+  // Detect duplicate names within the batch
+  const batchNames = new Set<string>();
   for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
+    if (jsonObj.name && batchNames.has(jsonObj.name)) {
+      modelPricingErrorsToDisplay.value.push([
+        {
+          field: "model_pricing_name",
+          message: `Model pricing - ${index + 1}: duplicate name "${jsonObj.name}" within this import batch. Each model must have a unique name.`,
+        },
+      ]);
+      continue;
+    }
+    if (jsonObj.name) batchNames.add(jsonObj.name);
     const success = await processJsonObject(jsonObj, index + 1);
     if (success) {
       successCount++;
@@ -338,6 +350,17 @@ async function validateModelPricingInputs(jsonObj: any, index: number) {
       {
         field: "model_pricing_pattern",
         message: `Model pricing - ${index}: match_pattern is required`,
+      },
+    ]);
+    return false;
+  }
+
+  // Check for duplicate name against existing models in the org
+  if (props.existingModels?.includes(jsonObj.name)) {
+    modelPricingErrorsToDisplay.value.push([
+      {
+        field: "model_pricing_name",
+        message: `Model pricing - ${index}: a model with name "${jsonObj.name}" already exists. Please choose a different name.`,
       },
     ]);
     return false;

@@ -139,13 +139,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="props.row.__sectionStart"
           class="inherited-section-header"
         >
-          <q-td :colspan="columns.length + 1" style="padding: 10px 16px; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+          <q-td :colspan="columns.length + 1" class="section-header-cell">
             <div class="tw:flex tw:items-center tw:gap-2">
               <q-icon :name="sectionIcon(props.row.__sectionStart)" size="18px" color="grey-7" />
-              <span class="text-caption" style="font-weight: 600; color: #555;">
+              <span class="text-caption section-header-title">
                 {{ sectionLabel(props.row.__sectionStart) }}
               </span>
-              <span class="text-caption" style="color: #888;">
+              <span class="text-caption section-header-subtitle">
                 &mdash; Read-only. Clone to create your own copy.
               </span>
             </div>
@@ -202,6 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ formatPerMillion(getDefaultTier(props.row).prices?.input) }} /
                   {{ formatPerMillion(getDefaultTier(props.row).prices?.output) }}
                 </span>
+                <span v-else class="text-grey-5">—</span>
               </div>
             </template>
             <template v-else-if="col.name === 'actions'">
@@ -533,11 +534,15 @@ function customSort(rows: any[], sortBy: string, descending: boolean) {
 }
 
 function getDefaultTier(model: any) {
-  return model.tiers?.[0];
+  // Find the first unconditional tier (the fallback/default tier).
+  // The editor always stores the default as tiers[0], but inherited/built-in
+  // entries might have a different order.
+  const fallback = model.tiers?.find((t: any) => !t.condition);
+  return fallback || model.tiers?.[0];
 }
 
 function formatPerMillion(pricePerToken: number | undefined | null): string {
-  if (pricePerToken == null) return "N/A";
+  if (pricePerToken == null || pricePerToken === undefined) return "$0.00";
   if (pricePerToken === 0) return "$0.00";
   const perMillion = pricePerToken * 1_000_000;
   return `$${perMillion.toFixed(2)}`;
@@ -553,7 +558,7 @@ async function fetchModels() {
     const res = await modelPricingService.list(orgIdentifier.value);
     models.value = res.data || [];
   } catch (e: any) {
-    q.notify({ type: "negative", message: "Failed to load models: " + e.message });
+    q.notify({ type: "negative", message: "Failed to load models: " + e.message, position: "bottom", timeout: 5000 });
   } finally {
     loading.value = false;
   }
@@ -578,9 +583,9 @@ async function toggleEnabled(model: any, enabled: boolean) {
     const updated = { ...model, enabled };
     await modelPricingService.update(orgIdentifier.value, model.id, updated);
     model.enabled = enabled;
-    q.notify({ type: "positive", message: `Model "${model.name}" ${enabled ? "enabled" : "disabled"}` });
+    q.notify({ type: "positive", message: `Model "${model.name}" ${enabled ? "enabled" : "disabled"}`, position: "bottom", timeout: 3000 });
   } catch (e: any) {
-    q.notify({ type: "negative", message: "Failed to update: " + e.message });
+    q.notify({ type: "negative", message: "Failed to update: " + e.message, position: "bottom", timeout: 5000 });
   }
 }
 
@@ -599,10 +604,10 @@ function confirmDelete(model: any) {
     onConfirm: async () => {
       try {
         await modelPricingService.delete(orgIdentifier.value, model.id);
-        q.notify({ type: "positive", message: "Model pricing deleted" });
+        q.notify({ type: "positive", message: "Model pricing deleted", position: "bottom", timeout: 3000 });
         await fetchModels();
       } catch (e: any) {
-        q.notify({ type: "negative", message: "Failed to delete: " + e.message });
+        q.notify({ type: "negative", message: "Failed to delete: " + e.message, position: "bottom", timeout: 5000 });
       }
     },
   };
@@ -623,10 +628,10 @@ async function refreshBuiltIn() {
   refreshing.value = true;
   try {
     await modelPricingService.refreshBuiltIn(orgIdentifier.value);
-    q.notify({ type: "positive", message: "Built-in models refreshed" });
+    q.notify({ type: "positive", message: "Built-in models refreshed", position: "bottom", timeout: 3000 });
     await fetchModels();
   } catch (e: any) {
-    q.notify({ type: "negative", message: "Refresh failed: " + e.message });
+    q.notify({ type: "negative", message: "Refresh failed: " + e.message, position: "bottom", timeout: 5000 });
   } finally {
     refreshing.value = false;
   }
@@ -657,7 +662,7 @@ function exportSelected() {
     (m: any) => !isReadOnly(m) && selectedIds.value.includes(m.id)
   );
   if (selected.length === 0) {
-    q.notify({ type: "warning", message: "No models selected to export" });
+    q.notify({ type: "warning", message: "No models selected to export", position: "bottom", timeout: 3000 });
     return;
   }
   const exportData = selected.map((m: any) => ({
@@ -692,11 +697,11 @@ function confirmDeleteSelected() {
           await modelPricingService.delete(orgIdentifier.value, id);
           successCount++;
         } catch (e: any) {
-          q.notify({ type: "negative", message: `Failed to delete model: ${e.message}` });
+          q.notify({ type: "negative", message: `Failed to delete model: ${e.message}`, position: "bottom", timeout: 5000 });
         }
       }
       if (successCount > 0) {
-        q.notify({ type: "positive", message: `Deleted ${successCount} model${successCount !== 1 ? "s" : ""}` });
+        q.notify({ type: "positive", message: `Deleted ${successCount} model${successCount !== 1 ? "s" : ""}`, position: "bottom", timeout: 3000 });
         selectedIds.value = [];
         await fetchModels();
       }
@@ -736,10 +741,33 @@ onActivated(() => {
 
 .inherited-row {
   opacity: 0.7;
-  background: #fafafa;
+  background: rgba(0, 0, 0, 0.02);
+
+  .body--dark & {
+    background: rgba(255, 255, 255, 0.03);
+  }
 
   &:hover {
     opacity: 0.85;
   }
+}
+
+.section-header-cell {
+  padding: 10px 16px;
+  background: rgba(0, 0, 0, 0.03);
+  border-bottom: 1px solid var(--o2-border-color);
+
+  .body--dark & {
+    background: rgba(255, 255, 255, 0.05);
+  }
+}
+
+.section-header-title {
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.section-header-subtitle {
+  opacity: 0.5;
 }
 </style>

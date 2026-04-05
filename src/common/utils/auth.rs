@@ -398,44 +398,28 @@ where
                 entity
             )
         } else if path_columns[1].eq("llm") {
-            // LLM model pricing routes — treated as admin-level settings.
+            // LLM model pricing routes — uses dedicated "model_pricing" resource.
             // url_len==3: /{org_id}/llm/models  (list / create)
             // url_len==4: /{org_id}/llm/models/built-in  (read-only catalog)
             // url_len==4: /{org_id}/llm/models/{model_id}  (get / update / delete)
+            let resource_key = OFGA_MODELS
+                .get("model_pricing")
+                .map_or("model_pricing", |m| m.key);
             if url_len == 3 {
                 if method.eq("GET") {
                     method = "LIST".to_string();
                 } else if method.eq("POST") {
                     method = "PUT".to_string();
                 }
-                format!(
-                    "{}:{}",
-                    OFGA_MODELS.get("settings").map_or("settings", |m| m.key),
-                    path_columns[0] // org_id
-                )
+                format!("{resource_key}:{}", path_columns[0])
             } else if path_columns.get(3) == Some(&"built-in") {
-                // Read-only built-in catalog — same permission as list
                 method = "LIST".to_string();
-                format!(
-                    "{}:{}",
-                    OFGA_MODELS.get("settings").map_or("settings", |m| m.key),
-                    path_columns[0] // org_id
-                )
+                format!("{resource_key}:{}", path_columns[0])
             } else if path_columns.get(3) == Some(&"refresh-built-in") {
-                // Refresh built-in pricing — requires PUT permission on settings
                 method = "PUT".to_string();
-                format!(
-                    "{}:{}",
-                    OFGA_MODELS.get("settings").map_or("settings", |m| m.key),
-                    path_columns[0] // org_id
-                )
+                format!("{resource_key}:{}", path_columns[0])
             } else {
-                // Specific model_id: GET/PUT/DELETE on settings:{model_id}
-                format!(
-                    "{}:{}",
-                    OFGA_MODELS.get("settings").map_or("settings", |m| m.key),
-                    path_columns[3] // model_id
-                )
+                format!("{resource_key}:{}", path_columns[0])
             }
         } else if path_columns[1].eq("groups") || path_columns[1].eq("roles") {
             // for groups or roles, path will be of format /org/roles/id , so we need

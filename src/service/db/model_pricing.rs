@@ -34,7 +34,10 @@ const WATCHER_PREFIX: &str = "/model_pricing/";
 
 /// Maximum compiled regex size (bytes). Limits NFA state-set size to prevent
 /// pathological patterns from consuming excessive CPU on the hot path.
-pub const REGEX_SIZE_LIMIT: usize = 10 * 1024; // 10 KB
+/// The Rust `regex` crate default is 10 MB; 256 KB is protective while
+/// accommodating Unicode-aware patterns like `(?i)\d{4}` which expand
+/// significantly due to Unicode digit/case-folding tables.
+pub const REGEX_SIZE_LIMIT: usize = 256 * 1024; // 256 KB
 
 /// Cached model pricing entry with pre-compiled regex.
 #[derive(Clone)]
@@ -418,6 +421,13 @@ pub async fn list(org_id: &str) -> Result<Vec<ModelPricingDefinition>, anyhow::E
 
 pub async fn get_by_id(id: &str) -> Result<Option<ModelPricingDefinition>, anyhow::Error> {
     Ok(table::model_pricing::get_by_id(id).await?)
+}
+
+pub async fn get_by_name(
+    org_id: &str,
+    name: &str,
+) -> Result<Option<ModelPricingDefinition>, anyhow::Error> {
+    Ok(table::model_pricing::get(org_id, name).await?)
 }
 
 pub async fn set(item: ModelPricingDefinition) -> Result<ModelPricingDefinition, anyhow::Error> {
