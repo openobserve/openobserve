@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -31,6 +31,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-icon name="search" size="0.875rem" />
           </template>
         </q-input>
+      </div>
+    </div>
+
+    <!-- Filter mode toggle + selection count -->
+    <div
+      v-if="showMultiSelect"
+      class="filter-mode-bar q-px-sm q-py-xs tw:flex tw:items-center tw:justify-between"
+      data-test="field-values-panel-filter-mode-bar"
+    >
+      <div class="tw:flex tw:items-center tw:gap-[0.25rem]">
+        <span
+          v-if="selectedValues.length > 0"
+          class="selection-count"
+          data-test="field-values-panel-selection-count"
+        >
+          {{ selectedValues.length }} selected
+        </span>
+        <span v-else class="selection-hint">Select to filter</span>
+        <q-btn
+          v-if="selectedValues.length > 0"
+          flat
+          round
+          dense
+          size="0.2rem"
+          padding="0.1rem"
+          title="Clear selection"
+          class="selection-clear-btn"
+          @click="clearSelection"
+          data-test="field-values-panel-clear-selection-btn"
+        >
+          <q-icon name="close" size="0.6rem" />
+        </q-btn>
+      </div>
+      <div
+        class="filter-mode-toggle"
+        data-test="field-values-panel-filter-mode-toggle"
+      >
+        <q-btn
+          flat
+          dense
+          no-caps
+          size="xs"
+          padding="0.1rem 0.35rem"
+          :class="[
+            'filter-mode-btn',
+            filterMode === 'include' ? 'filter-mode-btn--active-include' : '',
+          ]"
+          title="Include mode (=)"
+          @click="filterMode = 'include'"
+          data-test="field-values-panel-include-mode-btn"
+        >
+          <q-icon class="tw:h-[0.6rem]! tw:w-[0.6rem]! tw:m-[0.1rem]!">
+            <EqualIcon />
+          </q-icon>
+        </q-btn>
+        <q-btn
+          flat
+          dense
+          no-caps
+          size="xs"
+          padding="0.1rem 0.35rem"
+          :class="[
+            'filter-mode-btn',
+            filterMode === 'exclude' ? 'filter-mode-btn--active-exclude' : '',
+          ]"
+          title="Exclude mode (≠)"
+          @click="filterMode = 'exclude'"
+          data-test="field-values-panel-exclude-mode-btn"
+        >
+          <q-icon class="tw:h-[0.6rem]! tw:w-[0.6rem]! tw:m-[0.1rem]!">
+            <NotEqualIcon />
+          </q-icon>
+        </q-btn>
       </div>
     </div>
 
@@ -67,22 +140,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-pr-none"
             :data-test="`logs-search-subfield-add-${fieldName}-${value.key}`"
           >
-            <!-- Checkbox for multi-select -->
+            <!-- Checkbox for multi-select — uses :model-value + @update to
+                 separate user-initiated changes from parent-sync updates,
+                 preventing re-emit loops when the parent reflects query state. -->
             <q-checkbox
               v-if="showMultiSelect"
-              v-model="selectedValues"
+              :model-value="selectedValues"
               :val="value.key"
               :color="checkboxColor(value.key)"
               size="xs"
               dense
               class="q-mr-xs"
+              @update:model-value="handleUserCheckboxChange"
               @click.stop
             />
 
             <div
               class="flex row wrap justify-between"
               :style="
-                showMultiSelect ? 'width: calc(100% - 4.25rem)' : 'width: 100%'
+                showMultiSelect ? 'width: calc(100% - 1.5rem)' : 'width: 100%'
               "
             >
               <div
@@ -102,57 +178,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <!-- Include/Exclude buttons -->
-            <div
-              v-if="showMultiSelect"
-              class="flex row tw:ml-[0.125rem]"
-              :class="theme === 'dark' ? 'text-white' : 'text-black'"
-            >
-              <q-btn
-                class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
-                size="0.25rem"
-                @click.stop="
-                  emit('add-search-term', fieldName, value.key, 'include')
-                "
-                title="Include Term"
-                round
-                :data-test="`log-search-subfield-list-equal-${fieldName}-field-btn`"
-              >
-                <q-icon
-                  v-if="fieldName === 'duration'"
-                  :name="outlinedArrowForwardIos"
-                  class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
-                />
-                <q-icon
-                  v-else
-                  class="tw:h-[0.5rem]! tw:w-[0.5rem]! tw:m-[0.15rem]!"
-                >
-                  <EqualIcon />
-                </q-icon>
-              </q-btn>
-              <q-btn
-                class="o2-custom-button-hover tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
-                size="0.25rem"
-                @click.stop="
-                  emit('add-search-term', fieldName, value.key, 'exclude')
-                "
-                title="Exclude Term"
-                round
-                :data-test="`log-search-subfield-list-not-equal-${fieldName}-field-btn`"
-              >
-                <q-icon
-                  v-if="fieldName === 'duration'"
-                  :name="outlinedArrowBackIos"
-                  class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
-                />
-                <q-icon
-                  v-else
-                  class="tw:h-[0.5rem]! tw:w-[0.5rem]! tw:m-[0.15rem]!"
-                >
-                  <NotEqualIcon />
-                </q-icon>
-              </q-btn>
-            </div>
           </q-item>
         </q-list>
       </div>
@@ -176,60 +201,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         View more values
       </q-btn>
     </div>
-
-    <!-- Multi-select action bar -->
-    <div
-      v-if="selectedValues.length > 0 && showMultiSelect"
-      class="multi-select-action-bar q-px-sm q-py-xs"
-    >
-      <div class="flex items-center justify-between">
-        <span class="multi-select-count">
-          {{ selectedValues.length }} selected
-        </span>
-        <div class="flex items-center" style="gap: 0.2rem">
-          <q-btn
-            flat
-            round
-            dense
-            size="0.2rem"
-            padding="0.1rem"
-            class="multi-select-clear-btn"
-            :class="theme === 'dark' ? 'text-white' : 'text-dark'"
-            title="Clear selection"
-            @click="selectedValues = []"
-            :data-test="`log-search-subfield-clear-selected-${fieldName}`"
-          >
-            <q-icon name="close" size="0.6rem" />
-          </q-btn>
-          <q-btn
-            unelevated
-            no-caps
-            dense
-            size="0.2rem"
-            padding="0.1rem 0.3rem"
-            class="multi-select-include-btn"
-            @click="handleApplyMultiSelect('include')"
-            title="Include selected values (OR)"
-            :data-test="`log-search-subfield-include-selected-${fieldName}`"
-          >
-            Include
-          </q-btn>
-          <q-btn
-            unelevated
-            no-caps
-            dense
-            size="0.2rem"
-            padding="0.1rem 0.3rem"
-            class="multi-select-exclude-btn"
-            @click="handleApplyMultiSelect('exclude')"
-            title="Exclude selected values"
-            :data-test="`log-search-subfield-exclude-selected-${fieldName}`"
-          >
-            Exclude
-          </q-btn>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -238,10 +209,6 @@ import { computed, ref, watch } from "vue";
 import { watchDebounced } from "@vueuse/core";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
-import {
-  outlinedArrowBackIos,
-  outlinedArrowForwardIos,
-} from "@quasar/extras/material-icons-outlined";
 import { formatLargeNumber } from "@/utils/zincutils";
 
 interface FieldValues {
@@ -268,15 +235,22 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  "add-search-term": [fieldName: string, value: string, action: string];
   "add-multiple-search-terms": [
     fieldName: string,
     values: string[],
     action: string,
   ];
+  "remove-field-filter": [fieldName: string];
   "load-more-values": [fieldName: string];
   "search-field-values": [fieldName: string, searchTerm: string];
 }>();
+
+/**
+ * Filter mode (include / exclude). Defaults to include.
+ * Switching the mode only affects future checkbox interactions —
+ * it does NOT retroactively modify already-applied filters.
+ */
+const filterMode = ref<"include" | "exclude">("include");
 
 /**
  * Union of all values that are currently active in the query (both included
@@ -299,6 +273,8 @@ const cachedValues = ref<{ key: string; count: number; label?: string }[]>([]);
 
 // Sync selectedValues whenever the parent's active query changes so that
 // checkboxes always reflect the current filter state.
+// NOTE: This updates selectedValues.value directly and does NOT call
+// handleUserCheckboxChange, so no spurious emits occur on parent sync.
 watch(allActiveValues, (newVals) => {
   selectedValues.value = newVals;
 });
@@ -342,15 +318,44 @@ watchDebounced(
   { debounce: 300 },
 );
 
-const handleApplyMultiSelect = (action: string) => {
-  if (!selectedValues.value.length) return;
-  emit(
-    "add-multiple-search-terms",
-    props.fieldName,
-    [...selectedValues.value],
-    action,
-  );
+// When the user flips the mode switch with values already selected,
+// immediately re-apply the current selection under the new mode.
+watch(filterMode, (newMode) => {
+  if (selectedValues.value.length > 0) {
+    emit(
+      "add-multiple-search-terms",
+      props.fieldName,
+      [...selectedValues.value],
+      newMode,
+    );
+  }
+});
+
+/**
+ * Called only on explicit user checkbox interaction (never on parent sync).
+ * Immediately emits the updated selection with the current filter mode,
+ * or emits remove-field-filter when all values are unchecked.
+ */
+const handleUserCheckboxChange = (newValues: string[]) => {
+  selectedValues.value = newValues;
+  if (newValues.length === 0) {
+    emit("remove-field-filter", props.fieldName);
+  } else {
+    emit(
+      "add-multiple-search-terms",
+      props.fieldName,
+      [...newValues],
+      filterMode.value,
+    );
+  }
+};
+
+/**
+ * Clears all selected values and removes the field filter from the query.
+ */
+const clearSelection = () => {
   selectedValues.value = [];
+  emit("remove-field-filter", props.fieldName);
 };
 
 /**
@@ -372,12 +377,54 @@ const reset = () => {
   selectedValues.value = allActiveValues.value;
   valueSearchTerm.value = "";
   cachedValues.value = [];
+  filterMode.value = "include";
 };
 
 defineExpose({ reset });
 </script>
 
 <style scoped lang="scss">
+.filter-mode-bar {
+  border-bottom: 1px solid var(--o2-border-color);
+
+  .selection-count {
+    font-size: 0.625rem;
+    font-weight: 500;
+    color: var(--q-primary);
+  }
+
+  .selection-hint {
+    font-size: 0.625rem;
+    color: var(--o2-text-secondary, #888);
+  }
+
+  .filter-mode-toggle {
+    display: flex;
+    border: 1px solid var(--o2-border-color);
+    border-radius: 0.375rem;
+    overflow: hidden;
+  }
+
+  .filter-mode-btn {
+    border-radius: 0 !important;
+    color: var(--o2-text-secondary, #888) !important;
+    min-height: 1.25rem !important;
+    transition:
+      background 0.15s,
+      color 0.15s;
+
+    &--active-include {
+      background: var(--q-primary) !important;
+      color: #fff !important;
+    }
+
+    &--active-exclude {
+      background: var(--q-negative) !important;
+      color: #fff !important;
+    }
+  }
+}
+
 .value-search-container {
   border-bottom: 1px solid var(--o2-border-color);
 }
@@ -415,56 +462,6 @@ defineExpose({ reset });
 
   .q-icon {
     line-height: 1.3;
-  }
-}
-
-.multi-select-action-bar {
-  border-top: 1px solid var(--o2-border-color);
-  background: var(--o2-hover-accent, rgba(0, 0, 0, 0.02));
-  border-radius: 0 0 0.25rem 0.25rem;
-
-  .multi-select-count {
-    font-size: 0.625rem;
-    font-weight: 500;
-    color: var(--q-primary);
-    display: flex;
-    align-items: center;
-  }
-
-  .multi-select-clear-btn {
-    transition: opacity 0.15s;
-
-    &:hover {
-      opacity: 0.7;
-    }
-  }
-
-  .multi-select-include-btn {
-    background: var(--q-primary) !important;
-    color: #fff !important;
-    border-radius: 0.25rem !important;
-    font-size: 0.625rem !important;
-    font-weight: 500;
-    letter-spacing: 0.01em;
-    transition: filter 0.15s;
-
-    &:hover {
-      filter: brightness(1.12);
-    }
-  }
-
-  .multi-select-exclude-btn {
-    background: var(--q-negative) !important;
-    color: #fff !important;
-    border-radius: 0.25rem !important;
-    font-size: 0.625rem !important;
-    font-weight: 500;
-    letter-spacing: 0.01em;
-    transition: filter 0.15s;
-
-    &:hover {
-      filter: brightness(1.12);
-    }
   }
 }
 

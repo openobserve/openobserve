@@ -349,6 +349,7 @@ import {
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
+import { getDataValue } from "@/utils/dashboard/aliasUtils";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { useRoute, useRouter } from "vue-router";
 import useNotifications from "@/composables/useNotifications";
@@ -1120,6 +1121,8 @@ export default defineComponent({
         (it: any) => it.alias || [],
       );
 
+      const firstRow = data.value[0]?.[0];
+
       switch (panelType) {
         case "area":
         case "area-stacked":
@@ -1130,11 +1133,10 @@ export default defineComponent({
         case "line":
         case "scatter":
         case "gauge": {
-          // return data.value[0].some((it: any) => {return (xAlias.every((x: any) => it[x]) && yAlias.every((y: any) => it[y]))});
           return (
             data.value[0]?.length > 1 ||
-            (xAlias.every((x: any) => data.value[0][0][x] != null) &&
-              yAlias.every((y: any) => data.value[0][0][y]) != null)
+            (xAlias.every((x: any) => getDataValue(firstRow, x) != null) &&
+              yAlias.every((y: any) => getDataValue(firstRow, y) != null))
           );
         }
         case "table": {
@@ -1142,8 +1144,8 @@ export default defineComponent({
           return (
             data.value[0]?.length > 1 ||
             (data.value[0]?.length == 1 &&
-              (xAlias.some((x: any) => data.value[0][0][x] != null) ||
-                yAlias.some((y: any) => data.value[0][0][y] != null)))
+              (xAlias.some((x: any) => getDataValue(firstRow, x) != null) ||
+                yAlias.some((y: any) => getDataValue(firstRow, y) != null)))
           );
         }
         case "metric": {
@@ -1151,23 +1153,23 @@ export default defineComponent({
             data.value[0]?.length > 1 ||
             yAlias.every(
               (y: any) =>
-                data.value[0][0][y] != null || data.value[0][0][y] === 0,
+                getDataValue(firstRow, y) != null,
             )
           );
         }
         case "heatmap": {
           return (
             data.value[0]?.length > 1 ||
-            (xAlias.every((x: any) => data.value[0][0][x] != null) &&
-              yAlias.every((y: any) => data.value[0][0][y] != null) &&
-              zAlias.every((z: any) => data.value[0][0][z]) != null)
+            (xAlias.every((x: any) => getDataValue(firstRow, x) != null) &&
+              yAlias.every((y: any) => getDataValue(firstRow, y) != null) &&
+              zAlias.every((z: any) => getDataValue(firstRow, z) != null))
           );
         }
         case "pie":
         case "donut": {
           return (
             data.value[0]?.length > 1 ||
-            yAlias.every((y: any) => data.value[0][0][y] != null)
+            yAlias.every((y: any) => getDataValue(firstRow, y) != null)
           );
         }
         case "maps":
@@ -1180,9 +1182,9 @@ export default defineComponent({
           const value = panelSchema.value.queries[0].fields.value.alias;
           return (
             data.value[0]?.length > 1 ||
-            source.every((s: any) => data.value[0][0][s] != null) ||
-            target.every((t: any) => data.value[0][0][t] != null) ||
-            value.every((v: any) => data.value[0][0][v] != null)
+            source.every((s: any) => getDataValue(firstRow, s) != null) ||
+            target.every((t: any) => getDataValue(firstRow, t) != null) ||
+            value.every((v: any) => getDataValue(firstRow, v) != null)
           );
         }
         default:

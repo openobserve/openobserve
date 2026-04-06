@@ -26,6 +26,7 @@ import {
 } from "@/utils/date";
 import config from "@/aws-exports";
 import { b64EncodeUnicode, addSpacesToOperators } from "@/utils/zincutils";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 
 export const useSearchQuery = () => {
   const store = useStore();
@@ -290,7 +291,9 @@ export const useSearchQuery = () => {
         if (searchObj.data.stream.selectedStream.length == 1) {
           req.query.sql = req.query.sql.replace(
             "[FIELD_LIST]",
-            interestingFields.join(","),
+            interestingFields
+              .map((field: string) => quoteSqlIdentifierIfNeeded(field))
+              .join(","),
           );
         }
       } else {
@@ -470,15 +473,16 @@ export const useSearchQuery = () => {
     if (whereClause.trim() != "") {
       whereClause = addSpacesToOperators(whereClause);
       const parsedSQL = whereClause.split(" ");
+      const streamFieldNames = new Set(
+        searchObj.data.stream.selectedStreamFields.map(
+          (field: any) => field.name,
+        ),
+      );
 
-      let field: any;
-      let node: any;
-      let index: any;
-      for (field of searchObj.data.stream.selectedStreamFields) {
-        for ([node, index] of parsedSQL) {
-          if (node === field.name) {
-            parsedSQL[index] = '"' + node.replaceAll('"', "") + '"';
-          }
+      for (const [index, token] of parsedSQL.entries()) {
+        const normalizedToken = token.replaceAll('"', "");
+        if (streamFieldNames.has(normalizedToken)) {
+          parsedSQL[index] = quoteSqlIdentifierIfNeeded(normalizedToken);
         }
       }
 

@@ -184,6 +184,10 @@ import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocatio
 import FrustrationBadge from "@/components/rum/FrustrationBadge.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import useStreams from "@/composables/useStreams";
+import {
+  applyFilterTerm,
+  removeFieldCondition,
+} from "@/utils/traces/filterUtils";
 
 interface Session {
   timestamp: string;
@@ -266,6 +270,8 @@ const userDataSet = new Set([
   "usr_email",
   "session_id",
   "view_id",
+  "view_url",
+  "resource_url",
 ]);
 
 const columns = ref([
@@ -370,8 +376,10 @@ const getStreamFields = () => {
         const priorityFields = [
           "application_id",
           "usr_email",
-          "session_id",
           "env",
+          "view_url",
+          "resource_url",
+          "session_id",
         ];
         const priorityFieldsMap = new Map(
           priorityFields.map((field, index) => [field, index]),
@@ -670,11 +678,15 @@ const handleCellClick = (payload: any) => {
 
 const handleSidebarEvent = (event: string, value: any) => {
   if (event === "add-field") {
-    if (sessionState.data.editorValue.length) {
-      sessionState.data.editorValue += " and " + value;
-    } else {
-      sessionState.data.editorValue += value;
-    }
+    sessionState.data.editorValue = applyFilterTerm(
+      value,
+      sessionState.data.editorValue,
+    );
+  } else if (event === "remove-field") {
+    sessionState.data.editorValue = removeFieldCondition(
+      sessionState.data.editorValue,
+      value,
+    );
   }
 };
 
