@@ -972,7 +972,6 @@ import {
   getCoreRowModel,
   getSortedRowModel,
 } from "@tanstack/vue-table";
-import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
@@ -1036,11 +1035,6 @@ const props = defineProps({
     type: Boolean,
     default: () => true,
   },
-  jsonpreviewStreamName: {
-    type: String,
-    default: "",
-    required: false,
-  },
   highlightQuery: {
     type: String,
     default: "",
@@ -1049,10 +1043,6 @@ const props = defineProps({
   selectedStreamFtsKeys: {
     type: Array as PropType<StreamField[]>,
     default: () => [],
-  },
-  hideViewRelatedButton: {
-    type: Boolean,
-    default: false,
   },
   hideExpandFieldOptions: {
     type: Boolean,
@@ -1169,17 +1159,12 @@ const props = defineProps({
 const { t } = useI18n();
 
 const emits = defineEmits([
-  "copy",
-  "addSearchTerm",
-  "addFieldToTable",
   "closeColumn",
   "click:dataRow",
   "update:columnSizes",
   "update:columnOrder",
   "expandRow",
-  "view-trace",
   "sendToAiChat",
-  "show-correlation",
   "sort-change",
 ]);
 
@@ -1794,20 +1779,6 @@ const setExpandedRows = () => {
   actualIndexCache.value.clear();
 };
 
-const copyLogToClipboard = (value: any, copyAsJson: boolean = true) => {
-  emits("copy", value, copyAsJson);
-};
-const addSearchTerm = (
-  field: string,
-  field_value: string | number | boolean,
-  action: string,
-) => {
-  emits("addSearchTerm", field, field_value, action);
-};
-const addFieldToTable = (value: string) => {
-  emits("addFieldToTable", value);
-};
-
 const closeColumn = (data: any) => {
   emits("closeColumn", data);
 };
@@ -1982,14 +1953,6 @@ const handleCellMouseOver = (cell: { id: string; column: { id: string } }) => {
 
 const handleCellMouseLeave = () => {
   activeCellActionId.value = "";
-};
-
-const viewTrace = (row: any) => {
-  emits("view-trace", row);
-};
-
-const showCorrelation = (row: any) => {
-  emits("show-correlation", row);
 };
 
 const sendToAiChat = (

@@ -603,7 +603,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @copy="copyContentToClipboard"
               @update:columnOrder="handleEventsColumnOrder"
               @update:columnSizes="handleEventsColumnSizes"
-            />
+            >
+              <template #expanded-row="{ row }">
+                <json-preview
+                  :value="row"
+                  class="tw:py-[0.375rem] tw:pl-[0.375rem]"
+                  copyButtonClass="tw:left-[0.25rem]! tw:w-fit! tw:sticky!"
+                  mode="expanded"
+                />
+              </template>
+            </TenstackTable>
           </div>
         </template>
         <div
