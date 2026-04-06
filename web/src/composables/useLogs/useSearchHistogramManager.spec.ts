@@ -148,6 +148,26 @@ describe("useSearchHistogramManager", () => {
       const result = histogramManager.shouldShowHistogram(parsedSQL);
       expect(result).toBe(true);
     });
+
+    it("should return false for SQL mode LIMIT query", () => {
+      mockState.searchObj.data.stream.selectedStream = ["stream1"];
+      mockState.searchObj.meta.sqlMode = true;
+
+      vi.mocked(logsUtils).mockReturnValue({
+        fnParsedSQL: vi.fn(() => ({})),
+        isDistinctQuery: vi.fn(() => false),
+        isWithQuery: vi.fn(() => false),
+        isLimitQuery: vi.fn(() => true),
+        addTraceId: vi.fn(),
+        isNonAggregatedSQLMode: vi.fn(() => true),
+      } as any);
+
+      histogramManager = useSearchHistogramManager();
+
+      const parsedSQL = { limit: { value: [10] } };
+      const result = histogramManager.shouldShowHistogram(parsedSQL);
+      expect(result).toBe(false);
+    });
   });
 
   describe("resetHistogramResults", () => {
