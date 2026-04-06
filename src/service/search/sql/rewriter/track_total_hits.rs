@@ -70,6 +70,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                                 lateral: false,
                                 subquery: Box::new(original_query),
                                 alias: None,
+                                sample: None,
                             },
                             joins: vec![],
                         }],
@@ -84,10 +85,12 @@ impl VisitorMut for TrackTotalHitsVisitor {
                         named_window: vec![],
                         qualify: None,
                         window_before_qualify: false,
-                        connect_by: None,
+                        connect_by: vec![],
                         value_table_mode: None,
                         exclude: None,
                         flavor: SelectFlavor::Standard,
+                        optimizer_hint: None,
+                        select_modifiers: None,
                     })));
                     *query = Query {
                         with: None,
@@ -155,6 +158,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                             lateral: false,
                             subquery: Box::new(query.clone()),
                             alias: None,
+                            sample: None,
                         },
                         joins: vec![],
                     }],
@@ -169,10 +173,12 @@ impl VisitorMut for TrackTotalHitsVisitor {
                     named_window: vec![],
                     qualify: None,
                     window_before_qualify: false,
-                    connect_by: None,
+                    connect_by: vec![],
                     value_table_mode: None,
                     exclude: None,
                     flavor: SelectFlavor::Standard,
+                    optimizer_hint: None,
+                    select_modifiers: None,
                 })));
                 *query = Query {
                     with: None,

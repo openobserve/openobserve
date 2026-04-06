@@ -278,6 +278,7 @@ message DmlNode{
     INSERT_APPEND = 3;
     INSERT_OVERWRITE = 4;
     INSERT_REPLACE = 5;
+    TRUNCATE = 6;
   }
   Type dml_type = 1;
   LogicalPlanNode input = 2;
@@ -749,6 +750,8 @@ message PhysicalPlanNode {
     SortMergeJoinExecNode sort_merge_join = 34;
     MemoryScanExecNode memory_scan = 35;
     AsyncFuncExecNode async_func = 36;
+    BufferExecNode buffer = 37;
+    ArrowScanExecNode arrow_scan = 38;
   }
 }
 
@@ -757,6 +760,16 @@ message PartitionColumn {
   datafusion_common.ArrowType arrow_type = 2;
 }
 
+
+// Determines how file sink output paths are interpreted.
+enum FileOutputMode {
+  // Infer output mode from the URL (extension/trailing `/` heuristic).
+  FILE_OUTPUT_MODE_AUTOMATIC = 0;
+  // Write to a single file at the exact output path.
+  FILE_OUTPUT_MODE_SINGLE_FILE = 1;
+  // Write to a directory with generated filenames.
+  FILE_OUTPUT_MODE_DIRECTORY = 2;
+}
 
 message FileSinkConfig {
   reserved 6; // writer_mode
@@ -770,6 +783,8 @@ message FileSinkConfig {
   bool keep_partition_by_columns = 9;
   InsertOp insert_op = 10;
   string file_extension = 11;
+  // Determines how the output path is interpreted.
+  FileOutputMode file_output_mode = 12;
 }
 
 enum InsertOp {
@@ -836,6 +851,14 @@ message PhysicalExtensionNode {
 message PhysicalExprNode {
   // Was date_time_interval_expr
   reserved 17;
+
+  // Unique identifier for this expression to do deduplication during deserialization.
+  // When serializing, this is set to a unique identifier for each combination of
+  // expression, process and serialization run.
+  // When deserializing, if this ID has been seen before, the cached Arc is returned
+  // instead of creating a new one, enabling reconstruction of referential integrity
+  // across serde roundtrips.
+  optional uint64 expr_id = 30;
 
   oneof ExprType {
     // column references
@@ -1006,6 +1029,8 @@ message FilterExecNode {
   PhysicalExprNode expr = 2;
   uint32 default_filter_selectivity = 3;
   repeated uint32 projection = 9;
+  uint32 batch_size = 10;
+  optional uint32 fetch = 11;
 }
 
 message FileGroup {
@@ -1083,6 +1108,10 @@ message AvroScanExecNode {
   FileScanExecConf base_conf = 1;
 }
 
+message ArrowScanExecNode {
+  FileScanExecConf base_conf = 1;
+}
+
 message MemoryScanExecNode {
   repeated bytes partitions = 1;
   datafusion_common.Schema schema = 2;
@@ -1111,6 +1140,7 @@ message HashJoinExecNode {
   datafusion_common.NullEquality null_equality = 7;
   JoinFilter filter = 8;
   repeated uint32 projection = 9;
+  bool null_aware = 10;
 }
 
 enum StreamPartitionMode {
@@ -1190,6 +1220,7 @@ enum AggregateMode {
   FINAL_PARTITIONED = 2;
   SINGLE = 3;
   SINGLE_PARTITIONED = 4;
+  PARTIAL_REDUCE = 5;
 }
 
 message PartiallySortedInputOrderMode {
@@ -1219,6 +1250,8 @@ message MaybePhysicalSortExprs {
 message AggLimit {
   // wrap into a message to make it optional
   uint64 limit = 1;
+  // Optional ordering direction for TopK aggregation (true = descending, false = ascending)
+  optional bool descending = 2;
 }
 
 message AggregateExecNode {
@@ -1411,4 +1444,9 @@ message AsyncFuncExecNode {
   PhysicalPlanNode input = 1;
   repeated PhysicalExprNode async_exprs = 2;
   repeated string async_expr_names = 3;
+}
+
+message BufferExecNode {
+  PhysicalPlanNode input = 1;
+  uint64 capacity = 2;
 }

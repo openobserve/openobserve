@@ -23,11 +23,9 @@ use config::{
     FileFormat, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config, ider, is_local_disk_storage,
-    meta::{
-        search::StorageType,
-        stream::{
-            FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StreamType,
-        },
+    meta::stream::{
+        FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StorageType,
+        StreamType,
     },
     metrics,
     utils::{
@@ -758,15 +756,16 @@ pub async fn merge_files(
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
-    let (defined_schema_fields, need_original, index_original_data, index_all_values) =
+    let (defined_schema_fields, need_original, index_original_data, index_all_values, storage_type) =
         match stream_settings {
             Some(s) => (
                 s.defined_schema_fields,
                 s.store_original_data,
                 s.index_original_data,
                 s.index_all_values,
+                s.storage_type,
             ),
-            None => (Vec::new(), false, false, false),
+            None => (Vec::new(), false, false, false, StorageType::Normal),
         };
     let latest_schema = if !defined_schema_fields.is_empty() {
         let latest_schema = SchemaCache::new(latest_schema);
@@ -796,7 +795,16 @@ pub async fn merge_files(
         let buf = file_data::get(&file.account, &file.key, None).await?;
         let file_format = FileFormat::from_extension(&file.key)
             .ok_or_else(|| anyhow::anyhow!("invalid file format: {}", file.key))?;
-        let schema = read_schema_from_bytes(file_format, &buf).await?;
+        let schema = match read_schema_from_bytes(file_format, &buf).await {
+            Ok(schema) => schema,
+            Err(e) => {
+                log::error!(
+                    "[COMPACTOR:WORKER:{thread_id}:{fi}] read schema error for file: {}, err: {e}",
+                    &file.key
+                );
+                return Err(e);
+            }
+        };
         let schema = schema.as_ref().clone().with_metadata(Default::default());
         let schema_key = schema.hash_key();
         if !schemas.contains_key(&schema_key) {
@@ -815,7 +823,7 @@ pub async fn merge_files(
     let trace_id = ider::generate();
     let session = config::meta::search::Session {
         id: trace_id.to_string(),
-        storage_type: StorageType::Memory,
+        storage_type: config::meta::search::StorageType::Memory,
         work_group: None,
         target_partitions: 2,
     };
@@ -906,7 +914,11 @@ pub async fn merge_files(
             }
 
             let account = storage::get_account(&new_file_key).unwrap_or_default();
-            storage::put(&account, &new_file_key, buf.clone()).await?;
+            if cfg.s3.feature_force_infrequent_access && storage_type.is_compliance() {
+                storage::put_with_compliance(&account, &new_file_key, buf.clone()).await?;
+            } else {
+                storage::put(&account, &new_file_key, buf.clone()).await?;
+            }
 
             if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
                 // generate inverted index
@@ -948,7 +960,11 @@ pub async fn merge_files(
                 }
 
                 let account = storage::get_account(&new_file_key).unwrap_or_default();
-                storage::put(&account, &new_file_key, buf.clone()).await?;
+                if cfg.s3.feature_force_infrequent_access && storage_type.is_compliance() {
+                    storage::put_with_compliance(&account, &new_file_key, buf.clone()).await?;
+                } else {
+                    storage::put(&account, &new_file_key, buf.clone()).await?;
+                }
 
                 if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
                     // generate inverted index

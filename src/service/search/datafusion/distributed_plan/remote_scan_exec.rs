@@ -27,7 +27,7 @@ use config::{
     utils::rand::generate_random_string,
 };
 use datafusion::{
-    common::{DataFusionError, Result, Statistics},
+    common::{DataFusionError, Result},
     execution::{SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, Partitioning},
     physical_plan::{
@@ -58,7 +58,7 @@ pub struct RemoteScanExec {
     input: Arc<dyn ExecutionPlan>,
     remote_scan_node: RemoteScanNode,
     partitions: usize,
-    cache: PlanProperties,
+    cache: Arc<PlanProperties>,
     pub scan_stats: Arc<Mutex<ScanStats>>,
     pub peak_memory: Arc<AtomicUsize>,
     pub partial_err: Arc<Mutex<String>>,
@@ -154,17 +154,17 @@ impl RemoteScanExec {
 
     /// This function creates the cache object that stores the plan properties such as schema,
     /// equivalence properties, ordering, partitioning, etc.
-    fn compute_properties(schema: SchemaRef, n_partitions: usize) -> PlanProperties {
+    fn compute_properties(schema: SchemaRef, n_partitions: usize) -> Arc<PlanProperties> {
         let eq_properties = EquivalenceProperties::new(schema);
         let output_partitioning = Self::output_partitioning_helper(n_partitions);
-        PlanProperties::new(
+        Arc::new(PlanProperties::new(
             eq_properties,
             // Output Partitioning
             output_partitioning,
             // Execution Mode
             EmissionType::Incremental,
             Boundedness::Bounded,
-        )
+        ))
     }
 
     pub fn set_analyze(mut self) -> Self {
@@ -216,7 +216,7 @@ impl ExecutionPlan for RemoteScanExec {
         Arc::clone(&self.input.schema())
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.cache
     }
 
@@ -262,10 +262,6 @@ impl ExecutionPlan for RemoteScanExec {
             self.schema().clone(),
             stream,
         )))
-    }
-
-    fn statistics(&self) -> Result<Statistics> {
-        Ok(Statistics::new_unknown(&self.schema()))
     }
 
     fn metrics(&self) -> Option<MetricsSet> {

@@ -32,10 +32,9 @@ use super::utils::AsyncDefer;
 /// Guard that automatically releases work group lock when dropped
 pub struct DeferredLock {
     pub took_wait: usize,
-    pub work_group_str: String,
     #[cfg(feature = "enterprise")]
-    #[allow(dead_code)] // Available for external use/debugging
     pub work_group: Option<WorkGroup>,
+    pub work_group_str: String,
     _guard: AsyncDefer,
 }
 
@@ -109,7 +108,6 @@ pub async fn check_work_group(
 ) -> Result<DeferredLock> {
     let cfg = get_config();
     let work_group_str = work_group.to_string();
-
     // Get distributed lock temporarily (for queue coordination)
     let locker_key = format!("/search/cluster_queue/{work_group_str}");
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
@@ -194,8 +192,8 @@ pub async fn check_work_group(
 
     Ok(DeferredLock {
         took_wait,
-        work_group_str,
         work_group: Some(work_group),
+        work_group_str,
         _guard: guard,
     })
 }
@@ -287,9 +285,7 @@ async fn work_group_need_wait(
                 // Need to wait - concurrency limit reached
                 if !log_wait {
                     log::info!(
-                        "[trace_id {trace_id}] user: {user_id:?} is waiting in work_group {work_group:?}[global:{}/{}, org:{}/{}, user:{}/{}]",
-                        status.global_current,
-                        status.global_limit,
+                        "[trace_id {trace_id}] user: {user_id:?} is waiting in work_group {work_group:?}[org:{}/{}, user:{}/{}]",
                         status.org_current,
                         status.org_limit,
                         status.user_current,
@@ -303,9 +299,7 @@ async fn work_group_need_wait(
                 // Got approval - slot available
                 if log_wait {
                     log::info!(
-                        "[trace_id {trace_id}] user: {user_id:?} get approved in work_group {work_group:?}[global:{}/{}, org:{}/{}, user:{}/{}]",
-                        status.global_current,
-                        status.global_limit,
+                        "[trace_id {trace_id}] user: {user_id:?} get approved in work_group {work_group:?}[org:{}/{}, user:{}/{}]",
                         status.org_current,
                         status.org_limit,
                         status.user_current,
@@ -326,8 +320,8 @@ async fn work_group_need_wait(
 ///
 /// This is a high-level helper that encapsulates:
 /// - Determining if request is a background task
-/// - Predicting appropriate work group (enterprise only)
-/// - Adding work group to search server (enterprise only)
+/// - Predicting appropriate work group
+/// - Adding work group to search server
 /// - Acquiring the work group lock
 #[cfg(not(feature = "enterprise"))]
 pub async fn acquire_work_group_lock(
@@ -348,14 +342,6 @@ pub async fn acquire_work_group_lock(
     .await
 }
 
-/// Acquire work group lock with automatic work group prediction (enterprise)
-/// or simple distributed lock (OSS)
-///
-/// This is a high-level helper that encapsulates:
-/// - Determining if request is a background task
-/// - Predicting appropriate work group (enterprise only)
-/// - Adding work group to search server (enterprise only)
-/// - Acquiring the work group lock
 #[cfg(feature = "enterprise")]
 pub async fn acquire_work_group_lock(
     trace_id: &str,
@@ -365,7 +351,6 @@ pub async fn acquire_work_group_lock(
     nodes: &[Node],
     file_id_list_vec: &[&FileId],
 ) -> Result<DeferredLock> {
-    // Predict workgroup first
     let is_background_task = req
         .search_event_type
         .as_ref()

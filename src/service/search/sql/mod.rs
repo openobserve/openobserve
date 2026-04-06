@@ -26,6 +26,7 @@ use config::{
         sql::{OrderBy, TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
     },
+    utils::query_select_utils::replace_o2_custom_patterns,
 };
 use datafusion::{arrow::datatypes::Schema, common::TableReference};
 use hashbrown::{HashMap, HashSet};
@@ -40,8 +41,7 @@ use sqlparser::{ast::VisitMut, dialect::PostgreSqlDialect, parser::Parser};
 use crate::service::search::sql::{
     rewriter::{
         add_o2_id::AddO2IdVisitor, add_timestamp::AddTimestampVisitor,
-        approx_percentile::ReplaceApproxPercentiletVisitor, match_all_raw::MatchAllRawVisitor,
-        remove_dashboard_placeholder::RemoveDashboardAllVisitor,
+        match_all_raw::MatchAllRawVisitor, remove_dashboard_placeholder::RemoveDashboardAllVisitor,
         track_total_hits::TrackTotalHitsVisitor,
     },
     schema::{generate_schema_fields, generate_select_star_schema, has_original_column},
@@ -105,6 +105,23 @@ impl Sql {
         Self::new_with_options(query, org_id, stream_type, search_event_type, false).await
     }
 
+    pub fn get_first_stream_key(&self) -> String {
+        self.stream_names
+            .first()
+            .map(|s| {
+                format!(
+                    "{}/{}",
+                    s.get_stream_type(self.stream_type),
+                    s.stream_name()
+                )
+            })
+            // For multi-stream / cross-index queries there is no single stream
+            // name.  Fall back to the stream-type prefix so select_nodes always
+            // receives a non-empty, deterministic key (rather than "" which
+            // would silently select all nodes and defeat org/stream affinity).
+            .unwrap_or_else(|| format!("{}/", self.stream_type))
+    }
+
     pub async fn new_with_options(
         query: &SearchQuery,
         org_id: &str,
@@ -116,8 +133,7 @@ impl Sql {
         let sql = query.sql.clone();
         let offset = query.from as i64;
         let mut limit = query.size as i64;
-        let sql =
-            config::utils::query_select_utils::replace_o2_custom_patterns(&sql).unwrap_or(sql);
+        let sql = replace_o2_custom_patterns(&sql).unwrap_or(sql);
 
         // 1. get table name
         let stream_names = resolve_stream_names_with_type(&sql)
@@ -156,7 +172,6 @@ impl Sql {
         // 4. rewrite match_all_raw and match_all_raw_ignore_case to match_all
         let mut match_all_raw_visitor = MatchAllRawVisitor::new();
         let _ = statement.visit(&mut match_all_raw_visitor);
-
         //********************Change the sql end*********************************//
 
         // 5. get column name, alias, group by, order by
@@ -255,11 +270,7 @@ impl Sql {
         }
 
         //********************Change the sql start*********************************//
-        // 11. replace approx_percentile_cont to new format
-        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
-        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
-
-        // 12. add _timestamp and _o2_id if need
+        // 11. add _timestamp and _o2_id if need
         if !is_complex_query(&mut statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             let _ = statement.visit(&mut add_timestamp_visitor);
@@ -268,42 +279,10 @@ impl Sql {
                 let _ = statement.visit(&mut add_o2_id_visitor);
             }
         }
+        //********************Change the sql end************************************//
 
-        // 12. replace the Utf8 to Utf8View type
-        let final_schemas = if cfg.common.utf8_view_enabled {
-            let mut final_schemas = HashMap::with_capacity(used_schemas.len());
-            for (stream, schema) in used_schemas.iter() {
-                let mut fields = schema
-                    .schema()
-                    .fields()
-                    .iter()
-                    .map(|f| {
-                        if f.data_type() == &DataType::Utf8 || f.data_type() == &DataType::LargeUtf8
-                        {
-                            Arc::new(Field::new(f.name(), DataType::Utf8View, f.is_nullable()))
-                        } else {
-                            f.clone()
-                        }
-                    })
-                    .collect::<Vec<_>>();
-                fields.sort_by(|a, b| a.name().cmp(b.name()));
-                let new_schema =
-                    Schema::new(fields).with_metadata(schema.schema().metadata().clone());
-                final_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(new_schema)));
-            }
-            final_schemas
-        } else {
-            let mut final_schemas = HashMap::with_capacity(used_schemas.len());
-            // sort the schema fields by name
-            for (stream, schema) in used_schemas.iter() {
-                let mut fields = schema.schema().fields().to_vec();
-                fields.sort_by(|a, b| a.name().cmp(b.name()));
-                let new_schema =
-                    Schema::new(fields).with_metadata(schema.schema().metadata().clone());
-                final_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(new_schema)));
-            }
-            final_schemas
-        };
+        // 13. replace the Utf8 to Utf8View type
+        let final_schemas = finalize_schemas(&used_schemas);
 
         let is_complex = is_complex_query(&mut statement);
 
@@ -325,43 +304,13 @@ impl Sql {
             order_by,
             histogram_interval,
             sorted_by_time: need_sort_by_time,
-            sampling_config: Self::parse_sampling_config(
+            sampling_config: parse_sampling_config(
                 query,
                 histogram_interval,
                 (query.start_time, query.end_time),
                 extract_patterns,
             ),
         })
-    }
-
-    /// Parse sampling configuration from SearchQuery
-    /// Converts sampling_ratio to SamplingConfig for internal use
-    fn parse_sampling_config(
-        query: &proto::cluster_rpc::SearchQuery,
-        _histogram_interval: Option<i64>,
-        _time_range: (i64, i64),
-        _extract_patterns: bool,
-    ) -> Option<proto::cluster_rpc::SamplingConfig> {
-        #[cfg(not(feature = "enterprise"))]
-        {
-            if query.sampling_ratio.is_some() {
-                log::warn!(
-                    "[SAMPLING] Sampling is an enterprise feature. Queries will run without sampling. \
-                    To enable sampling, please upgrade to OpenObserve Enterprise Edition."
-                );
-            }
-            None
-        }
-
-        #[cfg(feature = "enterprise")]
-        {
-            o2_enterprise::enterprise::search::sampling::core::parse_sampling_config(
-                query,
-                _histogram_interval,
-                _time_range,
-                _extract_patterns,
-            )
-        }
     }
 }
 
@@ -400,4 +349,71 @@ fn o2_id_is_needed(
             stream_setting
                 .is_some_and(|setting| setting.store_original_data || setting.index_original_data)
         })
+}
+
+fn finalize_schemas(
+    used_schemas: &HashMap<TableReference, Arc<SchemaCache>>,
+) -> HashMap<TableReference, Arc<SchemaCache>> {
+    let cfg = get_config();
+    if cfg.common.utf8_view_enabled {
+        let mut final_schemas = HashMap::with_capacity(used_schemas.len());
+        for (stream, schema) in used_schemas.iter() {
+            let mut fields = schema
+                .schema()
+                .fields()
+                .iter()
+                .map(|f| {
+                    if f.data_type() == &DataType::Utf8 || f.data_type() == &DataType::LargeUtf8 {
+                        Arc::new(Field::new(f.name(), DataType::Utf8View, f.is_nullable()))
+                    } else {
+                        f.clone()
+                    }
+                })
+                .collect::<Vec<_>>();
+            fields.sort_by(|a, b| a.name().cmp(b.name()));
+            let new_schema = Schema::new(fields).with_metadata(schema.schema().metadata().clone());
+            final_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(new_schema)));
+        }
+        final_schemas
+    } else {
+        let mut final_schemas = HashMap::with_capacity(used_schemas.len());
+        // sort the schema fields by name
+        for (stream, schema) in used_schemas.iter() {
+            let mut fields = schema.schema().fields().to_vec();
+            fields.sort_by(|a, b| a.name().cmp(b.name()));
+            let new_schema = Schema::new(fields).with_metadata(schema.schema().metadata().clone());
+            final_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(new_schema)));
+        }
+        final_schemas
+    }
+}
+
+/// Parse sampling configuration from SearchQuery
+/// Converts sampling_ratio to SamplingConfig for internal use
+fn parse_sampling_config(
+    query: &proto::cluster_rpc::SearchQuery,
+    _histogram_interval: Option<i64>,
+    _time_range: (i64, i64),
+    _extract_patterns: bool,
+) -> Option<proto::cluster_rpc::SamplingConfig> {
+    #[cfg(not(feature = "enterprise"))]
+    {
+        if query.sampling_ratio.is_some() {
+            log::warn!(
+                "[SAMPLING] Sampling is an enterprise feature. Queries will run without sampling. \
+                    To enable sampling, please upgrade to OpenObserve Enterprise Edition."
+            );
+        }
+        None
+    }
+
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::search::sampling::core::parse_sampling_config(
+            query,
+            _histogram_interval,
+            _time_range,
+            _extract_patterns,
+        )
+    }
 }

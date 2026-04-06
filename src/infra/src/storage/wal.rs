@@ -16,7 +16,9 @@
 use std::{ops::Range, sync::LazyLock as Lazy};
 
 use config::get_config;
-use object_store::{GetOptions, GetResult, ObjectMeta, ObjectStore, Result, path::Path};
+use object_store::{
+    GetOptions, GetResult, ObjectMeta, ObjectStore, ObjectStoreExt as _, Result, path::Path,
+};
 
 static DEFAULT: Lazy<Box<dyn ObjectStore>> = Lazy::new(default);
 
@@ -111,21 +113,6 @@ mod tests {
         // Verify the error is appropriate for a non-existent file
         if let Err(e) = result {
             assert!(matches!(e, object_store::Error::NotFound { .. }));
-        }
-    }
-
-    #[tokio::test]
-    async fn test_head_function() {
-        let (_temp_dir, _wal_path) = setup_test_environment().await;
-        let path = Path::from("test/file.txt");
-
-        // Test with a non-existent file
-        let result = head(&path).await;
-        assert!(result.is_err());
-
-        // Verify the error is NotImplemented (as implemented in local storage)
-        if let Err(e) = result {
-            assert!(matches!(e, object_store::Error::NotImplemented));
         }
     }
 
@@ -283,7 +270,7 @@ mod tests {
         ));
         assert!(matches!(
             head_result,
-            Err(object_store::Error::NotImplemented)
+            Err(object_store::Error::NotFound { .. })
         ));
     }
 }

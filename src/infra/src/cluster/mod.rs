@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashMap,
     ops::Bound,
     sync::{Arc, LazyLock as Lazy},
     time::Duration,
@@ -31,6 +30,7 @@ use config::{
         sysinfo::{NodeMetrics, get_node_metrics},
     },
 };
+use hashbrown::{HashMap, HashSet};
 
 use crate::{
     db::{Event, get_coordinator},
@@ -125,41 +125,97 @@ pub async fn get_node_from_consistent_hash(
     None
 }
 
-pub async fn print_consistent_hash() -> HashMap<String, HashMap<String, Vec<u64>>> {
-    let mut map = HashMap::new();
-    let r = QUERIER_INTERACTIVE_CONSISTENT_HASH.read().await;
-    let mut node_map = HashMap::new();
-    for (k, v) in r.iter() {
-        let entry = node_map.entry(v.clone()).or_insert(Vec::new());
-        entry.push(*k);
+/// Like [`get_node_from_consistent_hash`] but restricts the ring walk to nodes
+/// whose names are in `allowed`.
+///
+/// Use this when a query runs on a subset of all queriers (e.g.
+/// `max_nodes_per_query=3` with `strategy=org/stream`).  Walking the global
+/// ring but skipping nodes outside the allowed set preserves all consistent-
+/// hashing properties (minimal remapping on membership change, even
+/// distribution via vnodes) while confining dispatch to the selected subset.
+pub async fn get_node_from_consistent_hash_within(
+    key: &str,
+    role: &Role,
+    group: Option<RoleGroup>,
+    allowed: &HashSet<String>,
+) -> Option<String> {
+    let hash = config::utils::hash::gxhash::new().sum64(key);
+    let nodes = match role {
+        Role::Querier => match group {
+            Some(RoleGroup::Interactive) => QUERIER_INTERACTIVE_CONSISTENT_HASH.read().await,
+            Some(RoleGroup::Background) => QUERIER_BACKGROUND_CONSISTENT_HASH.read().await,
+            _ => QUERIER_INTERACTIVE_CONSISTENT_HASH.read().await,
+        },
+        Role::Compactor => COMPACTOR_CONSISTENT_HASH.read().await,
+        Role::FlattenCompactor => FLATTEN_COMPACTOR_CONSISTENT_HASH.read().await,
+        _ => return None,
+    };
+    if nodes.is_empty() {
+        return None;
     }
-    drop(r);
-    map.insert("querier_interactive".to_string(), node_map);
-    let r = QUERIER_BACKGROUND_CONSISTENT_HASH.read().await;
-    let mut node_map = HashMap::new();
-    for (k, v) in r.iter() {
-        let entry = node_map.entry(v.clone()).or_insert(Vec::new());
-        entry.push(*k);
+
+    // Walk clockwise from the hash position, stop at the first node in `allowed`.
+    let mut iter = nodes.lower_bound(Bound::Included(&hash));
+    while let Some((_, name)) = iter.next() {
+        if allowed.contains(name) {
+            return Some(name.clone());
+        }
     }
-    drop(r);
-    map.insert("querier_background".to_string(), node_map);
-    let r = COMPACTOR_CONSISTENT_HASH.read().await;
-    let mut node_map = HashMap::new();
-    for (k, v) in r.iter() {
-        let entry = node_map.entry(v.clone()).or_insert(Vec::new());
-        entry.push(*k);
+    // Wrap around to the beginning of the ring.
+    for (_, name) in nodes.iter() {
+        if allowed.contains(name) {
+            return Some(name.clone());
+        }
     }
-    drop(r);
-    map.insert("compactor".to_string(), node_map);
-    let r = FLATTEN_COMPACTOR_CONSISTENT_HASH.read().await;
-    let mut node_map = HashMap::new();
-    for (k, v) in r.iter() {
-        let entry = node_map.entry(v.clone()).or_insert(Vec::new());
-        entry.push(*k);
+    None
+}
+
+/// Returns up to `n` distinct node names starting from the position of `key`
+/// on the consistent hash ring, wrapping around if necessary.
+///
+/// Useful for selecting a stable subset of nodes for a given key (e.g. org_id
+/// or stream_key) without pinning to a single node.
+pub async fn get_nodes_from_consistent_hash(
+    key: &str,
+    role: &Role,
+    group: Option<RoleGroup>,
+    n: usize,
+) -> HashSet<String> {
+    if n == 0 {
+        return HashSet::new();
     }
-    drop(r);
-    map.insert("flatten_compactor".to_string(), node_map);
-    map
+    let hash = config::utils::hash::gxhash::new().sum64(key);
+    let nodes = match role {
+        Role::Querier => match group {
+            Some(RoleGroup::Interactive) => QUERIER_INTERACTIVE_CONSISTENT_HASH.read().await,
+            Some(RoleGroup::Background) => QUERIER_BACKGROUND_CONSISTENT_HASH.read().await,
+            _ => QUERIER_INTERACTIVE_CONSISTENT_HASH.read().await,
+        },
+        Role::Compactor => COMPACTOR_CONSISTENT_HASH.read().await,
+        Role::FlattenCompactor => FLATTEN_COMPACTOR_CONSISTENT_HASH.read().await,
+        _ => return HashSet::new(),
+    };
+    if nodes.is_empty() {
+        return HashSet::new();
+    }
+
+    // Start from the hash position and walk clockwise until we have `n` distinct nodes.
+    let mut result = HashSet::with_capacity(n);
+    let mut iter = nodes.lower_bound(Bound::Included(&hash));
+    while let Some((_, name)) = iter.next() {
+        result.insert(name.to_string());
+        if result.len() >= n {
+            return result;
+        }
+    }
+    // Wrap around to the beginning of the ring.
+    for (_, name) in nodes.iter() {
+        result.insert(name.to_string());
+        if result.len() >= n {
+            break;
+        }
+    }
+    result
 }
 
 pub async fn count_consistent_hash() -> HashMap<String, usize> {
@@ -647,5 +703,108 @@ mod tests {
     #[ignore]
     async fn test_list_nodes() {
         assert!(list_nodes().await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_cluster_consistent_hash() {
+        // Reset the global state.
+        reset_consistent_hash().await;
+
+        // Test consistent hash logic.
+        let node = LOCAL_NODE.clone();
+        for i in 0..10 {
+            let node_q = Node {
+                name: format!("node-q-{i}").to_string(),
+                role: [Role::Querier].to_vec(),
+                ..node.clone()
+            };
+            let node_c = Node {
+                name: format!("node-c-{i}").to_string(),
+                role: [Role::Compactor].to_vec(),
+                ..node.clone()
+            };
+            add_node_to_consistent_hash(&node_q, &Role::Querier, Some(RoleGroup::Interactive))
+                .await;
+            add_node_to_consistent_hash(&node_q, &Role::Querier, Some(RoleGroup::Background)).await;
+            add_node_to_consistent_hash(&node_q, &Role::Querier, None).await;
+            add_node_to_consistent_hash(&node_c, &Role::Compactor, None).await;
+            add_node_to_consistent_hash(&node_c, &Role::FlattenCompactor, None).await;
+        }
+
+        for key in ["test", "test1", "test2", "test3", "test4", "test5", "test6"] {
+            println!(
+                "{key}-q: {}",
+                get_node_from_consistent_hash(key, &Role::Querier, None)
+                    .await
+                    .unwrap()
+            );
+            println!(
+                "{key}-c: {}",
+                get_node_from_consistent_hash(key, &Role::Compactor, None)
+                    .await
+                    .unwrap()
+            );
+        }
+
+        // gxhash hash
+        let data = [
+            ["test", "node-q-2", "node-c-7"],
+            ["test1", "node-q-3", "node-c-0"],
+            ["test2", "node-q-6", "node-c-5"],
+            ["test3", "node-q-9", "node-c-9"],
+            ["test4", "node-q-2", "node-c-0"],
+            ["test5", "node-q-5", "node-c-8"],
+            ["test6", "node-q-5", "node-c-8"],
+        ];
+
+        remove_node_from_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;
+        remove_node_from_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background)).await;
+        remove_node_from_consistent_hash(&node, &Role::Compactor, None).await;
+        remove_node_from_consistent_hash(&node, &Role::FlattenCompactor, None).await;
+        for key in data {
+            assert_eq!(
+                get_node_from_consistent_hash(key.first().unwrap(), &Role::Querier, None).await,
+                Some(key.get(1).unwrap().to_string())
+            );
+            assert_eq!(
+                get_node_from_consistent_hash(key.first().unwrap(), &Role::Compactor, None).await,
+                Some(key.get(2).unwrap().to_string())
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_nodes_from_consistent_hash() {
+        // Reset the global state.
+        reset_consistent_hash().await;
+
+        // Test consistent hash logic.
+        let node = LOCAL_NODE.clone();
+        for i in 0..10 {
+            let node_q = Node {
+                name: format!("node-q-{i}").to_string(),
+                role: [Role::Querier].to_vec(),
+                ..node.clone()
+            };
+            let node_c = Node {
+                name: format!("node-c-{i}").to_string(),
+                role: [Role::Compactor].to_vec(),
+                ..node.clone()
+            };
+            add_node_to_consistent_hash(&node_q, &Role::Querier, Some(RoleGroup::Interactive))
+                .await;
+            add_node_to_consistent_hash(&node_q, &Role::Querier, Some(RoleGroup::Background)).await;
+            add_node_to_consistent_hash(&node_q, &Role::Querier, None).await;
+            add_node_to_consistent_hash(&node_c, &Role::Compactor, None).await;
+            add_node_to_consistent_hash(&node_c, &Role::FlattenCompactor, None).await;
+        }
+
+        let nodes = get_nodes_from_consistent_hash("test", &Role::Querier, None, 3).await;
+
+        // sort the nodes by name
+        let mut nodes: Vec<String> = nodes.into_iter().collect();
+        nodes.sort();
+        assert_eq!(nodes.len(), 3);
+        assert_eq!(nodes, vec!["node-q-2", "node-q-5", "node-q-8"]);
     }
 }

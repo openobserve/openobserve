@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 35;
+pub const DB_SCHEMA_VERSION: u64 = 36;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -714,10 +714,11 @@ pub struct Http {
     pub tls_min_version: String,
     #[env_config(
         name = "ZO_HTTP_TLS_ROOT_CERTIFICATES",
+        parse,
         default = "webpki",
         help = "this value must use webpki or native. it means use standard root certificates from webpki-roots or native-roots as a rustls certificate store"
     )]
-    pub tls_root_certificates: String,
+    pub tls_root_certificates: TlsRootCertificates,
     #[env_config(
         name = "ZO_HTTP_ACCESS_LOG_FORMAT",
         default = "",
@@ -756,6 +757,45 @@ pub struct Grpc {
     pub tls_cert_path: String,
     #[env_config(name = "ZO_GRPC_TLS_KEY_PATH", default = "")]
     pub tls_key_path: String,
+    #[env_config(
+        name = "ZO_GRPC_TLS_ROOT_CERTIFICATES",
+        parse,
+        default = "webpki",
+        help = "this value can be set to webpki or native. Using webpki means client will trust a preset CA bundle. Using native means client will trust the certificates in OS trust store"
+    )]
+    pub tls_root_certificates: TlsRootCertificates,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum TlsRootCertificates {
+    #[default]
+    Webpki,
+    Native,
+}
+
+impl std::fmt::Display for TlsRootCertificates {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Webpki => write!(f, "webpki"),
+            Self::Native => write!(f, "native"),
+        }
+    }
+}
+
+impl std::str::FromStr for TlsRootCertificates {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "webpki" => Ok(Self::Webpki),
+            "native" => Ok(Self::Native),
+            _ => Err(anyhow::anyhow!(
+                "Invalid tls_root_certificates value: '{}'. Must be 'webpki' or 'native'",
+                s
+            )),
+        }
+    }
 }
 
 #[derive(Serialize, PartialEq, Default)]
@@ -1293,6 +1333,12 @@ pub struct Common {
         help = "Enable to show symbol in dashboard"
     )]
     pub dashboard_show_symbol_enabled: bool,
+    #[env_config(
+        name = "ZO_DASHBOARD_SHOW_FIELD_AS_JSON_ENABLED",
+        default = false,
+        help = "Enable to show field as JSON in dashboard table"
+    )]
+    pub dashboard_show_field_as_json_enabled: bool,
     #[env_config(name = "ZO_INGEST_DEFAULT_HEC_STREAM", default = "")]
     pub default_hec_stream: String,
     #[env_config(
@@ -2020,6 +2066,12 @@ pub struct S3 {
     pub feature_bulk_delete: bool,
     #[env_config(name = "ZO_S3_ALLOW_INVALID_CERTIFICATES", default = false)]
     pub allow_invalid_certificates: bool,
+    #[env_config(
+        name = "ZO_S3_FEATURE_FORCE_INFREQUENT_ACCESS",
+        default = false,
+        help = "Use STANDARD_IA storage class for compliance storage type"
+    )]
+    pub feature_force_infrequent_access: bool,
     #[env_config(name = "ZO_S3_SYNC_TO_CACHE_INTERVAL", default = 600)] // seconds
     pub sync_to_cache_interval: u64,
     #[env_config(name = "ZO_S3_MAX_RETRIES", default = 10)]
@@ -2577,6 +2629,8 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.batch_size = 8192;
     }
     cfg.limit.batch_size = cfg.limit.batch_size.clamp(1024, 8192);
+    // clamp datafusion_min_partition_num to 1
+    cfg.limit.datafusion_min_partition_num = cfg.limit.datafusion_min_partition_num.max(1);
 
     Ok(())
 }
@@ -3324,6 +3378,13 @@ fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub fn ensure_not_empty(s: &str, name: &str) -> Result<(), anyhow::Error> {
+    if s.trim().is_empty() {
+        return Err(anyhow::anyhow!("{} is empty", name));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3460,5 +3521,25 @@ mod tests {
         unsafe {
             std::env::remove_var("ZO_USAGE_REPORT_TO_OWN_ORG");
         }
+    }
+
+    #[test]
+    fn test_ensure_not_empty_valid() {
+        assert!(ensure_not_empty("valid", "TEST").is_ok());
+    }
+
+    #[test]
+    fn test_ensure_not_empty_invalid() {
+        assert!(ensure_not_empty("", "TEST").is_err());
+    }
+
+    #[test]
+    fn test_ensure_not_empty_with_whitespace() {
+        assert!(ensure_not_empty("  value  ", "TEST").is_ok());
+    }
+
+    #[test]
+    fn test_ensure_not_empty_single_char() {
+        assert!(ensure_not_empty("a", "TEST").is_ok());
     }
 }

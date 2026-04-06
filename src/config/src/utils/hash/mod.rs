@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,6 +22,10 @@ pub mod murmur3;
 
 pub trait Sum64 {
     fn sum64(&mut self, key: &str) -> u64;
+}
+
+pub fn sum64(key: &str) -> u64 {
+    gxhash::new().sum64(key)
 }
 
 pub fn get_passcode_hash(pass: &str, salt: &str) -> String {
