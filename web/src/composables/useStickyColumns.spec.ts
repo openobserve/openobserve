@@ -29,9 +29,7 @@ describe("useStickyColumns", () => {
     });
 
     mockProps = {
-      data: {
-        columns: [],
-      },
+      columns: [],
     };
 
     mockStore = {
@@ -71,7 +69,7 @@ describe("useStickyColumns", () => {
 
   describe("Column Offset Calculation", () => {
     it("should calculate offsets for sticky columns", async () => {
-      mockProps.data.columns = [
+      mockProps.columns = [
         { name: "col1", sticky: true, width: 100 },
         { name: "col2", sticky: true, width: 150 },
         { name: "col3", sticky: false },
@@ -87,7 +85,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should use default width of 100 when width is not specified", async () => {
-      mockProps.data.columns = [
+      mockProps.columns = [
         { name: "col1", sticky: true },
         { name: "col2", sticky: true },
       ];
@@ -102,7 +100,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should parse string width values", async () => {
-      mockProps.data.columns = [
+      mockProps.columns = [
         { name: "col1", sticky: true, width: "120" },
         { name: "col2", sticky: true, width: "180" },
       ];
@@ -117,7 +115,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should calculate cumulative widths correctly", async () => {
-      mockProps.data.columns = [
+      mockProps.columns = [
         { name: "col1", sticky: true, width: 100 },
         { name: "col2", sticky: true, width: 200 },
         { name: "col3", sticky: true, width: 150 },
@@ -134,7 +132,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should only include sticky columns in offsets", async () => {
-      mockProps.data.columns = [
+      mockProps.columns = [
         { name: "col1", sticky: true, width: 100 },
         { name: "col2", sticky: false, width: 150 },
         { name: "col3", sticky: true, width: 200 },
@@ -150,7 +148,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should add __colIndex to each column", async () => {
-      mockProps.data.columns = [
+      mockProps.columns = [
         { name: "col1" },
         { name: "col2" },
         { name: "col3" },
@@ -159,13 +157,13 @@ describe("useStickyColumns", () => {
       composable = useStickyColumns(mockProps, mockStore);
       await nextTick();
 
-      expect(mockProps.data.columns[0].__colIndex).toBe(0);
-      expect(mockProps.data.columns[1].__colIndex).toBe(1);
-      expect(mockProps.data.columns[2].__colIndex).toBe(2);
+      expect(mockProps.columns[0].__colIndex).toBe(0);
+      expect(mockProps.columns[1].__colIndex).toBe(1);
+      expect(mockProps.columns[2].__colIndex).toBe(2);
     });
 
     it("should handle empty columns array", async () => {
-      mockProps.data.columns = [];
+      mockProps.columns = [];
 
       composable = useStickyColumns(mockProps, mockStore);
       await nextTick();
@@ -174,7 +172,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should handle undefined columns", async () => {
-      mockProps.data.columns = undefined;
+      mockProps.columns = undefined;
 
       composable = useStickyColumns(mockProps, mockStore);
       await nextTick();
@@ -209,7 +207,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should return style object for sticky columns", async () => {
-      mockProps.data.columns = [{ name: "col1", sticky: true, width: 100 }];
+      mockProps.columns = [{ name: "col1", sticky: true, width: 100 }];
 
       composable = useStickyColumns(mockProps, mockStore);
       await nextTick();
@@ -226,7 +224,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should use correct left offset from precomputed offsets", async () => {
-      mockProps.data.columns = [
+      mockProps.columns = [
         { name: "col1", sticky: true, width: 100 },
         { name: "col2", sticky: true, width: 150 },
       ];
@@ -273,7 +271,7 @@ describe("useStickyColumns", () => {
 
   describe("Style Generation Logic", () => {
     it("should calculate offsets for style generation", () => {
-      mockProps.data.columns = [{ name: "col1", sticky: true, width: 100 }];
+      mockProps.columns = [{ name: "col1", sticky: true, width: 100 }];
       composable = useStickyColumns(mockProps, mockStore);
 
       // Offsets are calculated which would be used for style generation
@@ -281,7 +279,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should track multiple column offsets for styling", () => {
-      mockProps.data.columns = [
+      mockProps.columns = [
         { name: "col1", sticky: true, width: 100 },
         { name: "col2", sticky: true, width: 150 },
       ];
@@ -296,7 +294,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should add column index for CSS targeting", () => {
-      mockProps.data.columns = [
+      mockProps.columns = [
         { name: "col1", sticky: true },
         { name: "col2", sticky: false },
       ];
@@ -304,13 +302,13 @@ describe("useStickyColumns", () => {
       composable = useStickyColumns(mockProps, mockStore);
 
       // __colIndex added for nth-child CSS selectors
-      expect(mockProps.data.columns[0].__colIndex).toBe(0);
-      expect(mockProps.data.columns[1].__colIndex).toBe(1);
+      expect(mockProps.columns[0].__colIndex).toBe(0);
+      expect(mockProps.columns[1].__colIndex).toBe(1);
     });
 
     it("should determine theme color for styles", () => {
       mockStore.state.theme = "dark";
-      mockProps.data.columns = [{ name: "col1", sticky: true }];
+      mockProps.columns = [{ name: "col1", sticky: true }];
 
       composable = useStickyColumns(mockProps, mockStore);
 
@@ -321,7 +319,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should skip offset calculation for non-sticky columns", () => {
-      mockProps.data.columns = [
+      mockProps.columns = [
         { name: "col1", sticky: true, width: 100 },
         { name: "col2", sticky: false, width: 150 },
         { name: "col3", sticky: true, width: 200 },
@@ -340,7 +338,7 @@ describe("useStickyColumns", () => {
 
   describe("Dynamic Updates", () => {
     it("should initialize offsets based on initial columns", () => {
-      mockProps.data.columns = [{ name: "col1", sticky: true, width: 100 }];
+      mockProps.columns = [{ name: "col1", sticky: true, width: 100 }];
       composable = useStickyColumns(mockProps, mockStore);
 
       // Immediate watcher should calculate offsets on init
@@ -348,7 +346,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should recalculate offsets with different initial columns", () => {
-      mockProps.data.columns = [
+      mockProps.columns = [
         { name: "col1", sticky: true, width: 100 },
         { name: "col2", sticky: true, width: 150 },
       ];
@@ -361,7 +359,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should calculate all column indexes immediately", () => {
-      mockProps.data.columns = [
+      mockProps.columns = [
         { name: "col1", sticky: true, width: 100 },
         { name: "col2", sticky: true, width: 200 },
         { name: "col3", sticky: false },
@@ -370,13 +368,13 @@ describe("useStickyColumns", () => {
       composable = useStickyColumns(mockProps, mockStore);
 
       // All columns get __colIndex regardless of sticky status
-      expect(mockProps.data.columns[0].__colIndex).toBe(0);
-      expect(mockProps.data.columns[1].__colIndex).toBe(1);
-      expect(mockProps.data.columns[2].__colIndex).toBe(2);
+      expect(mockProps.columns[0].__colIndex).toBe(0);
+      expect(mockProps.columns[1].__colIndex).toBe(1);
+      expect(mockProps.columns[2].__colIndex).toBe(2);
     });
 
     it("should return consistent offsets reference", () => {
-      mockProps.data.columns = [{ name: "col1", sticky: true }];
+      mockProps.columns = [{ name: "col1", sticky: true }];
       composable = useStickyColumns(mockProps, mockStore);
 
       const ref1 = composable.stickyColumnOffsets;
@@ -389,7 +387,7 @@ describe("useStickyColumns", () => {
 
   describe("Return Values", () => {
     it("should return stickyColumnOffsets ref", () => {
-      mockProps.data.columns = [{ name: "col1", sticky: true }];
+      mockProps.columns = [{ name: "col1", sticky: true }];
       composable = useStickyColumns(mockProps, mockStore);
 
       expect(composable).toHaveProperty("stickyColumnOffsets");
@@ -397,7 +395,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should return getStickyColumnStyle function", () => {
-      mockProps.data.columns = [];
+      mockProps.columns = [];
       composable = useStickyColumns(mockProps, mockStore);
 
       expect(composable).toHaveProperty("getStickyColumnStyle");
@@ -405,7 +403,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should only return expected properties", () => {
-      mockProps.data.columns = [];
+      mockProps.columns = [];
       composable = useStickyColumns(mockProps, mockStore);
 
       const keys = Object.keys(composable);
@@ -418,7 +416,7 @@ describe("useStickyColumns", () => {
 
   describe("Edge Cases", () => {
     it("should handle columns with zero width", () => {
-      mockProps.data.columns = [
+      mockProps.columns = [
         { name: "col1", sticky: true, width: 0 },
         { name: "col2", sticky: true, width: 150 },
       ];
@@ -432,7 +430,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should handle very large column widths", () => {
-      mockProps.data.columns = [
+      mockProps.columns = [
         { name: "col1", sticky: true, width: 10000 },
         { name: "col2", sticky: true, width: 20000 },
       ];
@@ -446,7 +444,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should handle columns with no name property", () => {
-      mockProps.data.columns = [{ sticky: true, width: 100 }];
+      mockProps.columns = [{ sticky: true, width: 100 }];
 
       composable = useStickyColumns(mockProps, mockStore);
 
@@ -457,7 +455,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should handle mixed numeric and string widths", () => {
-      mockProps.data.columns = [
+      mockProps.columns = [
         { name: "col1", sticky: true, width: 100 },
         { name: "col2", sticky: true, width: "150" },
         { name: "col3", sticky: true, width: 200 },
@@ -473,7 +471,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should handle floating point widths", () => {
-      mockProps.data.columns = [
+      mockProps.columns = [
         { name: "col1", sticky: true, width: 100.5 },
         { name: "col2", sticky: true, width: "150.7" },
       ];
@@ -488,7 +486,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should handle negative widths", () => {
-      mockProps.data.columns = [
+      mockProps.columns = [
         { name: "col1", sticky: true, width: -50 },
         { name: "col2", sticky: true, width: 100 },
       ];
@@ -502,7 +500,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should handle many sticky columns", () => {
-      mockProps.data.columns = Array.from({ length: 20 }, (_, i) => ({
+      mockProps.columns = Array.from({ length: 20 }, (_, i) => ({
         name: `col${i}`,
         sticky: true,
         width: 100,
@@ -519,7 +517,7 @@ describe("useStickyColumns", () => {
 
   describe("Reactivity", () => {
     it("should calculate offsets on initialization", () => {
-      mockProps.data.columns = [{ name: "col1", sticky: true, width: 100 }];
+      mockProps.columns = [{ name: "col1", sticky: true, width: 100 }];
       composable = useStickyColumns(mockProps, mockStore);
 
       // The watch runs immediately, so offsets should be calculated
@@ -527,13 +525,13 @@ describe("useStickyColumns", () => {
     });
 
     it("should handle columns being added", async () => {
-      mockProps.data.columns = [{ name: "col1", sticky: true, width: 100 }];
+      mockProps.columns = [{ name: "col1", sticky: true, width: 100 }];
       composable = useStickyColumns(mockProps, mockStore);
 
       expect(composable.stickyColumnOffsets.value).toEqual({ col1: 0 });
 
       // Add more columns by pushing (modifies array in place)
-      mockProps.data.columns.push({ name: "col2", sticky: true, width: 150 });
+      mockProps.columns.push({ name: "col2", sticky: true, width: 150 });
       await nextTick();
       await nextTick(); // Sometimes need extra tick for deep watch
 
@@ -543,7 +541,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should update style when theme changes in store", () => {
-      mockProps.data.columns = [{ name: "col1", sticky: true }];
+      mockProps.columns = [{ name: "col1", sticky: true }];
       mockStore.state.theme = "light";
       composable = useStickyColumns(mockProps, mockStore);
 
@@ -559,7 +557,7 @@ describe("useStickyColumns", () => {
 
     it("should handle immediate watcher execution", () => {
       // The watch has immediate: true, so it runs on setup
-      mockProps.data.columns = [
+      mockProps.columns = [
         { name: "col1", sticky: true, width: 100 },
         { name: "col2", sticky: true, width: 150 },
       ];
