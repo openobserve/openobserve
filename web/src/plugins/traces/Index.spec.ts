@@ -161,6 +161,8 @@ const mockSearchObj = {
     searchMode: "traces" as "traces" | "spans" | "service-graph",
     resultGrid: {
       rowsPerPage: 25,
+      sortBy: "start_time" as string,
+      sortOrder: "desc" as "asc" | "desc",
     },
     refreshInterval: 0,
     serviceColors: {},
@@ -653,9 +655,7 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(
-        wrapper
-          .find('[data-test="traces-search-not-started-text"]')
-          .exists(),
+        wrapper.find('[data-test="traces-search-not-started-text"]').exists(),
       ).toBe(true);
     });
 
@@ -769,9 +769,7 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(
-        wrapper
-          .find('[data-test="traces-search-error-text"]')
-          .exists(),
+        wrapper.find('[data-test="traces-search-error-text"]').exists(),
       ).toBe(true);
     });
 
@@ -1268,9 +1266,7 @@ describe("Index.vue (Main Traces Page)", () => {
       });
       await flushPromises();
 
-      expect(mockSearchObj.data.editorValue).toContain(
-        "AND duration <= 20000",
-      );
+      expect(mockSearchObj.data.editorValue).toContain("AND duration <= 20000");
     });
 
     it("should combine all optional filter fields when all are provided", async () => {
@@ -1384,9 +1380,7 @@ describe("Index.vue (Main Traces Page)", () => {
 
       await flushPromises();
 
-      expect(
-        wrapper.find(".traces-horizontal-splitter").exists(),
-      ).toBe(true);
+      expect(wrapper.find(".traces-horizontal-splitter").exists()).toBe(true);
     });
 
     it("should initialize splitterModel with a default value of 15", async () => {
@@ -1573,6 +1567,97 @@ describe("Index.vue (Main Traces Page)", () => {
 
       // No error should be thrown
       expect(wrapper.vm).toBeTruthy();
+    });
+  });
+
+  describe("onSearchModeChange — sortBy reset", () => {
+    function mountIndexStubbed() {
+      return mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+    }
+
+    it("should reset sortBy to start_time when switching to traces mode and sortBy is a spans-only column", async () => {
+      // Simulate a spans-specific sort column being active
+      mockSearchObj.meta.resultGrid.sortBy = "span_status";
+      mockSearchObj.meta.searchMode = "spans";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "traces");
+      await flushPromises();
+
+      expect(mockSearchObj.meta.resultGrid.sortBy).toBe("start_time");
+    });
+
+    it("should NOT reset sortBy when switching to traces mode and sortBy is start_time", async () => {
+      mockSearchObj.meta.resultGrid.sortBy = "start_time";
+      mockSearchObj.meta.searchMode = "spans";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "traces");
+      await flushPromises();
+
+      expect(mockSearchObj.meta.resultGrid.sortBy).toBe("start_time");
+    });
+
+    it("should NOT reset sortBy when switching to traces mode and sortBy is duration", async () => {
+      mockSearchObj.meta.resultGrid.sortBy = "duration";
+      mockSearchObj.meta.searchMode = "spans";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "traces");
+      await flushPromises();
+
+      expect(mockSearchObj.meta.resultGrid.sortBy).toBe("duration");
+    });
+
+    it("should NOT reset sortBy when switching to spans mode", async () => {
+      mockSearchObj.meta.resultGrid.sortBy = "operation_name";
+      mockSearchObj.meta.searchMode = "traces";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "spans");
+      await flushPromises();
+
+      // Switching to spans does not reset sortBy
+      expect(mockSearchObj.meta.resultGrid.sortBy).toBe("operation_name");
+    });
+
+    it("should reset sortBy to start_time when switching to traces mode and sortBy is operation_name", async () => {
+      mockSearchObj.meta.resultGrid.sortBy = "operation_name";
+      mockSearchObj.meta.searchMode = "spans";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "traces");
+      await flushPromises();
+
+      expect(mockSearchObj.meta.resultGrid.sortBy).toBe("start_time");
     });
   });
 
