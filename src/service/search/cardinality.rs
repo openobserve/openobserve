@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::LazyLock as Lazy;
+
 use config::{RwHashMap, meta::stream::StreamType, utils::time::now_micros};
 use hashbrown::HashMap;
 use infra::errors::{Error, Result};
-use once_cell::sync::Lazy;
 
 use crate::service::search as searchService;
 

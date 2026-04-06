@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{hash::Hash, sync::Arc};
+use std::{
+    hash::Hash,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use arrow_schema::Schema;
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::try_join;
 

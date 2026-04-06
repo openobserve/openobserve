@@ -13,13 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::PathBuf,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use config::{
     RwAHashSet, metrics,
     stats::{CacheStatsAsync, MemorySize},
 };
-use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::{fs, sync::mpsc};
 

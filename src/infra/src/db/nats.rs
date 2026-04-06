@@ -15,7 +15,7 @@
 
 use std::{
     sync::{
-        Arc,
+        Arc, LazyLock as Lazy,
         atomic::{AtomicU8, Ordering},
     },
     time::Duration,
@@ -34,7 +34,6 @@ use config::{
 };
 use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashMap;
-use once_cell::sync::Lazy;
 use tokio::{
     sync::{Mutex, OnceCell, mpsc},
     task::JoinHandle,

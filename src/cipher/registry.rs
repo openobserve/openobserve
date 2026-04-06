@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::LazyLock as Lazy;
+
 use hashbrown::HashMap;
 use o2_enterprise::enterprise::cipher::Cipher;
-use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 
 pub static REGISTRY: Lazy<RwLock<Registry>> = Lazy::new(|| RwLock::new(Registry::new()));
