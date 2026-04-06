@@ -56,7 +56,6 @@ pub const V2_API_PREFIX: &str = "v2";
 /// permission level. This function handles those overrides:
 /// - `delete_fields` endpoints: PATCH/PUT → DELETE (needs delete permission)
 /// - General PATCH normalization: PATCH → PUT (treat as update)
-/// - Alert trigger: → GET (non-mutating test action, only needs view permission)
 #[cfg(any(feature = "enterprise", test))]
 pub(crate) fn resolve_write_method(method: &str, path_columns: &[&str]) -> String {
     let url_len = path_columns.len();
@@ -68,17 +67,6 @@ pub(crate) fn resolve_write_method(method: &str, path_columns: &[&str]) -> Strin
 
     if resolved == "PATCH" {
         resolved = "PUT".to_string();
-    }
-
-    // Alert trigger is a non-mutating action (fires a test notification),
-    // so it only requires GET (view) permission, not PUT (update).
-    // Fixes: https://github.com/openobserve/openobserve/issues/10765
-    if url_len >= 5
-        && path_columns[0] == V2_API_PREFIX
-        && path_columns.get(2) == Some(&"alerts")
-        && path_columns[url_len - 1] == "trigger"
-    {
-        resolved = "GET".to_string();
     }
 
     resolved
@@ -1820,9 +1808,9 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_write_method_alert_trigger_uses_get() {
+    fn test_resolve_write_method_alert_trigger_uses_put() {
         let path: Vec<&str> = "v2/default/alerts/abc123/trigger".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "GET");
+        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
     }
 
     #[test]
@@ -1866,7 +1854,7 @@ mod tests {
 
     #[test]
     fn test_resolve_write_method_trigger_only_matches_v2_alerts() {
-        // v1-style path should NOT get the GET override
+        // v1-style path should continue to normalize PATCH to PUT
         let path: Vec<&str> = "default/streams/alerts/abc123/trigger".split('/').collect();
         assert_eq!(resolve_write_method("PATCH", &path), "PUT");
     }
