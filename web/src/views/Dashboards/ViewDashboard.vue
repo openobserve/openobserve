@@ -1184,15 +1184,15 @@ export default defineComponent({
           // Clear the drilldown guard after reactivity settles
           await nextTick();
           await nextTick();
+
+          // Now sync the full URL state (adds back from/to, refresh, print, etc.)
+          // The drilldown's router.push may not include all params (e.g. when passAllVariables is false),
+          // so we need updateUrlWithCurrentState to fill in the missing ones.
+          // Only runs if updateInitialVariableValues() succeeded — avoids writing stale state on error.
+          updateUrlWithCurrentState();
         } finally {
           isDrilldownInProgress.value = false;
         }
-
-        // Now sync the full URL state (adds back from/to, refresh, print, etc.)
-        // The drilldown's router.push may not include all params (e.g. when passAllVariables is false),
-        // so we need updateUrlWithCurrentState to fill in the missing ones.
-        // This is safe now because the manager has already been updated with new values.
-        updateUrlWithCurrentState();
       },
     );
 
