@@ -802,10 +802,13 @@ pub async fn validator_gcp(req_data: &RequestData) -> Result<AuthValidationResul
 
 /// Validates RUM requests
 pub async fn validator_rum(req_data: &RequestData) -> Result<AuthValidationResult, AuthError> {
+    // By the time this middleware runs, axum's nested router has already stripped
+    // both the base_uri prefix (outer nest) and the "/rum" prefix (inner nest),
+    // so the path is always "/v1/{org_id}/{endpoint}" regardless of base_uri.
     let path = req_data
         .uri
         .path()
-        .strip_prefix(format!("{}/v1/", get_config().common.base_uri).as_str())
+        .strip_prefix("/v1/")
         .unwrap_or(req_data.uri.path());
 
     // After this previous path clean we should get only the
