@@ -394,7 +394,7 @@ const isSampleValuesNumbers = (arr: any, key: string, sampleSize: number) => {
 
 /**
  * Merges table data from multiple SQL queries in UNION mode.
- * Each query's rows are appended with a __query identifier column.
+ * Rows from all queries are combined into a single list.
  * Column set is the union of all queries' columns.
  */
 export const convertMultiQueryTableData = (
@@ -410,34 +410,17 @@ export const convertMultiQueryTableData = (
   const allColumnNames = new Set<string>();
 
   // Collect rows and discover all column names
-  searchQueryData.forEach((queryData: any[], queryIndex: number) => {
+  searchQueryData.forEach((queryData: any[]) => {
     if (!queryData || !Array.isArray(queryData)) return;
-
-    const qConfig = panelSchema.queries[queryIndex]?.config;
-    let queryLabel = `Q${queryIndex + 1}`;
-    if (qConfig?.query_label) {
-      queryLabel = qConfig.query_label.replace(/\{[^}]+\}/g, "").trim() || queryLabel;
-    }
 
     queryData.forEach((row: any) => {
       Object.keys(row).forEach((key) => allColumnNames.add(key));
-      allRows.push({ __query: queryLabel, ...row });
+      allRows.push({ ...row });
     });
   });
 
-  // Remove __query from discovered columns (we add it manually as first column)
-  allColumnNames.delete("__query");
-
   // Build column definitions
-  const columns: any[] = [
-    {
-      name: "__query",
-      field: "__query",
-      label: "Query",
-      align: "left",
-      sortable: true,
-    },
-  ];
+  const columns: any[] = [];
 
   // Try to use field configs from queries for known columns
   const knownAliases = new Map<string, any>();
