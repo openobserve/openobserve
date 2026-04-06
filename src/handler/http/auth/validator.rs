@@ -322,9 +322,9 @@ pub async fn validate_credentials(
     let user = user.unwrap();
 
     // Check token authentication first (before native login restrictions)
-    // This allows service accounts and all users to use API tokens regardless of native login
-    // settings
-    if user.role.eq(&UserRole::ServiceAccount) && user.token.eq(&user_password) {
+    // This allows service accounts (including SRE agents) and all users to use API tokens
+    // regardless of native login settings
+    if user.role.is_service_account() && user.token.eq(&user_password) {
         // Check if service accounts are enabled
         let config = get_config();
         if !config.auth.service_account_enabled {
