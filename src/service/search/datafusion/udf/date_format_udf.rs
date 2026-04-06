@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{iter::zip, sync::Arc};
+use std::{
+    iter::zip,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use chrono::{FixedOffset, TimeZone, Utc};
 use config::utils::time;
@@ -28,7 +31,6 @@ use datafusion::{
     prelude::create_udf,
     sql::sqlparser::parser::ParserError,
 };
-use once_cell::sync::Lazy;
 
 /// The name of the date_format UDF given to DataFusion.
 pub const DATE_FORMAT_UDF_NAME: &str = "date_format";

@@ -55,10 +55,11 @@
 //! - CSV parsing handles incomplete lines across chunk boundaries
 //! - Batch processing (10k records) limits in-memory accumulation
 
+use std::sync::LazyLock as Lazy;
+
 use anyhow::{Result, anyhow};
 use config::{get_config, meta::enrichment_table::*, utils::json};
 use futures::StreamExt;
-use once_cell::sync::Lazy;
 use reqwest::Client;
 use tokio::sync::mpsc;
 
@@ -81,7 +82,7 @@ pub struct EnrichmentUrlJobEvent {
 
 /// Global MPSC sender initialized lazily on first access.
 ///
-/// We use `Lazy` from `once_cell` to ensure the channel and background processor
+/// We use `std::sync::LazyLock` to ensure the channel and background processor
 /// are initialized exactly once, even in multi-threaded environments. This happens
 /// automatically on the first call to `trigger_url_job_processing()`.
 ///

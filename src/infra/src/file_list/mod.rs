@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap as stdHashMap;
+use std::{collections::HashMap as stdHashMap, sync::LazyLock as Lazy};
 
 use async_trait::async_trait;
 use config::{
@@ -24,7 +24,6 @@ use config::{
     },
     utils::time::second_micros,
 };
-use once_cell::sync::Lazy;
 
 use crate::errors::{Error, Result};
 

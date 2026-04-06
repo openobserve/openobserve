@@ -55,7 +55,7 @@ pub struct DistributeAnalyzeExec {
     pub input: Arc<dyn ExecutionPlan>,
     /// The output schema for RecordBatches of this exec node
     schema: SchemaRef,
-    cache: PlanProperties,
+    cache: Arc<PlanProperties>,
 }
 
 impl DistributeAnalyzeExec {
@@ -80,13 +80,16 @@ impl DistributeAnalyzeExec {
 
     /// This function creates the cache object that stores the plan properties such as schema,
     /// equivalence properties, ordering, partitioning, etc.
-    fn compute_properties(input: &Arc<dyn ExecutionPlan>, schema: SchemaRef) -> PlanProperties {
-        PlanProperties::new(
+    fn compute_properties(
+        input: &Arc<dyn ExecutionPlan>,
+        schema: SchemaRef,
+    ) -> Arc<PlanProperties> {
+        Arc::new(PlanProperties::new(
             EquivalenceProperties::new(schema),
             Partitioning::UnknownPartitioning(1),
             input.pipeline_behavior(),
             input.boundedness(),
-        )
+        ))
     }
 }
 
@@ -106,7 +109,7 @@ impl ExecutionPlan for DistributeAnalyzeExec {
         self
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.cache
     }
 
