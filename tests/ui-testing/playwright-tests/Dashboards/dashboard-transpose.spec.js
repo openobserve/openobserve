@@ -339,16 +339,15 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-custom-query-type"]').click();
 
     // Focus on the editor and enter the custom SQL query
-    await page
-      .locator('[data-test="dashboard-panel-query-editor"]')
-      .getByRole('code')
-      .click();
-    await page
-      .locator('[data-test="dashboard-panel-query-editor"]')
-      .locator(".inputarea")
-      .fill(
-        'SELECT kubernetes_namespace_name as "xAxis", count(kubernetes_namespace_name) as "y_axis_1"  FROM "e2e_automate"  GROUP BY "xAxis"'
-      );
+    const queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
+    await queryEditor.waitFor({ state: "visible", timeout: 10000 });
+    await queryEditor.getByRole('code').click({ clickCount: 3 });
+    await page.keyboard.press("Backspace");
+    await page.keyboard.type(
+      'SELECT kubernetes_namespace_name as "xAxis", count(kubernetes_namespace_name) as "y_axis_1"  FROM "e2e_automate"  GROUP BY "xAxis"',
+      { delay: 50 }
+    );
+    await page.keyboard.press("Escape");
 
     await pm.chartTypeSelector.searchAndAddField("y_axis_1", "x");
     await pm.chartTypeSelector.searchAndAddField("xAxis", "y");
