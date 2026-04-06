@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :wrap="wrapCells"
       :show-pagination="showPagination"
       :rows-per-page="rowsPerPage"
+      :enable-column-reorder="false"
       :enable-cell-copy="true"
       data-test="dashboard-panel-table"
       @click:dataRow="(row: any, _idx: number, evt?: MouseEvent) => $emit('row-click', evt ?? null, row)"
