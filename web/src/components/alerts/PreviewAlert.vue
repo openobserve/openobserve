@@ -448,14 +448,14 @@ const fetchQuerySchema = async () => {
       const queryForPreview = cleanAggregationQuery(props.query);
 
       // Build breakdown from aggregation group_by fields.
-      // Backend aliases them as x_axis_2, x_axis_3, … (index + 2).
+      // Backend uses the original field names (e.g. status, service) in the SELECT and GROUP BY.
       const groupByFields: string[] = (
         props.formData.query_condition?.aggregation?.group_by || []
       ).filter((f: string) => f && f.trim() !== "");
 
-      const breakdown = groupByFields.map((field: string, index: number) => ({
-        alias: `x_axis_${index + 2}`,
-        column: `x_axis_${index + 2}`,
+      const breakdown = groupByFields.map((field: string) => ({
+        alias: field,
+        column: field,
         color: null,
         label: field,
       }));
