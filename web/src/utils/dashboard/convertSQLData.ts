@@ -23,6 +23,8 @@
  */
 import { convertSQLChartData } from "./sql";
 import { applySeriesColorMappings } from "./chartColorUtils";
+import { calculateOptimalFontSize } from "./chartDimensionUtils";
+import { calculateGridPositions } from "./calculateGridForSubPlot";
 
 export const convertMultiSQLData = async (
   panelSchema: any,
@@ -129,22 +131,85 @@ export const convertMultiSQLData = async (
     return options[0];
   }
 
-  // C6: Metric — collect values from all queries for grid display
+  // C6: Metric — build grid so each query value occupies its own cell
   if (chartType === "metric" && options.length > 1) {
-    const additionalValues = options.slice(1).map((opt: any, idx: number) => {
-      // slice(1) means execIndex is idx + 1
-      const execIndex = idx + 1;
-      const panelQueryIndex = metadata?.queries?.[execIndex]?.panelQueryIndex ?? execIndex;
-      const qConfig = panelSchema.queries[panelQueryIndex]?.config;
-      return {
-        options: opt.options,
-        queryLabel: qConfig?.query_label || "",
+    const allMetricSeries: any[] = [];
+    options.forEach((opt: any) => {
+      if (opt?.options?.series?.[0]) {
+        allMetricSeries.push(opt.options.series[0]);
+      }
+    });
+
+    const gridData = calculateGridPositions(
+      chartPanelRef.value.offsetWidth,
+      chartPanelRef.value.offsetHeight,
+      allMetricSeries.length,
+    );
+    const isDark = store.state.theme === "dark";
+    const longestText = allMetricSeries.reduce(
+      (acc: string, s: any) =>
+        (s._metricText ?? "").length > acc.length ? (s._metricText ?? "") : acc,
+      "",
+    );
+    const sharedFontSize = calculateOptimalFontSize(
+      longestText,
+      gridData.gridWidth,
+    );
+    const labelFontSize = Math.max(
+      11,
+      Math.min(14, Math.round(gridData.gridWidth / 30)),
+    );
+
+    allMetricSeries.forEach((s: any, idx: number) => {
+      const cell = gridData.gridArray[idx];
+      const cx =
+        ((parseFloat(cell.left) + parseFloat(cell.width) / 2) / 100) *
+        chartPanelRef.value.offsetWidth;
+      const cy =
+        ((parseFloat(cell.top) + parseFloat(cell.height) / 2) / 100) *
+        chartPanelRef.value.offsetHeight;
+      const fill = s._metricFillColor ?? (isDark ? "#fff" : "#000");
+      s.renderItem = () => {
+        try {
+          return {
+            type: "group",
+            children: [
+              {
+                type: "text",
+                style: {
+                  text: s._metricText ?? "",
+                  fontSize: sharedFontSize,
+                  fontWeight: 500,
+                  align: "center",
+                  verticalAlign: "middle",
+                  x: cx,
+                  y: cy - labelFontSize / 2 - 2,
+                  fill,
+                },
+              },
+              {
+                type: "text",
+                style: {
+                  text: s._metricLabel ?? "",
+                  fontSize: labelFontSize,
+                  fontWeight: 400,
+                  align: "center",
+                  verticalAlign: "middle",
+                  x: cx,
+                  y: cy + sharedFontSize / 2 + 4,
+                  fill,
+                  opacity: 0.65,
+                },
+              },
+            ],
+          };
+        } catch {
+          return "";
+        }
       };
     });
-    options[0].extras = {
-      ...options[0].extras,
-      additionalMetricValues: additionalValues,
-    };
+
+    options[0].options.series = allMetricSeries;
     return options[0];
   }
 
@@ -156,15 +221,33 @@ export const convertMultiSQLData = async (
         allSeries.push(...opt.options.series);
       }
     });
-    const total = allSeries.length;
+    const gridDataForGauge = calculateGridPositions(
+      chartPanelRef.value.offsetWidth,
+      chartPanelRef.value.offsetHeight,
+      allSeries.length,
+    );
+    const minDim = Math.min(
+      gridDataForGauge.gridWidth,
+      gridDataForGauge.gridHeight,
+    );
+
     allSeries.forEach((s: any, idx: number) => {
-      const col = idx % 3;
-      const row = Math.floor(idx / 3);
-      s.center = [
-        `${(col + 1) * 25}%`,
-        `${(row + 1) * (100 / (Math.ceil(total / 3) + 1))}%`,
-      ];
+      const cell = gridDataForGauge.gridArray[idx];
       s.gridIndex = idx;
+      s.center = [
+        `${parseFloat(cell.left) + parseFloat(cell.width) / 2}%`,
+        `${parseFloat(cell.top) + parseFloat(cell.height) / 2}%`,
+      ];
+      s.radius = `${minDim / 2 - 5}px`;
+      if (s.progress) {
+        s.progress.width = `${minDim / 6}`;
+      }
+      if (s.axisLine?.lineStyle) {
+        s.axisLine.lineStyle.width = `${minDim / 6}`;
+      }
+      if (s.title) {
+        s.title.width = `${gridDataForGauge.gridWidth}`;
+      }
     });
     options[0].options.series = allSeries;
     applySeriesColorMappings(
