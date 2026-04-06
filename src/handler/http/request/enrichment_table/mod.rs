@@ -702,10 +702,7 @@ fn validate_enrichment_url(url: &str) -> Result<(), String> {
             std::net::IpAddr::V6(v6) => v6.to_ipv4_mapped(),
         };
         if let Some(ip) = v4
-            && (ip.is_loopback()
-                || ip.is_private()
-                || ip.is_link_local()
-                || ip.is_unspecified())
+            && (ip.is_loopback() || ip.is_private() || ip.is_link_local() || ip.is_unspecified())
         {
             return Err("Cannot access private IP addresses".to_string());
         }
