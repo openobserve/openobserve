@@ -1178,30 +1178,43 @@ export default defineComponent({
 
     /**
      * Updates the initial variable values (used for drilldowns)
-     * @param args - Any arguments (not used with variables manager)
+     * Handles same-dashboard drilldown by pushing new var-* values
+     * from the URL into the variables manager and committing them.
      */
     const updateInitialVariableValues = async (...args: any) => {
       // if view panel is open then close it
       showViewPanel.value = false;
 
-      // first, refresh the dashboard
-      refreshDashboard(true);
+      // Check if this is a same-dashboard drilldown (tab may differ)
+      const isSameDashboard =
+        route.query.dashboard === props.dashboardData?.dashboardId;
 
-      // NOTE: With the variables manager, this works without changing the initial variable values
-      // The manager handles variable updates automatically
+      if (isSameDashboard) {
+        // Same-dashboard drilldown: update variables in-place without reloading dashboard
+        // Reloading would reinitialize the variables manager, wiping out the new values
 
-      // This is necessary to ensure that panels refresh automatically based on the drilldown
-      // without requiring the user to click on refresh to load the panel/whole dashboard
-      // Use committed state to match panel expectations
-      const allGlobalVars = variablesManager.committedVariablesData.global;
-      currentVariablesDataRef.value = {
-        __global: JSON.parse(
-          JSON.stringify({
-            isVariablesLoading: variablesManager.isLoading.value,
-            values: allGlobalVars,
-          }),
-        ),
-      };
+        // Push new variable values into the manager using loadFromUrl
+        // This properly parses values, handles multi-select, and marks variables as loaded
+        variablesManager.loadFromUrl({ query: route.query });
+
+        // Commit the updated values immediately so panels see them
+        variablesManager.commitAll();
+
+        // Update currentVariablesDataRef with the newly committed state
+        // This triggers panel re-renders via the :variablesData binding
+        const allGlobalVars = variablesManager.committedVariablesData.global;
+        currentVariablesDataRef.value = {
+          __global: JSON.parse(
+            JSON.stringify({
+              isVariablesLoading: variablesManager.isLoading.value,
+              values: allGlobalVars,
+            }),
+          ),
+        };
+      } else {
+        // Different-dashboard drilldown: full reload (existing behavior)
+        refreshDashboard(false);
+      }
     };
 
     // Track which panels are currently being synced to prevent infinite loops
