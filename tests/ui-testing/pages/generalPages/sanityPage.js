@@ -288,13 +288,19 @@ export class SanityPage {
         
         const queryEditor = this.page.locator(this.queryEditorContent);
         await expect(queryEditor).toBeVisible({ timeout: 10000 });
-        
-        await queryEditor.getByRole('code').click();
+
+        // Click the editor to ensure Monaco mounts/activates the hidden textarea
+        await queryEditor.click({ force: true });
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
         await this.page.keyboard.press("Backspace");
         await this.page.waitForTimeout(300);
-        await queryEditor.locator('.inputarea').fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
-        
+
+        // Use 'attached' state because Monaco's inputarea is opacity:0 (not CSS-visible).
+        // Fall back to textarea / role=textbox in case the internal selector changes.
+        const inputArea = queryEditor.locator('.inputarea, textarea, [role="textbox"]').first();
+        await inputArea.waitFor({ state: 'attached', timeout: 30000 });
+        await inputArea.fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+
         await this.page.waitForLoadState('domcontentloaded');
         const limitSearchPromise = this.page.waitForResponse(resp => resp.url().includes('/_search'), { timeout: 30000 });
         await this.page.locator(this.refreshButton).click({ force: true });
@@ -353,7 +359,15 @@ export class SanityPage {
             }
         }
         
-        await this.page.locator(this.fnEditor).locator(".inputarea").fill(".a=2");
+        // Click the editor to ensure Monaco mounts/activates the hidden textarea
+        await this.page.locator(this.fnEditor).first().click({ force: true }).catch(() => {});
+
+        // Use 'attached' state because Monaco's inputarea is opacity:0 (not CSS-visible).
+        // Fall back to textarea / role=textbox in case the internal selector changes.
+        const fnInputArea = this.page.locator(this.fnEditor).first()
+            .locator('.inputarea, textarea, [role="textbox"]').first();
+        await fnInputArea.waitFor({ state: 'attached', timeout: 30000 });
+        await fnInputArea.fill(".a=2");
         await waitUtils.smartWait(this.page, 1000, 'VRL editor content stabilization');
 
         // Wait for 3 seconds before attempting to click save button
@@ -1075,11 +1089,17 @@ export class SanityPage {
         const queryEditor = this.page.locator(this.queryEditorContent);
         await expect(queryEditor).toBeVisible({ timeout: 15000 });
 
-        await queryEditor.getByRole('code').click();
+        // Click the editor to ensure Monaco mounts/activates the hidden textarea
+        await queryEditor.click({ force: true });
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
         await this.page.keyboard.press("Backspace");
         await this.page.waitForTimeout(300);
-        await queryEditor.locator('.inputarea').fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+
+        // Use 'attached' state because Monaco's inputarea is opacity:0 (not CSS-visible).
+        // Fall back to textarea / role=textbox in case the internal selector changes.
+        const inputArea = queryEditor.locator('.inputarea, textarea, [role="textbox"]').first();
+        await inputArea.waitFor({ state: 'attached', timeout: 30000 });
+        await inputArea.fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
         await this.page.waitForLoadState('domcontentloaded');
         await this.page.waitForTimeout(1000);
 
