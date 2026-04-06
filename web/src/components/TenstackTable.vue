@@ -189,14 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="!header.isPlaceholder"
                 :data-test="`o2-table-th-sort-${header.id}`"
-                :class="[
-                  'text-left',
-                  header.column.getCanSort() ||
-                  (sortBy !== undefined &&
-                    (header.column.columnDef.meta as any)?.sortable)
-                    ? 'cursor-pointer tw:gap-1'
-                    : 'cursor-pointer tw:gap-1',
-                ]"
+                :class="['text-left', 'cursor-pointer tw:gap-1']"
                 @click="
                   handleHeaderSortClick(
                     $event,

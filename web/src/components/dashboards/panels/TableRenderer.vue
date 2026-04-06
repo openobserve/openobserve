@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from "vue";
+import { defineComponent, ref, computed, watch } from "vue";
 import TenstackTable from "@/components/TenstackTable.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
@@ -179,6 +179,15 @@ export default defineComponent({
       localSortBy.value = by;
       localSortOrder.value = order;
     };
+
+    // Reset sort when columns change (e.g. dashboard re-query with different fields)
+    watch(
+      () => props.data.columns,
+      () => {
+        localSortBy.value = "";
+        localSortOrder.value = "desc";
+      },
+    );
 
     const downloadTableAsCSV = (title?: string) => {
       const rows = tableRef.value?.getRows() ?? [];
