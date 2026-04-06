@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::Ordering, sync::Arc};
+use std::{
+    cmp::Ordering,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use config::utils::json;
 use datafusion::{
@@ -27,7 +30,6 @@ use datafusion::{
     prelude::create_udf,
     sql::sqlparser::parser::ParserError,
 };
-use once_cell::sync::Lazy;
 
 /// The name of the arrsort UDF given to DataFusion.
 pub const ARR_SORT_UDF_NAME: &str = "arrsort";

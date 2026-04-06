@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, fmt::Debug};
+use std::{collections::HashMap, fmt::Debug, sync::LazyLock as Lazy};
 
 use axum::{
     Json,
@@ -26,7 +26,6 @@ use config::{
     meta::user::UserRole,
     utils::{hash::get_passcode_hash, json},
 };
-use once_cell::sync::Lazy;
 use regex::Regex;
 #[cfg(feature = "enterprise")]
 use {
