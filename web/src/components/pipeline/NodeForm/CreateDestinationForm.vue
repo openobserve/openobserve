@@ -1461,6 +1461,10 @@ defineExpose({
     .card-icon {
       color: var(--o2-border-color);
     }
+
+    .card-label {
+      color: #333333;
+    }
   }
 
   &.dark-mode {
@@ -1479,6 +1483,10 @@ defineExpose({
 
       .card-icon {
         color: #5d9cec;
+      }
+
+      .card-label {
+        color: #ffffff;
       }
     }
   }
