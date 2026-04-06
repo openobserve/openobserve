@@ -57,22 +57,13 @@ export default class DashboardTimeRefresh {
       .first()
       .click();
 
-    // Scope day buttons to the calendar panel to avoid matching unrelated buttons.
-    // After clicking the start day the date picker re-renders (range highlight update),
-    // so wait for DOM stability before clicking the end day.
-    const calendar = this.page.locator(".q-date__calendar-days");
-    await calendar.first().waitFor({ state: "visible" });
-    await calendar
-      .getByRole("button", { name: new RegExp(`^${startDay}$`) })
+    // Select the start and end days dynamically
+    await this.page
+      .getByRole("button", { name: String(startDay) })
       .last()
       .click();
-    await this.page.waitForLoadState("domcontentloaded");
-    await calendar
-      .getByRole("button", { name: new RegExp(`^${endDay}$`) })
-      .last()
-      .waitFor({ state: "visible" });
-    await calendar
-      .getByRole("button", { name: new RegExp(`^${endDay}$`) })
+    await this.page
+      .getByRole("button", { name: String(endDay) })
       .last()
       .click();
 
