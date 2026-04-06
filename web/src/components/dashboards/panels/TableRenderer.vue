@@ -185,7 +185,7 @@ export default defineComponent({
       () => props.data.columns,
       () => {
         localSortBy.value = "";
-        localSortOrder.value = "desc";
+        localSortOrder.value = "asc";
       },
     );
 
