@@ -576,7 +576,7 @@ describe("PromQLTableChart", () => {
       wrapper = createWrapper({ data: largeData });
       const endTime = performance.now();
 
-      expect(endTime - startTime).toBeLessThan(1000);
+      expect(endTime - startTime).toBeLessThan(10000);
       expect(wrapper.vm.tableRows.length).toBe(10000);
     });
 

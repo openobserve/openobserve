@@ -1698,7 +1698,10 @@ const parentRef = ref<HTMLElement | null>(null);
 
 const isFirefox = computed(() => {
   return (
-    typeof document !== "undefined" && CSS.supports("-moz-appearance", "none")
+    typeof document !== "undefined" &&
+    typeof CSS !== "undefined" &&
+    typeof CSS.supports === "function" &&
+    CSS.supports("-moz-appearance", "none")
   );
 });
 
