@@ -784,6 +784,8 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
  * @returns {string} - the WHERE clause as a string.
  */
 const buildWhereClause = (filterData: any, dashboardPanelData: any) => {
+  if (!filterData?.length) return "";
+
   const whereConditions = filterData
     ?.map((condition) => buildCondition(condition, dashboardPanelData))
     ?.filter(Boolean);
