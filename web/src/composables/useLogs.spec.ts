@@ -2518,6 +2518,27 @@ describe("Use Logs Composable", () => {
     });
   });
 
+  describe("getFilterExpressionByFieldType", () => {
+    const setupStreamSchema = (fieldName: string, fieldType: string) => {
+      wrapper.vm.searchObj.data.stream.selectedStream = ["logs"];
+      wrapper.vm.searchObj.data.streamResults.list = [
+        {
+          name: "logs",
+          schema: [{ name: fieldName, type: fieldType }],
+        },
+      ];
+    };
+
+    it("keeps the field unquoted in non-SQL mode", () => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      setupStreamSchema("user", "Utf8");
+
+      expect(
+        wrapper.vm.getFilterExpressionByFieldType("user", "alice", "include"),
+      ).toBe("user = 'alice'");
+    });
+  });
+
   describe.skip("Utility Helper Functions", () => {
     // These functions have been moved to other composables or removed entirely
     it("functions moved to separate composables or removed", () => {

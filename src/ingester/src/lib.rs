@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,7 +23,11 @@ mod stream;
 mod wal;
 mod writer;
 
-use std::{fs::create_dir_all, path::PathBuf, sync::Arc};
+use std::{
+    fs::create_dir_all,
+    path::PathBuf,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use arrow_schema::Schema;
 use config::RwAHashMap;
@@ -32,7 +36,6 @@ pub use immutable::{
     check_persist_done, get_immutables_cache_stats, get_processing_tables_cache_stats,
     read_from_immutable,
 };
-use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::{Mutex, mpsc};
 pub use wal::collect_wal_parquet_metrics;
@@ -174,15 +177,10 @@ async fn run() -> errors::Result<()> {
     Ok(())
 }
 
+// check if the file is a wal file
 // wal file format:
 // files/{org}/{stype}/{stream}/{thread_id}/{year}/{month}/{day}/{hour}/{schema_key}/{file_name}
-pub fn is_wal_file(local_mode: bool, file: &str) -> bool {
-    // not local mode, directly return false
-    if !local_mode {
-        return false;
-    }
-
-    // local mode, check the file name format
+pub fn is_wal_file(file: &str) -> bool {
     let columns = file.split('/').collect::<Vec<_>>();
     !(columns.len() < 11
         // thread_id is impossible over 1000
@@ -199,11 +197,9 @@ mod tests {
     #[test]
     fn test_is_wal_file_wal_file() {
         assert!(is_wal_file(
-            true,
             "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/file.parquet"
         ));
         assert!(is_wal_file(
-            true,
             "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/a=b/file.parquet"
         ));
     }
@@ -211,27 +207,22 @@ mod tests {
     #[test]
     fn test_is_wal_file_storage_file() {
         assert!(!is_wal_file(
-            true,
             "files/org/stype/stream/2025/03/24/00/file.parquet"
         ));
         assert!(!is_wal_file(
-            true,
             "files/org/stype/stream/2025/03/24/00/a=b/file.parquet"
         ));
     }
 
     #[test]
     fn test_is_wal_file_not_local_mode() {
-        assert!(!is_wal_file(
-            false,
+        assert!(is_wal_file(
             "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/file.parquet"
         ));
         assert!(!is_wal_file(
-            false,
             "files/org/stype/stream/2025/03/24/00/file.parquet"
         ));
         assert!(!is_wal_file(
-            false,
             "files/org/stype/stream/2025/03/24/00/a=b/file.parquet"
         ));
     }

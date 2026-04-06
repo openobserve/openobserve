@@ -138,6 +138,10 @@ import FieldList from "@/components/common/sidebar/FieldList.vue";
 import { useI18n } from "vue-i18n";
 import useStreams from "@/composables/useStreams";
 import { useQuasar } from "quasar";
+import {
+  applyFilterTerm,
+  removeFieldCondition,
+} from "@/utils/traces/filterUtils";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -252,11 +256,15 @@ onMounted(async () => {
 
 const handleSidebarEvent = (event: string, value: any) => {
   if (event === "add-field") {
-    if (errorTrackingState.data.editorValue.length) {
-      errorTrackingState.data.editorValue += " and " + value;
-    } else {
-      errorTrackingState.data.editorValue += value;
-    }
+    errorTrackingState.data.editorValue = applyFilterTerm(
+      value,
+      errorTrackingState.data.editorValue,
+    );
+  } else if (event === "remove-field") {
+    errorTrackingState.data.editorValue = removeFieldCondition(
+      errorTrackingState.data.editorValue,
+      value,
+    );
   }
 };
 

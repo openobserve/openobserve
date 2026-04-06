@@ -17,7 +17,7 @@ use std::{
     collections::HashMap,
     hash::Hash,
     sync::{
-        Arc,
+        Arc, LazyLock as Lazy,
         atomic::{AtomicBool, Ordering},
     },
 };
@@ -25,11 +25,10 @@ use std::{
 use arrow_schema::{DataType, Field, Schema};
 use config::{
     TIMESTAMP_COL_NAME, get_config,
-    meta::stream::{StreamSettings, StreamType},
+    meta::stream::{StorageType, StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt, time::now_micros},
 };
 use infra::schema::get_partition_time_level;
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -223,6 +222,7 @@ impl TraceListIndex {
                 enable_log_patterns_extraction: false,
                 is_llm_stream: false,
                 cross_links: vec![],
+                storage_type: StorageType::Normal,
             };
 
             stream::save_stream_settings(org_id, STREAM_NAME, StreamType::Metadata, settings)

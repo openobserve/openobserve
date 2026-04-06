@@ -106,6 +106,7 @@ const defaultObject = {
       selectedFields: <string[]>[],
       filterField: "",
       addToFilter: "",
+      removeFilterField: "",
       functions: [],
       filters: [] as any[],
       fieldValues: {} as {

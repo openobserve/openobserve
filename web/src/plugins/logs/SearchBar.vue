@@ -2358,6 +2358,7 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import {
@@ -2385,6 +2386,7 @@ import {
   getFieldFromExpression,
   hasFieldCondition,
   replaceExistingFieldCondition,
+  removeFieldCondition,
 } from "@/plugins/logs/filterUtils";
 
 const defaultValue: any = () => {
@@ -2394,6 +2396,53 @@ const defaultValue: any = () => {
     params: "row",
     transType: "0",
   };
+};
+
+/**
+ * Extracts the field name from a filter expression.
+ * Handles single: `field = 'val'`, multi: `(field = 'x' OR field = 'y')`,
+ * and SQL-prefixed: `"stream".field = 'val'`.
+ */
+const getFieldFromExpression = (expression: string): string | null => {
+  const cleaned = expression.trim().replace(/^\(\s*/, "");
+  const match =
+    cleaned.match(/^"[^"]+"\."?(\w+)"?\s*(?:=|!=|is)/i) ||
+    cleaned.match(/^"?(\w+)"?\s*(?:=|!=|is)/i);
+  return match ? match[1] : null;
+};
+
+/**
+ * Tries to replace an existing condition for `fieldName` in `queryStr` with
+ * `newExpression`. Returns the modified string, or the original if not found.
+ * Handles both parenthesized multi-value groups and single conditions.
+ */
+const replaceExistingFieldCondition = (
+  queryStr: string,
+  fieldName: string,
+  newExpression: string,
+): string => {
+  const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
+  const opPat = `(?:=|!=|is(?:\\s+not)?)`;
+  const fieldPat = `(?:"${esc}"|${esc})`;
+  const condPat = `(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;
+
+  // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
+  const multiRegex = new RegExp(
+    `\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`,
+    "gi",
+  );
+  if (multiRegex.test(queryStr)) {
+    return queryStr.replace(multiRegex, newExpression);
+  }
+
+  // Try single condition
+  const singleRegex = new RegExp(condPat, "gi");
+  if (singleRegex.test(queryStr)) {
+    return queryStr.replace(singleRegex, newExpression);
+  }
+
+  return queryStr;
 };
 
 export default defineComponent({
@@ -4427,9 +4476,16 @@ export default defineComponent({
     }
 
     function buildStreamQuery(stream, fieldList, isQuickMode) {
+      const selectFields =
+        fieldList.length > 0 && isQuickMode
+          ? fieldList
+              .map((field) => quoteSqlIdentifierIfNeeded(field))
+              .join(",")
+          : "*";
+
       return QUERY_TEMPLATE.replace("[STREAM_NAME]", stream).replace(
         "[FIELD_LIST]",
-        fieldList.length > 0 && isQuickMode ? fieldList.join(",") : "*",
+        selectFields,
       );
     }
 
@@ -5304,6 +5360,9 @@ export default defineComponent({
     addSearchTerm() {
       return this.searchObj.data.stream.addToFilter;
     },
+    removeFieldTerm() {
+      return this.searchObj.data.stream.removeFilterField;
+    },
     toggleTransformEditor() {
       return this.searchObj.meta.showTransformEditor;
     },
@@ -5496,6 +5555,17 @@ export default defineComponent({
             this.queryEditorRef.setValue(this.searchObj.data.query);
         }
       }
+    },
+    removeFieldTerm(fieldName: string) {
+      if (!fieldName) return;
+      const newValue = removeFieldCondition(
+        this.searchObj.data.editorValue,
+        fieldName,
+      );
+      this.searchObj.data.editorValue = newValue;
+      this.searchObj.data.query = newValue;
+      this.searchObj.data.stream.removeFilterField = "";
+      if (this.queryEditorRef?.setValue) this.queryEditorRef.setValue(newValue);
     },
     toggleTransformEditor(newVal) {
       if (newVal == false) {

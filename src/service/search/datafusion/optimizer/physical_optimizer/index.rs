@@ -36,7 +36,7 @@ use datafusion::{
     physical_plan::{
         ExecutionPlan, PhysicalExpr,
         expressions::{BinaryExpr, Column, InListExpr, NotExpr},
-        filter::FilterExec,
+        filter::{FilterExec, FilterExecBuilder},
         limit::LocalLimitExec,
         projection::ProjectionExec,
     },
@@ -246,12 +246,11 @@ fn construct_filter_exec(
         Ok(plan)
     } else {
         // TODO: remove the unused column after extract index condition
-        let plan = FilterExec::try_new(conjunction(exprs), filter.input().clone())?
-            .with_projection(filter.projection().cloned())?;
-        let plan = plan
+        let plan = FilterExecBuilder::new(conjunction(exprs), filter.input().clone())
+            .apply_projection_by_ref(filter.projection().as_ref())?
             .with_fetch(filter.fetch())
-            .unwrap_or_else(|| Arc::new(plan));
-        Ok(plan)
+            .build()?;
+        Ok(Arc::new(plan))
     }
 }
 
