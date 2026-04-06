@@ -133,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @toggle-interesting="addToInterestingFieldList"
         @add-search-term="addSearchTerm"
         @add-multiple-search-terms="addMultipleSearchTerms"
+        @remove-field-filter="removeFieldFilter"
         @search-field-values="searchFieldValues"
         @load-more-values="loadMoreFieldValues"
         @before-show="openFilterCreator"
@@ -1047,6 +1048,10 @@ export default defineComponent({
       searchObj.data.stream.addToFilter = combined;
     };
 
+    const removeFieldFilter = (fieldName: string) => {
+      searchObj.data.stream.removeFilterField = fieldName;
+    };
+
     const loadMoreFieldValues = (fieldName: string) => {
       const payloads = lastFieldFetchPayloads.value[fieldName];
       if (!payloads?.length) return;
@@ -1758,6 +1763,7 @@ export default defineComponent({
       addToFilter,
       clickFieldFn,
       addMultipleSearchTerms,
+      removeFieldFilter,
       searchFieldValues,
       loadMoreFieldValues,
       getImageURL,

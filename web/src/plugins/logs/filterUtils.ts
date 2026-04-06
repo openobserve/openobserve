@@ -54,6 +54,30 @@ export const hasFieldCondition = (
 };
 
 /**
+ * Removes all conditions for `fieldName` from `queryStr`.
+ * Handles both single conditions and parenthesized multi-value groups.
+ * Cleans up dangling AND connectors after removal.
+ */
+export const removeFieldCondition = (
+  queryStr: string,
+  fieldName: string,
+): string => {
+  const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const fieldPattern = new RegExp(`^"?${esc}"?\\s*[=!<>]`, "i");
+  const multiPattern = new RegExp(`^\\(\\s*"?${esc}"?\\s*[=!<>]`, "i");
+
+  const remaining = queryStr
+    .trim()
+    .split(/\s+AND\s+/i)
+    .filter((cond) => {
+      const trimmed = cond.trim();
+      return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
+    });
+
+  return remaining.join(" AND ");
+};
+
+/**
  * Tries to replace an existing condition for `fieldName` in `queryStr` with
  * `newExpression`. Returns the modified string, or the original if not found.
  * Handles both parenthesized multi-value groups and single conditions.
