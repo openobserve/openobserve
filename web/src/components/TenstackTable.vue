@@ -534,25 +534,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`o2-table-expanded-row-${virtualRow.index}`"
               class="tw:w-full tw:relative"
             >
-              <json-preview
-                :value="tableRows[virtualRow.index - 1] as any"
-                show-copy-button
-                class="tw:py-[0.375rem]"
-                mode="expanded"
+              <slot
+                name="expanded-row"
+                :row="tableRows[virtualRow.index - 1]"
                 :index="calculateActualIndex(virtualRow.index - 1)"
-                :highlight-query="highlightQuery"
-                :hide-view-related="hideViewRelatedButton"
-                @copy="copyLogToClipboard"
-                @add-field-to-table="addFieldToTable"
-                @add-search-term="addSearchTerm"
-                @view-trace="
-                  viewTrace(formattedRows[virtualRow.index - 1]?.original)
-                "
-                @show-correlation="
-                  showCorrelation(formattedRows[virtualRow.index - 1]?.original)
-                "
-                :streamName="jsonpreviewStreamName"
-                @send-to-ai-chat="sendToAiChat"
               />
             </td>
             <template v-else>
@@ -884,7 +869,6 @@ import {
   getCoreRowModel,
   getSortedRowModel,
 } from "@tanstack/vue-table";
-import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
@@ -948,11 +932,6 @@ const props = defineProps({
     type: Boolean,
     default: () => true,
   },
-  jsonpreviewStreamName: {
-    type: String,
-    default: "",
-    required: false,
-  },
   highlightQuery: {
     type: String,
     default: "",
@@ -961,10 +940,6 @@ const props = defineProps({
   selectedStreamFtsKeys: {
     type: Array as PropType<StreamField[]>,
     default: () => [],
-  },
-  hideViewRelatedButton: {
-    type: Boolean,
-    default: false,
   },
   // ── Generic / traces props ───────────────────────────────────────────────
   /** Active sort backend field name (server-side sort mode). When provided,
@@ -1077,17 +1052,12 @@ const props = defineProps({
 const { t } = useI18n();
 
 const emits = defineEmits([
-  "copy",
-  "addSearchTerm",
-  "addFieldToTable",
   "closeColumn",
   "click:dataRow",
   "update:columnSizes",
   "update:columnOrder",
   "expandRow",
-  "view-trace",
   "sendToAiChat",
-  "show-correlation",
   "sort-change",
 ]);
 
@@ -1698,20 +1668,6 @@ const setExpandedRows = () => {
   actualIndexCache.value.clear();
 };
 
-const copyLogToClipboard = (value: any, copyAsJson: boolean = true) => {
-  emits("copy", value, copyAsJson);
-};
-const addSearchTerm = (
-  field: string,
-  field_value: string | number | boolean,
-  action: string,
-) => {
-  emits("addSearchTerm", field, field_value, action);
-};
-const addFieldToTable = (value: string) => {
-  emits("addFieldToTable", value);
-};
-
 const closeColumn = (data: any) => {
   emits("closeColumn", data);
 };
@@ -1886,14 +1842,6 @@ const handleCellMouseOver = (cell: { id: string; column: { id: string } }) => {
 
 const handleCellMouseLeave = () => {
   activeCellActionId.value = "";
-};
-
-const viewTrace = (row: any) => {
-  emits("view-trace", row);
-};
-
-const showCorrelation = (row: any) => {
-  emits("show-correlation", row);
 };
 
 const sendToAiChat = (
