@@ -258,17 +258,51 @@ const searchTypeForPanel = computed(() =>
   props.isAggregationEnabled ? "dashboards" : "UI",
 );
 
-// Strip HAVING, zo_sql_min/max_time columns, and rename zo_sql_val → zo_sql_num
-// so the aggregation preview query is clean and uses consistent column names.
+// Clean the aggregation query for preview:
+//  • Remove HAVING clause (added by alert engine, irrelevant for chart)
+//  • Remove helper time columns (zo_sql_min_time, zo_sql_max_time)
+//  • Rename aggregation value column → zo_sql_num (local SQL: zo_sql_val,
+//    backend SQL: alert_agg_value)
+//  • Ensure histogram(_timestamp) AS zo_sql_key is in SELECT and GROUP BY
+//  • Move zo_sql_num immediately after zo_sql_key in the SELECT list so the
+//    field order is: zo_sql_key, zo_sql_num, <breakdown fields…>
 const cleanAggregationQuery = (query: string): string => {
   let cleaned = query;
-  // Remove HAVING clause (and everything after it) – alert engine appends it
+  // Remove HAVING clause (and everything after it)
   cleaned = cleaned.replace(/\s+HAVING\s+[\s\S]*$/gi, "");
   // Remove zo_sql_min_time and zo_sql_max_time from SELECT list
   cleaned = cleaned.replace(/,\s*[^,\n]*?\s+[aA][sS]\s+zo_sql_min_time/g, "");
   cleaned = cleaned.replace(/,\s*[^,\n]*?\s+[aA][sS]\s+zo_sql_max_time/g, "");
-  // Rename zo_sql_val → zo_sql_num for consistent y-axis field naming
+  // Rename aggregation value aliases to zo_sql_num
   cleaned = cleaned.replace(/\bzo_sql_val\b/g, "zo_sql_num");
+  cleaned = cleaned.replace(/\balert_agg_value\b/g, "zo_sql_num");
+  // Ensure histogram(...) is aliased as zo_sql_key
+  cleaned = cleaned.replace(
+    /\bhistogram\s*\([^)]+\)(?:\s+[aA][sS]\s+\w+)?/g,
+    (match) => {
+      if (/\bas\s+zo_sql_key\b/i.test(match)) return match;
+      return match.replace(/\s+[aA][sS]\s+\w+$/, "") + " AS zo_sql_key";
+    },
+  );
+  // If zo_sql_key is still absent, inject histogram(_timestamp) AS zo_sql_key
+  if (!/\bzo_sql_key\b/i.test(cleaned)) {
+    cleaned = cleaned.replace(
+      /\bSELECT\s+/i,
+      "SELECT histogram(_timestamp) AS zo_sql_key, ",
+    );
+    cleaned = cleaned.replace(/\bGROUP\s+BY\s+/i, "GROUP BY zo_sql_key, ");
+  }
+  // Move zo_sql_num field to sit right after zo_sql_key in the SELECT list.
+  // Pattern: remove ", <expr> AS zo_sql_num" from wherever it is, then
+  // re-insert it immediately after the zo_sql_key field expression.
+  const numFieldMatch = cleaned.match(/,\s*([^,]+?\s+[aA][sS]\s+zo_sql_num)/);
+  if (numFieldMatch) {
+    const numExpr = numFieldMatch[1].trim();
+    // Remove the original occurrence (with its leading comma)
+    cleaned = cleaned.replace(numFieldMatch[0], "");
+    // Insert right after zo_sql_key field (before the next comma or FROM)
+    cleaned = cleaned.replace(/(\bzo_sql_key\b(?:\s*\))?)/i, `$1, ${numExpr}`);
+  }
   return cleaned.trim();
 };
 
