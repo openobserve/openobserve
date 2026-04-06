@@ -24,7 +24,7 @@ use config::{
 };
 use datafusion::{
     arrow::{array::RecordBatch, datatypes::SchemaRef},
-    common::{Result, Statistics, internal_err},
+    common::{Result, internal_err},
     error::DataFusionError,
     execution::{SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, Partitioning},
@@ -49,7 +49,7 @@ pub struct TantivyOptimizeExec {
     schema: SchemaRef,                       // The schema for the produced row
     file_list: Vec<FileKey>,                 // The list of files to read
     index_condition: Option<IndexCondition>, // The condition to filter the rows
-    cache: PlanProperties,                   // Cached properties of this plan
+    cache: Arc<PlanProperties>,              // Cached properties of this plan
     index_optimize_mode: IndexOptimizeMode,  // Type of query the ttv index optimizes
     metrics: ExecutionPlanMetricsSet,
 }
@@ -75,15 +75,15 @@ impl TantivyOptimizeExec {
         }
     }
 
-    fn compute_properties(schema: SchemaRef) -> PlanProperties {
-        PlanProperties::new(
+    fn compute_properties(schema: SchemaRef) -> Arc<PlanProperties> {
+        Arc::new(PlanProperties::new(
             EquivalenceProperties::new(schema.clone()),
             // Output Partitioning
             Partitioning::UnknownPartitioning(1),
             // Execution Mode
             EmissionType::Final,
             Boundedness::Bounded,
-        )
+        ))
     }
 }
 
@@ -115,7 +115,7 @@ impl ExecutionPlan for TantivyOptimizeExec {
         self
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.cache
     }
 
@@ -155,10 +155,6 @@ impl ExecutionPlan for TantivyOptimizeExec {
             self.schema.clone(),
             stream,
         )))
-    }
-
-    fn statistics(&self) -> Result<Statistics> {
-        Ok(Statistics::new_unknown(&self.schema))
     }
 
     fn metrics(&self) -> Option<MetricsSet> {

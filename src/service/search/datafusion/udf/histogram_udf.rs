@@ -13,14 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::any::Any;
+use std::{any::Any, sync::LazyLock as Lazy};
 
 use arrow::datatypes::{DataType, DataType::Timestamp, TimeUnit::Microsecond};
 use datafusion::{
     common::Result,
     logical_expr::{ColumnarValue, ScalarUDF, ScalarUDFImpl, Signature, Volatility},
 };
-use once_cell::sync::Lazy;
 
 pub const HISTOGRAM_UDF_NAME: &str = "histogram";
 

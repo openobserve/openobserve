@@ -15,12 +15,11 @@
 
 use std::{
     collections::{HashSet, VecDeque},
-    sync::Arc,
+    sync::{Arc, LazyLock as Lazy},
 };
 
 use config::{meta::bitvec::BitVec, metrics};
 use dashmap::DashMap;
-use once_cell::sync::Lazy;
 use roaring::RoaringBitmap;
 
 use crate::service::search::grpc::tantivy_result::TantivyResult;

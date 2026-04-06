@@ -81,38 +81,39 @@ pub fn create_session_config(
         .with_batch_size(get_batch_size())
         .with_target_partitions(target_partitions)
         .with_information_schema(true);
+
     config
         .options_mut()
         .execution
         .listing_table_ignore_subdirectory = false;
+
     config.options_mut().sql_parser.dialect = Dialect::PostgreSQL;
 
-    // based on data distributing, it only works for the data on a few records
-    config = config.set_bool(
-        "datafusion.execution.parquet.pushdown_filters",
-        cfg.common.feature_pushdown_filter_enabled,
-    );
+    config.options_mut().execution.parquet.pushdown_filters =
+        cfg.common.feature_pushdown_filter_enabled;
     // config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
 
     if cfg.common.bloom_filter_enabled {
-        config = config.set_bool("datafusion.execution.parquet.bloom_filter_on_read", true);
-    }
-    if cfg.common.bloom_filter_disabled_on_search {
-        config = config.set_bool("datafusion.execution.parquet.bloom_filter_on_read", false);
-    }
-    if sorted_by_time {
-        config = config.set_bool("datafusion.execution.split_file_groups_by_statistics", true);
+        config.options_mut().execution.parquet.bloom_filter_on_read = true;
     }
 
-    // due to: https://github.com/apache/datafusion/issues/19219
-    config = config.set_bool("datafusion.optimizer.enable_topk_aggregation", false);
+    if cfg.common.bloom_filter_disabled_on_search {
+        config.options_mut().execution.parquet.bloom_filter_on_read = false;
+    }
+
+    if sorted_by_time {
+        config
+            .options_mut()
+            .execution
+            .split_file_groups_by_statistics = true;
+    }
 
     // When set to true, skips verifying that the schema produced by planning the input of
     // `LogicalPlan::Aggregate` exactly matches the schema of the input plan.
-    config = config.set_bool(
-        "datafusion.execution.skip_physical_aggregate_schema_check",
-        true,
-    );
+    config
+        .options_mut()
+        .execution
+        .skip_physical_aggregate_schema_check = true;
 
     Ok(config)
 }

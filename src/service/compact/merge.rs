@@ -795,7 +795,16 @@ pub async fn merge_files(
         let buf = file_data::get(&file.account, &file.key, None).await?;
         let file_format = FileFormat::from_extension(&file.key)
             .ok_or_else(|| anyhow::anyhow!("invalid file format: {}", file.key))?;
-        let schema = read_schema_from_bytes(file_format, &buf).await?;
+        let schema = match read_schema_from_bytes(file_format, &buf).await {
+            Ok(schema) => schema,
+            Err(e) => {
+                log::error!(
+                    "[COMPACTOR:WORKER:{thread_id}:{fi}] read schema error for file: {}, err: {e}",
+                    &file.key
+                );
+                return Err(e);
+            }
+        };
         let schema = schema.as_ref().clone().with_metadata(Default::default());
         let schema_key = schema.hash_key();
         if !schemas.contains_key(&schema_key) {

@@ -13,14 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use config::{
     RwHashMap,
     meta::stream::StreamType,
     utils::time::{hour_micros, now_micros},
 };
-use once_cell::sync::Lazy;
 
 use crate::service::db;
 
