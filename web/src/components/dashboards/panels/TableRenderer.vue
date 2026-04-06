@@ -219,8 +219,8 @@ export default defineComponent({
       top: auto !important;
     }
 
-    // Let Quasar's scroll wrapper expand to content height.
-    :deep(.q-table__middle) {
+    // Let the scroll container expand to show all rows.
+    :deep(.table-container) {
       overflow: visible !important;
       height: auto !important;
     }
@@ -228,7 +228,7 @@ export default defineComponent({
     // Pin the footer to the bottom of .table-wrapper (the nearest
     // position:relative ancestor) so it is always visible at the
     // bottom of the panel, regardless of how many rows the table has.
-    :deep(.q-table__bottom) {
+    :deep([data-test="dashboard-table-pagination"]) {
       position: absolute !important;
       bottom: 0 !important;
       left: 0 !important;
@@ -239,7 +239,7 @@ export default defineComponent({
   }
 
   .body--dark .my-sticky-virtscroll-table {
-    :deep(.q-table__bottom) {
+    :deep([data-test="dashboard-table-pagination"]) {
       background-color: #1a1a2e !important;
     }
   }
