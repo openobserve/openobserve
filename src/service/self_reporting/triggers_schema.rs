@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::LazyLock as Lazy;
+
 use anyhow::Result;
 use config::{
     get_config,
@@ -24,7 +26,6 @@ use config::{
 };
 use dashmap::DashSet;
 use infra;
-use once_cell::sync::Lazy;
 
 /// Tracks which organizations have had their triggers stream schema initialized.
 /// Uses a lock-free DashSet for better concurrency and bounded memory usage.

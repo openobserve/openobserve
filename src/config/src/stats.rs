@@ -13,12 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{any::Any, collections::BTreeMap, path::PathBuf, sync::Arc};
+use std::{
+    any::Any,
+    collections::BTreeMap,
+    path::PathBuf,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use dashmap::{DashMap, DashSet};
 use hashbrown::{HashMap, HashSet};
 use indexmap::IndexMap;
-use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
 use crate::utils::schema_ext::SchemaExt;

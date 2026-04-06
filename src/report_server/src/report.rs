@@ -1,3 +1,5 @@
+use std::sync::LazyLock as Lazy;
+
 use chromiumoxide::{
     Page,
     browser::{Browser, BrowserConfig, BrowserConfigBuilder},
@@ -16,7 +18,6 @@ use lettre::{
         client::{Tls, TlsParameters},
     },
 };
-use once_cell::sync::Lazy;
 use tokio::time::{Duration, sleep};
 
 use crate::models::{self, ReportType};
