@@ -813,37 +813,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :paginationOptions="paginationOptions"
         :totalRows="tableRows.length"
         :pagination="{ rowsPerPage: localRowsPerPage, page: currentPage }"
-        :pagesNumber="
-          localRowsPerPage === 0
-            ? 1
-            : Math.ceil(tableRows.length / localRowsPerPage) || 1
-        "
+        :pagesNumber="pagesNumber"
         :isFirstPage="currentPage === 1"
-        :isLastPage="
-          currentPage >=
-          (localRowsPerPage === 0
-            ? 1
-            : Math.ceil(tableRows.length / localRowsPerPage) || 1)
-        "
+        :isLastPage="currentPage >= pagesNumber"
         :firstPage="() => (currentPage = 1)"
         :prevPage="() => (currentPage = Math.max(1, currentPage - 1))"
-        :nextPage="
-          () => {
-            const pages =
-              localRowsPerPage === 0
-                ? 1
-                : Math.ceil(tableRows.length / localRowsPerPage) || 1;
-            currentPage = Math.min(pages, currentPage + 1);
-          }
-        "
-        :lastPage="
-          () => {
-            currentPage =
-              localRowsPerPage === 0
-                ? 1
-                : Math.ceil(tableRows.length / localRowsPerPage) || 1;
-          }
-        "
+        :nextPage="() => { currentPage = Math.min(pagesNumber, currentPage + 1); }"
+        :lastPage="() => { currentPage = pagesNumber; }"
       />
     </template>
   </div>
@@ -1349,6 +1325,12 @@ const paginationOptions = computed(() => {
   sorted.push(0);
   return sorted;
 });
+
+const pagesNumber = computed(() =>
+  localRowsPerPage.value === 0
+    ? 1
+    : Math.ceil(tableRows.value.length / localRowsPerPage.value) || 1
+);
 
 // pagedRows is defined after formattedRows below — see declaration near virtualizer.
 
