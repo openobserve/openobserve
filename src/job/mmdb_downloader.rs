@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{Arc, LazyLock as Lazy};
+use std::sync::{Arc, LazyLock};
 
 use config::{
     MMDB_ASN_FILE_NAME, MMDB_CITY_FILE_NAME,
@@ -31,8 +31,8 @@ use crate::{
     service::enrichment_table::geoip::{Geoip, GeoipConfig},
 };
 
-static CLIENT_INITIALIZED: Lazy<bool> = Lazy::new(|| true);
-pub static MMDB_INIT_NOTIFIER: Lazy<Arc<Notify>> = Lazy::new(|| Arc::new(Notify::new()));
+static CLIENT_INITIALIZED: LazyLock<bool> = LazyLock::new(|| true);
+pub static MMDB_INIT_NOTIFIER: LazyLock<Arc<Notify>> = LazyLock::new(|| Arc::new(Notify::new()));
 
 pub async fn run() -> Result<(), anyhow::Error> {
     let cfg = config::get_config();
@@ -105,11 +105,11 @@ async fn run_download_files() {
         }
     }
 
-    if Lazy::get(&CLIENT_INITIALIZED).is_none() {
+    if LazyLock::get(&CLIENT_INITIALIZED).is_none() {
         update_maxmind_table(&asn_fname).await;
         update_maxmind_table(&city_fname).await;
         update_maxmind_client().await;
-        Lazy::force(&MMDB_INIT_NOTIFIER).notify_one();
+        LazyLock::force(&MMDB_INIT_NOTIFIER).notify_one();
     } else {
         if download_asn_files {
             log::info!("New asn file found, updating client");
@@ -125,7 +125,7 @@ async fn run_download_files() {
 
     log::info!("Maxmind client initialized");
 
-    Lazy::force(&CLIENT_INITIALIZED);
+    LazyLock::force(&CLIENT_INITIALIZED);
 }
 
 /// Update the maxmind client
