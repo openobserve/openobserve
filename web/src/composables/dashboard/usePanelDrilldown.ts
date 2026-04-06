@@ -1103,19 +1103,8 @@ export function usePanelDrilldown({
             path: "/dashboards/view",
             query: pushQuery,
           });
-
-          // ======= [START] default variable values
-
-          const initialVariableValues: any = {};
-          Object.keys(route.query).forEach((key) => {
-            if (key.startsWith("var-")) {
-              const newKey = key.slice(4);
-              initialVariableValues[newKey] = route.query[key];
-            }
-          });
-          // ======= [END] default variable values
-
-          emit("update:initialVariableValues", initialVariableValues);
+          // ViewDashboard's var-* watcher detects the route change and calls
+          // updateInitialVariableValues() directly via component ref — no emit needed.
         }
       }
     }
