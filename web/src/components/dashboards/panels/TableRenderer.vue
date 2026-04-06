@@ -18,8 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="table-wrapper">
     <TenstackTable
       ref="tableRef"
-      :rows="data.rows || []"
+      :rows="sortedRows"
       :columns="data.columns || []"
+      :sort-by="localSortBy"
+      :sort-order="localSortOrder"
+      @sort-change="handleSortChange"
       :use-virtual-scroll="false"
       :pivot-header-levels="data.pivotHeaderLevels || []"
       :sticky-total-row="data.stickyTotalRow || null"
@@ -145,6 +148,38 @@ export default defineComponent({
       return "";
     });
 
+    // ── Dashboard sort state (parent-managed, passed into TenstackTable) ──────
+    const localSortBy = ref<string>("");
+    const localSortOrder = ref<"asc" | "desc">("asc");
+
+    const sortedRows = computed(() => {
+      const rows = (props.data.rows as any[]) || [];
+      if (!localSortBy.value) return rows;
+      const col = (props.data.columns as any[])?.find(
+        (c: any) => c.name === localSortBy.value,
+      );
+      // col.field is the actual row data key; col.name is the column id used for sort-change
+      const dataKey = col?.field ?? localSortBy.value;
+      return [...rows].sort((a: any, b: any) => {
+        const va = typeof dataKey === "function" ? dataKey(a) : a[dataKey];
+        const vb = typeof dataKey === "function" ? dataKey(b) : b[dataKey];
+        let result: number;
+        if (col?.sort) {
+          result = col.sort(va, vb, a, b);
+        } else if (typeof va === "number" && typeof vb === "number") {
+          result = va - vb;
+        } else {
+          result = String(va ?? "").localeCompare(String(vb ?? ""));
+        }
+        return localSortOrder.value === "desc" ? -result : result;
+      });
+    });
+
+    const handleSortChange = (by: string, order: "asc" | "desc") => {
+      localSortBy.value = by;
+      localSortOrder.value = order;
+    };
+
     const downloadTableAsCSV = (title?: string) => {
       const rows = tableRef.value?.getRows() ?? [];
       if (!rows.length) return;
@@ -186,7 +221,16 @@ export default defineComponent({
       URL.revokeObjectURL(url);
     };
 
-    return { tableRef, cellStyleFn, downloadTableAsCSV, downloadTableAsJSON };
+    return {
+      tableRef,
+      cellStyleFn,
+      sortedRows,
+      localSortBy,
+      localSortOrder,
+      handleSortChange,
+      downloadTableAsCSV,
+      downloadTableAsJSON,
+    };
   },
 });
 </script>
