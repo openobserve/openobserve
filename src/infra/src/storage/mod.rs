@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,8 +22,9 @@ use datafusion::parquet::{data_type::AsBytes, file::metadata::ParquetMetaData};
 use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hashbrown::HashMap;
 use object_store::{
-    GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, PutMultipartOptions,
-    PutOptions, PutPayload, PutResult, Result, WriteMultipart, path::Path,
+    Attribute, AttributeValue, Attributes, GetOptions, GetResult, ListResult, MultipartUpload,
+    ObjectMeta, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, WriteMultipart,
+    path::Path,
 };
 use once_cell::sync::Lazy;
 use parquet::file::metadata::{FooterTail, ParquetMetaDataReader};
@@ -78,11 +79,11 @@ pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
     ) -> Result<Vec<Bytes>>;
     async fn head(&self, account: &str, location: &Path) -> Result<ObjectMeta>;
     async fn delete(&self, account: &str, location: &Path) -> Result<()>;
-    fn delete_stream<'a>(
-        &'a self,
+    fn delete_stream(
+        &self,
         account: &str,
-        locations: BoxStream<'a, Result<Path>>,
-    ) -> BoxStream<'a, Result<Path>>;
+        locations: BoxStream<'static, Result<Path>>,
+    ) -> BoxStream<'static, Result<Path>>;
     fn list(&self, account: &str, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>>;
     fn list_with_offset(
         &self,
@@ -156,9 +157,61 @@ pub async fn put(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
     Ok(())
 }
 
-pub async fn put_multipart(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
+async fn put_multipart(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
     let path = Path::from(file);
     let upload = MULTI_ACCOUNTS.put_multipart(account, &path).await?;
+    let mut write = WriteMultipart::new(upload);
+    write.write(data.as_bytes());
+    write.finish().await?;
+    Ok(())
+}
+
+pub async fn put_with_compliance(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
+    let cfg = get_config();
+    let attrs = match cfg.s3.provider.as_str() {
+        "aws" | "s3" => Attributes::from_iter([(
+            Attribute::StorageClass,
+            AttributeValue::from("STANDARD_IA".to_string()),
+        )]),
+        "gcs" | "gcp" => Attributes::from_iter([(
+            Attribute::StorageClass,
+            AttributeValue::from("NEARLINE".to_string()),
+        )]),
+        "azure" => Attributes::from_iter([(
+            Attribute::StorageClass,
+            AttributeValue::from("Cool".to_string()),
+        )]),
+        _ => Attributes::new(),
+    };
+    let multi_part_upload_size = cfg.s3.multi_part_upload_size;
+    if multi_part_upload_size > 0 && multi_part_upload_size < bytes_size_in_mb(&data) as usize {
+        let opts = PutMultipartOptions {
+            attributes: attrs,
+            ..Default::default()
+        };
+        put_multipart_opts(account, file, data, opts).await?;
+    } else {
+        let opts = PutOptions {
+            attributes: attrs,
+            ..Default::default()
+        };
+        MULTI_ACCOUNTS
+            .put_opts(account, &file.into(), data.into(), opts)
+            .await?;
+    }
+    Ok(())
+}
+
+async fn put_multipart_opts(
+    account: &str,
+    file: &str,
+    data: bytes::Bytes,
+    opts: PutMultipartOptions,
+) -> Result<()> {
+    let path = Path::from(file);
+    let upload = MULTI_ACCOUNTS
+        .put_multipart_opts(account, &path, opts)
+        .await?;
     let mut write = WriteMultipart::new(upload);
     write.write(data.as_bytes());
     write.finish().await?;
@@ -176,25 +229,30 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
     let columns = files[0].1.split('/').collect::<Vec<&str>>();
 
     if !is_local_disk_storage() && get_config().s3.feature_bulk_delete {
-        // group the files by account
-        let mut file_groups = HashMap::new();
+        // group the files by account (convert to owned strings for 'static)
+        let mut file_groups: HashMap<String, Vec<String>> = HashMap::new();
         for (account, file) in files {
             file_groups
-                .entry(account)
+                .entry(account.to_string())
                 .or_insert_with(Vec::new)
-                .push(file);
+                .push(file.to_string());
         }
         for (account, files) in file_groups {
             let files = futures::stream::iter(files)
                 .map(|file| Ok(Path::from(file)))
                 .boxed();
             match MULTI_ACCOUNTS
-                .delete_stream(account, files)
+                .delete_stream(&account, files)
                 .try_collect::<Vec<Path>>()
                 .await
             {
-                Ok(files) => {
-                    log::debug!("Deleted objects: {files:?}");
+                Ok(deleted) => {
+                    log::debug!("Deleted objects: {deleted:?}");
+                    if columns.len() > 2 && columns[0] == "files" {
+                        metrics::STORAGE_WRITE_REQUESTS
+                            .with_label_values(&[columns[1], columns[2], "remote"])
+                            .inc_by(deleted.len() as u64);
+                    }
                 }
                 Err(e) => {
                     log::error!("Failed to delete objects: {e}");
@@ -202,6 +260,11 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
             }
         }
     } else {
+        let storage_type = if is_local_disk_storage() {
+            "local"
+        } else {
+            "remote"
+        };
         let files = files
             .into_iter()
             .map(|(account, file)| (account, file.to_string()))
@@ -215,6 +278,12 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
                 {
                     Ok(_) => {
                         log::debug!("Deleted object: {file}");
+                        let columns = file.split('/').collect::<Vec<&str>>();
+                        if columns.len() > 2 && columns[0] == "files" {
+                            metrics::STORAGE_WRITE_REQUESTS
+                                .with_label_values(&[columns[1], columns[2], storage_type])
+                                .inc();
+                        }
                     }
                     Err(e) => {
                         // TODO: need a better solution for identifying the error
