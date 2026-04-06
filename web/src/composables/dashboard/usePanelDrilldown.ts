@@ -1079,8 +1079,8 @@ export function usePanelDrilldown({
           let oldParams: any = [];
           // if pass all variables is true
           if (drilldownData.data.passAllVariables) {
-            // get current query params
-            oldParams = route.query;
+            // get current query params — spread to avoid mutating Vue Router's reactive object
+            oldParams = { ...route.query };
           }
 
           drilldownData.data.variables.forEach((variable: any) => {
@@ -1092,29 +1092,19 @@ export function usePanelDrilldown({
           });
 
           // make changes in router
+          const pushQuery = {
+            ...oldParams,
+            org_identifier: store.state.selectedOrganization.identifier,
+            dashboard: dashboardData.dashboardId,
+            folder: folderId,
+            tab: tabId,
+          };
           await router.push({
             path: "/dashboards/view",
-            query: {
-              ...oldParams,
-              org_identifier: store.state.selectedOrganization.identifier,
-              dashboard: dashboardData.dashboardId,
-              folder: folderId,
-              tab: tabId,
-            },
+            query: pushQuery,
           });
-
-          // ======= [START] default variable values
-
-          const initialVariableValues: any = {};
-          Object.keys(route.query).forEach((key) => {
-            if (key.startsWith("var-")) {
-              const newKey = key.slice(4);
-              initialVariableValues[newKey] = route.query[key];
-            }
-          });
-          // ======= [END] default variable values
-
-          emit("update:initialVariableValues", initialVariableValues);
+          // ViewDashboard's var-* watcher detects the route change and calls
+          // updateInitialVariableValues() directly via component ref — no emit needed.
         }
       }
     }
