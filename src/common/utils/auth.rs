@@ -1495,6 +1495,12 @@ async fn decode_expiry(token: &str) -> Result<TokenData<HashMap<String, Value>>,
     }
 }
 
+pub fn build_basic_auth_header(email: &str, token: &str) -> String {
+    let credentials = format!("{email}:{token}");
+    let encoded = base64::engine::general_purpose::STANDARD.encode(credentials.as_bytes());
+    format!("Basic {encoded}")
+}
+
 #[cfg(test)]
 mod tests {
     use infra::{db as infra_db, table as infra_table};
