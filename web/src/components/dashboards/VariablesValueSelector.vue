@@ -129,6 +129,7 @@ import {
   generateTraceContext,
 } from "@/utils/zincutils";
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
+import { normalizeVariableSyntax } from "@/utils/dashboard/variables/variablesUtils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { getVariableKey } from "@/composables/dashboard/useVariablesManager";
@@ -700,9 +701,9 @@ export default defineComponent({
       // Using replace callback avoids regex exec loop risks and handles
       // special replacement patterns ($1, $&, etc.) safely.
       return value.replace(
-        /(?:\$([a-zA-Z0-9_-]+))|(?:\{\{([a-zA-Z0-9_-]+)(?::[a-zA-Z]+)?\}\})/g,
-        (fullMatch, dollarVarName, mustacheVarName) => {
-          const varName = dollarVarName || mustacheVarName;
+        /(?:\$\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*[a-zA-Z]+\s*)?\})|(?:\$([a-zA-Z0-9_-]+))|(?:\{\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*[a-zA-Z]+\s*)?\}\})/g,
+        (fullMatch, dollarBraceVarName, dollarVarName, mustacheVarName) => {
+          const varName = dollarBraceVarName || dollarVarName || mustacheVarName;
           if (varName in varLookup) {
             let varValue = varLookup[varName];
 
@@ -2007,6 +2008,9 @@ export default defineComponent({
           manager.getAllVisibleVariables(props.tabId, props.panelId) ||
           variablesData.values;
       }
+
+      // Normalize spaces inside variable syntax before replacement
+      queryContext = normalizeVariableSyntax(queryContext);
 
       for (const variable of variablesToResolve) {
         // Skip dynamic_filters as they don't participate in standard variable replacement

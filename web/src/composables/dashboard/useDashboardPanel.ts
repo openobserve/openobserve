@@ -1067,14 +1067,14 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     return validateRecursive(query, variables);
   };
 
-  // Extract variables from the query (supports $var, ${var}, and {{var}} syntax)
+  // Extract variables from the query (supports $var, ${var}, and {{var}} syntax, with optional spaces)
   const extractVariables = (query: any) => {
-    const regex = /(?:\$(\w+|\{\w+\}))|(?:\{\{(\w+)(?::[a-zA-Z]+)?\}\})/g;
+    const regex = /(?:\$(\w+|\{\s*\w+\s*\}))|(?:\{\{\s*(\w+)\s*(?::\s*[a-zA-Z]+\s*)?\}\})/g;
     const names: string[] = [];
     let match: RegExpExecArray | null;
     while ((match = regex.exec(query)) !== null) {
       const varName = match[1] || match[2];
-      names.push(varName.replace(/^\{|\}$/g, ""));
+      names.push(varName.replace(/^\{|\}$/g, "").trim());
     }
     return [...new Set(names)];
   };
@@ -1112,21 +1112,21 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           ].query;
 
         // replace variables with dummy values to verify query is correct or not
-        // Handle both ${var:format} and {{var:format}} syntaxes
+        // Handle both ${var:format} and {{var:format}} syntaxes (with optional spaces)
         currentQuery = currentQuery.replaceAll(
-          /(?:\$\{[a-zA-Z0-9_-]+:csv\})|(?:\{\{[a-zA-Z0-9_-]+:csv\}\})/g,
+          /(?:\$\{\s*[a-zA-Z0-9_-]+\s*:\s*csv\s*\})|(?:\{\{\s*[a-zA-Z0-9_-]+\s*:\s*csv\s*\}\})/g,
           "1,2",
         );
         currentQuery = currentQuery.replaceAll(
-          /(?:\$\{[a-zA-Z0-9_-]+:singlequote\})|(?:\{\{[a-zA-Z0-9_-]+:singlequote\}\})/g,
+          /(?:\$\{\s*[a-zA-Z0-9_-]+\s*:\s*singlequote\s*\})|(?:\{\{\s*[a-zA-Z0-9_-]+\s*:\s*singlequote\s*\}\})/g,
           "'1','2'",
         );
         currentQuery = currentQuery.replaceAll(
-          /(?:\$\{[a-zA-Z0-9_-]+:doublequote\})|(?:\{\{[a-zA-Z0-9_-]+:doublequote\}\})/g,
+          /(?:\$\{\s*[a-zA-Z0-9_-]+\s*:\s*doublequote\s*\})|(?:\{\{\s*[a-zA-Z0-9_-]+\s*:\s*doublequote\s*\}\})/g,
           '"1","2"',
         );
         currentQuery = currentQuery.replaceAll(
-          /(?:\$\{[a-zA-Z0-9_-]+:pipe\})|(?:\{\{[a-zA-Z0-9_-]+:pipe\}\})/g,
+          /(?:\$\{\s*[a-zA-Z0-9_-]+\s*:\s*pipe\s*\})|(?:\{\{\s*[a-zA-Z0-9_-]+\s*:\s*pipe\s*\}\})/g,
           "1|2",
         );
 

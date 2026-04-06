@@ -8,13 +8,14 @@ export const extractVariableNames = (
   str: string,
   variableNames?: Set<string>
 ): string[] => {
-  // Match both $<variable_name> and {{<variable_name>}} (with optional :format)
-  const regex = /(?:\$([a-zA-Z0-9_-]+))|(?:\{\{([a-zA-Z0-9_-]+)(?::[a-zA-Z]+)?\}\})/g;
+  // Match $<variable_name>, ${<variable_name>}, and {{<variable_name>}} (with optional :format)
+  // Supports optional whitespace inside braces: {{ var }}, ${ var }, {{ var : csv }}
+  const regex = /(?:\$\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*[a-zA-Z]+\s*)?\})|(?:\$([a-zA-Z0-9_-]+))|(?:\{\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*[a-zA-Z]+\s*)?\}\})/g;
   const names: string[] = [];
   let match: RegExpExecArray | null;
   // loop over all matches
   while ((match = regex.exec(str)) !== null) {
-    const varName = match[1] || match[2]; // group 1 = dollar-sign, group 2 = mustache
+    const varName = match[1] || match[2] || match[3]; // group 1 = ${var}, group 2 = $var, group 3 = {{var}}
     // only include the variable name if it exists in the list of variables
     if (!variableNames || variableNames.has(varName)) {
       names.push(varName);

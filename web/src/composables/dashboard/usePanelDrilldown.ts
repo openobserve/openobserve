@@ -28,6 +28,7 @@ import {
 } from "@/utils/commons";
 import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
+import { normalizeVariableSyntax } from "@/utils/dashboard/variables/variablesUtils";
 import searchService from "@/services/search";
 
 export function usePanelDrilldown({
@@ -119,6 +120,7 @@ export function usePanelDrilldown({
 
   // drilldown
   const replacePlaceholders = (str: any, obj: any) => {
+    str = normalizeVariableSyntax(str);
     // if the str is same as the key, return it's value(it can be an string or array).
     for (const key in obj) {
       // ${varName} == str or {{varName}} == str
@@ -129,7 +131,7 @@ export function usePanelDrilldown({
 
     // Replace both {{key}} and ${key} patterns
     return str.replace(/(?:\{\{([^}]+)\}\})|(?:\$\{([^}]+)\})/g, function (_: any, mustacheKey: any, dollarKey: any) {
-      const key = mustacheKey || dollarKey;
+      const key = (mustacheKey || dollarKey).trim();
       // Split the key into parts by either a dot or a ["xyz"] pattern and filter out empty strings
       let parts = key.split(/\.|\["(.*?)"\]/).filter(Boolean);
 
@@ -146,6 +148,7 @@ export function usePanelDrilldown({
   };
 
   const replaceDrilldownToLogs = (str: any, obj: any) => {
+    str = normalizeVariableSyntax(str);
     // If str is exactly equal to a key, return its value directly
     for (const key in obj) {
       if (`\$\{${key}\}` === str || `{{${key}}}` === str) {
@@ -158,7 +161,7 @@ export function usePanelDrilldown({
 
     // Replace both {{key}} and ${key} patterns
     return str.replace(/(?:\{\{([^}]+)\}\})|(?:\$\{([^}]+)\})/g, function (_: any, mustacheKey: any, dollarKey: any) {
-      const key = mustacheKey || dollarKey;
+      const key = (mustacheKey || dollarKey).trim();
       // Split the key into parts by either a dot or a ["xyz"] pattern and filter out empty strings
       let parts = key.split(/\.|\["(.*?)"\]/).filter(Boolean);
 
@@ -276,6 +279,8 @@ export function usePanelDrilldown({
     currentDependentVariablesData: any,
     panelSchema: any,
   ) => {
+    // Normalize spaces inside variable syntax before replacement
+    query = normalizeVariableSyntax(query);
     const queryType = panelSchema?.value?.queryType;
     currentDependentVariablesData?.forEach((variable: any) => {
       const variableName = `$${variable.name}`;
@@ -421,7 +426,7 @@ export function usePanelDrilldown({
     for (const f of fields) {
       aliasMap[f.name] = f.alias || f.name;
     }
-    return url.replace(/(?:\{\{(\w+)\}\})|(?:\$?\{(\w+)\})/g, (_match: string, mustacheField: string, dollarField: string) => {
+    return url.replace(/(?:\{\{\s*(\w+)\s*\}\})|(?:\$?\{\s*(\w+)\s*\})/g, (_match: string, mustacheField: string, dollarField: string) => {
       const fieldName = mustacheField || dollarField;
       const resolved = aliasMap[fieldName] || fieldName;
       return '${row.field["' + resolved + '"]}';

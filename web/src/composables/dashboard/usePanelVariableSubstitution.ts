@@ -22,6 +22,7 @@ import {
   formatInterval,
   formatRateInterval,
   getTimeInSecondsBasedOnUnit,
+  normalizeVariableSyntax,
 } from "@/utils/dashboard/variables/variablesUtils";
 import { escapeSingleQuotes } from "@/utils/zincutils";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
@@ -52,7 +53,7 @@ export const usePanelVariableSubstitution = ({
             ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
             ?.filter((it: any) => {
               const regexForVariable = new RegExp(
-                `(?:\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?\\}?)|(?:\\{\\{${it.name}(?::(csv|pipe|doublequote|singlequote))?\\}\\})`,
+                `(?:\\$\\{?\\s*${it.name}\\s*(?::\\s*(?:csv|pipe|doublequote|singlequote)\\s*)?\\}?)|(?:\\{\\{\\s*${it.name}\\s*(?::\\s*(?:csv|pipe|doublequote|singlequote)\\s*)?\\}\\})`,
               );
 
               return panelSchema.value.queries
@@ -88,7 +89,7 @@ export const usePanelVariableSubstitution = ({
       ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
       ?.filter((it: any) => {
         const regexForVariable = new RegExp(
-          `(?:\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?\\}?)|(?:\\{\\{${it.name}(?::(csv|pipe|doublequote|singlequote))?\\}\\})`,
+          `(?:\\$\\{?\\s*${it.name}\\s*(?::\\s*(?:csv|pipe|doublequote|singlequote)\\s*)?\\}?)|(?:\\{\\{\\s*${it.name}\\s*(?::\\s*(?:csv|pipe|doublequote|singlequote)\\s*)?\\}\\})`,
         );
 
         return panelSchema.value.queries
@@ -445,6 +446,9 @@ export const usePanelVariableSubstitution = ({
     endISOTimestamp: any,
     queryType: any,
   ) => {
+    // Normalize spaces inside variable syntax before replacement
+    query = normalizeVariableSyntax(query);
+
     const metadata: any[] = [];
 
     //fixed variables value calculations
