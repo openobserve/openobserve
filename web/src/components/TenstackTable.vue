@@ -1202,7 +1202,6 @@ const dashboardColumns = computed<ColumnDef<unknown, any>[] | null>(() => {
     ...(typeof col.field === "function"
       ? { accessorFn: col.field }
       : { accessorKey: col.field ?? col.name }),
-    ...(col.sort ? { sortingFn: col.sort } : {}),
     meta: {
       align: col.align,
       format: col.format,
@@ -1213,6 +1212,7 @@ const dashboardColumns = computed<ColumnDef<unknown, any>[] | null>(() => {
       _isTotalColumn: col._isTotalColumn,
       _totalColRightIndex: col._totalColRightIndex,
       _col: col, // reference to original Quasar column for style helpers
+      sortable: col.sortable, // mirrors Quasar column flag — drives sort icon visibility
     },
   }));
 });
