@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -260,6 +260,11 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
             }
         }
     } else {
+        let storage_type = if is_local_disk_storage() {
+            "local"
+        } else {
+            "remote"
+        };
         let files = files
             .into_iter()
             .map(|(account, file)| (account, file.to_string()))
@@ -273,6 +278,12 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
                 {
                     Ok(_) => {
                         log::debug!("Deleted object: {file}");
+                        let columns = file.split('/').collect::<Vec<&str>>();
+                        if columns.len() > 2 && columns[0] == "files" {
+                            metrics::STORAGE_WRITE_REQUESTS
+                                .with_label_values(&[columns[1], columns[2], storage_type])
+                                .inc();
+                        }
                     }
                     Err(e) => {
                         // TODO: need a better solution for identifying the error

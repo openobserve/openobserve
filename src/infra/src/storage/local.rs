@@ -36,6 +36,10 @@ pub struct Local {
 }
 
 impl Local {
+    pub fn name() -> &'static str {
+        "local"
+    }
+
     pub fn new(root_dir: &str, with_prefix: bool) -> Self {
         Self {
             client: LimitStore::new(init_client(root_dir), CONCURRENT_REQUESTS),
@@ -221,14 +225,14 @@ impl ObjectStore for Local {
     async fn list_with_delimiter(&self, _prefix: Option<&Path>) -> Result<ListResult> {
         Err(Error::NotImplemented {
             operation: "list_with_delimiter".to_string(),
-            implementer: "Local".to_string(),
+            implementer: Self::name().to_string(),
         })
     }
 
     async fn copy_opts(&self, _from: &Path, _to: &Path, _options: CopyOptions) -> Result<()> {
         Err(Error::NotImplemented {
             operation: "copy_opts".to_string(),
-            implementer: "Local".to_string(),
+            implementer: Self::name().to_string(),
         })
     }
 }

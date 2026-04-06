@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,8 +16,8 @@
 use async_trait::async_trait;
 use futures::{StreamExt, stream::BoxStream};
 use object_store::{
-    CopyOptions, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
-    PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, path::Path,
+    CopyOptions, Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta,
+    ObjectStore, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, path::Path,
 };
 
 use super::format_location;
@@ -27,6 +27,10 @@ use super::format_location;
 pub struct FS {}
 
 impl FS {
+    pub fn name() -> &'static str {
+        "Memory"
+    }
+
     /// Create new memory storage.
     pub fn new() -> Self {
         Self::default()
@@ -35,7 +39,7 @@ impl FS {
 
 impl std::fmt::Display for FS {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Memory")
+        write!(f, "{}", Self::name())
     }
 }
 
@@ -70,9 +74,9 @@ impl ObjectStore for FS {
 
     async fn list_with_delimiter(&self, prefix: Option<&Path>) -> Result<ListResult> {
         log::error!("NotImplemented list_with_delimiter: {prefix:?}");
-        Err(object_store::Error::NotImplemented {
+        Err(Error::NotImplemented {
             operation: "list_with_delimiter".to_string(),
-            implementer: "Memory".to_string(),
+            implementer: Self::name().to_string(),
         })
     }
 
@@ -83,9 +87,9 @@ impl ObjectStore for FS {
         _opts: PutOptions,
     ) -> Result<PutResult> {
         log::error!("NotImplemented put_opts: {location}");
-        Err(object_store::Error::NotImplemented {
+        Err(Error::NotImplemented {
             operation: "put_opts".to_string(),
-            implementer: "Memory".to_string(),
+            implementer: Self::name().to_string(),
         })
     }
 
@@ -95,9 +99,9 @@ impl ObjectStore for FS {
         _opts: PutMultipartOptions,
     ) -> Result<Box<dyn MultipartUpload>> {
         log::error!("NotImplemented put_multipart_opts: {location}");
-        Err(object_store::Error::NotImplemented {
+        Err(Error::NotImplemented {
             operation: "put_multipart_opts".to_string(),
-            implementer: "Memory".to_string(),
+            implementer: Self::name().to_string(),
         })
     }
 
@@ -108,9 +112,9 @@ impl ObjectStore for FS {
         log::error!("NotImplemented delete_stream");
         locations
             .map(|_| {
-                Err(object_store::Error::NotImplemented {
+                Err(Error::NotImplemented {
                     operation: "delete_stream".to_string(),
-                    implementer: "Memory".to_string(),
+                    implementer: Self::name().to_string(),
                 })
             })
             .boxed()
@@ -118,9 +122,9 @@ impl ObjectStore for FS {
 
     async fn copy_opts(&self, from: &Path, to: &Path, _options: CopyOptions) -> Result<()> {
         log::error!("NotImplemented copy_opts: from {from} to {to}");
-        Err(object_store::Error::NotImplemented {
+        Err(Error::NotImplemented {
             operation: "copy_opts".to_string(),
-            implementer: "Memory".to_string(),
+            implementer: Self::name().to_string(),
         })
     }
 }
@@ -140,9 +144,9 @@ mod tests {
         let fs_direct = FS {};
 
         // All should display as "Memory"
-        assert_eq!(fs_new.to_string(), "Memory");
-        assert_eq!(fs_default.to_string(), "Memory");
-        assert_eq!(fs_direct.to_string(), "Memory");
+        assert_eq!(fs_new.to_string(), FS::name());
+        assert_eq!(fs_default.to_string(), FS::name());
+        assert_eq!(fs_direct.to_string(), FS::name());
 
         // Debug should show "FS"
         assert_eq!(format!("{fs_direct:?}"), "FS");
@@ -187,7 +191,7 @@ mod tests {
         assert!(delimiter_result.is_err());
         assert!(matches!(
             delimiter_result.unwrap_err(),
-            object_store::Error::NotImplemented { .. }
+            Error::NotImplemented { .. }
         ));
     }
 
@@ -209,15 +213,15 @@ mod tests {
         // All should return NotImplemented error
         assert!(matches!(
             put_opts_result.unwrap_err(),
-            object_store::Error::NotImplemented { .. }
+            Error::NotImplemented { .. }
         ));
         assert!(matches!(
             put_multipart_opts_result.unwrap_err(),
-            object_store::Error::NotImplemented { .. }
+            Error::NotImplemented { .. }
         ));
         assert!(matches!(
             copy_opts_result.unwrap_err(),
-            object_store::Error::NotImplemented { .. }
+            Error::NotImplemented { .. }
         ));
     }
 

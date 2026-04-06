@@ -48,6 +48,10 @@ pub struct Remote {
 }
 
 impl Remote {
+    pub fn name() -> &'static str {
+        "remote"
+    }
+
     pub fn new(config: StorageConfig) -> Self {
         let bucket_prefix = config.bucket_prefix.clone();
         Self {
@@ -200,14 +204,14 @@ impl ObjectStore for Remote {
     async fn list_with_delimiter(&self, _prefix: Option<&Path>) -> Result<ListResult> {
         Err(Error::NotImplemented {
             operation: "list_with_delimiter".to_string(),
-            implementer: "Remote".to_string(),
+            implementer: Self::name().to_string(),
         })
     }
 
     async fn copy_opts(&self, _from: &Path, _to: &Path, _options: CopyOptions) -> Result<()> {
         Err(Error::NotImplemented {
             operation: "copy_opts".to_string(),
-            implementer: "Remote".to_string(),
+            implementer: Self::name().to_string(),
         })
     }
 }

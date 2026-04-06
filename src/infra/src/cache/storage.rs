@@ -39,11 +39,15 @@ static DEFAULT: Lazy<Box<dyn ObjectStoreExt>> = Lazy::new(CacheFS::new_store);
 
 impl std::fmt::Display for CacheFS {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "CacheFS")
+        write!(f, "{}", Self::name())
     }
 }
 
 impl CacheFS {
+    pub fn name() -> &'static str {
+        "CacheFS"
+    }
+
     pub fn new_store() -> Box<dyn ObjectStoreExt> {
         Box::new(Self {})
     }
@@ -63,7 +67,7 @@ impl ObjectStoreExt for CacheFS {
     ) -> Result<PutResult> {
         Err(Error::NotImplemented {
             operation: "put".to_string(),
-            implementer: "CacheFS".to_string(),
+            implementer: Self::name().to_string(),
         })
     }
 
@@ -76,7 +80,7 @@ impl ObjectStoreExt for CacheFS {
     ) -> Result<PutResult> {
         Err(Error::NotImplemented {
             operation: "put_opts".to_string(),
-            implementer: "CacheFS".to_string(),
+            implementer: Self::name().to_string(),
         })
     }
 
@@ -87,7 +91,7 @@ impl ObjectStoreExt for CacheFS {
     ) -> Result<Box<dyn MultipartUpload>> {
         Err(Error::NotImplemented {
             operation: "put_multipart".to_string(),
-            implementer: "CacheFS".to_string(),
+            implementer: Self::name().to_string(),
         })
     }
 
@@ -99,7 +103,7 @@ impl ObjectStoreExt for CacheFS {
     ) -> Result<Box<dyn MultipartUpload>> {
         Err(Error::NotImplemented {
             operation: "put_multipart_opts".to_string(),
-            implementer: "CacheFS".to_string(),
+            implementer: Self::name().to_string(),
         })
     }
 
@@ -173,7 +177,7 @@ impl ObjectStoreExt for CacheFS {
     async fn delete(&self, _account: &str, _location: &Path) -> Result<()> {
         Err(Error::NotImplemented {
             operation: "delete".to_string(),
-            implementer: "CacheFS".to_string(),
+            implementer: Self::name().to_string(),
         })
     }
 
@@ -183,9 +187,9 @@ impl ObjectStoreExt for CacheFS {
         _locations: BoxStream<'static, Result<Path>>,
     ) -> BoxStream<'static, Result<Path>> {
         futures::stream::once(async {
-            Err(object_store::Error::NotImplemented {
+            Err(Error::NotImplemented {
                 operation: "delete_stream".to_string(),
-                implementer: "CacheFS".to_string(),
+                implementer: Self::name().to_string(),
             })
         })
         .boxed()
@@ -197,9 +201,9 @@ impl ObjectStoreExt for CacheFS {
         _prefix: Option<&Path>,
     ) -> BoxStream<'static, Result<ObjectMeta>> {
         futures::stream::once(async {
-            Err(object_store::Error::NotImplemented {
+            Err(Error::NotImplemented {
                 operation: "list".to_string(),
-                implementer: "CacheFS".to_string(),
+                implementer: Self::name().to_string(),
             })
         })
         .boxed()
@@ -212,9 +216,9 @@ impl ObjectStoreExt for CacheFS {
         _offset: &Path,
     ) -> BoxStream<'static, Result<ObjectMeta>> {
         futures::stream::once(async {
-            Err(object_store::Error::NotImplemented {
+            Err(Error::NotImplemented {
                 operation: "list_with_offset".to_string(),
-                implementer: "CacheFS".to_string(),
+                implementer: Self::name().to_string(),
             })
         })
         .boxed()
@@ -227,35 +231,35 @@ impl ObjectStoreExt for CacheFS {
     ) -> Result<ListResult> {
         Err(Error::NotImplemented {
             operation: "list_with_delimiter".to_string(),
-            implementer: "CacheFS".to_string(),
+            implementer: Self::name().to_string(),
         })
     }
 
     async fn copy(&self, _account: &str, _from: &Path, _to: &Path) -> Result<()> {
         Err(Error::NotImplemented {
             operation: "copy".to_string(),
-            implementer: "CacheFS".to_string(),
+            implementer: Self::name().to_string(),
         })
     }
 
     async fn rename(&self, _account: &str, _from: &Path, _to: &Path) -> Result<()> {
         Err(Error::NotImplemented {
             operation: "rename".to_string(),
-            implementer: "CacheFS".to_string(),
+            implementer: Self::name().to_string(),
         })
     }
 
     async fn copy_if_not_exists(&self, _account: &str, _from: &Path, _to: &Path) -> Result<()> {
         Err(Error::NotImplemented {
             operation: "copy_if_not_exists".to_string(),
-            implementer: "CacheFS".to_string(),
+            implementer: Self::name().to_string(),
         })
     }
 
     async fn rename_if_not_exists(&self, _account: &str, _from: &Path, _to: &Path) -> Result<()> {
         Err(Error::NotImplemented {
             operation: "rename_if_not_exists".to_string(),
-            implementer: "CacheFS".to_string(),
+            implementer: Self::name().to_string(),
         })
     }
 }
