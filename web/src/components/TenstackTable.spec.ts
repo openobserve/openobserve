@@ -713,4 +713,151 @@ describe("TenstackTable", () => {
       expect(wrapper.find('[data-test="o2-table"]').exists()).toBe(true);
     });
   });
+
+  // ── showPagination prop ───────────────────────────────────────────────────
+  describe("showPagination prop", () => {
+    it("should render dashboard-data-row class rows when showPagination=true", () => {
+      wrapper = mountTable({ showPagination: true });
+      const rows = wrapper.findAll(".dashboard-data-row");
+      expect(rows.length).toBe(baseRows.length);
+    });
+
+    it("should not set min-height on the table when showPagination=true", () => {
+      wrapper = mountTable({ showPagination: true });
+      const table = wrapper.find('[data-test="o2-table"]');
+      const style = table.attributes("style") ?? "";
+      expect(style).not.toContain("min-height");
+    });
+
+    it("should limit rows to rowsPerPage when showPagination=true", () => {
+      // 3 rows total, rowsPerPage=2 → only 2 rows on first page
+      wrapper = mountTable({ showPagination: true, rowsPerPage: 2 });
+      const rows = wrapper.findAll(".dashboard-data-row");
+      expect(rows.length).toBe(2);
+    });
+
+    it("should render all rows when showPagination=false", () => {
+      wrapper = mountTable({ showPagination: false });
+      // virtual scroll renders rows via virtualizer mock (3 rows)
+      // o2-table-detail-* elements are rendered via virtual scroll path
+      expect(
+        wrapper.find('[data-test="o2-table-detail-1000"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should pass pagination info through the bottom slot when provided", () => {
+      let slotProps: any = null;
+      wrapper = mountTable(
+        { showPagination: true, rowsPerPage: 10 },
+        {
+          bottom: (props: any) => {
+            slotProps = props;
+            return [];
+          },
+        },
+      );
+      expect(slotProps).not.toBeNull();
+      expect(slotProps.pagination).toBeDefined();
+      expect(slotProps.pagination.rowsPerPage).toBe(10);
+      expect(slotProps.pagesNumber).toBeGreaterThanOrEqual(1);
+      expect(typeof slotProps.setRowsPerPage).toBe("function");
+      expect(typeof slotProps.firstPage).toBe("function");
+      expect(typeof slotProps.lastPage).toBe("function");
+    });
+  });
+
+  // ── useVirtualScroll=false prop ───────────────────────────────────────────
+  describe("useVirtualScroll=false (dashboard mode)", () => {
+    const dashboardColumns = [
+      { name: "product", label: "PRODUCT", field: "product", align: "left" },
+      { name: "revenue", label: "REVENUE", field: "revenue", align: "right" },
+    ];
+    const dashboardRows = [
+      { product: "Alpha", revenue: 100 },
+      { product: "Beta", revenue: 200 },
+    ];
+
+    it("should render dashboard-data-row class rows when useVirtualScroll=false", () => {
+      wrapper = mountTable({
+        columns: dashboardColumns,
+        rows: dashboardRows,
+        useVirtualScroll: false,
+      });
+      const rows = wrapper.findAll(".dashboard-data-row");
+      expect(rows.length).toBe(dashboardRows.length);
+    });
+
+    it("should not set min-height on the table when useVirtualScroll=false", () => {
+      wrapper = mountTable({
+        columns: dashboardColumns,
+        rows: dashboardRows,
+        useVirtualScroll: false,
+      });
+      const table = wrapper.find('[data-test="o2-table"]');
+      const style = table.attributes("style") ?? "";
+      expect(style).not.toContain("min-height");
+    });
+
+    it("should render column labels from Quasar column format", () => {
+      wrapper = mountTable({
+        columns: dashboardColumns,
+        rows: dashboardRows,
+        useVirtualScroll: false,
+      });
+      expect(wrapper.text()).toContain("PRODUCT");
+      expect(wrapper.text()).toContain("REVENUE");
+    });
+  });
+
+  // ── stickyTotalRow prop ───────────────────────────────────────────────────
+  describe("stickyTotalRow prop", () => {
+    it("should render a tfoot element when stickyTotalRow is set", () => {
+      wrapper = mountTable({
+        stickyTotalRow: { name: "Total", status: "—" },
+        useVirtualScroll: false,
+        columns: [
+          { name: "name", label: "NAME", field: "name" },
+          { name: "status", label: "STATUS", field: "status" },
+        ],
+        rows: baseRows,
+      });
+      expect(wrapper.find("tfoot").exists()).toBe(true);
+    });
+
+    it("should not render a tfoot element when stickyTotalRow is null", () => {
+      wrapper = mountTable({ stickyTotalRow: null });
+      expect(wrapper.find("tfoot").exists()).toBe(false);
+    });
+  });
+
+  // ── enableCellCopy prop ───────────────────────────────────────────────────
+  describe("enableCellCopy prop", () => {
+    it("should render copy buttons when enableCellCopy=true and dashboard mode", () => {
+      const dashCols = [
+        { name: "name", label: "NAME", field: "name", align: "left" },
+      ];
+      wrapper = mountTable({
+        columns: dashCols,
+        rows: [{ name: "alpha" }],
+        useVirtualScroll: false,
+        enableCellCopy: true,
+      });
+      const copyBtns = wrapper.findAll(".copy-btn");
+      expect(copyBtns.length).toBeGreaterThan(0);
+    });
+
+    it("should not render copy buttons when enableCellCopy=false", () => {
+      const dashCols = [
+        { name: "name", label: "NAME", field: "name", align: "left" },
+      ];
+      wrapper = mountTable({
+        columns: dashCols,
+        rows: [{ name: "alpha" }],
+        useVirtualScroll: false,
+        enableCellCopy: false,
+      });
+      const copyBtns = wrapper.findAll(".copy-btn");
+      expect(copyBtns.length).toBe(0);
+    });
+  });
 });
