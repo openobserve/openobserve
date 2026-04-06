@@ -29,9 +29,8 @@ use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 /// Called by compactor job
 #[cfg(feature = "enterprise")]
 pub async fn process_service_graph() -> Result<(), anyhow::Error> {
-    // Process last hour of traces
     let now = Utc::now().timestamp_micros();
-    let window_micros = super::DEFAULT_QUERY_WINDOW_MINUTES * 60 * 1_000_000;
+    let window_micros = get_o2_config().service_graph.query_time_range_minutes * 60 * 1_000_000;
     let start_time = now - window_micros;
 
     log::debug!(
@@ -48,18 +47,9 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
     );
 
     for (org_id, stream_name) in streams {
-        log::info!(
-            "[ServiceGraph] Processing stream {}/{}",
-            org_id,
-            stream_name
-        );
+        log::info!("[ServiceGraph] Processing stream {org_id}/{stream_name}");
         if let Err(e) = process_stream(&org_id, &stream_name, start_time, now).await {
-            log::error!(
-                "[ServiceGraph] Failed to process stream {}/{}: {}",
-                org_id,
-                stream_name,
-                e
-            );
+            log::error!("[ServiceGraph] Failed to process stream {org_id}/{stream_name}: {e}");
             continue; // Don't fail entire job if one stream fails
         }
     }
@@ -89,7 +79,7 @@ async fn get_trace_streams() -> Result<Vec<(String, String)>, anyhow::Error> {
         .await;
 
         if org_streams.is_empty() {
-            log::warn!(
+            log::debug!(
                 "[ServiceGraph] No trace streams found for org '{}' (identifier: {})",
                 org.name,
                 org.identifier
@@ -112,6 +102,17 @@ async fn process_stream(
     start_time: i64,
     end_time: i64,
 ) -> Result<(), anyhow::Error> {
+    // Skip if no new data was ingested since the last processing interval.
+    // Using doc_time_max against start_time avoids re-processing the same data
+    // on every tick when ingestion has stopped.
+    let stats = infra::cache::stats::get_stream_stats(org_id, stream_name, StreamType::Traces);
+    if stats.doc_time_max > 0 && stats.doc_time_max <= start_time {
+        log::info!(
+            "[ServiceGraph] Stream {org_id}/{stream_name} has no new data since last interval, skipping"
+        );
+        return Ok(());
+    }
+
     // Build SQL to aggregate service graph edges directly in DataFusion
     // Use CTE to compute client/server first, then aggregate
     log::info!(
@@ -122,9 +123,6 @@ async fn process_stream(
         end_time,
         (end_time - start_time) / 1_000_000
     );
-
-    // Build service graph using parent-child span relationships via reference_parent_span_id
-    // JOIN approach: match parent CLIENT/INTERNAL spans with child SERVER/INTERNAL spans
 
     let exclude_internal = get_o2_config().service_graph.exclude_internal_spans;
 
