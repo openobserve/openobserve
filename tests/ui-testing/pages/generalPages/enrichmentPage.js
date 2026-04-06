@@ -325,18 +325,14 @@ abc, err = get_enrichment_table_record("${fileName}", {
                 timeout: 30000
             });
 
-            // Click the editor to ensure Monaco mounts/activates the hidden textarea
+            // Click the editor to focus it
             await this.page.locator(this.vrlEditor).first().click({ force: true }).catch(() => {});
 
-            // Use 'attached' state because Monaco's inputarea is opacity:0 (not CSS-visible).
-            // Fall back to textarea / role=textbox in case the internal selector ever changes.
-            const textbox = this.page.locator(this.vrlEditor).first()
-                .locator('.inputarea, textarea, [role="textbox"]').first();
-            await textbox.waitFor({ state: 'attached', timeout: 30000 });
-
-            // Fill the VRL query
-            await textbox.clear();
-            await textbox.fill(fullQuery);
+            // Monaco may render a native-edit-context div (role=textbox) in Chrome 121+
+            // which does NOT support Playwright fill(). Use keyboard interaction instead.
+            await this.page.keyboard.press('Control+A');
+            await this.page.keyboard.press('Delete');
+            await this.page.keyboard.type(fullQuery);
             
             // Critical: Wait for VRL query validation and processing before proceeding
             // The VRL editor needs time to parse and validate the query syntax
