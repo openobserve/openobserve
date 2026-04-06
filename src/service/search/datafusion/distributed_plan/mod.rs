@@ -131,7 +131,7 @@ mod tests {
         fn as_any(&self) -> &dyn Any {
             self
         }
-        fn properties(&self) -> &PlanProperties {
+        fn properties(&self) -> &Arc<PlanProperties> {
             panic!("not needed")
         }
         fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
@@ -148,9 +148,6 @@ mod tests {
             _: usize,
             _: Arc<datafusion::execution::TaskContext>,
         ) -> datafusion::common::Result<datafusion::execution::SendableRecordBatchStream> {
-            panic!("not needed")
-        }
-        fn statistics(&self) -> datafusion::common::Result<datafusion::common::Statistics> {
             panic!("not needed")
         }
     }
