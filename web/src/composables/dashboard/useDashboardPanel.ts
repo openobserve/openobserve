@@ -105,7 +105,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     removeXYFilters,
     setFieldsBasedOnChartTypeValidation,
     isPivotMode,
-  } = usePanelFields({ dashboardPanelData, store });
+  } = usePanelFields({ dashboardPanelData, store, pageKey });
 
   const { resetAggregationFunction } = usePanelAggregation({
     dashboardPanelData,

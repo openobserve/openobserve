@@ -132,6 +132,7 @@ struct ConfigResponse<'a> {
     default_quick_mode_fields: Vec<String>,
     telemetry_enabled: bool,
     default_functions: Vec<ZoFunction<'a>>,
+    sql_reserved_keywords: Vec<String>,
     sql_base64_enabled: bool,
     timestamp_column: String,
     data_retention_days: i64,
@@ -173,6 +174,7 @@ struct ConfigResponse<'a> {
     ai_enabled: bool,
     dashboard_placeholder: String,
     dashboard_show_symbol_enabled: bool,
+    dashboard_show_field_as_json_enabled: bool,
     ingest_flatten_level: u32,
     #[cfg(feature = "enterprise")]
     license_expiry: i64,
@@ -369,6 +371,7 @@ pub async fn zo_config() -> impl IntoResponse {
             .collect(),
         default_quick_mode_fields: QUICK_MODEL_FIELDS.to_vec(),
         default_functions: DEFAULT_FUNCTIONS.to_vec(),
+        sql_reserved_keywords: config::meta::sql::sql_reserved_keywords().to_vec(),
         sql_base64_enabled: cfg.common.ui_sql_base64_enabled,
         timestamp_column: TIMESTAMP_COL_NAME.to_string(),
         data_retention_days: cfg.compact.data_retention_days,
@@ -410,6 +413,7 @@ pub async fn zo_config() -> impl IntoResponse {
         ai_enabled,
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
+        dashboard_show_field_as_json_enabled: cfg.common.dashboard_show_field_as_json_enabled,
         ingest_flatten_level: cfg.limit.ingest_flatten_level,
         #[cfg(feature = "enterprise")]
         license_expiry: expiry_time,
