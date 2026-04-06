@@ -1056,7 +1056,7 @@ const handleHeaderSortClick = (e: Event, column: any, toggleFn: any) => {
         ? props.sortOrder === "desc"
           ? "asc"
           : "desc"
-        : "desc";
+        : "asc";
     emits("sort-change", field, newOrder);
   } else {
     getSortingHandler(e, toggleFn);
