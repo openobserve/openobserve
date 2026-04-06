@@ -19,15 +19,14 @@ export class IamPage {
 
         this.closeDialogButton = "//div[@class='q-card']/div[1]/button/span/i[text()='close']";
 
-        // this.deleteButton = emailName => `//td[contains(text(),'${emailName}')]/following-sibling::td/button[@title='Delete Service Account']`;
-        this.deleteButton = emailName => `//td[contains(text(),'${emailName}')]/following-sibling::td/button[@title='Delete Service Account']`;
+        this.deleteButton = emailName => `//td[contains(.,'${emailName}')]/following-sibling::td/button[@title='Delete Service Account']`;
 
         this.confirmOkButton = "//div[@class='q-card']/div[2]/button/span[text()='OK']";
         this.cancelButton = "//div[@class='q-card']/div[2]/button/span[text()='Cancel']";
 
-        this.refreshButton = emailName => `//td[contains(text(),'${emailName}')]/following-sibling::td/button[@title='Refresh Service Token']`;
+        this.refreshButton = emailName => `//td[contains(.,'${emailName}')]/following-sibling::td/button[@title='Refresh Service Token']`;
 
-        this.updateButton = emailName => `//td[contains(text(),'${emailName}')]/following-sibling::td/button[@title='Update Service Account']`;
+        this.updateButton = emailName => `//td[contains(.,'${emailName}')]/following-sibling::td/button[@title='Update Service Account']`;
 
         // Removed deprecated alert reference - use specific alert verification in methods
 
