@@ -1571,11 +1571,11 @@ pub static SERVICE_STREAMS_CLEANUP_RUNS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "service_streams_cleanup_runs_total",
-            "Number of cleanup runs by type",
+            "Number of cleanup runs by status",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["cleanup_type"], // "cache", "pattern_learner", "dimension_tracker"
+        &["status"], // "success", "error"
     )
     .expect("Metric created")
 });
@@ -1593,6 +1593,32 @@ pub static SERVICE_STREAMS_CLEANUP_REMOVED: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static SERVICE_STREAMS_CLEANUP_DURATION_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "service_streams_cleanup_duration_seconds",
+            "Duration of service streams cleanup per organization in seconds",
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0, 30.0])
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static SERVICE_STREAMS_CLEANUP_ROWS_EVICTED: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "service_streams_cleanup_rows_evicted_total",
+            "Total rows evicted during service streams cleanup",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
 pub static LICENSE_USAGE_LAST_REPORT_TIMESTAMP: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
@@ -1602,10 +1628,9 @@ pub static LICENSE_USAGE_LAST_REPORT_TIMESTAMP: Lazy<IntGaugeVec> = Lazy::new(||
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
         &[],
-    )
+            )
     .expect("Metric created")
 });
-
 pub static LICENSE_USAGE_LAST_REPORTING_SUCCESS: Lazy<IntGauge> = Lazy::new(|| {
     IntGauge::with_opts(
         Opts::new(
@@ -1614,7 +1639,7 @@ pub static LICENSE_USAGE_LAST_REPORTING_SUCCESS: Lazy<IntGauge> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-    )
+        )
     .expect("Metric created")
 });
 
@@ -2034,6 +2059,12 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(SERVICE_STREAMS_CLEANUP_REMOVED.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_CLEANUP_DURATION_SECONDS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_CLEANUP_ROWS_EVICTED.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(LICENSE_USAGE_LAST_REPORT_TIMESTAMP.clone()))

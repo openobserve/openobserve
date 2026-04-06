@@ -146,6 +146,7 @@ struct ConfigResponse<'a> {
     default_quick_mode_fields: Vec<String>,
     telemetry_enabled: bool,
     default_functions: Vec<ZoFunction<'a>>,
+    sql_reserved_keywords: Vec<String>,
     sql_base64_enabled: bool,
     timestamp_column: String,
     data_retention_days: i64,
@@ -187,6 +188,7 @@ struct ConfigResponse<'a> {
     ai_enabled: bool,
     dashboard_placeholder: String,
     dashboard_show_symbol_enabled: bool,
+    dashboard_show_field_as_json_enabled: bool,
     ingest_flatten_level: u32,
     #[cfg(feature = "enterprise")]
     license_expiry: i64,
@@ -202,11 +204,9 @@ struct ConfigResponse<'a> {
     incidents_enabled: bool,
     service_streams_enabled: bool,
     anomaly_detection_enabled: bool,
-    /// Available FQN priority dimensions from O2_FQN_PRIORITY_DIMENSIONS env var
-    /// Used by UI to populate the FQN priority dimension selector
-    fqn_priority_dimensions: Vec<String>,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
+    search_inspector_enabled: bool,
     #[cfg(feature = "enterprise")]
     last_usage_report_ts: i64,
 }
@@ -394,6 +394,7 @@ pub async fn zo_config() -> impl IntoResponse {
             .collect(),
         default_quick_mode_fields: QUICK_MODEL_FIELDS.to_vec(),
         default_functions: DEFAULT_FUNCTIONS.to_vec(),
+        sql_reserved_keywords: config::meta::sql::sql_reserved_keywords().to_vec(),
         sql_base64_enabled: cfg.common.ui_sql_base64_enabled,
         timestamp_column: TIMESTAMP_COL_NAME.to_string(),
         data_retention_days: cfg.compact.data_retention_days,
@@ -435,6 +436,7 @@ pub async fn zo_config() -> impl IntoResponse {
         ai_enabled,
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
+        dashboard_show_field_as_json_enabled: cfg.common.dashboard_show_field_as_json_enabled,
         ingest_flatten_level: cfg.limit.ingest_flatten_level,
         #[cfg(feature = "enterprise")]
         license_expiry: expiry_time,
@@ -450,14 +452,9 @@ pub async fn zo_config() -> impl IntoResponse {
         incidents_enabled,
         service_streams_enabled,
         anomaly_detection_enabled,
-        fqn_priority_dimensions: enterprise_value!(
-            vec![],
-            o2_enterprise::enterprise::common::config::get_config()
-                .service_streams
-                .get_fqn_priority_dimensions()
-        ),
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
+        search_inspector_enabled: cfg.common.search_inspector_enabled,
         #[cfg(feature = "enterprise")]
         last_usage_report_ts,
     })

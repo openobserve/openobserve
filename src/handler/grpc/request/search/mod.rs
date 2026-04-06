@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -28,9 +28,15 @@ use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    config::meta::search::ScanStats,
-    config::metrics,
-    o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup},
+    config::{meta::search::ScanStats, metrics},
+    o2_enterprise::enterprise::search::{
+        QueryManager, TaskStatus, WorkGroup, admission::ledger::NODE_LEDGER,
+    },
+    proto::cluster_rpc::{
+        ReleaseQueryRequest, ReleaseQueryResponse, StartQueryRequest, StartQueryResponse,
+        TryAcquireRequest, TryAcquireResponse,
+    },
+    std::str::FromStr,
 };
 
 use crate::{handler::grpc::MetadataMap, service::search as SearchService};
@@ -405,7 +411,6 @@ impl Search for Searcher {
             file_data: res.to_vec(),
         }))
     }
-
     async fn get_license_usage_info(
         &self,
         _: Request<GetLicenseUsageRequest>,
@@ -413,8 +418,8 @@ impl Search for Searcher {
         #[cfg(not(feature = "enterprise"))]
         let res = GetLicenseUsageResponse {
             search_allowed: true,
-            ingestion_used: 0,
-            ingestion_limit_exceeded: false,
+            ingestion_used: 0.0,
+            ingestion_limit_exceeded_count: 0,
             last_reporting_successful: true,
             last_reporting_timestamp: chrono::Utc::now().timestamp_micros(),
             days_since_last_report: 0,
@@ -450,5 +455,77 @@ impl Search for Searcher {
             }
         };
         Ok(Response::new(res))
+    }
+    // --- Slot-based admission RPCs ---
+
+    #[cfg(feature = "enterprise")]
+    async fn try_acquire(
+        &self,
+        req: Request<TryAcquireRequest>,
+    ) -> Result<Response<TryAcquireResponse>, Status> {
+        let r = req.into_inner();
+        let wg = WorkGroup::from_str(&r.work_group).unwrap_or(WorkGroup::Short);
+        match NODE_LEDGER.try_acquire(&r.trace_id, &wg, r.ttl_ms) {
+            Ok(()) => Ok(Response::new(TryAcquireResponse {
+                success: true,
+                reason: String::new(),
+            })),
+            Err(reason) => Ok(Response::new(TryAcquireResponse {
+                success: false,
+                reason,
+            })),
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn try_acquire(
+        &self,
+        _req: Request<proto::cluster_rpc::TryAcquireRequest>,
+    ) -> Result<Response<proto::cluster_rpc::TryAcquireResponse>, Status> {
+        Err(Status::unimplemented("Not Supported"))
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn start_query(
+        &self,
+        req: Request<StartQueryRequest>,
+    ) -> Result<Response<StartQueryResponse>, Status> {
+        let trace_id = req.into_inner().trace_id;
+        match NODE_LEDGER.start(&trace_id) {
+            Ok(()) => Ok(Response::new(StartQueryResponse {
+                success: true,
+                reason: String::new(),
+            })),
+            Err(reason) => Ok(Response::new(StartQueryResponse {
+                success: false,
+                reason,
+            })),
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn start_query(
+        &self,
+        _req: Request<proto::cluster_rpc::StartQueryRequest>,
+    ) -> Result<Response<proto::cluster_rpc::StartQueryResponse>, Status> {
+        Err(Status::unimplemented("Not Supported"))
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn release_query(
+        &self,
+        req: Request<ReleaseQueryRequest>,
+    ) -> Result<Response<ReleaseQueryResponse>, Status> {
+        let trace_id = req.into_inner().trace_id;
+        NODE_LEDGER.release(&trace_id);
+        Ok(Response::new(ReleaseQueryResponse { success: true }))
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn release_query(
+        &self,
+        _req: Request<proto::cluster_rpc::ReleaseQueryRequest>,
+    ) -> Result<Response<proto::cluster_rpc::ReleaseQueryResponse>, Status> {
+        Err(Status::unimplemented("Not Supported"))
     }
 }

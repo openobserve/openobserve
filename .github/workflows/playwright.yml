@@ -15,9 +15,10 @@ on:
     #   - "**.md"
     #   - "**.yml"
     #   - "**.yaml"
+  merge_group:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -91,7 +92,7 @@ jobs:
           NODE_OPTIONS: "--max-old-space-size=8192"
           VITE_COVERAGE: "true"
           COVERAGE: "true"
-        run: cd web && npm install && npm run build
+        run: cd web && npm ci && npm run build
 
       - name: Build and run binary
         run: cargo build --release --target x86_64-unknown-linux-gnu
@@ -157,6 +158,7 @@ jobs:
                 "logsqueries.cte.spec.js",
                 "logsqueries.matchall.spec.js",
                 "searchpartition.spec.js",
+                "logs-autocomplete-suggestions.spec.js",
               ]
           - testfolder: "Alerts"
             browser: "chrome"
@@ -210,6 +212,8 @@ jobs:
                 "dashboard-create-alert.spec.js",
                 "dashboard-sankey.spec.js",
                 "dashboard-pie-donut.spec.js",
+                "dashboard-table-chart.spec.js",
+                "dashboard-metric-camelcase.spec.js",
               ]
           - testfolder: "Dashboards-Streaming"
             browser: "chrome"
@@ -261,6 +265,7 @@ jobs:
                 "traceDetails.spec.js",
                 "traceAdvancedFiltering.spec.js",
                 "tracesAnalyzeDimensions.spec.js",
+                "traces-autocomplete-suggestions.spec.js",
               ]
 
           - testfolder: "RegressionSet"

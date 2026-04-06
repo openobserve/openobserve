@@ -88,6 +88,13 @@ pub fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> Strin
     format!("{SCHEMA_KEY}{org_id}/{stream_type}/{stream_name}")
 }
 
+pub async fn exists(org_id: &str, stream_type: StreamType, stream_name: &str) -> bool {
+    let Ok(schema) = get_cache(org_id, stream_name, stream_type).await else {
+        return false;
+    };
+    !schema.is_empty()
+}
+
 pub async fn get(org_id: &str, stream_name: &str, stream_type: StreamType) -> Result<Schema> {
     let schema = get_cache(org_id, stream_name, stream_type).await?;
     Ok(schema.schema().as_ref().clone())
@@ -795,6 +802,10 @@ impl SchemaCache {
         }
         size += std::mem::size_of::<String>() + self.hash_key.len();
         size
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.fields_map.is_empty()
     }
 }
 

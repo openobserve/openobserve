@@ -84,7 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchObj.data?.queryResults?.hits?.length > 0 &&
               searchObj.data.lastSearchTraceId &&
               config.isEnterprise == 'true' &&
-              config.isCloud == 'false'
+              config.isCloud == 'false' &&
+              store.state.zoConfig.search_inspector_enabled
             "
             outline
             no-caps
@@ -367,6 +368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :wrap="searchObj.meta.toggleSourceWrap"
           @open-details="openPatternDetails"
           @add-to-search="addPatternToSearch"
+          @create-alert="createAlertFromPattern"
         />
       </div>
 
@@ -489,6 +491,8 @@ import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
 import useLogs from "../../composables/useLogs";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import usePatterns from "@/composables/useLogs/usePatterns";
+import { usePatternActions } from "@/plugins/logs/patterns/usePatternActions";
+import { extractConstantsFromPattern } from "@/plugins/logs/patterns/patternUtils";
 import { convertLogData } from "@/utils/logs/convertLogData";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useRouter } from "vue-router";
@@ -770,10 +774,17 @@ export default defineComponent({
     // Use separate patterns state (completely isolated from logs)
     const { patternsState } = usePatterns();
 
+    const {
+      selectedPattern,
+      showPatternDetails,
+      openPatternDetails,
+      navigatePatternDetail,
+      addPatternToSearch,
+      createAlertFromPattern,
+    } = usePatternActions();
+
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
-    const selectedPattern = ref(null);
-    const showPatternDetails = ref(false);
 
     // Volume Analysis state
     const showVolumeAnalysisDashboard = ref(false);
@@ -1061,9 +1072,8 @@ export default defineComponent({
         // Always set correlation props, even if metrics array is empty
         // This prevents re-fetching when switching between tabs
         //
-        // Use logStreams[0].filters as matchedDimensions — these contain
-        // the correct field names for the log stream (e.g., k8s_namespace_name)
-        // instead of semantic IDs (k8s-namespace). Same fix as 9127b6172.
+        // v2: backend returns per-stream actual field names in StreamInfo.filters
+        // Use log stream filters as matchedDimensions (actual field names for source stream)
         const logFilters =
           result.correlationData.related_streams.logs?.[0]?.filters || {};
         const actualMatchedDimensions =
@@ -1122,112 +1132,6 @@ export default defineComponent({
         correlationLoading.value = false;
         correlationFetchInProgress.value = false;
       }
-    };
-
-    const openPatternDetails = (pattern: any, index: number) => {
-      selectedPattern.value = { pattern, index };
-      showPatternDetails.value = true;
-    };
-
-    const navigatePatternDetail = (next: boolean, prev: boolean) => {
-      if (!selectedPattern.value) return;
-
-      const currentIndex = (selectedPattern.value as any).index;
-      const totalPatterns = patternsState.value.patterns?.patterns?.length || 0;
-
-      let newIndex = currentIndex;
-      if (next && currentIndex < totalPatterns - 1) {
-        newIndex = currentIndex + 1;
-      } else if (prev && currentIndex > 0) {
-        newIndex = currentIndex - 1;
-      }
-
-      if (newIndex !== currentIndex && patternsState.value.patterns?.patterns) {
-        const newPattern = patternsState.value.patterns.patterns[newIndex];
-        selectedPattern.value = { pattern: newPattern, index: newIndex };
-      }
-    };
-
-    // const sanitizeForMatchAll = (text: string): string => {
-    //   // Remove special characters that Tantivy's match_all doesn't handle well
-    //   // Keep only alphanumeric characters and spaces
-    //   // Replace multiple spaces with single space
-    //   return text
-    //     .replace(/[^\w\s]/g, ' ') // Replace special chars with space
-    //     .replace(/\s+/g, ' ')      // Replace multiple spaces with single space
-    //     .trim();
-    // };
-
-    const extractConstantsFromPattern = (template: string): string[] => {
-      // Extract longest non-variable strings from pattern template
-      // Pattern template has format like: "INFO action <*> at 14:47.1755283"
-      // Variables can be: <*>, <:IDENTIFIERS>, <:TIMESTAMP>, <:UNIX_TIMESTAMP>, etc.
-      // We want continuous strings between these variables that are longer than 10 chars
-      const constants: string[] = [];
-
-      // Split by all variable markers using regex
-      // Matches: <*>, <:WORD>, etc.
-      const parts = template.split(/<[*:][^>]*>/);
-
-      for (const part of parts) {
-        const trimmed = part.trim();
-        // Only include strings longer than 10 characters
-        if (trimmed.length > 10) {
-          constants.push(trimmed);
-        }
-      }
-
-      return constants;
-    };
-
-    const addPatternToSearch = (
-      pattern: any,
-      action: "include" | "exclude",
-    ) => {
-      // Extract constants from pattern template
-      const constants = extractConstantsFromPattern(pattern.template);
-
-      if (constants.length === 0) {
-        $q.notify({
-          type: "warning",
-          message: "No strings longer than 10 characters found in pattern",
-          timeout: 2000,
-        });
-        return;
-      }
-
-      // Build multiple match_all() clauses, one for each constant
-      // Each match_all takes a single string
-      const matchAllClauses = constants.map((constant) => {
-        // Escape special characters for match_all query
-        // Order matters: backslash must be escaped first
-        const escapedConstant = constant
-          .replace(/\\/g, "\\\\") // Escape backslashes
-          .replace(/'/g, "\\'") // Escape single quotes
-          .replace(/"/g, '\\"') // Escape double quotes
-          .replace(/\n/g, "\\n") // Escape newlines
-          .replace(/\r/g, "\\r") // Escape carriage returns
-          .replace(/\t/g, "\\t"); // Escape tabs
-        return `match_all('${escapedConstant}')`;
-      });
-
-      // Combine with AND
-      let filterExpression = matchAllClauses.join(" AND ");
-
-      // For exclude action, wrap the entire expression in NOT (...)
-      if (action === "exclude") {
-        if (matchAllClauses.length > 1) {
-          filterExpression = `NOT (${filterExpression})`;
-        } else {
-          filterExpression = `NOT ${filterExpression}`;
-        }
-      }
-
-      // Set the filter to be added to the query
-      searchObj.data.stream.addToFilter = filterExpression;
-
-      // Switch to logs view to show the filtered results
-      searchObj.meta.logsVisualizeToggle = "logs";
     };
 
     const getRowIndex = (next: boolean, prev: boolean, oldIndex: number) => {
@@ -1582,6 +1486,7 @@ export default defineComponent({
       openPatternDetails,
       navigatePatternDetail,
       addPatternToSearch,
+      createAlertFromPattern,
       extractConstantsFromPattern,
       openVolumeAnalysisDashboard,
       closeVolumeAnalysisDashboard,

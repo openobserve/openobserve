@@ -1184,8 +1184,23 @@ export default defineComponent({
       // if view panel is open then close it
       showViewPanel.value = false;
 
+      // Extract newQueryParams if passed (it will be args[1]). Fall back to route.query if unavailable.
+      const queryToLoad = args[1] || route.query;
+
+      // FIX: Update selectedTabId if it's in the query
+      if (queryToLoad.tab && queryToLoad.tab !== selectedTabId.value) {
+              selectedTabId.value = queryToLoad.tab;
+      }
+
+      // FIX: Manually load the variables from the new query params so that
+      // the manager updates immediately rather than waiting for dashboard components to reload
+      variablesManager.loadFromUrl({ query: queryToLoad });
+      variablesManager.commitAll();
+
       // first, refresh the dashboard
-      refreshDashboard(true);
+      // refreshDashboard(true);
+      // Removed redundant refreshDashboard(true) to avoid immediate state reversion
+      // because selectedTabId and pinned variables will trigger parent URL sync anyway.
 
       // NOTE: With the variables manager, this works without changing the initial variable values
       // The manager handles variable updates automatically
@@ -1678,5 +1693,23 @@ export default defineComponent({
 .grid-stack-item,
 .grid-stack-item-content {
   box-sizing: border-box;
+}
+
+@media print {
+  /* Prevent panel content from expanding beyond its allocated grid cell.
+   * Without this, tables with many rows (position:static in print mode)
+   * can grow taller than the cell, pushing the grid container's height up
+   * while other absolutely-positioned panels stay at their original pixel
+   * offsets — causing visible overlap across printed pages. */
+  .grid-stack-item-content {
+    overflow: hidden !important;
+  }
+
+  /* Quasar virtual-scroll inserts padding divs above/below the rendered
+   * rows to simulate the full scroll height. In print mode these become
+   * empty white space. Hide them so no blank gaps appear in table panels. */
+  :deep(.q-virtual-scroll__padding) {
+    display: none !important;
+  }
 }
 </style>
