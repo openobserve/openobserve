@@ -184,7 +184,10 @@ import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocatio
 import FrustrationBadge from "@/components/rum/FrustrationBadge.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import useStreams from "@/composables/useStreams";
-import { applyFilterTerm } from "@/utils/traces/filterUtils";
+import {
+  applyFilterTerm,
+  removeFieldCondition,
+} from "@/utils/traces/filterUtils";
 
 interface Session {
   timestamp: string;
@@ -674,6 +677,11 @@ const handleSidebarEvent = (event: string, value: any) => {
     sessionState.data.editorValue = applyFilterTerm(
       value,
       sessionState.data.editorValue,
+    );
+  } else if (event === "remove-field") {
+    sessionState.data.editorValue = removeFieldCondition(
+      sessionState.data.editorValue,
+      value,
     );
   }
 };
