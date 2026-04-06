@@ -8,7 +8,13 @@
     "test:poc": "npx playwright test --config=playwright-poc.config.js",
     "test:poc:headed": "npx playwright test --config=playwright-poc.config.js --headed",
     "test:poc:debug": "DEBUG=pw:api npx playwright test --config=playwright-poc.config.js",
-    "report": "npx playwright show-report playwright-results/poc-html-report"
+    "report": "npx playwright show-report playwright-results/poc-html-report",
+    "test:e2e-report": "node o2-reporting/run-e2e-report.js",
+    "test:e2e-report:dry": "node o2-reporting/run-e2e-report.js --dry-run",
+    "test:e2e-report:sdr": "node o2-reporting/run-e2e-report.js --shards=SDR",
+    "test:e2e-report:rum": "node o2-reporting/run-e2e-report.js --shards=RUM",
+    "test:e2e-report:streams": "node o2-reporting/run-e2e-report.js --shards=Streams",
+    "o2:upload-trends": "node o2-reporting/generate-trends-dashboard.js && node o2-reporting/upload-dashboard.js --config=trends-dashboard-config.json --upsert --folder=\"Playwright Reports\""
   },
   "author": "",
   "license": "ISC",

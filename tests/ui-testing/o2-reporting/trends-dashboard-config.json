@@ -1,0 +1,804 @@
+{
+  "version": 8,
+  "title": "E2E Playwright Test Trends",
+  "description": "Cross-run trends — pass rates, flaky tests, error patterns, environment breakdown",
+  "role": "",
+  "owner": "",
+  "tabs": [
+    {
+      "tabId": "trends",
+      "name": "Trends",
+      "panels": [
+        {
+          "id": "p_pass_rate_trend",
+          "type": "line",
+          "title": "Pass Rate Over Time (by Run)",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT run_id, ROUND(COUNT(CASE WHEN status = 'passed' THEN 1 END) * 100.0 / COUNT(*), 1) as pass_rate, COUNT(*) as total_tests FROM e2e_playwright_reports WHERE shard IN ('SDR', 'RUM', 'Streams') GROUP BY run_id ORDER BY MIN(_timestamp) DESC LIMIT 20",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Run ID",
+                    "alias": "run_id",
+                    "column": "run_id"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Pass Rate %",
+                    "alias": "pass_rate",
+                    "column": "pass_rate"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 192,
+            "h": 10,
+            "i": 1
+          }
+        },
+        {
+          "id": "p_failure_trend",
+          "type": "bar",
+          "title": "Failure Count Per Run",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT run_id, COUNT(CASE WHEN status = 'failed' THEN 1 END) as failures, COUNT(CASE WHEN status = 'passed' THEN 1 END) as passes FROM e2e_playwright_reports WHERE shard IN ('SDR', 'RUM', 'Streams') GROUP BY run_id ORDER BY MIN(_timestamp) DESC LIMIT 20",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Run ID",
+                    "alias": "run_id",
+                    "column": "run_id"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Failures",
+                    "alias": "failures",
+                    "column": "failures"
+                  },
+                  {
+                    "label": "Passes",
+                    "alias": "passes",
+                    "column": "passes"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 10,
+            "w": 192,
+            "h": 10,
+            "i": 2
+          }
+        },
+        {
+          "id": "p_shard_trend",
+          "type": "line",
+          "title": "Pass Rate by Shard Over Time",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT run_id, ROUND(SUM(CASE WHEN shard='SDR' AND status='passed' THEN 1 ELSE 0 END)*100.0/NULLIF(SUM(CASE WHEN shard='SDR' THEN 1 ELSE 0 END),0),1) as sdr_pass_rate, ROUND(SUM(CASE WHEN shard='RUM' AND status='passed' THEN 1 ELSE 0 END)*100.0/NULLIF(SUM(CASE WHEN shard='RUM' THEN 1 ELSE 0 END),0),1) as rum_pass_rate, ROUND(SUM(CASE WHEN shard='Streams' AND status='passed' THEN 1 ELSE 0 END)*100.0/NULLIF(SUM(CASE WHEN shard='Streams' THEN 1 ELSE 0 END),0),1) as streams_pass_rate FROM e2e_playwright_reports WHERE shard IN ('SDR', 'RUM', 'Streams') GROUP BY run_id ORDER BY MIN(_timestamp) ASC LIMIT 20",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Run ID",
+                    "alias": "run_id",
+                    "column": "run_id"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "SDR",
+                    "alias": "sdr_pass_rate",
+                    "column": "sdr_pass_rate"
+                  },
+                  {
+                    "label": "RUM",
+                    "alias": "rum_pass_rate",
+                    "column": "rum_pass_rate"
+                  },
+                  {
+                    "label": "Streams",
+                    "alias": "streams_pass_rate",
+                    "column": "streams_pass_rate"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 20,
+            "w": 192,
+            "h": 10,
+            "i": 3
+          }
+        },
+        {
+          "id": "p_duration_trend",
+          "type": "line",
+          "title": "Average Test Duration by Shard (s)",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT run_id, ROUND(AVG(CASE WHEN shard='SDR' THEN duration_secs END),1) as sdr_avg_secs, ROUND(AVG(CASE WHEN shard='RUM' THEN duration_secs END),1) as rum_avg_secs, ROUND(AVG(CASE WHEN shard='Streams' THEN duration_secs END),1) as streams_avg_secs FROM e2e_playwright_reports WHERE shard IN ('SDR', 'RUM', 'Streams') GROUP BY run_id ORDER BY MIN(_timestamp) ASC LIMIT 20",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Run ID",
+                    "alias": "run_id",
+                    "column": "run_id"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "SDR (s)",
+                    "alias": "sdr_avg_secs",
+                    "column": "sdr_avg_secs"
+                  },
+                  {
+                    "label": "RUM (s)",
+                    "alias": "rum_avg_secs",
+                    "column": "rum_avg_secs"
+                  },
+                  {
+                    "label": "Streams (s)",
+                    "alias": "streams_avg_secs",
+                    "column": "streams_avg_secs"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 30,
+            "w": 192,
+            "h": 10,
+            "i": 4
+          }
+        }
+      ]
+    },
+    {
+      "tabId": "flaky",
+      "name": "Flaky & Failing",
+      "panels": [
+        {
+          "id": "p_flaky_list",
+          "type": "table",
+          "title": "Flaky Tests (Mixed Pass/Fail Across Runs)",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT test_name, file_path, shard, COUNT(*) as total_runs, COUNT(CASE WHEN status = 'passed' THEN 1 END) as passes, COUNT(CASE WHEN status = 'failed' THEN 1 END) as failures, COUNT(CASE WHEN status = 'flaky' THEN 1 END) as flaky_count, ROUND(COUNT(CASE WHEN status = 'failed' THEN 1 END) * 100.0 / COUNT(*), 1) as failure_rate FROM e2e_playwright_reports WHERE shard IN ('SDR', 'RUM', 'Streams') GROUP BY test_name, file_path, shard HAVING COUNT(CASE WHEN status = 'failed' THEN 1 END) > 0 AND COUNT(CASE WHEN status = 'passed' THEN 1 END) > 0 ORDER BY failure_rate DESC LIMIT 30",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Test",
+                    "alias": "test_name",
+                    "column": "test_name"
+                  },
+                  {
+                    "label": "File",
+                    "alias": "file_path",
+                    "column": "file_path"
+                  },
+                  {
+                    "label": "Shard",
+                    "alias": "shard",
+                    "column": "shard"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Total Runs",
+                    "alias": "total_runs",
+                    "column": "total_runs"
+                  },
+                  {
+                    "label": "Passes",
+                    "alias": "passes",
+                    "column": "passes"
+                  },
+                  {
+                    "label": "Failures",
+                    "alias": "failures",
+                    "column": "failures"
+                  },
+                  {
+                    "label": "Flaky",
+                    "alias": "flaky_count",
+                    "column": "flaky_count"
+                  },
+                  {
+                    "label": "Failure Rate %",
+                    "alias": "failure_rate",
+                    "column": "failure_rate"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 192,
+            "h": 10,
+            "i": 5
+          }
+        },
+        {
+          "id": "p_flaky_trend",
+          "type": "line",
+          "title": "Flaky Test Count Per Run",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT run_id, COUNT(CASE WHEN status = 'flaky' THEN 1 END) as flaky_count FROM e2e_playwright_reports WHERE shard IN ('SDR', 'RUM', 'Streams') GROUP BY run_id ORDER BY MIN(_timestamp) DESC LIMIT 20",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Run ID",
+                    "alias": "run_id",
+                    "column": "run_id"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Flaky Count",
+                    "alias": "flaky_count",
+                    "column": "flaky_count"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 10,
+            "w": 192,
+            "h": 10,
+            "i": 6
+          }
+        },
+        {
+          "id": "p_top_failing",
+          "type": "table",
+          "title": "Most Frequently Failing Tests (All Time)",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT test_name, file_path, shard, COUNT(*) as failure_count, COUNT(DISTINCT run_id) as runs_failed FROM e2e_playwright_reports WHERE status = 'failed' AND shard IN ('SDR', 'RUM', 'Streams') GROUP BY test_name, file_path, shard ORDER BY failure_count DESC LIMIT 20",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Test",
+                    "alias": "test_name",
+                    "column": "test_name"
+                  },
+                  {
+                    "label": "File",
+                    "alias": "file_path",
+                    "column": "file_path"
+                  },
+                  {
+                    "label": "Shard",
+                    "alias": "shard",
+                    "column": "shard"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Failures",
+                    "alias": "failure_count",
+                    "column": "failure_count"
+                  },
+                  {
+                    "label": "Runs Failed",
+                    "alias": "runs_failed",
+                    "column": "runs_failed"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 20,
+            "w": 192,
+            "h": 10,
+            "i": 7
+          }
+        }
+      ]
+    },
+    {
+      "tabId": "errors",
+      "name": "Error Patterns",
+      "panels": [
+        {
+          "id": "p_error_cats",
+          "type": "pie",
+          "title": "Error Categories (All Runs)",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT error_category, COUNT(*) as count FROM e2e_playwright_reports WHERE status = 'failed' AND error_category != '' AND shard IN ('SDR', 'RUM', 'Streams') GROUP BY error_category ORDER BY count DESC",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Category",
+                    "alias": "error_category",
+                    "column": "error_category"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Count",
+                    "alias": "count",
+                    "column": "count"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 192,
+            "h": 10,
+            "i": 8
+          }
+        },
+        {
+          "id": "p_error_trend",
+          "type": "table",
+          "title": "Error Categories by Run",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT run_id, error_category, COUNT(*) as count FROM e2e_playwright_reports WHERE status = 'failed' AND error_category != '' AND shard IN ('SDR', 'RUM', 'Streams') GROUP BY run_id, error_category ORDER BY MIN(_timestamp) DESC LIMIT 100",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Run ID",
+                    "alias": "run_id",
+                    "column": "run_id"
+                  },
+                  {
+                    "label": "Error Category",
+                    "alias": "error_category",
+                    "column": "error_category"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Count",
+                    "alias": "count",
+                    "column": "count"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 10,
+            "w": 192,
+            "h": 10,
+            "i": 9
+          }
+        }
+      ]
+    },
+    {
+      "tabId": "environment",
+      "name": "Environment",
+      "panels": [
+        {
+          "id": "p_by_runner",
+          "type": "stacked",
+          "title": "Results by Runner (CI vs Local)",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT runner, COUNT(CASE WHEN status='passed' THEN 1 END) as passed, COUNT(CASE WHEN status='failed' THEN 1 END) as failed, COUNT(CASE WHEN status='skipped' THEN 1 END) as skipped, COUNT(CASE WHEN status='flaky' THEN 1 END) as flaky FROM e2e_playwright_reports WHERE shard IN ('SDR', 'RUM', 'Streams') GROUP BY runner ORDER BY runner",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Runner",
+                    "alias": "runner",
+                    "column": "runner"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Passed",
+                    "alias": "passed",
+                    "column": "passed"
+                  },
+                  {
+                    "label": "Failed",
+                    "alias": "failed",
+                    "column": "failed"
+                  },
+                  {
+                    "label": "Skipped",
+                    "alias": "skipped",
+                    "column": "skipped"
+                  },
+                  {
+                    "label": "Flaky",
+                    "alias": "flaky",
+                    "column": "flaky"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 192,
+            "h": 10,
+            "i": 10
+          }
+        },
+        {
+          "id": "p_branch",
+          "type": "table",
+          "title": "Pass Rate by Branch",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT git_branch, COUNT(*) as total_tests, COUNT(CASE WHEN status = 'passed' THEN 1 END) as passed, COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed, ROUND(COUNT(CASE WHEN status = 'passed' THEN 1 END) * 100.0 / COUNT(*), 1) as pass_rate, COUNT(DISTINCT run_id) as total_runs FROM e2e_playwright_reports WHERE shard IN ('SDR', 'RUM', 'Streams') GROUP BY git_branch ORDER BY total_runs DESC LIMIT 20",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Branch",
+                    "alias": "git_branch",
+                    "column": "git_branch"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Total Tests",
+                    "alias": "total_tests",
+                    "column": "total_tests"
+                  },
+                  {
+                    "label": "Passed",
+                    "alias": "passed",
+                    "column": "passed"
+                  },
+                  {
+                    "label": "Failed",
+                    "alias": "failed",
+                    "column": "failed"
+                  },
+                  {
+                    "label": "Pass Rate %",
+                    "alias": "pass_rate",
+                    "column": "pass_rate"
+                  },
+                  {
+                    "label": "Total Runs",
+                    "alias": "total_runs",
+                    "column": "total_runs"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 10,
+            "w": 192,
+            "h": 10,
+            "i": 11
+          }
+        },
+        {
+          "id": "p_all_runs",
+          "type": "table",
+          "title": "All Runs (Recent First)",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT run_id, run_timestamp, environment, runner, git_branch, os, COUNT(*) as total_tests, COUNT(CASE WHEN status = 'passed' THEN 1 END) as passed, COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed, COUNT(CASE WHEN status = 'skipped' THEN 1 END) as skipped, ROUND(COUNT(CASE WHEN status = 'passed' THEN 1 END) * 100.0 / COUNT(*), 1) as pass_rate FROM e2e_playwright_reports WHERE shard IN ('SDR', 'RUM', 'Streams') GROUP BY run_id, run_timestamp, environment, runner, git_branch, os ORDER BY MIN(_timestamp) DESC LIMIT 50",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Run",
+                    "alias": "run_id",
+                    "column": "run_id"
+                  },
+                  {
+                    "label": "Timestamp",
+                    "alias": "run_timestamp",
+                    "column": "run_timestamp"
+                  },
+                  {
+                    "label": "Environment",
+                    "alias": "environment",
+                    "column": "environment"
+                  },
+                  {
+                    "label": "Runner",
+                    "alias": "runner",
+                    "column": "runner"
+                  },
+                  {
+                    "label": "Branch",
+                    "alias": "git_branch",
+                    "column": "git_branch"
+                  },
+                  {
+                    "label": "OS",
+                    "alias": "os",
+                    "column": "os"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Total Tests",
+                    "alias": "total_tests",
+                    "column": "total_tests"
+                  },
+                  {
+                    "label": "Passed",
+                    "alias": "passed",
+                    "column": "passed"
+                  },
+                  {
+                    "label": "Failed",
+                    "alias": "failed",
+                    "column": "failed"
+                  },
+                  {
+                    "label": "Skipped",
+                    "alias": "skipped",
+                    "column": "skipped"
+                  },
+                  {
+                    "label": "Pass Rate %",
+                    "alias": "pass_rate",
+                    "column": "pass_rate"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 20,
+            "w": 192,
+            "h": 10,
+            "i": 12
+          }
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "list": [],
+    "showDynamicFilters": false
+  }
+}
