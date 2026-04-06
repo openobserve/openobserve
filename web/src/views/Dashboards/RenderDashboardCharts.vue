@@ -1637,7 +1637,6 @@ export default defineComponent({
   &.dark {
     border-color: rgba(204, 204, 220, 0.12) !important;
   }
-
   .grid-stack-item-content {
     border: 1px solid #c2c2c27a;
     border-radius: 4px;

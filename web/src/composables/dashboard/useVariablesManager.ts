@@ -88,11 +88,7 @@ const expandVariablesForScopes = (
   // Helper to get initial value for a variable
   const getInitialValue = (variable: VariableConfig) => {
     // If value is explicitly set (not empty string), use it
-    if (
-      variable.value !== "" &&
-      variable.value !== undefined &&
-      variable.value !== null
-    ) {
+    if (variable.value !== "" && variable.value !== undefined && variable.value !== null) {
       return variable.value;
     }
 
@@ -114,7 +110,9 @@ const expandVariablesForScopes = (
     if (variable.type === "custom") {
       const options = (variable as any).options;
       if (options && options.length > 0) {
-        return variable.multiSelect ? [options[0].value] : options[0].value;
+        return variable.multiSelect
+          ? [options[0].value]
+          : options[0].value;
       }
     }
 
@@ -141,8 +139,7 @@ const expandVariablesForScopes = (
         isLoading: false,
         // Non-query types are immediately ready
         // Custom and "all" variables are also immediately ready (no API call needed)
-        isVariablePartialLoaded:
-          variable.type !== "query_values" || hasCustomOrAllDefault,
+        isVariablePartialLoaded: variable.type !== "query_values" || hasCustomOrAllDefault,
       });
     } else if (scope === "tabs" && variable.tabs && variable.tabs.length > 0) {
       variable.tabs.forEach((tabId) => {
@@ -153,8 +150,7 @@ const expandVariablesForScopes = (
           value: initialValue,
           isVariableLoadingPending: false,
           isLoading: false,
-          isVariablePartialLoaded:
-            variable.type !== "query_values" || hasCustomOrAllDefault,
+          isVariablePartialLoaded: variable.type !== "query_values" || hasCustomOrAllDefault,
         });
       });
     } else if (
@@ -170,8 +166,7 @@ const expandVariablesForScopes = (
           value: initialValue,
           isVariableLoadingPending: false,
           isLoading: false,
-          isVariablePartialLoaded:
-            variable.type !== "query_values" || hasCustomOrAllDefault,
+          isVariablePartialLoaded: variable.type !== "query_values" || hasCustomOrAllDefault,
         });
       });
     }
@@ -491,11 +486,7 @@ export const useVariablesManager = () => {
       // Mark as pending so selector will load them
       // Non-API types (custom, constant, textbox) need to load to notify manager
       // query_values types without custom/all need API calls
-      if (
-        v.type === "custom" ||
-        v.type === "constant" ||
-        v.type === "textbox"
-      ) {
+      if (v.type === "custom" || v.type === "constant" || v.type === "textbox") {
         // Non-API types still need to load to set values and notify manager
         v.isVariableLoadingPending = true;
       } else if (v.type === "query_values") {
@@ -742,11 +733,10 @@ export const useVariablesManager = () => {
 
     // After resetting all descendants, trigger ONLY the immediate children
     // that are ready to load (i.e. all their parents are now ready)
-    const immediateChildrenKeys =
-      dependencyGraph.value[variableKey]?.children || [];
+    const immediateChildrenKeys = dependencyGraph.value[variableKey]?.children || [];
     const allVars = getAllVariablesFlat();
 
-    immediateChildrenKeys.forEach((childKey) => {
+    immediateChildrenKeys.forEach(childKey => {
       const childVar = findVariableByKey(childKey, allVars);
       if (!childVar) {
         return;
@@ -899,11 +889,7 @@ export const useVariablesManager = () => {
       if (parsed.scope === "global") {
         const variable = getVariable(parsed.name, "global");
         if (variable) {
-          const parsedValue = parseValue(
-            value,
-            variable.type,
-            variable.multiSelect,
-          );
+          const parsedValue = parseValue(value, variable.type, variable.multiSelect);
           variable.value = parsedValue;
           // CRITICAL: Mark as fully loaded so it doesn't try to fetch from API
           // When restoring from URL, we already have the value we need
@@ -916,11 +902,7 @@ export const useVariablesManager = () => {
         Object.values(variablesData.tabs).forEach((tabVars) => {
           const tabVar = tabVars.find((v) => v.name === parsed.name);
           if (tabVar) {
-            const parsedValue = parseValue(
-              value,
-              tabVar.type,
-              tabVar.multiSelect,
-            );
+            const parsedValue = parseValue(value, tabVar.type, tabVar.multiSelect);
             tabVar.value = parsedValue;
             // Mark as fully loaded
             tabVar.isVariablePartialLoaded = true;
@@ -932,11 +914,7 @@ export const useVariablesManager = () => {
         Object.values(variablesData.panels).forEach((panelVars) => {
           const panelVar = panelVars.find((v) => v.name === parsed.name);
           if (panelVar) {
-            const parsedValue = parseValue(
-              value,
-              panelVar.type,
-              panelVar.multiSelect,
-            );
+            const parsedValue = parseValue(value, panelVar.type, panelVar.multiSelect);
             panelVar.value = parsedValue;
             // Mark as fully loaded
             panelVar.isVariablePartialLoaded = true;
@@ -953,11 +931,7 @@ export const useVariablesManager = () => {
           parsed.panelId,
         );
         if (variable) {
-          const parsedValue = parseValue(
-            value,
-            variable.type,
-            variable.multiSelect,
-          );
+          const parsedValue = parseValue(value, variable.type, variable.multiSelect);
           variable.value = parsedValue;
           // Mark as fully loaded
           variable.isVariablePartialLoaded = true;
@@ -1002,11 +976,7 @@ export const useVariablesManager = () => {
     };
   };
 
-  const parseValue = (
-    value: any,
-    type?: string,
-    multiSelect?: boolean,
-  ): any => {
+  const parseValue = (value: any, type?: string, multiSelect?: boolean): any => {
     if (value === "" || value === undefined || value === null) {
       return type === "dynamic_filters" || multiSelect ? [] : null;
     }
@@ -1044,11 +1014,7 @@ export const useVariablesManager = () => {
       if (value === null || value === undefined) return false;
       if (value === "null") return false;
       if (Array.isArray(value) && value.length === 0) return false;
-      if (
-        Array.isArray(value) &&
-        value.every((v) => v === null || v === undefined || v === "")
-      )
-        return false;
+      if (Array.isArray(value) && value.every((v) => v === null || v === undefined || v === "")) return false;
       return true;
     };
 
@@ -1064,34 +1030,30 @@ export const useVariablesManager = () => {
     });
 
     // Tab variables (use .t.[tabId] suffix)
-    Object.entries(sourceData.tabs).forEach(
-      ([tabId, variables]: [string, any]) => {
-        variables.forEach((variable: any) => {
-          if (hasValidValue(variable.value)) {
-            let value = variable.value;
-            if (variable.type === "dynamic_filters") {
-              value = encodeURIComponent(JSON.stringify(value));
-            }
-            variableParams[`var-${variable.name}.t.${tabId}`] = value;
+    Object.entries(sourceData.tabs).forEach(([tabId, variables]: [string, any]) => {
+      variables.forEach((variable: any) => {
+        if (hasValidValue(variable.value)) {
+          let value = variable.value;
+          if (variable.type === "dynamic_filters") {
+            value = encodeURIComponent(JSON.stringify(value));
           }
-        });
-      },
-    );
+          variableParams[`var-${variable.name}.t.${tabId}`] = value;
+        }
+      });
+    });
 
     // Panel variables (use .p.[panelId] suffix)
-    Object.entries(sourceData.panels).forEach(
-      ([panelId, variables]: [string, any]) => {
-        variables.forEach((variable: any) => {
-          if (hasValidValue(variable.value)) {
-            let value = variable.value;
-            if (variable.type === "dynamic_filters") {
-              value = encodeURIComponent(JSON.stringify(value));
-            }
-            variableParams[`var-${variable.name}.p.${panelId}`] = value;
+    Object.entries(sourceData.panels).forEach(([panelId, variables]: [string, any]) => {
+      variables.forEach((variable: any) => {
+        if (hasValidValue(variable.value)) {
+          let value = variable.value;
+          if (variable.type === "dynamic_filters") {
+            value = encodeURIComponent(JSON.stringify(value));
           }
-        });
-      },
-    );
+          variableParams[`var-${variable.name}.p.${panelId}`] = value;
+        }
+      });
+    });
 
     return variableParams;
   };
