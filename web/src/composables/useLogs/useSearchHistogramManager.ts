@@ -43,6 +43,10 @@ export const useSearchHistogramManager = () => {
   const { searchObj, searchObjDebug, resetHistogramError } = searchState();
 
   const shouldShowHistogram = (parsedSQL: any) => {
+    if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
+      return false;
+    }
+
     return (
       ((isHistogramDataMissing(searchObj) &&
         isHistogramEnabled(searchObj) &&
