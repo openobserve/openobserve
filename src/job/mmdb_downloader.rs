@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use config::{
     MMDB_ASN_FILE_NAME, MMDB_CITY_FILE_NAME,
@@ -21,7 +21,6 @@ use config::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-use once_cell::sync::Lazy;
 use tokio::{sync::Notify, time};
 
 use crate::{

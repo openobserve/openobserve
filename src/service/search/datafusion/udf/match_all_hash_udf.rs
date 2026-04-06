@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use datafusion::{
     arrow::datatypes::DataType,
@@ -21,7 +21,6 @@ use datafusion::{
     logical_expr::{ColumnarValue, ScalarUDF, Volatility},
     prelude::create_udf,
 };
-use once_cell::sync::Lazy;
 
 /// The name of the match_all_hash UDF given to DataFusion.
 pub const MATCH_ALL_HASH_UDF_NAME: &str = "match_all_hash";

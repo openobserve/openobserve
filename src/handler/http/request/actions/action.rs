@@ -35,11 +35,11 @@ use {
         delete_app_from_target_cluster, get_action_details, get_actions, register_app,
         serve_file_from_s3, update_app_on_target_cluster,
     },
-    once_cell::sync::Lazy,
     regex::Regex,
     serde_json,
     std::collections::HashMap,
     std::str::FromStr,
+    std::sync::LazyLock as Lazy,
     svix_ksuid::Ksuid,
 };
 

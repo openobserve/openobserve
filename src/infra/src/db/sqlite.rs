@@ -13,13 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
+use std::{
+    collections::HashSet,
+    str::FromStr,
+    sync::{Arc, LazyLock as Lazy},
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::{FxIndexMap, cluster, utils::util::zero_or};
 use hashbrown::HashMap;
-use once_cell::sync::Lazy;
 use sqlx::{
     Pool, Sqlite,
     sqlite::{

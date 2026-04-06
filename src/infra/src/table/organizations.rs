@@ -13,13 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 #[cfg(feature = "cloud")]
 use config::utils::time::day_micros;
 use config::{RwAHashMap, meta::organization::OrganizationType};
 use hashbrown::HashMap;
-use once_cell::sync::Lazy;
 use sea_orm::{
     ColumnTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder,
     QuerySelect, Schema, Set, entity::prelude::*,

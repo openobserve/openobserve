@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{iter::zip, sync::Arc};
+use std::{
+    iter::zip,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use arrow::datatypes::ArrowNativeType;
 use config::utils::json;
@@ -28,7 +31,6 @@ use datafusion::{
     prelude::create_udf,
     sql::sqlparser::parser::ParserError,
 };
-use once_cell::sync::Lazy;
 
 /// The name of the arrindex UDF given to DataFusion.
 pub const ARR_INDEX_UDF_NAME: &str = "arrindex";

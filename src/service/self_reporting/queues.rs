@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use config::{
     META_ORG_ID, get_config,
@@ -27,7 +27,6 @@ use config::{
     utils::json,
 };
 use hashbrown::HashMap;
-use once_cell::sync::Lazy;
 use tokio::{
     sync::{Mutex, mpsc},
     time,
