@@ -610,6 +610,12 @@ pub async fn update_stream_settings(
     }
 
     if let Some(data_retention) = new_settings.data_retention {
+        let effective_storage_type = new_settings.storage_type.unwrap_or(settings.storage_type);
+        if effective_storage_type.is_compliance() && data_retention < 30 {
+            return Ok(MetaHttpResponse::bad_request(
+                "data_retention must be at least 30 days when storage_type is compliance",
+            ));
+        }
         #[cfg(feature = "enterprise")]
         if org_id == META_ORG_ID && stream_name == USAGE_STREAM {
             if data_retention >= 32 {
@@ -826,6 +832,20 @@ pub async fn update_stream_settings(
 
     if let Some(enable_log_patterns_extraction) = new_settings.enable_log_patterns_extraction {
         settings.enable_log_patterns_extraction = enable_log_patterns_extraction;
+    }
+
+    if let Some(storage_type) = new_settings.storage_type {
+        if storage_type.is_compliance() {
+            let effective_retention = new_settings
+                .data_retention
+                .unwrap_or(settings.data_retention);
+            if effective_retention < 30 {
+                return Ok(MetaHttpResponse::bad_request(
+                    "data_retention must be at least 30 days when storage_type is compliance",
+                ));
+            }
+        }
+        settings.storage_type = storage_type;
     }
 
     if !new_settings.full_text_search_keys.add.is_empty() {

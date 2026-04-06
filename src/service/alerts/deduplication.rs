@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Alert deduplication logic (Enterprise only)
+//! Alert deduplication logic
 //!
 //! This module provides the deduplication interface that delegates to the enterprise
 //! implementation. It is only compiled when the enterprise feature is enabled.
@@ -36,7 +36,7 @@ pub fn calculate_fingerprint(
     result_row: &Map<String, Value>,
     config: &DeduplicationConfig,
     org_config: Option<&GlobalDeduplicationConfig>,
-    semantic_groups: &[config::meta::correlation::SemanticFieldGroup],
+    semantic_groups: &[config::meta::correlation::FieldAlias],
 ) -> String {
     o2_enterprise::enterprise::alerts::dedup::calculate_fingerprint(
         alert,
@@ -197,7 +197,7 @@ async fn apply_deduplication_impl(
     result_rows: Vec<Map<String, Value>>,
     dedup_config: &DeduplicationConfig,
     org_config: Option<&GlobalDeduplicationConfig>,
-    semantic_groups: &[config::meta::correlation::SemanticFieldGroup],
+    semantic_groups: &[config::meta::correlation::FieldAlias],
 ) -> Result<Vec<Map<String, Value>>, sea_orm::DbErr> {
     let now = o2_enterprise::enterprise::alerts::dedup::current_timestamp_micros();
     let alert_id = alert.get_unique_key();

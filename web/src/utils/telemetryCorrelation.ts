@@ -15,7 +15,7 @@
 
 import type {
   ServiceMetadata,
-  SemanticFieldGroup,
+  FieldAlias,
   CorrelationResponse,
   StreamInfo,
 } from "@/services/service_streams";
@@ -65,7 +65,7 @@ export interface CorrelationResult {
  */
 export function extractSemanticDimensions(
   context: TelemetryContext,
-  semanticGroups: SemanticFieldGroup[],
+  semanticGroups: FieldAlias[],
   stableOnly: boolean = false
 ): Record<string, string> {
   const dimensions: Record<string, string> = {};
@@ -103,7 +103,7 @@ export function extractSemanticDimensions(
  */
 function translateDimensionsToFields(
   dimensions: Record<string, string>,
-  semanticGroups: SemanticFieldGroup[]
+  semanticGroups: FieldAlias[]
 ): Array<{ dimensionId: string; possibleFields: string[]; value: string }> {
   const translations: Array<{ dimensionId: string; possibleFields: string[]; value: string }> = [];
 
@@ -155,13 +155,12 @@ function buildExactDimensionConditions(
 export function buildTraceQuery(
   streamInfo: StreamInfo,
   context: TelemetryContext,
-  timeWindowMinutes: number = 5
+  timeWindowMinutes: number = 5,
+  matchedDimensions: Record<string, string> = {}
 ): CorrelationQuery {
   const conditions: string[] = [];
 
-  // Add dimension conditions using exact field names from StreamInfo.filters
-  // This includes service_name if present in the trace stream
-  const dimensionConditions = buildExactDimensionConditions(streamInfo.filters);
+  const dimensionConditions = buildExactDimensionConditions(matchedDimensions);
   conditions.push(...dimensionConditions);
 
   // Build SQL WITHOUT timestamp (timestamp passed separately as from/to)
@@ -180,7 +179,7 @@ export function buildTraceQuery(
     type: "traces",
     stream: streamInfo.stream_name,
     sql,
-    filters: streamInfo.filters,
+    filters: matchedDimensions,
     timeRange: {
       start: startTime,
       end: endTime,
@@ -198,13 +197,12 @@ export function buildTraceQuery(
 export function buildMetricQuery(
   streamInfo: StreamInfo,
   context: TelemetryContext,
-  timeWindowMinutes: number = 5
+  timeWindowMinutes: number = 5,
+  matchedDimensions: Record<string, string> = {}
 ): CorrelationQuery {
   const conditions: string[] = [];
 
-  // Add dimension conditions using exact field names from StreamInfo.filters
-  // These filters contain ONLY the labels that actually exist in this metric stream
-  const dimensionConditions = buildExactDimensionConditions(streamInfo.filters);
+  const dimensionConditions = buildExactDimensionConditions(matchedDimensions);
   conditions.push(...dimensionConditions);
 
   // Build SQL WITHOUT timestamp (timestamp passed separately as from/to)
@@ -223,7 +221,7 @@ export function buildMetricQuery(
     type: "metrics",
     stream: streamInfo.stream_name,
     sql,
-    filters: streamInfo.filters,
+    filters: matchedDimensions,
     timeRange: {
       start: startTime,
       end: endTime,
@@ -238,12 +236,12 @@ export function buildMetricQuery(
 export function buildLogQuery(
   streamInfo: StreamInfo,
   context: TelemetryContext,
-  timeWindowMinutes: number = 5
+  timeWindowMinutes: number = 5,
+  matchedDimensions: Record<string, string> = {}
 ): CorrelationQuery {
   const conditions: string[] = [];
 
-  // Add dimension conditions using exact field names from StreamInfo.filters
-  const dimensionConditions = buildExactDimensionConditions(streamInfo.filters);
+  const dimensionConditions = buildExactDimensionConditions(matchedDimensions);
   conditions.push(...dimensionConditions);
 
   // Build SQL WITHOUT timestamp (timestamp passed separately as from/to)
@@ -262,7 +260,7 @@ export function buildLogQuery(
     type: "logs",
     stream: streamInfo.stream_name,
     sql,
-    filters: streamInfo.filters,
+    filters: matchedDimensions,
     timeRange: {
       start: startTime,
       end: endTime,
@@ -280,32 +278,31 @@ export function generateCorrelationQueries(
   service: ServiceMetadata,
   context: TelemetryContext,
   sourceType: TelemetryType,
-  semanticGroups: SemanticFieldGroup[],
+  semanticGroups: FieldAlias[],
   timeWindowMinutes: number = 5,
   correlationData?: CorrelationResponse
 ): CorrelationQuery[] {
   const queries: CorrelationQuery[] = [];
 
-  // If we have correlation data from the API, use the exact StreamInfo with field names
+  // If we have correlation data from the API, use matched_dimensions for WHERE clauses
   if (correlationData) {
-    // Generate queries for each target type (excluding source type)
+    const dims = correlationData.matched_dimensions ?? {};
+
     if (sourceType !== "traces") {
       for (const streamInfo of correlationData.related_streams.traces) {
-        // Use filters from StreamInfo directly (same as logs/metrics)
-        // service_name is already in filters if present
-        queries.push(buildTraceQuery(streamInfo, context, timeWindowMinutes));
+        queries.push(buildTraceQuery(streamInfo, context, timeWindowMinutes, dims));
       }
     }
 
     if (sourceType !== "metrics") {
       for (const streamInfo of correlationData.related_streams.metrics) {
-        queries.push(buildMetricQuery(streamInfo, context, timeWindowMinutes));
+        queries.push(buildMetricQuery(streamInfo, context, timeWindowMinutes, dims));
       }
     }
 
     if (sourceType !== "logs") {
       for (const streamInfo of correlationData.related_streams.logs) {
-        queries.push(buildLogQuery(streamInfo, context, timeWindowMinutes));
+        queries.push(buildLogQuery(streamInfo, context, timeWindowMinutes, dims));
       }
     }
   }

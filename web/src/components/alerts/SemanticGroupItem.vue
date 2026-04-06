@@ -49,55 +49,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- Actions Column: Scope, Stable, Normalize and Delete -->
+      <!-- Checkboxes Column: scope, stable, normalize -->
+      <div class="checkboxes-column">
+        <q-checkbox
+          data-test="semantic-group-action-scope-chkbox"
+          v-model="localGroup.is_scope"
+          :label="t('correlation.scope')"
+          dense
+          @update:model-value="emitUpdate"
+        />
+        <q-checkbox
+          data-test="semantic-group-action-stable-chkbox"
+          v-model="localGroup.is_stable"
+          :label="t('correlation.stable')"
+          dense
+          @update:model-value="emitUpdate"
+        />
+        <q-checkbox
+          data-test="semantic-group-action-normalize-chkbox"
+          v-model="localGroup.normalize"
+          :label="t('correlation.normalize')"
+          dense
+          @update:model-value="emitUpdate"
+        />
+      </div>
+
+      <!-- Actions Column: Delete -->
       <div class="actions-column">
-        <div class="checkboxes-row q-mb-sm">
-          <q-checkbox
-            data-test="semantic-group-action-scope-chkbox"
-            v-model="localGroup.is_scope"
-            size="sm"
-            dense
-            @update:model-value="emitUpdate"
-          >
-            <span class="checkbox-label">{{ t("correlation.scope") }}</span>
-            <q-tooltip max-width="300px">{{
-              t("correlation.scopeTooltip")
-            }}</q-tooltip>
-          </q-checkbox>
-          <q-checkbox
-            data-test="semantic-group-action-stable-chkbox"
-            v-model="localGroup.is_stable"
-            size="sm"
-            dense
-            @update:model-value="emitUpdate"
-          >
-            <span class="checkbox-label">{{ t("correlation.stable") }}</span>
-            <q-tooltip max-width="300px">{{
-              t("correlation.stableTooltip")
-            }}</q-tooltip>
-          </q-checkbox>
-          <q-checkbox
-            data-test="semantic-group-action-normalize-chkbox"
-            v-model="localGroup.normalize"
-            size="sm"
-            dense
-            @update:model-value="emitUpdate"
-          >
-            <span class="checkbox-label">{{ t("correlation.normalize") }}</span>
-            <q-tooltip>{{ t("correlation.actionNormalize") }}</q-tooltip>
-          </q-checkbox>
-        </div>
         <div class="flex justify-end">
           <q-btn
             data-test="semantic-group-remove-group-btn"
             flat
             round
             dense
-            color="negative"
+            :color="isProtected ? 'grey-5' : 'negative'"
             icon="delete"
-            @click="emit('delete')"
+            :disable="isProtected"
+            @click="!isProtected && emit('delete')"
           >
-            <q-tooltip>{{ t("correlation.removeSemanticGroup") }}</q-tooltip>
+            <q-tooltip>
+              {{ isProtected ? t("correlation.serviceGroupProtected") : t("correlation.removeSemanticGroup") }}
+            </q-tooltip>
           </q-btn>
         </div>
       </div>
@@ -106,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, watch } from "vue";
+import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import TagInput from "./TagInput.vue";
 
@@ -117,8 +109,8 @@ interface SemanticGroup {
   display: string;
   fields: string[];
   normalize: boolean;
-  is_stable?: boolean;
-  is_scope?: boolean;
+  is_stable: boolean;
+  is_scope: boolean;
 }
 
 interface Props {
@@ -131,6 +123,7 @@ const emit = defineEmits<{
   (e: "delete"): void;
 }>();
 
+const isProtected = computed(() => props.group.id === "service");
 const localGroup = ref<SemanticGroup>({ ...props.group });
 
 watch(
@@ -188,7 +181,7 @@ const emitUpdate = () => {
 
 .group-layout {
   display: grid;
-  grid-template-columns: 200px 1fr auto;
+  grid-template-columns: 200px 1fr auto auto;
   gap: 16px;
   align-items: start;
   width: 100%;
@@ -237,17 +230,6 @@ const emitUpdate = () => {
   flex-direction: column;
   justify-content: space-between;
   min-height: 100%;
-}
-
-.checkboxes-row {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.checkbox-label {
-  font-size: 12px;
-  margin-left: 4px;
 }
 
 .text-subtitle2 {

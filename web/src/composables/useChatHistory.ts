@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { ChatMessage, ChatHistoryEntry } from "@/types/chat";
+import type { ChatMessage, ChatHistoryEntry } from "@/ts/interfaces/chat";
 
 const DB_NAME = "o2ChatDB";
 const DB_VERSION = 2;

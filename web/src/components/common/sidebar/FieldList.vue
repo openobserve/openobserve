@@ -36,7 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-td :props="props" class="field_list">
               <!-- Non-expandable field (ftsKey or no values to show) -->
               <div
-                v-if="(props.row.ftsKey && !showFtsFieldValues) || !props.row.showValues"
+                v-if="
+                  (props.row.ftsKey && !showFtsFieldValues) ||
+                  !props.row.showValues
+                "
                 class="field-container flex content-center ellipsis q-pr-sm"
                 :title="props.row.name"
               >
@@ -131,6 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :theme="store.state.theme"
                       @add-search-term="handleAddSearchTerm"
                       @add-multiple-search-terms="handleAddMultipleSearchTerms"
+                      @remove-field-filter="handleRemoveFieldFilter"
                       @load-more-values="handleLoadMoreValues"
                       @search-field-values="handleSearchFieldValues"
                     />
@@ -489,6 +493,10 @@ export default defineComponent({
       );
     };
 
+    const handleRemoveFieldFilter = (fieldName: string) => {
+      emit("event-emitted", "remove-field", fieldName);
+    };
+
     // ─── Misc helpers ─────────────────────────────────────────────────────
 
     const addSearchTerm = (term: string) => {
@@ -522,6 +530,7 @@ export default defineComponent({
       setPage,
       handleAddSearchTerm,
       handleAddMultipleSearchTerms,
+      handleRemoveFieldFilter,
       handleLoadMoreValues,
       handleSearchFieldValues,
       showFtsFieldValues,

@@ -57,7 +57,7 @@ pub fn new_parquet_writer<'a>(
     let compression = compression.unwrap_or(&cfg.common.parquet_compression);
     let mut writer_props = WriterProperties::builder()
         .set_write_batch_size(cfg.limit.batch_size) // in bytes
-        .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
+        .set_max_row_group_row_count(Some(PARQUET_MAX_ROW_GROUP_SIZE)) // maximum number of rows in a row group
         .set_compression(get_parquet_compression(compression))
         .set_column_dictionary_enabled(
             TIMESTAMP_COL_NAME.into(),

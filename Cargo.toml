@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.80.0"
+version = "0.90.0"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -319,18 +319,18 @@ cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = "52"
-datafusion-proto = "52"
-datafusion-functions-aggregate-common = "52"
-datafusion-functions-json = "0.52"
+datafusion = "53"
+datafusion-proto = "53"
+datafusion-functions-aggregate-common = "53"
+datafusion-functions-json = "0.53"
 expect-test = "1.4"
-arrow = { version = "57", features = ["ipc_compression", "prettyprint"] }
-arrow-flight = "57"
-arrow-json = "57"
-arrow-schema = { version = "57", features = ["serde"] }
-parquet = { version = "57", features = ["arrow", "async", "object_store"] }
-object_store = { version = "0.12", features = ["aws", "azure", "gcp"] }
-sqlparser = { version = "0.59", features = ["serde", "visitor"] }
+arrow = { version = "58", features = ["ipc_compression", "prettyprint"] }
+arrow-flight = "58"
+arrow-json = "58"
+arrow-schema = { version = "58", features = ["serde"] }
+parquet = { version = "58", features = ["arrow", "async", "object_store"] }
+object_store = { version = "0.13", features = ["aws", "azure", "gcp"] }
+sqlparser = { version = "0.61", features = ["serde", "visitor"] }
 dotenv_config = "0.2"
 dotenvy = "0.15"
 env_logger = "0.11"
@@ -446,7 +446,7 @@ tokio-rustls = { version = "0.26", default-features = false, features = [
 ] }
 tokio-util = { version = "0.7", features = ["compat"] }
 tokio-stream = "0.1"
-tonic = { version = "0.14", features = ["gzip", "tls-webpki-roots"] }
+tonic = { version = "0.14", features = ["gzip", "tls-webpki-roots", "tls-native-roots"] }
 tonic-prost = "0.14"
 tracing = "0.1.44"
 tracing-appender = "0.2.4"

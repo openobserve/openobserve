@@ -78,48 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #body-cell-token="props">
-            <q-td :props="props" side >
-              <div class="tw:flex tw:items-center" v-if="props.row.isLoading">
-                <q-spinner-dots color="primary"  />
-              </div>
-              <!-- Display the token or masked text based on visibility -->
-            <div v-else  class="tw:flex tw:items-center">
-              <span 
-                style="
-                display: inline-block;
-                width: 150px; /* Set a fixed width */
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-                text-align: center;
-              "
-                >
-                {{ getDisplayToken(props.row) }}
-                </span>
-
-                <!-- Button to fetch or toggle token visibility -->
-                <q-btn
-                  :icon="props.row.isTokenVisible ? 'visibility_off' : 'visibility'"
-                  :title="props.row.isTokenVisible ? t('serviceAccounts.hideToken') : t('serviceAccounts.showToken')"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  style="cursor: pointer !important; "
-                  @click="getServiceToken(props.row)"
-                />
-                <q-btn
-                  @click.stop="copyToClipboard(props.row.token)"
-                  size="sm"
-                  dense
-                  flat
-                  :title="t('serviceAccounts.copyToken')"
-                  icon="content_copy"
-                  :disable="!props.row.token"
-                  :class="{ 'disabled-opacity': !props.row.token }"
-                  class="copy-btn-sql"
-                />
-              </div>
+            <q-td :props="props" side>
+              <span class="tw:font-mono">{{ props.row.token || '' }}</span>
             </q-td>
           </template>
 
@@ -268,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             class="no-border"
             color="primary"
-            @click="refreshServiceToken(toBeRefreshed,false)"
+            @click="refreshServiceToken(toBeRefreshed)"
           >
             {{ t("user.ok") }}
           </q-btn>
@@ -522,39 +482,6 @@ export default defineComponent({
       confirmDelete.value = true;
       deleteUserEmail = props.row.email;
     };
-    const getServiceToken = async (row:any, fromColum = true) =>{
-      if(fromColum){ row.isLoading = true;
-        if(!row.isTokenVisible){
-          row.isTokenVisible = true;
-          setTimeout(() => {
-            row.isTokenVisible = false;
-          }, 5 * 60 * 1000);
-        }
-        else{
-          row.isTokenVisible = false;
-        }
-      if(row.token){
-        row.isLoading = false;
-        return;
-      }
-      }
-       service_accounts.get_service_token(store.state.selectedOrganization.identifier,row.email).then((res)=>{
-        if(fromColum) row.token = res.data.token;
-        else serviceToken.value = res.data.token;
-       }).catch((err)=>{
-        if(err.response?.status != 403){
-          $q.notify({
-          color: "negative",
-          message: `Error fetching token: ${err.response?.data?.message || 'Unknown error'}`,
-          });
-        }
-        
-       }).finally(()=>{
-        row.isLoading = false;
-       });
-    }
-
-
     const getServiceAccountsUsers = async () =>{
       const dismiss = $q.notify({
         spinner: true,
@@ -576,7 +503,7 @@ export default defineComponent({
                 email: maskText(data.email),
                 first_name: data.first_name,
                 last_name: data.last_name,
-                isTokenVisible: false,
+                token: data.token || '',
               };
             });
 
@@ -645,6 +572,11 @@ export default defineComponent({
       });
     };
 
+    const redactToken = (token: string): string => {
+      if (token.length <= 4) return '*'.repeat(token.length);
+      return token.slice(0, 4) + '*'.repeat(token.length - 4);
+    };
+
     const addMember = async (res: any, data: any, operationType: string) => {
       showAddUserDialog.value = false;
       if (res.code == 200 ) {
@@ -654,7 +586,7 @@ export default defineComponent({
               message: "Service Account created successfully.",
             });
 
-          await getServiceToken(data, false);
+          serviceToken.value = res.token;
           isShowToken.value = true;
           if (
             store.state.selectedOrganization.identifier == data.organization
@@ -667,6 +599,7 @@ export default defineComponent({
               email: data.email,
               first_name: data.first_name,
               last_name: data.last_name,
+              token: res.token ? redactToken(res.token) : '',
             };
 
             serviceAccountsState.service_accounts_users.push(user);
@@ -768,18 +701,18 @@ export default defineComponent({
       }
     };
 
-    const refreshServiceToken = async (row:any,fromColum = true) =>{
-      if(fromColum) row.isLoading = true;
+    const refreshServiceToken = async (row:any) =>{
+      row.isLoading = true;
       await service_accounts.refresh_token(store.state.selectedOrganization.identifier,row.email).then((res)=>{
-          row.token = res.data.token;
           serviceToken.value = res.data.token;
-          row.isTokenVisible = true;
           isShowToken.value = true;
 
         $q.notify({
           color: "positive",
           message: "Service token refreshed successfully.",
         });
+
+        getServiceAccountsUsers();
       }).catch((err)=>{
         if(err.response?.status != 403){
           $q.notify({
@@ -787,7 +720,7 @@ export default defineComponent({
           message: err.response?.data?.message || "Error while refreshing token.",
           });
         }
-        
+
       }).finally(()=>{
         row.isLoading = false;
       });
@@ -821,17 +754,6 @@ export default defineComponent({
     const confirmRefreshAction = (row: any) => {
       confirmRefresh.value = true;
       toBeRefreshed.value = row;
-    };
-
-    const getDisplayToken = (row: any): string => {
-      if (!row.token) return '* * * * * * * * * * * * * * * *';
-      if (!row.isTokenVisible) return '* * * * * * * * * * * * * * * *';
-      return maskToken(row.token);
-    };
-
-    const maskToken = (token: string): string => {
-      if (token.length <= 8) return token;
-      return `${token.slice(0, 4)} **** ${token.slice(-4)}`;
     };
 
     const filterData = (rows: any, terms: any) => {
@@ -880,7 +802,6 @@ export default defineComponent({
       addUser,
       confirmDeleteAction,
       outlinedVisibility,
-      getServiceToken,
       deleteUser,
       getServiceAccountsUsers,
       pagination,
@@ -898,8 +819,6 @@ export default defineComponent({
       isShowToken,
       serviceToken,
       confirmRefreshAction,
-      getDisplayToken,
-      maskToken,
       filterQuery,
       filterData,
       userEmail,
@@ -918,6 +837,7 @@ export default defineComponent({
       confirmBulkDelete,
       openBulkDeleteDialog,
       bulkDeleteServiceAccounts,
+      redactToken,
     };
   },
 });
@@ -925,9 +845,6 @@ export default defineComponent({
 
 
 <style lang="scss" scoped>
-.disabled-opacity {
-  opacity: 0.1 !important;
-}
 .warning-text {
   color: #ec960c;
 }

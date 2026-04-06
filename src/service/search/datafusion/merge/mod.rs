@@ -31,9 +31,7 @@ use futures::TryStreamExt;
 use parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue};
 
 use super::table_provider::uniontable::NewUnionTable;
-use crate::service::search::datafusion::exec::{
-    DATAFUSION_MIN_PARTITION, DataFusionContextBuilder,
-};
+use crate::service::search::datafusion::exec::DataFusionContextBuilder;
 
 #[cfg(feature = "enterprise")]
 pub mod downsampling;
@@ -107,7 +105,7 @@ pub async fn merge_parquet_files(
 
     let ctx = DataFusionContextBuilder::new()
         .sorted_by_time(true)
-        .build(DATAFUSION_MIN_PARTITION)
+        .build(get_config().limit.datafusion_min_partition_num)
         .await?;
     // register union table
     let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));

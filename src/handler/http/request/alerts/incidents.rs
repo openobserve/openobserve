@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! HTTP handlers for alert incident management (Enterprise only)
+//! HTTP handlers for alert incident management
 
 use axum::{
     Json,
@@ -400,14 +400,14 @@ pub async fn trigger_incident_rca(
         common::config::get_config as get_o2_config,
     };
 
-    let o2_config = get_o2_config();
+    let o2_cfg = get_o2_config();
 
     // Check if RCA is enabled
-    if !o2_config.incidents.enabled || !o2_config.incidents.rca_enabled {
+    if !o2_cfg.incidents.enabled || !o2_cfg.incidents.rca_enabled {
         return MetaHttpResponse::bad_request("RCA is not enabled");
     }
 
-    if o2_config.ai.agent_url.is_empty() {
+    if o2_cfg.ai.agent_url.is_empty() {
         return axum::response::Response::builder()
             .status(axum::http::StatusCode::SERVICE_UNAVAILABLE)
             .header(axum::http::header::CONTENT_TYPE, "application/json")
@@ -419,7 +419,7 @@ pub async fn trigger_incident_rca(
 
     // In-flight guard
     {
-        let cooldown = o2_config.incidents.reanalysis_cooldown_minutes;
+        let cooldown = o2_cfg.incidents.reanalysis_cooldown_minutes;
         let events = infra::table::incident_events::get(&org_id, &incident_id)
             .await
             .unwrap_or_default();
@@ -466,13 +466,12 @@ pub async fn trigger_incident_rca(
         };
 
     // Build RCA context — include previous analysis so the agent can build on it
-    let previous_analysis = incident
-        .incident
-        .topology_context
-        .as_ref()
-        .and_then(|t| t.suggested_root_cause.as_deref())
-        .filter(|s| !s.is_empty())
-        .map(|s| s.to_string());
+    let previous_analysis = infra::table::alert_incidents::get_topology(&org_id, &incident_id)
+        .await
+        .ok()
+        .flatten()
+        .and_then(|t| t.suggested_root_cause)
+        .filter(|s| !s.is_empty());
     let context = IncidentRcaContext {
         incident_id: incident.incident.id.clone(),
         org_id: incident.incident.org_id.clone(),
@@ -482,7 +481,7 @@ pub async fn trigger_incident_rca(
     // Create RCA agent client
     let zo_config = config::get_config();
     let client = match RcaAgentClient::new(
-        &o2_config.ai.agent_url,
+        &o2_cfg.ai.agent_url,
         &zo_config.auth.root_user_email,
         &zo_config.auth.root_user_password,
     ) {
@@ -825,10 +824,8 @@ mod tests {
         let incident = config::meta::alerts::incidents::Incident {
             id: "test-id".to_string(),
             org_id: "default".to_string(),
-            correlation_key: "key123".to_string(),
             status: config::meta::alerts::incidents::IncidentStatus::Open,
             severity: config::meta::alerts::incidents::IncidentSeverity::P1,
-            stable_dimensions: std::collections::HashMap::new(),
             topology_context: None,
             first_alert_at: 1000,
             last_alert_at: 2000,
@@ -838,6 +835,8 @@ mod tests {
             assigned_to: None,
             created_at: 1000,
             updated_at: 2000,
+            group_values: serde_json::Value::Object(Default::default()),
+            key_type: config::meta::alerts::incidents::KeyType::default(),
         };
 
         let response = ListIncidentsResponse {

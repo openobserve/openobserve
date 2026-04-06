@@ -878,7 +878,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item>
               <q-separator v-if="config.isEnterprise == 'true'" />
               <q-item
-                v-if="config.isEnterprise == 'true' && config.isCloud == 'false'"
+                v-if="config.isEnterprise == 'true' && config.isCloud == 'false' && store.state.zoConfig.search_inspector_enabled"
                 data-test="search-inspect-btn"
                 class="q-pa-sm saved-view-item"
                 clickable
@@ -2358,6 +2358,7 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import {
@@ -2381,6 +2382,12 @@ import {
   Minimize,
 } from "lucide-vue-next";
 import { outlinedShowChart } from "@quasar/extras/material-icons-outlined";
+import {
+  getFieldFromExpression,
+  hasFieldCondition,
+  replaceExistingFieldCondition,
+  removeFieldCondition,
+} from "@/plugins/logs/filterUtils";
 
 const defaultValue: any = () => {
   return {
@@ -2400,7 +2407,7 @@ const getFieldFromExpression = (expression: string): string | null => {
   const cleaned = expression.trim().replace(/^\(\s*/, "");
   const match =
     cleaned.match(/^"[^"]+"\."?(\w+)"?\s*(?:=|!=|is)/i) ||
-    cleaned.match(/^(\w+)\s*(?:=|!=|is)/i);
+    cleaned.match(/^"?(\w+)"?\s*(?:=|!=|is)/i);
   return match ? match[1] : null;
 };
 
@@ -2417,7 +2424,8 @@ const replaceExistingFieldCondition = (
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
   const opPat = `(?:=|!=|is(?:\\s+not)?)`;
-  const condPat = `(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
+  const fieldPat = `(?:"${esc}"|${esc})`;
+  const condPat = `(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;
 
   // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
   const multiRegex = new RegExp(
@@ -2868,60 +2876,15 @@ export default defineComponent({
       { immediate: true, deep: true },
     );
 
-    // Watch SQL mode toggle - turn off NLP mode when SQL mode is enabled
-    watch(
-      () => searchObj.meta.sqlMode,
-      (newSqlMode, oldSqlMode) => {
-        // Only act when SQL mode is turned ON (not when turning off)
-        if (newSqlMode === true && oldSqlMode === false) {
-          console.log(
-            "[NL2Q-Handler] SQL mode enabled, turning off NLP mode (mutually exclusive)",
-          );
-          searchObj.meta.nlpMode = false;
-          // Reset flags when switching to SQL mode
-          hasInteractedWithAI.value = false;
-          isNaturalLanguageDetected.value = false;
-        }
-      },
-    );
-
-    // Watch NLP mode toggle - turn off SQL mode when NLP mode is enabled
-    // Also prevent auto-detection from immediately turning it back off
+    // Watch NLP mode toggle - AI mode is independent of SQL mode
     watch(
       () => searchObj.meta.nlpMode,
       (newNlpMode, oldNlpMode) => {
         if (newNlpMode === true && oldNlpMode === false) {
-          // NLP mode turned ON
-          console.log(
-            "[NL2Q-Handler] NLP mode manually enabled, turning off SQL mode (mutually exclusive)",
-          );
-          searchObj.meta.sqlMode = false;
-          // Reset detection flag when manually switching to NLP mode
+          // NLP mode turned ON - reset detection flag
           isNaturalLanguageDetected.value = false;
-
-          // CRITICAL: User manually toggled NLP mode ON
-          // We need to prevent the next auto-detection from turning it back OFF
-          // The existing text in editor might be SQL, which would trigger auto-detection
-          // and emit nlpModeDetected:false, turning NLP mode back OFF
-          // So we don't emit auto-detection events when nlpMode prop is already true
         } else if (newNlpMode === false && oldNlpMode === true) {
-          // NLP mode turned OFF - default to SQL mode
-          console.log(
-            "[NL2Q-Handler] NLP mode disabled, switching to SQL mode",
-          );
-
-          // CRITICAL: Preserve the current editor content (e.g., AI-generated SQL)
-          // Sync editorValue → query BEFORE enabling sqlMode, so the fullSQLMode
-          // watcher in Index.vue doesn't rebuild the query from stale data.
-          const currentEditorValue = searchObj.data.editorValue || "";
-          if (currentEditorValue.trim()) {
-            searchObj.data.query = currentEditorValue;
-          }
-
-          // Set manual trigger flag so the fullSQLMode watcher skips setQuery()
-          searchObj.meta.sqlModeManualTrigger = true;
-          searchObj.meta.sqlMode = true;
-          // Reset flags
+          // NLP mode turned OFF - reset flags
           isNaturalLanguageDetected.value = false;
           hasInteractedWithAI.value = false;
         }
@@ -4513,9 +4476,16 @@ export default defineComponent({
     }
 
     function buildStreamQuery(stream, fieldList, isQuickMode) {
+      const selectFields =
+        fieldList.length > 0 && isQuickMode
+          ? fieldList
+              .map((field) => quoteSqlIdentifierIfNeeded(field))
+              .join(",")
+          : "*";
+
       return QUERY_TEMPLATE.replace("[STREAM_NAME]", stream).replace(
         "[FIELD_LIST]",
-        fieldList.length > 0 && isQuickMode ? fieldList.join(",") : "*",
+        selectFields,
       );
     }
 
@@ -5390,6 +5360,9 @@ export default defineComponent({
     addSearchTerm() {
       return this.searchObj.data.stream.addToFilter;
     },
+    removeFieldTerm() {
+      return this.searchObj.data.stream.removeFilterField;
+    },
     toggleTransformEditor() {
       return this.searchObj.meta.showTransformEditor;
     },
@@ -5469,14 +5442,14 @@ export default defineComponent({
               // if query contains where clause then add filter after that with and operator and keep order by or limit after that
               // if query does not contain where clause then add where clause before filter
               if (query.toLowerCase().includes("where")) {
-                // Try to replace existing condition for this field first
+                // Replace an existing condition for this field, or append if none.
                 const fieldNameSQL = getFieldFromExpression(filter);
-                const replacedSQL = fieldNameSQL
-                  ? replaceExistingFieldCondition(query, fieldNameSQL, filter)
-                  : query;
-
-                if (replacedSQL !== query) {
-                  query = replacedSQL;
+                if (fieldNameSQL && hasFieldCondition(query, fieldNameSQL)) {
+                  query = replaceExistingFieldCondition(
+                    query,
+                    fieldNameSQL,
+                    filter,
+                  );
                 } else if (query.toLowerCase().includes("order by")) {
                   const [beforeOrderBy, afterOrderBy] = queryIndexSplit(
                     query,
@@ -5554,15 +5527,12 @@ export default defineComponent({
               currentQuery[0] = query;
             } else {
               const fieldName = getFieldFromExpression(filter);
-              const replaced = fieldName
-                ? replaceExistingFieldCondition(
-                    currentQuery[0],
-                    fieldName,
-                    filter,
-                  )
-                : currentQuery[0];
-              if (replaced !== currentQuery[0]) {
-                currentQuery[0] = replaced;
+              if (fieldName && hasFieldCondition(currentQuery[0], fieldName)) {
+                currentQuery[0] = replaceExistingFieldCondition(
+                  currentQuery[0],
+                  fieldName,
+                  filter,
+                );
               } else {
                 currentQuery[0].length == 0
                   ? (currentQuery[0] = filter)
@@ -5585,6 +5555,17 @@ export default defineComponent({
             this.queryEditorRef.setValue(this.searchObj.data.query);
         }
       }
+    },
+    removeFieldTerm(fieldName: string) {
+      if (!fieldName) return;
+      const newValue = removeFieldCondition(
+        this.searchObj.data.editorValue,
+        fieldName,
+      );
+      this.searchObj.data.editorValue = newValue;
+      this.searchObj.data.query = newValue;
+      this.searchObj.data.stream.removeFilterField = "";
+      if (this.queryEditorRef?.setValue) this.queryEditorRef.setValue(newValue);
     },
     toggleTransformEditor(newVal) {
       if (newVal == false) {

@@ -22,6 +22,10 @@ import { Mock } from 'vitest';
 import Index from "@/plugins/logs/Index.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+vi.mock("@/stores", async () => {
+  const { default: store } = await import("@/test/unit/helpers/store");
+  return { default: store };
+});
 // @ts-ignore
 import { rest } from "msw";
 import searchService from "@/services/search";
@@ -198,7 +202,7 @@ vi.mock("@/composables/useDashboardPanelData", () => ({
     generateLabelFromName: (name: string) => name,
     resetDashboardPanelData: vi.fn()
   })
-  
+
 }));
 vi.mock('@/composables/useLogs', async () => {
   // Import the real module
@@ -243,7 +247,7 @@ describe("Logs Index", async () => {
     vi.spyOn(store, 'dispatch').mockResolvedValue(undefined as any);
     // default safe mock to avoid destructuring errors in watchers
     (getFieldsFromQuery as Mock).mockResolvedValue({ fields: [], filters: [], streamName: '' });
-    
+
     wrapper = mount(Index, {
       attachTo: "#app",
       global: {
@@ -264,7 +268,7 @@ describe("Logs Index", async () => {
 
 
   it("Should hide index list when showFields is false.", async () => {
-    
+
 
     wrapper.vm.searchObj.meta.showFields = false;
     await flushPromises();
@@ -294,6 +298,24 @@ describe("Logs Index", async () => {
     // Verify the query was transformed correctly
     expect(wrapper.vm.searchObj.data.query).toBe('SELECT field1,field2 FROM "stream1" WHERE field2 > 5');
     expect(wrapper.vm.searchObj.data.editorValue).toBe('SELECT field1,field2 FROM "stream1" WHERE field2 > 5');
+  });
+
+  it("Should keep non-reserved fields unquoted when converting to SQL mode", async () => {
+    wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
+    wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "message" }, { name: "user" }];
+    wrapper.vm.searchObj.data.stream.interestingFieldList = ["message", "user"];
+    wrapper.vm.searchObj.meta.quickMode = true;
+    wrapper.vm.searchObj.data.query = "message='asdf' and user='test'";
+
+    await wrapper.vm.setQuery(true);
+    await flushPromises();
+
+    expect(wrapper.vm.searchObj.data.query).toBe(
+      'SELECT message,"user" FROM "stream1" WHERE message = \'asdf\' and "user" = \'test\'',
+    );
+    expect(wrapper.vm.searchObj.data.editorValue).toBe(
+      'SELECT message,"user" FROM "stream1" WHERE message = \'asdf\' and "user" = \'test\'',
+    );
   });
 
   it("Should modify SQL query when adding/removing interesting fields", async () => {
@@ -353,7 +375,7 @@ describe("Logs Index", async () => {
         ]
       }]
     };
-    
+
     // Add a new field (field2) to the query
     await wrapper.vm.setInterestingFieldInSQLQuery({
       "name": "field2",
@@ -361,7 +383,7 @@ describe("Logs Index", async () => {
       "isSchemaField": true,
       "group": "my_stream1",
       "streams": [
-          "my_stream1"
+        "my_stream1"
       ],
       "showValues": true,
       "isInterestingField": true
@@ -418,16 +440,54 @@ describe("Logs Index", async () => {
     // Test with empty interesting fields list
     wrapper.vm.searchObj.data.stream.interestingFieldList = [];
     wrapper.vm.searchObj.data.query = 'SELECT field1,field2 FROM "my_stream1" WHERE level = "error"';
-    
+
     await wrapper.vm.handleQuickModeChange();
     await flushPromises();
 
     // Verify query reverts to SELECT * when no interesting fields
     expect(wrapper.vm.searchObj.data.query).toBe('SELECT * FROM "my_stream1" WHERE level = "error"');
-    
+
     // Cleanup
     setQuerySpy.mockRestore();
     updateUrlQueryParamsSpy.mockRestore();
+  });
+
+  it('Should quote only reserved newly added interesting fields after enabling quick mode in SQL mode', async () => {
+    wrapper.vm.searchObj.meta.sqlMode = true;
+    wrapper.vm.searchObj.meta.quickMode = true;
+    wrapper.vm.searchObj.data.stream.selectedStream = ["my_stream1"];
+    wrapper.vm.searchObj.data.stream.interestingFieldList = ["field1"];
+    wrapper.vm.searchObj.data.query = 'SELECT * FROM "my_stream1" WHERE field1 = 5';
+    wrapper.vm.searchObj.data.editorValue = wrapper.vm.searchObj.data.query;
+    wrapper.vm.searchObj.data.streamResults.list = [
+      {
+        name: "my_stream1",
+        schema: [
+          { name: "field1" },
+          { name: "user" },
+        ],
+      },
+    ];
+
+    await wrapper.vm.handleQuickModeChange();
+    await flushPromises();
+
+    await wrapper.vm.setInterestingFieldInSQLQuery(
+      {
+        name: "user",
+        ftsKey: false,
+        isSchemaField: true,
+        group: "my_stream1",
+        streams: ["my_stream1"],
+        showValues: true,
+        isInterestingField: false,
+      },
+      false,
+    );
+    await flushPromises();
+
+    expect(wrapper.vm.searchObj.data.query).toContain('SELECT field1, "user" FROM "my_stream1"');
+    expect(wrapper.vm.searchObj.data.editorValue).toContain('SELECT field1, "user" FROM "my_stream1"');
   });
 
   it.skip("Should properly set fields and conditions for dashboard panel", async () => {
@@ -436,7 +496,7 @@ describe("Logs Index", async () => {
     wrapper.vm.searchObj.data.stream.streamType = "logs";
     wrapper.vm.searchObj.data.stream.selectedStream = ["my_stream1"];
     wrapper.vm.searchObj.data.query = 'SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1, level FROM "my_stream1" WHERE level = "error"';
-    
+
     // Mock store state
     store.state.zoConfig.timestamp_column = "_timestamp";
 
@@ -472,7 +532,7 @@ describe("Logs Index", async () => {
 
     // Verify dashboard panel data was set correctly
     const panelData = wrapper.vm.dashboardPanelData.data.queries[0].fields;
-    
+
     // Check stream settings
     expect(panelData.stream_type).toBe("logs");
     expect(panelData.stream).toBe("my_stream1");
@@ -614,34 +674,34 @@ describe("Logs Index", async () => {
   it("Should handle search history toggling via route action query", async () => {
     // Ensure initial state
     expect(wrapper.vm.showSearchHistory).toBe(false);
-    
+
     // Navigate to history view
-    await wrapper.vm.router.push({ 
-      name: 'logs', 
-      query: { 
-        action: 'history', 
-        org_identifier: store.state.selectedOrganization.identifier 
-      } 
+    await wrapper.vm.router.push({
+      name: 'logs',
+      query: {
+        action: 'history',
+        org_identifier: store.state.selectedOrganization.identifier
+      }
     });
-    
+
     // Wait for all async operations and route changes
     await flushPromises();
     await wrapper.vm.$nextTick();
-    
+
     expect(wrapper.vm.showSearchHistory).toBe(true);
 
     // Navigate back to normal view
-    await wrapper.vm.router.push({ 
-      name: 'logs', 
-      query: { 
-        org_identifier: store.state.selectedOrganization.identifier 
-      } 
+    await wrapper.vm.router.push({
+      name: 'logs',
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier
+      }
     });
-    
+
     // Wait for all async operations and route changes
     await flushPromises();
     await wrapper.vm.$nextTick();
-    
+
     expect(wrapper.vm.showSearchHistory).toBe(false);
     expect(wrapper.vm.showSearchScheduler).toBe(false);
   }, 10000);
