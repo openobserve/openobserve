@@ -111,6 +111,7 @@ pub async fn search(
     // get stream name
     let stream = TableReference::from(empty_exec.name());
     let stream_type = stream.get_stream_type(req.stream_type);
+    let stream_key = format!("{}/{}", stream_type, stream.stream_name());
 
     // 1. get file id list
     let file_id_list = get_file_id_lists(
@@ -161,7 +162,8 @@ pub async fn search(
                 .map(RoleGroup::from)
         })
         .unwrap_or(Some(RoleGroup::Interactive));
-    let mut nodes = get_online_querier_nodes(&trace_id, role_group).await?;
+    let mut nodes =
+        get_online_querier_nodes(&trace_id, &req.org_id, &stream_key, role_group).await?;
 
     // local mode, only use local node as querier node
     if req.local_mode.unwrap_or_default() {

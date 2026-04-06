@@ -48,7 +48,7 @@ use datafusion::{
     prelude::{SessionContext, col},
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::WorkGroup};
+use o2_enterprise::enterprise::search::WorkGroup;
 #[cfg(all(feature = "enterprise", feature = "vortex"))]
 use {
     vortex::{VortexSessionDefault, io::session::RuntimeSessionExt, session::VortexSession},
@@ -65,7 +65,6 @@ use crate::service::search::{
 };
 
 pub(crate) const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
-pub(crate) const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
 
 pub fn create_session_config(
     sorted_by_time: bool,
@@ -77,10 +76,7 @@ pub fn create_session_config(
     } else {
         target_partitions
     };
-    let target_partitions = max(
-        DATAFUSION_MIN_PARTITION,
-        max(cfg.limit.datafusion_min_partition_num, target_partitions),
-    );
+    let target_partitions = max(cfg.limit.datafusion_min_partition_num, target_partitions);
     let mut config = SessionConfig::from_env()?
         .with_batch_size(get_batch_size())
         .with_target_partitions(target_partitions)
@@ -397,10 +393,7 @@ impl TableBuilder {
         } else {
             session.target_partitions
         };
-        let target_partitions = max(
-            DATAFUSION_MIN_PARTITION,
-            max(cfg.limit.datafusion_min_partition_num, target_partitions),
-        );
+        let target_partitions = max(cfg.limit.datafusion_min_partition_num, target_partitions);
 
         #[cfg(feature = "enterprise")]
         let (target_partitions, _) = get_cpu_and_mem_limit(
@@ -569,29 +562,24 @@ impl TableBuilder {
 async fn get_cpu_and_mem_limit(
     trace_id: &str,
     work_group: Option<String>,
-    mut target_partitions: usize,
-    mut memory_size: usize,
+    target_partitions: usize,
+    memory_size: usize,
 ) -> Result<(usize, usize)> {
-    if let Some(wg) = work_group.as_ref()
+    let (target_partitions, memory_size) = if let Some(wg) = work_group.as_ref()
         && let Ok(wg) = WorkGroup::from_str(wg)
     {
-        let (cpu, mem) = wg.get_dynamic_resource().await.map_err(|e| {
-            DataFusionError::Execution(format!("Failed to get dynamic resource: {e}"))
-        })?;
-        if get_o2_config().search_group.cpu_limit_enabled {
-            target_partitions = std::cmp::max(
-                get_config().limit.datafusion_min_partition_num,
-                target_partitions * cpu as usize / 100,
-            );
-        }
-        memory_size = memory_size * mem as usize / 100;
-    }
-
-    let target_partitions = if target_partitions == 0 {
-        DATAFUSION_MIN_PARTITION
+        wg.get_resource(trace_id, target_partitions, memory_size)
+            .await
+            .map_err(|e| {
+                DataFusionError::Execution(format!("Failed to get dynamic resource: {e}"))
+            })?
     } else {
-        target_partitions
+        (target_partitions, memory_size)
     };
+    let target_partitions = std::cmp::max(
+        get_config().limit.datafusion_min_partition_num,
+        target_partitions,
+    );
 
     log::info!(
         "[trace_id: {trace_id}] work_group: {work_group:?}, target_partitions: {target_partitions}, memory_size: {memory_size}"
@@ -627,7 +615,6 @@ mod tests {
             get_config()
                 .limit
                 .cpu_num
-                .max(DATAFUSION_MIN_PARTITION)
                 .max(get_config().limit.datafusion_min_partition_num)
         );
         assert_eq!(config.options().execution.batch_size, get_batch_size());
@@ -644,11 +631,8 @@ mod tests {
         let config = create_session_config(true, target_partitions)?;
 
         let expected_partitions = std::cmp::max(
-            DATAFUSION_MIN_PARTITION,
-            std::cmp::max(
-                get_config().limit.datafusion_min_partition_num,
-                target_partitions,
-            ),
+            get_config().limit.datafusion_min_partition_num,
+            target_partitions,
         );
 
         assert_eq!(
@@ -910,7 +894,7 @@ mod tests {
             let config = create_session_config(false, 1)?; // Very small number
 
             let actual_partitions = config.options().execution.target_partitions;
-            assert!(actual_partitions >= DATAFUSION_MIN_PARTITION);
+            assert!(actual_partitions >= get_config().limit.datafusion_min_partition_num);
 
             Ok(())
         }

@@ -253,6 +253,18 @@ vi.mock("@/composables/useStreamingSearch", () => ({
   }),
 }));
 
+vi.mock("@/utils/query/sqlIdentifiers", () => ({
+  quoteSqlIdentifierIfNeeded: vi.fn((identifier: string) =>
+    identifier.toUpperCase() === "USER" ? `"${identifier}"` : identifier,
+  ),
+  stripSqlIdentifierQuotes: vi.fn((identifier: string) =>
+    identifier.replace(/"/g, ""),
+  ),
+  needsSqlIdentifierQuoting: vi.fn((identifier: string) =>
+    identifier.toUpperCase() === "USER"
+  ),
+}));
+
 // 1. Define your mock function FIRST
 vi.mock("@/services/stream", () => {
   // Define the mock function with a console.log
@@ -1611,8 +1623,23 @@ describe("Index List", async () => {
   });
 
   it("adds field to filter with correct format", async () => {
+    wrapper.vm.searchObj.meta.sqlMode = false;
     wrapper.vm.addToFilter("field1=value1");
     expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("field1=value1");
+  });
+
+  it("keeps simple field unquoted when adding filter in SQL mode", async () => {
+    wrapper.vm.searchObj.meta.sqlMode = true;
+    wrapper.vm.addToFilter("default='alice'");
+    expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("default='alice'");
+  });
+
+  it("quotes reserved field when adding filter in SQL mode", async () => {
+    wrapper.vm.searchObj.meta.sqlMode = true;
+    wrapper.vm.addToFilter("user='alice'");
+    expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe(
+      '"user"=\'alice\'',
+    );
   });
 
   it("toggles field selection in clickFieldFn", async () => {

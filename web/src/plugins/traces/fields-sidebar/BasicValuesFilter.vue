@@ -147,6 +147,7 @@
           :active-exclude-values="activeExcludeValues"
           @add-search-term="handleAddSearchTerm"
           @add-multiple-search-terms="handleAddMultipleSearchTerms"
+          @remove-field-filter="handleRemoveFieldFilter"
           @load-more-values="handleLoadMoreValues"
           @search-field-values="handleSearchFieldValues"
         />
@@ -447,6 +448,10 @@ const handleAddMultipleSearchTerms = (
   const combined =
     expressions.length > 1 ? `(${expressions.join(joinOp)})` : expressions[0];
   addSearchTerm(combined);
+};
+
+const handleRemoveFieldFilter = () => {
+  searchObj.data.stream.removeFilterField = props.row.name;
 };
 
 const handleBeforeHide = () => {
