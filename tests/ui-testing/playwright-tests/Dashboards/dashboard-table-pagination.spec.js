@@ -1038,7 +1038,7 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     // Focus on the editor and enter a simple PromQL query using keyboard.type for reliable Monaco input
     await queryEditor.getByRole('code').click();
     await page.keyboard.press('Control+a');
-    await page.keyboard.type('up');
+    await page.keyboard.type('cpu_usage{}');
     await page.keyboard.press('Escape'); // Dismiss any Monaco autocomplete suggestions
 
     // Apply
@@ -1128,7 +1128,7 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     // Focus on the editor and enter a PromQL query using keyboard.type for reliable Monaco input
     await queryEditor.getByRole('code').click();
     await page.keyboard.press('Control+a');
-    await page.keyboard.type('up');
+    await page.keyboard.type('cpu_usage{}');
     await page.keyboard.press('Escape'); // Dismiss any Monaco autocomplete suggestions
 
     // Apply
@@ -1167,7 +1167,7 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     }
 
     // Data is required for pagination to render - fail clearly if still no data
-    expect(hasRows, 'PromQL query "up" must return data rows for pagination test - check metrics ingestion').toBe(true);
+    expect(hasRows, 'PromQL query "cpu_usage{}" must return data rows for pagination test - check metrics ingestion').toBe(true);
 
     // Wait for the table bottom container which holds all pagination controls
     // (PromQL with legend uses a custom bottom slot that also has this data-test)

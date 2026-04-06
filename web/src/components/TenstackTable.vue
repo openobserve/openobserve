@@ -384,7 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <tr
               v-for="(row, rowIdx) in pagedRows"
               :key="row.id"
-              class="tw:border-b tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
+              class="dashboard-data-row tw:border-b tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
               @click="
                 handleDataRowClick(row.original, rowIdx as number, $event)
               "
