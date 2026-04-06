@@ -13,13 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use chrono::{TimeZone, Utc};
 use config::meta::{bitvec::BitVec, stream::FileKey};
 use hashbrown::HashMap;
 use object_store::ObjectMeta;
-use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 
 use super::{ACCOUNT_SEPARATOR, TRACE_ID_SEPARATOR};

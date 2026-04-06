@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use config::SOURCEMAP_MEM_CACHE_SIZE;
 use hashbrown::HashMap;
@@ -24,7 +24,6 @@ use infra::{
     errors::{self, DbError},
     table::source_maps::SourceMap,
 };
-use once_cell::sync::Lazy;
 use parquet::data_type::AsBytes;
 use serde::Serialize;
 use tokio::sync::RwLock;

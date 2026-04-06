@@ -15,7 +15,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    sync::Arc,
+    sync::{Arc, LazyLock as Lazy},
 };
 
 use config::meta::promql::{
@@ -23,7 +23,6 @@ use config::meta::promql::{
     value::{Label, LabelsExt, RangeValue, Sample, Value, signature},
 };
 use datafusion::error::{DataFusionError, Result};
-use once_cell::sync::Lazy;
 use promql_parser::parser::{BinaryExpr, VectorMatchCardinality, token};
 use rayon::prelude::*;
 
