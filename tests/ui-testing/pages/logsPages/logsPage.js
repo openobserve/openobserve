@@ -5835,8 +5835,16 @@ export class LogsPage {
      * @param {string} query - The SQL query to set
      */
     async setQueryEditorContent(query) {
+        // Wait for the Monaco editor container to be visible before interacting.
+        // enableSqlModeIfNeeded() only waits for the toggle to flip; the editor
+        // renders asynchronously after that, so we must wait here too.
+        await this.page.locator('[data-test="logs-search-bar-query-editor"]').waitFor({
+            state: 'visible',
+            timeout: 15000,
+        });
         // Monaco's .inputarea is behind the .view-line overlay, so use force:true to bypass
         const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea');
+        await inputArea.waitFor({ state: 'attached', timeout: 10000 });
         await inputArea.click({ force: true });
         await inputArea.fill(query);
         // Wait for Monaco to render the new content in the view-line
