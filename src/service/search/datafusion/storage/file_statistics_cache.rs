@@ -21,7 +21,10 @@ use std::{
 use dashmap::DashMap;
 use datafusion::{
     common::Statistics,
-    execution::cache::{CacheAccessor, cache_manager::FileStatisticsCacheEntry},
+    execution::cache::{
+        CacheAccessor,
+        cache_manager::{CachedFileMetadata, FileStatisticsCacheEntry},
+    },
 };
 use object_store::{ObjectMeta, path::Path};
 use once_cell::sync::Lazy;
@@ -129,46 +132,18 @@ impl Default for FileStatisticsCache {
     }
 }
 
-impl CacheAccessor<Path, Arc<Statistics>> for FileStatisticsCache {
-    type Extra = ObjectMeta;
-
-    /// Get `Statistics` for file location.
-    fn get(&self, k: &Path) -> Option<Arc<Statistics>> {
+impl CacheAccessor<Path, CachedFileMetadata> for FileStatisticsCache {
+    /// Get cached metadata for file location.
+    fn get(&self, k: &Path) -> Option<CachedFileMetadata> {
         let k = self.format_key(k);
-        self.statistics
-            .get(&k)
-            .map(|s| Some(s.value().1.clone()))
-            .unwrap_or(None)
-    }
-
-    /// Get `Statistics` for file location. Returns None if file has changed or not found.
-    fn get_with_extra(&self, k: &Path, e: &Self::Extra) -> Option<Arc<Statistics>> {
-        let k = self.format_key(k);
-        self.statistics
-            .get(&k)
-            .map(|s| {
-                let (saved_meta, statistics) = s.value();
-                if saved_meta.size != e.size || saved_meta.last_modified != e.last_modified {
-                    // file has changed
-                    None
-                } else {
-                    Some(statistics.clone())
-                }
-            })
-            .unwrap_or(None)
+        self.statistics.get(&k).map(|s| {
+            let (meta, statistics) = s.value();
+            CachedFileMetadata::new(meta.clone(), statistics.clone(), None)
+        })
     }
 
     /// Save collected file statistics
-    fn put(&self, _key: &Path, _value: Arc<Statistics>) -> Option<Arc<Statistics>> {
-        panic!("Put cache in FileStatisticsCache without Extra not supported.")
-    }
-
-    fn put_with_extra(
-        &self,
-        k: &Path,
-        value: Arc<Statistics>,
-        e: &Self::Extra,
-    ) -> Option<Arc<Statistics>> {
+    fn put(&self, k: &Path, value: CachedFileMetadata) -> Option<CachedFileMetadata> {
         let k = self.format_key(k);
         let mut w = self.cacher.lock();
 
@@ -188,12 +163,16 @@ impl CacheAccessor<Path, Arc<Statistics>> for FileStatisticsCache {
         }
         w.push_back(k.clone());
         drop(w);
-        self.statistics.insert(k, (e.clone(), value)).map(|x| x.1)
+        self.statistics
+            .insert(k, (value.meta.clone(), value.statistics.clone()))
+            .map(|(meta, stats)| CachedFileMetadata::new(meta, stats, None))
     }
 
-    fn remove(&self, k: &Path) -> Option<Arc<Statistics>> {
+    fn remove(&self, k: &Path) -> Option<CachedFileMetadata> {
         let k = self.format_key(k);
-        self.statistics.remove(&k).map(|x| x.1.1)
+        self.statistics
+            .remove(&k)
+            .map(|(_, (meta, stats))| CachedFileMetadata::new(meta, stats, None))
     }
 
     fn contains_key(&self, k: &Path) -> bool {
@@ -228,6 +207,7 @@ impl datafusion::execution::cache::cache_manager::FileStatisticsCache for FileSt
                     num_columns: stats.column_statistics.len(),
                     table_size_bytes: stats.total_byte_size,
                     statistics_size_bytes: 0,
+                    has_ordering: false,
                 },
             );
         }
@@ -255,36 +235,42 @@ mod tests {
             version: None,
         };
         let cache = FileStatisticsCache::default();
-        assert!(cache.get_with_extra(&meta.location, &meta).is_none());
+        assert!(cache.get(&meta.location).is_none());
 
-        cache.put_with_extra(
+        let stats: Arc<Statistics> = Statistics::new_unknown(&Schema::new(vec![Field::new(
+            "test_column",
+            DataType::Timestamp(TimeUnit::Second, None),
+            false,
+        )]))
+        .into();
+        cache.put(
             &meta.location,
-            Statistics::new_unknown(&Schema::new(vec![Field::new(
-                "test_column",
-                DataType::Timestamp(TimeUnit::Second, None),
-                false,
-            )]))
-            .into(),
-            &meta,
+            CachedFileMetadata::new(meta.clone(), stats, None),
         );
-        assert!(cache.get_with_extra(&meta.location, &meta).is_some());
+        let cached = cache.get(&meta.location);
+        assert!(cached.is_some());
+        assert!(cached.unwrap().is_valid_for(&meta));
 
         // file size changed
         let mut meta2 = meta.clone();
         meta2.size = 2048;
-        assert!(cache.get_with_extra(&meta2.location, &meta2).is_none());
+        let cached = cache.get(&meta2.location);
+        assert!(cached.is_some());
+        assert!(!cached.unwrap().is_valid_for(&meta2));
 
         // file last_modified changed
         let mut meta2 = meta.clone();
         meta2.last_modified = DateTime::parse_from_rfc3339("2022-09-27T22:40:00+02:00")
             .unwrap()
             .into();
-        assert!(cache.get_with_extra(&meta2.location, &meta2).is_none());
+        let cached = cache.get(&meta2.location);
+        assert!(cached.is_some());
+        assert!(!cached.unwrap().is_valid_for(&meta2));
 
         // different file
         let mut meta2 = meta;
         meta2.location = Path::from("test2");
-        assert!(cache.get_with_extra(&meta2.location, &meta2).is_none());
+        assert!(cache.get(&meta2.location).is_none());
     }
 
     #[test]
@@ -317,10 +303,13 @@ mod tests {
                 ),
             ]);
 
-            cache.put_with_extra(
+            cache.put(
                 &meta.location,
-                Statistics::new_unknown(&schema).into(),
-                &meta,
+                CachedFileMetadata::new(
+                    meta.clone(),
+                    Statistics::new_unknown(&schema).into(),
+                    None,
+                ),
             );
         }
 

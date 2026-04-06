@@ -70,6 +70,7 @@ pub(super) fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Res
     let mut deduplication_columns_proto = Vec::new();
     for column in exec.deduplication_columns() {
         let expr_proto = datafusion_proto::protobuf::PhysicalExprNode {
+            expr_id: None,
             expr_type: Some(
                 datafusion_proto::protobuf::physical_expr_node::ExprType::Column(
                     datafusion_proto::protobuf::PhysicalColumn {

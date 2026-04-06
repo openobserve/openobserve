@@ -626,6 +626,39 @@ describe("TenstackTable", () => {
       const th = wrapper.find('[data-test="o2-table-th-name"]');
       expect(th.attributes("style")).toContain("height: 48px");
     });
+
+    it("should apply the default rowHeight of 22px to th elements when rowHeight prop is not passed", () => {
+      wrapper = mountTable();
+      const th = wrapper.find('[data-test="o2-table-th-name"]');
+      expect(th.attributes("style")).toContain("height: 22px");
+    });
+  });
+
+  // ── totalSize computed ─────────────────────────────────────────────────────
+  describe("totalSize computed", () => {
+    it("should set the table minHeight to getTotalSize() + rowHeight when using default rowHeight", () => {
+      // Mock returns count * 24 for getTotalSize(). With 3 rows: 3*24 = 72.
+      // Default rowHeight = 22. Expected totalSize = 72 + 22 = 94.
+      wrapper = mountTable();
+      const table = wrapper.find('[data-test="o2-table"]');
+      expect(table.attributes("style")).toContain("min-height: 94px");
+    });
+
+    it("should set the table minHeight to getTotalSize() + rowHeight when rowHeight is explicitly provided", () => {
+      // Mock returns count * 24 for getTotalSize(). With 3 rows: 3*24 = 72.
+      // rowHeight = 48. Expected totalSize = 72 + 48 = 120.
+      wrapper = mountTable({ rowHeight: 48 });
+      const table = wrapper.find('[data-test="o2-table"]');
+      expect(table.attributes("style")).toContain("min-height: 120px");
+    });
+
+    it("should set the table minHeight to getTotalSize() + rowHeight when rows is empty", () => {
+      // Mock returns 0 * 24 = 0 for getTotalSize(). Default rowHeight = 22.
+      // Expected totalSize = 0 + 22 = 22.
+      wrapper = mountTable({ rows: [] });
+      const table = wrapper.find('[data-test="o2-table"]');
+      expect(table.attributes("style")).toContain("min-height: 22px");
+    });
   });
 
   // ── wrap prop ─────────────────────────────────────────────────────────────
