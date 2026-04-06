@@ -427,6 +427,7 @@ const updatePlayerState = () => {
   if (!player?.value) return;
   const playerMeta = player.value?.getMetaData();
 
+  if (!playerMeta) return;
   playerState.value.startTime = playerMeta?.startTime;
   playerState.value.endTime = playerMeta?.endTime;
   playerState.value.totalTime = playerMeta?.totalTime;
