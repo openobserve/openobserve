@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         default-opened
       >
         <div class="tw:p-4">
-          <FieldAliassConfig
+          <SemanticFieldGroupsConfig
             v-model:semantic-field-groups="localSemanticGroups"
             @update:semantic-field-groups="handleSemanticGroupsUpdate"
           />
