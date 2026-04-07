@@ -134,7 +134,7 @@ pub fn estimate_json_bytes(val: &Value) -> usize {
             }
         }
         Value::String(s) => {
-            // count escapable characters in one pass; they are escaped in input json
+            // count quotes and backslashes in one pass; these add an extra byte when escaped
             // also we use bytes() here as sometimes compiler can optimize it faster with sse
             // see https://users.rust-lang.org/t/count-number-of-z-in-a-string/49763/5
             let (quote_count, slash_count) =
