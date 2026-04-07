@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -368,6 +368,7 @@ impl SendReport for Report {
                     name: self.name.clone(),
                     message: self.message.clone(),
                     dashb_url: format!("{}{}/web", cfg.common.web_url, cfg.common.base_uri),
+                    image_preview: self.image_preview,
                 },
             };
 

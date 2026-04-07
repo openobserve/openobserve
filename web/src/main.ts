@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -112,7 +112,12 @@ const getConfig = async () => {
             const errorStack = event.error?.stack || "";
 
             // List of error patterns to ignore
-            const ignoredErrorPatterns = [/ResizeObserver loop/i];
+            const ignoredErrorPatterns = [
+              /ResizeObserver loop/i,
+              /RS SDK/i,
+              /reo.dev/i,
+              /Cannot set properties of null \(setting 'innerHTML'\)/,
+            ];
 
             // Check if error matches any ignored pattern
             const shouldIgnore = ignoredErrorPatterns.some(

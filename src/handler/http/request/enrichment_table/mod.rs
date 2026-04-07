@@ -690,31 +690,31 @@ fn validate_enrichment_url(url: &str) -> Result<(), String> {
         .ok_or_else(|| "URL must have a valid host".to_string())?;
 
     // Block localhost
+    let host = host.trim_start_matches('[').trim_end_matches(']');
     if host == "localhost" || host == "127.0.0.1" || host == "::1" {
         return Err("Cannot access localhost URLs".to_string());
     }
 
     // Block private IP ranges
     if let Ok(ip) = host.parse::<std::net::IpAddr>() {
-        match ip {
-            std::net::IpAddr::V4(v4) => {
-                let octets = v4.octets();
-                // RFC1918 private ranges: 10.x.x.x, 172.16-31.x.x, 192.168.x.x
-                // AWS metadata: 169.254.169.254
-                if octets[0] == 10
-                    || (octets[0] == 172 && (16..=31).contains(&octets[1]))
-                    || (octets[0] == 192 && octets[1] == 168)
-                    || (octets[0] == 169 && octets[1] == 254)
-                {
-                    return Err("Cannot access private IP addresses".to_string());
+        let v4 = match ip {
+            std::net::IpAddr::V4(v4) => Some(v4),
+            std::net::IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
+                Some(v4) => Some(v4),
+                None => {
+                    // Native IPv6: block ULA (fc00::/7) and link-local (fe80::/10)
+                    let seg0 = v6.segments()[0];
+                    if v6.is_loopback() || (seg0 & 0xfe00 == 0xfc00) || (seg0 & 0xffc0 == 0xfe80) {
+                        return Err("Cannot access private IP addresses".to_string());
+                    }
+                    None
                 }
-            }
-            std::net::IpAddr::V6(v6) => {
-                // Block IPv6 localhost and private ranges
-                if v6.is_loopback() || v6.segments()[0] & 0xfe00 == 0xfc00 {
-                    return Err("Cannot access private IP addresses".to_string());
-                }
-            }
+            },
+        };
+        if let Some(ip) = v4
+            && (ip.is_loopback() || ip.is_private() || ip.is_link_local() || ip.is_unspecified())
+        {
+            return Err("Cannot access private IP addresses".to_string());
         }
     }
 
@@ -822,5 +822,21 @@ mod tests {
             validate_enrichment_url("https://raw.githubusercontent.com/user/repo/main/data.csv")
                 .is_ok()
         );
+    }
+    #[test]
+    fn test_validate_enrichment_url_ipv6() {
+        let ips = [
+            "http://[::1]/api/{org}/",
+            "http://[::ffff:127.0.0.1]/admin",
+            "http://[::ffff:169.254.169.254]/latest/meta-data/",
+            "http://[::ffff:10.0.0.1]/secret",
+            "http://[fc00::1]/secret",
+            "http://[fe80::1]/secret",
+            "http://169.254.169.254/",
+            "http://0.0.0.0/",
+        ];
+        for ip in ips {
+            assert!(validate_enrichment_url(ip).is_err());
+        }
     }
 }

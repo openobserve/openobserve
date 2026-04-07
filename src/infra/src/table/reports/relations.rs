@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::dashboards::reports::ReportDashboard as MetaReportDashboard;
+use config::meta::dashboards::reports::{
+    ReportAttachmentDimensions, ReportDashboard as MetaReportDashboard,
+};
 use sea_orm::{ActiveValue::NotSet, ConnectionTrait, Set};
 
 use super::{super::entity::report_dashboards, Error, intermediate, queries};
@@ -65,12 +67,23 @@ pub async fn relations_to_create<C: ConnectionTrait>(
             serde_json::to_value(updated_timerange_intermediate)?;
         let timerange = Set(updated_timerange_json);
 
+        let report_type = Set(i16::from(rltn.report_type.clone()));
+        let email_attachment_type = Set(i16::from(rltn.email_attachment_type.clone()));
+        let attachment_dimensions = Set(rltn
+            .attachment_dimensions
+            .as_ref()
+            .map(serde_json::to_value)
+            .transpose()?);
+
         to_create.push(report_dashboards::ActiveModel {
             report_id: Set(report_id.to_owned()),
             dashboard_id: Set(dashboard.id.clone()),
             tab_names,
             variables,
             timerange,
+            report_type,
+            email_attachment_type,
+            attachment_dimensions,
         });
     }
 
@@ -135,7 +148,48 @@ pub fn relations_to_update(
             NotSet
         };
 
-        if tab_names.is_not_set() && variables.is_not_set() && timerange.is_not_set() {
+        let existing_report_type = ex_rltn.report_dashboard_report_type;
+        let desired_report_type = i16::from(des_rltn.report_type.clone());
+        let report_type = if existing_report_type != desired_report_type {
+            Set(desired_report_type)
+        } else {
+            NotSet
+        };
+
+        let existing_attachment_type = ex_rltn.report_dashboard_email_attachment_type;
+        let desired_attachment_type = i16::from(des_rltn.email_attachment_type.clone());
+        let email_attachment_type = if existing_attachment_type != desired_attachment_type {
+            Set(desired_attachment_type)
+        } else {
+            NotSet
+        };
+
+        let existing_dims: Option<ReportAttachmentDimensions> = ex_rltn
+            .report_dashboard_attachment_dimensions
+            .as_ref()
+            .and_then(|v| serde_json::from_value(v.clone()).ok());
+        let attachment_dimensions = if existing_dims.as_ref().map(|d| (d.width, d.height))
+            != des_rltn
+                .attachment_dimensions
+                .as_ref()
+                .map(|d| (d.width, d.height))
+        {
+            Set(des_rltn
+                .attachment_dimensions
+                .as_ref()
+                .map(serde_json::to_value)
+                .transpose()?)
+        } else {
+            NotSet
+        };
+
+        if tab_names.is_not_set()
+            && variables.is_not_set()
+            && timerange.is_not_set()
+            && report_type.is_not_set()
+            && email_attachment_type.is_not_set()
+            && attachment_dimensions.is_not_set()
+        {
             continue;
         }
 
@@ -145,6 +199,9 @@ pub fn relations_to_update(
             tab_names,
             variables,
             timerange,
+            report_type,
+            email_attachment_type,
+            attachment_dimensions,
         });
     }
 

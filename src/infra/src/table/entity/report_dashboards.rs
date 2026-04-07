@@ -12,6 +12,13 @@ pub struct Model {
     pub tab_names: Json,
     pub variables: Json,
     pub timerange: Json,
+    /// 0 = PDF (default), 1 = PNG
+    pub report_type: i16,
+    /// 0 = Standard (default), 1 = Inline
+    pub email_attachment_type: i16,
+    /// Optional JSON object with `width` and `height` fields (u32).
+    /// When NULL the report server uses its configured defaults.
+    pub attachment_dimensions: Option<Json>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

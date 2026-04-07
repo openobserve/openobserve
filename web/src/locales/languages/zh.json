@@ -2695,7 +2695,14 @@
     "cached": "已缓存",
     "cachedReport": "缓存报表",
     "destination": "接收地址",
-    "scheduled": "已计划"
+    "scheduled": "已计划",
+    "reportFormat": "报告格式",
+    "reportType": "报告类型",
+    "attachmentType": "附件风格",
+    "dimensionWidth": "宽度 (px)",
+    "dimensionHeight": "高度 (px)",
+    "imagePreview": "包括内联仪表板预览图片",
+    "customDimensions": "自定义尺寸（高级）"
   },
   "queries": {
     "runningQueries": "运行查询",

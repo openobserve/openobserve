@@ -2691,7 +2691,14 @@
     "cached": "mis en cache",
     "cachedReport": "Rapport mis en cache",
     "destination": "Destination",
-    "scheduled": "Planifié"
+    "scheduled": "Planifié",
+    "reportFormat": "Format du rapport",
+    "reportType": "Type de rapport",
+    "attachmentType": "Style de pièce jointe",
+    "dimensionWidth": "Largeur (px)",
+    "dimensionHeight": "Hauteur (px)",
+    "imagePreview": "Inclure une image d'aperçu du tableau de bord en ligne",
+    "customDimensions": "Dimensions personnalisées (avancées)"
   },
   "queries": {
     "runningQueries": "Exécution de requêtes",

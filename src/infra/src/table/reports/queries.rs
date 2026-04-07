@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,9 +16,11 @@
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use config::meta::{
     dashboards::reports::{
-        ListReportsParams, Report as MetaReport, ReportDashboard as MetaReportDashboard,
+        ListReportsParams, Report as MetaReport, ReportAttachmentDimensions,
+        ReportDashboard as MetaReportDashboard,
         ReportDashboardVariable as MetaReportDashboardVariable,
-        ReportDestination as MetaReportDestination, ReportFrequency as MetaReportFrequency,
+        ReportDestination as MetaReportDestination, ReportEmailAttachmentType,
+        ReportFrequency as MetaReportFrequency, ReportMediaType,
         ReportTimerange as MetaReportTimeRange,
     },
     folder::{Folder as MetaFolder, FolderType},
@@ -150,6 +152,16 @@ pub struct JoinReportDashboardFolderResults {
     /// The `timerange` JSON field from the `report_dashboards` table.
     pub report_dashboard_timerange: Json,
 
+    /// The `report_type` integer field from the `report_dashboards` table (0=PDF, 1=PNG).
+    pub report_dashboard_report_type: i16,
+
+    /// The `email_attachment_type` integer field from the `report_dashboards` table
+    /// (0=Standard, 1=Inline).
+    pub report_dashboard_email_attachment_type: i16,
+
+    /// The `attachment_dimensions` JSON field from the `report_dashboards` table (nullable).
+    pub report_dashboard_attachment_dimensions: Option<Json>,
+
     /// KSUID primary key of the dashboard.
     pub dashboard_id: String,
 
@@ -190,6 +202,18 @@ impl JoinReportDashboardFolderResults {
             .column_as(
                 report_dashboards::Column::Timerange,
                 "report_dashboard_timerange",
+            )
+            .column_as(
+                report_dashboards::Column::ReportType,
+                "report_dashboard_report_type",
+            )
+            .column_as(
+                report_dashboards::Column::EmailAttachmentType,
+                "report_dashboard_email_attachment_type",
+            )
+            .column_as(
+                report_dashboards::Column::AttachmentDimensions,
+                "report_dashboard_attachment_dimensions",
             )
             .column_as(dashboards::Column::Id, "dashboard_id")
             .column_as(dashboards::Column::DashboardId, "dashboard_snowflake_id")
@@ -253,7 +277,7 @@ impl TryFrom<SelectReportAndJoinRelationsResult> for (MetaFolder, MetaReport) {
             description: report_model.description.unwrap_or_default(),
             message: report_model.message.unwrap_or_default(),
             enabled: report_model.enabled,
-            media_type: config::meta::dashboards::reports::ReportMediaType::Pdf,
+            image_preview: report_model.image_preview,
             timezone: report_model.timezone,
             tz_offset: report_model.tz_offset,
             created_at: created_at_utc,
@@ -282,12 +306,22 @@ impl TryFrom<JoinReportDashboardFolderResults> for MetaReportDashboard {
             serde_json::from_value(value.report_dashboard_timerange)?;
         let timerange: MetaReportTimeRange = timerange_intermediate.into();
 
+        let report_type = ReportMediaType::from(value.report_dashboard_report_type);
+        let email_attachment_type =
+            ReportEmailAttachmentType::from(value.report_dashboard_email_attachment_type);
+        let attachment_dimensions: Option<ReportAttachmentDimensions> = value
+            .report_dashboard_attachment_dimensions
+            .and_then(|v| serde_json::from_value(v).ok());
+
         Ok(Self {
             dashboard: value.dashboard_snowflake_id,
             folder: value.dashboard_folder_snowflake_id,
             tabs: tab_names,
             variables,
             timerange,
+            report_type,
+            email_attachment_type,
+            attachment_dimensions,
         })
     }
 }
@@ -327,7 +361,6 @@ impl ListReportsQueryResult {
         params: &ListReportsParams,
     ) -> Result<Vec<Self>, sea_orm::DbErr> {
         let rslts = Self::select(params).all(conn).await?;
-        log::info!("rslts: {rslts:?}");
         Ok(rslts)
     }
 
@@ -417,23 +450,29 @@ mod tests {
         collapsed_eq!(
             &postgres_statement,
             r#"
-                SELECT 
+                SELECT
                 "report_dashboards"."report_id",
                 "report_dashboards"."dashboard_id",
                 "report_dashboards"."tab_names",
                 "report_dashboards"."variables",
                 "report_dashboards"."timerange",
+                "report_dashboards"."report_type",
+                "report_dashboards"."email_attachment_type",
+                "report_dashboards"."attachment_dimensions",
                 "report_dashboards"."report_id" AS "report_id",
                 "report_dashboards"."tab_names" AS "report_dashboard_tab_names",
                 "report_dashboards"."variables" AS "report_dashboard_variables",
                 "report_dashboards"."timerange" AS "report_dashboard_timerange",
+                "report_dashboards"."report_type" AS "report_dashboard_report_type",
+                "report_dashboards"."email_attachment_type" AS "report_dashboard_email_attachment_type",
+                "report_dashboards"."attachment_dimensions" AS "report_dashboard_attachment_dimensions",
                 "dashboards"."id" AS "dashboard_id",
                 "dashboards"."dashboard_id" AS "dashboard_snowflake_id",
                 "folders"."id" AS "dashboard_folder_id",
-                "folders"."folder_id" AS "dashboard_folder_snowflake_id" 
-                FROM "report_dashboards" 
-                INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id" 
-                INNER JOIN "folders" ON "dashboards"."folder_id" = "folders"."id" 
+                "folders"."folder_id" AS "dashboard_folder_snowflake_id"
+                FROM "report_dashboards"
+                INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id"
+                INNER JOIN "folders" ON "dashboards"."folder_id" = "folders"."id"
                 WHERE "report_dashboards"."report_id" = 'TEST_REPORT_ID'
             "#
         );
@@ -444,23 +483,29 @@ mod tests {
         collapsed_eq!(
             &sqlite_statement,
             r#"
-                SELECT 
+                SELECT
                 "report_dashboards"."report_id",
                 "report_dashboards"."dashboard_id",
                 "report_dashboards"."tab_names",
                 "report_dashboards"."variables",
                 "report_dashboards"."timerange",
+                "report_dashboards"."report_type",
+                "report_dashboards"."email_attachment_type",
+                "report_dashboards"."attachment_dimensions",
                 "report_dashboards"."report_id" AS "report_id",
                 "report_dashboards"."tab_names" AS "report_dashboard_tab_names",
                 "report_dashboards"."variables" AS "report_dashboard_variables",
                 "report_dashboards"."timerange" AS "report_dashboard_timerange",
+                "report_dashboards"."report_type" AS "report_dashboard_report_type",
+                "report_dashboards"."email_attachment_type" AS "report_dashboard_email_attachment_type",
+                "report_dashboards"."attachment_dimensions" AS "report_dashboard_attachment_dimensions",
                 "dashboards"."id" AS "dashboard_id",
                 "dashboards"."dashboard_id" AS "dashboard_snowflake_id",
                 "folders"."id" AS "dashboard_folder_id",
-                "folders"."folder_id" AS "dashboard_folder_snowflake_id" 
-                FROM "report_dashboards" 
-                INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id" 
-                INNER JOIN "folders" ON "dashboards"."folder_id" = "folders"."id" 
+                "folders"."folder_id" AS "dashboard_folder_snowflake_id"
+                FROM "report_dashboards"
+                INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id"
+                INNER JOIN "folders" ON "dashboards"."folder_id" = "folders"."id"
                 WHERE "report_dashboards"."report_id" = 'TEST_REPORT_ID'
             "#
         );
@@ -495,6 +540,7 @@ mod tests {
                 "reports"."created_at",
                 "reports"."updated_at",
                 "reports"."start_at",
+                "reports"."image_preview",
                 "reports"."id" AS "report_id",
                 "reports"."name" AS "report_name",
                 "reports"."owner" AS "report_owner",
@@ -544,6 +590,7 @@ mod tests {
                 "reports"."created_at",
                 "reports"."updated_at",
                 "reports"."start_at",
+                "reports"."image_preview",
                 "reports"."id" AS "report_id",
                 "reports"."name" AS "report_name",
                 "reports"."owner" AS "report_owner",
@@ -607,6 +654,7 @@ mod tests {
                 "reports"."created_at",
                 "reports"."updated_at",
                 "reports"."start_at",
+                "reports"."image_preview",
                 "reports"."id" AS "report_id",
                 "reports"."name" AS "report_name",
                 "reports"."owner" AS "report_owner",
@@ -662,6 +710,7 @@ mod tests {
                 "reports"."created_at",
                 "reports"."updated_at",
                 "reports"."start_at",
+                "reports"."image_preview",
                 "reports"."id" AS "report_id",
                 "reports"."name" AS "report_name",
                 "reports"."owner" AS "report_owner",
