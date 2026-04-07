@@ -129,17 +129,17 @@ async fn extract_filtered_semantic_dimensions(
         if let Some(alias_group) = semantic_groups.iter().find(|g| g.id == *group_id) {
             // Find first matching field from this semantic group
             for field_name in &alias_group.fields {
-                if let Some(value) = labels.get(field_name) {
-                    if !value.is_empty() {
-                        group_values.insert(group_id.clone(), value.clone());
-                        log::debug!(
-                            "[incidents] Mapped field '{}' → '{}' = '{}'",
-                            field_name,
-                            group_id,
-                            value
-                        );
-                        break; // Take first match from this group
-                    }
+                if let Some(value) = labels.get(field_name)
+                    && !value.is_empty()
+                {
+                    group_values.insert(group_id.clone(), value.clone());
+                    log::debug!(
+                        "[incidents] Mapped field '{}' → '{}' = '{}'",
+                        field_name,
+                        group_id,
+                        value
+                    );
+                    break; // Take first match from this group
                 }
             }
         } else {
@@ -276,15 +276,15 @@ fn extract_service_name_parallel(
 
     // Priority 2: Extract from labels using standard service field names
     for field in ["service", "service_name", "svc", "app"] {
-        if let Some(service) = labels.get(field) {
-            if !service.is_empty() {
-                log::debug!(
-                    "[incidents] Extracted service name from field '{}': '{}'",
-                    field,
-                    service
-                );
-                return service.clone();
-            }
+        if let Some(service) = labels.get(field)
+            && !service.is_empty()
+        {
+            log::debug!(
+                "[incidents] Extracted service name from field '{}': '{}'",
+                field,
+                service
+            );
+            return service.clone();
         }
     }
 

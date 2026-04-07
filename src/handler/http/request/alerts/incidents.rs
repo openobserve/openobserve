@@ -169,7 +169,7 @@ pub async fn list_incidents(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get an incident's details", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"description": "Get an incident's details", "category": "alerts", "pinned": true}))
     )
 )]
 pub async fn get_incident(Path((org_id, incident_id)): Path<(String, String)>) -> Response {

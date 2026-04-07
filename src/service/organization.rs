@@ -1038,7 +1038,7 @@ pub async fn ensure_sys_rca_agent(org_id: &str) -> Result<(), anyhow::Error> {
                 .await?;
             } else {
                 // Return the original error for non-"not found" failures
-                return Err(err.into());
+                return Err(err);
             }
         }
     }
@@ -1077,7 +1077,7 @@ pub async fn get_sre_agent_credentials(org_id: &str) -> Result<(String, String),
                 ensure_sys_rca_agent(org_id).await?;
             } else {
                 // Return the original error for non-"not found" failures
-                return Err(err.into());
+                return Err(err);
             }
         }
     }
