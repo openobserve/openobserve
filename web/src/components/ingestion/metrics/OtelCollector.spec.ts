@@ -151,6 +151,14 @@ describe('OtelCollector.vue', () => {
       const vm = wrapper.vm as any;
       expect(vm.getOtelHttpConfig).toContain('Authorization');
     });
+
+    it('should include service telemetry logs level warn in HTTP config', () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      expect(vm.getOtelHttpConfig).toContain('service:');
+      expect(vm.getOtelHttpConfig).toContain('telemetry:');
+      expect(vm.getOtelHttpConfig).toContain('level: warn');
+    });
   });
 
   describe('getOtelGrpcConfig Computed', () => {
@@ -194,6 +202,14 @@ describe('OtelCollector.vue', () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
       expect(vm.getOtelGrpcConfig).toContain('localhost');
+    });
+
+    it('should include service telemetry logs level warn in gRPC config', () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      expect(vm.getOtelGrpcConfig).toContain('service:');
+      expect(vm.getOtelGrpcConfig).toContain('telemetry:');
+      expect(vm.getOtelGrpcConfig).toContain('level: warn');
     });
   });
 
