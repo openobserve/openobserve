@@ -22,12 +22,14 @@
 //! - Write operations emit coordinator events so all nodes stay in sync. User-defined models take
 //!   priority over built-in models during cost calculation.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, LazyLock},
+};
 
 use config::meta::model_pricing::{BUILT_IN_ORG, META_ORG, ModelPricingDefinition, PricingSource};
 use dashmap::DashMap;
 use infra::table;
-use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
 
 const WATCHER_PREFIX: &str = "/model_pricing/";
@@ -48,12 +50,12 @@ pub struct CachedModelPricing {
 
 /// Per-org raw entries: org_id -> sorted Vec of that org's own enabled entries.
 /// Updated by `reload_org` on startup and coordinator events.
-static CACHE: Lazy<DashMap<String, Arc<Vec<CachedModelPricing>>>> = Lazy::new(DashMap::new);
+static CACHE: LazyLock<DashMap<String, Arc<Vec<CachedModelPricing>>>> = LazyLock::new(DashMap::new);
 
 /// Lazily-computed merged views: org_id -> (org source Arc, meta source Arc, merged result).
 /// Valid as long as the source `Arc` pointers haven't changed (checked via `Arc::ptr_eq`).
 /// This avoids re-merging on every span — the merge only happens once after a pricing change.
-static MERGED: Lazy<DashMap<String, MergedEntry>> = Lazy::new(DashMap::new);
+static MERGED: LazyLock<DashMap<String, MergedEntry>> = LazyLock::new(DashMap::new);
 
 /// A cached merge of org + meta + built-in entries, valid while the source `Arc`s are unchanged.
 struct MergedEntry {
