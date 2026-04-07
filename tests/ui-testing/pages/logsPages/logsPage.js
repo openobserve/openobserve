@@ -5842,13 +5842,15 @@ export class LogsPage {
             state: 'visible',
             timeout: 15000,
         });
-        // Monaco's .inputarea is behind the .view-line overlay, so use force:true to bypass
+        // Monaco's .inputarea is behind the .view-line overlay, so use force:true to bypass.
+        // Monaco lazy-loads its bundle (~3MB) on first render, which can take 30+ seconds in CI
+        // even though the Vue container becomes visible immediately. Use a generous timeout.
         const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea');
-        await inputArea.waitFor({ state: 'attached', timeout: 10000 });
+        await inputArea.waitFor({ state: 'attached', timeout: 45000 });
         await inputArea.click({ force: true });
         await inputArea.fill(query);
         // Wait for Monaco to render the new content in the view-line
-        await this.page.locator('[data-test="logs-search-bar-query-editor"] .view-line').first().waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator('[data-test="logs-search-bar-query-editor"] .view-line').first().waitFor({ state: 'visible', timeout: 15000 });
         testLogger.info(`Query editor set to: "${query.substring(0, 60)}"`);
     }
 
