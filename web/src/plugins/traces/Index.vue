@@ -302,6 +302,7 @@ const {
   getUrlQueryParams,
   copyTracesUrl,
   formatTracesMetaData,
+  setServiceColors,
   loadLocalLogFilterField,
   updatedLocalLogFilterField,
 } = useTraces();
@@ -963,6 +964,10 @@ async function getQueryData(
               searchObj.meta.searchMode === "traces"
                 ? formatTracesMetaData(rawHits)
                 : rawHits;
+
+            if (searchObj.meta.searchMode === "spans") {
+              setServiceColors(rawHits);
+            }
 
             isLLMSpanPresent.value =
               (!appendResult ? false : isLLMSpanPresent.value) ||
