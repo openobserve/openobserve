@@ -393,10 +393,7 @@ pub async fn trigger_incident_rca(
     Query(query): Query<TriggerRcaQuery>,
 ) -> Response {
     use o2_enterprise::enterprise::{
-        alerts::{
-            rca_agent::RcaAgentClient,
-            rca_service::{self, IncidentRcaContext},
-        },
+        alerts::rca_service::{self, IncidentRcaContext},
         common::config::get_config as get_o2_config,
     };
 
@@ -478,23 +475,28 @@ pub async fn trigger_incident_rca(
         previous_analysis,
     };
 
-    // Create RCA agent client
-    let zo_config = config::get_config();
-    let client = match RcaAgentClient::new(
-        &o2_cfg.ai.agent_url,
-        &zo_config.auth.root_user_email,
-        &zo_config.auth.root_user_password,
-    ) {
-        Ok(c) => c,
-        Err(e) => {
-            clear_inflight_and_return!(MetaHttpResponse::internal_error(format!(
-                "Failed to create RCA client: {e}"
-            )))
+    // Create RCA agent client with SA credentials
+    let (email, token) =
+        match crate::service::organization::get_sre_agent_credentials(&org_id).await {
+            Ok(creds) => creds,
+            Err(e) => {
+                clear_inflight_and_return!(MetaHttpResponse::internal_error(format!(
+                    "Failed to get SRE agent credentials: {e}"
+                )))
+            }
+        };
+    let auth_header = crate::common::utils::auth::build_basic_auth_header(&email, &token);
+    let client = match o2_enterprise::enterprise::alerts::rca_agent::get_agent_client() {
+        Some(c) => c,
+        None => {
+            clear_inflight_and_return!(MetaHttpResponse::internal_error(
+                "RCA agent client not initialized"
+            ))
         }
     };
 
     // Check agent health
-    if let Err(e) = client.health().await {
+    if let Err(e) = client.health(&auth_header).await {
         clear_inflight_and_return!(
             axum::response::Response::builder()
                 .status(axum::http::StatusCode::SERVICE_UNAVAILABLE)
@@ -543,7 +545,13 @@ pub async fn trigger_incident_rca(
     if query.stream {
         // AIAnalysisComplete is emitted inside the stream closure (rca_service.rs)
         // after the stream is fully drained, not here.
-        let stream = match rca_service::analyze_incident_stream(client, context).await {
+        let stream = match rca_service::analyze_incident_stream(
+            (*client).clone(),
+            context,
+            auth_header.clone(),
+        )
+        .await
+        {
             Ok(s) => s,
             Err(e) => {
                 clear_inflight_and_return!(MetaHttpResponse::internal_error(format!(
@@ -559,14 +567,15 @@ pub async fn trigger_incident_rca(
             .unwrap()
     } else {
         // Perform RCA analysis (non-streaming)
-        let rca_content = match rca_service::analyze_incident(client, context).await {
-            Ok(content) => content,
-            Err(e) => {
-                clear_inflight_and_return!(MetaHttpResponse::internal_error(format!(
-                    "Failed to perform RCA: {e}"
-                )))
-            }
-        };
+        let rca_content =
+            match rca_service::analyze_incident((*client).clone(), context, &auth_header).await {
+                Ok(content) => content,
+                Err(e) => {
+                    clear_inflight_and_return!(MetaHttpResponse::internal_error(format!(
+                        "Failed to perform RCA: {e}"
+                    )))
+                }
+            };
 
         // Emit AIAnalysisComplete on success
         let _ = infra::table::incident_events::append(

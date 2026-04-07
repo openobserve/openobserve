@@ -101,6 +101,19 @@ async fn create_and_assign_tenant_admin_role(
     .await
 }
 
+#[cfg(feature = "enterprise")]
+/// Wrapper function to create and assign the system-managed SRE read-only role.
+async fn create_and_assign_sre_readonly_role(
+    org_id: &str,
+    service_account_email: &str,
+) -> Result<(), anyhow::Error> {
+    o2_openfga::authorizer::roles::create_and_assign_sre_readonly_role(
+        org_id,
+        service_account_email,
+    )
+    .await
+}
+
 pub async fn get_summary(org_id: &str) -> OrgSummary {
     let streams = get_streams(org_id, None, false, None).await;
     let mut stream_summary = StreamSummary::default();
@@ -476,6 +489,15 @@ pub async fn create_org(
                     org.identifier
                 );
                 add_admin_to_org(&org.identifier, user_email).await?;
+            }
+            #[cfg(feature = "enterprise")]
+            {
+                if let Err(e) = ensure_sys_rca_agent(&org.identifier).await {
+                    log::warn!(
+                        "Failed to create SysRcaAgent for org '{}': {e}",
+                        org.identifier
+                    );
+                }
             }
             #[cfg(feature = "cloud")]
             enqueue_cloud_event(CloudEvent {
@@ -968,6 +990,104 @@ pub async fn is_org_in_free_trial_period(org_id: &str) -> Result<bool, anyhow::E
         }
     }
     Ok(true)
+}
+
+// Re-export the canonical constants from the config crate so callers can use
+// O2_SRE_AGENT_EMAIL_PREFIX / O2_SRE_AGENT_EMAIL_SUFFIX as before.
+pub use config::meta::user::SRE_AGENT_EMAIL_PREFIX as O2_SRE_AGENT_EMAIL_PREFIX;
+use config::meta::user::SRE_AGENT_EMAIL_SUFFIX as O2_SRE_AGENT_EMAIL_SUFFIX;
+
+/// Returns true if the given email belongs to a system-managed SRE agent service account.
+pub fn is_system_service_account(email: &str) -> bool {
+    email.starts_with(O2_SRE_AGENT_EMAIL_PREFIX) && email.ends_with(O2_SRE_AGENT_EMAIL_SUFFIX)
+}
+
+/// Ensures the SysRcaAgent service account exists for the given org, creating it if needed.
+/// Idempotent: returns Ok(()) immediately if the account already exists.
+#[cfg(feature = "enterprise")]
+pub async fn ensure_sys_rca_agent(org_id: &str) -> Result<(), anyhow::Error> {
+    use config::{meta::user::UserRole, utils::rand::generate_random_string};
+    use o2_openfga::authorizer::authz::{get_add_user_to_org_tuples, update_tuples};
+
+    use crate::service::users::create_service_account_if_not_exists;
+
+    let email = format!("{O2_SRE_AGENT_EMAIL_PREFIX}{org_id}{O2_SRE_AGENT_EMAIL_SUFFIX}");
+
+    // Only create the DB record if the account doesn't exist yet.
+    match db::org_users::get(org_id, &email).await {
+        Ok(_) => {
+            // Account already exists, skip creation
+        }
+        Err(err) => {
+            // Only treat genuine "not found" errors as missing accounts
+            // Other DB errors should bubble up rather than triggering creation
+            if err.to_string().contains("User not found") {
+                create_service_account_if_not_exists(&email).await?;
+
+                let token = generate_random_string(32);
+                let rum_token = format!("rum{}", generate_random_string(16));
+
+                db::org_users::add_with_flags(
+                    org_id,
+                    &email,
+                    UserRole::SreAgent,
+                    &token,
+                    Some(rum_token),
+                    true,
+                )
+                .await?;
+            } else {
+                // Return the original error for non-"not found" failures
+                return Err(err.into());
+            }
+        }
+    }
+
+    // Always ensure FGA is set up — both calls are idempotent, so this self-heals
+    // accounts provisioned by the DB migration (which has no FGA access).
+    if get_openfga_config().enabled {
+        let mut tuples = vec![];
+        get_add_user_to_org_tuples(org_id, &email, &UserRole::SreAgent.to_string(), &mut tuples);
+        if let Err(e) = update_tuples(tuples, vec![]).await {
+            log::error!("Error adding SRE agent to org '{org_id}' in openfga: {e}");
+        }
+
+        if let Err(e) = create_and_assign_sre_readonly_role(org_id, &email).await {
+            log::error!(
+                "Failed to create/assign sre-readonly role for SRE agent in org '{org_id}': {e}"
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// Returns the (email, token) credentials for the SysRcaAgent service account in the given org.
+/// Creates the account if it does not yet exist.
+#[cfg(feature = "enterprise")]
+pub async fn get_sre_agent_credentials(org_id: &str) -> Result<(String, String), anyhow::Error> {
+    let email = format!("{O2_SRE_AGENT_EMAIL_PREFIX}{org_id}{O2_SRE_AGENT_EMAIL_SUFFIX}");
+
+    match db::org_users::get(org_id, &email).await {
+        Ok(record) => return Ok((email, record.token)),
+        Err(err) => {
+            // Only treat genuine "not found" errors as missing accounts
+            // Other DB errors should bubble up rather than triggering creation
+            if err.to_string().contains("User not found") {
+                ensure_sys_rca_agent(org_id).await?;
+            } else {
+                // Return the original error for non-"not found" failures
+                return Err(err.into());
+            }
+        }
+    }
+
+    match db::org_users::get(org_id, &email).await {
+        Ok(record) => Ok((email, record.token)),
+        Err(_) => Err(anyhow::anyhow!(
+            "SysRcaAgent SA not found for org '{org_id}' after recreation attempt"
+        )),
+    }
 }
 
 #[cfg(test)]

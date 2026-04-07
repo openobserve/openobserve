@@ -194,6 +194,13 @@ pub struct UserResponse {
     pub created_at: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
+    /// True when this account is a system-managed service account.
+    /// The UI should display "System Managed" for the role instead of the raw role string.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub is_system: bool,
+    /// Human-readable description of what this account is used for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -632,6 +639,8 @@ mod tests {
             }]),
             created_at: 1234567890,
             token: None,
+            is_system: false,
+            description: None,
         };
 
         assert_eq!(response.email, "test@example.com");
@@ -655,6 +664,8 @@ mod tests {
                 orgs: None,
                 created_at: 1234567890,
                 token: None,
+                is_system: false,
+                description: None,
             }],
         };
 
