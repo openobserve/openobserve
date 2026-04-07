@@ -699,7 +699,17 @@ fn validate_enrichment_url(url: &str) -> Result<(), String> {
     if let Ok(ip) = host.parse::<std::net::IpAddr>() {
         let v4 = match ip {
             std::net::IpAddr::V4(v4) => Some(v4),
-            std::net::IpAddr::V6(v6) => v6.to_ipv4_mapped(),
+            std::net::IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
+                Some(v4) => Some(v4),
+                None => {
+                    // Native IPv6: block ULA (fc00::/7) and link-local (fe80::/10)
+                    let seg0 = v6.segments()[0];
+                    if v6.is_loopback() || (seg0 & 0xfe00 == 0xfc00) || (seg0 & 0xffc0 == 0xfe80) {
+                        return Err("Cannot access private IP addresses".to_string());
+                    }
+                    None
+                }
+            },
         };
         if let Some(ip) = v4
             && (ip.is_loopback() || ip.is_private() || ip.is_link_local() || ip.is_unspecified())
@@ -820,6 +830,8 @@ mod tests {
             "http://[::ffff:127.0.0.1]/admin",
             "http://[::ffff:169.254.169.254]/latest/meta-data/",
             "http://[::ffff:10.0.0.1]/secret",
+            "http://[fc00::1]/secret",
+            "http://[fe80::1]/secret",
             "http://169.254.169.254/",
             "http://0.0.0.0/",
         ];
