@@ -201,7 +201,7 @@ pub async fn delete_by_id(org_id: &str, id: &str) -> Result<bool, Error> {
         .await?
     {
         if model.source == config::meta::model_pricing::PricingSource::BuiltIn.as_str() {
-            return Err(Error::Message(
+            return Err(Error::ReadOnly(
                 "Built-in model pricing definitions cannot be deleted".to_string(),
             ));
         }

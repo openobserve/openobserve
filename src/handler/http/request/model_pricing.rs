@@ -349,8 +349,9 @@ pub async fn delete(
         Ok(true) => MetaHttpResponse::ok("Model pricing definition deleted"),
         Ok(false) => MetaHttpResponse::not_found("Model pricing definition not found"),
         Err(e) => {
-            let msg = e.to_string();
-            if msg.contains("Built-in") {
+            if let Some(infra::errors::Error::ReadOnly(msg)) =
+                e.downcast_ref::<infra::errors::Error>()
+            {
                 MetaHttpResponse::forbidden(msg)
             } else {
                 MetaHttpResponse::internal_error(e)
@@ -510,6 +511,11 @@ pub async fn refresh_built_in(
     .await
     {
         return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+
+    let last_sync = crate::service::db::model_pricing_sync::last_sync_timestamp();
+    if last_sync > 0 && chrono::Utc::now().timestamp() - last_sync < 60 {
+        return MetaHttpResponse::too_many_requests("Rate limit: wait 60s between refreshes");
     }
 
     match crate::service::db::model_pricing_sync::sync_built_in_from_github(true).await {
