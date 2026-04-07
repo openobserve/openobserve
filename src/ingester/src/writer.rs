@@ -17,7 +17,7 @@ use std::{
     collections::HashSet,
     path::PathBuf,
     sync::{
-        Arc,
+        Arc, LazyLock as Lazy,
         atomic::{AtomicI64, AtomicU64, Ordering},
     },
     time::Instant,
@@ -31,7 +31,6 @@ use config::{
     utils::hash::{Sum64, gxhash},
 };
 use infra::runtime::WAL_RUNTIME;
-use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::{RwLock, mpsc};
 use wal::{Writer as WalWriter, build_file_path};

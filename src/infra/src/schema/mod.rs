@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use arc_swap::ArcSwap;
 use chrono::Utc;
@@ -27,7 +30,6 @@ use config::{
     utils::{json, schema_ext::SchemaExt, time::now_micros},
 };
 use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Schema, SchemaRef};
-use once_cell::sync::Lazy;
 use serde::Serialize;
 
 use crate::{
@@ -86,6 +88,13 @@ pub async fn get_stream_schema_from_cache(
 
 pub fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
     format!("{SCHEMA_KEY}{org_id}/{stream_type}/{stream_name}")
+}
+
+pub async fn exists(org_id: &str, stream_type: StreamType, stream_name: &str) -> bool {
+    let Ok(schema) = get_cache(org_id, stream_name, stream_type).await else {
+        return false;
+    };
+    !schema.is_empty()
 }
 
 pub async fn get(org_id: &str, stream_name: &str, stream_type: StreamType) -> Result<Schema> {
@@ -795,6 +804,10 @@ impl SchemaCache {
         }
         size += std::mem::size_of::<String>() + self.hash_key.len();
         size
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.fields_map.is_empty()
     }
 }
 

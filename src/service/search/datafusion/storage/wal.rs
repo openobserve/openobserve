@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,15 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::ops::Range;
-
 use async_trait::async_trait;
-use bytes::Bytes;
 use futures::{StreamExt, stream::BoxStream};
 use infra::storage;
 use object_store::{
-    GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
-    PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, path::Path,
+    CopyOptions, Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta,
+    ObjectStore, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, path::Path,
 };
 
 use super::format_location;
@@ -31,6 +28,10 @@ use super::format_location;
 pub struct FS {}
 
 impl FS {
+    pub fn name() -> &'static str {
+        "Wal"
+    }
+
     /// Create new local wal storage.
     pub fn new() -> Self {
         Self::default()
@@ -39,30 +40,15 @@ impl FS {
 
 impl std::fmt::Display for FS {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Wal")
+        write!(f, "{}", Self::name())
     }
 }
 
 #[async_trait]
 impl ObjectStore for FS {
-    async fn get(&self, location: &Path) -> Result<GetResult> {
-        let (_, location) = format_location(location);
-        storage::wal::get(&location).await
-    }
-
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
         let (_, location) = format_location(location);
         storage::wal::get_opts(&location, options).await
-    }
-
-    async fn get_range(&self, location: &Path, range: Range<u64>) -> Result<Bytes> {
-        let (_, location) = format_location(location);
-        storage::wal::get_range(&location, range).await
-    }
-
-    async fn head(&self, location: &Path) -> Result<ObjectMeta> {
-        let (_, location) = format_location(location);
-        storage::wal::head(&location).await
     }
 
     fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
@@ -83,7 +69,10 @@ impl ObjectStore for FS {
 
     async fn list_with_delimiter(&self, prefix: Option<&Path>) -> Result<ListResult> {
         log::error!("NotImplemented list_with_delimiter: {prefix:?}");
-        Err(object_store::Error::NotImplemented {})
+        Err(Error::NotImplemented {
+            operation: "list_with_delimiter".to_string(),
+            implementer: Self::name().to_string(),
+        })
     }
 
     async fn put_opts(
@@ -93,12 +82,10 @@ impl ObjectStore for FS {
         _opts: PutOptions,
     ) -> Result<PutResult> {
         log::error!("NotImplemented put_opts: {location}");
-        Err(object_store::Error::NotImplemented {})
-    }
-
-    async fn put_multipart(&self, location: &Path) -> Result<Box<dyn MultipartUpload>> {
-        log::error!("NotImplemented put_multipart: {location}");
-        Err(object_store::Error::NotImplemented)
+        Err(Error::NotImplemented {
+            operation: "put_opts".to_string(),
+            implementer: Self::name().to_string(),
+        })
     }
 
     async fn put_multipart_opts(
@@ -107,21 +94,32 @@ impl ObjectStore for FS {
         _opts: PutMultipartOptions,
     ) -> Result<Box<dyn MultipartUpload>> {
         log::error!("NotImplemented put_multipart_opts: {location}");
-        Err(object_store::Error::NotImplemented)
+        Err(Error::NotImplemented {
+            operation: "put_multipart_opts".to_string(),
+            implementer: Self::name().to_string(),
+        })
     }
 
-    async fn delete(&self, location: &Path) -> Result<()> {
-        log::error!("NotImplemented delete: {location}");
-        Err(object_store::Error::NotImplemented {})
+    fn delete_stream(
+        &self,
+        locations: BoxStream<'static, Result<Path>>,
+    ) -> BoxStream<'static, Result<Path>> {
+        log::error!("NotImplemented delete_stream");
+        locations
+            .map(|_| {
+                Err(Error::NotImplemented {
+                    operation: "delete_stream".to_string(),
+                    implementer: Self::name().to_string(),
+                })
+            })
+            .boxed()
     }
 
-    async fn copy(&self, from: &Path, to: &Path) -> Result<()> {
-        log::error!("NotImplemented copy: from {from} to {to}");
-        Err(object_store::Error::NotImplemented {})
-    }
-
-    async fn copy_if_not_exists(&self, from: &Path, to: &Path) -> Result<()> {
-        log::error!("NotImplemented copy_if_not_exists: from {from} to {to}");
-        Err(object_store::Error::NotImplemented {})
+    async fn copy_opts(&self, from: &Path, to: &Path, _options: CopyOptions) -> Result<()> {
+        log::error!("NotImplemented copy_opts: from {from} to {to}");
+        Err(Error::NotImplemented {
+            operation: "copy_opts".to_string(),
+            implementer: Self::name().to_string(),
+        })
     }
 }

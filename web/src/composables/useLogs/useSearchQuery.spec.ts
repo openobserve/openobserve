@@ -127,9 +127,29 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
-vi.mock("@/utils/zincutils", () => ({
-  b64EncodeUnicode: vi.fn((s: string) => s),
-  addSpacesToOperators: vi.fn((s: string) => s),
+vi.mock("@/utils/zincutils", async () => {
+  const actual = await vi.importActual<typeof import("@/utils/zincutils")>("@/utils/zincutils");
+  return {
+    ...actual,
+    b64EncodeUnicode: vi.fn((s: string) => s),
+  };
+});
+
+const {
+  RESERVED_KEYWORD,
+  quoteSqlIdentifierIfNeededMock,
+} = vi.hoisted(() => {
+  const RESERVED_KEYWORD = "user";
+  return {
+    RESERVED_KEYWORD,
+    quoteSqlIdentifierIfNeededMock: vi.fn((identifier: string) =>
+      identifier === RESERVED_KEYWORD ? `"${identifier}"` : identifier,
+    ),
+  };
+});
+
+vi.mock("@/utils/query/sqlIdentifiers", () => ({
+  quoteSqlIdentifierIfNeeded: quoteSqlIdentifierIfNeededMock,
 }));
 
 vi.mock("@/utils/date", () => ({
@@ -331,5 +351,38 @@ describe("useSearchQuery › buildSearch › ignoreQuickMode parameter", () => {
       expect(result).not.toBeNull();
       expect(result.query.quick_mode).toBe(false);
     });
+  });
+});
+
+describe("useSearchQuery › SQL Reserved Keyword Quoting", () => {
+  let buildSearch: ReturnType<typeof useSearchQuery>["buildSearch"];
+
+  beforeEach(() => {
+    mockState = createMockState();
+    vi.clearAllMocks();
+    ({ buildSearch } = useSearchQuery());
+    mockState.searchObj.meta.sqlMode = false;
+    mockState.searchObj.meta.quickMode = true;
+    mockState.searchObj.data.stream.selectedStream = ["my-stream"];
+    mockState.searchObj.data.stream.selectedStreamFields = [
+      { name: "message" },
+      { name: RESERVED_KEYWORD },
+    ];
+    mockState.searchObj.data.stream.interestingFieldList = [
+      "message",
+      RESERVED_KEYWORD,
+    ];
+  });
+
+  it("should quote reserved keywords in SELECT and WHERE, keep non-reserved unquoted", () => {
+    mockState.searchObj.data.query = `${RESERVED_KEYWORD}='val1' AND message='val2'`;
+
+    const result = buildSearch(false, false);
+    const sql = getSql(result);
+
+    expect(sql).toContain(`"${RESERVED_KEYWORD}"`);
+    expect(sql).toContain("message");
+    expect(sql).toContain(`"${RESERVED_KEYWORD}" = 'val1'`);
+    expect(sql).toContain("message = 'val2'");
   });
 });

@@ -17,7 +17,7 @@ use std::{
     cmp::max,
     collections::BTreeMap,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, LazyLock as Lazy},
     time::Duration,
 };
 
@@ -35,7 +35,6 @@ use lettre::{
         client::{Tls, TlsParameters},
     },
 };
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use sha256::digest;
 
@@ -1334,6 +1333,12 @@ pub struct Common {
         help = "Enable to show symbol in dashboard"
     )]
     pub dashboard_show_symbol_enabled: bool,
+    #[env_config(
+        name = "ZO_DASHBOARD_SHOW_FIELD_AS_JSON_ENABLED",
+        default = false,
+        help = "Enable to show field as JSON in dashboard table"
+    )]
+    pub dashboard_show_field_as_json_enabled: bool,
     #[env_config(name = "ZO_INGEST_DEFAULT_HEC_STREAM", default = "")]
     pub default_hec_stream: String,
     #[env_config(
@@ -2061,6 +2066,12 @@ pub struct S3 {
     pub feature_bulk_delete: bool,
     #[env_config(name = "ZO_S3_ALLOW_INVALID_CERTIFICATES", default = false)]
     pub allow_invalid_certificates: bool,
+    #[env_config(
+        name = "ZO_S3_FEATURE_FORCE_INFREQUENT_ACCESS",
+        default = false,
+        help = "Use STANDARD_IA storage class for compliance storage type"
+    )]
+    pub feature_force_infrequent_access: bool,
     #[env_config(name = "ZO_S3_SYNC_TO_CACHE_INTERVAL", default = 600)] // seconds
     pub sync_to_cache_interval: u64,
     #[env_config(name = "ZO_S3_MAX_RETRIES", default = 10)]
@@ -2618,6 +2629,8 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.batch_size = 8192;
     }
     cfg.limit.batch_size = cfg.limit.batch_size.clamp(1024, 8192);
+    // clamp datafusion_min_partition_num to 1
+    cfg.limit.datafusion_min_partition_num = cfg.limit.datafusion_min_partition_num.max(1);
 
     Ok(())
 }
@@ -3365,9 +3378,25 @@ fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub fn ensure_not_empty(s: &str, name: &str) -> Result<(), anyhow::Error> {
+    if s.trim().is_empty() {
+        return Err(anyhow::anyhow!("{} is empty", name));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_config_static_uses_std_lazylock_api() {
+        let cfg = std::sync::LazyLock::force(&CONFIG).load();
+        assert_eq!(
+            cfg.limit.req_cols_per_record_limit,
+            get_config().limit.req_cols_per_record_limit
+        );
+    }
 
     #[test]
     fn test_get_config() {
@@ -3492,5 +3521,25 @@ mod tests {
         unsafe {
             std::env::remove_var("ZO_USAGE_REPORT_TO_OWN_ORG");
         }
+    }
+
+    #[test]
+    fn test_ensure_not_empty_valid() {
+        assert!(ensure_not_empty("valid", "TEST").is_ok());
+    }
+
+    #[test]
+    fn test_ensure_not_empty_invalid() {
+        assert!(ensure_not_empty("", "TEST").is_err());
+    }
+
+    #[test]
+    fn test_ensure_not_empty_with_whitespace() {
+        assert!(ensure_not_empty("  value  ", "TEST").is_ok());
+    }
+
+    #[test]
+    fn test_ensure_not_empty_single_char() {
+        assert!(ensure_not_empty("a", "TEST").is_ok());
     }
 }

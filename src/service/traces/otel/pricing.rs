@@ -21,7 +21,8 @@
 //! Pricing is based on publicly available information from model providers and
 //! is updated as of March 2026.
 
-use once_cell::sync::Lazy;
+use std::sync::LazyLock as Lazy;
+
 use regex::Regex;
 use tiktoken_rs::{get_bpe_from_model, o200k_base};
 

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -34,10 +34,10 @@ use {
     jsonwebtoken::TokenData,
     o2_openfga::authorizer::authz::{get_new_user_creation_tuple, update_tuples},
     o2_openfga::config::get_config as get_openfga_config,
-    once_cell::sync::Lazy,
     regex::Regex,
     serde_json::Value,
     std::collections::HashMap,
+    std::sync::LazyLock as Lazy,
 };
 
 #[cfg(feature = "cloud")]

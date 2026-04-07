@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // Licensed under the GNU Affero General Public License, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.

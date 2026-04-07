@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -1506,8 +1506,6 @@ async fn handle_report_triggers(
         ReportFrequencyType::Once => {
             // Check on next week
             new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
-            // Disable the report
-            report.enabled = false;
             run_once = true;
         }
         ReportFrequencyType::Cron => {
@@ -1582,6 +1580,34 @@ async fn handle_report_triggers(
             // Report generation successful, update the trigger
             if run_once {
                 new_trigger.status = db::scheduler::TriggerStatus::Completed;
+                // Get the report again from db to pause it
+                match infra::table::reports::get_by_id(conn, report_id).await? {
+                    Some((folder, mut old_report)) => {
+                        // Pause the report as this is the last run
+                        if old_report.enabled {
+                            // Disable the report
+                            old_report.enabled = false;
+                        }
+                        let result = db::dashboards::reports::update_without_updating_trigger(
+                            conn,
+                            &folder.folder_id,
+                            None,
+                            old_report,
+                        )
+                        .await;
+                        if result.is_err() {
+                            log::error!(
+                                "[SCHEDULER trace_id {scheduler_trace_id}] Failed to update report: {report_name} after trigger: {}",
+                                result.err().unwrap()
+                            );
+                        }
+                    }
+                    None => {
+                        log::error!(
+                            "[SCHEDULER trace_id {scheduler_trace_id}] Report not found: {report_id} while updating run_once state"
+                        );
+                    }
+                }
             }
             db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             log::debug!(

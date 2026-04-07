@@ -1,6 +1,6 @@
 // serviceGraphPage.js
 // Page object for Service Graph feature in Traces module
-// Selectors verified against: ServiceGraph.vue, ServiceGraphSidePanel.vue
+// Selectors verified against: ServiceGraph.vue, ServiceGraphNodeSidePanel.vue
 
 import { expect } from '@playwright/test';
 
@@ -25,25 +25,29 @@ export class ServiceGraphPage {
     // ===== SEARCH =====
     this.searchInput = 'input[placeholder="Search services..."]';
 
-    // ===== NODE DETAIL PANEL (ServiceGraphSidePanel.vue) =====
+    // ===== NODE DETAIL PANEL (ServiceGraphNodeSidePanel.vue) =====
     this.sidePanel = '[data-test="service-graph-side-panel"]';
     this.sidePanelHeader = '[data-test="service-graph-side-panel-header"]';
     this.sidePanelServiceName = '[data-test="service-graph-side-panel-service-name"]';
     this.sidePanelShowTelemetryBtn = '[data-test="service-graph-side-panel-show-telemetry-btn"]';
     this.sidePanelCloseBtn = '[data-test="service-graph-side-panel-close-btn"]';
-    this.sidePanelMetrics = '[data-test="service-graph-side-panel-metrics"]';
-    this.sidePanelRequestRate = '[data-test="service-graph-side-panel-request-rate"]';
-    this.sidePanelErrorRate = '[data-test="service-graph-side-panel-error-rate"]';
-    this.sidePanelP95Latency = '[data-test="service-graph-side-panel-p95-latency"]';
-    this.sidePanelP50Latency = '[data-test="service-graph-side-panel-p50-latency"]';
-    this.sidePanelP99Latency = '[data-test="service-graph-side-panel-p99-latency"]';
-    this.sidePanelUpstreamServices = '[data-test="service-graph-side-panel-upstream-services"]';
-    this.sidePanelUpstreamServiceItem = '[data-test="service-graph-side-panel-upstream-service-item"]';
-    this.sidePanelDownstreamServices = '[data-test="service-graph-side-panel-downstream-services"]';
-    this.sidePanelDownstreamServiceItem = '[data-test="service-graph-side-panel-downstream-service-item"]';
-    this.sidePanelRecentTraces = '[data-test="service-graph-side-panel-recent-traces"]';
-    this.sidePanelTraceItem = '[data-test="service-graph-side-panel-trace-item"]';
-    this.sidePanelCopyTraceBtn = '[data-test="service-graph-side-panel-copy-trace-btn"]';
+
+    // RED charts section (Rate/Errors/Duration dashboards)
+    this.sidePanelRedCharts = '[data-test="service-graph-side-panel-red-charts"]';
+    this.sidePanelFilterChips = '[data-test="service-graph-side-panel-filter-chips"]';
+    this.sidePanelViewInTracesBtn = '[data-test="service-graph-side-panel-view-in-traces-btn"]';
+
+    // Tabs section (Operations / Nodes / Pods)
+    this.nodePanelTabs = '[data-test="service-graph-node-panel-tabs"]';
+    this.operationsTab = '[data-test="service-graph-node-panel-tab-operations"]';
+    this.nodesTab = '[data-test="service-graph-node-panel-tab-nodes"]';
+    this.podsTab = '[data-test="service-graph-node-panel-tab-pods"]';
+    this.recentOperations = '[data-test="service-graph-side-panel-recent-operations"]';
+    this.operationsTable = '[data-test="service-graph-side-panel-operations-table"]';
+    this.nodesPanel = '[data-test="service-graph-side-panel-nodes"]';
+    this.nodesTable = '[data-test="service-graph-side-panel-nodes-table"]';
+    this.podsPanel = '[data-test="service-graph-side-panel-pods"]';
+    this.podsTable = '[data-test="service-graph-side-panel-pods-table"]';
 
     // ===== TELEMETRY CORRELATION DIALOG =====
     this.correlationDashboardClose = '[data-test="correlation-dashboard-close"]';
@@ -266,8 +270,15 @@ export class ServiceGraphPage {
     await expect(this.page.locator(this.sidePanel)).not.toBeVisible({ timeout: 5000 });
   }
 
-  async expectMetricsSectionVisible() {
-    await expect(this.page.locator(this.sidePanelMetrics)).toBeVisible({ timeout: 10000 });
+  async expectRedChartsSectionVisible() {
+    await expect(this.page.locator(this.sidePanelRedCharts)).toBeVisible({ timeout: 10000 });
+  }
+
+  async isRedChartsSectionVisible() {
+    return await this.page.locator(this.sidePanelRedCharts)
+      .waitFor({ state: 'visible', timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
   }
 
   async getSidePanelServiceName() {
@@ -275,80 +286,46 @@ export class ServiceGraphPage {
   }
 
   async getHealthStatus() {
-    const header = this.page.locator(this.sidePanelHeader);
-    const text = await header.textContent();
-    if (text.includes('Critical')) return 'critical';
-    if (text.includes('Degraded')) return 'degraded';
-    if (text.includes('Healthy')) return 'healthy';
+    const nameEl = this.page.locator(this.sidePanelServiceName);
+    const badge = nameEl.locator('.health-badge');
+    const badgeExists = await badge.count() > 0;
+    if (!badgeExists) return 'unknown';
+    const classes = await badge.getAttribute('class') || '';
+    if (classes.includes('critical')) return 'critical';
+    if (classes.includes('degraded')) return 'degraded';
+    if (classes.includes('healthy')) return 'healthy';
     return 'unknown';
   }
 
-  async getRequestRate() {
-    return await this.page.locator(this.sidePanelRequestRate).textContent();
+  // ===== TABS (Operations / Nodes / Pods) =====
+
+  async switchToOperationsTab() {
+    await this.page.locator(this.operationsTab).click();
   }
 
-  async getErrorRate() {
-    return await this.page.locator(this.sidePanelErrorRate).textContent();
+  async switchToNodesTab() {
+    await this.page.locator(this.nodesTab).click();
   }
 
-  async getP95Latency() {
-    return await this.page.locator(this.sidePanelP95Latency).textContent();
+  async switchToPodsTab() {
+    await this.page.locator(this.podsTab).click();
   }
 
-  async getP50Latency() {
-    return await this.page.locator(this.sidePanelP50Latency).textContent();
+  async expectOperationsSectionVisible() {
+    await expect(this.page.locator(this.recentOperations)).toBeVisible({ timeout: 10000 });
   }
 
-  async getP99Latency() {
-    return await this.page.locator(this.sidePanelP99Latency).textContent();
-  }
-
-  async getUpstreamServiceCount() {
-    return await this.page.locator(this.sidePanelUpstreamServiceItem).count();
-  }
-
-  async getDownstreamServiceCount() {
-    return await this.page.locator(this.sidePanelDownstreamServiceItem).count();
-  }
-
-  async getUpstreamServiceNames() {
-    const items = this.page.locator(this.sidePanelUpstreamServiceItem);
-    const count = await items.count();
-    const names = [];
-    for (let i = 0; i < count; i++) {
-      names.push((await items.nth(i).textContent()).trim());
-    }
-    return names;
-  }
-
-  async getDownstreamServiceNames() {
-    const items = this.page.locator(this.sidePanelDownstreamServiceItem);
-    const count = await items.count();
-    const names = [];
-    for (let i = 0; i < count; i++) {
-      names.push((await items.nth(i).textContent()).trim());
-    }
-    return names;
-  }
-
-  async getRecentTraceCount() {
-    // Wait for the loading spinner inside the recent traces section to disappear.
-    // fetchRecentTraces() is async — the section div renders immediately but trace
-    // items only appear after the API call completes and loadingTraces becomes false.
-    const section = this.page.locator(this.sidePanelRecentTraces);
-    await section.locator('.q-spinner').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
-    return await this.page.locator(this.sidePanelTraceItem).count();
-  }
-
-  async expectRecentTracesSectionVisible() {
-    await expect(this.page.locator(this.sidePanelRecentTraces)).toBeVisible({ timeout: 10000 });
-  }
-
-  async isRecentTracesSectionVisible() {
-    return await this.page.locator(this.sidePanelRecentTraces)
+  async isOperationsSectionVisible() {
+    return await this.page.locator(this.recentOperations)
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false);
+  }
+
+  async getOperationsTableRowCount() {
+    const table = this.page.locator(this.operationsTable);
+    await table.locator('.q-spinner, .loading').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
+    return await table.locator('tbody tr').count();
   }
 
   async closeSidePanel() {

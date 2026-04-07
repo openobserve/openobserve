@@ -13,11 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, net::IpAddr, sync::Arc};
+use std::{
+    collections::HashMap,
+    net::IpAddr,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use axum::{body::Body, http::Request, middleware::Next, response::Response};
 use maxminddb::geoip2::city::Location;
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use uaparser::{Parser, UserAgentParser};
 

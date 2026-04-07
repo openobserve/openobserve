@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use config::{
     cluster::LOCAL_NODE,
@@ -25,7 +25,6 @@ use config::{
 };
 use hashbrown::HashMap;
 use infra::{client::grpc::get_cached_channel, cluster};
-use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use tokio::sync::{RwLock, mpsc};
 use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
@@ -50,6 +49,20 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
     })
     .await
     .unwrap_or_default();
+
+    // Enterprise: when max_nodes_per_query > 0 the query side uses a filtered
+    // ring walk (get_node_from_consistent_hash_within) to dispatch files only
+    // to the selected subset of nodes.  Pre-compute per-item target nodes here
+    // using the same logic so broadcast and dispatch always agree on which node
+    // owns each file.  When max_nodes_per_query == 0 (strategy=all) this
+    // returns None and the code falls through to the existing global-ring path.
+    #[cfg(feature = "enterprise")]
+    let item_slot_targets =
+        o2_enterprise::enterprise::search::admission::node_selection::broadcast_item_targets(
+            items, &nodes,
+        )
+        .await;
+
     for node in nodes {
         if node.uuid.eq(&LOCAL_NODE.uuid) {
             continue;
@@ -61,6 +74,25 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
                 node_items.push(item.clone());
                 continue;
             }
+
+            // Enterprise: use pre-computed selection-aware targets so that
+            // broadcast routes each file to exactly the node that the filtered
+            // ring walk would pick at query time.
+            #[cfg(feature = "enterprise")]
+            {
+                if let Some(ref targets) = item_slot_targets
+                    && let Some((interactive, background)) = targets.get(&item.id)
+                {
+                    if interactive.as_deref() == Some(node.name.as_str())
+                        || background.as_deref() == Some(node.name.as_str())
+                    {
+                        node_items.push(item.clone());
+                    }
+                    continue;
+                }
+            }
+
+            // OSS / strategy=all: use the global ring unchanged.
             // check if the item is for interactive node
             if let Some(node_name) = cluster::get_node_from_consistent_hash(
                 &item.id.to_string(),

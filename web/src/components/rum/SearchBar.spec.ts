@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -748,6 +748,49 @@ describe("SearchBar Component", () => {
       );
       expect(mockSetValue).toHaveBeenCalledWith(
         "SELECT * FROM logs |  level='info' and timestamp > '2023-01-01' and status='error'",
+      );
+    });
+
+    it("should replace existing filter when same field is included again", () => {
+      const mockSetValue = wrapper.vm.queryEditorRef.setValue;
+      wrapper.vm.searchObj.data.stream.addToFilter = "field1='value2'";
+      wrapper.vm.searchObj.data.editorValue = "field1='value1'";
+
+      wrapper.vm.$options.watch.addSearchTerm.call(wrapper.vm);
+
+      expect(wrapper.vm.searchObj.data.query).toBe("field1='value2'");
+      expect(mockSetValue).toHaveBeenCalledWith("field1='value2'");
+    });
+
+    it("should replace existing filter in piped query when same field is included again", () => {
+      const mockSetValue = wrapper.vm.queryEditorRef.setValue;
+      wrapper.vm.searchObj.data.stream.addToFilter = "field1='value2'";
+      wrapper.vm.searchObj.data.editorValue =
+        "SELECT * FROM table | field1='value1'";
+
+      wrapper.vm.$options.watch.addSearchTerm.call(wrapper.vm);
+
+      expect(wrapper.vm.searchObj.data.query).toBe(
+        "SELECT * FROM table |  field1='value2'",
+      );
+      expect(mockSetValue).toHaveBeenCalledWith(
+        "SELECT * FROM table |  field1='value2'",
+      );
+    });
+
+    it("should replace multi-value group for same field", () => {
+      const mockSetValue = wrapper.vm.queryEditorRef.setValue;
+      wrapper.vm.searchObj.data.stream.addToFilter =
+        "(field1='valueA' OR field1='valueB')";
+      wrapper.vm.searchObj.data.editorValue = "field1='value1'";
+
+      wrapper.vm.$options.watch.addSearchTerm.call(wrapper.vm);
+
+      expect(wrapper.vm.searchObj.data.query).toBe(
+        "(field1='valueA' OR field1='valueB')",
+      );
+      expect(mockSetValue).toHaveBeenCalledWith(
+        "(field1='valueA' OR field1='valueB')",
       );
     });
   });

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Alert Incident Correlation Service (Enterprise only)
+//! Alert Incident Correlation Service
 //!
 //! Correlates fired alerts into unified incidents to reduce alert fatigue.
 
@@ -37,13 +37,260 @@ struct ServiceDiscoveryResult {
     service_name: String,
 }
 
-/// Extract service name from dimensions
-/// Guarantees a service name is always returned (fallback to "unknown")
-fn extract_service_name_from_dimensions(dimensions: &HashMap<String, String>) -> String {
-    dimensions
-        .get("service")
-        .cloned()
-        .unwrap_or_else(|| "unknown".to_string())
+/// Result from filtered semantic extraction using distinguish_by groups
+struct FilteredSemanticResult {
+    group_values: HashMap<String, String>,
+    key_type: config::meta::alerts::incidents::KeyType,
+    matched_set_id: Option<String>, // Which identity set matched best
+}
+
+/// Combined correlation result from both Service Discovery and semantic extraction
+struct ParallelCorrelationResult {
+    service_discovery: Option<ServiceDiscoveryResult>,
+    semantic_extraction: Option<FilteredSemanticResult>,
+    final_group_values: HashMap<String, String>,
+    final_key_type: config::meta::alerts::incidents::KeyType,
+    correlation_reason: String,
+}
+
+/// Extract semantic dimensions using configured distinguish_by groups only
+/// This replaces the current fallback that uses ALL labels
+#[cfg(feature = "enterprise")]
+async fn extract_filtered_semantic_dimensions(
+    org_id: &str,
+    labels: &HashMap<String, String>,
+) -> Option<FilteredSemanticResult> {
+    use config::meta::{
+        alerts::incidents::KeyType, correlation::ServiceIdentityConfig,
+        system_settings::SettingScope,
+    };
+
+    // Load ServiceIdentityConfig to get distinguish_by groups
+    let identity_config = match infra::table::system_settings::get(
+        &SettingScope::Org,
+        Some(org_id),
+        None,
+        "service_identity",
+    )
+    .await
+    {
+        Ok(Some(s)) => serde_json::from_value::<ServiceIdentityConfig>(s.setting_value)
+            .unwrap_or_else(|e| {
+                log::warn!(
+                    "[incidents] Invalid service_identity config for org {}: {}, using default",
+                    org_id,
+                    e
+                );
+                ServiceIdentityConfig::default_config()
+            }),
+        _ => {
+            log::debug!(
+                "[incidents] No service_identity config found for org {}, using default",
+                org_id
+            );
+            ServiceIdentityConfig::default_config()
+        }
+    };
+
+    // Validate config has at least one set
+    if identity_config.sets.is_empty() {
+        log::debug!(
+            "[incidents] ServiceIdentityConfig for org {} has no identity sets, semantic extraction skipped",
+            org_id
+        );
+        return None;
+    }
+
+    // Load semantic groups for field mapping
+    let semantic_groups =
+        crate::service::db::system_settings::get_semantic_field_groups(org_id).await;
+
+    // Try each identity set, pick best coverage (same as Service Discovery logic)
+    let best_set = match identity_config.resolve_best_set(labels) {
+        Some(set) => set,
+        None => {
+            log::debug!(
+                "[incidents] No identity set matches labels for org {}, semantic extraction skipped",
+                org_id
+            );
+            return None;
+        }
+    };
+
+    log::debug!(
+        "[incidents] Using identity set '{}' for semantic extraction, distinguish_by: {:?}",
+        best_set.id,
+        best_set.distinguish_by
+    );
+
+    // Extract only dimensions from distinguish_by fields of the best set
+    let mut group_values = HashMap::new();
+    for group_id in &best_set.distinguish_by {
+        if let Some(alias_group) = semantic_groups.iter().find(|g| g.id == *group_id) {
+            // Find first matching field from this semantic group
+            for field_name in &alias_group.fields {
+                if let Some(value) = labels.get(field_name) {
+                    if !value.is_empty() {
+                        group_values.insert(group_id.clone(), value.clone());
+                        log::debug!(
+                            "[incidents] Mapped field '{}' → '{}' = '{}'",
+                            field_name,
+                            group_id,
+                            value
+                        );
+                        break; // Take first match from this group
+                    }
+                }
+            }
+        } else {
+            log::debug!(
+                "[incidents] Semantic group '{}' not found, skipping",
+                group_id
+            );
+        }
+    }
+
+    if group_values.is_empty() {
+        log::debug!(
+            "[incidents] No dimensions extracted from configured distinguish_by groups for org {}",
+            org_id
+        );
+        return None;
+    }
+
+    log::debug!(
+        "[incidents] Filtered semantic extraction for org {} extracted dimensions: {:?}",
+        org_id,
+        group_values
+    );
+
+    Some(FilteredSemanticResult {
+        group_values,
+        key_type: KeyType::Secondary, // Lower priority than Service Discovery
+        matched_set_id: Some(best_set.id.clone()),
+    })
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn extract_filtered_semantic_dimensions(
+    _org_id: &str,
+    _labels: &HashMap<String, String>,
+) -> Option<FilteredSemanticResult> {
+    None
+}
+
+/// Execute Service Discovery and semantic extraction in parallel
+async fn correlate_parallel(
+    org_id: &str,
+    labels: &HashMap<String, String>,
+) -> ParallelCorrelationResult {
+    // Execute both approaches in parallel
+    let (sd_result, semantic_result) = tokio::join!(
+        query_service_discovery_key(org_id, labels),
+        extract_filtered_semantic_dimensions(org_id, labels)
+    );
+
+    log::debug!(
+        "[incidents] Parallel correlation results: service_discovery_success={}, semantic_extraction_success={}",
+        sd_result.is_some(),
+        semantic_result.is_some()
+    );
+
+    // Merge results using priority system
+    let (final_group_values, final_key_type, correlation_reason) =
+        merge_correlation_results(&sd_result, &semantic_result);
+
+    ParallelCorrelationResult {
+        service_discovery: sd_result,
+        semantic_extraction: semantic_result,
+        final_group_values,
+        final_key_type,
+        correlation_reason,
+    }
+}
+
+/// Merge correlation results from Service Discovery and semantic extraction using priority system
+fn merge_correlation_results(
+    sd_result: &Option<ServiceDiscoveryResult>,
+    semantic_result: &Option<FilteredSemanticResult>,
+) -> (
+    HashMap<String, String>,
+    config::meta::alerts::incidents::KeyType,
+    String,
+) {
+    use config::meta::alerts::incidents::KeyType;
+
+    match (sd_result, semantic_result) {
+        // Service Discovery success - highest priority
+        (Some(sd), _) => {
+            log::debug!(
+                "[incidents] Using Service Discovery result: service='{}', dimensions={:?}",
+                sd.service_name,
+                sd.group_values
+            );
+            (
+                sd.group_values.clone(),
+                sd.key_type,
+                "service_discovery".to_string(),
+            )
+        }
+        // Semantic extraction success - medium priority
+        (None, Some(sem)) => {
+            log::debug!(
+                "[incidents] Using filtered semantic extraction result: set='{}', dimensions={:?}",
+                sem.matched_set_id.as_deref().unwrap_or("unknown"),
+                sem.group_values
+            );
+            (
+                sem.group_values.clone(),
+                sem.key_type,
+                format!(
+                    "semantic_extraction:{}",
+                    sem.matched_set_id.as_deref().unwrap_or("unknown")
+                ),
+            )
+        }
+        // Both failed - fallback to AlertId isolation
+        (None, None) => {
+            log::debug!(
+                "[incidents] Both Service Discovery and semantic extraction failed, using AlertId fallback"
+            );
+            (
+                HashMap::new(),
+                KeyType::AlertId,
+                "alert_id_fallback".to_string(),
+            )
+        }
+    }
+}
+
+/// Extract service name from both parallel correlation results
+fn extract_service_name_parallel(
+    labels: &HashMap<String, String>,
+    sd_result: &Option<ServiceDiscoveryResult>,
+) -> String {
+    // Priority 1: Service Discovery result
+    if let Some(sd) = sd_result {
+        return sd.service_name.clone();
+    }
+
+    // Priority 2: Extract from labels using standard service field names
+    for field in ["service", "service_name", "svc", "app"] {
+        if let Some(service) = labels.get(field) {
+            if !service.is_empty() {
+                log::debug!(
+                    "[incidents] Extracted service name from field '{}': '{}'",
+                    field,
+                    service
+                );
+                return service.clone();
+            }
+        }
+    }
+
+    // Priority 3: Default fallback
+    log::debug!("[incidents] No service name found in labels, using 'unknown'");
+    "unknown".to_string()
 }
 
 /// Collect the union of notification destinations from all alerts correlated to an incident.
@@ -332,44 +579,18 @@ pub async fn correlate_alert_to_incident(
         labels
     );
 
-    // Query Service Discovery for group_values/key_type using the correlation API
-    let service_discovery_result = query_service_discovery_key(&alert.org_id, &labels).await;
+    // Execute Service Discovery and semantic extraction in parallel (non-blocking)
+    let parallel_result = correlate_parallel(&alert.org_id, &labels).await;
 
-    // Determine group_values and key_type from SD result or label extraction
-    use config::meta::alerts::incidents::KeyType;
-    let (group_values, mut key_type, correlation_reason) = if let Some(ref sd_result) =
-        service_discovery_result
-    {
-        (
-            sd_result.group_values.clone(),
-            sd_result.key_type,
-            "service_discovery".to_string(),
-        )
-    } else {
-        // Fallback: extract semantic dimensions from labels
-        #[cfg(feature = "enterprise")]
-        {
-            let dims =
-                o2_enterprise::enterprise::alerts::incidents::extract_semantic_dimensions(&labels);
-            let kt = if dims.is_empty() {
-                KeyType::AlertId
-            } else {
-                KeyType::Primary
-            };
-            let reason = match kt {
-                KeyType::Primary => "primary_match",
-                KeyType::Secondary => "secondary_match",
-                KeyType::AlertId => "alert_id",
-            };
-            (dims, kt, reason.to_string())
-        }
-        #[cfg(not(feature = "enterprise"))]
-        {
-            (HashMap::new(), KeyType::AlertId, "alert_id".to_string())
-        }
-    };
+    let group_values = parallel_result.final_group_values;
+    let mut key_type = parallel_result.final_key_type;
+    let correlation_reason = parallel_result.correlation_reason;
+
+    // Extract service name using both results
+    let service_name = extract_service_name_parallel(&labels, &parallel_result.service_discovery);
 
     // If group_values is empty, isolate by alert_id to prevent incorrect grouping
+    use config::meta::alerts::incidents::KeyType;
     if group_values.is_empty() {
         key_type = KeyType::AlertId;
         log::warn!(
@@ -378,29 +599,25 @@ pub async fn correlate_alert_to_incident(
         );
     }
 
-    // Guarantee service_name extraction
-    let service_name = if let Some(ref sd_result) = service_discovery_result {
-        sd_result.service_name.clone()
-    } else {
-        // Fallback 1: Check if service_name is directly in the alert result labels
-        if let Some(svc) = labels.get("service_name") {
-            svc.clone()
-        } else if let Some(svc) = labels.get("service") {
-            svc.clone()
-        } else {
-            // Fallback 2: Extract from group_values
-            extract_service_name_from_dimensions(&group_values)
-        }
-    };
-
+    // Enhanced logging for correlation decisions
     log::info!(
-        "[incidents] Alert {} correlation - service: {}, key_type: {:?}, group_values: {:?}",
+        "[incidents] Alert '{}' correlation result: reason={}, key_type={:?}, dimensions={:?}, service_discovery_success={}, semantic_extraction_success={}",
         alert.name,
-        service_name,
+        correlation_reason,
         key_type,
-        group_values
+        group_values,
+        parallel_result.service_discovery.is_some(),
+        parallel_result.semantic_extraction.is_some()
     );
 
+    if let Some(sem_result) = &parallel_result.semantic_extraction {
+        log::debug!(
+            "[incidents] Semantic extraction for alert '{}': matched_set={:?}, dimensions={:?}",
+            alert.name,
+            sem_result.matched_set_id,
+            sem_result.group_values
+        );
+    }
     // Find or create incident
     let outcome = find_or_create_incident(
         &alert.org_id,
@@ -1343,9 +1560,9 @@ pub async fn trigger_rca_for_incident(
     // For automated/system-initiated calls, use "system@openobserve.ai".
     _user_email: String,
 ) -> Result<(), anyhow::Error> {
-    use config::{get_config, meta::alerts::incidents::IncidentTopology};
+    use config::meta::alerts::incidents::IncidentTopology;
     use o2_enterprise::enterprise::{
-        alerts::rca_agent::RcaAgentClient, common::config::get_config as get_o2_config,
+        alerts::rca_agent::get_agent_client, common::config::get_config as get_o2_config,
     };
 
     let config = get_o2_config();
@@ -1447,21 +1664,21 @@ pub async fn trigger_rca_for_incident(
         }
     }
 
-    // Create RCA agent client with root credentials
-    let zo_config = get_config();
-    let username = &zo_config.auth.root_user_email;
-    let password = &zo_config.auth.root_user_password;
+    // Create RCA agent client with SA credentials
+    let (email, token) = crate::service::organization::get_sre_agent_credentials(&org_id).await?;
+    let auth_header = crate::common::utils::auth::build_basic_auth_header(&email, &token);
 
-    let client = RcaAgentClient::new(&config.ai.agent_url, username, password)?;
+    let client =
+        get_agent_client().ok_or_else(|| anyhow::anyhow!("RCA agent client not initialized"))?;
 
     // Quick health check
-    if let Err(e) = client.health().await {
+    if let Err(e) = client.health(&auth_header).await {
         log::debug!("[INCIDENTS::RCA] Agent health check failed for immediate trigger: {e}");
         return Err(anyhow::anyhow!("RCA agent not available: {}", e));
     }
 
     // Analyze incident
-    match client.analyze_incident(&incident).await {
+    match client.analyze_incident(&incident, &auth_header).await {
         Ok(rca_result) => {
             log::info!(
                 "[INCIDENTS::RCA] RCA completed for {incident_id}: {} chars",
@@ -1513,13 +1730,19 @@ pub async fn trigger_rca_for_incident(
 async fn model_to_incident(
     db_model: infra::table::entity::alert_incidents::Model,
 ) -> Result<Incident, anyhow::Error> {
-    Ok(model_to_incident_with_topology(db_model, None))
+    // Load topology context (including RCA analysis) from database
+    let topology = infra::table::alert_incidents::get_topology(&db_model.org_id, &db_model.id)
+        .await
+        .ok()
+        .flatten();
+
+    Ok(model_to_incident_with_topology(db_model, topology))
 }
 
 /// Convert database model to domain model with pre-fetched topology
 fn model_to_incident_with_topology(
     db_model: infra::table::entity::alert_incidents::Model,
-    _topology_context: Option<IncidentTopology>,
+    topology_context: Option<IncidentTopology>,
 ) -> Incident {
     Incident {
         id: db_model.id,
@@ -1536,7 +1759,7 @@ fn model_to_incident_with_topology(
         updated_at: db_model.updated_at,
         group_values: db_model.group_values,
         key_type: config::meta::alerts::incidents::KeyType::from_stored(&db_model.key_type),
-        topology_context: _topology_context,
+        topology_context,
     }
 }
 

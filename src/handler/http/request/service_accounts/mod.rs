@@ -212,6 +212,17 @@ pub async fn update(
 
     let email_id = email_id.trim().to_string();
 
+    // Check if this is a system service account - prefer role-based check over email pattern
+    // matching
+    if let Ok(user_record) = crate::service::db::org_users::get(&org_id, &email_id).await {
+        if user_record.role == UserRole::SreAgent {
+            return MetaHttpResponse::forbidden("System service accounts cannot be modified");
+        }
+    } else if crate::service::organization::is_system_service_account(&email_id) {
+        // Fall back to email pattern matching if user record is not found
+        return MetaHttpResponse::forbidden("System service accounts cannot be modified");
+    }
+
     let rotate_token = match query.get("rotateToken") {
         Some(s) => match s.to_lowercase().as_str() {
             "true" => true,
