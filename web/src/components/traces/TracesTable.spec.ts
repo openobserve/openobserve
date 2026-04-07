@@ -372,7 +372,7 @@ describe("TenstackTable — generic features", () => {
       expect(wrapper.emitted("sort-change")).toBeTruthy();
       expect(wrapper.emitted("sort-change")![0]).toEqual([
         "start_time",
-        "desc",
+        "asc",
       ]);
     });
 
