@@ -181,6 +181,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="text-transform: capitalize"
               data-test="service-graph-node-panel-tab-pods"
             />
+            <q-tab
+              name="metrics"
+              label="Metrics"
+              style="text-transform: capitalize"
+              data-test="service-graph-node-panel-tab-metrics"
+            />
           </q-tabs>
           <q-tab-panels v-model="activeTab" animated>
             <!-- Operations Tab -->
@@ -551,6 +557,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
             </q-tab-panel>
+
+            <!-- Metrics Tab -->
+            <q-tab-panel
+              name="metrics"
+              class="tw:p-0! panel-section tw:mb-0!"
+              data-test="service-graph-side-panel-metrics"
+            >
+              <!-- Loading state -->
+              <div
+                v-if="metricsCorrelationLoading"
+                class="tw:flex tw:items-center tw:gap-2 tw:py-3 tw:text-sm"
+                style="color: var(--o2-text-secondary)"
+                data-test="service-graph-side-panel-metrics-loading"
+              >
+                <q-spinner color="primary" size="sm" />
+                <span>Loading metrics...</span>
+              </div>
+
+              <!-- Error state -->
+              <div
+                v-else-if="metricsCorrelationError"
+                class="tw:flex tw:flex-col tw:items-center tw:gap-3 tw:py-6 tw:text-center tw:text-sm"
+                style="color: var(--o2-text-secondary)"
+                data-test="service-graph-side-panel-metrics-error"
+              >
+                <span>{{ metricsCorrelationError }}</span>
+                <q-btn
+                  flat
+                  dense
+                  no-caps
+                  size="sm"
+                  label="Retry"
+                  color="primary"
+                  data-test="service-graph-side-panel-metrics-retry-btn"
+                  @click="fetchMetricsCorrelation(true)"
+                />
+              </div>
+
+              <!-- Metrics dashboard -->
+              <TelemetryCorrelationDashboard
+                v-else-if="metricsCorrelationData"
+                mode="embedded-tabs"
+                external-active-tab="metrics"
+                :service-name="metricsCorrelationData.serviceName"
+                :matched-dimensions="metricsCorrelationData.matchedDimensions"
+                :additional-dimensions="
+                  metricsCorrelationData.additionalDimensions
+                "
+                :metric-streams="metricsCorrelationData.metricStreams"
+                :log-streams="metricsCorrelationData.logStreams"
+                :trace-streams="metricsCorrelationData.traceStreams"
+                :source-stream="streamFilter"
+                source-type="traces"
+                :time-range="telemetryTimeRange"
+                :hide-dimension-filters="true"
+                data-test="service-graph-side-panel-metrics-dashboard"
+              />
+
+              <!-- Empty state -->
+              <div
+                v-else-if="metricsCorrelationLoaded"
+                class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                style="color: var(--o2-text-secondary)"
+                data-test="service-graph-side-panel-metrics-empty"
+              >
+                No metrics available for this service.
+              </div>
+            </q-tab-panel>
           </q-tab-panels>
         </template>
       </div>
@@ -852,6 +926,19 @@ export default defineComponent({
       endTime: props.timeRange.endTime,
     }));
 
+    // Metrics Tab State (independent from "Show Telemetry" dialog)
+    const metricsCorrelationLoading = ref(false);
+    const metricsCorrelationError = ref<string | null>(null);
+    const metricsCorrelationData = ref<{
+      serviceName: string;
+      matchedDimensions: Record<string, string>;
+      additionalDimensions: Record<string, string>;
+      logStreams: any[];
+      metricStreams: any[];
+      traceStreams: any[];
+    } | null>(null);
+    const metricsCorrelationLoaded = ref(false);
+
     const fetchCorrelatedStreams = async (force = false) => {
       if (!props.selectedNode) return;
       if (!force && correlationData.value) return;
@@ -911,6 +998,125 @@ export default defineComponent({
       },
     );
 
+    // Extract semantic dimensions from a span for richer metric correlation
+    const extractSpanDimensions = (
+      span: Record<string, any>,
+    ): Record<string, string> => {
+      const dimensions: Record<string, string> = {};
+      if (span.service_name) dimensions["service"] = span.service_name;
+
+      const attributeMappings: Record<string, string> = {
+        k8s_namespace_name: "k8s-namespace",
+        "k8s.namespace.name": "k8s-namespace",
+        k8s_deployment_name: "k8s-deployment",
+        "k8s.deployment.name": "k8s-deployment",
+        k8s_pod_name: "k8s-pod",
+        "k8s.pod.name": "k8s-pod",
+        k8s_container_name: "k8s-container",
+        "k8s.container.name": "k8s-container",
+        k8s_node_name: "k8s-node",
+        "k8s.node.name": "k8s-node",
+        k8s_cluster_name: "k8s-cluster",
+        "k8s.cluster.name": "k8s-cluster",
+        host_name: "host-name",
+        "host.name": "host-name",
+        cloud_region: "cloud-region",
+        "cloud.region": "cloud-region",
+        cloud_availability_zone: "cloud-availability-zone",
+        "cloud.availability_zone": "cloud-availability-zone",
+        container_name: "container-name",
+        "container.name": "container-name",
+      };
+
+      for (const [attr, dim] of Object.entries(attributeMappings)) {
+        let service_attr = "service_" + attr;
+        if (span[service_attr] && !dimensions[dim]) {
+          dimensions[dim] = String(span[service_attr]);
+        }
+      }
+      return dimensions;
+    };
+
+    // Fetch the most recent span for this service to extract rich semantic dimensions
+    const fetchLatestSpan = async (): Promise<Record<string, any> | null> => {
+      const serviceName = buildServiceName();
+      const streamName = props.streamFilter || "default";
+      const org = store.state.selectedOrganization.identifier;
+
+      try {
+        const response = await searchService.search({
+          org_identifier: org,
+          query: {
+            query: {
+              sql: `SELECT * FROM "${streamName}" WHERE service_name = '${escapeSingleQuotes(serviceName)}' ORDER BY _timestamp DESC`,
+              start_time: props.timeRange.startTime,
+              end_time: props.timeRange.endTime,
+              from: 0,
+              size: 1,
+            },
+          },
+          page_type: "traces",
+        });
+        return response.data?.hits?.[0] ?? null;
+      } catch {
+        return null;
+      }
+    };
+
+    // Fetch correlated metric streams for the Metrics tab
+    const fetchMetricsCorrelation = async (force = false) => {
+      if (!props.selectedNode) return;
+      if (!force && metricsCorrelationLoaded.value) return;
+
+      metricsCorrelationLoading.value = true;
+      metricsCorrelationError.value = null;
+      metricsCorrelationData.value = null;
+
+      try {
+        const org = store.state.selectedOrganization.identifier;
+        const serviceName = buildServiceName();
+
+        // Fetch latest span to extract richer semantic dimensions
+        const latestSpan = await fetchLatestSpan();
+        const spanDimensions = latestSpan
+          ? extractSpanDimensions(latestSpan)
+          : { "service-name": serviceName };
+
+        const correlateResponse = await correlateStreams(org, {
+          source_stream: props.streamFilter || "default",
+          source_type: "traces",
+          available_dimensions: spanDimensions,
+        });
+
+        const data = correlateResponse.data;
+        if (!data) {
+          metricsCorrelationData.value = null;
+          return;
+        }
+
+        metricsCorrelationData.value = {
+          serviceName: data.service_name,
+          matchedDimensions: data.matched_dimensions || {},
+          additionalDimensions: data.additional_dimensions || {},
+          logStreams: data.related_streams?.logs || [],
+          metricStreams: data.related_streams?.metrics || [],
+          traceStreams: data.related_streams?.traces || [],
+        };
+      } catch (err: any) {
+        if (err.response?.status === 403) {
+          metricsCorrelationError.value =
+            "Service Discovery is an enterprise feature.";
+        } else {
+          metricsCorrelationError.value =
+            err.message || "Failed to load metrics.";
+        }
+        metricsCorrelationData.value = null;
+      } finally {
+        metricsCorrelationLoading.value = false;
+        metricsCorrelationLoaded.value = true;
+      }
+    };
+
     // Reload RED charts when node, time range, stream, or visibility changes
     watch(
       () =>
@@ -931,7 +1137,9 @@ export default defineComponent({
     );
 
     // Active tab state
-    const activeTab = ref<"operations" | "nodes" | "pods">("operations");
+    const activeTab = ref<"operations" | "nodes" | "pods" | "metrics">(
+      "operations",
+    );
 
     // Recent Operations State
     const operationsViewMode = ref<"aggregated" | "spans">("aggregated");
@@ -1473,7 +1681,7 @@ export default defineComponent({
       })),
     );
 
-    // Lazy-fetch nodes/pods when their tab is activated
+    // Lazy-fetch nodes/pods/metrics when their tab is activated
     watch(
       () => [
         props.visible,
@@ -1491,15 +1699,19 @@ export default defineComponent({
         if (activeTab.value === "nodes" && !recentNodes.value.length)
           fetchNodes();
         if (activeTab.value === "pods" && !recentPods.value.length) fetchPods();
+        if (activeTab.value === "metrics") fetchMetricsCorrelation();
       },
     );
 
-    // Reset nodes/pods data, local filters, and go back to operations tab when node or stream changes
+    // Reset nodes/pods/metrics data, local filters, and go back to operations tab when node or stream changes
     watch(
       () => [props.selectedNode?.id, props.streamFilter],
       () => {
         recentNodes.value = [];
         recentPods.value = [];
+        metricsCorrelationData.value = null;
+        metricsCorrelationError.value = null;
+        metricsCorrelationLoaded.value = false;
         activeTab.value = "operations";
         localRangeFilters.value.clear();
         rangeFiltersVersion.value++;
@@ -1619,6 +1831,12 @@ export default defineComponent({
       recentPods,
       podsTableColumns,
       podsTableRows,
+      // Metrics Tab
+      metricsCorrelationLoading,
+      metricsCorrelationError,
+      metricsCorrelationData,
+      metricsCorrelationLoaded,
+      fetchMetricsCorrelation,
     };
   },
 });
