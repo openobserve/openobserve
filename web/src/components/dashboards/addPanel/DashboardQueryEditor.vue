@@ -615,7 +615,6 @@ export default defineComponent({
 
     // Unified Query Editor: Handle language change
     const handleLanguageChange = (newLanguage: "sql" | "promql") => {
-      console.log("[DashboardQueryEditor] Language changed to:", newLanguage);
       dashboardPanelData.data.queryType = newLanguage;
 
       // Explicitly sync the editor with the correct query after language change
@@ -625,12 +624,6 @@ export default defineComponent({
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].query;
-          console.log(
-            "[DashboardQueryEditor] Syncing editor with query for",
-            newLanguage,
-            ":",
-            currentQuery,
-          );
           queryEditorRef.value.setValue(currentQuery);
         }
       }, 50);
@@ -641,12 +634,6 @@ export default defineComponent({
       naturalLanguage: string,
       language: "sql" | "promql",
     ) => {
-      console.log(
-        "[DashboardQueryEditor] Ask AI for language:",
-        language,
-        "input:",
-        naturalLanguage,
-      );
       // The unified component handles AI generation internally
       // This event is just for parent components that may need to react
     };
@@ -659,7 +646,6 @@ export default defineComponent({
 
     // Unified Query Editor: Handle run query from AI bar execution intent
     const handleRunQuery = () => {
-      console.log("[DashboardQueryEditor] Run query triggered from AI bar");
       if (injectedRunQuery) {
         injectedRunQuery(false);
       } else {
@@ -679,12 +665,10 @@ export default defineComponent({
     };
 
     const handleVrlGenerationStart = () => {
-      console.log("[DashboardQueryEditor] VRL AI generation started");
       // Can add loading indicators here if needed
     };
 
     const handleVrlGenerationEnd = () => {
-      console.log("[DashboardQueryEditor] VRL AI generation ended");
       // Can remove loading indicators here if needed
     };
 
@@ -692,10 +676,6 @@ export default defineComponent({
       type: string;
       message: string;
     }) => {
-      console.log(
-        "[DashboardQueryEditor] VRL AI generation success:",
-        payload.type,
-      );
       // VRL function code is already updated via @update:query handler
     };
 
