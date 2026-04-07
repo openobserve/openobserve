@@ -1692,4 +1692,22 @@ export default defineComponent({
 .grid-stack-item-content {
   box-sizing: border-box;
 }
+
+@media print {
+  /* Prevent panel content from expanding beyond its allocated grid cell.
+   * Without this, tables with many rows (position:static in print mode)
+   * can grow taller than the cell, pushing the grid container's height up
+   * while other absolutely-positioned panels stay at their original pixel
+   * offsets — causing visible overlap across printed pages. */
+  .grid-stack-item-content {
+    overflow: hidden !important;
+  }
+
+  /* Quasar virtual-scroll inserts padding divs above/below the rendered
+   * rows to simulate the full scroll height. In print mode these become
+   * empty white space. Hide them so no blank gaps appear in table panels. */
+  :deep(.q-virtual-scroll__padding) {
+    display: none !important;
+  }
+}
 </style>
