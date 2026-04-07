@@ -124,18 +124,21 @@ export function parseUsageDetails(value: any): UsageDetails {
     const data = typeof value === 'string' ? JSON.parse(value) : value || {};
 
     // Try new OTEL-compliant names first (flattened), then legacy llm_* names
-    const input = data.gen_ai_usage_input_tokens
-      || data.input
-      || data.llm_usage_details_input
-      || 0;
-    const output = data.gen_ai_usage_output_tokens
-      || data.output
-      || data.llm_usage_details_output
-      || 0;
-    const total = data.gen_ai_usage_total_tokens
-      || data.total
-      || data.llm_usage_details_total
-      || input + output;
+    const input =
+      Number(data.gen_ai_usage_input_tokens) ||
+      Number(data.input) ||
+      Number(data.llm_usage_details_input) ||
+      0;
+    const output =
+      Number(data.gen_ai_usage_output_tokens) ||
+      Number(data.output) ||
+      Number(data.llm_usage_details_output) ||
+      0;
+    const total =
+      Number(data.gen_ai_usage_total_tokens) ||
+      Number(data.total) ||
+      Number(data.llm_usage_details_total) ||
+      input + output;
 
     return {
       input,
